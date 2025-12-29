@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -65,20 +64,25 @@ export default function WhatsAppInboxPage() {
   const [showNewChat, setShowNewChat] = useState(false)
   const [newPhoneNumber, setNewPhoneNumber] = useState('')
 
-  // Translation state
+  // Translation state - Outgoing
   const [translationEnabled, setTranslationEnabled] = useState(false)
   const [translatedMessage, setTranslatedMessage] = useState('')
   const [isTranslating, setIsTranslating] = useState(false)
   const [customerLanguage, setCustomerLanguage] = useState('es')
   const [showLanguageSelector, setShowLanguageSelector] = useState(false)
 
+  // Translation state - Incoming
+  const [incomingTranslations, setIncomingTranslations] = useState<Record<string, string>>({})
+  const [translatingMessageIds, setTranslatingMessageIds] = useState<Set<string>>(new Set())
+  const [showOriginalMap, setShowOriginalMap] = useState<Record<string, boolean>>({})
+
   // Get language info
   const getLanguageInfo = (code: string) => {
     return QUICK_LANGUAGES.find(l => l.code === code) || { code, name: code, flag: '🌐' }
   }
 
-  // Simple translation function - calls API and returns result or null
-  const translateText = async (text: string, targetLang: string): Promise<string | null> => {
+  // Translate outgoing message (English → customer language)
+  const translateOutgoing = async (text: string, targetLang: string): Promise<string | null> => {
     try {
       const res = await fetch('/api/translate', {
         method: 'POST',
@@ -89,7 +93,6 @@ export default function WhatsAppInboxPage() {
           action: 'fromEnglish'
         })
       })
-
       const data = await res.json()
       
       if (data.success && data.data?.translatedText) {
@@ -97,31 +100,91 @@ export default function WhatsAppInboxPage() {
       }
       return null
     } catch (error) {
-      console.error('Translation error:', error)
+      console.error('Outgoing translation error:', error)
       return null
     }
   }
 
-  // Handle translation when message or language changes
+  // Translate incoming message (any language → English)
+  const translateIncoming = async (text: string): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          action: 'toEnglish'
+        })
+      })
+      const data = await res.json()
+      
+      if (data.success && data.data?.translatedText) {
+        return data.data.translatedText
+      }
+      return null
+    } catch (error) {
+      console.error('Incoming translation error:', error)
+      return null
+    }
+  }
+
+  // Translate a specific incoming message
+  const handleTranslateMessage = async (messageId: string, messageBody: string) => {
+    // Skip if already translated or currently translating
+    if (incomingTranslations[messageId] || translatingMessageIds.has(messageId)) {
+      return
+    }
+
+    setTranslatingMessageIds(prev => new Set(prev).add(messageId))
+    
+    const translation = await translateIncoming(messageBody)
+    
+    if (translation) {
+      setIncomingTranslations(prev => ({
+        ...prev,
+        [messageId]: translation
+      }))
+    }
+    
+    setTranslatingMessageIds(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(messageId)
+      return newSet
+    })
+  }
+
+  // Auto-translate all incoming messages when translation is enabled
   useEffect(() => {
-    // Skip if translation disabled or no message
+    if (translationEnabled && messages.length > 0) {
+      messages.forEach(msg => {
+        if (msg.direction === 'inbound' && !incomingTranslations[msg.id]) {
+          handleTranslateMessage(msg.id, msg.message_body)
+        }
+      })
+    }
+  }, [translationEnabled, messages])
+
+  // Toggle show original for a message
+  const toggleShowOriginal = (msgId: string) => {
+    setShowOriginalMap(prev => ({ ...prev, [msgId]: !prev[msgId] }))
+  }
+
+  // Handle outgoing translation (debounced)
+  useEffect(() => {
     if (!translationEnabled || !newMessage.trim()) {
       setTranslatedMessage('')
       setIsTranslating(false)
       return
     }
 
-    // Debounce translation
     setIsTranslating(true)
     const timer = setTimeout(async () => {
-      const result = await translateText(newMessage.trim(), customerLanguage)
+      const result = await translateOutgoing(newMessage.trim(), customerLanguage)
       setTranslatedMessage(result || '')
       setIsTranslating(false)
     }, 500)
 
-    return () => {
-      clearTimeout(timer)
-    }
+    return () => clearTimeout(timer)
   }, [newMessage, customerLanguage, translationEnabled])
 
   // Fetch conversations
@@ -187,7 +250,7 @@ export default function WhatsAppInboxPage() {
         messageToSend = translatedMessage
       } else if (translationEnabled && !translatedMessage) {
         // Try quick translation if none available
-        const quickResult = await translateText(newMessage.trim(), customerLanguage)
+        const quickResult = await translateOutgoing(newMessage.trim(), customerLanguage)
         if (quickResult) {
           messageToSend = quickResult
         }
@@ -268,6 +331,9 @@ export default function WhatsAppInboxPage() {
     }
     setNewMessage('')
     setTranslatedMessage('')
+    // Reset incoming translations for new conversation
+    setIncomingTranslations({})
+    setShowOriginalMap({})
   }
 
   // Auto-scroll
@@ -295,7 +361,7 @@ export default function WhatsAppInboxPage() {
       if (selectedConversation) {
         fetchMessages(selectedConversation.id, false)
       }
-    }, 15000) // 15 seconds
+    }, 15000)
 
     return () => clearInterval(interval)
   }, [selectedConversation?.id])
@@ -471,28 +537,75 @@ export default function WhatsAppInboxPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-                    >
+                  {messages.map((msg) => {
+                    const isInbound = msg.direction === 'inbound'
+                    const hasTranslation = isInbound && incomingTranslations[msg.id]
+                    const isTranslatingThis = translatingMessageIds.has(msg.id)
+                    const showOriginal = showOriginalMap[msg.id]
+                    
+                    return (
                       <div
-                        className={`max-w-[70%] rounded-lg px-3 py-2 shadow-sm ${
-                          msg.direction === 'outbound'
-                            ? 'bg-[#dcf8c6] rounded-tr-none'
-                            : 'bg-white rounded-tl-none'
-                        }`}
+                        key={msg.id}
+                        className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
                       >
-                        <p className="text-sm text-gray-900 whitespace-pre-wrap">{msg.message_body}</p>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <span className="text-xs text-gray-500">
-                            {new Date(msg.sent_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          {msg.direction === 'outbound' && getStatusIcon(msg.status)}
+                        <div
+                          className={`max-w-[70%] rounded-lg px-3 py-2 shadow-sm ${
+                            msg.direction === 'outbound'
+                              ? 'bg-[#dcf8c6] rounded-tr-none'
+                              : 'bg-white rounded-tl-none'
+                          }`}
+                        >
+                          {/* Translation controls for inbound messages */}
+                          {isInbound && translationEnabled && (
+                            <div className="flex items-center gap-2 mb-1 pb-1 border-b border-gray-200">
+                              {isTranslatingThis ? (
+                                <span className="flex items-center gap-1 text-xs text-blue-500">
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  Translating...
+                                </span>
+                              ) : hasTranslation ? (
+                                <button
+                                  onClick={() => toggleShowOriginal(msg.id)}
+                                  className="text-xs text-blue-600 hover:text-blue-700"
+                                >
+                                  {showOriginal ? '🇬🇧 Show English' : '🌐 Show Original'}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleTranslateMessage(msg.id, msg.message_body)}
+                                  className="text-xs text-blue-600 hover:text-blue-700"
+                                >
+                                  🌐 Translate
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Message content */}
+                          <p className="text-sm text-gray-900 whitespace-pre-wrap">
+                            {isInbound && hasTranslation && !showOriginal 
+                              ? incomingTranslations[msg.id] 
+                              : msg.message_body
+                            }
+                          </p>
+                          
+                          {/* Show original in small text if showing translation */}
+                          {isInbound && hasTranslation && !showOriginal && (
+                            <p className="text-xs text-gray-400 mt-1 italic">
+                              Original: {msg.message_body}
+                            </p>
+                          )}
+                          
+                          <div className="flex items-center justify-end gap-1 mt-1">
+                            <span className="text-xs text-gray-500">
+                              {new Date(msg.sent_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {msg.direction === 'outbound' && getStatusIcon(msg.status)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
               )}

@@ -27,32 +27,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!targetLanguage && action === 'fromEnglish') {
-      return NextResponse.json(
-        { success: false, error: 'Target language is required' },
-        { status: 400 }
-      )
+    let prompt: string
+    let systemPrompt: string
+
+    if (action === 'toEnglish') {
+      // Translate incoming message TO English
+      systemPrompt = 'You are a professional translator. Detect the language of the input and translate it to English. Respond only with the translation, nothing else.'
+      prompt = `Translate the following text to English. Only respond with the translation, no explanations:\n\n${text}`
+    } else if (action === 'fromEnglish') {
+      // Translate outgoing message FROM English
+      if (!targetLanguage) {
+        return NextResponse.json(
+          { success: false, error: 'Target language is required' },
+          { status: 400 }
+        )
+      }
+      systemPrompt = 'You are a professional translator. Respond only with the translation, nothing else.'
+      prompt = `Translate the following English text to ${targetLanguage}. Only respond with the translation, no explanations:\n\n${text}`
+    } else {
+      // Default: auto-detect and translate to target
+      if (!targetLanguage) {
+        return NextResponse.json(
+          { success: false, error: 'Target language is required' },
+          { status: 400 }
+        )
+      }
+      systemPrompt = 'You are a professional translator. Respond only with the translation, nothing else.'
+      prompt = `Translate the following text to ${targetLanguage}. Only respond with the translation, no explanations:\n\n${text}`
     }
-
-    // Build the prompt
-    const targetLang = targetLanguage || 'Spanish'
-    const prompt = `Translate the following English text to ${targetLang}. 
-Only respond with the translation, nothing else. No quotes, no explanations.
-Keep the tone friendly and professional, suitable for travel customer service.
-
-Text: ${text}`
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        {
-          role: 'system',
-          content: 'You are a professional translator. Respond only with the translation.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
       ],
       temperature: 0.3,
       max_tokens: 1000
@@ -72,14 +80,14 @@ Text: ${text}`
       data: {
         translatedText,
         originalText: text,
-        targetLanguage: targetLang
+        action,
+        targetLanguage: action === 'toEnglish' ? 'en' : targetLanguage
       }
     })
 
   } catch (error: any) {
     console.error('Translation API error:', error)
     
-    // Check for specific OpenAI errors
     if (error?.status === 401 || error?.code === 'invalid_api_key') {
       return NextResponse.json(
         { success: false, error: 'Invalid API key' },
@@ -105,6 +113,7 @@ export async function GET() {
   return NextResponse.json({
     success: true,
     message: 'Translation API is running',
-    configured: !!process.env.OPENAI_API_KEY
+    configured: !!process.env.OPENAI_API_KEY,
+    supportedActions: ['toEnglish', 'fromEnglish', 'translate']
   })
 }
