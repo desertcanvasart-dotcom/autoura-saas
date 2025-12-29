@@ -176,13 +176,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Respond to Twilio with 200 OK
-    return new NextResponse('OK', { status: 200 })
+    return new NextResponse(
+      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+      { status: 200, headers: { 'Content-Type': 'text/xml' } }
+    )
 
   } catch (error: any) {
     console.error('❌ Error processing WhatsApp webhook:', error)
     // Still return 200 to Twilio to avoid retries
-    return new NextResponse('OK', { status: 200 })
-  }
+    return new NextResponse(
+      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+      { status: 200, headers: { 'Content-Type': 'text/xml' } }
+    )  }
 }
 
 // ============================================
