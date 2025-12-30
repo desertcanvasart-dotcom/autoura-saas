@@ -16,7 +16,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create server-side Supabase client
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -37,18 +36,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Map resource type to table name
-    const tableMap: Record<string, string> = {
-      'restaurant': 'suppliers',
-      'airport_staff': 'suppliers',
-      'hotel_staff': 'suppliers'
-    }
-
-    const tableName = tableMap[resourceType] || 'suppliers'
-
     // Get resource details from suppliers table
     const { data: resource, error: resourceError } = await supabase
-      .from(tableName)
+      .from('suppliers')
       .select('*')
       .eq('id', resourceId)
       .single()
@@ -61,11 +51,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('📱 Resource found:', { name: resource.name, phone: resource.phone })
+    // Use contact_phone or whatsapp field
+    const resourcePhone = resource.contact_phone || resource.whatsapp || resource.phone2
+    
+    console.log('📱 Resource:', { name: resource.name, contact_phone: resource.contact_phone, whatsapp: resource.whatsapp })
 
-    if (!resource.phone) {
+    if (!resourcePhone) {
       return NextResponse.json(
-        { success: false, error: `No phone number found for ${resource.name || resourceName}` },
+        { success: false, error: `No phone number found for ${resource.name || resourceName}. Please add contact_phone to the supplier.` },
         { status: 400 }
       )
     }
@@ -141,11 +134,10 @@ export async function POST(request: NextRequest) {
         `${businessName} Operations`
     }
 
-    console.log('📤 Sending to:', resource.phone)
+    console.log('📤 Sending to:', resourcePhone)
 
-    // Send via WhatsApp
     const result = await sendWhatsAppMessage({
-      to: resource.phone,
+      to: resourcePhone,
       body: message
     })
 

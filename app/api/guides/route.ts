@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     
     // Apply filters
     if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`)
+      query = query.or(`name.ilike.%${search}%,contact_email.ilike.%${search}%`)
     }
     
     if (is_active === 'true') {
@@ -54,12 +54,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Map supplier fields to guide format
+    // Map supplier fields to guide format - use contact_phone for phone
     let guides = (suppliers || []).map(g => ({
       id: g.id,
       name: g.name,
-      phone: g.phone,
-      email: g.email,
+      phone: g.contact_phone || g.whatsapp || g.phone2,
+      email: g.contact_email,
       city: g.city,
       languages: g.languages || [],
       specialties: g.specialties || [],
@@ -67,6 +67,8 @@ export async function GET(request: NextRequest) {
       daily_rate: g.daily_rate,
       hourly_rate: g.hourly_rate,
       notes: g.notes,
+      contact_phone: g.contact_phone,
+      whatsapp: g.whatsapp,
       ...g
     }))
 
@@ -150,8 +152,9 @@ export async function POST(request: NextRequest) {
     const guideData = {
       type: 'guide',
       name: body.name,
-      email: body.email || null,
-      phone: body.phone || null,
+      contact_email: body.email || null,
+      contact_phone: body.phone || body.contact_phone || null,
+      whatsapp: body.whatsapp || null,
       city: body.city || null,
       languages: body.languages || [],
       specialties: body.specialties || [],

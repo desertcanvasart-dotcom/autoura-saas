@@ -16,7 +16,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create server-side Supabase client
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get guide details from SUPPLIERS table (not guides table)
+    // Get guide details from SUPPLIERS table
     const { data: guide, error: guideError } = await supabase
       .from('suppliers')
       .select('*')
@@ -52,11 +51,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('📱 Guide found:', { name: guide.name, phone: guide.phone })
+    // Use contact_phone or whatsapp field
+    const guidePhone = guide.contact_phone || guide.whatsapp || guide.phone2
+    
+    console.log('📱 Guide:', { name: guide.name, contact_phone: guide.contact_phone, whatsapp: guide.whatsapp })
 
-    if (!guide.phone) {
+    if (!guidePhone) {
       return NextResponse.json(
-        { success: false, error: 'Guide phone number not found' },
+        { success: false, error: 'Guide phone number not found. Please add contact_phone to the supplier.' },
         { status: 400 }
       )
     }
@@ -82,11 +84,10 @@ export async function POST(request: NextRequest) {
       `Good luck! 🌟\n\n` +
       `${businessName} Operations Team`
 
-    console.log('📤 Sending to:', guide.phone)
+    console.log('📤 Sending to:', guidePhone)
 
-    // Send via WhatsApp
     const result = await sendWhatsAppMessage({
-      to: guide.phone,
+      to: guidePhone,
       body: message
     })
 
