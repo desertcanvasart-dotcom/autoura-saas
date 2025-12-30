@@ -1,26 +1,17 @@
 // ============================================
 // API: SEND QUOTE VIA WHATSAPP
 // ============================================
-// POST /api/whatsapp/send-quote
-// Sends a quote to a client via WhatsApp with PDF attachment
-// ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sendQuoteViaWhatsApp } from '@/lib/twilio-whatsapp'
+import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
 import { createClient } from '@/app/supabase'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    const {
-      itineraryId,
-      clientName,
-      clientPhone,
-      clientEmail
-    } = body
+    const { itineraryId, clientName, clientPhone } = body
 
-    // Validate required fields
     if (!itineraryId) {
       return NextResponse.json(
         { success: false, error: 'Itinerary ID is required' },
@@ -35,7 +26,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get itinerary details from database
     const supabase = createClient()
     const { data: itinerary, error: dbError } = await supabase
       .from('itineraries')
@@ -51,32 +41,53 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate PDF URL (assuming you have a PDF generation endpoint)
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const pdfUrl = `${appUrl}/api/pdf/quote/${itineraryId}`
+    const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
+    const businessEmail = process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'
+    const businessWebsite = process.env.BUSINESS_WEBSITE || 'travel2egypt.org'
 
-    // Prepare quote data
-    const quoteData = {
-      clientName: clientName || itinerary.client_name,
-      clientPhone: clientPhone,
-      itineraryId: itinerary.id,
-      tourName: itinerary.tour_name || 'Egypt Tour',
-      startDate: itinerary.start_date,
-      endDate: itinerary.end_date,
-      adults: itinerary.adults || 1,
-      children: itinerary.children || 0,
-      totalCost: itinerary.total_cost || 0,
-      pdfUrl: pdfUrl
-    }
+    // Format dates
+    const startDate = new Date(itinerary.start_date).toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    })
+    const endDate = new Date(itinerary.end_date).toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    })
+
+    // Build message
+    const message = `🌟 *${businessName}* 🌟\n\n` +
+      `Dear ${clientName || itinerary.client_name},\n\n` +
+      `Thank you for your interest in exploring Egypt with us! 🇪🇬\n\n` +
+      `📋 *Your Tour Quote*\n` +
+      `━━━━━━━━━━━━━━━━━━━━\n` +
+      `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
+      `📅 *Dates:* ${startDate} - ${endDate}\n` +
+      `👥 *Travelers:* ${itinerary.num_adults || 1} adult${(itinerary.num_adults || 1) > 1 ? 's' : ''}` +
+      `${itinerary.num_children > 0 ? `, ${itinerary.num_children} child${itinerary.num_children > 1 ? 'ren' : ''}` : ''}\n` +
+      `💰 *Total Cost:* ${itinerary.currency || 'EUR'} ${(itinerary.total_cost || 0).toFixed(2)}\n\n` +
+      `✨ *What's Included:*\n` +
+      `✅ Professional tour guide\n` +
+      `✅ All entrance fees\n` +
+      `✅ Private transportation\n` +
+      `✅ Meals as specified\n` +
+      `✅ Hotel pickups\n\n` +
+      `💳 *Ready to Book?*\n` +
+      `Reply to this message or contact us:\n` +
+      `📧 ${businessEmail}\n` +
+      `🌐 ${businessWebsite}\n\n` +
+      `We look forward to creating unforgettable memories with you! 🐪✨\n\n` +
+      `Best regards,\n${businessName} Team`
 
     console.log('📤 Sending quote via WhatsApp:', {
       to: clientPhone,
       itineraryId,
-      tourName: quoteData.tourName
+      tourName: itinerary.trip_name
     })
 
-    // Send quote via WhatsApp
-    const result = await sendQuoteViaWhatsApp(quoteData)
+    // Send message (text only - no PDF attachment)
+    const result = await sendWhatsAppMessage({
+      to: clientPhone,
+      body: message
+    })
 
     if (!result.success) {
       return NextResponse.json(
@@ -89,8 +100,7 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('itineraries')
       .update({
-        quote_sent: true,
-        quote_sent_at: new Date().toISOString(),
+        status: 'sent',
         updated_at: new Date().toISOString()
       })
       .eq('id', itineraryId)
@@ -111,25 +121,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
-// ============================================
-// USAGE EXAMPLE
-// ============================================
-// 
-// Frontend call:
-// 
-// const response = await fetch('/api/whatsapp/send-quote', {
-//   method: 'POST',
-//   headers: { 'Content-Type': 'application/json' },
-//   body: JSON.stringify({
-//     itineraryId: '123e4567-e89b-12d3-a456-426614174000',
-//     clientPhone: '+201234567890',
-//     clientName: 'Ahmed Mohamed' // Optional, will use DB value if not provided
-//   })
-// })
-// 
-// const data = await response.json()
-// if (data.success) {
-//   console.log('Quote sent!', data.messageId)
-// }
-// ============================================
