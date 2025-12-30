@@ -1,138 +1,128 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
-import { createClient } from '@/app/supabase'
-import { generateContractPDF } from '@/lib/contract-pdf-generator'
+// ============================================
+// CONTRACT PDF GENERATOR (Server-side)
+// ============================================
 
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { itineraryId } = body
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
-    if (!itineraryId) {
-      return NextResponse.json(
-        { success: false, error: 'Itinerary ID is required' },
-        { status: 400 }
-      )
-    }
+interface ContractData {
+  contractNumber: string
+  contractDate: string
+  clientName: string
+  clientEmail?: string
+  numTravelers: number
+  tourName: string
+  startDate: string
+  endDate: string
+  destinations: string
+  totalCost: number
+  currency: string
+}
 
-    const supabase = createClient()
+export async function generateContractPDF(data: ContractData): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create()
+  const page = pdfDoc.addPage([595, 842]) // A4 size
+  
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  
+  const { height } = page.getSize()
+  let y = height - 50
 
-    // Get itinerary details
-    const { data: itinerary, error: dbError } = await supabase
-      .from('itineraries')
-      .select('*')
-      .eq('id', itineraryId)
-      .single()
+  // Title
+  page.drawText('TRAVEL CONTRACT', {
+    x: 200, y, size: 20, font: helveticaBold, color: rgb(0.39, 0.49, 0.28)
+  })
+  y -= 30
 
-    if (dbError || !itinerary) {
-      return NextResponse.json(
-        { success: false, error: 'Itinerary not found' },
-        { status: 404 }
-      )
-    }
+  // Contract number
+  page.drawText(`Contract: ${data.contractNumber}`, {
+    x: 50, y, size: 11, font: helvetica, color: rgb(0.3, 0.3, 0.3)
+  })
+  y -= 15
+  page.drawText(`Date: ${new Date(data.contractDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, {
+    x: 50, y, size: 11, font: helvetica, color: rgb(0.3, 0.3, 0.3)
+  })
+  y -= 30
 
-    if (!itinerary.client_phone) {
-      return NextResponse.json(
-        { success: false, error: 'Client phone number not found' },
-        { status: 400 }
-      )
-    }
-
-    // Generate contract PDF
-    console.log('📄 Generating contract PDF...')
-    const contractData = {
-      contractNumber: `TC-2025-${itineraryId.slice(0, 8).toUpperCase()}`,
-      contractDate: new Date().toISOString(),
-      clientName: itinerary.client_name || 'Valued Guest',
-      clientEmail: itinerary.client_email,
-      numTravelers: (itinerary.num_adults || 1) + (itinerary.num_children || 0),
-      tourName: itinerary.trip_name || 'Egypt Tour',
-      startDate: itinerary.start_date,
-      endDate: itinerary.end_date,
-      destinations: 'Cairo, Luxor, Aswan',
-      totalCost: itinerary.total_cost || 0,
-      currency: itinerary.currency || 'EUR'
-    }
-
-    const pdfBytes = await generateContractPDF(contractData)
-    
-    // Upload to Supabase Storage
-    console.log('📤 Uploading PDF to storage...')
-    const fileName = `contracts/contract-${itineraryId}-${Date.now()}.pdf`
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(fileName, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true
-      })
-
-    if (uploadError) {
-      console.error('❌ Upload error:', uploadError)
-      throw new Error(`Failed to upload PDF: ${uploadError.message}`)
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('documents')
-      .getPublicUrl(fileName)
-
-    const pdfUrl = urlData.publicUrl
-    console.log('✅ PDF uploaded:', pdfUrl)
-
-    // Build message
-    const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    
-    const message = `📄 *${businessName}* 📄\n\n` +
-      `Dear ${itinerary.client_name || 'Valued Guest'},\n\n` +
-      `Your tour contract is ready! 🎉\n\n` +
-      `📋 *Contract Details:*\n` +
-      `━━━━━━━━━━━━━━━━━━━━\n` +
-      `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
-      `📅 *Dates:* ${new Date(itinerary.start_date).toLocaleDateString()} - ${new Date(itinerary.end_date).toLocaleDateString()}\n` +
-      `👥 *Travelers:* ${itinerary.num_adults} adult${itinerary.num_adults > 1 ? 's' : ''}` +
-      `${itinerary.num_children > 0 ? `, ${itinerary.num_children} child${itinerary.num_children > 1 ? 'ren' : ''}` : ''}\n` +
-      `💰 *Total:* ${itinerary.currency} ${itinerary.total_cost.toFixed(2)}\n\n` +
-      `📄 Please review the attached contract carefully.\n\n` +
-      `✍️ *Next Steps:*\n` +
-      `1. Review all terms and conditions\n` +
-      `2. Sign the contract\n` +
-      `3. Return signed copy to us\n` +
-      `4. Complete payment\n\n` +
-      `If you have any questions, please don't hesitate to reach out!\n\n` +
-      `📧 ${process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'}\n` +
-      `🌐 ${process.env.BUSINESS_WEBSITE || 'travel2egypt.org'}\n\n` +
-      `Looking forward to your adventure! 🐪✨\n\n` +
-      `Best regards,\n${businessName} Team`
-
-    // Send via WhatsApp WITH PDF attachment
-    const result = await sendWhatsAppMessage({
-      to: itinerary.client_phone,
-      body: message,
-      mediaUrl: pdfUrl  // ✅ Now includes the PDF!
-    })
-
-    if (!result.success) {
-      return NextResponse.json(
-        { success: false, error: result.error },
-        { status: 500 }
-      )
-    }
-
-    console.log('✅ Contract sent with PDF:', result.messageId)
-
-    return NextResponse.json({
-      success: true,
-      messageId: result.messageId,
-      pdfUrl: pdfUrl,
-      message: 'Contract sent successfully via WhatsApp with PDF attachment'
-    })
-
-  } catch (error: any) {
-    console.error('❌ Error sending contract:', error)
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    )
+  // Parties
+  page.drawText('PARTIES', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
+  y -= 20
+  page.drawText('Service Provider: Travel2Egypt', { x: 50, y, size: 11, font: helvetica })
+  y -= 15
+  page.drawText('Website: https://travel2egypt.org', { x: 50, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
+  y -= 25
+  page.drawText(`Client: ${data.clientName}`, { x: 50, y, size: 11, font: helvetica })
+  y -= 15
+  if (data.clientEmail) {
+    page.drawText(`Email: ${data.clientEmail}`, { x: 50, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
+    y -= 15
   }
+  page.drawText(`Travelers: ${data.numTravelers} person${data.numTravelers > 1 ? 's' : ''}`, { x: 50, y, size: 11, font: helvetica })
+  y -= 35
+
+  // Tour Details
+  page.drawText('TOUR DETAILS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
+  y -= 20
+  page.drawText(`Tour: ${data.tourName}`, { x: 50, y, size: 11, font: helvetica })
+  y -= 15
+  page.drawText(`Dates: ${new Date(data.startDate).toLocaleDateString('en-GB')} - ${new Date(data.endDate).toLocaleDateString('en-GB')}`, { x: 50, y, size: 11, font: helvetica })
+  y -= 15
+  page.drawText(`Destinations: ${data.destinations}`, { x: 50, y, size: 11, font: helvetica })
+  y -= 35
+
+  // Financial
+  page.drawText('FINANCIAL TERMS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
+  y -= 20
+  page.drawText(`Total Price: ${data.currency} ${data.totalCost.toLocaleString()}`, { 
+    x: 50, y, size: 13, font: helveticaBold, color: rgb(0.39, 0.49, 0.28) 
+  })
+  y -= 20
+  page.drawText('Payment: 10% deposit to confirm. Balance due upon arrival.', { x: 50, y, size: 10, font: helvetica })
+  y -= 35
+
+  // Inclusions
+  page.drawText('INCLUSIONS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
+  y -= 18
+  const inclusions = [
+    '• Private transportation throughout',
+    '• Licensed Egyptologist guide',
+    '• Entrance fees to all sites',
+    '• Accommodation as specified',
+    '• Meals as mentioned',
+    '• All taxes and service charges'
+  ]
+  for (const item of inclusions) {
+    page.drawText(item, { x: 55, y, size: 10, font: helvetica })
+    y -= 14
+  }
+  y -= 20
+
+  // Exclusions
+  page.drawText('EXCLUSIONS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
+  y -= 18
+  const exclusions = [
+    '• International flights',
+    '• Travel insurance',
+    '• Personal expenses',
+    '• Guide gratuities (optional)'
+  ]
+  for (const item of exclusions) {
+    page.drawText(item, { x: 55, y, size: 10, font: helvetica })
+    y -= 14
+  }
+  y -= 30
+
+  // Signatures
+  page.drawText('SIGNATURES', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
+  y -= 25
+  page.drawText('Service Provider: _________________________  Date: __________', { x: 50, y, size: 10, font: helvetica })
+  y -= 25
+  page.drawText('Client: _________________________  Date: __________', { x: 50, y, size: 10, font: helvetica })
+
+  // Footer
+  page.drawText('Travel2Egypt | www.travel2egypt.org | info@travel2egypt.org', {
+    x: 150, y: 30, size: 9, font: helvetica, color: rgb(0.5, 0.5, 0.5)
+  })
+
+  return await pdfDoc.save()
 }
