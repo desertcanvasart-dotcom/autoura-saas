@@ -1,27 +1,73 @@
-// ============================================
-// API: SEND STATUS UPDATE VIA WHATSAPP
-// ============================================
-// POST /api/whatsapp/send-status
-// Sends booking status updates to clients
-// ============================================
-
 import { NextRequest, NextResponse } from 'next/server'
-import { sendStatusUpdate } from '@/lib/twilio-whatsapp'
-import { createClient } from '@/app/supabase'
+import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { createClient } from '@supabase/supabase-js'
 
 type BookingStatus = 'confirmed' | 'cancelled' | 'pending_payment' | 'paid' | 'completed'
+
+function getStatusMessage(
+  clientName: string,
+  tourName: string,
+  status: BookingStatus,
+  notes?: string
+): string {
+  const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
+  const emoji = {
+    confirmed: '✅',
+    cancelled: '❌',
+    pending_payment: '💳',
+    paid: '✅',
+    completed: '🎉'
+  }[status]
+
+  let message = `${emoji} *${businessName}* ${emoji}\n\n`
+  message += `Dear ${clientName},\n\n`
+
+  switch (status) {
+    case 'confirmed':
+      message += `Great news! Your booking for *${tourName}* has been confirmed! 🎉\n\n`
+      message += `We're excited to show you the wonders of Egypt! Your guide will contact you 24 hours before your tour with pickup details.\n\n`
+      message += `If you have any questions, feel free to reach out anytime.`
+      break
+
+    case 'cancelled':
+      message += `Your booking for *${tourName}* has been cancelled as requested.\n\n`
+      if (notes) {
+        message += `Note: ${notes}\n\n`
+      }
+      message += `If you'd like to reschedule or book another tour, we're here to help!`
+      break
+
+    case 'pending_payment':
+      message += `Your booking for *${tourName}* is confirmed! We're just waiting for your payment to finalize everything.\n\n`
+      message += `💳 Payment details have been sent to your email.\n\n`
+      message += `Once payment is received, you're all set! 🎯`
+      break
+
+    case 'paid':
+      message += `Thank you! We've received your payment for *${tourName}*. ✅\n\n`
+      message += `Everything is confirmed and ready to go! Your guide will contact you 24 hours before your tour.\n\n`
+      message += `Get ready for an amazing adventure! 🐪✨`
+      break
+
+    case 'completed':
+      message += `Thank you for choosing ${businessName} for your *${tourName}*! 🎉\n\n`
+      message += `We hope you had an incredible experience exploring Egypt! 🇪🇬\n\n`
+      message += `We'd love to hear your feedback. If you enjoyed your tour, please consider leaving us a review!\n\n`
+      message += `We hope to see you again soon! 🌟`
+      break
+  }
+
+  message += `\n\nBest regards,\n${businessName} Team`
+  return message
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    
-    const {
-      itineraryId,
-      status,
-      notes
-    } = body
+    const { itineraryId, status, notes } = body
 
-    // Validate required fields
+    console.log('📤 Status update request:', { itineraryId, status })
+
     if (!itineraryId) {
       return NextResponse.json(
         { success: false, error: 'Itinerary ID is required' },
@@ -36,7 +82,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate status value
     const validStatuses: BookingStatus[] = ['confirmed', 'cancelled', 'pending_payment', 'paid', 'completed']
     if (!validStatuses.includes(status as BookingStatus)) {
       return NextResponse.json(
@@ -45,8 +90,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get itinerary details from database
-    const supabase = createClient()
+    // Create server-side Supabase client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    // Get itinerary
     const { data: itinerary, error: dbError } = await supabase
       .from('itineraries')
       .select('*')
@@ -61,7 +111,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if client phone is available
     if (!itinerary.client_phone) {
       return NextResponse.json(
         { success: false, error: 'Client phone number not found in itinerary' },
@@ -69,24 +118,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Prepare status update data
-    const updateData = {
-      clientName: itinerary.client_name || 'Valued Client',
-      clientPhone: itinerary.client_phone,
-      itineraryId: itinerary.id,
-      tourName: itinerary.tour_name || 'Egypt Tour',
-      status: status as BookingStatus,
-      notes: notes
-    }
+    // Build message
+    const message = getStatusMessage(
+      itinerary.client_name || 'Valued Client',
+      itinerary.trip_name || itinerary.tour_name || 'Egypt Tour',
+      status as BookingStatus,
+      notes
+    )
 
-    console.log('📤 Sending status update via WhatsApp:', {
+    console.log('📤 Sending to:', itinerary.client_phone)
+
+    // Send via WhatsApp
+    const result = await sendWhatsAppMessage({
       to: itinerary.client_phone,
-      itineraryId,
-      status
+      body: message
     })
-
-    // Send status update via WhatsApp
-    const result = await sendStatusUpdate(updateData)
 
     if (!result.success) {
       return NextResponse.json(
@@ -95,7 +141,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update itinerary status in database
+    // Update itinerary status
     await supabase
       .from('itineraries')
       .update({
@@ -104,20 +150,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', itineraryId)
 
-    // Log the status change
-    await supabase
-      .from('activity_logs')
-      .insert({
-        itinerary_id: itineraryId,
-        action: 'status_update',
-        description: `Status changed to: ${status}${notes ? `. Note: ${notes}` : ''}`,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single()
-      .catch(err => console.error('Failed to log activity:', err))
-
-    console.log('✅ Status update sent successfully via WhatsApp:', result.messageId)
+    console.log('✅ Status update sent:', result.messageId)
 
     return NextResponse.json({
       success: true,
@@ -126,41 +159,10 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('❌ Error sending status update:', error)
+    console.error('❌ Error:', error)
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
     )
   }
 }
-
-// ============================================
-// USAGE EXAMPLE
-// ============================================
-// 
-// Frontend call:
-// 
-// const response = await fetch('/api/whatsapp/send-status', {
-//   method: 'POST',
-//   headers: { 'Content-Type': 'application/json' },
-//   body: JSON.stringify({
-//     itineraryId: '123e4567-e89b-12d3-a456-426614174000',
-//     status: 'confirmed',
-//     notes: 'Looking forward to your tour!' // Optional
-//   })
-// })
-// 
-// const data = await response.json()
-// if (data.success) {
-//   console.log('Status update sent!', data.messageId)
-// }
-// 
-// ============================================
-// AVAILABLE STATUSES:
-// ============================================
-// - 'confirmed'        → Booking confirmed
-// - 'cancelled'        → Booking cancelled  
-// - 'pending_payment'  → Awaiting payment
-// - 'paid'             → Payment received
-// - 'completed'        → Tour completed
-// ============================================
