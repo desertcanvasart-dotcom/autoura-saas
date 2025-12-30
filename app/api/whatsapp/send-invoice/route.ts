@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
-import { createClient } from '@/app/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { invoiceId } = body
+
+    console.log('📤 Send invoice request:', { invoiceId })
 
     if (!invoiceId) {
       return NextResponse.json(
@@ -14,18 +16,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createClient()
+    // Create server-side Supabase client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
 
-    // Get invoice with client details
+    // Get invoice
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .select('*')
       .eq('id', invoiceId)
       .single()
 
+    console.log('📋 Invoice lookup:', { found: !!invoice, error: invoiceError?.message })
+
     if (invoiceError || !invoice) {
       return NextResponse.json(
-        { success: false, error: 'Invoice not found' },
+        { success: false, error: `Invoice not found: ${invoiceError?.message || 'No data'}` },
         { status: 404 }
       )
     }
@@ -39,6 +47,7 @@ export async function POST(request: NextRequest) {
         .eq('id', invoice.client_id)
         .single()
       clientPhone = client?.phone
+      console.log('📱 Client phone from clients:', clientPhone)
     }
 
     // Or try to get from itinerary
@@ -49,11 +58,12 @@ export async function POST(request: NextRequest) {
         .eq('id', invoice.itinerary_id)
         .single()
       clientPhone = itinerary?.client_phone
+      console.log('📱 Client phone from itinerary:', clientPhone)
     }
 
     if (!clientPhone) {
       return NextResponse.json(
-        { success: false, error: 'Client phone number not found' },
+        { success: false, error: 'Client phone number not found. Please add phone to client profile.' },
         { status: 400 }
       )
     }
@@ -61,10 +71,8 @@ export async function POST(request: NextRequest) {
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
     const businessEmail = process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'
 
-    // Format currency
     const currencySymbol = { EUR: '€', USD: '$', GBP: '£' }[invoice.currency] || invoice.currency
 
-    // Format dates
     const issueDate = new Date(invoice.issue_date).toLocaleDateString('en-GB', {
       day: 'numeric', month: 'long', year: 'numeric'
     })
@@ -74,14 +82,12 @@ export async function POST(request: NextRequest) {
         })
       : 'On Arrival'
 
-    // Determine invoice type label
     const typeLabel = invoice.invoice_type === 'deposit' 
       ? `Deposit Invoice (${invoice.deposit_percent}%)`
       : invoice.invoice_type === 'final'
         ? 'Final Balance Invoice'
         : 'Invoice'
 
-    // Build message
     const message = `📄 *${businessName}* 📄\n\n` +
       `Dear ${invoice.client_name},\n\n` +
       `Please find your invoice details below:\n\n` +
@@ -99,15 +105,12 @@ export async function POST(request: NextRequest) {
       `• Bank Transfer\n` +
       `• Credit Card\n` +
       `• Wise / PayPal\n\n` +
-      `For payment details or questions, please contact us:\n` +
+      `For payment details or questions:\n` +
       `📧 ${businessEmail}\n\n` +
       `Thank you for your business! 🙏\n\n` +
       `Best regards,\n${businessName} Team`
 
-    console.log('📤 Sending invoice via WhatsApp:', {
-      to: clientPhone,
-      invoiceNumber: invoice.invoice_number
-    })
+    console.log('📤 Sending to:', clientPhone)
 
     const result = await sendWhatsAppMessage({
       to: clientPhone,
@@ -121,7 +124,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update invoice status to sent if it was draft
+    // Update invoice status
     if (invoice.status === 'draft') {
       await supabase
         .from('invoices')
@@ -132,7 +135,7 @@ export async function POST(request: NextRequest) {
         .eq('id', invoiceId)
     }
 
-    console.log('✅ Invoice sent via WhatsApp:', result.messageId)
+    console.log('✅ Invoice sent:', result.messageId)
 
     return NextResponse.json({
       success: true,
@@ -141,7 +144,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
-    console.error('❌ Error sending invoice:', error)
+    console.error('❌ Error:', error)
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
