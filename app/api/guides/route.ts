@@ -1,17 +1,23 @@
 // ============================================
 // API Route: /api/guides
 // ============================================
-// Handles CRUD operations for tour guides
+// Fetches guides from suppliers table (type='guide')
 // GET: List all guides (with filters)
-// POST: Create new guide
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabase()
     const searchParams = request.nextUrl.searchParams
     
     // Parse query parameters
@@ -19,13 +25,14 @@ export async function GET(request: NextRequest) {
     const is_active = searchParams.get('is_active')
     const availability_from = searchParams.get('availability_from')
     const availability_to = searchParams.get('availability_to')
-    const exclude_itinerary_id = searchParams.get('exclude_itinerary_id') // ⭐ NEW
+    const exclude_itinerary_id = searchParams.get('exclude_itinerary_id')
     const with_stats = searchParams.get('with_stats') === 'true'
     
-    // Build query
+    // Build query - fetch from suppliers table with type='guide'
     let query = supabase
-      .from('guides')
+      .from('suppliers')
       .select('*')
+      .eq('type', 'guide')
       .order('name', { ascending: true })
     
     // Apply filters
@@ -33,11 +40,11 @@ export async function GET(request: NextRequest) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`)
     }
     
-    if (is_active !== null) {
-      query = query.eq('is_active', is_active === 'true')
+    if (is_active === 'true') {
+      query = query.eq('status', 'active')
     }
     
-    const { data: guides, error } = await query
+    const { data: suppliers, error } = await query
     
     if (error) {
       console.error('Error fetching guides:', error)
@@ -46,18 +53,33 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Map supplier fields to guide format
+    let guides = (suppliers || []).map(g => ({
+      id: g.id,
+      name: g.name,
+      phone: g.phone,
+      email: g.email,
+      city: g.city,
+      languages: g.languages || [],
+      specialties: g.specialties || [],
+      is_active: g.status === 'active',
+      daily_rate: g.daily_rate,
+      hourly_rate: g.hourly_rate,
+      notes: g.notes,
+      ...g
+    }))
+
+    console.log(`✅ Found ${guides.length} guides from suppliers table`)
     
     // If checking availability, filter out guides with conflicting bookings
-    let availableGuides = guides
     if (availability_from && availability_to) {
-      // ⭐ UPDATED: Build query to check conflicts, excluding current itinerary
       let bookingsQuery = supabase
         .from('itineraries')
         .select('assigned_guide_id')
         .not('assigned_guide_id', 'is', null)
         .or(`and(start_date.lte.${availability_to},end_date.gte.${availability_from})`)
       
-      // ⭐ NEW: Exclude the current itinerary from conflict check
       if (exclude_itinerary_id) {
         bookingsQuery = bookingsQuery.neq('id', exclude_itinerary_id)
       }
@@ -65,13 +87,13 @@ export async function GET(request: NextRequest) {
       const { data: bookings } = await bookingsQuery
       
       const bookedGuideIds = bookings?.map(b => b.assigned_guide_id) || []
-      availableGuides = guides?.filter(g => !bookedGuideIds.includes(g.id))
+      guides = guides.filter(g => !bookedGuideIds.includes(g.id))
     }
     
     // Add statistics if requested
-    if (with_stats && availableGuides) {
+    if (with_stats && guides.length > 0) {
       const guidesWithStats = await Promise.all(
-        availableGuides.map(async (guide) => {
+        guides.map(async (guide) => {
           const { data: bookings } = await supabase
             .from('itineraries')
             .select('id, start_date, end_date, total_cost')
@@ -97,18 +119,11 @@ export async function GET(request: NextRequest) {
         })
       )
       
-      return NextResponse.json({
-        success: true,
-        data: guidesWithStats,
-        total: guidesWithStats.length,
-      })
+      return NextResponse.json(guidesWithStats)
     }
     
-    return NextResponse.json({
-      success: true,
-      data: availableGuides,
-      total: availableGuides?.length || 0,
-    })
+    // Return as array (ResourceAssignment expects array, not {success, data})
+    return NextResponse.json(guides)
     
   } catch (error) {
     console.error('Error in guides GET:', error)
@@ -121,10 +136,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = getSupabase()
     const body = await request.json()
     
-    // Validate required fields
     if (!body.name) {
       return NextResponse.json(
         { success: false, error: 'Guide name is required' },
@@ -132,29 +146,23 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Prepare guide data
+    // Create guide as a supplier with type='guide'
     const guideData = {
+      type: 'guide',
       name: body.name,
       email: body.email || null,
       phone: body.phone || null,
+      city: body.city || null,
       languages: body.languages || [],
       specialties: body.specialties || [],
-      certification_number: body.certification_number || null,
-      license_expiry: body.license_expiry || null,
-      is_active: body.is_active !== undefined ? body.is_active : true,
-      max_group_size: body.max_group_size || null,
-      hourly_rate: body.hourly_rate || null,
+      status: body.is_active !== false ? 'active' : 'inactive',
       daily_rate: body.daily_rate || null,
-      emergency_contact_name: body.emergency_contact_name || null,
-      emergency_contact_phone: body.emergency_contact_phone || null,
-      address: body.address || null,
+      hourly_rate: body.hourly_rate || null,
       notes: body.notes || null,
-      profile_photo_url: body.profile_photo_url || null,
     }
     
-    // Insert into database
     const { data, error } = await supabase
-      .from('guides')
+      .from('suppliers')
       .insert([guideData])
       .select()
       .single()
@@ -162,7 +170,6 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error creating guide:', error)
       
-      // Check for unique constraint violation (email)
       if (error.code === '23505') {
         return NextResponse.json(
           { success: false, error: 'A guide with this email already exists' },
