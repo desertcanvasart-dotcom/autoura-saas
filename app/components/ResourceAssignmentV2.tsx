@@ -336,6 +336,9 @@ export default function ResourceAssignmentV2({
       case 'city':
         // For guides, vehicles, hotels, restaurants
         if (modalCityFilter === 'all') return resources
+        if (modalCityFilter === 'none') {
+          return resources.filter(r => !r[typeConfig.cityField || 'city'])
+        }
         return resources.filter(r => {
           const city = r[typeConfig.cityField || 'city']
           return city?.toLowerCase().includes(modalCityFilter.toLowerCase())
@@ -825,7 +828,8 @@ export default function ResourceAssignmentV2({
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                   >
                     <option value="all">All Cities ({allAvailableForType.length})</option>
-                    {getUniqueCities(activeTab).map((city) => {
+                    <option value="none">No City Assigned ({allAvailableForType.filter(r => !r[activeTypeConfig.cityField || 'city']).length})</option>
+                     {getUniqueCities(activeTab).map((city) => {
                       const count = allAvailableForType.filter(r => r[activeTypeConfig.cityField || 'city'] === city).length
                       return (
                         <option key={city} value={city}>
