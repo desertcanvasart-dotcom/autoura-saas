@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
 import { createClient } from '@/app/supabase'
+import { generateContractPDF } from '@/lib/contract-pdf-generator'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { itineraryId, contractPdfUrl } = body
+    const { itineraryId } = body
 
     if (!itineraryId) {
       return NextResponse.json(
@@ -37,6 +38,49 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Generate contract PDF
+    console.log('📄 Generating contract PDF...')
+    const contractData = {
+      contractNumber: `TC-2025-${itineraryId.slice(0, 8).toUpperCase()}`,
+      contractDate: new Date().toISOString(),
+      clientName: itinerary.client_name || 'Valued Guest',
+      clientEmail: itinerary.client_email,
+      numTravelers: (itinerary.num_adults || 1) + (itinerary.num_children || 0),
+      tourName: itinerary.trip_name || 'Egypt Tour',
+      startDate: itinerary.start_date,
+      endDate: itinerary.end_date,
+      destinations: 'Cairo, Luxor, Aswan',
+      totalCost: itinerary.total_cost || 0,
+      currency: itinerary.currency || 'EUR'
+    }
+
+    const pdfBytes = await generateContractPDF(contractData)
+    
+    // Upload to Supabase Storage
+    console.log('📤 Uploading PDF to storage...')
+    const fileName = `contracts/contract-${itineraryId}-${Date.now()}.pdf`
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(fileName, pdfBytes, {
+        contentType: 'application/pdf',
+        upsert: true
+      })
+
+    if (uploadError) {
+      console.error('❌ Upload error:', uploadError)
+      throw new Error(`Failed to upload PDF: ${uploadError.message}`)
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('documents')
+      .getPublicUrl(fileName)
+
+    const pdfUrl = urlData.publicUrl
+    console.log('✅ PDF uploaded:', pdfUrl)
+
+    // Build message
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
     
     const message = `📄 *${businessName}* 📄\n\n` +
@@ -61,11 +105,11 @@ export async function POST(request: NextRequest) {
       `Looking forward to your adventure! 🐪✨\n\n` +
       `Best regards,\n${businessName} Team`
 
-    // Send via WhatsApp with PDF attachment
+    // Send via WhatsApp WITH PDF attachment
     const result = await sendWhatsAppMessage({
       to: itinerary.client_phone,
-      body: message
-      // No mediaUrl - send text only for now
+      body: message,
+      mediaUrl: pdfUrl
     })
 
     if (!result.success) {
@@ -75,12 +119,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('✅ Contract sent:', result.messageId)
+    console.log('✅ Contract sent with PDF:', result.messageId)
 
     return NextResponse.json({
       success: true,
       messageId: result.messageId,
-      message: 'Contract sent successfully via WhatsApp'
+      pdfUrl: pdfUrl,
+      message: 'Contract sent successfully via WhatsApp with PDF attachment'
     })
 
   } catch (error: any) {
