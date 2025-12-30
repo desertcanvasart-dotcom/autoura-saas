@@ -33,6 +33,7 @@
     "next": "^16.0.10",
     "nodemailer": "^7.0.10",
     "openai": "^6.8.1",
+    "pdf-lib": "^1.17.1",
     "puppeteer": "^24.33.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
