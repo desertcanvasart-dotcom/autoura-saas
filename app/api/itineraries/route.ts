@@ -4,8 +4,18 @@ import { createClient } from '@/app/supabase'
 // Generate unique itinerary code
 function generateItineraryCode(): string {
   const year = new Date().getFullYear()
-  const random = Math.floor(Math.random() * 9000) + 1000 // 4-digit random
+  const random = Math.floor(Math.random() * 9000) + 1000
   return `ITN-${year}-${random}`
+}
+
+// Calculate days between two dates
+function calculateTotalDays(startDate: string, endDate: string): number {
+  if (!startDate || !endDate) return 1
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const diffTime = Math.abs(end.getTime() - start.getTime())
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  return diffDays + 1 // Include both start and end day
 }
 
 export async function GET(request: NextRequest) {
@@ -47,12 +57,25 @@ export async function POST(request: NextRequest) {
       body.itinerary_code = generateItineraryCode()
     }
 
+    // Calculate total_days from dates if not provided
+    if (!body.total_days && body.start_date && body.end_date) {
+      body.total_days = calculateTotalDays(body.start_date, body.end_date)
+    } else if (!body.total_days) {
+      body.total_days = 1
+    }
+
     // Set default status if not provided
     if (!body.status) {
       body.status = 'draft'
     }
 
-    // Set created_at and updated_at
+    // Set default values for other required fields
+    body.num_adults = body.num_adults || 1
+    body.num_children = body.num_children || 0
+    body.total_cost = body.total_cost || 0
+    body.currency = body.currency || 'EUR'
+
+    // Set timestamps
     const now = new Date().toISOString()
     body.created_at = body.created_at || now
     body.updated_at = now
