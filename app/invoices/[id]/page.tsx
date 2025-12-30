@@ -23,9 +23,11 @@ import {
   Wallet,
   Receipt,
   ArrowRight,
-  Link as LinkIcon
+  Link as LinkIcon,
+  MessageCircle
 } from 'lucide-react'
 import { downloadInvoicePDF } from '@/lib/invoice-pdf-generator'
+import { downloadReceiptPDF } from '@/lib/receipt-pdf-generator'
 
 interface Invoice {
   id: string
@@ -131,7 +133,6 @@ const REMINDER_TYPE_LABELS: Record<string, string> = {
   overdue_30: '30+ days overdue',
   manual: 'Manual'
 }
-
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const router = useRouter()
@@ -145,6 +146,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const [savingPayment, setSavingPayment] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [creatingFinalInvoice, setCreatingFinalInvoice] = useState(false)
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false)
   const [paymentForm, setPaymentForm] = useState<PaymentFormData>({
     amount: 0,
     currency: 'EUR',
@@ -172,7 +174,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           currency: data.currency
         }))
 
-        // Fetch linked invoice (parent if this is final)
         if (data.parent_invoice_id) {
           const parentResponse = await fetch(`/api/invoices/${data.parent_invoice_id}`)
           if (parentResponse.ok) {
@@ -181,7 +182,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           }
         }
 
-        // Fetch child invoice (if this is deposit, find the final invoice)
         if (data.invoice_type === 'deposit') {
           const allInvoicesResponse = await fetch(`/api/invoices?itineraryId=${data.itinerary_id}`)
           if (allInvoicesResponse.ok) {
@@ -290,6 +290,52 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  const handleSendWhatsApp = async () => {
+    if (!invoice) return
+    
+    setSendingWhatsApp(true)
+    try {
+      const response = await fetch('/api/whatsapp/send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId: invoice.id })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send invoice')
+      }
+      
+      alert('Invoice sent via WhatsApp! ✅')
+      fetchInvoice()
+    } catch (error: any) {
+      console.error('Error sending WhatsApp:', error)
+      alert(`Failed to send: ${error.message}`)
+    } finally {
+      setSendingWhatsApp(false)
+    }
+  }
+
+  const handleGenerateReceipt = (payment: Payment) => {
+    if (!invoice) return
+    
+    const receiptData = {
+      receiptNumber: `RCP-${invoice.invoice_number}-${payments.indexOf(payment) + 1}`,
+      invoiceNumber: invoice.invoice_number,
+      clientName: invoice.client_name,
+      clientEmail: invoice.client_email,
+      paymentDate: payment.payment_date,
+      paymentMethod: payment.payment_method,
+      amount: payment.amount,
+      currency: payment.currency,
+      transactionRef: payment.transaction_reference,
+      notes: payment.notes
+    }
+    
+    downloadReceiptPDF(receiptData, invoice)
+  }
+
   const handleDeletePayment = async (paymentId: string) => {
     if (!confirm('Are you sure you want to delete this payment?')) return
 
@@ -313,7 +359,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
 
     setCreatingFinalInvoice(true)
     try {
-      // Calculate full trip cost from deposit
       const fullTripCost = (Number(invoice.total_amount) * 100) / invoice.deposit_percent
       const balanceAmount = fullTripCost - Number(invoice.total_amount)
 
@@ -339,7 +384,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           total_amount: balanceAmount,
           currency: invoice.currency,
           issue_date: new Date().toISOString().split('T')[0],
-          due_date: null, // Due on arrival
+          due_date: null,
           payment_terms: 'Balance payable in cash upon arrival or before first day of service.',
           notes: `Related Deposit Invoice: ${invoice.invoice_number}`
         })
@@ -374,7 +419,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     })
   }
 
-  // Check if overdue
   const getDisplayStatus = () => {
     if (!invoice) return 'draft'
     if (invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.due_date) {
@@ -388,7 +432,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     return invoice.status
   }
 
-  // Check if we can create a final invoice
   const canCreateFinalInvoice = () => {
     if (!invoice) return false
     return (
@@ -397,7 +440,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       !childInvoice
     )
   }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -423,7 +465,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const typeConfig = TYPE_CONFIG[invoice.invoice_type] || TYPE_CONFIG.standard
   const TypeIcon = typeConfig.icon
 
-  // Calculate full trip cost for display
   const fullTripCost = invoice.invoice_type === 'deposit' 
     ? (Number(invoice.total_amount) * 100) / invoice.deposit_percent
     : invoice.invoice_type === 'final' && linkedInvoice
@@ -459,6 +500,25 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Send via WhatsApp Button */}
+          <button
+            onClick={handleSendWhatsApp}
+            disabled={sendingWhatsApp}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+          >
+            {sendingWhatsApp ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                Sending...
+              </>
+            ) : (
+              <>
+                <MessageCircle className="h-4 w-4" />
+                Send via WhatsApp
+              </>
+            )}
+          </button>
+
           <button
             onClick={handleDownloadPDF}
             disabled={generatingPDF}
@@ -556,7 +616,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      {/* Trip Cost Summary (for deposit/final invoices) */}
+      {/* Trip Cost Summary */}
       {invoice.invoice_type !== 'standard' && (
         <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Trip Cost Breakdown</h3>
@@ -757,7 +817,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
               </button>
             )}
 
-            {/* Create Final Invoice Button */}
             {canCreateFinalInvoice() && (
               <button
                 onClick={handleCreateFinalInvoice}
@@ -827,12 +886,22 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeletePayment(payment.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleGenerateReceipt(payment)}
+                        className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Download Receipt"
+                      >
+                        <Receipt className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePayment(payment.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Payment"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
