@@ -114,7 +114,7 @@ export async function sendWhatsAppMessage({
   to,
   body,
   mediaUrl
-}: WhatsAppMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
+}: WhatsAppMessage): Promise<{ success: boolean; messageId?: string; error?: string; warning?: string }> {
   try {
     const client = getTwilioClient()
     const from = process.env.TWILIO_WHATSAPP_FROM
@@ -123,10 +123,8 @@ export async function sendWhatsAppMessage({
       throw new Error('TWILIO_WHATSAPP_FROM not configured')
     }
 
-    // Format the recipient number
     const formattedTo = formatWhatsAppNumber(to)
 
-    // Send message
     const message = await client.messages.create({
       from,
       to: formattedTo,
@@ -134,14 +132,29 @@ export async function sendWhatsAppMessage({
       ...(mediaUrl && { mediaUrl: [mediaUrl] })
     })
 
-    console.log('✅ WhatsApp message sent:', message.sid)
+    console.log('✅ WhatsApp message sent:', message.sid, 'Status:', message.status)
+
+    // Check if message might be blocked by 24-hour window
+    const warning = message.status === 'queued' 
+      ? 'Message queued. If customer hasn\'t messaged in 24hrs, delivery may fail.'
+      : undefined
 
     return {
       success: true,
-      messageId: message.sid
+      messageId: message.sid,
+      warning
     }
   } catch (error: any) {
     console.error('❌ Failed to send WhatsApp message:', error)
+    
+    // Handle specific Twilio errors
+    if (error.code === 63016) {
+      return {
+        success: false,
+        error: 'Customer must message first (24-hour window). Use a template message to initiate.'
+      }
+    }
+    
     return {
       success: false,
       error: error.message

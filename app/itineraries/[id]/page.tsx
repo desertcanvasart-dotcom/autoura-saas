@@ -393,26 +393,43 @@ export default function ViewItineraryPage() {
     }
   }
 
-  const handleSendWhatsApp = () => {
+  const handleSendWhatsApp = async () => {
     if (!itinerary) return
-
+  
     if (!itinerary.client_phone) {
       alert('Client phone number is required for WhatsApp. Please add it in edit mode.')
       return
     }
-
-    const message = generateWhatsAppMessage(
-      itinerary.client_name,
-      itinerary.trip_name,
-      itinerary.total_cost.toFixed(2),
-      itinerary.currency
-    )
-
-    const formattedPhone = formatPhoneForWhatsApp(itinerary.client_phone)
-    const whatsappUrl = generateWhatsAppLink(formattedPhone, message)
-
-    markAsSent('WhatsApp')
-    window.open(whatsappUrl, '_blank')
+  
+    setShowSendModal(false)
+    setSendingEmail(true) // Reuse loading state for UI feedback
+  
+    try {
+      const response = await fetch('/api/whatsapp/send-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itineraryId: itinerary.id,
+          clientPhone: itinerary.client_phone,
+          clientName: itinerary.client_name
+        })
+      })
+  
+      const data = await response.json()
+  
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send WhatsApp message')
+      }
+  
+      markAsSent('WhatsApp')
+      setSendSuccess('Quote sent via WhatsApp! ✅')
+      setTimeout(() => setSendSuccess(null), 5000)
+    } catch (error: any) {
+      console.error('WhatsApp send error:', error)
+      alert(`Failed to send WhatsApp: ${error.message}`)
+    } finally {
+      setSendingEmail(false)
+    }
   }
 
   const handleSendEmail = async () => {

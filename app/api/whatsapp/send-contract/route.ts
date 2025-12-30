@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
     // Send via WhatsApp with PDF attachment
     const result = await sendWhatsAppMessage({
       to: itinerary.client_phone,
-      body: message,
-      mediaUrl: contractPdfUrl
+      body: message
+      // No mediaUrl - send text only for now
     })
 
     if (!result.success) {
