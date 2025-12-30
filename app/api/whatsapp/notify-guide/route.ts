@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
-import { createClient } from '@/app/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { itineraryId, guideId } = body
+
+    console.log('📤 Notify guide request:', { itineraryId, guideId })
 
     if (!itineraryId || !guideId) {
       return NextResponse.json(
@@ -14,7 +16,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createClient()
+    // Create server-side Supabase client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
 
     // Get itinerary details
     const { data: itinerary, error: itinError } = await supabase
@@ -23,19 +29,30 @@ export async function POST(request: NextRequest) {
       .eq('id', itineraryId)
       .single()
 
-    // Get guide details
+    if (itinError || !itinerary) {
+      console.error('❌ Itinerary error:', itinError)
+      return NextResponse.json(
+        { success: false, error: 'Itinerary not found' },
+        { status: 404 }
+      )
+    }
+
+    // Get guide details from SUPPLIERS table (not guides table)
     const { data: guide, error: guideError } = await supabase
-      .from('guides')
+      .from('suppliers')
       .select('*')
       .eq('id', guideId)
       .single()
 
-    if (itinError || guideError || !itinerary || !guide) {
+    if (guideError || !guide) {
+      console.error('❌ Guide error:', guideError)
       return NextResponse.json(
-        { success: false, error: 'Itinerary or guide not found' },
+        { success: false, error: 'Guide not found' },
         { status: 404 }
       )
     }
+
+    console.log('📱 Guide found:', { name: guide.name, phone: guide.phone })
 
     if (!guide.phone) {
       return NextResponse.json(
@@ -54,7 +71,7 @@ export async function POST(request: NextRequest) {
       `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
       `📅 *Start Date:* ${new Date(itinerary.start_date).toLocaleDateString()}\n` +
       `📅 *End Date:* ${new Date(itinerary.end_date).toLocaleDateString()}\n` +
-      `👥 *Guests:* ${itinerary.num_adults || 1} adult${itinerary.num_adults > 1 ? 's' : ''}` +
+      `👥 *Guests:* ${itinerary.num_adults || 1} adult${(itinerary.num_adults || 1) > 1 ? 's' : ''}` +
       `${itinerary.num_children > 0 ? `, ${itinerary.num_children} child${itinerary.num_children > 1 ? 'ren' : ''}` : ''}\n` +
       `👤 *Client:* ${itinerary.client_name || 'N/A'}\n` +
       `📞 *Phone:* ${itinerary.client_phone || 'N/A'}\n` +
@@ -65,6 +82,8 @@ export async function POST(request: NextRequest) {
       `Good luck! 🌟\n\n` +
       `${businessName} Operations Team`
 
+    console.log('📤 Sending to:', guide.phone)
+
     // Send via WhatsApp
     const result = await sendWhatsAppMessage({
       to: guide.phone,
@@ -72,6 +91,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!result.success) {
+      console.error('❌ WhatsApp error:', result.error)
       return NextResponse.json(
         { success: false, error: result.error },
         { status: 500 }
