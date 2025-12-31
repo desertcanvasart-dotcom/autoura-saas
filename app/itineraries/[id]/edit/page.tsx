@@ -1255,15 +1255,15 @@ export default function ItineraryEditorPage() {
                                 }`}
                               >
                                 {editingServiceId === service.id ? (
-                                  // Edit Mode - Two rows for better layout
+                                  // Edit Mode - Three rows for clear layout
                                   <div className="space-y-3">
-                                    {/* Row 1: Type, Name, Supplier */}
+                                    {/* Row 1: Type and Name */}
                                     <div className="flex items-center gap-2">
                                       <span className="text-lg w-8">{getServiceIcon(service.service_type)}</span>
                                       <select
                                         value={service.service_type}
                                         onChange={(e) => updateService(service.id, { service_type: e.target.value })}
-                                        className="w-32 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
+                                        className="w-36 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
                                       >
                                         {SERVICE_TYPES.map(t => (
                                           <option key={t.value} value={t.value}>{t.label}</option>
@@ -1278,40 +1278,49 @@ export default function ItineraryEditorPage() {
                                       />
                                     </div>
                                     
-                                    {/* Row 2: Supplier, Qty, Rate, Total, Actions */}
+                                    {/* Row 2: Supplier Selection - Full Width */}
                                     <div className="flex items-center gap-2 pl-10">
-                                      <div className="flex-1">
-                                        <select
-                                          value={service.supplier_id || ''}
-                                          onChange={(e) => {
-                                            const supplierId = e.target.value || null
-                                            const supplier = suppliers.find(s => s.id === supplierId)
-                                            updateService(service.id, { 
-                                              supplier_id: supplierId,
-                                              supplier_name: supplier?.name || null
-                                            })
-                                          }}
-                                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
-                                        >
-                                          <option value="">-- No Supplier (Optional) --</option>
-                                          <optgroup label="Recommended">
+                                      <label className="text-xs font-medium text-gray-600 whitespace-nowrap">
+                                        📦 Supplier:
+                                      </label>
+                                      <select
+                                        value={service.supplier_id || ''}
+                                        onChange={(e) => {
+                                          const supplierId = e.target.value || null
+                                          const supplier = suppliers.find(s => s.id === supplierId)
+                                          updateService(service.id, { 
+                                            supplier_id: supplierId,
+                                            supplier_name: supplier?.name || null
+                                          })
+                                        }}
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47] bg-white"
+                                      >
+                                        <option value="">-- No Supplier (Optional) --</option>
+                                        {getSuppliersForServiceType(service.service_type).length > 0 && (
+                                          <optgroup label={`Recommended for ${service.service_type}`}>
                                             {getSuppliersForServiceType(service.service_type).map(s => (
                                               <option key={s.id} value={s.id}>
-                                                {s.name} ({s.type})
+                                                {s.name} {s.city ? `(${s.city})` : ''} - {s.type}
                                               </option>
                                             ))}
                                           </optgroup>
-                                          <optgroup label="All Suppliers">
+                                        )}
+                                        {suppliers.filter(s => !getSuppliersForServiceType(service.service_type).find(r => r.id === s.id)).length > 0 && (
+                                          <optgroup label="All Other Suppliers">
                                             {suppliers.filter(s => !getSuppliersForServiceType(service.service_type).find(r => r.id === s.id)).map(s => (
                                               <option key={s.id} value={s.id}>
-                                                {s.name} ({s.type})
+                                                {s.name} {s.city ? `(${s.city})` : ''} - {s.type}
                                               </option>
                                             ))}
                                           </optgroup>
-                                        </select>
-                                      </div>
+                                        )}
+                                      </select>
+                                    </div>
+
+                                    {/* Row 3: Qty, Rate, Total, Actions */}
+                                    <div className="flex items-center gap-3 pl-10">
                                       <div className="flex items-center gap-1">
-                                        <span className="text-xs text-gray-500">Qty:</span>
+                                        <label className="text-xs text-gray-500">Qty:</label>
                                         <input
                                           type="number"
                                           value={service.quantity}
@@ -1320,12 +1329,12 @@ export default function ItineraryEditorPage() {
                                             const total = qty * (service.rate_non_eur || service.rate_eur || 0)
                                             updateService(service.id, { quantity: qty, total_cost: total })
                                           }}
-                                          className="w-14 px-2 py-1.5 border border-gray-300 rounded text-sm text-center focus:outline-none focus:border-[#647C47]"
+                                          className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm text-center focus:outline-none focus:border-[#647C47]"
                                           min="1"
                                         />
                                       </div>
                                       <div className="flex items-center gap-1">
-                                        <span className="text-xs text-gray-500">Rate:</span>
+                                        <label className="text-xs text-gray-500">Rate:</label>
                                         <input
                                           type="number"
                                           value={service.rate_non_eur || service.rate_eur || 0}
@@ -1339,18 +1348,19 @@ export default function ItineraryEditorPage() {
                                           }}
                                           className="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:border-[#647C47]"
                                           step="0.01"
-                                          placeholder="Rate"
+                                          placeholder="0.00"
                                         />
                                       </div>
-                                      <div className="w-28 text-right font-semibold text-gray-900">
+                                      <div className="flex-1"></div>
+                                      <div className="text-right font-semibold text-gray-900 text-lg">
                                         {itinerary.currency} {service.total_cost?.toFixed(2) || '0.00'}
                                       </div>
                                       <button
                                         onClick={() => setEditingServiceId(null)}
-                                        className="p-1.5 text-green-600 hover:bg-green-50 rounded"
+                                        className="px-3 py-1.5 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 flex items-center gap-1"
                                         title="Done editing"
                                       >
-                                        <Check size={16} />
+                                        <Check size={14} /> Done
                                       </button>
                                     </div>
                                   </div>
