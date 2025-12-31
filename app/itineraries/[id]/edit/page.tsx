@@ -98,6 +98,8 @@ interface ItineraryService {
   day_number?: number
   service_type: string
   service_name: string
+  supplier_id?: string | null
+  supplier_name?: string | null
   quantity: number
   rate_eur: number
   rate_non_eur: number
@@ -105,6 +107,14 @@ interface ItineraryService {
   notes: string
   isNew?: boolean
   isDeleted?: boolean
+}
+
+interface Supplier {
+  id: string
+  name: string
+  type: string
+  city?: string
+  contact_phone?: string
 }
 
 // ============================================
@@ -213,6 +223,10 @@ export default function ItineraryEditorPage() {
   const [attractionSearch, setAttractionSearch] = useState('')
   const [attractionCityFilter, setAttractionCityFilter] = useState<string | null>(null)
 
+  // Suppliers state
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [supplierSearch, setSupplierSearch] = useState('')
+
   // ============================================
   // LOAD DATA
   // ============================================
@@ -220,6 +234,7 @@ export default function ItineraryEditorPage() {
   useEffect(() => {
     loadItinerary()
     loadAttractions()
+    loadSuppliers()
   }, [itineraryId])
 
   const loadItinerary = async () => {
@@ -308,6 +323,43 @@ export default function ItineraryEditorPage() {
     } catch (error) {
       console.error('Error loading attractions:', error)
     }
+  }
+
+  const loadSuppliers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name, type, city, contact_phone')
+        .eq('is_active', true)
+        .order('type')
+        .order('name')
+
+      if (error) throw error
+      setSuppliers(data || [])
+    } catch (error) {
+      console.error('Error loading suppliers:', error)
+    }
+  }
+
+  // Helper to get relevant suppliers for a service type
+  const getSuppliersForServiceType = (serviceType: string) => {
+    const typeMapping: Record<string, string[]> = {
+      transportation: ['transport', 'driver', 'dmc', 'ground_handler'],
+      guide: ['guide', 'dmc', 'ground_handler'],
+      accommodation: ['hotel'],
+      entrance: ['activity_provider', 'attraction', 'dmc'],
+      activity: ['activity_provider', 'attraction', 'dmc'],
+      meal: ['restaurant', 'dmc', 'ground_handler'],
+      cruise: ['cruise', 'cruise_line'],
+      tips: ['dmc', 'ground_handler'],
+      supplies: ['dmc', 'ground_handler'],
+      service_fee: ['dmc', 'ground_handler', 'tour_operator']
+    }
+    
+    const relevantTypes = typeMapping[serviceType] || []
+    if (relevantTypes.length === 0) return suppliers
+    
+    return suppliers.filter(s => relevantTypes.includes(s.type))
   }
 
   const checkExistingInvoice = async () => {
@@ -433,6 +485,8 @@ export default function ItineraryEditorPage() {
       day_number: dayNumber,
       service_type: 'activity',
       service_name: 'New Service',
+      supplier_id: null,
+      supplier_name: null,
       quantity: 1,
       rate_eur: 0,
       rate_non_eur: 0,
@@ -1196,64 +1250,105 @@ export default function ItineraryEditorPage() {
                             {dayServices.map(service => (
                               <div
                                 key={service.id}
-                                className={`px-4 py-3 flex items-center gap-3 ${
+                                className={`px-4 py-3 ${
                                   editingServiceId === service.id ? 'bg-amber-50' : 'hover:bg-gray-50'
                                 }`}
                               >
-                                <span className="text-lg">{getServiceIcon(service.service_type)}</span>
-                                
                                 {editingServiceId === service.id ? (
-                                  // Edit Mode
-                                  <div className="flex-1 grid grid-cols-12 gap-2 items-center">
-                                    <select
-                                      value={service.service_type}
-                                      onChange={(e) => updateService(service.id, { service_type: e.target.value })}
-                                      className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
-                                    >
-                                      {SERVICE_TYPES.map(t => (
-                                        <option key={t.value} value={t.value}>{t.label}</option>
-                                      ))}
-                                    </select>
-                                    <input
-                                      type="text"
-                                      value={service.service_name}
-                                      onChange={(e) => updateService(service.id, { service_name: e.target.value })}
-                                      className="col-span-4 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
-                                      placeholder="Service name"
-                                    />
-                                    <input
-                                      type="number"
-                                      value={service.quantity}
-                                      onChange={(e) => {
-                                        const qty = parseInt(e.target.value) || 1
-                                        const total = qty * (service.rate_non_eur || service.rate_eur || 0)
-                                        updateService(service.id, { quantity: qty, total_cost: total })
-                                      }}
-                                      className="col-span-1 px-2 py-1.5 border border-gray-300 rounded text-sm text-center focus:outline-none focus:border-[#647C47]"
-                                      min="1"
-                                    />
-                                    <input
-                                      type="number"
-                                      value={service.rate_non_eur || service.rate_eur || 0}
-                                      onChange={(e) => {
-                                        const rate = parseFloat(e.target.value) || 0
-                                        updateService(service.id, { 
-                                          rate_non_eur: rate, 
-                                          rate_eur: rate,
-                                          total_cost: service.quantity * rate 
-                                        })
-                                      }}
-                                      className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:border-[#647C47]"
-                                      step="0.01"
-                                      placeholder="Rate"
-                                    />
-                                    <div className="col-span-2 text-right font-semibold text-gray-900">
-                                      {itinerary.currency} {service.total_cost?.toFixed(2) || '0.00'}
+                                  // Edit Mode - Two rows for better layout
+                                  <div className="space-y-3">
+                                    {/* Row 1: Type, Name, Supplier */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-lg w-8">{getServiceIcon(service.service_type)}</span>
+                                      <select
+                                        value={service.service_type}
+                                        onChange={(e) => updateService(service.id, { service_type: e.target.value })}
+                                        className="w-32 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
+                                      >
+                                        {SERVICE_TYPES.map(t => (
+                                          <option key={t.value} value={t.value}>{t.label}</option>
+                                        ))}
+                                      </select>
+                                      <input
+                                        type="text"
+                                        value={service.service_name}
+                                        onChange={(e) => updateService(service.id, { service_name: e.target.value })}
+                                        className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
+                                        placeholder="Service name"
+                                      />
                                     </div>
-                                    <div className="col-span-1 flex justify-end gap-1">
+                                    
+                                    {/* Row 2: Supplier, Qty, Rate, Total, Actions */}
+                                    <div className="flex items-center gap-2 pl-10">
+                                      <div className="flex-1">
+                                        <select
+                                          value={service.supplier_id || ''}
+                                          onChange={(e) => {
+                                            const supplierId = e.target.value || null
+                                            const supplier = suppliers.find(s => s.id === supplierId)
+                                            updateService(service.id, { 
+                                              supplier_id: supplierId,
+                                              supplier_name: supplier?.name || null
+                                            })
+                                          }}
+                                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
+                                        >
+                                          <option value="">-- No Supplier (Optional) --</option>
+                                          <optgroup label="Recommended">
+                                            {getSuppliersForServiceType(service.service_type).map(s => (
+                                              <option key={s.id} value={s.id}>
+                                                {s.name} ({s.type})
+                                              </option>
+                                            ))}
+                                          </optgroup>
+                                          <optgroup label="All Suppliers">
+                                            {suppliers.filter(s => !getSuppliersForServiceType(service.service_type).find(r => r.id === s.id)).map(s => (
+                                              <option key={s.id} value={s.id}>
+                                                {s.name} ({s.type})
+                                              </option>
+                                            ))}
+                                          </optgroup>
+                                        </select>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs text-gray-500">Qty:</span>
+                                        <input
+                                          type="number"
+                                          value={service.quantity}
+                                          onChange={(e) => {
+                                            const qty = parseInt(e.target.value) || 1
+                                            const total = qty * (service.rate_non_eur || service.rate_eur || 0)
+                                            updateService(service.id, { quantity: qty, total_cost: total })
+                                          }}
+                                          className="w-14 px-2 py-1.5 border border-gray-300 rounded text-sm text-center focus:outline-none focus:border-[#647C47]"
+                                          min="1"
+                                        />
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs text-gray-500">Rate:</span>
+                                        <input
+                                          type="number"
+                                          value={service.rate_non_eur || service.rate_eur || 0}
+                                          onChange={(e) => {
+                                            const rate = parseFloat(e.target.value) || 0
+                                            updateService(service.id, { 
+                                              rate_non_eur: rate, 
+                                              rate_eur: rate,
+                                              total_cost: service.quantity * rate 
+                                            })
+                                          }}
+                                          className="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:border-[#647C47]"
+                                          step="0.01"
+                                          placeholder="Rate"
+                                        />
+                                      </div>
+                                      <div className="w-28 text-right font-semibold text-gray-900">
+                                        {itinerary.currency} {service.total_cost?.toFixed(2) || '0.00'}
+                                      </div>
                                       <button
                                         onClick={() => setEditingServiceId(null)}
                                         className="p-1.5 text-green-600 hover:bg-green-50 rounded"
+                                        title="Done editing"
                                       >
                                         <Check size={16} />
                                       </button>
@@ -1261,12 +1356,18 @@ export default function ItineraryEditorPage() {
                                   </div>
                                 ) : (
                                   // View Mode
-                                  <div className="flex-1 flex items-center justify-between">
-                                    <div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-lg">{getServiceIcon(service.service_type)}</span>
+                                    <div className="flex-1">
                                       <p className="text-sm font-medium text-gray-900">{service.service_name}</p>
-                                      <p className="text-xs text-gray-500 capitalize">
-                                        {service.service_type.replace('_', ' ')}
+                                      <p className="text-xs text-gray-500">
+                                        <span className="capitalize">{service.service_type.replace('_', ' ')}</span>
                                         {service.quantity > 1 && ` • Qty: ${service.quantity}`}
+                                        {service.supplier_name && (
+                                          <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
+                                            📦 {service.supplier_name}
+                                          </span>
+                                        )}
                                       </p>
                                     </div>
                                     <div className="flex items-center gap-3">
