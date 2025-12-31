@@ -327,14 +327,19 @@ export default function ItineraryEditorPage() {
 
   const loadSuppliers = async () => {
     try {
+      console.log('Loading suppliers...')
       const { data, error } = await supabase
         .from('suppliers')
         .select('id, name, type, city, contact_phone')
-        .eq('is_active', true)
         .order('type')
         .order('name')
 
-      if (error) throw error
+      if (error) {
+        console.error('Error loading suppliers:', error)
+        return
+      }
+      
+      console.log('Loaded suppliers:', data?.length || 0)
       setSuppliers(data || [])
     } catch (error) {
       console.error('Error loading suppliers:', error)
