@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
 import {
   GripVertical,
@@ -27,8 +28,15 @@ import {
   Search,
   Trash2,
   Edit3,
-  DollarSign
+  DollarSign,
+  FileText,
+  Receipt,
+  Download,
+  Eye,
+  Send
 } from 'lucide-react'
+import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
+import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
 
 // ============================================
 // TYPES
@@ -130,6 +138,14 @@ const PACKAGE_TYPES = [
 
 const TIERS = ['budget', 'standard', 'deluxe', 'luxury']
 
+const STATUS_OPTIONS = [
+  { value: 'draft', label: 'Draft', color: 'bg-gray-100 text-gray-700' },
+  { value: 'sent', label: 'Sent', color: 'bg-blue-100 text-blue-700' },
+  { value: 'confirmed', label: 'Confirmed', color: 'bg-green-100 text-green-700' },
+  { value: 'completed', label: 'Completed', color: 'bg-purple-100 text-purple-700' },
+  { value: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-700' }
+]
+
 const SERVICE_TYPES = [
   { value: 'transportation', label: 'Transportation', icon: '🚗' },
   { value: 'guide', label: 'Guide', icon: '👨‍🏫' },
@@ -184,6 +200,11 @@ export default function ItineraryEditorPage() {
   const [showServicesSection, setShowServicesSection] = useState(true)
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null)
   const [servicesChanged, setServicesChanged] = useState(false)
+  
+  // Status & Invoice State
+  const [existingInvoice, setExistingInvoice] = useState<{id: string, invoice_number: string} | null>(null)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [generatingPDF, setGeneratingPDF] = useState(false)
   
   // Attraction picker modal
   const [showAttractionModal, setShowAttractionModal] = useState(false)
@@ -288,6 +309,47 @@ export default function ItineraryEditorPage() {
       console.error('Error loading attractions:', error)
     }
   }
+
+  const checkExistingInvoice = async () => {
+    try {
+      const response = await fetch(`/api/invoices?itineraryId=${itineraryId}`)
+      if (response.ok) {
+        const invoices = await response.json()
+        if (invoices && invoices.length > 0) {
+          setExistingInvoice({ id: invoices[0].id, invoice_number: invoices[0].invoice_number })
+        }
+      }
+    } catch (error) {
+      console.error('Error checking existing invoice:', error)
+    }
+  }
+
+  const updateStatus = async (newStatus: string) => {
+    if (!itinerary) return
+    setUpdatingStatus(true)
+    
+    try {
+      const { error } = await supabase
+        .from('itineraries')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', itineraryId)
+
+      if (error) throw error
+      setItinerary({ ...itinerary, status: newStatus })
+    } catch (error) {
+      console.error('Error updating status:', error)
+      alert('Failed to update status')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  // Load invoice on mount
+  useEffect(() => {
+    if (itineraryId) {
+      checkExistingInvoice()
+    }
+  }, [itineraryId])
 
   // ============================================
   // DAY MANAGEMENT
@@ -672,36 +734,130 @@ export default function ItineraryEditorPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-5">
-      {/* HEADER */}
-      <div className="bg-white rounded-xl p-5 mb-5 shadow-sm flex justify-between items-center">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <span className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-md text-xs font-semibold">
-              {itinerary.status?.toUpperCase() || 'DRAFT'}
-            </span>
-            <h1 className="text-xl font-bold text-gray-900">{itinerary.itinerary_code}</h1>
+      {/* HEADER WITH ALL ACTIONS */}
+      <div className="bg-white rounded-xl p-5 mb-5 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Left: Title & Info */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push(`/itineraries/${itineraryId}`)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Back to view"
+            >
+              <ArrowLeft size={20} className="text-gray-600" />
+            </button>
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                {/* Status Dropdown */}
+                <select
+                  value={itinerary.status || 'draft'}
+                  onChange={(e) => updateStatus(e.target.value)}
+                  disabled={updatingStatus}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#647C47] ${
+                    STATUS_OPTIONS.find(s => s.value === itinerary.status)?.color || 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {STATUS_OPTIONS.map(status => (
+                    <option key={status.value} value={status.value}>{status.label}</option>
+                  ))}
+                </select>
+                <h1 className="text-xl font-bold text-gray-900">{itinerary.itinerary_code}</h1>
+              </div>
+              <p className="text-gray-500 text-sm">
+                {itinerary.client_name} • {days.length} days • {itinerary.num_adults} adults
+                {itinerary.num_children > 0 && `, ${itinerary.num_children} children`}
+              </p>
+            </div>
           </div>
-          <p className="text-gray-500 text-sm">
-            {itinerary.client_name} • {days.length} days • {itinerary.num_adults} adults
-            {itinerary.num_children > 0 && `, ${itinerary.num_children} children`}
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => router.back()}
-            className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </button>
-          <button
-            onClick={calculatePricing}
-            disabled={calculating || saving}
-            className="px-5 py-2.5 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] flex items-center gap-2 disabled:opacity-50"
-          >
-            <Calculator size={16} />
-            {calculating ? 'Calculating...' : saving ? 'Saving...' : 'Calculate Pricing'}
-          </button>
+
+          {/* Right: Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* View Mode Button */}
+            <Link
+              href={`/itineraries/${itineraryId}`}
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center gap-1.5"
+            >
+              <Eye size={16} />
+              View
+            </Link>
+
+            {/* Invoice Button */}
+            {existingInvoice ? (
+              <Link
+                href={`/invoices/${existingInvoice.id}`}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-1.5"
+              >
+                <Receipt size={16} />
+                {existingInvoice.invoice_number}
+              </Link>
+            ) : (
+              <button
+                onClick={async () => {
+                  // Quick invoice generation
+                  const response = await fetch('/api/invoices', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      itinerary_id: itinerary.id,
+                      client_name: itinerary.client_name,
+                      client_email: itinerary.client_email,
+                      line_items: [{
+                        description: `${itinerary.trip_name} - ${itinerary.itinerary_code}`,
+                        quantity: 1,
+                        unit_price: itinerary.total_cost,
+                        amount: itinerary.total_cost
+                      }],
+                      subtotal: itinerary.total_cost,
+                      total_amount: itinerary.total_cost,
+                      currency: itinerary.currency || 'EUR',
+                      issue_date: new Date().toISOString().split('T')[0],
+                      due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+                    })
+                  })
+                  if (response.ok) {
+                    const invoice = await response.json()
+                    router.push(`/invoices/${invoice.id}`)
+                  }
+                }}
+                className="px-3 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 flex items-center gap-1.5"
+              >
+                <Receipt size={16} />
+                Invoice
+              </button>
+            )}
+
+            {/* Documents Dropdown */}
+            <GenerateDocumentsButton 
+              itineraryId={itinerary.id}
+              itineraryCode={itinerary.itinerary_code}
+            />
+
+            {/* Contract Link */}
+            <Link
+              href={`/documents/contract/${itinerary.id}`}
+              className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-1.5"
+            >
+              <FileText size={16} />
+              Contract
+            </Link>
+
+            {/* Add Expense */}
+            <AddExpenseFromItinerary 
+              itineraryId={itinerary.id}
+              itineraryCode={itinerary.itinerary_code}
+              clientName={itinerary.client_name}
+            />
+
+            {/* Calculate Pricing */}
+            <button
+              onClick={calculatePricing}
+              disabled={calculating || saving}
+              className="px-4 py-2 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Calculator size={16} />
+              {calculating ? 'Calculating...' : 'Calculate'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1220,24 +1376,27 @@ export default function ItineraryEditorPage() {
           {/* Action Box */}
           <div className="bg-[#f4f7f1] rounded-xl p-5 border border-[#b8c9a8]">
             <p className="text-sm text-[#4a5c35] mb-4">
-              ✨ Review and edit content above, then calculate pricing or save your changes.
+              ✨ Edit content and pricing, then save or recalculate from rate tables.
             </p>
-            <button
-              onClick={calculatePricing}
-              disabled={calculating || saving}
-              className="w-full py-3.5 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] mb-2.5 flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <Calculator size={18} />
-              {calculating ? 'Calculating...' : saving ? 'Saving...' : 'Calculate Pricing'}
-            </button>
             <button
               onClick={saveDraft}
               disabled={saving || calculating}
+              className="w-full py-3 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] mb-2.5 flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Save size={18} />
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+            <button
+              onClick={calculatePricing}
+              disabled={calculating || saving}
               className="w-full py-3 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              <Save size={16} />
-              {saving ? 'Saving...' : 'Save Draft'}
+              <Calculator size={16} />
+              {calculating ? 'Calculating...' : 'Recalculate from Rates'}
             </button>
+            <p className="text-xs text-gray-500 mt-3 text-center">
+              Recalculating will regenerate services from your rate tables
+            </p>
           </div>
 
           {/* Tips */}
