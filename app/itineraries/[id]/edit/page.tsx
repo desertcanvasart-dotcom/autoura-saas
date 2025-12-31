@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-// ✅ FIXED: Changed from '@/app/supabase' to '@/lib/supabase'
 import { createClient } from '@/lib/supabase'
 import {
   GripVertical,
@@ -25,7 +24,10 @@ import {
   User,
   Ticket,
   Car,
-  Search
+  Search,
+  Trash2,
+  Edit3,
+  DollarSign
 } from 'lucide-react'
 
 // ============================================
@@ -45,8 +47,8 @@ interface DayService {
   lunch: boolean
   dinner: boolean
   hotel: boolean
-  water: boolean  // Always true (standard)
-  tips: boolean   // Always true (standard)
+  water: boolean
+  tips: boolean
 }
 
 interface ItineraryDay {
@@ -56,9 +58,9 @@ interface ItineraryDay {
   city: string
   description: string
   overnight_city: string | null
-  attractions: string[]  // Attraction names
+  attractions: string[]
   services: DayService
-  flight_from?: string   // For inter-city flights
+  flight_from?: string
 }
 
 interface Itinerary {
@@ -82,22 +84,28 @@ interface Itinerary {
   notes: string
 }
 
+interface ItineraryService {
+  id: string
+  itinerary_day_id: string
+  day_number?: number
+  service_type: string
+  service_name: string
+  quantity: number
+  rate_eur: number
+  rate_non_eur: number
+  total_cost: number
+  notes: string
+  isNew?: boolean
+  isDeleted?: boolean
+}
+
 // ============================================
 // CONSTANTS
 // ============================================
 
 const CITIES = [
-  'Cairo',
-  'Giza',
-  'Luxor',
-  'Aswan',
-  'Alexandria',
-  'Hurghada',
-  'Sharm El Sheikh',
-  'Dahab',
-  'Siwa',
-  'Marsa Alam',
-  'El Gouna'
+  'Cairo', 'Giza', 'Luxor', 'Aswan', 'Alexandria',
+  'Hurghada', 'Sharm El Sheikh', 'Dahab', 'Siwa', 'Marsa Alam', 'El Gouna'
 ]
 
 const CITY_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
@@ -122,15 +130,31 @@ const PACKAGE_TYPES = [
 
 const TIERS = ['budget', 'standard', 'deluxe', 'luxury']
 
+const SERVICE_TYPES = [
+  { value: 'transportation', label: 'Transportation', icon: '🚗' },
+  { value: 'guide', label: 'Guide', icon: '👨‍🏫' },
+  { value: 'entrance', label: 'Entrance Fee', icon: '🎫' },
+  { value: 'meal', label: 'Meal', icon: '🍽️' },
+  { value: 'accommodation', label: 'Accommodation', icon: '🏨' },
+  { value: 'activity', label: 'Activity', icon: '🎭' },
+  { value: 'tips', label: 'Tips', icon: '💰' },
+  { value: 'supplies', label: 'Supplies', icon: '💧' },
+  { value: 'service_fee', label: 'Service Fee', icon: '💼' },
+]
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
 
-const getCityColor = (city: string) => {
-  return CITY_COLORS[city] || CITY_COLORS['default']
+const getCityColor = (city: string) => CITY_COLORS[city] || CITY_COLORS['default']
+const generateId = () => `new-${Math.random().toString(36).substr(2, 9)}`
+const getServiceIcon = (type: string) => {
+  const icons: Record<string, string> = {
+    accommodation: '🏨', transportation: '🚗', guide: '👨‍🏫', entrance: '🎫',
+    meal: '🍽️', activity: '🎭', service_fee: '💼', tips: '💰', supplies: '💧'
+  }
+  return icons[type] || '📋'
 }
-
-const generateId = () => Math.random().toString(36).substr(2, 9)
 
 // ============================================
 // MAIN COMPONENT
@@ -154,6 +178,12 @@ export default function ItineraryEditorPage() {
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
   const [showAdvancedPackages, setShowAdvancedPackages] = useState(false)
   const [draggedDay, setDraggedDay] = useState<string | null>(null)
+  
+  // Services & Pricing State
+  const [services, setServices] = useState<ItineraryService[]>([])
+  const [showServicesSection, setShowServicesSection] = useState(true)
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null)
+  const [servicesChanged, setServicesChanged] = useState(false)
   
   // Attraction picker modal
   const [showAttractionModal, setShowAttractionModal] = useState(false)
@@ -183,7 +213,6 @@ export default function ItineraryEditorPage() {
         .single()
 
       if (itinError) throw itinError
-
       setItinerary(itin)
 
       // Load days
@@ -195,7 +224,6 @@ export default function ItineraryEditorPage() {
 
       if (daysError) throw daysError
 
-      // Transform days to our format
       const transformedDays: ItineraryDay[] = (daysData || []).map(day => ({
         id: day.id,
         day_number: day.day_number,
@@ -209,13 +237,34 @@ export default function ItineraryEditorPage() {
           lunch: day.lunch_included ?? true,
           dinner: day.dinner_included ?? false,
           hotel: day.hotel_included ?? (day.overnight_city !== null),
-          water: true,  // Always included
-          tips: true    // Always included
+          water: true,
+          tips: true
         },
         flight_from: day.flight_from
       }))
 
       setDays(transformedDays)
+
+      // Load services for each day
+      if (daysData && daysData.length > 0) {
+        const dayIds = daysData.map(d => d.id)
+        const { data: servicesData, error: servicesError } = await supabase
+          .from('itinerary_services')
+          .select('*')
+          .in('itinerary_day_id', dayIds)
+          .order('id')
+
+        if (servicesError) {
+          console.error('Error loading services:', servicesError)
+        } else {
+          // Add day_number to each service for display
+          const servicesWithDayNumber = (servicesData || []).map(service => {
+            const day = daysData.find(d => d.id === service.itinerary_day_id)
+            return { ...service, day_number: day?.day_number || 1 }
+          })
+          setServices(servicesWithDayNumber)
+        }
+      }
 
     } catch (error) {
       console.error('Error loading itinerary:', error)
@@ -255,16 +304,12 @@ export default function ItineraryEditorPage() {
   }
 
   const updateDay = (dayId: string, updates: Partial<ItineraryDay>) => {
-    setDays(prev => prev.map(day => 
-      day.id === dayId ? { ...day, ...updates } : day
-    ))
+    setDays(prev => prev.map(day => day.id === dayId ? { ...day, ...updates } : day))
   }
 
   const updateDayService = (dayId: string, service: keyof DayService, value: boolean) => {
     setDays(prev => prev.map(day => 
-      day.id === dayId 
-        ? { ...day, services: { ...day.services, [service]: value } } 
-        : day
+      day.id === dayId ? { ...day, services: { ...day.services, [service]: value } } : day
     ))
   }
 
@@ -296,35 +341,71 @@ export default function ItineraryEditorPage() {
       description: '',
       overnight_city: lastDay?.city || 'Cairo',
       attractions: [],
-      services: {
-        guide: true,
-        lunch: true,
-        dinner: false,
-        hotel: true,
-        water: true,
-        tips: true
-      }
+      services: { guide: true, lunch: true, dinner: false, hotel: true, water: true, tips: true }
     }
     setDays([...days, newDay])
     setExpandedDays(new Set([...expandedDays, newDay.id]))
-    
-    // Update itinerary total days
-    if (itinerary) {
-      setItinerary({ ...itinerary, total_days: days.length + 1 })
-    }
+    if (itinerary) setItinerary({ ...itinerary, total_days: days.length + 1 })
   }
 
   const removeDay = (dayId: string) => {
     const newDays = days.filter(d => d.id !== dayId)
-    // Renumber remaining days
-    newDays.forEach((day, index) => {
-      day.day_number = index + 1
-    })
+    newDays.forEach((day, index) => { day.day_number = index + 1 })
     setDays(newDays)
-    
-    // Update itinerary total days
+    if (itinerary) setItinerary({ ...itinerary, total_days: newDays.length })
+  }
+
+  // ============================================
+  // SERVICE MANAGEMENT
+  // ============================================
+
+  const updateService = (serviceId: string, updates: Partial<ItineraryService>) => {
+    setServices(prev => prev.map(s => s.id === serviceId ? { ...s, ...updates } : s))
+    setServicesChanged(true)
+  }
+
+  const addNewService = (dayId: string, dayNumber: number) => {
+    const newService: ItineraryService = {
+      id: generateId(),
+      itinerary_day_id: dayId,
+      day_number: dayNumber,
+      service_type: 'activity',
+      service_name: 'New Service',
+      quantity: 1,
+      rate_eur: 0,
+      rate_non_eur: 0,
+      total_cost: 0,
+      notes: '',
+      isNew: true
+    }
+    setServices([...services, newService])
+    setEditingServiceId(newService.id)
+    setServicesChanged(true)
+  }
+
+  const deleteService = (serviceId: string) => {
+    const service = services.find(s => s.id === serviceId)
+    if (service?.isNew) {
+      // If it's a new service that hasn't been saved, just remove it
+      setServices(services.filter(s => s.id !== serviceId))
+    } else {
+      // Mark existing service as deleted
+      setServices(prev => prev.map(s => s.id === serviceId ? { ...s, isDeleted: true } : s))
+    }
+    setServicesChanged(true)
+  }
+
+  const calculateServiceTotal = (service: ItineraryService) => {
+    const rate = service.rate_non_eur || service.rate_eur || 0
+    return service.quantity * rate
+  }
+
+  const recalculateTotalCost = () => {
+    const total = services
+      .filter(s => !s.isDeleted)
+      .reduce((sum, s) => sum + (s.total_cost || 0), 0)
     if (itinerary) {
-      setItinerary({ ...itinerary, total_days: newDays.length })
+      setItinerary({ ...itinerary, total_cost: total })
     }
   }
 
@@ -332,38 +413,26 @@ export default function ItineraryEditorPage() {
   // DRAG AND DROP
   // ============================================
 
-  const handleDragStart = (dayId: string) => {
-    setDraggedDay(dayId)
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
+  const handleDragStart = (dayId: string) => setDraggedDay(dayId)
+  const handleDragOver = (e: React.DragEvent) => e.preventDefault()
 
   const handleDrop = (targetDayId: string) => {
     if (!draggedDay || draggedDay === targetDayId) {
       setDraggedDay(null)
       return
     }
-
     const dragIndex = days.findIndex(d => d.id === draggedDay)
     const dropIndex = days.findIndex(d => d.id === targetDayId)
-
     const newDays = [...days]
     const [removed] = newDays.splice(dragIndex, 1)
     newDays.splice(dropIndex, 0, removed)
-
-    // Renumber days
-    newDays.forEach((day, index) => {
-      day.day_number = index + 1
-    })
-
+    newDays.forEach((day, index) => { day.day_number = index + 1 })
     setDays(newDays)
     setDraggedDay(null)
   }
 
   // ============================================
-  // ✅ FIXED: SAVE & CALCULATE
+  // SAVE & CALCULATE
   // ============================================
 
   const saveDraft = async (): Promise<boolean> => {
@@ -374,6 +443,10 @@ export default function ItineraryEditorPage() {
       console.log('💾 Saving draft...')
 
       // 1. Update itinerary metadata
+      const totalCost = services
+        .filter(s => !s.isDeleted)
+        .reduce((sum, s) => sum + (s.total_cost || 0), 0)
+
       const { error: itinError } = await supabase
         .from('itineraries')
         .update({
@@ -381,19 +454,16 @@ export default function ItineraryEditorPage() {
           tier: itinerary.tier,
           package_type: itinerary.package_type,
           total_days: days.length,
+          total_cost: totalCost,
           status: 'draft',
           updated_at: new Date().toISOString()
         })
         .eq('id', itineraryId)
 
-      if (itinError) {
-        console.error('❌ Error updating itinerary:', itinError)
-        throw itinError
-      }
-
+      if (itinError) throw itinError
       console.log('✅ Itinerary updated')
 
-      // 2. Update each day individually (safer than delete-all-recreate)
+      // 2. Update each day
       for (const day of days) {
         const dayData = {
           day_number: day.day_number,
@@ -408,45 +478,82 @@ export default function ItineraryEditorPage() {
           hotel_included: day.services?.hotel ?? false
         }
 
-        // Check if this is a real UUID (existing day) or temp ID (new day)
         const isRealUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(day.id)
 
         if (!isRealUUID) {
-          // Insert new day
-          console.log(`➕ Inserting new day ${day.day_number}...`)
           const { data: newDay, error: insertError } = await supabase
             .from('itinerary_days')
-            .insert({
-              ...dayData,
-              itinerary_id: itineraryId
-            })
+            .insert({ ...dayData, itinerary_id: itineraryId })
             .select()
             .single()
 
-          if (insertError) {
-            console.error('❌ Insert error:', insertError)
-            throw insertError
-          }
-
-          // Update local ID
-          if (newDay) {
-            day.id = newDay.id
-          }
+          if (insertError) throw insertError
+          if (newDay) day.id = newDay.id
           console.log(`✅ Day ${day.day_number} inserted`)
         } else {
-          // Update existing day
-          console.log(`📝 Updating day ${day.day_number}...`)
           const { error: updateError } = await supabase
             .from('itinerary_days')
             .update(dayData)
             .eq('id', day.id)
 
-          if (updateError) {
-            console.error('❌ Update error:', updateError)
-            throw updateError
-          }
+          if (updateError) throw updateError
           console.log(`✅ Day ${day.day_number} updated`)
         }
+      }
+
+      // 3. Save services if changed
+      if (servicesChanged) {
+        console.log('💾 Saving services...')
+        
+        // Delete services marked for deletion
+        const toDelete = services.filter(s => s.isDeleted && !s.isNew)
+        for (const service of toDelete) {
+          await supabase.from('itinerary_services').delete().eq('id', service.id)
+          console.log(`🗑️ Deleted service ${service.id}`)
+        }
+
+        // Insert new services
+        const toInsert = services.filter(s => s.isNew && !s.isDeleted)
+        for (const service of toInsert) {
+          const { isNew, isDeleted, day_number, ...serviceData } = service
+          // Make sure we have a valid day ID
+          const day = days.find(d => d.day_number === day_number)
+          if (day) {
+            const { data: newService, error } = await supabase
+              .from('itinerary_services')
+              .insert({ ...serviceData, itinerary_day_id: day.id })
+              .select()
+              .single()
+            
+            if (error) {
+              console.error('Error inserting service:', error)
+            } else if (newService) {
+              service.id = newService.id
+              service.isNew = false
+              console.log(`✅ Service inserted: ${service.service_name}`)
+            }
+          }
+        }
+
+        // Update existing services
+        const toUpdate = services.filter(s => !s.isNew && !s.isDeleted)
+        for (const service of toUpdate) {
+          const { isNew, isDeleted, day_number, ...serviceData } = service
+          const { error } = await supabase
+            .from('itinerary_services')
+            .update(serviceData)
+            .eq('id', service.id)
+          
+          if (error) {
+            console.error('Error updating service:', error)
+          } else {
+            console.log(`✅ Service updated: ${service.service_name}`)
+          }
+        }
+
+        // Clean up deleted services from state
+        setServices(services.filter(s => !s.isDeleted))
+        setServicesChanged(false)
       }
 
       console.log('🎉 Draft saved successfully!')
@@ -466,7 +573,6 @@ export default function ItineraryEditorPage() {
     setCalculating(true)
 
     try {
-      // First save the current state
       console.log('💾 Saving before calculating...')
       const saveSuccess = await saveDraft()
       
@@ -478,7 +584,6 @@ export default function ItineraryEditorPage() {
 
       console.log('📊 Calling calculate-pricing API...')
 
-      // Call the pricing calculation API
       const response = await fetch(`/api/itineraries/${itineraryId}/calculate-pricing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -494,7 +599,7 @@ export default function ItineraryEditorPage() {
           })),
           num_adults: itinerary.num_adults,
           num_children: itinerary.num_children,
-          nationality_type: 'non-eur' // Default, could be passed from client data
+          nationality_type: 'non-eur'
         })
       })
 
@@ -506,8 +611,6 @@ export default function ItineraryEditorPage() {
       }
 
       console.log('✅ Pricing calculated:', result)
-      
-      // Redirect to view page after successful calculation
       router.push(`/itineraries/${itineraryId}`)
 
     } catch (error: any) {
@@ -528,17 +631,24 @@ export default function ItineraryEditorPage() {
   }, {} as Record<string, number>)
 
   const totalAttractions = days.reduce((sum, day) => sum + day.attractions.length, 0)
-  
   const totalLunches = days.filter(d => d.services.lunch).length
   const totalDinners = days.filter(d => d.services.dinner).length
   const totalHotelNights = days.filter(d => d.services.hotel && d.overnight_city).length
 
   const filteredAttractions = attractions.filter(a => {
-    const matchesSearch = !attractionSearch || 
-      a.activity_name.toLowerCase().includes(attractionSearch.toLowerCase())
+    const matchesSearch = !attractionSearch || a.activity_name.toLowerCase().includes(attractionSearch.toLowerCase())
     const matchesCity = !attractionCityFilter || a.city === attractionCityFilter
     return matchesSearch && matchesCity
   })
+
+  const servicesByDay = days.map(day => ({
+    day,
+    services: services.filter(s => s.itinerary_day_id === day.id && !s.isDeleted)
+  }))
+
+  const totalServicesCost = services
+    .filter(s => !s.isDeleted)
+    .reduce((sum, s) => sum + (s.total_cost || 0), 0)
 
   // ============================================
   // RENDER
@@ -560,117 +670,81 @@ export default function ItineraryEditorPage() {
     )
   }
 
-return (
-  <div className="min-h-screen bg-gray-50 p-5">
-    {/* ============================================ */}
-    {/* HEADER */}
-    {/* ============================================ */}
-    <div className="bg-white rounded-xl p-5 mb-5 shadow-sm flex justify-between items-center">
-      <div>
-        <div className="flex items-center gap-3 mb-1">
-          <span className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-md text-xs font-semibold">
-            {itinerary.status?.toUpperCase() || 'DRAFT'}
-          </span>
-          <h1 className="text-xl font-bold text-gray-900">{itinerary.itinerary_code}</h1>
+  return (
+    <div className="min-h-screen bg-gray-50 p-5">
+      {/* HEADER */}
+      <div className="bg-white rounded-xl p-5 mb-5 shadow-sm flex justify-between items-center">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <span className="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-md text-xs font-semibold">
+              {itinerary.status?.toUpperCase() || 'DRAFT'}
+            </span>
+            <h1 className="text-xl font-bold text-gray-900">{itinerary.itinerary_code}</h1>
+          </div>
+          <p className="text-gray-500 text-sm">
+            {itinerary.client_name} • {days.length} days • {itinerary.num_adults} adults
+            {itinerary.num_children > 0 && `, ${itinerary.num_children} children`}
+          </p>
         </div>
-        <p className="text-gray-500 text-sm">
-          {itinerary.client_name} • {days.length} days • {itinerary.num_adults} adults
-          {itinerary.num_children > 0 && `, ${itinerary.num_children} children`}
-        </p>
-      </div>
-      <div className="flex gap-3">
-        <button
-          onClick={() => router.back()}
-          className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
-        <button
-          onClick={calculatePricing}
-          disabled={calculating || saving}
-          className="px-5 py-2.5 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] flex items-center gap-2 disabled:opacity-50"
-        >
-          <Calculator size={16} />
-          {calculating ? 'Calculating...' : saving ? 'Saving...' : 'Calculate Pricing'}
-        </button>
-      </div>
-    </div>
-
-    {/* ============================================ */}
-    {/* WORKFLOW STATUS BAR */}
-    {/* ============================================ */}
-    <div className="bg-white rounded-xl p-4 mb-5 shadow-sm flex items-center gap-2">
-      {/* Step 1 - Complete */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-[#e8ede3] rounded-full">
-        <span className="w-6 h-6 bg-[#647C47] rounded-full flex items-center justify-center text-white text-xs font-bold">
-          <Check size={14} />
-        </span>
-        <span className="text-sm font-semibold text-[#4a5c35]">AI Generated</span>
-      </div>
-      <div className="w-10 h-0.5 bg-[#647C47]"></div>
-      
-      {/* Step 2 - Active */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-[#f4f7f1] rounded-full border-2 border-[#647C47]">
-        <span className="w-6 h-6 bg-[#647C47] rounded-full flex items-center justify-center text-white text-xs font-bold">2</span>
-        <span className="text-sm font-semibold text-[#647C47]">Edit Content</span>
-      </div>
-      <div className="w-10 h-0.5 bg-gray-200"></div>
-      
-      {/* Step 3 - Pending */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
-        <span className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center text-white text-xs font-bold">3</span>
-        <span className="text-sm font-medium text-gray-500">Calculate Pricing</span>
-      </div>
-      <div className="w-10 h-0.5 bg-gray-200"></div>
-      
-      {/* Step 4 - Pending */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
-        <span className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center text-white text-xs font-bold">4</span>
-        <span className="text-sm font-medium text-gray-500">Download PDF</span>
-      </div>
-    </div>
-
-    {/* ============================================ */}
-    {/* PACKAGE TYPE SELECTOR */}
-    {/* ============================================ */}
-    <div className="bg-white rounded-xl p-5 mb-5 shadow-sm">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-semibold text-gray-900">Package Type</h3>
-        <button
-          onClick={() => setShowAdvancedPackages(!showAdvancedPackages)}
-          className="text-sm text-gray-500 hover:text-[#647C47] flex items-center gap-1"
-        >
-          {showAdvancedPackages ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          {showAdvancedPackages ? 'Hide' : 'Show'} advanced options
-        </button>
-      </div>
-      
-      {/* Main Package Options */}
-      <div className="grid grid-cols-3 gap-3 mb-3">
-        {PACKAGE_TYPES.filter(p => !p.advanced).map(pkg => (
+        <div className="flex gap-3">
           <button
-            key={pkg.id}
-            onClick={() => setItinerary({ ...itinerary, package_type: pkg.id })}
-            className={`p-4 rounded-xl border-2 text-center transition-all ${
-              itinerary.package_type === pkg.id
-                ? 'border-[#647C47] bg-[#e8ede3]'
-                : 'border-gray-200 hover:border-[#b8c9a8] hover:bg-[#f4f7f1]'
-            }`}
+            onClick={() => router.back()}
+            className="px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-50 flex items-center gap-2"
           >
-            <div className="text-2xl mb-1">{pkg.icon}</div>
-            <div className={`text-sm font-semibold ${itinerary.package_type === pkg.id ? 'text-[#4a5c35]' : 'text-gray-700'}`}>
-              {pkg.name}
-            </div>
-            <div className="text-xs text-gray-500 mt-0.5">{pkg.desc}</div>
+            <ArrowLeft size={16} />
+            Back
           </button>
-        ))}
+          <button
+            onClick={calculatePricing}
+            disabled={calculating || saving}
+            className="px-5 py-2.5 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] flex items-center gap-2 disabled:opacity-50"
+          >
+            <Calculator size={16} />
+            {calculating ? 'Calculating...' : saving ? 'Saving...' : 'Calculate Pricing'}
+          </button>
+        </div>
       </div>
-      
-      {/* Advanced Options */}
-      {showAdvancedPackages && (
-        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-200">
-          {PACKAGE_TYPES.filter(p => p.advanced).map(pkg => (
+
+      {/* WORKFLOW STATUS BAR */}
+      <div className="bg-white rounded-xl p-4 mb-5 shadow-sm flex items-center gap-2">
+        <div className="flex items-center gap-2 px-4 py-2 bg-[#e8ede3] rounded-full">
+          <span className="w-6 h-6 bg-[#647C47] rounded-full flex items-center justify-center text-white text-xs font-bold">
+            <Check size={14} />
+          </span>
+          <span className="text-sm font-semibold text-[#4a5c35]">AI Generated</span>
+        </div>
+        <div className="w-10 h-0.5 bg-[#647C47]"></div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-[#f4f7f1] rounded-full border-2 border-[#647C47]">
+          <span className="w-6 h-6 bg-[#647C47] rounded-full flex items-center justify-center text-white text-xs font-bold">2</span>
+          <span className="text-sm font-semibold text-[#647C47]">Edit Content</span>
+        </div>
+        <div className="w-10 h-0.5 bg-gray-200"></div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
+          <span className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center text-white text-xs font-bold">3</span>
+          <span className="text-sm font-medium text-gray-500">Calculate Pricing</span>
+        </div>
+        <div className="w-10 h-0.5 bg-gray-200"></div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
+          <span className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center text-white text-xs font-bold">4</span>
+          <span className="text-sm font-medium text-gray-500">Download PDF</span>
+        </div>
+      </div>
+
+      {/* PACKAGE TYPE SELECTOR */}
+      <div className="bg-white rounded-xl p-5 mb-5 shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-sm font-semibold text-gray-900">Package Type</h3>
+          <button
+            onClick={() => setShowAdvancedPackages(!showAdvancedPackages)}
+            className="text-sm text-gray-500 hover:text-[#647C47] flex items-center gap-1"
+          >
+            {showAdvancedPackages ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {showAdvancedPackages ? 'Hide' : 'Show'} advanced options
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-3 gap-3 mb-3">
+          {PACKAGE_TYPES.filter(p => !p.advanced).map(pkg => (
             <button
               key={pkg.id}
               onClick={() => setItinerary({ ...itinerary, package_type: pkg.id })}
@@ -688,238 +762,402 @@ return (
             </button>
           ))}
         </div>
-      )}
-    </div>
-
-    {/* ============================================ */}
-    {/* MAIN CONTENT - TWO COLUMNS */}
-    {/* ============================================ */}
-    <div className="grid grid-cols-[1fr_380px] gap-5">
-      {/* LEFT COLUMN - Days Editor */}
-      <div>
-        {/* Trip Name */}
-        <div className="bg-white rounded-xl p-5 mb-4 shadow-sm">
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
-            Trip Name
-          </label>
-          <input
-            type="text"
-            value={itinerary.trip_name}
-            onChange={(e) => setItinerary({ ...itinerary, trip_name: e.target.value })}
-            className="w-full px-4 py-3 text-lg font-semibold border border-gray-200 rounded-lg focus:outline-none focus:border-[#647C47]"
-          />
-        </div>
-
-        {/* Section Header */}
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-base font-semibold text-gray-900">Itinerary Days</h2>
-          <span className="text-xs text-gray-500">💡 Drag to reorder • Click Edit to expand</span>
-        </div>
-
-        {/* Days List */}
-        {days.map((day) => (
-          <div
-            key={day.id}
-            draggable
-            onDragStart={() => handleDragStart(day.id)}
-            onDragOver={handleDragOver}
-            onDrop={() => handleDrop(day.id)}
-            className={`bg-white rounded-xl mb-3 shadow-sm border-2 transition-all ${
-              draggedDay === day.id
-                ? 'border-dashed border-[#647C47] rotate-1 shadow-lg'
-                : 'border-transparent hover:shadow-md'
-            }`}
-          >
-            {/* Day Header */}
-            <div className="p-4 flex items-center gap-3 cursor-grab">
-              <GripVertical className="text-gray-400" size={18} />
-              <div className="w-9 h-9 bg-[#647C47] rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                {day.day_number}
-              </div>
-              <div className="flex-1 min-w-0">
-                <input
-                  type="text"
-                  value={day.title}
-                  onChange={(e) => updateDay(day.id, { title: e.target.value })}
-                  className="w-full border-none text-[15px] font-semibold text-gray-900 bg-transparent focus:outline-none"
-                  placeholder="Day title..."
-                />
-                <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                  <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${getCityColor(day.city).bg} ${getCityColor(day.city).text}`}>
-                    📍 {day.city}
-                  </span>
-                  {day.flight_from && (
-                    <span className="flex items-center gap-1">
-                      <Plane size={12} /> from {day.flight_from}
-                    </span>
-                  )}
-                  {day.overnight_city && (
-                    <span className="flex items-center gap-1">
-                      <Moon size={12} /> {day.overnight_city}
-                    </span>
-                  )}
-                </div>
-              </div>
+        
+        {showAdvancedPackages && (
+          <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-200">
+            {PACKAGE_TYPES.filter(p => p.advanced).map(pkg => (
               <button
-                onClick={() => toggleDayExpanded(day.id)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  expandedDays.has(day.id)
-                    ? 'bg-[#647C47] text-white'
-                    : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                key={pkg.id}
+                onClick={() => setItinerary({ ...itinerary, package_type: pkg.id })}
+                className={`p-4 rounded-xl border-2 text-center transition-all ${
+                  itinerary.package_type === pkg.id
+                    ? 'border-[#647C47] bg-[#e8ede3]'
+                    : 'border-gray-200 hover:border-[#b8c9a8] hover:bg-[#f4f7f1]'
                 }`}
               >
-                {expandedDays.has(day.id) ? 'Collapse' : 'Edit'}
+                <div className="text-2xl mb-1">{pkg.icon}</div>
+                <div className={`text-sm font-semibold ${itinerary.package_type === pkg.id ? 'text-[#4a5c35]' : 'text-gray-700'}`}>
+                  {pkg.name}
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">{pkg.desc}</div>
               </button>
-            </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-            {/* Day Content (Expanded) */}
-            {expandedDays.has(day.id) && (
-              <div className="p-5 border-t border-gray-200">
-                {/* City Selector */}
-                <div className="mb-4">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
-                    City (affects transportation & guide rates)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {CITIES.map(city => (
-                      <button
-                        key={city}
-                        onClick={() => updateDay(day.id, { city, overnight_city: city })}
-                        className={`px-3 py-2 rounded-md text-sm transition-all ${
-                          day.city === city
-                            ? 'bg-[#647C47] text-white'
-                            : 'bg-white border border-gray-200 text-gray-600 hover:border-[#b8c9a8]'
-                        }`}
-                      >
-                        {city}
-                      </button>
-                    ))}
-                  </div>
+      {/* MAIN CONTENT - TWO COLUMNS */}
+      <div className="grid grid-cols-[1fr_380px] gap-5">
+        {/* LEFT COLUMN - Days Editor */}
+        <div>
+          {/* Trip Name */}
+          <div className="bg-white rounded-xl p-5 mb-4 shadow-sm">
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+              Trip Name
+            </label>
+            <input
+              type="text"
+              value={itinerary.trip_name}
+              onChange={(e) => setItinerary({ ...itinerary, trip_name: e.target.value })}
+              className="w-full px-4 py-3 text-lg font-semibold border border-gray-200 rounded-lg focus:outline-none focus:border-[#647C47]"
+            />
+          </div>
+
+          {/* Section Header */}
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-base font-semibold text-gray-900">Itinerary Days</h2>
+            <span className="text-xs text-gray-500">💡 Drag to reorder • Click Edit to expand</span>
+          </div>
+
+          {/* Days List */}
+          {days.map((day) => (
+            <div
+              key={day.id}
+              draggable
+              onDragStart={() => handleDragStart(day.id)}
+              onDragOver={handleDragOver}
+              onDrop={() => handleDrop(day.id)}
+              className={`bg-white rounded-xl mb-3 shadow-sm border-2 transition-all ${
+                draggedDay === day.id
+                  ? 'border-dashed border-[#647C47] rotate-1 shadow-lg'
+                  : 'border-transparent hover:shadow-md'
+              }`}
+            >
+              {/* Day Header */}
+              <div className="p-4 flex items-center gap-3 cursor-grab">
+                <GripVertical className="text-gray-400" size={18} />
+                <div className="w-9 h-9 bg-[#647C47] rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                  {day.day_number}
                 </div>
-
-                {/* Description */}
-                <div className="mb-4">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={day.description}
-                    onChange={(e) => updateDay(day.id, { description: e.target.value })}
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#647C47] resize-y"
-                    placeholder="Describe this day..."
+                <div className="flex-1 min-w-0">
+                  <input
+                    type="text"
+                    value={day.title}
+                    onChange={(e) => updateDay(day.id, { title: e.target.value })}
+                    className="w-full border-none text-[15px] font-semibold text-gray-900 bg-transparent focus:outline-none"
+                    placeholder="Day title..."
                   />
-                </div>
-
-                {/* Attractions */}
-                <div className="mb-4">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
-                    Attractions / Sites (affects entrance fees)
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {day.attractions.map((attr, i) => (
-                      <span
-                        key={i}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#e8ede3] border border-[#b8c9a8] rounded-full text-sm text-[#4a5c35]"
-                      >
-                        <Ticket size={14} />
-                        {attr}
-                        <button
-                          onClick={() => removeAttraction(day.id, attr)}
-                          className="text-red-500 hover:text-red-700 ml-1"
-                        >
-                          <X size={14} />
-                        </button>
-                      </span>
-                    ))}
-                    <button
-                      onClick={() => {
-                        setAttractionModalDayId(day.id)
-                        setAttractionCityFilter(day.city)
-                        setShowAttractionModal(true)
-                      }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-full text-sm text-gray-500 hover:border-[#647C47] hover:text-[#647C47]"
-                    >
-                      <Plus size={14} />
-                      Add attraction
-                    </button>
+                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                    <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${getCityColor(day.city).bg} ${getCityColor(day.city).text}`}>
+                      📍 {day.city}
+                    </span>
+                    {day.flight_from && <span className="flex items-center gap-1"><Plane size={12} /> from {day.flight_from}</span>}
+                    {day.overnight_city && <span className="flex items-center gap-1"><Moon size={12} /> {day.overnight_city}</span>}
                   </div>
                 </div>
+                <button
+                  onClick={() => toggleDayExpanded(day.id)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    expandedDays.has(day.id)
+                      ? 'bg-[#647C47] text-white'
+                      : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {expandedDays.has(day.id) ? 'Collapse' : 'Edit'}
+                </button>
+              </div>
 
-                {/* Services Grid */}
-                <div className="grid grid-cols-6 gap-3 p-4 bg-gray-50 rounded-lg">
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={day.services.guide}
-                      onChange={(e) => updateDayService(day.id, 'guide', e.target.checked)}
-                      className="w-4 h-4 accent-[#647C47]"
+              {/* Day Content (Expanded) */}
+              {expandedDays.has(day.id) && (
+                <div className="p-5 border-t border-gray-200">
+                  {/* City Selector */}
+                  <div className="mb-4">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+                      City
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {CITIES.map(city => (
+                        <button
+                          key={city}
+                          onClick={() => updateDay(day.id, { city, overnight_city: city })}
+                          className={`px-3 py-2 rounded-md text-sm transition-all ${
+                            day.city === city
+                              ? 'bg-[#647C47] text-white'
+                              : 'bg-white border border-gray-200 text-gray-600 hover:border-[#b8c9a8]'
+                          }`}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div className="mb-4">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+                      Description
+                    </label>
+                    <textarea
+                      value={day.description}
+                      onChange={(e) => updateDay(day.id, { description: e.target.value })}
+                      rows={3}
+                      className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#647C47] resize-y"
+                      placeholder="Describe this day..."
                     />
-                    <User size={14} /> Guide
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={day.services.lunch}
-                      onChange={(e) => updateDayService(day.id, 'lunch', e.target.checked)}
-                      className="w-4 h-4 accent-[#647C47]"
-                    />
-                    <Utensils size={14} /> Lunch
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={day.services.dinner}
-                      onChange={(e) => updateDayService(day.id, 'dinner', e.target.checked)}
-                      className="w-4 h-4 accent-[#647C47]"
-                    />
-                    <Wine size={14} /> Dinner
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={day.services.hotel}
-                      onChange={(e) => updateDayService(day.id, 'hotel', e.target.checked)}
-                      className="w-4 h-4 accent-[#647C47]"
-                      disabled={day.day_number === days.length} // Last day usually no hotel
-                    />
-                    <Hotel size={14} /> Hotel
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-400 cursor-not-allowed">
-                    <input type="checkbox" checked disabled className="w-4 h-4" />
-                    <Droplets size={14} /> Water
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-400 cursor-not-allowed">
-                    <input type="checkbox" checked disabled className="w-4 h-4" />
-                    <Banknote size={14} /> Tips
-                  </label>
+                  </div>
+
+                  {/* Attractions */}
+                  <div className="mb-4">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+                      Attractions / Sites
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {day.attractions.map((attr, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#e8ede3] border border-[#b8c9a8] rounded-full text-sm text-[#4a5c35]"
+                        >
+                          <Ticket size={14} />
+                          {attr}
+                          <button onClick={() => removeAttraction(day.id, attr)} className="text-red-500 hover:text-red-700 ml-1">
+                            <X size={14} />
+                          </button>
+                        </span>
+                      ))}
+                      <button
+                        onClick={() => {
+                          setAttractionModalDayId(day.id)
+                          setAttractionCityFilter(day.city)
+                          setShowAttractionModal(true)
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-dashed border-gray-300 rounded-full text-sm text-gray-500 hover:border-[#647C47] hover:text-[#647C47]"
+                      >
+                        <Plus size={14} />
+                        Add attraction
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Services Grid */}
+                  <div className="grid grid-cols-6 gap-3 p-4 bg-gray-50 rounded-lg">
+                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={day.services.guide} onChange={(e) => updateDayService(day.id, 'guide', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
+                      <User size={14} /> Guide
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={day.services.lunch} onChange={(e) => updateDayService(day.id, 'lunch', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
+                      <Utensils size={14} /> Lunch
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={day.services.dinner} onChange={(e) => updateDayService(day.id, 'dinner', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
+                      <Wine size={14} /> Dinner
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={day.services.hotel} onChange={(e) => updateDayService(day.id, 'hotel', e.target.checked)} className="w-4 h-4 accent-[#647C47]" disabled={day.day_number === days.length} />
+                      <Hotel size={14} /> Hotel
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-400 cursor-not-allowed">
+                      <input type="checkbox" checked disabled className="w-4 h-4" />
+                      <Droplets size={14} /> Water
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-400 cursor-not-allowed">
+                      <input type="checkbox" checked disabled className="w-4 h-4" />
+                      <Banknote size={14} /> Tips
+                    </label>
+                  </div>
+
+                  {days.length > 1 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <button onClick={() => removeDay(day.id)} className="text-sm text-red-500 hover:text-red-700">
+                        Remove this day
+                      </button>
+                    </div>
+                  )}
                 </div>
+              )}
+            </div>
+          ))}
 
-                {/* Remove Day Button */}
-                {days.length > 1 && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <button
-                      onClick={() => removeDay(day.id)}
-                      className="text-sm text-red-500 hover:text-red-700"
-                    >
-                      Remove this day
-                    </button>
+          {/* Add Day Button */}
+          <button
+            onClick={addNewDay}
+            className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-[#647C47] hover:text-[#647C47] flex items-center justify-center gap-2 mb-5"
+          >
+            <Plus size={18} />
+            Add Another Day
+          </button>
+
+          {/* ============================================ */}
+          {/* SERVICES & PRICING SECTION */}
+          {/* ============================================ */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => setShowServicesSection(!showServicesSection)}
+              className="w-full px-5 py-4 flex items-center justify-between bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center">
+                  <DollarSign className="text-white" size={20} />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-base font-semibold text-gray-900">Services & Pricing</h3>
+                  <p className="text-xs text-gray-500">
+                    {services.filter(s => !s.isDeleted).length} services • Total: {itinerary.currency} {totalServicesCost.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {servicesChanged && (
+                  <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">
+                    Unsaved changes
+                  </span>
+                )}
+                {showServicesSection ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+              </div>
+            </button>
+
+            {showServicesSection && (
+              <div className="p-5">
+                {services.filter(s => !s.isDeleted).length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p className="text-sm mb-2">No services added yet</p>
+                    <p className="text-xs">Click "Calculate Pricing" to auto-generate services from your itinerary</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {servicesByDay.map(({ day, services: dayServices }) => (
+                      <div key={day.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-7 h-7 bg-[#647C47] rounded flex items-center justify-center text-white text-xs font-bold">
+                              {day.day_number}
+                            </span>
+                            <span className="font-medium text-gray-900 text-sm">{day.title}</span>
+                            <span className={`px-2 py-0.5 rounded text-xs ${getCityColor(day.city).bg} ${getCityColor(day.city).text}`}>
+                              {day.city}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => addNewService(day.id, day.day_number)}
+                            className="text-xs text-[#647C47] hover:text-[#4a5c35] font-medium flex items-center gap-1"
+                          >
+                            <Plus size={14} /> Add Service
+                          </button>
+                        </div>
+
+                        {dayServices.length > 0 ? (
+                          <div className="divide-y divide-gray-100">
+                            {dayServices.map(service => (
+                              <div
+                                key={service.id}
+                                className={`px-4 py-3 flex items-center gap-3 ${
+                                  editingServiceId === service.id ? 'bg-amber-50' : 'hover:bg-gray-50'
+                                }`}
+                              >
+                                <span className="text-lg">{getServiceIcon(service.service_type)}</span>
+                                
+                                {editingServiceId === service.id ? (
+                                  // Edit Mode
+                                  <div className="flex-1 grid grid-cols-12 gap-2 items-center">
+                                    <select
+                                      value={service.service_type}
+                                      onChange={(e) => updateService(service.id, { service_type: e.target.value })}
+                                      className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
+                                    >
+                                      {SERVICE_TYPES.map(t => (
+                                        <option key={t.value} value={t.value}>{t.label}</option>
+                                      ))}
+                                    </select>
+                                    <input
+                                      type="text"
+                                      value={service.service_name}
+                                      onChange={(e) => updateService(service.id, { service_name: e.target.value })}
+                                      className="col-span-4 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
+                                      placeholder="Service name"
+                                    />
+                                    <input
+                                      type="number"
+                                      value={service.quantity}
+                                      onChange={(e) => {
+                                        const qty = parseInt(e.target.value) || 1
+                                        const total = qty * (service.rate_non_eur || service.rate_eur || 0)
+                                        updateService(service.id, { quantity: qty, total_cost: total })
+                                      }}
+                                      className="col-span-1 px-2 py-1.5 border border-gray-300 rounded text-sm text-center focus:outline-none focus:border-[#647C47]"
+                                      min="1"
+                                    />
+                                    <input
+                                      type="number"
+                                      value={service.rate_non_eur || service.rate_eur || 0}
+                                      onChange={(e) => {
+                                        const rate = parseFloat(e.target.value) || 0
+                                        updateService(service.id, { 
+                                          rate_non_eur: rate, 
+                                          rate_eur: rate,
+                                          total_cost: service.quantity * rate 
+                                        })
+                                      }}
+                                      className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:border-[#647C47]"
+                                      step="0.01"
+                                      placeholder="Rate"
+                                    />
+                                    <div className="col-span-2 text-right font-semibold text-gray-900">
+                                      {itinerary.currency} {service.total_cost?.toFixed(2) || '0.00'}
+                                    </div>
+                                    <div className="col-span-1 flex justify-end gap-1">
+                                      <button
+                                        onClick={() => setEditingServiceId(null)}
+                                        className="p-1.5 text-green-600 hover:bg-green-50 rounded"
+                                      >
+                                        <Check size={16} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  // View Mode
+                                  <div className="flex-1 flex items-center justify-between">
+                                    <div>
+                                      <p className="text-sm font-medium text-gray-900">{service.service_name}</p>
+                                      <p className="text-xs text-gray-500 capitalize">
+                                        {service.service_type.replace('_', ' ')}
+                                        {service.quantity > 1 && ` • Qty: ${service.quantity}`}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-sm font-semibold text-gray-900">
+                                        {itinerary.currency} {service.total_cost?.toFixed(2) || '0.00'}
+                                      </span>
+                                      <button
+                                        onClick={() => setEditingServiceId(service.id)}
+                                        className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-100 rounded"
+                                        title="Edit"
+                                      >
+                                        <Edit3 size={14} />
+                                      </button>
+                                      <button
+                                        onClick={() => deleteService(service.id)}
+                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                                        title="Delete"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="px-4 py-6 text-center text-gray-400 text-sm">
+                            No services for this day
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
+
+                {/* Total Cost Bar */}
+                <div className="mt-5 p-4 bg-[#e8ede3] rounded-lg flex items-center justify-between">
+                  <span className="font-semibold text-[#4a5c35]">Total Cost</span>
+                  <span className="text-xl font-bold text-[#4a5c35]">
+                    {itinerary.currency} {totalServicesCost.toFixed(2)}
+                  </span>
+                </div>
               </div>
             )}
           </div>
-        ))}
-
-        {/* Add Day Button */}
-        <button
-          onClick={addNewDay}
-          className="w-full p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl text-sm font-medium text-gray-500 hover:border-[#647C47] hover:text-[#647C47] flex items-center justify-center gap-2"
-        >
-          <Plus size={18} />
-          Add Another Day
-        </button>
-      </div>
+        </div>
 
         {/* RIGHT COLUMN - Summary & Actions */}
         <div>
@@ -965,7 +1203,7 @@ return (
             {/* Cities Breakdown */}
             <div className="mt-4 pt-4 border-t border-gray-200">
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-3">
-                Cities Involved (rates vary)
+                Cities Involved
               </label>
               {Object.entries(citiesBreakdown).map(([city, count]) => (
                 <div key={city} className="flex items-center justify-between py-2 text-sm">
@@ -979,76 +1217,10 @@ return (
             </div>
           </div>
 
-          {/* Services to Calculate */}
-          <div className="bg-white rounded-xl p-5 mb-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Services to Calculate</h3>
-            
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 p-2.5 bg-blue-50 rounded-lg text-sm">
-                <Car size={16} className="text-blue-600" />
-                <span className="flex-1 text-gray-700">Transportation</span>
-                <span className="text-blue-700 font-semibold">{Object.keys(citiesBreakdown).length} cities</span>
-              </div>
-              <p className="text-[11px] text-gray-500 -mt-1 ml-8 mb-2">
-                {Object.entries(citiesBreakdown).map(([city, count]) => `${city}: ${count} day${count > 1 ? 's' : ''}`).join(' • ')}
-              </p>
-
-              <div className="flex items-center gap-2 p-2.5 bg-blue-50 rounded-lg text-sm">
-                <User size={16} className="text-blue-600" />
-                <span className="flex-1 text-gray-700">Guide Service</span>
-                <span className="text-blue-700 font-semibold">{Object.keys(citiesBreakdown).length} cities</span>
-              </div>
-
-              <div className="flex items-center gap-2 p-2.5 bg-[#e8ede3] rounded-lg text-sm">
-                <Ticket size={16} className="text-[#647C47]" />
-                <span className="flex-1 text-gray-700">Entrance Fees</span>
-                <span className="text-[#4a5c35] font-semibold">{totalAttractions} sites</span>
-              </div>
-
-              <div className="flex items-center gap-2 p-2.5 bg-[#e8ede3] rounded-lg text-sm">
-                <Utensils size={16} className="text-[#647C47]" />
-                <span className="flex-1 text-gray-700">Meals</span>
-                <span className="text-[#4a5c35] font-semibold">
-                  {totalLunches} lunch{totalLunches !== 1 ? 'es' : ''}
-                  {totalDinners > 0 && `, ${totalDinners} dinner${totalDinners !== 1 ? 's' : ''}`}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 p-2.5 bg-[#e8ede3] rounded-lg text-sm">
-                <Droplets size={16} className="text-[#647C47]" />
-                <span className="flex-1 text-gray-700">Water Bottles</span>
-                <span className="text-[#4a5c35] font-semibold">× {days.length} days</span>
-              </div>
-
-              <div className="flex items-center gap-2 p-2.5 bg-[#e8ede3] rounded-lg text-sm">
-                <Banknote size={16} className="text-[#647C47]" />
-                <span className="flex-1 text-gray-700">Daily Tips</span>
-                <span className="text-[#4a5c35] font-semibold">× {days.length} days</span>
-              </div>
-
-              {totalHotelNights > 0 && (
-                <>
-                  <div className="flex items-center gap-2 p-2.5 bg-amber-100 rounded-lg text-sm">
-                    <Hotel size={16} className="text-amber-600" />
-                    <span className="flex-1 text-gray-700">Hotels ({itinerary.tier})</span>
-                    <span className="text-amber-700 font-semibold">× {totalHotelNights} nights</span>
-                  </div>
-                  <p className="text-[11px] text-gray-500 -mt-1 ml-8">
-                    {Object.entries(citiesBreakdown)
-                      .filter(([_, count]) => count > 0)
-                      .map(([city, count]) => `${city}: ${Math.max(0, count - (city === Object.keys(citiesBreakdown)[Object.keys(citiesBreakdown).length - 1] ? 1 : 0))}`)
-                      .filter(s => !s.endsWith(': 0'))
-                      .join(' • ')}
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-
           {/* Action Box */}
           <div className="bg-[#f4f7f1] rounded-xl p-5 border border-[#b8c9a8]">
             <p className="text-sm text-[#4a5c35] mb-4">
-              ✨ Review the content above, then calculate pricing. Rates will be pulled from your rate tables based on each city.
+              ✨ Review and edit content above, then calculate pricing or save your changes.
             </p>
             <button
               onClick={calculatePricing}
@@ -1070,37 +1242,24 @@ return (
 
           {/* Tips */}
           <div className="mt-4 p-4 bg-[#e8ede3] rounded-lg border border-[#b8c9a8]">
-            <h4 className="text-sm font-semibold text-[#4a5c35] mb-2">💡 Pricing Notes</h4>
+            <h4 className="text-sm font-semibold text-[#4a5c35] mb-2">💡 Tips</h4>
             <ul className="text-xs text-[#647C47] space-y-1.5 list-disc pl-4">
-              <li><strong>Standard inclusions:</strong> Water & Tips (every day)</li>
-              <li>Transportation rates vary by city</li>
-              <li>Guide rates differ per location</li>
-              <li>Hotels pull from city-specific rates</li>
-              <li>Entrance fees match each attraction</li>
-              <li>Drag days to optimize route</li>
+              <li>Edit services directly in the pricing section</li>
+              <li>Add/remove services for each day</li>
+              <li>Changes are saved when you click Save Draft</li>
+              <li>Calculate Pricing regenerates from rate tables</li>
             </ul>
           </div>
         </div>
       </div>
 
-      {/* ============================================ */}
       {/* ATTRACTION PICKER MODAL */}
-      {/* ============================================ */}
       {showAttractionModal && (
-        <div 
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          onClick={() => setShowAttractionModal(false)}
-        >
-          <div 
-            className="bg-white rounded-2xl w-[550px] max-h-[80vh] overflow-hidden shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAttractionModal(false)}>
+          <div className="bg-white rounded-2xl w-[550px] max-h-[80vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="p-5 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold">Add Attraction</h3>
-              <button 
-                onClick={() => setShowAttractionModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={() => setShowAttractionModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={24} />
               </button>
             </div>
@@ -1116,14 +1275,11 @@ return (
                 />
               </div>
               
-              {/* City Filter */}
               <div className="flex flex-wrap gap-2 mb-4">
                 <button
                   onClick={() => setAttractionCityFilter(null)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    !attractionCityFilter
-                      ? 'bg-[#647C47] text-white'
-                      : 'bg-white border border-gray-200 text-gray-600 hover:border-[#647C47]'
+                    !attractionCityFilter ? 'bg-[#647C47] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-[#647C47]'
                   }`}
                 >
                   All Cities
@@ -1133,9 +1289,7 @@ return (
                     key={city}
                     onClick={() => setAttractionCityFilter(city)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      attractionCityFilter === city
-                        ? 'bg-[#647C47] text-white'
-                        : 'bg-white border border-gray-200 text-gray-600 hover:border-[#647C47]'
+                      attractionCityFilter === city ? 'bg-[#647C47] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-[#647C47]'
                     }`}
                   >
                     {city}
@@ -1143,7 +1297,6 @@ return (
                 ))}
               </div>
 
-              {/* Attractions List */}
               <div className="max-h-[400px] overflow-y-auto space-y-2">
                 {filteredAttractions.map(attr => {
                   const currentDay = days.find(d => d.id === attractionModalDayId)
@@ -1158,9 +1311,7 @@ return (
                         }
                       }}
                       className={`p-3.5 rounded-lg border flex justify-between items-center transition-all ${
-                        isAdded
-                          ? 'border-green-300 bg-green-50 cursor-default'
-                          : 'border-gray-200 hover:border-[#b8c9a8] hover:bg-[#f4f7f1] cursor-pointer'
+                        isAdded ? 'border-green-300 bg-green-50 cursor-default' : 'border-gray-200 hover:border-[#b8c9a8] hover:bg-[#f4f7f1] cursor-pointer'
                       }`}
                     >
                       <div>
@@ -1171,17 +1322,13 @@ return (
                         <div className="text-xs text-gray-500 mt-0.5">📍 {attr.city}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-semibold text-[#647C47]">
-                          €{attr.base_rate_eur} / €{attr.base_rate_non_eur}
-                        </div>
+                        <div className="text-sm font-semibold text-[#647C47]">€{attr.base_rate_eur} / €{attr.base_rate_non_eur}</div>
                         <div className="text-[11px] text-gray-500">EUR / non-EUR</div>
                       </div>
                     </div>
                   )
                 })}
-                {filteredAttractions.length === 0 && (
-                  <p className="text-center text-gray-500 py-8">No attractions found</p>
-                )}
+                {filteredAttractions.length === 0 && <p className="text-center text-gray-500 py-8">No attractions found</p>}
               </div>
             </div>
           </div>
