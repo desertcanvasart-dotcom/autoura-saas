@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   Search, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
@@ -37,6 +37,8 @@ interface Attraction {
   category?: string
   notes?: string
   is_active: boolean
+  is_addon: boolean  // NEW: Add-on flag
+  addon_note?: string  // NEW: Optional note for add-ons
   supplier_id?: string
   supplier?: { id: string; name: string }
   created_at?: string
@@ -189,9 +191,11 @@ export default function AttractionsContent() {
   const [selectedCity, setSelectedCity] = useState('all')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [showInactive, setShowInactive] = useState(false)
+  const [showAddonsOnly, setShowAddonsOnly] = useState(false)  // NEW: Filter for add-ons
   const [showModal, setShowModal] = useState(false)
   const [editingAttraction, setEditingAttraction] = useState<Attraction | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [togglingAddon, setTogglingAddon] = useState<string | null>(null)  // NEW: Track which row is toggling
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -216,6 +220,8 @@ export default function AttractionsContent() {
     category: '',
     notes: '',
     is_active: true,
+    is_addon: false,  // NEW
+    addon_note: '',   // NEW
     supplier_id: ''
   })
 
@@ -276,7 +282,7 @@ export default function AttractionsContent() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedCity, selectedCategory, showInactive, itemsPerPage])
+  }, [searchTerm, selectedCity, selectedCategory, showInactive, showAddonsOnly, itemsPerPage])
 
   // Generate service code
   const generateServiceCode = () => {
@@ -296,10 +302,40 @@ export default function AttractionsContent() {
 
   // Handle checkbox for active status
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target
     setFormData(prev => ({
       ...prev,
-      is_active: e.target.checked
+      [name]: checked
     }))
+  }
+
+  // NEW: Toggle add-on status directly from table
+  const toggleAddonStatus = async (attraction: Attraction) => {
+    setTogglingAddon(attraction.id)
+    try {
+      const response = await fetch(`/api/rates/attractions/${attraction.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...attraction,
+          is_addon: !attraction.is_addon
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        showToast('success', `${attraction.attraction_name} is now ${!attraction.is_addon ? 'an add-on' : 'standard'}`)
+        fetchAttractions()
+      } else {
+        showToast('error', data.error || 'Failed to update')
+      }
+    } catch (error) {
+      console.error('Error toggling add-on:', error)
+      showToast('error', 'Failed to update add-on status')
+    } finally {
+      setTogglingAddon(null)
+    }
   }
 
   // Open modal for new attraction
@@ -321,6 +357,8 @@ export default function AttractionsContent() {
       category: '',
       notes: '',
       is_active: true,
+      is_addon: false,
+      addon_note: '',
       supplier_id: ''
     })
     setShowModal(true)
@@ -345,6 +383,8 @@ export default function AttractionsContent() {
       category: attraction.category || '',
       notes: attraction.notes || '',
       is_active: attraction.is_active,
+      is_addon: attraction.is_addon || false,
+      addon_note: attraction.addon_note || '',
       supplier_id: attraction.supplier_id || ''
     })
     setShowModal(true)
@@ -433,8 +473,9 @@ export default function AttractionsContent() {
     const matchesCity = selectedCity === 'all' || attraction.city === selectedCity
     const matchesCategory = selectedCategory === 'all' || attraction.category === selectedCategory
     const matchesActive = showInactive || attraction.is_active
+    const matchesAddon = !showAddonsOnly || attraction.is_addon  // NEW: Add-on filter
     
-    return matchesSearch && matchesCity && matchesCategory && matchesActive
+    return matchesSearch && matchesCity && matchesCategory && matchesActive && matchesAddon
   })
 
   // Pagination calculations
@@ -450,7 +491,8 @@ export default function AttractionsContent() {
 
   // Calculate stats
   const activeAttractions = attractions.filter(a => a.is_active).length
-  const inactiveAttractions = attractions.filter(a => !a.is_active).length
+  const addonAttractions = attractions.filter(a => a.is_addon).length  // NEW
+  const standardAttractions = attractions.filter(a => !a.is_addon).length  // NEW
   const avgRate = attractions.length > 0 
   ? (attractions.reduce((sum, a) => sum + (a.eur_rate || 0), 0) / attractions.length).toFixed(2)
   : '0.00'
@@ -533,9 +575,9 @@ export default function AttractionsContent() {
         </div>
       </header>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - UPDATED */}
       <div className="container mx-auto px-4 lg:px-6 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-4">
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-gray-400 text-xl">🎫</span>
@@ -554,19 +596,29 @@ export default function AttractionsContent() {
             <p className="text-2xl font-bold text-gray-900">{activeAttractions}</p>
           </div>
 
+          {/* NEW: Standard vs Add-on stats */}
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">✗</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-red-600" />
+              <span className="text-gray-400 text-xl">📍</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             </div>
-            <p className="text-xs text-gray-600">Inactive</p>
-            <p className="text-2xl font-bold text-gray-900">{inactiveAttractions}</p>
+            <p className="text-xs text-gray-600">Standard</p>
+            <p className="text-2xl font-bold text-gray-900">{standardAttractions}</p>
+          </div>
+
+          <div className="bg-white p-3 rounded-lg shadow-md border border-orange-200 bg-orange-50">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="text-orange-500 w-5 h-5" />
+              <div className="w-1.5 h-1.5 rounded-full bg-orange-600" />
+            </div>
+            <p className="text-xs text-orange-700">Add-ons</p>
+            <p className="text-2xl font-bold text-orange-700">{addonAttractions}</p>
           </div>
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-gray-400 text-xl">🏙️</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
             </div>
             <p className="text-xs text-gray-600">Cities</p>
             <p className="text-2xl font-bold text-gray-900">{cities.length}</p>
@@ -582,7 +634,7 @@ export default function AttractionsContent() {
           </div>
         </div>
 
-        {/* Search and Filters */}
+        {/* Search and Filters - UPDATED */}
         <div className="bg-white rounded-lg shadow-md border border-gray-200 p-3 mb-4">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1 relative">
@@ -629,16 +681,29 @@ export default function AttractionsContent() {
             >
               {showInactive ? 'Active Only' : 'Show Inactive'}
             </button>
+            {/* NEW: Add-on filter button */}
+            <button
+              onClick={() => setShowAddonsOnly(!showAddonsOnly)}
+              className={`px-3 py-2 text-sm rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
+                showAddonsOnly 
+                  ? 'bg-orange-100 border border-orange-400 text-orange-700' 
+                  : 'bg-white border border-gray-300 text-gray-700'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              {showAddonsOnly ? 'All Types' : 'Add-ons Only'}
+            </button>
           </div>
           
           <div className="mt-3 pt-3 border-t border-gray-200">
             <p className="text-xs text-gray-600">
               Showing <span className="font-bold text-gray-900">{filteredAttractions.length}</span> of {attractions.length} attractions
+              {showAddonsOnly && <span className="ml-1 text-orange-600">(add-ons only)</span>}
             </p>
           </div>
         </div>
 
-        {/* Attractions Table */}
+        {/* Attractions Table - UPDATED with Add-on column */}
         <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -650,13 +715,23 @@ export default function AttractionsContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">
+                    <span className="flex items-center justify-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                      Add-on
+                    </span>
+                  </th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {paginatedAttractions.map((attraction, index) => (
-                  <tr key={attraction.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                  <tr key={attraction.id} className={`${
+                    attraction.is_addon 
+                      ? 'bg-orange-50/50 hover:bg-orange-50' 
+                      : index % 2 === 0 ? 'bg-white hover:bg-gray-100' : 'bg-gray-50 hover:bg-gray-100'
+                  } transition-colors`}>
                     <td className="px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{attraction.attraction_name}</p>
@@ -695,6 +770,23 @@ export default function AttractionsContent() {
                       {attraction.fee_type === 'free' ? 'FREE' : `€${(attraction.non_eur_rate || 0).toFixed(2)}`}
                       </span>
                     </td>
+                    {/* NEW: Add-on toggle column */}
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => toggleAddonStatus(attraction)}
+                        disabled={togglingAddon === attraction.id}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                          attraction.is_addon ? 'bg-orange-500' : 'bg-gray-200'
+                        } ${togglingAddon === attraction.id ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                        title={attraction.is_addon ? 'Click to make standard' : 'Click to make add-on'}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            attraction.is_addon ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                         attraction.is_active 
@@ -724,7 +816,7 @@ export default function AttractionsContent() {
                 ))}
                 {paginatedAttractions.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
                       <div className="flex flex-col items-center gap-2">
                         <span className="text-3xl text-gray-400">🎫</span>
                         <p className="text-sm font-medium">No attractions found</p>
@@ -758,7 +850,7 @@ export default function AttractionsContent() {
         </div>
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal - UPDATED with Add-on fields */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -808,7 +900,7 @@ export default function AttractionsContent() {
                     />
                   </div>
 
-                  {/* SUPPLIER FIELD - NEW */}
+                  {/* SUPPLIER FIELD */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       <span className="flex items-center gap-1">
@@ -1029,6 +1121,47 @@ export default function AttractionsContent() {
                 </div>
               </div>
 
+              {/* NEW: Add-on Settings */}
+              <div className="mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                <h3 className="text-base font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Add-on Settings
+                </h3>
+                <div className="space-y-3">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="is_addon"
+                      checked={formData.is_addon}
+                      onChange={handleCheckboxChange}
+                      className="w-5 h-5 mt-0.5 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">This is an optional add-on</span>
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        Add-ons are not automatically included in itinerary pricing. They're only added when explicitly requested by the customer (e.g., pyramid interior entry, Sound & Light shows, camel rides).
+                      </p>
+                    </div>
+                  </label>
+
+                  {formData.is_addon && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Add-on Note (internal)
+                      </label>
+                      <input
+                        type="text"
+                        name="addon_note"
+                        value={formData.addon_note}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent shadow-sm bg-white"
+                        placeholder="e.g., Only include if customer requests pyramid interior"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Notes */}
               <div className="mb-4">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1049,6 +1182,7 @@ export default function AttractionsContent() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
+                    name="is_active"
                     checked={formData.is_active}
                     onChange={handleCheckboxChange}
                     className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"

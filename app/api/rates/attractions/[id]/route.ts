@@ -1,104 +1,202 @@
-// app/api/rates/attractions/[id]/route.ts
+// ============================================
+// INDIVIDUAL ATTRACTION API
+// File: app/api/rates/attractions/[id]/route.ts
+// 
+// Handles GET, PUT, DELETE for single attraction
+// ============================================
 
-import { createClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+// GET - Fetch single attraction
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
     const { id } = await params
     
     const { data, error } = await supabase
-      .from('entrance_fees')
-      .select(`
-        *,
-        supplier:suppliers(id, name)
-      `)
+      .from('activity_rates')
+      .select('*')
       .eq('id', id)
       .single()
     
-    if (error) throw error
+    if (error) {
+      console.error('[Attraction API] Error fetching:', error)
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
     
-    return NextResponse.json({ success: true, data })
-  } catch (error) {
-    console.error('Error fetching attraction:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch attraction' },
-      { status: 500 }
-    )
+    if (!data) {
+      return NextResponse.json({ success: false, error: 'Attraction not found' }, { status: 404 })
+    }
+    
+    // Transform for frontend
+    const transformed = {
+      id: data.id,
+      service_code: data.activity_code,
+      attraction_name: data.activity_name,
+      city: data.city,
+      fee_type: data.fee_type,
+      eur_rate: data.base_rate_eur,
+      non_eur_rate: data.base_rate_non_eur,
+      egyptian_rate: data.egyptian_rate,
+      student_discount_percentage: data.student_discount_percentage,
+      child_discount_percent: data.child_discount_percent,
+      season: data.season,
+      rate_valid_from: data.rate_valid_from,
+      rate_valid_to: data.rate_valid_to,
+      category: data.category,
+      notes: data.notes,
+      is_active: data.is_active,
+      is_addon: data.is_addon || false,
+      addon_note: data.addon_note,
+      supplier_id: data.supplier_id,
+      created_at: data.created_at,
+      updated_at: data.updated_at
+    }
+    
+    return NextResponse.json({ success: true, data: transformed })
+    
+  } catch (error: any) {
+    console.error('[Attraction API] Error:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
 
+// PUT - Update attraction
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
     const { id } = await params
     const body = await request.json()
     
+    const {
+      service_code,
+      attraction_name,
+      city,
+      fee_type,
+      eur_rate,
+      non_eur_rate,
+      egyptian_rate,
+      student_discount_percentage,
+      child_discount_percent,
+      season,
+      rate_valid_from,
+      rate_valid_to,
+      category,
+      notes,
+      is_active,
+      is_addon,
+      addon_note,
+      supplier_id
+    } = body
+    
+    // Build update object - only include fields that are provided
+    const updateData: Record<string, any> = {
+      updated_at: new Date().toISOString()
+    }
+    
+    if (service_code !== undefined) updateData.activity_code = service_code
+    if (attraction_name !== undefined) updateData.activity_name = attraction_name
+    if (city !== undefined) updateData.city = city
+    if (fee_type !== undefined) updateData.fee_type = fee_type
+    if (eur_rate !== undefined) updateData.base_rate_eur = eur_rate
+    if (non_eur_rate !== undefined) updateData.base_rate_non_eur = non_eur_rate
+    if (egyptian_rate !== undefined) updateData.egyptian_rate = egyptian_rate
+    if (student_discount_percentage !== undefined) updateData.student_discount_percentage = student_discount_percentage
+    if (child_discount_percent !== undefined) updateData.child_discount_percent = child_discount_percent
+    if (season !== undefined) updateData.season = season
+    if (rate_valid_from !== undefined) updateData.rate_valid_from = rate_valid_from
+    if (rate_valid_to !== undefined) updateData.rate_valid_to = rate_valid_to
+    if (category !== undefined) updateData.category = category
+    if (notes !== undefined) updateData.notes = notes
+    if (is_active !== undefined) updateData.is_active = is_active
+    if (is_addon !== undefined) updateData.is_addon = is_addon
+    if (addon_note !== undefined) updateData.addon_note = addon_note
+    if (supplier_id !== undefined) updateData.supplier_id = supplier_id || null
+    
     const { data, error } = await supabase
-      .from('entrance_fees')
-      .update({
-        service_code: body.service_code,
-        attraction_name: body.attraction_name,
-        city: body.city,
-        fee_type: body.fee_type,
-        eur_rate: body.eur_rate,
-        non_eur_rate: body.non_eur_rate,
-        egyptian_rate: body.egyptian_rate || null,
-        student_discount_percentage: body.student_discount_percentage || null,
-        child_discount_percent: body.child_discount_percent || null,
-        season: body.season,
-        rate_valid_from: body.rate_valid_from,
-        rate_valid_to: body.rate_valid_to,
-        category: body.category || null,
-        notes: body.notes || null,
-        is_active: body.is_active,
-        supplier_id: body.supplier_id || null,
-        updated_at: new Date().toISOString()
-      })
+      .from('activity_rates')
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
     
-    if (error) throw error
+    if (error) {
+      console.error('[Attraction API] Error updating:', error)
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
     
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({ 
+      success: true, 
+      data,
+      message: 'Attraction updated successfully'
+    })
+    
   } catch (error: any) {
-    console.error('Error updating attraction:', error)
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to update attraction' },
-      { status: 500 }
-    )
+    console.error('[Attraction API] Error:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
 
+// DELETE - Delete attraction
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
     const { id } = await params
     
+    // First check if attraction exists
+    const { data: existing } = await supabase
+      .from('activity_rates')
+      .select('id, activity_name')
+      .eq('id', id)
+      .single()
+    
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'Attraction not found' }, { status: 404 })
+    }
+    
+    // Check if attraction is used in any itinerary services
+    const { data: usedIn } = await supabase
+      .from('itinerary_services')
+      .select('id')
+      .ilike('service_name', `%${existing.activity_name}%`)
+      .limit(1)
+    
+    if (usedIn && usedIn.length > 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Cannot delete: This attraction is used in existing itineraries. Consider deactivating it instead.' 
+      }, { status: 400 })
+    }
+    
     const { error } = await supabase
-      .from('entrance_fees')
+      .from('activity_rates')
       .delete()
       .eq('id', id)
     
-    if (error) throw error
+    if (error) {
+      console.error('[Attraction API] Error deleting:', error)
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
     
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Attraction deleted successfully'
+    })
+    
   } catch (error: any) {
-    console.error('Error deleting attraction:', error)
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to delete attraction' },
-      { status: 500 }
-    )
+    console.error('[Attraction API] Error:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }

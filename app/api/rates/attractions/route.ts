@@ -1,75 +1,187 @@
-// app/api/rates/attractions/route.ts
+// ============================================
+// ATTRACTIONS API
+// File: app/api/rates/attractions/route.ts
+// 
+// Handles CRUD operations for attraction/entrance fee rates
+// Supports is_addon flag for optional extras
+// ============================================
 
-import { createClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+// GET - Fetch all attractions
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const { searchParams } = new URL(request.url)
+    const city = searchParams.get('city')
+    const category = searchParams.get('category')
+    const activeOnly = searchParams.get('active_only') === 'true'
+    const addonsOnly = searchParams.get('addons_only') === 'true'
     
-    const { data, error } = await supabase
-      .from('entrance_fees')
+    let query = supabase
+      .from('activity_rates')
       .select(`
-        *,
-        supplier:suppliers(id, name)
+        id,
+        activity_code,
+        activity_name,
+        city,
+        fee_type,
+        base_rate_eur,
+        base_rate_non_eur,
+        egyptian_rate,
+        student_discount_percentage,
+        child_discount_percent,
+        season,
+        rate_valid_from,
+        rate_valid_to,
+        category,
+        notes,
+        is_active,
+        is_addon,
+        addon_note,
+        supplier_id,
+        created_at,
+        updated_at
       `)
-      .order('attraction_name', { ascending: true })
+      .order('activity_name', { ascending: true })
     
-    if (error) throw error
+    if (city) {
+      query = query.eq('city', city)
+    }
     
-    return NextResponse.json({ success: true, data })
-  } catch (error) {
-    console.error('Error fetching attractions:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to fetch attractions' },
-      { status: 500 }
-    )
+    if (category) {
+      query = query.eq('category', category)
+    }
+    
+    if (activeOnly) {
+      query = query.eq('is_active', true)
+    }
+    
+    if (addonsOnly) {
+      query = query.eq('is_addon', true)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('[Attractions API] Error fetching:', error)
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+    
+    // Transform field names for frontend compatibility
+    const transformedData = data?.map(item => ({
+      id: item.id,
+      service_code: item.activity_code,
+      attraction_name: item.activity_name,
+      city: item.city,
+      fee_type: item.fee_type,
+      eur_rate: item.base_rate_eur,
+      non_eur_rate: item.base_rate_non_eur,
+      egyptian_rate: item.egyptian_rate,
+      student_discount_percentage: item.student_discount_percentage,
+      child_discount_percent: item.child_discount_percent,
+      season: item.season,
+      rate_valid_from: item.rate_valid_from,
+      rate_valid_to: item.rate_valid_to,
+      category: item.category,
+      notes: item.notes,
+      is_active: item.is_active,
+      is_addon: item.is_addon || false,
+      addon_note: item.addon_note,
+      supplier_id: item.supplier_id,
+      created_at: item.created_at,
+      updated_at: item.updated_at
+    })) || []
+    
+    return NextResponse.json({ 
+      success: true, 
+      data: transformedData,
+      count: transformedData.length
+    })
+    
+  } catch (error: any) {
+    console.error('[Attractions API] Error:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
 
+// POST - Create new attraction
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
     const body = await request.json()
     
-    // Generate service code if not provided
-    if (!body.service_code) {
-      const prefix = 'ENT'
-      const random = Math.random().toString(36).substring(2, 8).toUpperCase()
-      body.service_code = `${prefix}-${random}`
+    const {
+      service_code,
+      attraction_name,
+      city,
+      fee_type,
+      eur_rate,
+      non_eur_rate,
+      egyptian_rate,
+      student_discount_percentage,
+      child_discount_percent,
+      season,
+      rate_valid_from,
+      rate_valid_to,
+      category,
+      notes,
+      is_active,
+      is_addon,
+      addon_note,
+      supplier_id
+    } = body
+    
+    // Validate required fields
+    if (!attraction_name || !city) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Attraction name and city are required' 
+      }, { status: 400 })
     }
     
     const { data, error } = await supabase
-      .from('entrance_fees')
-      .insert([{
-        service_code: body.service_code,
-        attraction_name: body.attraction_name,
-        city: body.city,
-        fee_type: body.fee_type || 'standard',
-        eur_rate: body.eur_rate || 0,
-        non_eur_rate: body.non_eur_rate || 0,
-        egyptian_rate: body.egyptian_rate || null,
-        student_discount_percentage: body.student_discount_percentage || null,
-        child_discount_percent: body.child_discount_percent || null,
-        season: body.season || 'all_year',
-        rate_valid_from: body.rate_valid_from,
-        rate_valid_to: body.rate_valid_to,
-        category: body.category || null,
-        notes: body.notes || null,
-        is_active: body.is_active ?? true,
-        supplier_id: body.supplier_id || null
-      }])
+      .from('activity_rates')
+      .insert({
+        activity_code: service_code,
+        activity_name: attraction_name,
+        city,
+        fee_type: fee_type || 'standard',
+        base_rate_eur: eur_rate || 0,
+        base_rate_non_eur: non_eur_rate || 0,
+        egyptian_rate: egyptian_rate || null,
+        student_discount_percentage: student_discount_percentage || null,
+        child_discount_percent: child_discount_percent || null,
+        season: season || 'all_year',
+        rate_valid_from,
+        rate_valid_to,
+        category,
+        notes,
+        is_active: is_active !== false,
+        is_addon: is_addon || false,
+        addon_note: addon_note || null,
+        supplier_id: supplier_id || null
+      })
       .select()
       .single()
     
-    if (error) throw error
+    if (error) {
+      console.error('[Attractions API] Error creating:', error)
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
     
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({ 
+      success: true, 
+      data,
+      message: 'Attraction created successfully'
+    })
+    
   } catch (error: any) {
-    console.error('Error creating attraction:', error)
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to create attraction' },
-      { status: 500 }
-    )
+    console.error('[Attractions API] Error:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }

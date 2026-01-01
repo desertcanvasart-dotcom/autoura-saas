@@ -43,7 +43,6 @@ const DOCUMENT_TYPES = [
   { value: 'hotel_voucher', label: 'Hotel Voucher', icon: Hotel, color: 'bg-blue-100 text-blue-700' },
   { value: 'service_order', label: 'Service Order', icon: FileText, color: 'bg-purple-100 text-purple-700' },
   { value: 'transport_voucher', label: 'Transport Voucher', icon: Car, color: 'bg-amber-100 text-amber-700' },
-  { value: 'activity_voucher', label: 'Activity Voucher', icon: MapPin, color: 'bg-green-100 text-green-700' },
   { value: 'guide_assignment', label: 'Guide Assignment', icon: Users, color: 'bg-pink-100 text-pink-700' },
   { value: 'cruise_voucher', label: 'Cruise Voucher', icon: Ship, color: 'bg-cyan-100 text-cyan-700' }
 ]

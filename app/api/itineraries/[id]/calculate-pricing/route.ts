@@ -5,6 +5,7 @@
 // Recalculates pricing for an existing itinerary
 // after edits in the Editor page.
 // NOW USES USER PREFERENCES for margin, tier, etc.
+// UPDATED: Respects is_addon flag for attractions
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -45,6 +46,7 @@ interface PricingRequest {
   num_adults: number
   num_children: number
   nationality_type: 'eur' | 'non-eur'
+  include_addons?: boolean // NEW: Whether to include add-on attractions
 }
 
 interface UserPreferences {
@@ -253,7 +255,21 @@ async function getGuideRate(city: string, tier: string, language: string = 'Engl
   }
 }
 
-async function getEntranceFee(attractionName: string, isEuroPassport: boolean) {
+// ============================================
+// UPDATED: getEntranceFee with is_addon support
+// ============================================
+
+interface EntranceFeeResult {
+  rate: number
+  rateEur: number
+  rateNonEur: number
+  name: string
+  code: string
+  isAddon: boolean  // NEW: Flag to indicate if this is an add-on
+  addonNote?: string // NEW: Optional note about the add-on
+}
+
+async function getEntranceFee(attractionName: string, isEuroPassport: boolean): Promise<EntranceFeeResult> {
   // Try entrance_fees table first
   const { data: fee } = await supabaseAdmin
     .from('entrance_fees')
@@ -271,7 +287,9 @@ async function getEntranceFee(attractionName: string, isEuroPassport: boolean) {
       rateEur,
       rateNonEur,
       name: fee.attraction_name,
-      code: `ENT-${fee.attraction_name.substring(0,5).toUpperCase().replace(/\s/g, '')}`
+      code: `ENT-${fee.attraction_name.substring(0,5).toUpperCase().replace(/\s/g, '')}`,
+      isAddon: fee.is_addon || false,
+      addonNote: fee.addon_note || undefined
     }
   }
 
@@ -292,16 +310,20 @@ async function getEntranceFee(attractionName: string, isEuroPassport: boolean) {
       rateEur,
       rateNonEur,
       name: activity.activity_name,
-      code: activity.activity_code || `ENT-${activity.activity_name.substring(0,5).toUpperCase().replace(/\s/g, '')}`
+      code: activity.activity_code || `ENT-${activity.activity_name.substring(0,5).toUpperCase().replace(/\s/g, '')}`,
+      isAddon: activity.is_addon || false,
+      addonNote: activity.addon_note || undefined
     }
   }
 
+  // Fallback - unknown attractions are NOT add-ons
   return {
     rate: 15,
     rateEur: 15,
     rateNonEur: 15,
     name: attractionName,
-    code: `ENT-${attractionName.substring(0,5).toUpperCase().replace(/\s/g, '')}`
+    code: `ENT-${attractionName.substring(0,5).toUpperCase().replace(/\s/g, '')}`,
+    isAddon: false
   }
 }
 
@@ -433,12 +455,22 @@ export async function POST(
     const { id: itineraryId } = await params
     const body: PricingRequest = await request.json()
     
-    const { tier, package_type, days, num_adults, num_children, nationality_type } = body
+    const { 
+      tier, 
+      package_type, 
+      days, 
+      num_adults, 
+      num_children, 
+      nationality_type,
+      include_addons = false  // NEW: Default to NOT including add-ons
+    } = body
+    
     const totalPax = num_adults + num_children
     const isEuroPassport = nationality_type === 'eur'
 
     console.log(`[Pricing] Starting for itinerary ${itineraryId}`)
     console.log(`[Pricing] ${days.length} days, ${totalPax} pax, tier: ${tier}, package: ${package_type}`)
+    console.log(`[Pricing] Include add-ons: ${include_addons}`)
 
     // ============================================
     // GET USER PREFERENCES
@@ -505,6 +537,9 @@ export async function POST(
     const allServices: any[] = []
     let totalSupplierCost = 0
     let totalClientPrice = 0
+    
+    // NEW: Track skipped add-ons for reporting
+    const skippedAddons: string[] = []
 
     const tipping = await getTippingRate(tier)
     const waterRate = 2
@@ -562,9 +597,17 @@ export async function POST(
         totalClientPrice += guideClient
       }
 
-      // ENTRANCE FEES
+      // ENTRANCE FEES - NOW WITH ADD-ON CHECK
       for (const attraction of attractions) {
         const entrance = await getEntranceFee(attraction, isEuroPassport)
+        
+        // NEW: Skip add-ons if not explicitly included
+        if (entrance.isAddon && !include_addons) {
+          console.log(`[Pricing] ⏭️ Skipping add-on: ${entrance.name} (${entrance.addonNote || 'optional extra'})`)
+          skippedAddons.push(entrance.name)
+          continue
+        }
+        
         const entranceTotal = entrance.rate * totalPax
         // No markup on entrance fees typically
         allServices.push({
@@ -577,7 +620,9 @@ export async function POST(
           rate_non_eur: entrance.rateNonEur,
           total_cost: entranceTotal,
           client_price: entranceTotal,
-          notes: `${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
+          notes: entrance.isAddon 
+            ? `${isEuroPassport ? 'EUR' : 'non-EUR'} rate (Optional Add-on)` 
+            : `${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
         })
         totalSupplierCost += entranceTotal
         totalClientPrice += entranceTotal
@@ -721,6 +766,10 @@ export async function POST(
       .eq('id', itineraryId)
 
     console.log(`[Pricing] Complete: Cost €${totalSupplierCost.toFixed(2)} → Client €${totalClientPrice.toFixed(2)} (${marginPercent}% margin = €${profit.toFixed(2)} profit)`)
+    
+    if (skippedAddons.length > 0) {
+      console.log(`[Pricing] Skipped ${skippedAddons.length} add-ons: ${skippedAddons.join(', ')}`)
+    }
 
     return NextResponse.json({
       success: true,
@@ -734,7 +783,10 @@ export async function POST(
       currency,
       services_count: allServices.length,
       per_person: Math.round(totalClientPrice / totalPax * 100) / 100,
-      preferences_used: !!userPrefs
+      preferences_used: !!userPrefs,
+      // NEW: Report skipped add-ons
+      skipped_addons: skippedAddons,
+      skipped_addons_count: skippedAddons.length
     })
 
   } catch (error: any) {
