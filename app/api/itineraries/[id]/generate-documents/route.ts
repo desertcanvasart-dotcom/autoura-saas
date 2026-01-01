@@ -2,22 +2,41 @@ import { createClient } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Map service types to document types
-const SERVICE_TO_DOC_TYPE: Record<string, string> = {
-  accommodation: 'hotel_voucher',
-  hotel: 'hotel_voucher',
-  transportation: 'transport_voucher',
-  transport: 'transport_voucher',
-  transfer: 'transport_voucher',
-  guide: 'guide_assignment',
-  cruise: 'cruise_voucher',
-  activity: 'activity_voucher',
-  entrance: 'activity_voucher',
-  tour: 'activity_voucher',
-  excursion: 'activity_voucher',
-  meal: 'service_order',
-  tips: 'service_order',
-  supplies: 'service_order',
-  service_fee: 'service_order'
+// null = skip (no document needed)
+// For service_order, we also track a sub-category to create separate SOs
+const SERVICE_TO_DOC_TYPE: Record<string, { docType: string | null, category?: string }> = {
+  // Creates Transport Voucher
+  transportation: { docType: 'transport_voucher' },
+  transport: { docType: 'transport_voucher' },
+  transfer: { docType: 'transport_voucher' },
+  
+  // Creates Guide Assignment
+  guide: { docType: 'guide_assignment' },
+  
+  // Creates Service Order for MEALS
+  meal: { docType: 'service_order', category: 'meals' },
+  lunch: { docType: 'service_order', category: 'meals' },
+  dinner: { docType: 'service_order', category: 'meals' },
+  breakfast: { docType: 'service_order', category: 'meals' },
+  
+  // Creates Service Order for ENTRANCE FEES
+  entrance: { docType: 'service_order', category: 'entrance' },
+  activity: { docType: 'service_order', category: 'entrance' },
+  tour: { docType: 'service_order', category: 'entrance' },
+  excursion: { docType: 'service_order', category: 'entrance' },
+  
+  // Creates Hotel Voucher
+  accommodation: { docType: 'hotel_voucher' },
+  hotel: { docType: 'hotel_voucher' },
+  
+  // Creates Cruise Voucher
+  cruise: { docType: 'cruise_voucher' },
+  
+  // NO document needed - skip these
+  tips: { docType: null },
+  supplies: { docType: null },
+  water: { docType: null },
+  service_fee: { docType: null }
 }
 
 // Map supplier types to document types
@@ -27,13 +46,12 @@ const SUPPLIER_TO_DOC_TYPE: Record<string, string> = {
   driver: 'transport_voucher',
   guide: 'guide_assignment',
   cruise: 'cruise_voucher',
-  activity_provider: 'activity_voucher',
-  attraction: 'activity_voucher',
+  restaurant: 'service_order',
+  activity_provider: 'service_order',
+  attraction: 'service_order',
   tour_operator: 'service_order',
   ground_handler: 'service_order',
-  dmc: 'service_order',
-  restaurant: 'service_order',
-  shop: 'service_order'
+  dmc: 'service_order'
 }
 
 // Document number prefixes
@@ -41,19 +59,21 @@ const DOC_PREFIXES: Record<string, string> = {
   hotel_voucher: 'HV',
   service_order: 'SO',
   transport_voucher: 'TV',
-  activity_voucher: 'AV',
   guide_assignment: 'GA',
   cruise_voucher: 'CV'
 }
 
-// Default supplier names by document type
-const DEFAULT_SUPPLIER_NAMES: Record<string, string> = {
-  hotel_voucher: 'Hotel',
-  transport_voucher: 'Transportation',
-  activity_voucher: 'Activities',
-  guide_assignment: 'Guide Services',
-  cruise_voucher: 'Cruise Line',
-  service_order: 'Ground Services'
+// Default supplier names by document type and category
+const DEFAULT_SUPPLIER_NAMES: Record<string, Record<string, string>> = {
+  hotel_voucher: { default: 'Hotel' },
+  transport_voucher: { default: 'Transportation' },
+  guide_assignment: { default: 'Guide Services' },
+  cruise_voucher: { default: 'Cruise Line' },
+  service_order: { 
+    meals: 'Restaurant & Meals',
+    entrance: 'Entrance Fees',
+    default: 'Ground Services'
+  }
 }
 
 // Track offsets per document type during batch generation
@@ -175,12 +195,14 @@ export async function POST(
       services: any[],
       cities: Set<string>,
       dates: { min: string, max: string },
-      docType: string
+      docType: string,
+      category?: string
     }> = {}
     
-    // Group services WITHOUT suppliers by docType + city
+    // Group services WITHOUT suppliers by docType + category + city
     const unassignedGroups: Record<string, {
       docType: string,
+      category?: string,
       city: string,
       services: any[],
       dates: { min: string, max: string }
@@ -191,6 +213,16 @@ export async function POST(
         const serviceDate = day.date
         const serviceCity = day.city || service.city || 'Cairo'
         
+        // Check if this service type should generate a document
+        const serviceMapping = SERVICE_TO_DOC_TYPE[service.service_type]
+        if (!serviceMapping || serviceMapping.docType === null) {
+          // Skip services that don't need documents (tips, water, supplies, service_fee)
+          console.log(`⏭️ Skipping ${service.service_type} - no document needed`)
+          continue
+        }
+        
+        const { docType: serviceDocType, category: serviceCategory } = serviceMapping
+        
         if (service.supplier_id && suppliersMap[service.supplier_id]) {
           // HAS SUPPLIER - group by supplier
           const supplierId = service.supplier_id
@@ -198,7 +230,7 @@ export async function POST(
           
           if (!supplierGroups[supplierId]) {
             let docType = SUPPLIER_TO_DOC_TYPE[supplier.type] || 
-                          SERVICE_TO_DOC_TYPE[service.service_type] || 
+                          serviceDocType || 
                           'service_order'
             
             supplierGroups[supplierId] = {
@@ -206,7 +238,8 @@ export async function POST(
               services: [],
               cities: new Set(),
               dates: { min: serviceDate || '', max: serviceDate || '' },
-              docType
+              docType,
+              category: serviceCategory
             }
           }
           
@@ -226,13 +259,14 @@ export async function POST(
             supplierGroups[supplierId].dates.max = serviceDate
           }
         } else {
-          // NO SUPPLIER - group by docType + city
-          const docType = SERVICE_TO_DOC_TYPE[service.service_type] || 'service_order'
-          const groupKey = `${docType}-${serviceCity}`
+          // NO SUPPLIER - group by docType + category + city
+          // This ensures meals and entrance fees create SEPARATE service orders
+          const groupKey = `${serviceDocType}-${serviceCategory || 'default'}-${serviceCity}`
           
           if (!unassignedGroups[groupKey]) {
             unassignedGroups[groupKey] = {
-              docType,
+              docType: serviceDocType,
+              category: serviceCategory,
               city: serviceCity,
               services: [],
               dates: { min: serviceDate || '', max: serviceDate || '' }
@@ -341,7 +375,7 @@ export async function POST(
       console.log(`📝 Will create (supplier): ${docNumber} - ${group.supplier.name}`)
     }
     
-    // 2. Documents for services WITHOUT suppliers (grouped by docType + city)
+    // 2. Documents for services WITHOUT suppliers (grouped by docType + category + city)
     for (const [groupKey, group] of Object.entries(unassignedGroups)) {
       // Check if we should skip
       if (existingUnassignedDocKeys.has(groupKey)) {
@@ -370,8 +404,11 @@ export async function POST(
       const isHotel = group.docType === 'hotel_voucher'
       const isCruise = group.docType === 'cruise_voucher'
       
-      // Generate a meaningful supplier name based on document type and city
-      const defaultName = DEFAULT_SUPPLIER_NAMES[group.docType] || 'Services'
+      // Generate a meaningful supplier name based on document type, category, and city
+      const docTypeNames = DEFAULT_SUPPLIER_NAMES[group.docType] || { default: 'Services' }
+      const defaultName = (typeof docTypeNames === 'object' 
+        ? (docTypeNames[group.category || 'default'] || docTypeNames.default)
+        : docTypeNames) || 'Services'
       const supplierName = `${group.city} ${defaultName}`
       
       documentsToCreate.push({
