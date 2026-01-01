@@ -576,7 +576,7 @@ export default function ItineraryEditorPage() {
           package_type: itinerary.package_type,
           total_days: days.length,
           total_cost: totalCost,
-          status: 'draft',
+          status: itinerary.status, // Preserve the current status
           updated_at: new Date().toISOString()
         })
         .eq('id', itineraryId)
@@ -795,8 +795,8 @@ export default function ItineraryEditorPage() {
     <div className="min-h-screen bg-gray-50 p-5">
       {/* HEADER WITH ALL ACTIONS */}
       <div className="bg-white rounded-xl p-5 mb-5 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          {/* Left: Title & Info */}
+        {/* Row 1: Back button, Code, Status, View button */}
+        <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push(`/itineraries/${itineraryId}`)}
@@ -805,41 +805,51 @@ export default function ItineraryEditorPage() {
             >
               <ArrowLeft size={20} className="text-gray-600" />
             </button>
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                {/* Status Dropdown */}
-                <select
-                  value={itinerary.status || 'draft'}
-                  onChange={(e) => updateStatus(e.target.value)}
-                  disabled={updatingStatus}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#647C47] ${
-                    STATUS_OPTIONS.find(s => s.value === itinerary.status)?.color || 'bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  {STATUS_OPTIONS.map(status => (
-                    <option key={status.value} value={status.value}>{status.label}</option>
-                  ))}
-                </select>
-                <h1 className="text-xl font-bold text-gray-900">{itinerary.itinerary_code}</h1>
-              </div>
-              <p className="text-gray-500 text-sm">
-                {itinerary.client_name} • {days.length} days • {itinerary.num_adults} adults
-                {itinerary.num_children > 0 && `, ${itinerary.num_children} children`}
-              </p>
+            
+            <div className="flex items-center gap-3">
+              {/* Status Dropdown */}
+              <select
+                value={itinerary.status || 'draft'}
+                onChange={(e) => updateStatus(e.target.value)}
+                disabled={updatingStatus}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#647C47] ${
+                  STATUS_OPTIONS.find(s => s.value === itinerary.status)?.color || 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                {STATUS_OPTIONS.map(status => (
+                  <option key={status.value} value={status.value}>{status.label}</option>
+                ))}
+              </select>
+              
+              {/* Itinerary Code */}
+              <h1 className="text-2xl font-bold text-gray-900">{itinerary.itinerary_code}</h1>
             </div>
           </div>
+          
+          {/* View button */}
+          <Link
+            href={`/itineraries/${itineraryId}`}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center gap-2"
+          >
+            <Eye size={16} />
+            View
+          </Link>
+        </div>
+        
+        {/* Row 2: Client info + Action Buttons */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Left: Client Info */}
+          <p className="text-gray-600 text-sm">
+            <span className="font-medium text-gray-800">{itinerary.client_name}</span>
+            <span className="mx-2">•</span>
+            {days.length} days
+            <span className="mx-2">•</span>
+            {itinerary.num_adults} adults
+            {itinerary.num_children > 0 && <><span className="mx-2">•</span>{itinerary.num_children} children</>}
+          </p>
 
           {/* Right: Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* View Mode Button */}
-            <Link
-              href={`/itineraries/${itineraryId}`}
-              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center gap-1.5"
-            >
-              <Eye size={16} />
-              View
-            </Link>
-
             {/* Invoice Button */}
             {existingInvoice ? (
               <Link
