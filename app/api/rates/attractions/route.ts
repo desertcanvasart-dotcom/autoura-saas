@@ -3,7 +3,7 @@
 // File: app/api/rates/attractions/route.ts
 // 
 // Handles CRUD operations for attraction/entrance fee rates
-// Supports is_addon flag for optional extras
+// Uses entrance_fees table
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -24,31 +24,9 @@ export async function GET(request: NextRequest) {
     const addonsOnly = searchParams.get('addons_only') === 'true'
     
     let query = supabase
-      .from('activity_rates')
-      .select(`
-        id,
-        activity_code,
-        activity_name,
-        city,
-        fee_type,
-        base_rate_eur,
-        base_rate_non_eur,
-        egyptian_rate,
-        student_discount_percentage,
-        child_discount_percent,
-        season,
-        rate_valid_from,
-        rate_valid_to,
-        category,
-        notes,
-        is_active,
-        is_addon,
-        addon_note,
-        supplier_id,
-        created_at,
-        updated_at
-      `)
-      .order('activity_name', { ascending: true })
+      .from('entrance_fees')
+      .select('*')
+      .order('attraction_name', { ascending: true })
     
     if (city) {
       query = query.eq('city', city)
@@ -76,12 +54,12 @@ export async function GET(request: NextRequest) {
     // Transform field names for frontend compatibility
     const transformedData = data?.map(item => ({
       id: item.id,
-      service_code: item.activity_code,
-      attraction_name: item.activity_name,
+      service_code: item.service_code || `ENT-${item.id?.substring(0, 6).toUpperCase()}`,
+      attraction_name: item.attraction_name,
       city: item.city,
-      fee_type: item.fee_type,
-      eur_rate: item.base_rate_eur,
-      non_eur_rate: item.base_rate_non_eur,
+      fee_type: item.fee_type || 'standard',
+      eur_rate: item.eur_rate,
+      non_eur_rate: item.non_eur_rate,
       egyptian_rate: item.egyptian_rate,
       student_discount_percentage: item.student_discount_percentage,
       child_discount_percent: item.child_discount_percent,
@@ -90,7 +68,7 @@ export async function GET(request: NextRequest) {
       rate_valid_to: item.rate_valid_to,
       category: item.category,
       notes: item.notes,
-      is_active: item.is_active,
+      is_active: item.is_active !== false, // Default to true if not set
       is_addon: item.is_addon || false,
       addon_note: item.addon_note,
       supplier_id: item.supplier_id,
@@ -145,14 +123,14 @@ export async function POST(request: NextRequest) {
     }
     
     const { data, error } = await supabase
-      .from('activity_rates')
+      .from('entrance_fees')
       .insert({
-        activity_code: service_code,
-        activity_name: attraction_name,
+        service_code: service_code || `ENT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+        attraction_name,
         city,
         fee_type: fee_type || 'standard',
-        base_rate_eur: eur_rate || 0,
-        base_rate_non_eur: non_eur_rate || 0,
+        eur_rate: eur_rate || 0,
+        non_eur_rate: non_eur_rate || 0,
         egyptian_rate: egyptian_rate || null,
         student_discount_percentage: student_discount_percentage || null,
         child_discount_percent: child_discount_percent || null,

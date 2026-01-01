@@ -3,6 +3,7 @@
 // File: app/api/rates/attractions/[id]/route.ts
 // 
 // Handles GET, PUT, DELETE for single attraction
+// Uses entrance_fees table
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -22,7 +23,7 @@ export async function GET(
     const { id } = await params
     
     const { data, error } = await supabase
-      .from('activity_rates')
+      .from('entrance_fees')
       .select('*')
       .eq('id', id)
       .single()
@@ -39,12 +40,12 @@ export async function GET(
     // Transform for frontend
     const transformed = {
       id: data.id,
-      service_code: data.activity_code,
-      attraction_name: data.activity_name,
+      service_code: data.service_code,
+      attraction_name: data.attraction_name,
       city: data.city,
       fee_type: data.fee_type,
-      eur_rate: data.base_rate_eur,
-      non_eur_rate: data.base_rate_non_eur,
+      eur_rate: data.eur_rate,
+      non_eur_rate: data.non_eur_rate,
       egyptian_rate: data.egyptian_rate,
       student_discount_percentage: data.student_discount_percentage,
       child_discount_percent: data.child_discount_percent,
@@ -53,7 +54,7 @@ export async function GET(
       rate_valid_to: data.rate_valid_to,
       category: data.category,
       notes: data.notes,
-      is_active: data.is_active,
+      is_active: data.is_active !== false,
       is_addon: data.is_addon || false,
       addon_note: data.addon_note,
       supplier_id: data.supplier_id,
@@ -104,12 +105,12 @@ export async function PUT(
       updated_at: new Date().toISOString()
     }
     
-    if (service_code !== undefined) updateData.activity_code = service_code
-    if (attraction_name !== undefined) updateData.activity_name = attraction_name
+    if (service_code !== undefined) updateData.service_code = service_code
+    if (attraction_name !== undefined) updateData.attraction_name = attraction_name
     if (city !== undefined) updateData.city = city
     if (fee_type !== undefined) updateData.fee_type = fee_type
-    if (eur_rate !== undefined) updateData.base_rate_eur = eur_rate
-    if (non_eur_rate !== undefined) updateData.base_rate_non_eur = non_eur_rate
+    if (eur_rate !== undefined) updateData.eur_rate = eur_rate
+    if (non_eur_rate !== undefined) updateData.non_eur_rate = non_eur_rate
     if (egyptian_rate !== undefined) updateData.egyptian_rate = egyptian_rate
     if (student_discount_percentage !== undefined) updateData.student_discount_percentage = student_discount_percentage
     if (child_discount_percent !== undefined) updateData.child_discount_percent = child_discount_percent
@@ -124,7 +125,7 @@ export async function PUT(
     if (supplier_id !== undefined) updateData.supplier_id = supplier_id || null
     
     const { data, error } = await supabase
-      .from('activity_rates')
+      .from('entrance_fees')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -157,8 +158,8 @@ export async function DELETE(
     
     // First check if attraction exists
     const { data: existing } = await supabase
-      .from('activity_rates')
-      .select('id, activity_name')
+      .from('entrance_fees')
+      .select('id, attraction_name')
       .eq('id', id)
       .single()
     
@@ -170,7 +171,7 @@ export async function DELETE(
     const { data: usedIn } = await supabase
       .from('itinerary_services')
       .select('id')
-      .ilike('service_name', `%${existing.activity_name}%`)
+      .ilike('service_name', `%${existing.attraction_name}%`)
       .limit(1)
     
     if (usedIn && usedIn.length > 0) {
@@ -181,7 +182,7 @@ export async function DELETE(
     }
     
     const { error } = await supabase
-      .from('activity_rates')
+      .from('entrance_fees')
       .delete()
       .eq('id', id)
     

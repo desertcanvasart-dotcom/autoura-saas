@@ -270,14 +270,32 @@ interface EntranceFeeResult {
 }
 
 async function getEntranceFee(attractionName: string, isEuroPassport: boolean): Promise<EntranceFeeResult> {
-  // Try entrance_fees table first
-  const { data: fee } = await supabaseAdmin
+  // Try entrance_fees table first (PRIMARY TABLE)
+  // Use exact match first, then fall back to fuzzy match
+  let fee = null
+  
+  // First try exact match
+  const { data: exactFee } = await supabaseAdmin
     .from('entrance_fees')
     .select('*')
     .eq('is_active', true)
-    .ilike('attraction_name', `%${attractionName}%`)
+    .eq('attraction_name', attractionName)
     .limit(1)
     .single()
+  
+  if (exactFee) {
+    fee = exactFee
+  } else {
+    // Fall back to fuzzy match
+    const { data: fuzzyFee } = await supabaseAdmin
+      .from('entrance_fees')
+      .select('*')
+      .eq('is_active', true)
+      .ilike('attraction_name', `%${attractionName}%`)
+      .limit(1)
+      .single()
+    fee = fuzzyFee
+  }
 
   if (fee) {
     const rateEur = fee.eur_rate || 0
@@ -287,13 +305,13 @@ async function getEntranceFee(attractionName: string, isEuroPassport: boolean): 
       rateEur,
       rateNonEur,
       name: fee.attraction_name,
-      code: `ENT-${fee.attraction_name.substring(0,5).toUpperCase().replace(/\s/g, '')}`,
+      code: fee.service_code || `ENT-${fee.attraction_name.substring(0,5).toUpperCase().replace(/\s/g, '')}`,
       isAddon: fee.is_addon || false,
       addonNote: fee.addon_note || undefined
     }
   }
 
-  // Try activity_rates table
+  // Try activity_rates table as secondary
   const { data: activity } = await supabaseAdmin
     .from('activity_rates')
     .select('*')
@@ -317,6 +335,7 @@ async function getEntranceFee(attractionName: string, isEuroPassport: boolean): 
   }
 
   // Fallback - unknown attractions are NOT add-ons
+  console.log(`[Pricing] ⚠️ No rate found for "${attractionName}", using fallback €15`)
   return {
     rate: 15,
     rateEur: 15,
