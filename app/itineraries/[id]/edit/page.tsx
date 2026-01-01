@@ -793,76 +793,69 @@ export default function ItineraryEditorPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-5">
-      {/* HEADER WITH ALL ACTIONS */}
-      <div className="bg-white rounded-xl p-5 mb-5 shadow-sm">
-        {/* Row 1: Back button, Code, Status, View button */}
-        <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
-          <div className="flex items-center gap-4">
+      {/* HEADER - Compact single row */}
+      <div className="bg-white rounded-xl p-4 mb-5 shadow-sm">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          {/* Left: Back, Status, Code, Client */}
+          <div className="flex items-center gap-3">
             <button
               onClick={() => router.push(`/itineraries/${itineraryId}`)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
               title="Back to view"
             >
-              <ArrowLeft size={20} className="text-gray-600" />
+              <ArrowLeft size={18} className="text-gray-600" />
             </button>
             
-            <div className="flex items-center gap-3">
-              {/* Status Dropdown */}
-              <select
-                value={itinerary.status || 'draft'}
-                onChange={(e) => updateStatus(e.target.value)}
-                disabled={updatingStatus}
-                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#647C47] ${
-                  STATUS_OPTIONS.find(s => s.value === itinerary.status)?.color || 'bg-gray-100 text-gray-700'
-                }`}
-              >
-                {STATUS_OPTIONS.map(status => (
-                  <option key={status.value} value={status.value}>{status.label}</option>
-                ))}
-              </select>
-              
-              {/* Itinerary Code */}
-              <h1 className="text-2xl font-bold text-gray-900">{itinerary.itinerary_code}</h1>
-            </div>
+            {/* Status Dropdown */}
+            <select
+              value={itinerary.status || 'draft'}
+              onChange={(e) => updateStatus(e.target.value)}
+              disabled={updatingStatus}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#647C47] flex-shrink-0 ${
+                STATUS_OPTIONS.find(s => s.value === itinerary.status)?.color || 'bg-gray-100 text-gray-700'
+              }`}
+            >
+              {STATUS_OPTIONS.map(status => (
+                <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </select>
+            
+            {/* Itinerary Code */}
+            <h1 className="text-lg font-bold text-gray-900 whitespace-nowrap">{itinerary.itinerary_code}</h1>
+            
+            {/* Separator */}
+            <span className="text-gray-300">|</span>
+            
+            {/* Client Info */}
+            <span className="text-gray-600 text-sm whitespace-nowrap">
+              {itinerary.client_name} • {days.length} days • {itinerary.num_adults} adults
+              {itinerary.num_children > 0 && ` • ${itinerary.num_children} children`}
+            </span>
           </div>
-          
-          {/* View button */}
-          <Link
-            href={`/itineraries/${itineraryId}`}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center gap-2"
-          >
-            <Eye size={16} />
-            View
-          </Link>
-        </div>
-        
-        {/* Row 2: Client info + Action Buttons */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          {/* Left: Client Info */}
-          <p className="text-gray-600 text-sm">
-            <span className="font-medium text-gray-800">{itinerary.client_name}</span>
-            <span className="mx-2">•</span>
-            {days.length} days
-            <span className="mx-2">•</span>
-            {itinerary.num_adults} adults
-            {itinerary.num_children > 0 && <><span className="mx-2">•</span>{itinerary.num_children} children</>}
-          </p>
 
           {/* Right: Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
+            {/* View Mode Button */}
+            <Link
+              href={`/itineraries/${itineraryId}`}
+              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 flex items-center gap-1.5"
+            >
+              <Eye size={14} />
+              View
+            </Link>
+
             {/* Invoice Button */}
             {existingInvoice ? (
               <Link
                 href={`/invoices/${existingInvoice.id}`}
-                className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 flex items-center gap-1.5"
               >
-                <Receipt size={16} />
+                <Receipt size={14} />
                 {existingInvoice.invoice_number}
               </Link>
             ) : (
               <button
                 onClick={async () => {
-                  // Quick invoice generation
                   const response = await fetch('/api/invoices', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -888,9 +881,9 @@ export default function ItineraryEditorPage() {
                     router.push(`/invoices/${invoice.id}`)
                   }
                 }}
-                className="px-3 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 flex items-center gap-1.5"
               >
-                <Receipt size={16} />
+                <Receipt size={14} />
                 Invoice
               </button>
             )}
@@ -904,9 +897,9 @@ export default function ItineraryEditorPage() {
             {/* Contract Link */}
             <Link
               href={`/documents/contract/${itinerary.id}`}
-              className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 flex items-center gap-1.5"
             >
-              <FileText size={16} />
+              <FileText size={14} />
               Contract
             </Link>
 
@@ -921,9 +914,9 @@ export default function ItineraryEditorPage() {
             <button
               onClick={calculatePricing}
               disabled={calculating || saving}
-              className="px-4 py-2 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3 py-1.5 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] flex items-center gap-1.5 disabled:opacity-50"
             >
-              <Calculator size={16} />
+              <Calculator size={14} />
               {calculating ? 'Calculating...' : 'Calculate'}
             </button>
           </div>
