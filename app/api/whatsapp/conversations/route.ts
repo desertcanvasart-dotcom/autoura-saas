@@ -9,6 +9,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'active'
     const search = searchParams.get('search') || ''
     const includeHidden = searchParams.get('include_hidden') === 'true'
+    const agentId = searchParams.get('agent_id')
+    const unassignedOnly = searchParams.get('unassigned_only') === 'true'
 
     let query = supabase
       .from('whatsapp_conversations')
@@ -20,6 +22,18 @@ export async function GET(request: NextRequest) {
           last_name,
           email,
           client_code
+        ),
+        assigned_agent:sales_agents!whatsapp_conversations_assigned_agent_id_fkey (
+          id,
+          name,
+          email,
+          avatar_url,
+          is_available
+        ),
+        last_agent:sales_agents!whatsapp_conversations_last_agent_id_fkey (
+          id,
+          name,
+          avatar_url
         )
       `)
       .eq('status', status)
@@ -28,6 +42,16 @@ export async function GET(request: NextRequest) {
     // Filter out hidden conversations unless explicitly requested
     if (!includeHidden) {
       query = query.or('is_hidden.is.null,is_hidden.eq.false')
+    }
+
+    // Filter by assigned agent
+    if (agentId) {
+      query = query.eq('assigned_agent_id', agentId)
+    }
+
+    // Filter unassigned only
+    if (unassignedOnly) {
+      query = query.is('assigned_agent_id', null)
     }
 
     if (search) {
@@ -59,7 +83,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
     const body = await request.json()
-    const { phone_number, client_name, client_id } = body
+    const { phone_number, client_name, client_id, auto_assign } = body
 
     if (!phone_number) {
       return NextResponse.json({ error: 'Phone number required' }, { status: 400 })
@@ -95,7 +119,10 @@ export async function POST(request: NextRequest) {
           .from('whatsapp_conversations')
           .update(updates)
           .eq('id', existing.id)
-          .select()
+          .select(`
+            *,
+            assigned_agent:sales_agents!whatsapp_conversations_assigned_agent_id_fkey (*)
+          `)
           .single()
 
         if (error) throw error
@@ -105,18 +132,69 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new conversation
+    let assignedAgentId = null
+
+    // Auto-assign if requested
+    if (auto_assign !== false) {
+      const { data: nextAgent } = await supabase
+        .from('sales_agents')
+        .select('id')
+        .eq('is_active', true)
+        .eq('is_available', true)
+        .order('last_assigned_at', { ascending: true, nullsFirst: true })
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (nextAgent) {
+        assignedAgentId = nextAgent.id
+      }
+    }
+
     const { data: newConversation, error } = await supabase
       .from('whatsapp_conversations')
       .insert({
         phone_number: cleanPhone,
         client_name: client_name || null,
         client_id: client_id || null,
-        is_hidden: false
+        is_hidden: false,
+        assigned_agent_id: assignedAgentId,
+        assigned_at: assignedAgentId ? new Date().toISOString() : null
       })
-      .select()
+      .select(`
+        *,
+        assigned_agent:sales_agents!whatsapp_conversations_assigned_agent_id_fkey (*)
+      `)
       .single()
 
     if (error) throw error
+
+    // Update agent's count if assigned
+    if (assignedAgentId) {
+      const { data: agentData } = await supabase
+        .from('sales_agents')
+        .select('current_conversations')
+        .eq('id', assignedAgentId)
+        .single()
+
+      await supabase
+        .from('sales_agents')
+        .update({ 
+          current_conversations: (agentData?.current_conversations || 0) + 1,
+          last_assigned_at: new Date().toISOString()
+        })
+        .eq('id', assignedAgentId)
+
+      // Log activity
+      await supabase
+        .from('conversation_activity')
+        .insert({
+          conversation_id: newConversation.id,
+          agent_id: assignedAgentId,
+          action_type: 'auto_assigned',
+          action_details: { source: 'new_conversation' }
+        })
+    }
 
     return NextResponse.json({ conversation: newConversation, created: true })
   } catch (error: any) {
@@ -130,7 +208,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = createClient()
     const body = await request.json()
-    const { conversation_id, action, ...updates } = body
+    const { conversation_id, action, agent_id, ...updates } = body
 
     if (!conversation_id) {
       return NextResponse.json({ error: 'Conversation ID required' }, { status: 400 })
@@ -156,10 +234,25 @@ export async function PATCH(request: NextRequest) {
       .from('whatsapp_conversations')
       .update(updateData)
       .eq('id', conversation_id)
-      .select()
+      .select(`
+        *,
+        assigned_agent:sales_agents!whatsapp_conversations_assigned_agent_id_fkey (*)
+      `)
       .single()
 
     if (error) throw error
+
+    // Log activity if agent provided
+    if (agent_id && action) {
+      await supabase
+        .from('conversation_activity')
+        .insert({
+          conversation_id,
+          agent_id,
+          action_type: 'status_changed',
+          action_details: { action, updates }
+        })
+    }
 
     return NextResponse.json({ conversation: data })
   } catch (error: any) {
