@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr'
 import { Eye, EyeOff, Lock, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
   
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -25,13 +28,14 @@ export default function ResetPasswordPage() {
       // Get the hash fragment from URL
       const hashParams = new URLSearchParams(window.location.hash.substring(1))
       const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
       const type = hashParams.get('type')
 
       if (accessToken && type === 'recovery') {
         // Set the session using the recovery token
         const { data, error } = await supabase.auth.setSession({
           access_token: accessToken,
-          refresh_token: hashParams.get('refresh_token') || '',
+          refresh_token: refreshToken || '',
         })
 
         if (error) {
@@ -41,7 +45,7 @@ export default function ResetPasswordPage() {
           setHasValidSession(true)
         }
       } else {
-        // Check if there's already a valid session (user might have clicked link already)
+        // Check if there's already a valid session
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
           setHasValidSession(true)
@@ -55,13 +59,12 @@ export default function ResetPasswordPage() {
     }
 
     checkSession()
-  }, [supabase.auth])
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
 
-    // Validation
     if (password.length < 8) {
       setError('Password must be at least 8 characters long')
       return
@@ -83,7 +86,6 @@ export default function ResetPasswordPage() {
         setError(error.message)
       } else {
         setSuccess(true)
-        // Sign out and redirect to login after 3 seconds
         setTimeout(async () => {
           await supabase.auth.signOut()
           router.push('/login')
@@ -96,7 +98,7 @@ export default function ResetPasswordPage() {
     }
   }
 
-  // Loading state while checking session
+  // Loading state
   if (!sessionChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -119,7 +121,7 @@ export default function ResetPasswordPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Password Updated!</h1>
             <p className="text-gray-600 mb-4">
-              Your password has been successfully reset. You will be redirected to the login page shortly.
+              Your password has been successfully reset. Redirecting to login...
             </p>
             <button
               onClick={() => router.push('/login')}
@@ -133,7 +135,7 @@ export default function ResetPasswordPage() {
     )
   }
 
-  // Invalid/expired link state
+  // Invalid link state
   if (!hasValidSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -163,7 +165,6 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md w-full">
         <div className="bg-white rounded-xl shadow-lg p-8">
-          {/* Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8 text-primary-600" />
@@ -172,7 +173,6 @@ export default function ResetPasswordPage() {
             <p className="text-gray-600 mt-2">Enter your new password below</p>
           </div>
 
-          {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -180,13 +180,9 @@ export default function ResetPasswordPage() {
             </div>
           )}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* New Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                New Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">New Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -208,11 +204,8 @@ export default function ResetPasswordPage() {
               <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters</p>
             </div>
 
-            {/* Confirm Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Confirm Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
               <div className="relative">
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
@@ -232,7 +225,6 @@ export default function ResetPasswordPage() {
               </div>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading || !password || !confirmPassword}
@@ -249,7 +241,6 @@ export default function ResetPasswordPage() {
             </button>
           </form>
 
-          {/* Back to Login */}
           <div className="mt-6 text-center">
             <button
               onClick={() => router.push('/login')}
