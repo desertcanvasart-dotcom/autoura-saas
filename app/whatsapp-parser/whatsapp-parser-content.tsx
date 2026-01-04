@@ -107,16 +107,10 @@ const TIER_OPTIONS = [
   { value: 'luxury', label: 'Luxury', icon: Crown, color: 'amber', description: 'Top-tier VIP experience' }
 ]
 
-const PACKAGE_TYPES_MAIN = [
+const PACKAGE_TYPES = [
   { slug: 'day-trips', name: 'Day Trips', icon: Sun, description: 'No accommodation', color: 'amber' },
   { slug: 'tours-only', name: 'Tours Only', icon: Map, description: 'Client has own hotel', color: 'blue' },
   { slug: 'full-package', name: 'Full Package', icon: Package, description: 'Everything included', color: 'primary' },
-]
-
-const PACKAGE_TYPES_ADVANCED = [
-  { slug: 'land-package', name: 'Land Package', icon: Building2, description: 'No airport transfers', color: 'emerald' },
-  { slug: 'cruise-land', name: 'Cruise + Land', icon: Ship, description: 'Nile cruise combo', color: 'indigo' },
-  { slug: 'shore-excursions', name: 'Shore Excursions', icon: Anchor, description: 'Port pickup', color: 'cyan' },
 ]
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -835,7 +829,7 @@ function WhatsAppParserContent() {
 
   const [selectedTier, setSelectedTier] = useState<string>('standard')
   const [packageType, setPackageType] = useState<PackageType>('full-package')
-  const [showAdvancedPackages, setShowAdvancedPackages] = useState(false)
+  // Package type state
 
   const [generationMode, setGenerationMode] = useState<GenerationMode>('edit')
   
@@ -1055,6 +1049,17 @@ function WhatsAppParserContent() {
 
       const clientEmail = editedData.client_email || extractedData.client_email || null
       const clientPhone = editedData.client_phone || extractedData.client_phone || phoneNumber || null
+      const clientNationality = editedData.nationality || extractedData.nationality || 'Unknown'
+
+      // Build the updated data BEFORE any async operations
+      // This ensures the correct values are passed to generateItinerary
+      const updatedExtractedData: ExtractedData = {
+        ...extractedData,
+        client_name: clientName,
+        client_email: clientEmail || '',
+        client_phone: clientPhone || '',
+        nationality: clientNationality
+      }
 
       let clientId: string | null = null
 
@@ -1077,16 +1082,10 @@ function WhatsAppParserContent() {
           setSelectedClientId(clientId)
           setClientStep('existing-selected')
           setShowClientConfirmation(false)
-          
-          setExtractedData({
-            ...extractedData,
-            client_name: editedData.client_name || extractedData.client_name,
-            client_email: editedData.client_email || extractedData.client_email,
-            client_phone: editedData.client_phone || extractedData.client_phone,
-            nationality: editedData.nationality || extractedData.nationality
-          })
+          setExtractedData(updatedExtractedData)
 
-          setTimeout(() => generateItinerary(clientId!), 100)
+          // Pass the updated data directly to avoid state timing issues
+          setTimeout(() => generateItineraryWithData(clientId!, updatedExtractedData), 100)
           return
         }
       }
@@ -1104,7 +1103,7 @@ function WhatsAppParserContent() {
           last_name: lastName,
           email: clientEmail,
           phone: clientPhone,
-          nationality: editedData.nationality || extractedData.nationality || 'Unknown',
+          nationality: clientNationality,
           status: 'prospect',
           client_type: extractedData.num_adults > 2 ? 'family' : 'individual',
           passport_type: 'other',
@@ -1137,7 +1136,8 @@ function WhatsAppParserContent() {
               setSelectedClientId(existingByEmail.id)
               setClientStep('existing-selected')
               setShowClientConfirmation(false)
-              setTimeout(() => generateItinerary(existingByEmail.id), 100)
+              setExtractedData(updatedExtractedData)
+              setTimeout(() => generateItineraryWithData(existingByEmail.id, updatedExtractedData), 100)
               return
             }
           }
@@ -1148,16 +1148,10 @@ function WhatsAppParserContent() {
       setSelectedClientId(result.data.id)
       setClientStep('confirmed')
       setShowClientConfirmation(false)
+      setExtractedData(updatedExtractedData)
 
-      setExtractedData({
-        ...extractedData,
-        client_name: editedData.client_name || extractedData.client_name,
-        client_email: editedData.client_email || extractedData.client_email,
-        client_phone: editedData.client_phone || extractedData.client_phone,
-        nationality: editedData.nationality || extractedData.nationality
-      })
-
-      setTimeout(() => generateItinerary(result.data.id), 100)
+      // Pass the updated data directly to avoid state timing issues
+      setTimeout(() => generateItineraryWithData(result.data.id, updatedExtractedData), 100)
 
     } catch (err: any) {
       setError(err.message || 'Failed to create client')
@@ -1166,16 +1160,8 @@ function WhatsAppParserContent() {
     }
   }
 
-  const generateItinerary = async (clientIdOverride?: string) => {
-    if (!extractedData) return
-
-    const clientIdToUse = clientIdOverride || selectedClientId
-
-    if (!clientIdToUse) {
-      openClientConfirmation()
-      return
-    }
-
+  // Generate itinerary with data passed directly (avoids state timing issues)
+  const generateItineraryWithData = async (clientId: string, data: ExtractedData) => {
     setIsGenerating(true)
     setError(null)
     setGenerationStep('checking-suppliers')
@@ -1192,13 +1178,12 @@ function WhatsAppParserContent() {
       
       setGenerationStep('finalizing')
 
-      // NEW: Include input mode and extracted days
       const response = await fetch('/api/ai/generate-itinerary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...extractedData,
-          client_id: clientIdToUse,
+          ...data,
+          client_id: clientId,
           tier: selectedTier,
           budget_level: selectedTier,
           package_type: packageType,
@@ -1206,11 +1191,10 @@ function WhatsAppParserContent() {
           margin_percent: userPreferences.default_margin_percent,
           currency: userPreferences.default_currency,
           skip_pricing: generationMode === 'edit',
-          // NEW: Pass input mode override
           input_mode_override: inputMode,
-          is_structured_input: extractedData.is_structured_input,
-          extracted_days: extractedData.extracted_days,
-          raw_itinerary: extractedData.raw_itinerary
+          is_structured_input: data.is_structured_input,
+          extracted_days: data.extracted_days,
+          raw_itinerary: data.raw_itinerary
         })
       })
 
@@ -1237,6 +1221,21 @@ function WhatsAppParserContent() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  // Generate itinerary using current extractedData state (for manual trigger)
+  const generateItinerary = async (clientIdOverride?: string) => {
+    if (!extractedData) return
+
+    const clientIdToUse = clientIdOverride || selectedClientId
+
+    if (!clientIdToUse) {
+      openClientConfirmation()
+      return
+    }
+
+    // Use the version that takes data directly
+    await generateItineraryWithData(clientIdToUse, extractedData)
   }
 
   // ============================================
@@ -1512,8 +1511,8 @@ function WhatsAppParserContent() {
                     Package Type
                   </h3>
 
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {PACKAGE_TYPES_MAIN.map((pkg) => {
+                  <div className="grid grid-cols-3 gap-2">
+                    {PACKAGE_TYPES.map((pkg) => {
                       const isSelected = packageType === pkg.slug
                       return (
                         <button
@@ -1534,39 +1533,6 @@ function WhatsAppParserContent() {
                       )
                     })}
                   </div>
-
-                  <button
-                    onClick={() => setShowAdvancedPackages(!showAdvancedPackages)}
-                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    {showAdvancedPackages ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                    {showAdvancedPackages ? 'Hide' : 'Show'} advanced package types
-                  </button>
-
-                  {showAdvancedPackages && (
-                    <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-gray-100">
-                      {PACKAGE_TYPES_ADVANCED.map((pkg) => {
-                        const isSelected = packageType === pkg.slug
-                        return (
-                          <button
-                            key={pkg.slug}
-                            onClick={() => setPackageType(pkg.slug as PackageType)}
-                            className={`p-3 rounded-xl border-2 text-left transition-all ${
-                              isSelected 
-                                ? 'border-primary-500 bg-primary-50' 
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <pkg.icon className={`w-4 h-4 ${isSelected ? 'text-primary-600' : 'text-gray-400'}`} />
-                              <span className="text-sm font-medium">{pkg.name}</span>
-                            </div>
-                            <p className="text-xs text-gray-500">{pkg.description}</p>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
                 </div>
 
                 {/* Generation Mode */}
