@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY!,
 })
 
 // Admin client for bypassing RLS on content library
@@ -20,6 +20,7 @@ const DEFAULT_MARGIN_PERCENT = 25
 // TIER SYSTEM CONSTANTS
 // ============================================
 type ServiceTier = 'budget' | 'standard' | 'deluxe' | 'luxury'
+type InputMode = 'creative' | 'structured'
 
 const VALID_TIERS: ServiceTier[] = ['budget', 'standard', 'deluxe', 'luxury']
 
@@ -34,6 +35,41 @@ const TIER_MAP: Record<string, ServiceTier> = {
   'luxury': 'luxury',
   'premium': 'luxury',
   'vip': 'luxury'
+}
+
+const TIER_DESCRIPTIONS: Record<ServiceTier, string> = {
+  'budget': 'cost-effective, good value',
+  'standard': 'comfortable mid-range',
+  'deluxe': 'superior quality, premium',
+  'luxury': 'top-tier, VIP treatment'
+}
+
+// ============================================
+// EXTRACTED DAY STRUCTURE (from parser)
+// ============================================
+interface ExtractedDay {
+  day_number: number
+  date: string | null
+  date_display: string | null
+  title: string
+  city: string | null
+  is_arrival: boolean
+  is_departure: boolean
+  is_transfer_only: boolean
+  is_free_day: boolean
+  activities: string[]
+  attractions: string[]
+  meals_included: {
+    breakfast: boolean
+    lunch: boolean
+    dinner: boolean
+  }
+  guide_required: boolean
+  transport_type: string | null
+  flight_info: string | null
+  hotel_name: string | null
+  overnight_city: string
+  notes: string | null
 }
 
 // Helper to validate date
@@ -646,6 +682,249 @@ async function getUserPreferences(supabase: any): Promise<{
 }
 
 // ============================================
+// FETCH ATTRACTION NAMES LIST
+// ============================================
+async function fetchAttractionsList(supabase: any): Promise<string[]> {
+  try {
+    const { data } = await supabase
+      .from('entrance_fees')
+      .select('attraction_name')
+      .eq('is_active', true)
+      .eq('is_addon', false) // Exclude add-ons
+    
+    return data?.map((a: any) => a.attraction_name) || []
+  } catch {
+    return []
+  }
+}
+
+// ============================================
+// STRUCTURED MODE: FOLLOW PROVIDED ITINERARY
+// ============================================
+
+async function generateFromStructuredInput(
+  extractedDays: ExtractedDay[],
+  rawItinerary: string,
+  params: {
+    tier: ServiceTier
+    totalPax: number
+    language: string
+    attractionNames: string[]
+    writingRules: WritingRule[]
+  }
+): Promise<any> {
+  const { tier, totalPax, language, attractionNames, writingRules } = params
+  const writingContext = buildWritingRulesContext(writingRules)
+
+  const prompt = `You are a travel operations assistant. The user has provided a SPECIFIC day-by-day itinerary that you must FOLLOW EXACTLY.
+
+CRITICAL INSTRUCTION: You are NOT creating an itinerary. You are CONVERTING the provided plan into the required JSON format while:
+1. PRESERVING the exact structure (same number of days, same dates)
+2. PRESERVING the exact activities for each day
+3. ONLY adding professional descriptions - never changing the content
+4. Matching attraction names to our database where possible
+
+PROVIDED ITINERARY:
+${rawItinerary}
+
+PARSED STRUCTURE (for reference):
+${JSON.stringify(extractedDays, null, 2)}
+
+AVAILABLE ATTRACTIONS IN OUR DATABASE (use exact names when matching):
+${attractionNames.join(', ')}
+
+SERVICE TIER: ${tier.toUpperCase()} (${TIER_DESCRIPTIONS[tier]})
+TRAVELERS: ${totalPax} people
+GUIDE LANGUAGE: ${language}
+${writingContext}
+
+YOUR TASK:
+Convert this into our JSON format. For each day:
+1. Keep the EXACT date and activities from the input
+2. Write a professional 2-3 sentence description
+3. Match attractions to our database names (use closest match)
+4. Set guide_required ONLY if explicitly mentioned in the original OR if it's a sightseeing day with attractions
+5. Set includes_lunch/includes_dinner ONLY if explicitly mentioned
+6. For transfer-only days: keep activities minimal, description brief, guide_required: false
+
+STRICT RULES:
+- Do NOT add attractions not in the original itinerary
+- Do NOT add meals unless explicitly mentioned
+- Do NOT reorder or combine days
+- Do NOT skip any days from the input
+- If original says "transfer to hotel" - that's the ONLY activity
+- Arrival days with just transfer = is_transfer_only: true
+
+Return ONLY valid JSON:
+{
+  "trip_name": "descriptive name based on the itinerary",
+  "total_days": ${extractedDays.length},
+  "days": [
+    {
+      "day_number": 1,
+      "date": "YYYY-MM-DD or null",
+      "title": "Day 1: [title from input]",
+      "description": "Professional 2-3 sentence description",
+      "city": "city name",
+      "overnight_city": "overnight city",
+      "is_arrival": true/false,
+      "is_departure": true/false,
+      "is_transfer_only": true/false,
+      "is_free_day": true/false,
+      "attractions": ["Exact Attraction Name from database"],
+      "activities": ["activity descriptions from input"],
+      "guide_required": true/false,
+      "includes_lunch": true/false,
+      "includes_dinner": true/false,
+      "includes_hotel": true/false,
+      "transport_notes": "flight/transfer info if any",
+      "hotel_name": "hotel if mentioned"
+    }
+  ]
+}
+
+Remember: Your job is to FORMAT the provided itinerary, not to CREATE a new one.`
+
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 8192,
+    messages: [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ]
+  })
+
+  const responseText = message.content
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+
+  // Parse JSON
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error('Failed to parse AI response as JSON')
+  }
+
+  return JSON.parse(jsonMatch[0])
+}
+
+// ============================================
+// CREATIVE MODE: AI GENERATES ITINERARY
+// ============================================
+
+async function generateCreativeItinerary(
+  params: {
+    clientName: string
+    tourName: string
+    durationDays: number
+    tier: ServiceTier
+    totalPax: number
+    numAdults: number
+    numChildren: number
+    language: string
+    cities: string[]
+    interests: string[]
+    specialRequests: string[]
+    startDate: string
+    effectiveCity: string
+    attractionNames: string[]
+    contentContext: string
+    writingContext: string
+    includeLunch: boolean
+    includeDinner: boolean
+    includeAccommodation: boolean
+  }
+): Promise<any> {
+  const {
+    clientName, tourName, durationDays, tier, totalPax, numAdults, numChildren,
+    language, cities, interests, specialRequests, startDate, effectiveCity,
+    attractionNames, contentContext, writingContext, includeLunch, includeDinner, includeAccommodation
+  } = params
+
+  const prompt = `Create a ${durationDays}-day Egypt itinerary.
+
+CLIENT: ${clientName}
+TOUR: ${tourName}
+DATE: ${startDate}
+TRAVELERS: ${numAdults} adults${numChildren > 0 ? `, ${numChildren} children` : ''}
+TIER: ${tier.toUpperCase()} (${TIER_DESCRIPTIONS[tier]})
+CITIES: ${cities.length > 0 ? cities.join(', ') : effectiveCity}
+${interests.length > 0 ? `INTERESTS: ${interests.join(', ')}` : ''}
+${specialRequests.length > 0 ? `SPECIAL REQUESTS: ${specialRequests.join(', ')}` : ''}
+
+AVAILABLE ATTRACTIONS (use EXACT names):
+${attractionNames.join(', ')}
+${contentContext}
+${writingContext}
+
+PACKAGE INCLUDES:
+- Transportation: Yes (private vehicle)
+- Guide: Yes (${language} speaking)
+- Entrance Fees: Yes
+- Lunch: ${includeLunch ? 'Yes' : 'No'}
+- Dinner: ${includeDinner ? 'Yes' : 'No'}
+- Hotels: ${includeAccommodation ? 'Yes (except last day)' : 'No'}
+
+PLANNING GUIDELINES:
+1. Create a logical flow between cities (don't jump around)
+2. First day typically arrival + lighter activities
+3. Last day typically departure transfer
+4. Group nearby attractions on the same day
+5. Include realistic driving times
+6. For ${tier} tier: ${TIER_DESCRIPTIONS[tier]}
+
+Return ONLY valid JSON:
+{
+  "trip_name": "Descriptive Trip Name",
+  "total_days": ${durationDays},
+  "days": [
+    {
+      "day_number": 1,
+      "title": "Day 1: Arrival in Cairo",
+      "description": "Professional 2-3 sentence description of the day",
+      "city": "Cairo",
+      "overnight_city": "Cairo",
+      "is_arrival": true,
+      "is_departure": false,
+      "is_transfer_only": false,
+      "attractions": ["Exact Attraction Name"],
+      "guide_required": true,
+      "includes_lunch": ${includeLunch},
+      "includes_dinner": ${includeDinner},
+      "includes_hotel": ${includeAccommodation}
+    }
+  ]
+}
+
+Use EXACT attraction names from the provided list. Set includes_hotel to false on the last day.`
+
+  const message = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 8192,
+    messages: [
+      {
+        role: 'user',
+        content: prompt
+      }
+    ]
+  })
+
+  const responseText = message.content
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error('Failed to parse AI response as JSON')
+  }
+
+  return JSON.parse(jsonMatch[0])
+}
+
+// ============================================
 // MAIN API HANDLER
 // ============================================
 
@@ -663,8 +942,8 @@ export async function POST(request: NextRequest) {
       tour_name,
       start_date,
       duration_days: raw_duration_days,
-      num_adults,
-      num_children,
+      num_adults = 2,
+      num_children = 0,
       language = 'English',
       conversation_language,
       interests = [],
@@ -684,7 +963,13 @@ export async function POST(request: NextRequest) {
       currency = userPrefs.default_currency,
       cost_mode = userPrefs.default_cost_mode,
       package_type = 'full-package',
-      skip_pricing = false
+      skip_pricing = false,
+      
+      // NEW: Structured input parameters from parser
+      is_structured_input = false,
+      extracted_days = null,
+      raw_itinerary = null,
+      input_mode_override = null // 'creative' | 'structured' | null
     } = body
 
     const finalTourName = tour_requested || tour_name || 'Egypt Tour'
@@ -699,14 +984,35 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // CRUISE DETECTION
+    // DETERMINE INPUT MODE
     // ============================================
-    const cruiseDetection = detectCruiseRequest(finalTourName, interests, cities, special_requests)
+    let inputMode: InputMode = 'creative'
+    
+    if (input_mode_override === 'structured') {
+      inputMode = 'structured'
+    } else if (input_mode_override === 'creative') {
+      inputMode = 'creative'
+    } else if (is_structured_input && extracted_days && extracted_days.length > 0) {
+      inputMode = 'structured'
+    }
+
+    console.log('🤖 Input Mode:', inputMode)
+
+    // ============================================
+    // CRUISE DETECTION (only for creative mode)
+    // ============================================
+    const cruiseDetection = inputMode === 'creative' 
+      ? detectCruiseRequest(finalTourName, interests, cities, special_requests)
+      : { isCruise: false, cruiseType: null, route: null, detectedDuration: null, startCity: null, endCity: null, keywords: [] }
 
     let duration_days = parseInt(raw_duration_days) || 1
     
+    // For structured mode, use extracted days count
+    if (inputMode === 'structured' && extracted_days?.length) {
+      duration_days = extracted_days.length
+    }
     // Adjust duration for cruise if needed
-    if (cruiseDetection.isCruise && duration_days === 1) {
+    else if (cruiseDetection.isCruise && duration_days === 1) {
       duration_days = cruiseDetection.detectedDuration || (cruiseDetection.cruiseType === 'lake-nasser' ? 4 : 5)
       console.log(`🚢 Adjusted cruise duration to ${duration_days} days`)
     }
@@ -720,6 +1026,7 @@ export async function POST(request: NextRequest) {
 
     console.log('🤖 Starting itinerary generation:', {
       client: client_name,
+      inputMode,
       isCruise: cruiseDetection.isCruise,
       tier,
       duration: duration_days,
@@ -750,9 +1057,9 @@ export async function POST(request: NextRequest) {
     const withMargin = (cost: number) => Math.round(cost * marginMultiplier * 100) / 100
 
     // ============================================
-    // CRUISE PATH
+    // CRUISE PATH (only for creative mode)
     // ============================================
-    if (cruiseDetection.isCruise) {
+    if (cruiseDetection.isCruise && inputMode === 'creative') {
       console.log('🚢 Processing as CRUISE itinerary...')
       
       const cruiseContent = await findCruiseContent(cruiseDetection, tier, duration_days)
@@ -923,6 +1230,7 @@ export async function POST(request: NextRequest) {
             package_type: 'nile-cruise',
             is_cruise: true,
             cruise_ship: cruiseRate.shipName,
+            generation_mode: 'creative',
             mode: skip_pricing ? 'draft' : 'quoted',
             redirect_to: skip_pricing ? `/itineraries/${itinerary.id}/edit` : `/itineraries/${itinerary.id}`,
             currency,
@@ -944,15 +1252,17 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // STANDARD LAND TOUR PATH
+    // LAND TOUR PATH (STRUCTURED OR CREATIVE)
     // ============================================
-    console.log('🏛️ Processing as LAND TOUR itinerary...')
+    console.log(`🏛️ Processing as LAND TOUR itinerary (${inputMode} mode)...`)
 
+    // Fetch rates and content
     const searchCities = cities.length > 0 ? cities : [effectiveCity]
     const contentLibrary = await fetchContentLibrary(tier, searchCities, interests)
     const writingRules = await fetchWritingRules()
     const contentContext = buildContentContext(contentLibrary)
     const writingContext = buildWritingRulesContext(writingRules)
+    const attractionNames = await fetchAttractionsList(supabase)
 
     // Determine inclusions based on package type
     let includeAccommodationFinal = include_accommodation
@@ -995,64 +1305,65 @@ export async function POST(request: NextRequest) {
     const tierTipsMultiplier: Record<ServiceTier, number> = { 'budget': 0.8, 'standard': 1.0, 'deluxe': 1.2, 'luxury': 1.5 }
     dailyTips = Math.round(dailyTips * tierTipsMultiplier[tier])
 
-    // Generate with AI
-    const attractionNames = allEntranceFees?.map((a: any) => a.attraction_name).join(', ') || ''
-    const tierDescriptions: Record<ServiceTier, string> = {
-      'budget': 'cost-effective, good value',
-      'standard': 'comfortable mid-range',
-      'deluxe': 'superior quality, premium',
-      'luxury': 'top-tier, VIP treatment'
+    const vehiclePerDay = selectedVehicle ? toNumber(selectedVehicle.daily_rate_eur, 50) : 50
+    const guidePerDay = selectedGuide ? toNumber(selectedGuide.daily_rate_eur, 55) : 55
+    const roomsNeeded = Math.ceil(totalPax / 2)
+
+    // ============================================
+    // GENERATE ITINERARY CONTENT
+    // ============================================
+
+    let itineraryData: any
+
+    if (inputMode === 'structured' && extracted_days && raw_itinerary) {
+      console.log('📋 Using STRUCTURED mode - following provided itinerary')
+      
+      itineraryData = await generateFromStructuredInput(
+        extracted_days,
+        raw_itinerary,
+        {
+          tier,
+          totalPax,
+          language: finalLanguage,
+          attractionNames,
+          writingRules
+        }
+      )
+    } else {
+      console.log('🎨 Using CREATIVE mode - AI generating itinerary')
+      
+      itineraryData = await generateCreativeItinerary({
+        clientName: client_name,
+        tourName: finalTourName,
+        durationDays: duration_days,
+        tier,
+        totalPax,
+        numAdults: num_adults,
+        numChildren: num_children,
+        language: finalLanguage,
+        cities,
+        interests,
+        specialRequests: special_requests,
+        startDate: start_date,
+        effectiveCity,
+        attractionNames,
+        contentContext,
+        writingContext,
+        includeLunch: include_lunch,
+        includeDinner: include_dinner,
+        includeAccommodation: includeAccommodationFinal
+      })
     }
 
-    const prompt = `Create a ${duration_days}-day Egypt itinerary.
-
-CLIENT: ${client_name}
-TOUR: ${finalTourName}
-DATE: ${start_date}
-TRAVELERS: ${num_adults} adults${num_children > 0 ? `, ${num_children} children` : ''}
-TIER: ${tier.toUpperCase()} (${tierDescriptions[tier]})
-CITIES: ${cities.length > 0 ? cities.join(', ') : effectiveCity}
-${interests.length > 0 ? `INTERESTS: ${interests.join(', ')}` : ''}
-
-AVAILABLE ATTRACTIONS: ${attractionNames}
-${contentContext}
-${writingContext}
-
-Return JSON:
-{
-  "trip_name": "descriptive name",
-  "days": [
-    {
-      "day_number": 1,
-      "title": "Day 1: Title",
-      "description": "Detailed description",
-      "attractions": ["Exact Attraction Name"],
-      "city": "${effectiveCity}",
-      "includes_hotel": ${includeAccommodationFinal && duration_days > 1}
-    }
-  ]
-}
-
-Use EXACT attraction names. Set includes_hotel ${includeAccommodationFinal ? 'true except last day' : 'false'}.`
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: 'Expert Egypt travel planner. Respond with valid JSON only.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      response_format: { type: 'json_object' }
+    console.log('✅ AI generated itinerary:', {
+      tripName: itineraryData.trip_name,
+      days: itineraryData.days?.length
     })
 
-    let responseText = completion.choices[0].message.content || '{}'
-    if (responseText.startsWith('```')) {
-      responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
-    }
+    // ============================================
+    // CREATE ITINERARY IN DATABASE
+    // ============================================
 
-    const itineraryData = JSON.parse(responseText)
-
-    // Create itinerary
     const { data: itinerary, error: itineraryError } = await supabase
       .from('itineraries')
       .insert({
@@ -1082,125 +1393,182 @@ Use EXACT attraction names. Set includes_hotel ${includeAccommodationFinal ? 'tr
 
     if (itineraryError) throw new Error(`Failed to create itinerary: ${itineraryError.message}`)
 
+    console.log('📝 Created itinerary:', itinerary.id)
+
+    // ============================================
+    // CREATE DAYS AND SERVICES
+    // ============================================
+
     let totalSupplierCost = 0
     let totalClientPrice = 0
-
-    const vehiclePerDay = selectedVehicle ? toNumber(selectedVehicle.daily_rate_eur, 50) : 50
-    const guidePerDay = selectedGuide ? toNumber(selectedGuide.daily_rate_eur, 55) : 55
-    const roomsNeeded = Math.ceil(totalPax / 2)
 
     for (const dayData of itineraryData.days) {
       const dayDate = new Date(startDateObj)
       dayDate.setDate(startDateObj.getDate() + dayData.day_number - 1)
 
       const isLastDay = dayData.day_number === duration_days
+      const isTransferOnly = dayData.is_transfer_only || (dayData.is_arrival && (!dayData.attractions || dayData.attractions.length === 0))
+      const isFreeDay = dayData.is_free_day || false
       const includesHotelForDay = dayData.includes_hotel !== false && !isLastDay && includeAccommodationFinal
+      
+      // Use day-specific settings if in structured mode
+      const dayIncludesLunch = inputMode === 'structured' 
+        ? dayData.includes_lunch === true 
+        : include_lunch && !isTransferOnly && !isFreeDay
+      
+      const dayIncludesDinner = inputMode === 'structured'
+        ? dayData.includes_dinner === true
+        : include_dinner && !isTransferOnly && !isFreeDay
+      
+      const dayNeedsGuide = inputMode === 'structured'
+        ? dayData.guide_required === true
+        : !isTransferOnly && !isFreeDay
 
       const { data: day, error: dayError } = await supabase
         .from('itinerary_days')
         .insert({
           itinerary_id: itinerary.id,
           day_number: dayData.day_number,
-          date: dayDate.toISOString().split('T')[0],
+          date: dayData.date || dayDate.toISOString().split('T')[0],
           title: dayData.title,
           description: dayData.description,
           city: dayData.city || effectiveCity,
-          overnight_city: dayData.city || effectiveCity,
+          overnight_city: dayData.overnight_city || dayData.city || effectiveCity,
           attractions: dayData.attractions || [],
-          guide_required: true,
-          lunch_included: include_lunch,
-          dinner_included: include_dinner,
+          guide_required: dayNeedsGuide,
+          lunch_included: dayIncludesLunch,
+          dinner_included: dayIncludesDinner,
           hotel_included: includesHotelForDay
         })
         .select()
         .single()
 
-      if (dayError) throw new Error(`Failed to create day: ${dayError.message}`)
+      if (dayError) {
+        console.error(`❌ Error creating day ${dayData.day_number}:`, dayError)
+        continue
+      }
 
+      // Skip pricing if requested
       if (skip_pricing) continue
 
-      // Services
+      // Skip most services for departure-only days
+      if (dayData.is_departure && isTransferOnly) {
+        // Only add transfer service
+        const transferCost = vehiclePerDay * 0.5 // Half day for airport transfer
+        await supabase.from('itinerary_services').insert({
+          itinerary_day_id: day.id,
+          service_type: 'transportation',
+          service_code: 'TRANSFER',
+          service_name: 'Airport Transfer',
+          quantity: 1,
+          rate_eur: transferCost,
+          rate_non_eur: transferCost,
+          total_cost: transferCost,
+          client_price: withMargin(transferCost),
+          notes: 'Transfer to airport'
+        })
+        totalSupplierCost += transferCost
+        totalClientPrice += withMargin(transferCost)
+        continue
+      }
+
+      // Services array
       const services: any[] = []
 
-      // Transport
-      services.push({
-        service_type: 'transportation',
-        service_code: selectedVehicle?.id || 'TRANS',
-        service_name: `${selectedVehicle?.vehicle_type || 'Vehicle'} Transportation`,
-        supplier_name: selectedVehicle?.company_name || null,
-        quantity: 1,
-        rate_eur: vehiclePerDay,
-        rate_non_eur: vehiclePerDay,
-        total_cost: vehiclePerDay,
-        client_price: withMargin(vehiclePerDay),
-        notes: `From ${dayData.city || effectiveCity}`
-      })
-      totalSupplierCost += vehiclePerDay
-      totalClientPrice += withMargin(vehiclePerDay)
+      // Transportation (always included unless it's a free day)
+      if (!isFreeDay) {
+        const transportRate = isTransferOnly ? vehiclePerDay * 0.5 : vehiclePerDay
+        services.push({
+          service_type: 'transportation',
+          service_code: selectedVehicle?.id || 'TRANS',
+          service_name: isTransferOnly ? 'Airport/Hotel Transfer' : `${selectedVehicle?.vehicle_type || 'Vehicle'} Transportation`,
+          supplier_name: selectedVehicle?.company_name || null,
+          quantity: 1,
+          rate_eur: transportRate,
+          rate_non_eur: transportRate,
+          total_cost: transportRate,
+          client_price: withMargin(transportRate),
+          notes: `From ${dayData.city || effectiveCity}`
+        })
+        totalSupplierCost += transportRate
+        totalClientPrice += withMargin(transportRate)
+      }
 
-      // Guide
-      services.push({
-        service_type: 'guide',
-        service_code: selectedGuide?.id || 'GUIDE',
-        service_name: `${finalLanguage} Speaking Guide`,
-        supplier_name: selectedGuide?.name || null,
-        quantity: 1,
-        rate_eur: guidePerDay,
-        rate_non_eur: guidePerDay,
-        total_cost: guidePerDay,
-        client_price: withMargin(guidePerDay),
-        notes: `Professional ${finalLanguage} guide`
-      })
-      totalSupplierCost += guidePerDay
-      totalClientPrice += withMargin(guidePerDay)
+      // Guide (only if required for this day)
+      if (dayNeedsGuide) {
+        services.push({
+          service_type: 'guide',
+          service_code: selectedGuide?.id || 'GUIDE',
+          service_name: `${finalLanguage} Speaking Guide`,
+          supplier_name: selectedGuide?.name || null,
+          quantity: 1,
+          rate_eur: guidePerDay,
+          rate_non_eur: guidePerDay,
+          total_cost: guidePerDay,
+          client_price: withMargin(guidePerDay),
+          notes: `Professional ${finalLanguage} guide`
+        })
+        totalSupplierCost += guidePerDay
+        totalClientPrice += withMargin(guidePerDay)
 
-      // Tips
-      services.push({
-        service_type: 'tips',
-        service_code: 'TIPS',
-        service_name: 'Daily Tips',
-        quantity: 1,
-        rate_eur: dailyTips,
-        rate_non_eur: dailyTips,
-        total_cost: dailyTips,
-        client_price: dailyTips,
-        notes: 'Driver and guide tips'
-      })
-      totalSupplierCost += dailyTips
-      totalClientPrice += dailyTips
+        // Tips (only when guide is present)
+        services.push({
+          service_type: 'tips',
+          service_code: 'TIPS',
+          service_name: 'Daily Tips',
+          quantity: 1,
+          rate_eur: dailyTips,
+          rate_non_eur: dailyTips,
+          total_cost: dailyTips,
+          client_price: dailyTips,
+          notes: 'Driver and guide tips'
+        })
+        totalSupplierCost += dailyTips
+        totalClientPrice += dailyTips
+      }
 
-      // Entrance fees
-      let dayEntranceTotal = 0
-      const matchedAttractions: string[] = []
-      for (const attr of dayData.attractions || []) {
-        const fee = allEntranceFees?.find((ef: any) =>
-          ef.attraction_name.toLowerCase().includes(attr.toLowerCase()) ||
-          attr.toLowerCase().includes(ef.attraction_name.toLowerCase())
-        )
-        if (fee) {
-          const feePerPerson = isEuroPassport ? toNumber(fee.eur_rate, 0) : toNumber(fee.non_eur_rate, fee.eur_rate || 0)
-          dayEntranceTotal += feePerPerson * totalPax
-          matchedAttractions.push(fee.attraction_name)
+      // Entrance fees (only for attractions actually visited)
+      if (dayData.attractions?.length > 0 && !isTransferOnly && !isFreeDay) {
+        let dayEntranceTotal = 0
+        const matchedAttractions: string[] = []
+        
+        for (const attr of dayData.attractions) {
+          const fee = allEntranceFees?.find((ef: any) =>
+            ef.attraction_name.toLowerCase().includes(attr.toLowerCase()) ||
+            attr.toLowerCase().includes(ef.attraction_name.toLowerCase())
+          )
+          
+          if (fee) {
+            // Check if it's an add-on (should be excluded from automatic pricing)
+            if (fee.is_addon) continue
+            
+            const feePerPerson = isEuroPassport 
+              ? toNumber(fee.eur_rate, 0) 
+              : toNumber(fee.non_eur_rate, fee.eur_rate || 0)
+            dayEntranceTotal += feePerPerson * totalPax
+            matchedAttractions.push(fee.attraction_name)
+          }
+        }
+        
+        if (dayEntranceTotal > 0) {
+          services.push({
+            service_type: 'entrance',
+            service_code: 'ENTRANCE',
+            service_name: `Entrance Fees (${isEuroPassport ? 'EUR' : 'non-EUR'})`,
+            quantity: totalPax,
+            rate_eur: dayEntranceTotal / totalPax,
+            rate_non_eur: dayEntranceTotal / totalPax,
+            total_cost: dayEntranceTotal,
+            client_price: withMargin(dayEntranceTotal),
+            notes: `Sites: ${matchedAttractions.join(', ')}`
+          })
+          totalSupplierCost += dayEntranceTotal
+          totalClientPrice += withMargin(dayEntranceTotal)
         }
       }
-      if (dayEntranceTotal > 0) {
-        services.push({
-          service_type: 'entrance',
-          service_code: 'ENTRANCE',
-          service_name: `Entrance Fees (${isEuroPassport ? 'EUR' : 'non-EUR'})`,
-          quantity: totalPax,
-          rate_eur: dayEntranceTotal / totalPax,
-          rate_non_eur: dayEntranceTotal / totalPax,
-          total_cost: dayEntranceTotal,
-          client_price: withMargin(dayEntranceTotal),
-          notes: `Sites: ${matchedAttractions.join(', ')}`
-        })
-        totalSupplierCost += dayEntranceTotal
-        totalClientPrice += withMargin(dayEntranceTotal)
-      }
 
-      // Lunch
-      if (include_lunch) {
+      // Lunch (only if included for this day)
+      if (dayIncludesLunch) {
         const lunchCost = lunchRate * totalPax
         services.push({
           service_type: 'meal',
@@ -1217,8 +1585,8 @@ Use EXACT attraction names. Set includes_hotel ${includeAccommodationFinal ? 'tr
         totalClientPrice += withMargin(lunchCost)
       }
 
-      // Dinner
-      if (include_dinner) {
+      // Dinner (only if included for this day)
+      if (dayIncludesDinner) {
         const dinnerCost = dinnerRate * totalPax
         services.push({
           service_type: 'meal',
@@ -1235,23 +1603,25 @@ Use EXACT attraction names. Set includes_hotel ${includeAccommodationFinal ? 'tr
         totalClientPrice += withMargin(dinnerCost)
       }
 
-      // Water
-      const waterCost = 2 * totalPax
-      services.push({
-        service_type: 'supplies',
-        service_code: 'WATER',
-        service_name: 'Water Bottles',
-        quantity: totalPax,
-        rate_eur: 2,
-        rate_non_eur: 2,
-        total_cost: waterCost,
-        client_price: waterCost,
-        notes: 'Bottled water'
-      })
-      totalSupplierCost += waterCost
-      totalClientPrice += waterCost
+      // Water (for touring days only)
+      if (!isTransferOnly && !isFreeDay) {
+        const waterCost = 2 * totalPax
+        services.push({
+          service_type: 'supplies',
+          service_code: 'WATER',
+          service_name: 'Water Bottles',
+          quantity: totalPax,
+          rate_eur: 2,
+          rate_non_eur: 2,
+          total_cost: waterCost,
+          client_price: waterCost,
+          notes: 'Bottled water'
+        })
+        totalSupplierCost += waterCost
+        totalClientPrice += waterCost
+      }
 
-      // Hotel
+      // Hotel (only if included and not last day)
       if (includesHotelForDay && hotelRate > 0) {
         const hotelCost = hotelRate * roomsNeeded
         services.push({
@@ -1270,7 +1640,7 @@ Use EXACT attraction names. Set includes_hotel ${includeAccommodationFinal ? 'tr
         totalClientPrice += withMargin(hotelCost)
       }
 
-      // Insert services
+      // Insert all services
       for (const svc of services) {
         await supabase.from('itinerary_services').insert({
           itinerary_day_id: day.id,
@@ -1290,7 +1660,13 @@ Use EXACT attraction names. Set includes_hotel ${includeAccommodationFinal ? 'tr
       }).eq('id', itinerary.id)
     }
 
-    console.log('🎉 Land tour itinerary complete!')
+    console.log('🎉 Land tour itinerary complete!', {
+      id: itinerary.id,
+      mode: inputMode,
+      days: duration_days,
+      supplierCost: totalSupplierCost,
+      clientPrice: totalClientPrice
+    })
 
     return NextResponse.json({
       success: true,
@@ -1302,6 +1678,7 @@ Use EXACT attraction names. Set includes_hotel ${includeAccommodationFinal ? 'tr
         tier,
         package_type,
         is_cruise: false,
+        generation_mode: inputMode,
         mode: skip_pricing ? 'draft' : 'quoted',
         redirect_to: skip_pricing ? `/itineraries/${itinerary.id}/edit` : `/itineraries/${itinerary.id}`,
         currency,

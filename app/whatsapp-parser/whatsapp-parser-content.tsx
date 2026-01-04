@@ -12,7 +12,7 @@ import {
   Crown, Star, Settings, Check, X, Hotel, Plane, Car, Ship,
   Sun, Map, Building2, Package, Anchor, Clock, BadgeCheck,
   Percent, Languages, ChevronDown, ChevronUp, Info, Edit3, Save,
-  Zap, Pencil
+  Zap, Pencil, FileText, Wand2, ListChecks, AlertTriangle
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -25,6 +25,31 @@ interface UserPreferences {
   default_tier: string
   default_margin_percent: number
   default_currency: string
+}
+
+interface ExtractedDay {
+  day_number: number
+  date: string | null
+  date_display: string | null
+  title: string
+  city: string
+  is_arrival: boolean
+  is_departure: boolean
+  is_transfer_only: boolean
+  is_free_day: boolean
+  activities: string[]
+  attractions: string[]
+  meals_included: {
+    breakfast: boolean
+    lunch: boolean
+    dinner: boolean
+  }
+  guide_required: boolean
+  transport_type: string | null
+  flight_info: string | null
+  hotel_name: string | null
+  overnight_city: string
+  notes: string | null
 }
 
 interface ExtractedData {
@@ -47,6 +72,12 @@ interface ExtractedData {
   confidence_score: number
   nationality?: string
   tier?: string
+  // NEW: Structured input detection
+  is_structured_input: boolean
+  structure_confidence: number
+  structure_signals: string[]
+  extracted_days: ExtractedDay[] | null
+  raw_itinerary: string | null
 }
 
 interface ExistingClient {
@@ -58,14 +89,12 @@ interface ExistingClient {
 }
 
 type PackageType = 'day-trips' | 'tours-only' | 'land-package' | 'full-package' | 'cruise-land' | 'shore-excursions'
-
 type GenerationStep = 'idle' | 'creating-client' | 'checking-suppliers' | 'building-route' | 'calculating-margins' | 'finalizing' | 'complete'
-
-// Client confirmation step
 type ClientStep = 'pending' | 'confirming' | 'confirmed' | 'existing-selected'
-
-// ⭐ NEW: Generation mode type
 type GenerationMode = 'edit' | 'quick'
+
+// NEW: Input mode type
+type InputMode = 'creative' | 'structured'
 
 // ============================================
 // CONSTANTS
@@ -246,10 +275,9 @@ function StepIndicator({
 // GENERATION PROGRESS COMPONENT
 // ============================================
 
-function GenerationProgress({ currentStep, mode }: { currentStep: GenerationStep; mode: GenerationMode }) {
+function GenerationProgress({ currentStep, mode, inputMode }: { currentStep: GenerationStep; mode: GenerationMode; inputMode: InputMode }) {
   const stepIndex = GENERATION_STEPS.findIndex(s => s.key === currentStep)
   
-  // For edit mode, skip the pricing step label
   const displaySteps = mode === 'edit' 
     ? GENERATION_STEPS.filter(s => s.key !== 'calculating-margins')
     : GENERATION_STEPS
@@ -281,8 +309,15 @@ function GenerationProgress({ currentStep, mode }: { currentStep: GenerationStep
           )
         })}
       </div>
+      <div className="flex items-center gap-2 text-xs text-primary-600 mt-2">
+        {inputMode === 'structured' ? (
+          <><ListChecks className="w-3 h-3" /> Following your provided itinerary</>
+        ) : (
+          <><Wand2 className="w-3 h-3" /> AI creating itinerary</>
+        )}
+      </div>
       {mode === 'edit' && (
-        <p className="text-xs text-primary-600 mt-2">
+        <p className="text-xs text-primary-600">
           ✏️ You'll be able to edit before pricing is calculated
         </p>
       )}
@@ -322,7 +357,6 @@ function ClientConfirmationModal({
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
-        {/* Header */}
         <div className={`px-6 py-4 ${tierColor.bg} border-b ${tierColor.border}`}>
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full ${tierColor.bg} border-2 ${tierColor.border} flex items-center justify-center`}>
@@ -335,9 +369,7 @@ function ClientConfirmationModal({
           </div>
         </div>
 
-        {/* Content */}
         <div className="p-6 space-y-4">
-          {/* Edit Toggle */}
           <div className="flex justify-end">
             <button
               onClick={() => setEditMode(!editMode)}
@@ -348,9 +380,7 @@ function ClientConfirmationModal({
             </button>
           </div>
 
-          {/* Client Details */}
           <div className="space-y-3">
-            {/* Name */}
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Full Name *</label>
               {editMode ? (
@@ -371,7 +401,6 @@ function ClientConfirmationModal({
               )}
             </div>
 
-            {/* Email */}
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</label>
               {editMode ? (
@@ -390,7 +419,6 @@ function ClientConfirmationModal({
               )}
             </div>
 
-            {/* Phone */}
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</label>
               {editMode ? (
@@ -409,7 +437,6 @@ function ClientConfirmationModal({
               )}
             </div>
 
-            {/* Nationality */}
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Nationality</label>
               {editMode ? (
@@ -429,7 +456,6 @@ function ClientConfirmationModal({
             </div>
           </div>
 
-          {/* Tier Badge */}
           <div className={`p-3 rounded-lg ${tierColor.bg} border ${tierColor.border}`}>
             <div className="flex items-center gap-2">
               <Crown className={`w-4 h-4 ${tierColor.text}`} />
@@ -437,22 +463,9 @@ function ClientConfirmationModal({
                 {tier.charAt(0).toUpperCase() + tier.slice(1)} Tier Client
               </span>
             </div>
-            <p className="text-xs text-gray-600 mt-1">
-              VIP status and preferences will be saved to their profile
-            </p>
-          </div>
-
-          {/* Trip Context */}
-          <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Inquiry Context</p>
-            <p className="text-sm text-gray-700">{extractedData.tour_name}</p>
-            <p className="text-xs text-gray-500 mt-1">
-              {extractedData.num_adults} adults • {extractedData.start_date} • {extractedData.cities?.join(', ') || 'Egypt'}
-            </p>
           </div>
         </div>
 
-        {/* Footer */}
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
           <button
             onClick={onCancel}
@@ -467,15 +480,9 @@ function ClientConfirmationModal({
             className="flex-1 px-4 py-2.5 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isCreating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Creating...
-              </>
+              <><Loader2 className="w-4 h-4 animate-spin" />Creating...</>
             ) : (
-              <>
-                <UserPlus className="w-4 h-4" />
-                Create Client & Generate
-              </>
+              <><UserPlus className="w-4 h-4" />Create Client & Generate</>
             )}
           </button>
         </div>
@@ -485,7 +492,159 @@ function ClientConfirmationModal({
 }
 
 // ============================================
-// ⭐ NEW: GENERATION MODE SELECTOR COMPONENT
+// NEW: INPUT MODE SELECTOR COMPONENT
+// ============================================
+
+function InputModeSelector({ 
+  mode, 
+  onChange,
+  autoDetected,
+  confidence,
+  signals,
+  extractedDaysCount
+}: { 
+  mode: InputMode
+  onChange: (mode: InputMode) => void
+  autoDetected: InputMode | null
+  confidence: number
+  signals: string[]
+  extractedDaysCount: number
+}) {
+  const [showDetails, setShowDetails] = useState(false)
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-gray-500" />
+          Input Type
+        </h3>
+        {autoDetected && (
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+          >
+            <Info className="w-3 h-3" />
+            {showDetails ? 'Hide' : 'Why?'}
+          </button>
+        )}
+      </div>
+
+      {/* Auto-detection banner */}
+      {autoDetected && (
+        <div className={`mb-3 p-2 rounded-lg text-xs ${
+          autoDetected === 'structured' 
+            ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' 
+            : 'bg-blue-50 border border-blue-200 text-blue-700'
+        }`}>
+          <div className="flex items-center gap-2">
+            {autoDetected === 'structured' ? (
+              <><ListChecks className="w-3 h-3" /> Detected structured itinerary ({confidence}% confidence)</>
+            ) : (
+              <><Wand2 className="w-3 h-3" /> Detected general request</>
+            )}
+          </div>
+          {showDetails && signals.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-current/20">
+              <p className="font-medium mb-1">Detection signals:</p>
+              <ul className="space-y-0.5">
+                {signals.map((signal, idx) => (
+                  <li key={idx}>• {signal}</li>
+                ))}
+              </ul>
+              {extractedDaysCount > 0 && (
+                <p className="mt-1 font-medium">📅 {extractedDaysCount} days extracted</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      
+      <div className="grid grid-cols-2 gap-3">
+        {/* Creative / General Request */}
+        <button
+          onClick={() => onChange('creative')}
+          className={`p-4 rounded-xl border-2 text-left transition-all ${
+            mode === 'creative'
+              ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-offset-1'
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              mode === 'creative' ? 'bg-blue-100' : 'bg-gray-100'
+            }`}>
+              <Wand2 className={`w-4 h-4 ${mode === 'creative' ? 'text-blue-600' : 'text-gray-500'}`} />
+            </div>
+            <span className={`text-sm font-semibold ${mode === 'creative' ? 'text-blue-700' : 'text-gray-700'}`}>
+              Let AI Create
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            AI suggests itinerary based on interests, cities, and duration.
+          </p>
+        </button>
+
+        {/* Structured / Follow Provided */}
+        <button
+          onClick={() => onChange('structured')}
+          className={`p-4 rounded-xl border-2 text-left transition-all ${
+            mode === 'structured'
+              ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500 ring-offset-1'
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              mode === 'structured' ? 'bg-emerald-100' : 'bg-gray-100'
+            }`}>
+              <ListChecks className={`w-4 h-4 ${mode === 'structured' ? 'text-emerald-600' : 'text-gray-500'}`} />
+            </div>
+            <span className={`text-sm font-semibold ${mode === 'structured' ? 'text-emerald-700' : 'text-gray-700'}`}>
+              Follow My Plan
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            I provided a day-by-day itinerary. Follow it exactly.
+          </p>
+        </button>
+      </div>
+
+      {/* Warning if mismatched */}
+      {autoDetected && mode !== autoDetected && (
+        <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-amber-700">
+            {mode === 'structured' 
+              ? "Your input doesn't appear to have a clear day-by-day structure. The AI might not be able to follow a specific plan."
+              : "Your input appears to contain a structured itinerary. Switching to 'Let AI Create' may ignore your specific plan."
+            }
+          </p>
+        </div>
+      )}
+
+      {/* Info box */}
+      <div className={`mt-3 p-3 rounded-lg text-xs ${
+        mode === 'structured' 
+          ? 'bg-emerald-50 border border-emerald-200 text-emerald-700' 
+          : 'bg-blue-50 border border-blue-200 text-blue-700'
+      }`}>
+        {mode === 'structured' ? (
+          <p>
+            <strong>📋 Follow My Plan:</strong> The AI will extract dates, cities, and activities from your input and create the itinerary exactly as specified. It won't add or change anything.
+          </p>
+        ) : (
+          <p>
+            <strong>✨ Let AI Create:</strong> The AI will design an optimal itinerary based on the cities, interests, and duration extracted from your input.
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// GENERATION MODE SELECTOR COMPONENT
 // ============================================
 
 function GenerationModeSelector({ 
@@ -503,7 +662,6 @@ function GenerationModeSelector({
       </h3>
       
       <div className="grid grid-cols-2 gap-3">
-        {/* Edit First - Recommended */}
         <button
           onClick={() => onChange('edit')}
           className={`p-4 rounded-xl border-2 text-left transition-all ${
@@ -530,11 +688,10 @@ function GenerationModeSelector({
             </div>
           </div>
           <p className="text-xs text-gray-500 leading-relaxed">
-            Review & edit content before calculating pricing. Best for accuracy.
+            Review & edit content before calculating pricing.
           </p>
         </button>
 
-        {/* Quick Generate */}
         <button
           onClick={() => onChange('quick')}
           className={`p-4 rounded-xl border-2 text-left transition-all ${
@@ -554,29 +711,79 @@ function GenerationModeSelector({
             </span>
           </div>
           <p className="text-xs text-gray-500 leading-relaxed">
-            Auto-calculate pricing immediately. Faster but less control.
+            Auto-calculate pricing immediately.
           </p>
         </button>
       </div>
+    </div>
+  )
+}
 
-      {/* Info Box */}
-      <div className={`mt-3 p-3 rounded-lg text-xs ${
-        mode === 'edit' 
-          ? 'bg-primary-50 border border-primary-200 text-primary-700' 
-          : 'bg-amber-50 border border-amber-200 text-amber-700'
-      }`}>
-        {mode === 'edit' ? (
-          <p>
-            <strong>✏️ Edit First:</strong> AI generates content → You edit cities, attractions & services → Then calculate pricing.
-            This ensures accurate quotes based on your edits.
-          </p>
-        ) : (
-          <p>
-            <strong>⚡ Quick:</strong> AI generates content & calculates pricing immediately.
-            You can still edit afterwards, but you'll need to recalculate.
-          </p>
-        )}
+// ============================================
+// EXTRACTED DAYS PREVIEW COMPONENT
+// ============================================
+
+function ExtractedDaysPreview({ days }: { days: ExtractedDay[] }) {
+  const [expanded, setExpanded] = useState(false)
+  
+  if (!days || days.length === 0) return null
+
+  const displayDays = expanded ? days : days.slice(0, 3)
+
+  return (
+    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold text-emerald-800 flex items-center gap-2">
+          <ListChecks className="w-4 h-4" />
+          Extracted Day-by-Day Plan
+        </h4>
+        <span className="text-xs text-emerald-600 bg-emerald-100 px-2 py-1 rounded-full">
+          {days.length} days
+        </span>
       </div>
+
+      <div className="space-y-2">
+        {displayDays.map((day, idx) => (
+          <div 
+            key={idx} 
+            className={`p-2 rounded-lg text-xs ${
+              day.is_transfer_only || day.is_arrival || day.is_departure
+                ? 'bg-white/50 border border-emerald-200'
+                : 'bg-white border border-emerald-200'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-emerald-700">
+                {day.date_display || `Day ${day.day_number}`}: {day.title || day.city}
+              </span>
+              <div className="flex gap-1">
+                {day.is_arrival && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">Arrival</span>}
+                {day.is_departure && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px]">Departure</span>}
+                {day.is_transfer_only && <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px]">Transfer</span>}
+                {day.guide_required && <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px]">Guide</span>}
+              </div>
+            </div>
+            {day.attractions && day.attractions.length > 0 && (
+              <p className="text-gray-600 mt-1">
+                📍 {day.attractions.join(', ')}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {days.length > 3 && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="mt-2 text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
+        >
+          {expanded ? (
+            <><ChevronUp className="w-3 h-3" /> Show less</>
+          ) : (
+            <><ChevronDown className="w-3 h-3" /> Show {days.length - 3} more days</>
+          )}
+        </button>
+      )}
     </div>
   )
 }
@@ -617,45 +824,42 @@ function WhatsAppParserContent() {
   // STATE
   // ============================================
 
-  // Preferences
   const [userPreferences, setUserPreferences] = useState<UserPreferences>(DEFAULT_PREFERENCES)
   const [preferencesLoaded, setPreferencesLoaded] = useState(false)
 
-  // Conversation & Analysis
   const [conversation, setConversation] = useState('')
   const [parsedMessages, setParsedMessages] = useState<ReturnType<typeof parseConversation>>([])
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Selections
   const [selectedTier, setSelectedTier] = useState<string>('standard')
   const [packageType, setPackageType] = useState<PackageType>('full-package')
   const [showAdvancedPackages, setShowAdvancedPackages] = useState(false)
 
-  // ⭐ NEW: Generation mode state
   const [generationMode, setGenerationMode] = useState<GenerationMode>('edit')
+  
+  // NEW: Input mode state
+  const [inputMode, setInputMode] = useState<InputMode>('creative')
+  const [autoDetectedMode, setAutoDetectedMode] = useState<InputMode | null>(null)
 
-  // Client - Explicit confirmation step
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   const [clientStep, setClientStep] = useState<ClientStep>('pending')
   const [showClientConfirmation, setShowClientConfirmation] = useState(false)
   const [isCreatingClient, setIsCreatingClient] = useState(false)
 
-  // Generation
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationStep, setGenerationStep] = useState<GenerationStep>('idle')
   const [generatedItinerary, setGeneratedItinerary] = useState<any>(null)
 
-  // UI
   const [fromInbox, setFromInbox] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null)
 
   const itinerarySuccessRef = useRef<HTMLDivElement>(null)
 
   // ============================================
-  // COMPUTED VALUES (Step Status)
+  // COMPUTED VALUES
   // ============================================
 
   const step1Complete = !!extractedData
@@ -675,7 +879,6 @@ function WhatsAppParserContent() {
   // EFFECTS
   // ============================================
 
-  // Load user preferences
   useEffect(() => {
     const loadUserPreferences = async () => {
       try {
@@ -707,7 +910,6 @@ function WhatsAppParserContent() {
     loadUserPreferences()
   }, [])
 
-  // Load conversation from URL
   useEffect(() => {
     if (conversationParam) {
       try {
@@ -727,7 +929,6 @@ function WhatsAppParserContent() {
     if (phoneParam) setPhoneNumber(phoneParam)
   }, [conversationParam, phoneParam])
 
-  // Handle pre-selected client
   useEffect(() => {
     if (preSelectedClientId && !selectedClientId) {
       setSelectedClientId(preSelectedClientId)
@@ -735,20 +936,11 @@ function WhatsAppParserContent() {
     }
   }, [preSelectedClientId])
 
-  // Update parsed messages when conversation changes
   useEffect(() => {
     if (conversation) {
       setParsedMessages(parseConversation(conversation))
     }
   }, [conversation])
-
-// ============================================
-// END OF PART 1 - CONTINUE IN PART 2
-// ============================================
-// ============================================
-// PART 2 - PASTE DIRECTLY AFTER PART 1
-// (Remove this comment block after pasting)
-// ============================================
 
   // ============================================
   // HANDLERS
@@ -764,6 +956,8 @@ function WhatsAppParserContent() {
     setSelectedClientId(null)
     setSelectedTier(userPreferences.default_tier)
     setPackageType('full-package')
+    setInputMode('creative')
+    setAutoDetectedMode(null)
   }
 
   const analyzeConversation = async () => {
@@ -800,6 +994,15 @@ function WhatsAppParserContent() {
       setSelectedTier(finalTier)
       setExtractedData(result.data)
 
+      // NEW: Set input mode based on detection
+      if (result.data.is_structured_input) {
+        setInputMode('structured')
+        setAutoDetectedMode('structured')
+      } else {
+        setInputMode('creative')
+        setAutoDetectedMode('creative')
+      }
+
       // Search for existing clients
       if (result.data.client_email || result.data.client_phone) {
         try {
@@ -827,18 +1030,15 @@ function WhatsAppParserContent() {
     }
   }
 
-  // Select existing client
   const selectExistingClient = (clientId: string) => {
     setSelectedClientId(clientId)
     setClientStep('existing-selected')
   }
 
-  // Open client confirmation modal
   const openClientConfirmation = () => {
     setShowClientConfirmation(true)
   }
 
-  // Create client and proceed
   const handleConfirmClient = async (editedData: Partial<ExtractedData>) => {
     if (!extractedData) return
 
@@ -858,10 +1058,8 @@ function WhatsAppParserContent() {
 
       let clientId: string | null = null
 
-      // ✅ FIRST: Check if client already exists by email or phone
+      // Check if client exists
       if (clientEmail || clientPhone) {
-        console.log('🔍 Checking for existing client...')
-        
         let query = supabase.from('clients').select('id, first_name, last_name, email, phone')
         
         if (clientEmail && clientPhone) {
@@ -875,16 +1073,11 @@ function WhatsAppParserContent() {
         const { data: existingClients } = await query.limit(1)
         
         if (existingClients && existingClients.length > 0) {
-          // Use existing client
           clientId = existingClients[0].id
-          console.log('✅ Found existing client:', clientId)
-          
-          // Update state and proceed
           setSelectedClientId(clientId)
           setClientStep('existing-selected')
           setShowClientConfirmation(false)
           
-          // Update extracted data
           setExtractedData({
             ...extractedData,
             client_name: editedData.client_name || extractedData.client_name,
@@ -893,15 +1086,12 @@ function WhatsAppParserContent() {
             nationality: editedData.nationality || extractedData.nationality
           })
 
-          // Auto-proceed to generation
           setTimeout(() => generateItinerary(clientId!), 100)
           return
         }
       }
 
-      // ✅ No existing client found - create new one
-      console.log('📝 Creating new client...')
-      
+      // Create new client
       const nameParts = clientName.split(' ')
       const firstName = nameParts[0] || 'Unknown'
       const lastName = nameParts.slice(1).join(' ') || firstName
@@ -927,7 +1117,7 @@ function WhatsAppParserContent() {
             interests: extractedData.interests?.join(', ') || '',
             tier: selectedTier
           },
-          note: `WhatsApp inquiry: ${extractedData.tour_name}. ${extractedData.cities?.join(', ') || 'Egypt'}. ${extractedData.num_adults} adults. Tier: ${selectedTier.toUpperCase()}.`,
+          note: `WhatsApp inquiry: ${extractedData.tour_name}. ${extractedData.cities?.join(', ') || 'Egypt'}. ${extractedData.num_adults} adults.`,
           link_whatsapp_phone: phoneNumber
         })
       })
@@ -935,9 +1125,7 @@ function WhatsAppParserContent() {
       const result = await response.json()
       
       if (!response.ok || !result.success) {
-        // ✅ Handle duplicate email error specifically
         if (result.error?.includes('duplicate') || result.error?.includes('already exists')) {
-          // Try to find and use the existing client
           if (clientEmail) {
             const { data: existingByEmail } = await supabase
               .from('clients')
@@ -946,7 +1134,6 @@ function WhatsAppParserContent() {
               .single()
             
             if (existingByEmail) {
-              console.log('✅ Using existing client (found via email):', existingByEmail.id)
               setSelectedClientId(existingByEmail.id)
               setClientStep('existing-selected')
               setShowClientConfirmation(false)
@@ -958,14 +1145,10 @@ function WhatsAppParserContent() {
         throw new Error(result.error || 'Failed to create client')
       }
 
-      console.log('✅ Client created:', result.data.id)
-
-      // Update state
       setSelectedClientId(result.data.id)
       setClientStep('confirmed')
       setShowClientConfirmation(false)
 
-      // Update extracted data with edited values
       setExtractedData({
         ...extractedData,
         client_name: editedData.client_name || extractedData.client_name,
@@ -974,25 +1157,21 @@ function WhatsAppParserContent() {
         nationality: editedData.nationality || extractedData.nationality
       })
 
-      // Auto-proceed to generation
       setTimeout(() => generateItinerary(result.data.id), 100)
 
     } catch (err: any) {
-      console.error('❌ Error in handleConfirmClient:', err)
       setError(err.message || 'Failed to create client')
     } finally {
       setIsCreatingClient(false)
     }
   }
 
-  // ⭐ UPDATED: Generate itinerary with skip_pricing support
   const generateItinerary = async (clientIdOverride?: string) => {
     if (!extractedData) return
 
     const clientIdToUse = clientIdOverride || selectedClientId
 
     if (!clientIdToUse) {
-      // Need to create client first - show confirmation
       openClientConfirmation()
       return
     }
@@ -1002,12 +1181,10 @@ function WhatsAppParserContent() {
     setGenerationStep('checking-suppliers')
 
     try {
-      // Simulate progress steps
       await new Promise(r => setTimeout(r, 800))
       setGenerationStep('building-route')
       await new Promise(r => setTimeout(r, 600))
       
-      // Only show margins step for quick mode
       if (generationMode === 'quick') {
         setGenerationStep('calculating-margins')
         await new Promise(r => setTimeout(r, 500))
@@ -1015,7 +1192,7 @@ function WhatsAppParserContent() {
       
       setGenerationStep('finalizing')
 
-      // ⭐ NEW: Pass skip_pricing based on generation mode
+      // NEW: Include input mode and extracted days
       const response = await fetch('/api/ai/generate-itinerary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1028,8 +1205,12 @@ function WhatsAppParserContent() {
           cost_mode: userPreferences.default_cost_mode,
           margin_percent: userPreferences.default_margin_percent,
           currency: userPreferences.default_currency,
-          // ⭐ NEW: Skip pricing if edit mode
-          skip_pricing: generationMode === 'edit'
+          skip_pricing: generationMode === 'edit',
+          // NEW: Pass input mode override
+          input_mode_override: inputMode,
+          is_structured_input: extractedData.is_structured_input,
+          extracted_days: extractedData.extracted_days,
+          raw_itinerary: extractedData.raw_itinerary
         })
       })
 
@@ -1039,8 +1220,6 @@ function WhatsAppParserContent() {
       setGenerationStep('complete')
       setGeneratedItinerary(result.data)
 
-      // ⭐ NEW: Auto-redirect based on mode
-      // For edit mode, redirect to editor immediately
       if (generationMode === 'edit' && result.data?.redirect_to) {
         setTimeout(() => {
           router.push(result.data.redirect_to)
@@ -1048,7 +1227,6 @@ function WhatsAppParserContent() {
         return
       }
 
-      // For quick mode, scroll to success message
       setTimeout(() => {
         itinerarySuccessRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }, 100)
@@ -1077,7 +1255,6 @@ function WhatsAppParserContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* CLIENT CONFIRMATION MODAL */}
       {showClientConfirmation && extractedData && (
         <ClientConfirmationModal
           extractedData={extractedData}
@@ -1115,7 +1292,6 @@ function WhatsAppParserContent() {
             </Link>
           </div>
 
-          {/* PROGRESS STEPPER */}
           <div className="grid grid-cols-4 gap-2 mt-3">
             <StepIndicator step={1} label="Analyze" status={getStepStatus(1)} isActive={!extractedData} />
             <StepIndicator step={2} label="Configure" status={getStepStatus(2)} isActive={step1Complete && !step2Complete} />
@@ -1125,14 +1301,12 @@ function WhatsAppParserContent() {
         </div>
       </div>
 
-      {/* MAIN CONTENT - 2 Column Layout */}
+      {/* MAIN CONTENT */}
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="grid grid-cols-12 gap-4">
 
-          {/* LEFT COLUMN: Input & Context (5 cols) */}
+          {/* LEFT COLUMN */}
           <div className="col-span-5 space-y-4">
-
-            {/* WhatsApp Conversation - Chat Bubbles */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1146,7 +1320,6 @@ function WhatsAppParserContent() {
                 )}
               </div>
 
-              {/* Chat View or Textarea */}
               {parsedMessages.length > 0 && !isAnalyzing ? (
                 <div className="p-4 bg-[#E5DDD5] max-h-[400px] overflow-y-auto">
                   {parsedMessages.map((msg, idx) => (
@@ -1157,7 +1330,7 @@ function WhatsAppParserContent() {
                 <textarea
                   value={conversation}
                   onChange={(e) => setConversation(e.target.value)}
-                  placeholder="Paste WhatsApp conversation here..."
+                  placeholder="Paste WhatsApp conversation or structured itinerary here..."
                   className="w-full h-80 px-4 py-3 text-sm border-0 focus:ring-0 resize-none font-mono bg-gray-50"
                 />
               )}
@@ -1169,7 +1342,7 @@ function WhatsAppParserContent() {
                   className="w-full px-4 py-2.5 text-sm bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isAnalyzing ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing...</>
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing with Claude AI...</>
                   ) : (
                     <><Sparkles className="w-4 h-4" /> {extractedData ? 'Re-Analyze' : 'Analyze with AI'}</>
                   )}
@@ -1177,7 +1350,6 @@ function WhatsAppParserContent() {
               </div>
             </div>
 
-            {/* Confidence Indicators */}
             {extractedData && (
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Readiness Check</h3>
@@ -1186,16 +1358,23 @@ function WhatsAppParserContent() {
                   <ConfidenceBadge label={`Tier: ${selectedTier}`} checked={true} />
                   <ConfidenceBadge label={`Language: ${extractedData.conversation_language}`} checked={!!extractedData.conversation_language} />
                   <ConfidenceBadge label="Client confirmed" checked={step3Complete} />
-                  <ConfidenceBadge label={`Mode: ${generationMode === 'edit' ? 'Edit First' : 'Quick'}`} checked={true} />
+                  <ConfidenceBadge 
+                    label={inputMode === 'structured' ? 'Follow Plan' : 'AI Create'} 
+                    checked={true} 
+                  />
                 </div>
               </div>
             )}
+
+            {/* NEW: Extracted Days Preview */}
+            {extractedData?.extracted_days && extractedData.extracted_days.length > 0 && inputMode === 'structured' && (
+              <ExtractedDaysPreview days={extractedData.extracted_days} />
+            )}
           </div>
 
-          {/* RIGHT COLUMN: Actions & Decisions (7 cols) */}
+          {/* RIGHT COLUMN */}
           <div className="col-span-7 space-y-4">
 
-            {/* Error */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
@@ -1206,21 +1385,19 @@ function WhatsAppParserContent() {
               </div>
             )}
 
-            {/* STEP 1 COMPLETE - Show extracted data and config */}
             {extractedData && (
               <>
-                {/* Extracted Information - Grouped */}
+                {/* Extracted Information */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <BadgeCheck className="w-4 h-4 text-green-500" />
                       <h2 className="text-sm font-semibold text-gray-900">Extracted Information</h2>
                     </div>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">AI-Extracted • Editable</span>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Claude AI • Editable</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    {/* Client Section */}
                     <div className="space-y-3">
                       <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Client</h4>
                       <div>
@@ -1253,7 +1430,6 @@ function WhatsAppParserContent() {
                       </div>
                     </div>
 
-                    {/* Trip Section */}
                     <div className="space-y-3">
                       <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Trip Details</h4>
                       <div>
@@ -1273,11 +1449,22 @@ function WhatsAppParserContent() {
                         <label className="text-xs text-gray-500">Travelers</label>
                         <div className="mt-1 px-3 py-2 text-sm bg-gray-50 rounded-lg text-gray-700">
                           {extractedData.num_adults} adults{extractedData.num_children > 0 && `, ${extractedData.num_children} children`}
+                          {extractedData.duration_days > 1 && ` • ${extractedData.duration_days} days`}
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
+
+                {/* NEW: Input Mode Selector */}
+                <InputModeSelector 
+                  mode={inputMode}
+                  onChange={setInputMode}
+                  autoDetected={autoDetectedMode}
+                  confidence={extractedData.structure_confidence || 0}
+                  signals={extractedData.structure_signals || []}
+                  extractedDaysCount={extractedData.extracted_days?.length || 0}
+                />
 
                 {/* Tier Selection */}
                 <div className={`bg-white rounded-xl border-2 shadow-sm p-4 ${tierColor.border}`}>
@@ -1323,10 +1510,8 @@ function WhatsAppParserContent() {
                   <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                     <Package className="w-4 h-4 text-primary-500" />
                     Package Type
-                    <span className="text-xs font-normal text-gray-500">(determines what's included)</span>
                   </h3>
 
-                  {/* Main Options */}
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     {PACKAGE_TYPES_MAIN.map((pkg) => {
                       const isSelected = packageType === pkg.slug
@@ -1350,7 +1535,6 @@ function WhatsAppParserContent() {
                     })}
                   </div>
 
-                  {/* Advanced Options Toggle */}
                   <button
                     onClick={() => setShowAdvancedPackages(!showAdvancedPackages)}
                     className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
@@ -1385,17 +1569,16 @@ function WhatsAppParserContent() {
                   )}
                 </div>
 
-                {/* ⭐ NEW: Generation Mode Selector */}
+                {/* Generation Mode */}
                 <GenerationModeSelector mode={generationMode} onChange={setGenerationMode} />
 
-                {/* CLIENT STEP - Existing or Create New */}
+                {/* Client Step */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                     <User className="w-4 h-4 text-primary-500" />
                     Step 3: Confirm Client
                   </h3>
 
-                  {/* Existing Clients Found */}
                   {existingClients.length > 0 && clientStep !== 'confirmed' && (
                     <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                       <p className="text-sm font-medium text-amber-800 mb-2">⚠️ Possible existing client(s) found:</p>
@@ -1422,13 +1605,9 @@ function WhatsAppParserContent() {
                           </button>
                         ))}
                       </div>
-                      <p className="text-xs text-gray-600 mt-2">
-                        Select an existing client above, or create a new one below.
-                      </p>
                     </div>
                   )}
 
-                  {/* Client Status */}
                   {clientStep === 'confirmed' && (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-3">
                       <CheckCircle className="w-5 h-5 text-green-500" />
@@ -1436,12 +1615,6 @@ function WhatsAppParserContent() {
                         <p className="text-sm font-medium text-green-800">Client created successfully</p>
                         <p className="text-xs text-green-600">{extractedData.client_name} added to CRM</p>
                       </div>
-                      <button
-                        onClick={() => router.push(`/clients/${selectedClientId}`)}
-                        className="text-xs text-green-700 hover:text-green-800 font-medium"
-                      >
-                        View →
-                      </button>
                     </div>
                   )}
 
@@ -1458,7 +1631,7 @@ function WhatsAppParserContent() {
                   {clientStep === 'pending' && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <p className="text-sm text-gray-700 mb-3">
-                        A new client profile will be created in your CRM before generating the itinerary.
+                        A new client profile will be created before generating.
                       </p>
                       <button
                         onClick={openClientConfirmation}
@@ -1471,22 +1644,23 @@ function WhatsAppParserContent() {
                   )}
                 </div>
 
-                {/* GENERATE BUTTON */}
+                {/* Generate Button */}
                 <div className={`rounded-xl p-4 shadow-lg ${
                   generationMode === 'edit' 
                     ? 'bg-gradient-to-r from-primary-500 to-primary-600' 
                     : 'bg-gradient-to-r from-green-500 to-emerald-600'
                 }`}>
                   {isGenerating ? (
-                    <GenerationProgress currentStep={generationStep} mode={generationMode} />
+                    <GenerationProgress currentStep={generationStep} mode={generationMode} inputMode={inputMode} />
                   ) : (
                     <>
                       <p className="text-sm text-white/90 mb-3">
                         {step3Complete 
-                          ? generationMode === 'edit'
-                            ? `Generate ${selectedTier.toUpperCase()} draft → Edit → Calculate pricing`
-                            : `Generate ${selectedTier.toUpperCase()} ${packageType.replace('-', ' ')} with pricing.`
-                          : 'Please confirm the client first to proceed.'}
+                          ? inputMode === 'structured'
+                            ? `Generate from your ${extractedData.extracted_days?.length || 0}-day plan (${selectedTier.toUpperCase()})`
+                            : `AI will create ${selectedTier.toUpperCase()} ${packageType.replace('-', ' ')} itinerary`
+                          : 'Please confirm the client first to proceed.'
+                        }
                       </p>
                       <button
                         onClick={() => generateItinerary()}
@@ -1497,18 +1671,12 @@ function WhatsAppParserContent() {
                             : 'text-green-700 hover:bg-green-50'
                         }`}
                       >
-                        {generationMode === 'edit' ? (
-                          <>
-                            <Pencil className="w-5 h-5" />
-                            {step3Complete ? 'Generate & Edit' : 'Confirm Client First'}
-                          </>
+                        {inputMode === 'structured' ? (
+                          <><ListChecks className="w-5 h-5" /> Generate from Plan</>
+                        ) : generationMode === 'edit' ? (
+                          <><Pencil className="w-5 h-5" /> Generate & Edit</>
                         ) : (
-                          <>
-                            <Zap className="w-5 h-5" />
-                            {step3Complete 
-                              ? `Quick Generate ${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)}` 
-                              : 'Confirm Client to Generate'}
-                          </>
+                          <><Zap className="w-5 h-5" /> Quick Generate</>
                         )}
                       </button>
                       {!canGenerate && !step3Complete && (
@@ -1520,7 +1688,7 @@ function WhatsAppParserContent() {
                   )}
                 </div>
 
-                {/* SUCCESS - Only shown for quick mode (edit mode auto-redirects) */}
+                {/* Success States */}
                 {generatedItinerary && generationMode === 'quick' && (
                   <div ref={itinerarySuccessRef} className="bg-green-50 border-2 border-green-300 rounded-xl p-4">
                     <div className="flex items-center gap-3 mb-3">
@@ -1530,7 +1698,7 @@ function WhatsAppParserContent() {
                       <div>
                         <h3 className="text-base font-bold text-green-800">Itinerary Generated!</h3>
                         <p className="text-sm text-green-600">
-                          {generatedItinerary.itinerary_code} • {generatedItinerary.content_items_used || 0} content items used
+                          {generatedItinerary.itinerary_code} • {generatedItinerary.generation_mode === 'structured' ? 'Followed your plan' : 'AI created'}
                         </p>
                       </div>
                     </div>
@@ -1547,16 +1715,10 @@ function WhatsAppParserContent() {
                       >
                         <Pencil className="w-4 h-4" /> Edit
                       </button>
-                      {fromInbox && (
-                        <Link href="/whatsapp-inbox" className="px-4 py-2.5 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 flex items-center gap-2 text-sm">
-                          <MessageSquare className="w-4 h-4" /> Back
-                        </Link>
-                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Edit Mode Success - Redirecting message */}
                 {generatedItinerary && generationMode === 'edit' && (
                   <div ref={itinerarySuccessRef} className="bg-primary-50 border-2 border-primary-300 rounded-xl p-4">
                     <div className="flex items-center gap-3">
@@ -1571,12 +1733,14 @@ function WhatsAppParserContent() {
               </>
             )}
 
-            {/* Empty State - Before Analysis */}
+            {/* Empty State */}
             {!extractedData && !isAnalyzing && (
               <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center">
                 <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <h3 className="text-sm font-medium text-gray-600 mb-1">Paste a WhatsApp conversation</h3>
-                <p className="text-xs text-gray-400">AI will extract client info, dates, and preferences</p>
+                <h3 className="text-sm font-medium text-gray-600 mb-1">Paste a WhatsApp conversation or itinerary</h3>
+                <p className="text-xs text-gray-400">
+                  AI will auto-detect if you've provided a structured plan or a general request
+                </p>
               </div>
             )}
           </div>
