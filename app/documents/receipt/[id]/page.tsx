@@ -1,8 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Receipt, Download, Search, Eye, Calendar, User, CreditCard, Loader2 } from 'lucide-react'
+import { 
+  ArrowLeft, 
+  Download, 
+  Loader2, 
+  Check, 
+  MessageCircle,
+  Calendar,
+  CreditCard,
+  User,
+  FileText,
+  Hash,
+  Mail,
+  Phone
+} from 'lucide-react'
 import { downloadReceiptPDF } from '@/lib/receipt-pdf-generator'
 
 interface Payment {
@@ -11,6 +25,7 @@ interface Payment {
   itinerary_code: string
   client_name: string
   client_email?: string
+  client_phone?: string
   payment_type: string
   amount: number
   currency: string
@@ -19,40 +34,42 @@ interface Payment {
   transaction_reference: string
   payment_date: string
   notes: string
-  created_at: string
 }
 
-export default function ReceiptsPage() {
-  const [payments, setPayments] = useState<Payment[]>([])
+export default function ReceiptPage() {
+  const params = useParams()
+  const router = useRouter()
+  const [payment, setPayment] = useState<Payment | null>(null)
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
 
   useEffect(() => {
-    fetchPayments()
-  }, [])
+    if (params.id) {
+      fetchPayment(params.id as string)
+    }
+  }, [params.id])
 
-  const fetchPayments = async () => {
+  const fetchPayment = async (id: string) => {
     try {
-      const response = await fetch('/api/payments?status=completed')
+      const response = await fetch(`/api/payments/${id}`)
       const data = await response.json()
       
       if (data.success) {
-        // Filter only completed payments (receipts are for completed payments)
-        const completedPayments = (data.data || []).filter(
-          (p: Payment) => p.payment_status === 'completed'
-        )
-        setPayments(completedPayments)
+        setPayment(data.data)
       }
     } catch (error) {
-      console.error('Error fetching payments:', error)
+      console.error('Error fetching payment:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDownloadReceipt = async (payment: Payment) => {
-    setDownloadingId(payment.id)
+  const handleDownloadPDF = () => {
+    if (!payment) return
+    
+    setDownloading(true)
     
     try {
       downloadReceiptPDF({
@@ -73,29 +90,42 @@ export default function ReceiptsPage() {
         currency: payment.currency
       })
     } catch (error) {
-      console.error('Error downloading receipt:', error)
+      console.error('Error downloading PDF:', error)
       alert('Failed to download receipt')
     } finally {
-      setDownloadingId(null)
+      setDownloading(false)
     }
   }
 
-  const filteredPayments = payments.filter(payment => {
-    const search = searchTerm.toLowerCase()
-    return (
-      payment.client_name?.toLowerCase().includes(search) ||
-      payment.itinerary_code?.toLowerCase().includes(search) ||
-      payment.transaction_reference?.toLowerCase().includes(search)
-    )
-  })
+  const handleSendWhatsApp = async () => {
+    if (!payment?.client_phone) {
+      alert('No phone number available for this client')
+      return
+    }
 
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return 'N/A'
-    return new Date(dateStr).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    })
+    setSending(true)
+    
+    try {
+      const response = await fetch('/api/whatsapp/send-receipt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentId: payment.id })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSent(true)
+        setTimeout(() => setSent(false), 3000)
+      } else {
+        alert(data.error || 'Failed to send receipt')
+      }
+    } catch (error) {
+      console.error('Error sending receipt:', error)
+      alert('Failed to send receipt via WhatsApp')
+    } finally {
+      setSending(false)
+    }
   }
 
   const formatCurrency = (amount: number, currency: string) => {
@@ -108,149 +138,220 @@ export default function ReceiptsPage() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-sm text-gray-600">Loading receipts...</p>
+          <p className="text-sm text-gray-600">Loading receipt...</p>
         </div>
       </div>
     )
   }
 
+  if (!payment) {
+    return (
+      <div className="p-4 lg:p-6">
+        <div className="max-w-3xl mx-auto text-center py-12">
+          <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-gray-900 mb-3">Payment Not Found</h1>
+          <p className="text-sm text-gray-600 mb-4">The receipt you're looking for doesn't exist.</p>
+          <Link href="/receipts" className="text-sm text-primary-600 hover:text-primary-700">
+            ← Back to Receipts
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+
   return (
-    <div className="p-4 lg:p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Receipt className="w-6 h-6 text-primary-600" />
-              Receipts
-            </h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Download receipts for completed payments
-            </p>
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+          
+          <div className="flex items-center gap-2">
+            {/* WhatsApp Button */}
+            {payment.client_phone && (
+              <button
+                onClick={handleSendWhatsApp}
+                disabled={sending}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  sent 
+                    ? 'bg-green-600 text-white' 
+                    : 'bg-[#25D366] text-white hover:bg-[#20BD5A]'
+                } disabled:opacity-50`}
+              >
+                {sending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : sent ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <MessageCircle className="w-4 h-4" />
+                )}
+                {sending ? 'Sending...' : sent ? 'Sent!' : 'Send via WhatsApp'}
+              </button>
+            )}
+            
+            {/* Download Button */}
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors disabled:opacity-50"
+            >
+              {downloading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {downloading ? 'Generating...' : 'Download PDF'}
+            </button>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by client name, itinerary code, or transaction reference..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            />
+        {/* Receipt Card */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          {/* Receipt Header */}
+          <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-primary-200 text-xs uppercase tracking-wider mb-1">Payment Receipt</p>
+                <h1 className="text-2xl font-bold">{receiptNumber}</h1>
+              </div>
+              <div className="text-right">
+                <p className="text-primary-200 text-xs mb-1">Travel2Egypt</p>
+                <p className="text-xs opacity-75">Cairo, Egypt</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Badge */}
+          <div className="px-6 py-3 bg-green-50 border-b border-green-100 flex items-center justify-center gap-2">
+            <Check className="w-4 h-4 text-green-600" />
+            <span className="text-sm font-medium text-green-700">Payment Completed Successfully</span>
+          </div>
+
+          {/* Receipt Body */}
+          <div className="p-6">
+            {/* Client & Date Info */}
+            <div className="grid grid-cols-2 gap-6 mb-6">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Received From</p>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-primary-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">{payment.client_name}</p>
+                    {payment.client_email && (
+                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
+                        <Mail className="w-3 h-3" />
+                        {payment.client_email}
+                      </p>
+                    )}
+                    {payment.client_phone && (
+                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
+                        <Phone className="w-3 h-3" />
+                        {payment.client_phone}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Date & Reference</p>
+                <p className="font-semibold text-gray-900">
+                  {new Date(payment.payment_date || Date.now()).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </p>
+                <Link 
+                  href={`/itineraries/${payment.itinerary_id}`}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-mono"
+                >
+                  {payment.itinerary_code}
+                </Link>
+              </div>
+            </div>
+
+            {/* Payment Details */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Payment Details</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-gray-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Payment Method</p>
+                    <p className="text-sm font-medium text-gray-900 capitalize">
+                      {payment.payment_method?.replace('_', ' ')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                    <FileText className="w-4 h-4 text-gray-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Payment Type</p>
+                    <p className="text-sm font-medium text-gray-900 capitalize">
+                      {payment.payment_type?.replace('_', ' ')}
+                    </p>
+                  </div>
+                </div>
+                {payment.transaction_reference && (
+                  <div className="flex items-center gap-3 col-span-2">
+                    <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center">
+                      <Hash className="w-4 h-4 text-gray-500" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Transaction Reference</p>
+                      <p className="text-sm font-mono font-medium text-gray-900">
+                        {payment.transaction_reference}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Amount */}
+            <div className="bg-primary-600 text-white rounded-lg p-6 text-center mb-6">
+              <p className="text-primary-200 text-xs uppercase tracking-wider mb-2">Amount Received</p>
+              <p className="text-4xl font-bold">
+                {formatCurrency(payment.amount, payment.currency)}
+              </p>
+            </div>
+
+            {/* Notes */}
+            {payment.notes && (
+              <div className="mb-6">
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Notes</p>
+                <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{payment.notes}</p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="border-t border-gray-200 pt-6 text-center">
+              <p className="text-lg font-semibold text-gray-900 mb-1">
+                Thank you for your payment!
+              </p>
+              <p className="text-sm text-gray-600">
+                This receipt confirms your payment has been received and processed.
+              </p>
+              <p className="text-xs text-gray-500 mt-3">
+                Questions? Contact us at info@travel2egypt.com
+              </p>
+            </div>
           </div>
         </div>
-
-        {/* Receipts List */}
-        {filteredPayments.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-12 text-center">
-            <Receipt className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Receipts Found</h3>
-            <p className="text-sm text-gray-600">
-              {searchTerm 
-                ? 'No receipts match your search criteria.' 
-                : 'Completed payments will appear here with downloadable receipts.'}
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Receipt #</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Client</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Itinerary</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Date</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Method</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Amount</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredPayments.map((payment) => {
-                  const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
-                  const isDownloading = downloadingId === payment.id
-                  
-                  return (
-                    <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <span className="text-sm font-mono font-medium text-gray-900">
-                          {receiptNumber}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-900">{payment.client_name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link 
-                          href={`/itineraries/${payment.itinerary_id}`}
-                          className="text-sm font-mono text-primary-600 hover:text-primary-700"
-                        >
-                          {payment.itinerary_code}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-700">{formatDate(payment.payment_date)}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-700 capitalize">
-                            {payment.payment_method?.replace('_', ' ')}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(payment.amount, payment.currency)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <Link
-                            href={`/documents/receipt/${payment.id}`}
-                            className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                            title="View Receipt"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                          <button
-                            onClick={() => handleDownloadReceipt(payment)}
-                            disabled={isDownloading}
-                            className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
-                            title="Download PDF"
-                          >
-                            {isDownloading ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Download className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Summary */}
-        {filteredPayments.length > 0 && (
-          <div className="mt-4 text-sm text-gray-600 text-right">
-            Showing {filteredPayments.length} receipt{filteredPayments.length !== 1 ? 's' : ''}
-          </div>
-        )}
       </div>
     </div>
   )
