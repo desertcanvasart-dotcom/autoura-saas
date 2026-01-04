@@ -270,6 +270,8 @@ export default function ContractPage() {
               <WhatsAppButton 
                 itineraryId={params.id as string}
                 type="contract"
+                clientPhone={itinerary.client_phone}
+                clientName={itinerary.client_name}
                 onSuccess={() => {
                   alert('Contract sent via WhatsApp! ✅')
                 }}

@@ -148,8 +148,9 @@ const navigation: NavSection[] = [
     key: 'finance',
     roles: ['admin', 'manager'],
     items: [
-      { label: 'Invoices', href: '/invoices', icon: FileText },
       { label: 'Payments', href: '/payments', icon: DollarSign },
+      { label: 'Invoices', href: '/invoices', icon: FileText },
+      { label: 'Receipts', href: '/receipts', icon: Receipt },
       { label: 'Receivables', href: '/accounts-receivable', icon: Wallet },
       { label: 'Payables', href: '/accounts-payable', icon: CreditCard },
       { label: 'Expenses', href: '/expenses', icon: Receipt },
