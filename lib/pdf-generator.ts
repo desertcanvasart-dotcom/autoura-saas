@@ -1,5 +1,5 @@
 // ============================================
-// PDF GENERATOR - NO AUTOTABLE (Pure jsPDF)
+// PDF GENERATOR - ITINERARY QUOTE
 // File: lib/pdf-generator.ts
 // ============================================
 
@@ -58,10 +58,23 @@ interface AggregatedService {
   rate: number
 }
 
+interface PDFOptions {
+  showPricingBreakdown?: boolean  // true = show service breakdown, false = total only
+  showServiceDetails?: boolean    // show individual service lines
+}
+
+const DEFAULT_OPTIONS: PDFOptions = {
+  showPricingBreakdown: true,
+  showServiceDetails: true
+}
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
 
+/**
+ * Clean up service names for display
+ */
 function cleanServiceName(name: string, type: string): string {
   if (!name) return type || 'Service'
   
@@ -73,6 +86,23 @@ function cleanServiceName(name: string, type: string): string {
   return cleaned || type || 'Service'
 }
 
+/**
+ * Clean day title - remove duplicate "Day X:" prefix if present
+ */
+function cleanDayTitle(title: string, dayNumber: number): string {
+  if (!title) return `Day ${dayNumber}`
+  
+  // Remove existing "Day X:" or "Day X -" prefix patterns
+  const cleaned = title
+    .replace(/^Day\s*\d+\s*[:\-–—]\s*/i, '')
+    .trim()
+  
+  return cleaned || `Day ${dayNumber}`
+}
+
+/**
+ * Format date for display
+ */
 function formatDate(dateStr: string): string {
   if (!dateStr) return ''
   try {
@@ -88,6 +118,9 @@ function formatDate(dateStr: string): string {
   }
 }
 
+/**
+ * Format short date (day + month only)
+ */
 function formatShortDate(dateStr: string): string {
   if (!dateStr) return ''
   try {
@@ -101,7 +134,30 @@ function formatShortDate(dateStr: string): string {
   }
 }
 
-// Simple table drawing function
+/**
+ * Get currency symbol
+ */
+function getCurrencySymbol(currency: string): string {
+  const symbols: Record<string, string> = {
+    EUR: '€',
+    USD: '$',
+    GBP: '£',
+    EGP: 'E£'
+  }
+  return symbols[currency] || currency
+}
+
+/**
+ * Format currency amount
+ */
+function formatCurrency(amount: number, currency: string): string {
+  const symbol = getCurrencySymbol(currency)
+  return `${symbol}${Number(amount).toFixed(2)}`
+}
+
+/**
+ * Draw a simple table
+ */
 function drawTable(
   doc: jsPDF,
   startY: number,
@@ -172,8 +228,14 @@ function drawTable(
 // MAIN EXPORT FUNCTION
 // ============================================
 
-export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices[]): jsPDF {
-  console.log('📄 PDF Generator started (no autoTable)')
+export function generateItineraryPDF(
+  itinerary: Itinerary, 
+  days: DayWithServices[],
+  options: PDFOptions = DEFAULT_OPTIONS
+): jsPDF {
+  console.log('📄 PDF Generator started')
+  
+  const opts = { ...DEFAULT_OPTIONS, ...options }
   
   try {
     if (!itinerary) {
@@ -195,6 +257,8 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
     const margin = 15
     const contentWidth = pageWidth - 2 * margin
     let yPos = margin
+    
+    const currency = itinerary.currency || 'EUR'
     
     // ============================================
     // HEADER
@@ -258,7 +322,7 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
     yPos += 10
     
     // ============================================
-    // ITINERARY OVERVIEW
+    // ITINERARY OVERVIEW TABLE
     // ============================================
     
     if (days.length > 0) {
@@ -269,10 +333,11 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
       
       yPos += 8
       
+      // Build table data - clean the titles to avoid "Day X: Day X:"
       const daysData = days.map(day => [
         `Day ${day.day_number || '?'}`,
         formatShortDate(day.date),
-        day.title || day.city || '',
+        cleanDayTitle(day.title, day.day_number) || day.city || '',
         day.overnight_city || ''
       ])
       
@@ -298,7 +363,10 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
       doc.setFontSize(11)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(74, 92, 53)
-      doc.text(`Day ${day.day_number || index + 1}: ${day.title || day.city || 'Tour Day'}`, margin + 3, yPos + 3)
+      
+      // FIX: Clean the title to avoid "Day X: Day X:" duplication
+      const cleanedTitle = cleanDayTitle(day.title, day.day_number)
+      doc.text(`Day ${day.day_number || index + 1}: ${cleanedTitle}`, margin + 3, yPos + 3)
       
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
@@ -337,50 +405,60 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
     
     yPos += 8
     
-    // Aggregate services
-    const serviceMap = new Map<string, AggregatedService>()
-    
-    days.forEach((day) => {
-      if (!day.services || !Array.isArray(day.services)) return
+    // Show service breakdown only if enabled
+    if (opts.showPricingBreakdown && opts.showServiceDetails) {
+      // Aggregate services across all days
+      const serviceMap = new Map<string, AggregatedService>()
       
-      day.services
-        .filter((s) => s && (s.total_cost || 0) > 0)
-        .forEach((service) => {
-          const name = cleanServiceName(service.service_name, service.service_type)
-          const key = `${service.service_type}-${name}`
-          
-          if (serviceMap.has(key)) {
-            const existing = serviceMap.get(key)!
-            existing.quantity += service.quantity || 0
-            existing.total += service.total_cost || 0
-          } else {
-            const qty = service.quantity || 1
-            const total = service.total_cost || 0
-            serviceMap.set(key, {
-              name,
-              type: service.service_type,
-              quantity: qty,
-              total,
-              rate: qty > 0 ? total / qty : total
-            })
-          }
-        })
-    })
-    
-    const serviceRows = Array.from(serviceMap.values()).map(s => [
-      s.name,
-      s.quantity.toString(),
-      `${itinerary.currency || 'EUR'} ${s.rate.toFixed(2)}`,
-      `${itinerary.currency || 'EUR'} ${s.total.toFixed(2)}`
-    ])
-    
-    if (serviceRows.length > 0) {
-      yPos = drawTable(doc, yPos, ['Service', 'Qty', 'Rate', 'Total'], serviceRows, [85, 20, 35, 40], margin)
+      days.forEach((day) => {
+        if (!day.services || !Array.isArray(day.services)) return
+        
+        day.services
+          .filter((s) => s && (s.total_cost || 0) > 0)
+          .forEach((service) => {
+            const name = cleanServiceName(service.service_name, service.service_type)
+            const key = `${service.service_type}-${name}`
+            
+            if (serviceMap.has(key)) {
+              const existing = serviceMap.get(key)!
+              existing.quantity += service.quantity || 0
+              existing.total += service.total_cost || 0
+            } else {
+              const qty = service.quantity || 1
+              const total = service.total_cost || 0
+              serviceMap.set(key, {
+                name,
+                type: service.service_type,
+                quantity: qty,
+                total,
+                rate: qty > 0 ? total / qty : total
+              })
+            }
+          })
+      })
+      
+      const serviceRows = Array.from(serviceMap.values()).map(s => [
+        s.name,
+        s.quantity.toString(),
+        formatCurrency(s.rate, currency),
+        formatCurrency(s.total, currency)
+      ])
+      
+      if (serviceRows.length > 0) {
+        yPos = drawTable(doc, yPos, ['Service', 'Qty', 'Rate', 'Total'], serviceRows, [85, 20, 35, 40], margin)
+      } else {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'italic')
+        doc.setTextColor(150, 150, 150)
+        doc.text('No services calculated yet', margin, yPos)
+        yPos += 10
+      }
     } else {
+      // Total only - no breakdown
       doc.setFontSize(10)
-      doc.setFont('helvetica', 'italic')
-      doc.setTextColor(150, 150, 150)
-      doc.text('No services calculated yet', margin, yPos)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(80, 80, 80)
+      doc.text('Package includes all services as per itinerary.', margin, yPos)
       yPos += 10
     }
     
@@ -390,20 +468,31 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
     
     yPos += 5
     const totalPrice = itinerary.total_cost || 0
+    const totalPax = (itinerary.num_adults || 0) + (itinerary.num_children || 0)
     
     doc.setFillColor(100, 124, 71)
-    doc.rect(pageWidth - margin - 70, yPos, 70, 18, 'F')
+    doc.roundedRect(pageWidth - margin - 80, yPos, 80, 22, 2, 2, 'F')
     
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(255, 255, 255)
-    doc.text('TOTAL PRICE', pageWidth - margin - 65, yPos + 6)
+    doc.text('TOTAL PRICE', pageWidth - margin - 75, yPos + 7)
     
-    doc.setFontSize(14)
+    doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
-    doc.text(`${itinerary.currency || 'EUR'} ${totalPrice.toFixed(2)}`, pageWidth - margin - 5, yPos + 13, { align: 'right' })
+    doc.text(formatCurrency(totalPrice, currency), pageWidth - margin - 5, yPos + 17, { align: 'right' })
     
-    yPos += 28
+    yPos += 32
+    
+    // Per person cost (if multiple travelers)
+    if (totalPax > 1 && totalPrice > 0) {
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100, 100, 100)
+      const perPerson = totalPrice / totalPax
+      doc.text(`(${formatCurrency(perPerson, currency)} per person)`, pageWidth - margin, yPos, { align: 'right' })
+      yPos += 10
+    }
     
     // ============================================
     // INCLUSIONS
@@ -433,7 +522,7 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
     ]
     
     inclusions.forEach(item => {
-      doc.text(`- ${item}`, margin + 3, yPos)
+      doc.text(`• ${item}`, margin + 3, yPos)
       yPos += 5
     })
     
@@ -461,7 +550,7 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
     ]
     
     exclusions.forEach(item => {
-      doc.text(`- ${item}`, margin + 3, yPos)
+      doc.text(`• ${item}`, margin + 3, yPos)
       yPos += 5
     })
     
@@ -493,12 +582,12 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
     ]
     
     terms.forEach(term => {
-      doc.text(`- ${term}`, margin + 3, yPos)
+      doc.text(`• ${term}`, margin + 3, yPos)
       yPos += 5
     })
     
     // ============================================
-    // FOOTER
+    // FOOTER ON ALL PAGES
     // ============================================
     
     const totalPages = doc.getNumberOfPages()
@@ -526,11 +615,31 @@ export function generateItineraryPDF(itinerary: Itinerary, days: DayWithServices
 }
 
 // ============================================
-// HELPER EXPORT
+// DOWNLOAD HELPER
 // ============================================
 
-export function downloadItineraryPDF(itinerary: Itinerary, days: DayWithServices[], filename?: string): void {
-  const doc = generateItineraryPDF(itinerary, days)
-  const defaultFilename = `${itinerary.itinerary_code}_${itinerary.client_name.replace(/\s+/g, '_')}.pdf`
+export function downloadItineraryPDF(
+  itinerary: Itinerary, 
+  days: DayWithServices[], 
+  filename?: string,
+  options?: PDFOptions
+): void {
+  const doc = generateItineraryPDF(itinerary, days, options)
+  const clientName = (itinerary.client_name || 'Client').replace(/\s+/g, '_')
+  const defaultFilename = `${itinerary.itinerary_code}_${clientName}.pdf`
   doc.save(filename || defaultFilename)
+}
+
+// ============================================
+// CONVENIENCE EXPORTS
+// ============================================
+
+// Download with full breakdown (default)
+export function downloadWithBreakdown(itinerary: Itinerary, days: DayWithServices[], filename?: string): void {
+  downloadItineraryPDF(itinerary, days, filename, { showPricingBreakdown: true, showServiceDetails: true })
+}
+
+// Download with total only (no service breakdown)
+export function downloadTotalOnly(itinerary: Itinerary, days: DayWithServices[], filename?: string): void {
+  downloadItineraryPDF(itinerary, days, filename, { showPricingBreakdown: false, showServiceDetails: false })
 }

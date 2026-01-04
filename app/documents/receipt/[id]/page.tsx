@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Download } from 'lucide-react'
+import { ArrowLeft, Download, Loader2 } from 'lucide-react'
+import { downloadReceiptPDF } from '@/lib/receipt-pdf-generator'
 
 interface Payment {
   id: string
   itinerary_id: string
   itinerary_code: string
   client_name: string
+  client_email?: string
   payment_type: string
   amount: number
   currency: string
@@ -24,6 +26,7 @@ export default function ReceiptPage() {
   const params = useParams()
   const [payment, setPayment] = useState<Payment | null>(null)
   const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
     if (params.id) {
@@ -46,21 +49,35 @@ export default function ReceiptPage() {
     }
   }
 
-  const downloadPDF = async () => {
+  const handleDownloadPDF = () => {
+    if (!payment) return
+    
+    setDownloading(true)
+    
     try {
-      const response = await fetch(`/api/documents/receipt/${params.id}`)
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `receipt-${payment?.itinerary_code}-${payment?.transaction_reference || params.id}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      // Use client-side PDF generation
+      downloadReceiptPDF({
+        receiptNumber: payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`,
+        invoiceNumber: payment.itinerary_code,
+        clientName: payment.client_name,
+        clientEmail: payment.client_email || '',
+        paymentDate: payment.payment_date || new Date().toISOString(),
+        paymentMethod: payment.payment_method,
+        amount: payment.amount,
+        currency: payment.currency,
+        transactionRef: payment.transaction_reference,
+        notes: payment.notes
+      }, {
+        invoice_number: payment.itinerary_code,
+        client_name: payment.client_name,
+        total_amount: payment.amount,
+        currency: payment.currency
+      })
     } catch (error) {
       console.error('Error downloading PDF:', error)
       alert('Failed to download receipt')
+    } finally {
+      setDownloading(false)
     }
   }
 
@@ -88,6 +105,8 @@ export default function ReceiptPage() {
     )
   }
 
+  const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+
   return (
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
       <div className="max-w-3xl mx-auto">
@@ -101,11 +120,16 @@ export default function ReceiptPage() {
             Back to Payments
           </Link>
           <button
-            onClick={downloadPDF}
-            className="bg-primary-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-primary-700 flex items-center gap-2 font-medium"
+            onClick={handleDownloadPDF}
+            disabled={downloading}
+            className="bg-primary-600 text-white px-3 py-1.5 text-sm rounded-lg hover:bg-primary-700 flex items-center gap-2 font-medium disabled:opacity-50"
           >
-            <Download className="w-4 h-4" />
-            Download PDF
+            {downloading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            {downloading ? 'Generating...' : 'Download PDF'}
           </button>
         </div>
 
@@ -122,9 +146,7 @@ export default function ReceiptPage() {
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div>
               <p className="text-xs text-gray-600 mb-1">Receipt Number</p>
-              <p className="text-sm font-bold text-gray-900">
-                {payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`}
-              </p>
+              <p className="text-sm font-bold text-gray-900">{receiptNumber}</p>
             </div>
             <div>
               <p className="text-xs text-gray-600 mb-1">Date</p>
@@ -164,10 +186,18 @@ export default function ReceiptPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Status:</span>
-                <span className="font-medium text-success capitalize">
+                <span className="font-medium text-green-600 capitalize">
                   {payment.payment_status.replace('_', ' ')}
                 </span>
               </div>
+              {payment.transaction_reference && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Transaction Ref:</span>
+                  <span className="font-medium text-gray-900 font-mono">
+                    {payment.transaction_reference}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import Link from 'next/link'
-import { ArrowLeft, Download, Eye, Edit2, Plus, X } from 'lucide-react'
+import { ArrowLeft, Download, Eye, Edit2, Plus, X, Loader2 } from 'lucide-react'
+import { generateContractPDF } from '@/lib/contract-pdf-generator'
 
 interface Itinerary {
   id: string
@@ -164,16 +165,26 @@ export default function ContractPage() {
     }))
   }
 
-  const downloadPDF = async () => {
+  const handleDownloadPDF = async () => {
     setSaving(true)
     try {
-      const response = await fetch(`/api/documents/contract/${params.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contractData)
+      // Use client-side PDF generation
+      const pdfBytes = await generateContractPDF({
+        contractNumber: contractData.contractNumber,
+        contractDate: contractData.contractDate,
+        clientName: contractData.clientName,
+        clientEmail: contractData.clientEmail,
+        numTravelers: contractData.numTravelers,
+        tourName: contractData.tourPackage,
+        startDate: contractData.startDate,
+        endDate: contractData.endDate,
+        destinations: contractData.destinations,
+        totalCost: contractData.totalCost,
+        currency: 'USD'
       })
       
-      const blob = await response.blob()
+      // Download the PDF
+      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -218,7 +229,7 @@ export default function ContractPage() {
     <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
       <div className="max-w-5xl mx-auto">
         
-        {/* ⭐ COMPACT HEADER */}
+        {/* COMPACT HEADER */}
         <div className="flex items-center justify-between mb-4">
           <Link
             href="/itineraries"
@@ -238,13 +249,13 @@ export default function ContractPage() {
             </button>
             
             <button
-              onClick={downloadPDF}
+              onClick={handleDownloadPDF}
               disabled={saving}
               className="bg-primary-600 text-white px-3 py-1.5 rounded-md hover:bg-primary-700 flex items-center gap-1.5 text-sm font-medium disabled:opacity-50"
             >
               {saving ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   Generating...
                 </>
               ) : (
@@ -259,7 +270,6 @@ export default function ContractPage() {
               <WhatsAppButton 
                 itineraryId={params.id as string}
                 type="contract"
-                contractPdfUrl={`${window.location.origin}/api/documents/contract/${params.id}`}
                 onSuccess={() => {
                   alert('Contract sent via WhatsApp! ✅')
                 }}
@@ -268,7 +278,7 @@ export default function ContractPage() {
           </div>
         </div>
 
-        {/* ⭐ COMPACT CONTRACT FORM/PREVIEW */}
+        {/* COMPACT CONTRACT FORM/PREVIEW */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-6">
           
           {/* Title */}
