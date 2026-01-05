@@ -16,7 +16,12 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('invoices')
-      .select('*')
+      .select(`
+        *,
+        itineraries (
+          client_phone
+        )
+      `)
       .order('created_at', { ascending: false })
 
     if (status) {
@@ -42,7 +47,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })
     }
 
-    return NextResponse.json(data || [])
+    // Flatten the response to include client_phone at the top level
+    const formattedData = (data || []).map(invoice => ({
+      ...invoice,
+      client_phone: invoice.itineraries?.client_phone || null,
+      itineraries: undefined // Remove nested object
+    }))
+
+    return NextResponse.json(formattedData)
   } catch (error) {
     console.error('Error in invoices GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
