@@ -14,32 +14,31 @@ import {
   Loader2,
   MessageCircle,
   Check,
-  Filter,
-  FileText
+  FileText,
+  MapPin
 } from 'lucide-react'
 import { downloadReceiptPDF } from '@/lib/receipt-pdf-generator'
 
-interface Payment {
+interface UnifiedPayment {
   id: string
-  itinerary_id: string
-  itinerary_code: string
+  source: 'invoice' | 'itinerary'
+  source_id: string
+  source_reference: string
   client_name: string
   client_email?: string
   client_phone?: string
-  payment_type: string
   amount: number
   currency: string
   payment_method: string
-  payment_status: string
-  transaction_reference: string
   payment_date: string
-  notes: string
+  transaction_reference: string | null
+  notes: string | null
   created_at: string
 }
 
 export default function ReceiptsPage() {
   const router = useRouter()
-  const [payments, setPayments] = useState<Payment[]>([])
+  const [payments, setPayments] = useState<UnifiedPayment[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
@@ -47,18 +46,90 @@ export default function ReceiptsPage() {
   const [sentIds, setSentIds] = useState<string[]>([])
 
   useEffect(() => {
-    fetchPayments()
+    fetchAllPayments()
   }, [])
 
-  const fetchPayments = async () => {
+  const fetchAllPayments = async () => {
+    setLoading(true)
     try {
-      const response = await fetch('/api/payments')
-      const data = await response.json()
-      
-      if (data.success) {
-        // Show all payments - if a payment was recorded, a receipt can be issued
-        setPayments(data.data || [])
+      // Fetch from both sources in parallel (same as Payments page)
+      const [itineraryPaymentsRes, invoicesRes] = await Promise.all([
+        fetch('/api/payments'),
+        fetch('/api/invoices')
+      ])
+
+      const allPayments: UnifiedPayment[] = []
+
+      // Process itinerary payments
+      if (itineraryPaymentsRes.ok) {
+        const itineraryData = await itineraryPaymentsRes.json()
+        const itineraryPayments = itineraryData.success ? itineraryData.data : (Array.isArray(itineraryData) ? itineraryData : [])
+        
+        itineraryPayments.forEach((p: any) => {
+          allPayments.push({
+            id: p.id,
+            source: 'itinerary',
+            source_id: p.itinerary_id,
+            source_reference: p.itinerary_code || p.itineraries?.itinerary_code || 'N/A',
+            client_name: p.client_name || p.itineraries?.client_name || 'Unknown',
+            client_email: p.client_email || p.itineraries?.client_email,
+            client_phone: p.client_phone || p.itineraries?.client_phone,
+            amount: Number(p.amount) || 0,
+            currency: p.currency || 'EUR',
+            payment_method: p.payment_method || 'unknown',
+            payment_date: p.payment_date,
+            transaction_reference: p.transaction_reference,
+            notes: p.notes,
+            created_at: p.created_at
+          })
+        })
       }
+
+      // Process invoice payments
+      if (invoicesRes.ok) {
+        const invoices = await invoicesRes.json()
+        
+        for (const invoice of invoices) {
+          try {
+            const paymentsRes = await fetch(`/api/invoices/${invoice.id}/payments`)
+            if (paymentsRes.ok) {
+              const invoicePayments = await paymentsRes.json()
+              
+              if (Array.isArray(invoicePayments)) {
+                invoicePayments.forEach((p: any) => {
+                  allPayments.push({
+                    id: p.id,
+                    source: 'invoice',
+                    source_id: invoice.id,
+                    source_reference: invoice.invoice_number,
+                    client_name: invoice.client_name || 'Unknown',
+                    client_email: invoice.client_email,
+                    client_phone: invoice.client_phone,
+                    amount: Number(p.amount) || 0,
+                    currency: p.currency || invoice.currency || 'EUR',
+                    payment_method: p.payment_method || 'unknown',
+                    payment_date: p.payment_date,
+                    transaction_reference: p.transaction_reference,
+                    notes: p.notes,
+                    created_at: p.created_at
+                  })
+                })
+              }
+            }
+          } catch (err) {
+            console.error(`Error fetching payments for invoice ${invoice.id}:`, err)
+          }
+        }
+      }
+
+      // Sort by date (newest first)
+      allPayments.sort((a, b) => {
+        const dateA = new Date(a.payment_date || a.created_at)
+        const dateB = new Date(b.payment_date || b.created_at)
+        return dateB.getTime() - dateA.getTime()
+      })
+
+      setPayments(allPayments)
     } catch (error) {
       console.error('Error fetching payments:', error)
     } finally {
@@ -66,17 +137,25 @@ export default function ReceiptsPage() {
     }
   }
 
-  const handleViewReceipt = (paymentId: string) => {
-    router.push(`/documents/receipt/${paymentId}`)
+  const handleViewReceipt = (payment: UnifiedPayment) => {
+    // For itinerary payments, go to the receipt page
+    // For invoice payments, go to the invoice page
+    if (payment.source === 'itinerary') {
+      router.push(`/documents/receipt/${payment.id}`)
+    } else {
+      router.push(`/invoices/${payment.source_id}`)
+    }
   }
 
-  const handleDownloadReceipt = async (payment: Payment) => {
+  const handleDownloadReceipt = async (payment: UnifiedPayment) => {
     setDownloadingId(payment.id)
     
     try {
+      const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
+      
       downloadReceiptPDF({
-        receiptNumber: payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`,
-        invoiceNumber: payment.itinerary_code,
+        receiptNumber,
+        invoiceNumber: payment.source_reference,
         clientName: payment.client_name,
         clientEmail: payment.client_email || '',
         paymentDate: payment.payment_date || new Date().toISOString(),
@@ -86,7 +165,7 @@ export default function ReceiptsPage() {
         transactionRef: payment.transaction_reference,
         notes: payment.notes
       }, {
-        invoice_number: payment.itinerary_code,
+        invoice_number: payment.source_reference,
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
@@ -99,7 +178,7 @@ export default function ReceiptsPage() {
     }
   }
 
-  const handleSendWhatsApp = async (payment: Payment) => {
+  const handleSendWhatsApp = async (payment: UnifiedPayment) => {
     if (!payment.client_phone) {
       alert('No phone number available for this client')
       return
@@ -108,10 +187,20 @@ export default function ReceiptsPage() {
     setSendingId(payment.id)
     
     try {
-      const response = await fetch('/api/whatsapp/send-receipt', {
+      // For itinerary payments, use the send-receipt API
+      // For invoice payments, use the invoice's send functionality
+      const endpoint = payment.source === 'itinerary' 
+        ? '/api/whatsapp/send-receipt'
+        : '/api/whatsapp/send-invoice'
+      
+      const body = payment.source === 'itinerary'
+        ? { paymentId: payment.id }
+        : { invoiceId: payment.source_id }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentId: payment.id })
+        body: JSON.stringify(body)
       })
 
       const data = await response.json()
@@ -136,7 +225,7 @@ export default function ReceiptsPage() {
     const search = searchTerm.toLowerCase()
     return (
       payment.client_name?.toLowerCase().includes(search) ||
-      payment.itinerary_code?.toLowerCase().includes(search) ||
+      payment.source_reference?.toLowerCase().includes(search) ||
       payment.transaction_reference?.toLowerCase().includes(search)
     )
   })
@@ -155,10 +244,24 @@ export default function ReceiptsPage() {
     return `${symbols[currency] || currency} ${amount.toFixed(2)}`
   }
 
+  const getMethodLabel = (method: string) => {
+    const labels: Record<string, string> = {
+      bank_transfer: 'Bank Transfer',
+      credit_card: 'Credit Card',
+      cash: 'Cash',
+      paypal: 'PayPal',
+      wise: 'Wise',
+      airwallex: 'Airwallex',
+      stripe: 'Stripe',
+      tab: 'Tab'
+    }
+    return labels[method] || method
+  }
+
   // Stats
   const totalReceipts = filteredPayments.length
   const totalAmount = filteredPayments.reduce((sum, p) => sum + p.amount, 0)
-  const mainCurrency = filteredPayments[0]?.currency || 'USD'
+  const mainCurrency = filteredPayments[0]?.currency || 'EUR'
 
   if (loading) {
     return (
@@ -182,7 +285,7 @@ export default function ReceiptsPage() {
               Receipts
             </h1>
             <p className="text-sm text-gray-600 mt-1">
-              View and send receipts for completed payments
+              Download and send receipts for all payments
             </p>
           </div>
         </div>
@@ -231,7 +334,7 @@ export default function ReceiptsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by client name, itinerary code, or transaction reference..."
+                placeholder="Search by client name, reference, or transaction..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
@@ -248,7 +351,7 @@ export default function ReceiptsPage() {
             <p className="text-sm text-gray-600 mb-4">
               {searchTerm 
                 ? 'No receipts match your search criteria.' 
-                : 'Completed payments will appear here with downloadable receipts.'}
+                : 'Payments will appear here with downloadable receipts.'}
             </p>
             <Link
               href="/payments/new"
@@ -265,8 +368,8 @@ export default function ReceiptsPage() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Receipt #</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Source</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Client</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Itinerary</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Date</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Method</th>
                     <th className="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase">Amount</th>
@@ -281,10 +384,24 @@ export default function ReceiptsPage() {
                     const isSent = sentIds.includes(payment.id)
                     
                     return (
-                      <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
+                      <tr key={`${payment.source}-${payment.id}`} className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
                           <span className="text-sm font-mono font-medium text-primary-600">
                             {receiptNumber}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                            payment.source === 'invoice' 
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}>
+                            {payment.source === 'invoice' ? (
+                              <FileText className="w-3 h-3" />
+                            ) : (
+                              <MapPin className="w-3 h-3" />
+                            )}
+                            {payment.source_reference}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -301,14 +418,6 @@ export default function ReceiptsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <Link 
-                            href={`/itineraries/${payment.itinerary_id}`}
-                            className="text-sm font-mono text-primary-600 hover:text-primary-700 hover:underline"
-                          >
-                            {payment.itinerary_code}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-gray-400" />
                             <span className="text-sm text-gray-700">{formatDate(payment.payment_date)}</span>
@@ -317,7 +426,7 @@ export default function ReceiptsPage() {
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-700 capitalize">
                             <CreditCard className="w-3 h-3" />
-                            {payment.payment_method?.replace('_', ' ')}
+                            {getMethodLabel(payment.payment_method)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -329,7 +438,7 @@ export default function ReceiptsPage() {
                           <div className="flex items-center justify-center gap-1">
                             {/* View Button */}
                             <button
-                              onClick={() => handleViewReceipt(payment.id)}
+                              onClick={() => handleViewReceipt(payment)}
                               className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                               title="View Receipt"
                             >
