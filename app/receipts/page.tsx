@@ -56,11 +56,8 @@ export default function ReceiptsPage() {
       const data = await response.json()
       
       if (data.success) {
-        // Filter only completed payments (receipts are for completed payments)
-        const completedPayments = (data.data || []).filter(
-          (p: Payment) => p.payment_status === 'completed'
-        )
-        setPayments(completedPayments)
+        // Show all payments - if a payment was recorded, a receipt can be issued
+        setPayments(data.data || [])
       }
     } catch (error) {
       console.error('Error fetching payments:', error)

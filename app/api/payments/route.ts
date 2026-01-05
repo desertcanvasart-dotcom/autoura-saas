@@ -4,7 +4,6 @@ import { createClient } from '@/app/supabase'
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient()
-
     const { data: payments, error } = await supabase
       .from('payments')
       .select(`
@@ -12,6 +11,8 @@ export async function GET(request: NextRequest) {
         itineraries (
           itinerary_code,
           client_name,
+          client_phone,
+          client_email,
           total_cost
         )
       `)
@@ -23,6 +24,8 @@ export async function GET(request: NextRequest) {
       ...p,
       itinerary_code: p.itineraries?.itinerary_code,
       client_name: p.itineraries?.client_name,
+      client_phone: p.itineraries?.client_phone,
+      client_email: p.itineraries?.client_email,
       total_cost: p.itineraries?.total_cost
     }))
 
