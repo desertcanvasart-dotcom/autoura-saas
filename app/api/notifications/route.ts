@@ -132,6 +132,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Notification types reference:
+// - task_assigned: New task assigned
+// - task_due_soon: Task due soon reminder  
+// - task_overdue: Task is overdue
+// - task_completed: Task was completed
+// - whatsapp_assigned: WhatsApp conversation assigned
+// - whatsapp_new_message: New message in assigned chat
+
 // Helper function to send email via Gmail API
 async function sendEmailNotification(
   toEmail: string,
@@ -144,14 +152,16 @@ async function sendEmailNotification(
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
   
   // Get notification type styling
-  const typeConfig = {
-    task_assigned: { color: '#647C47', icon: '📋', label: 'New Task Assigned' },
-    task_due_soon: { color: '#F59E0B', icon: '⏰', label: 'Task Due Soon' },
-    task_overdue: { color: '#EF4444', icon: '🚨', label: 'Task Overdue' },
-    task_completed: { color: '#10B981', icon: '✅', label: 'Task Completed' }
+  const typeConfig: Record<string, { color: string; icon: string; label: string; buttonText: string }> = {
+    task_assigned: { color: '#647C47', icon: '📋', label: 'New Task Assigned', buttonText: 'View Task' },
+    task_due_soon: { color: '#F59E0B', icon: '⏰', label: 'Task Due Soon', buttonText: 'View Task' },
+    task_overdue: { color: '#EF4444', icon: '🚨', label: 'Task Overdue', buttonText: 'View Task' },
+    task_completed: { color: '#10B981', icon: '✅', label: 'Task Completed', buttonText: 'View Task' },
+    whatsapp_assigned: { color: '#25D366', icon: '💬', label: 'WhatsApp Chat Assigned', buttonText: 'Open Chat' },
+    whatsapp_new_message: { color: '#25D366', icon: '📱', label: 'New WhatsApp Message', buttonText: 'View Message' },
   }
   
-  const config = typeConfig[type as keyof typeof typeConfig] || typeConfig.task_assigned
+  const config = typeConfig[type] || { color: '#647C47', icon: '🔔', label: 'Notification', buttonText: 'View' }
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -172,13 +182,21 @@ async function sendEmailNotification(
           <!-- Content -->
           <div style="padding: 24px;">
             <p style="color: #374151; font-size: 16px; margin: 0 0 8px 0;">Hi ${toName},</p>
-            <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px 0;">${message}</p>
+            <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px 0; white-space: pre-line;">${message}</p>
             
             ${link ? `
               <div style="text-align: center; margin: 24px 0;">
                 <a href="${baseUrl}${link}" style="display: inline-block; background-color: ${config.color}; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 14px;">
-                  View Task
+                  ${config.buttonText}
                 </a>
+              </div>
+            ` : ''}
+            
+            ${type === 'whatsapp_assigned' ? `
+              <div style="margin-top: 16px; padding: 12px; background-color: #f0fdf4; border-radius: 8px; border-left: 4px solid #25D366;">
+                <p style="color: #166534; font-size: 13px; margin: 0;">
+                  <strong>💡 Tip:</strong> Respond quickly to maintain good customer engagement!
+                </p>
               </div>
             ` : ''}
           </div>
@@ -186,7 +204,10 @@ async function sendEmailNotification(
           <!-- Footer -->
           <div style="background-color: #f9fafb; padding: 16px 24px; border-top: 1px solid #e5e7eb;">
             <p style="color: #9ca3af; font-size: 12px; margin: 0; text-align: center;">
-              This notification was sent from Autoura Task Management
+              This notification was sent from Autoura Operations System
+            </p>
+            <p style="color: #9ca3af; font-size: 11px; margin: 8px 0 0 0; text-align: center;">
+              <a href="${baseUrl}/notifications" style="color: #6b7280;">View all notifications</a>
             </p>
           </div>
         </div>

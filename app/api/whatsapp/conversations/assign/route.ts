@@ -144,6 +144,66 @@ export async function POST(request: NextRequest) {
         }
       })
 
+    // ============================================
+    // SEND NOTIFICATION TO ASSIGNED AGENT
+    // ============================================
+    if (newAgentId && actionType !== 'claimed') {
+      // Get the agent's details to find their team_member record
+      const { data: agent } = await supabase
+        .from('sales_agents')
+        .select('id, name, email')
+        .eq('id', newAgentId)
+        .single()
+
+      if (agent?.email) {
+        // Find the team_member by email
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('id, name, email')
+          .eq('email', agent.email)
+          .eq('is_active', true)
+          .single()
+
+        if (teamMember) {
+          // Get client name for notification
+          const clientName = conversation.client_name || conversation.phone_number
+
+          // Create notification
+          await supabase
+            .from('notifications')
+            .insert({
+              team_member_id: teamMember.id,
+              type: 'whatsapp_assigned',
+              title: 'New WhatsApp Chat Assigned',
+              message: `You've been assigned a WhatsApp conversation with ${clientName}`,
+              link: `/whatsapp-inbox?conversation=${conversation_id}`,
+              is_read: false,
+              email_sent: false
+            })
+
+          // Send email notification
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
+            await fetch(`${baseUrl}/api/notifications`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                team_member_id: teamMember.id,
+                type: 'whatsapp_assigned',
+                title: 'New WhatsApp Chat Assigned',
+                message: `You've been assigned a WhatsApp conversation with ${clientName}. Last message: "${conversation.last_message?.substring(0, 100) || 'No messages yet'}"`,
+                link: `/whatsapp-inbox?conversation=${conversation_id}`,
+                send_email: true
+              })
+            })
+          } catch (emailError) {
+            console.error('Failed to send assignment email:', emailError)
+            // Don't fail the whole request if email fails
+          }
+        }
+      }
+    }
+
     // Fetch updated conversation with agent
     const { data: updatedConversation } = await supabase
       .from('whatsapp_conversations')

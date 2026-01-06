@@ -8,9 +8,10 @@ import {
   CheckCheck, 
   Trash2, 
   ExternalLink,
-  Filter,
   Search,
-  ArrowLeft
+  ArrowLeft,
+  MessageSquare,
+  Loader2
 } from 'lucide-react'
 
 interface Notification {
@@ -116,6 +117,12 @@ export default function NotificationsPage() {
       case 'task_due_soon': return '⏰'
       case 'task_overdue': return '🚨'
       case 'task_completed': return '✅'
+      case 'whatsapp_assigned': return '💬'
+      case 'whatsapp_new_message': return '📱'
+      case 'whatsapp_mention': return '🔔'
+      case 'invoice_paid': return '💰'
+      case 'booking_confirmed': return '🎉'
+      case 'client_created': return '👤'
       default: return '🔔'
     }
   }
@@ -126,6 +133,12 @@ export default function NotificationsPage() {
       case 'task_due_soon': return 'bg-amber-50 border-l-amber-500'
       case 'task_overdue': return 'bg-red-50 border-l-red-500'
       case 'task_completed': return 'bg-green-50 border-l-green-500'
+      case 'whatsapp_assigned': return 'bg-emerald-50 border-l-[#25D366]'
+      case 'whatsapp_new_message': return 'bg-emerald-50 border-l-[#25D366]'
+      case 'whatsapp_mention': return 'bg-emerald-50 border-l-[#25D366]'
+      case 'invoice_paid': return 'bg-blue-50 border-l-blue-500'
+      case 'booking_confirmed': return 'bg-purple-50 border-l-purple-500'
+      case 'client_created': return 'bg-cyan-50 border-l-cyan-500'
       default: return 'bg-gray-50 border-l-gray-400'
     }
   }
@@ -136,7 +149,13 @@ export default function NotificationsPage() {
       case 'task_due_soon': return 'Due Soon'
       case 'task_overdue': return 'Overdue'
       case 'task_completed': return 'Completed'
-      default: return type
+      case 'whatsapp_assigned': return 'Chat Assigned'
+      case 'whatsapp_new_message': return 'New Message'
+      case 'whatsapp_mention': return 'Mentioned'
+      case 'invoice_paid': return 'Payment'
+      case 'booking_confirmed': return 'Booking'
+      case 'client_created': return 'New Client'
+      default: return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
     }
   }
 
@@ -144,11 +163,13 @@ export default function NotificationsPage() {
     const date = new Date(dateStr)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffDays === 0) {
-      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    }
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
     if (diffDays === 1) return 'Yesterday'
     if (diffDays < 7) return `${diffDays} days ago`
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -165,10 +186,14 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter(n => !n.is_read).length
   const types = [...new Set(notifications.map(n => n.type))]
 
+  // Group counts
+  const whatsappCount = notifications.filter(n => n.type.startsWith('whatsapp_') && !n.is_read).length
+  const taskCount = notifications.filter(n => n.type.startsWith('task_') && !n.is_read).length
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
+        <Loader2 className="h-8 w-8 text-[#647C47] animate-spin" />
       </div>
     )
   }
@@ -235,8 +260,18 @@ export default function NotificationsPage() {
             className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
           >
             <option value="">All Types</option>
-            {types.map(type => (
-              <option key={type} value={type}>{getTypeLabel(type)}</option>
+            <optgroup label="WhatsApp">
+              <option value="whatsapp_assigned">💬 Chat Assigned</option>
+              <option value="whatsapp_new_message">📱 New Message</option>
+            </optgroup>
+            <optgroup label="Tasks">
+              <option value="task_assigned">📋 Task Assigned</option>
+              <option value="task_due_soon">⏰ Due Soon</option>
+              <option value="task_overdue">🚨 Overdue</option>
+              <option value="task_completed">✅ Completed</option>
+            </optgroup>
+            {types.filter(t => !t.startsWith('whatsapp_') && !t.startsWith('task_')).map(type => (
+              <option key={type} value={type}>{getNotificationIcon(type)} {getTypeLabel(type)}</option>
             ))}
           </select>
         </div>
@@ -253,16 +288,15 @@ export default function NotificationsPage() {
           <p className="text-xl font-semibold text-[#647C47]">{unreadCount}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-3">
-          <p className="text-xs text-gray-500">Tasks Assigned</p>
-          <p className="text-xl font-semibold text-gray-900">
-            {notifications.filter(n => n.type === 'task_assigned').length}
-          </p>
+          <div className="flex items-center gap-1">
+            <MessageSquare className="h-3 w-3 text-[#25D366]" />
+            <p className="text-xs text-gray-500">WhatsApp</p>
+          </div>
+          <p className="text-xl font-semibold text-[#25D366]">{whatsappCount}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-3">
-          <p className="text-xs text-gray-500">Overdue Alerts</p>
-          <p className="text-xl font-semibold text-red-600">
-            {notifications.filter(n => n.type === 'task_overdue').length}
-          </p>
+          <p className="text-xs text-gray-500">Tasks</p>
+          <p className="text-xl font-semibold text-gray-900">{taskCount}</p>
         </div>
       </div>
 
@@ -272,6 +306,14 @@ export default function NotificationsPage() {
           <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
             <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">No notifications found</p>
+            {(searchTerm || typeFilter) && (
+              <button 
+                onClick={() => { setSearchTerm(''); setTypeFilter(''); }}
+                className="mt-2 text-sm text-[#647C47] hover:underline"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
           filteredNotifications.map(notification => (
@@ -279,7 +321,7 @@ export default function NotificationsPage() {
               key={notification.id}
               className={`border-l-4 rounded-lg p-4 transition-all ${
                 getNotificationColor(notification.type)
-              } ${!notification.is_read ? 'shadow-sm' : 'opacity-75'}`}
+              } ${!notification.is_read ? 'shadow-sm bg-opacity-100' : 'opacity-70'}`}
             >
               <div className="flex items-start gap-4">
                 {/* Icon */}
@@ -294,7 +336,11 @@ export default function NotificationsPage() {
                       <p className={`text-sm ${!notification.is_read ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
                         {notification.title}
                       </p>
-                      <span className="inline-block px-2 py-0.5 text-[10px] font-medium bg-white/80 rounded mt-1">
+                      <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded mt-1 ${
+                        notification.type.startsWith('whatsapp_') 
+                          ? 'bg-[#25D366]/20 text-[#128C7E]' 
+                          : 'bg-white/80 text-gray-600'
+                      }`}>
                         {getTypeLabel(notification.type)}
                       </span>
                     </div>
@@ -304,7 +350,7 @@ export default function NotificationsPage() {
                     </span>
                   </div>
 
-                  <p className="text-sm text-gray-600 mt-2">
+                  <p className="text-sm text-gray-600 mt-2 whitespace-pre-line">
                     {notification.message}
                   </p>
 
@@ -313,9 +359,14 @@ export default function NotificationsPage() {
                       <Link
                         href={notification.link}
                         onClick={() => !notification.is_read && markAsRead(notification.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors"
+                        className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white rounded-lg transition-colors ${
+                          notification.type.startsWith('whatsapp_')
+                            ? 'bg-[#25D366] hover:bg-[#128C7E]'
+                            : 'bg-[#647C47] hover:bg-[#4f6238]'
+                        }`}
                       >
-                        View <ExternalLink className="h-3 w-3" />
+                        {notification.type.startsWith('whatsapp_') ? 'Open Chat' : 'View'} 
+                        <ExternalLink className="h-3 w-3" />
                       </Link>
                     )}
 
@@ -349,6 +400,13 @@ export default function NotificationsPage() {
           ))
         )}
       </div>
+
+      {/* Load more hint */}
+      {filteredNotifications.length >= 100 && (
+        <div className="text-center py-4">
+          <p className="text-sm text-gray-500">Showing latest 100 notifications</p>
+        </div>
+      )}
     </div>
   )
 }
