@@ -6,7 +6,7 @@ import { NextResponse } from 'next/server'
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string; dayId: string; serviceId: string } }
+  { params }: { params: Promise<{ id: string; dayId: string; serviceId: string }> }
 ) {
   try {
     const supabase = createClient()
@@ -71,7 +71,7 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; dayId: string; serviceId: string } }
+  { params }: { params: Promise<{ id: string; dayId: string; serviceId: string }> }
 ) {
   try {
     const supabase = createClient()
@@ -102,7 +102,7 @@ export async function DELETE(
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string; dayId: string; serviceId: string } }
+  { params }: { params: Promise<{ id: string; dayId: string; serviceId: string }> }
 ) {
   try {
     const supabase = createClient()

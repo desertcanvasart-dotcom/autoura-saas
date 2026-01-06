@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 // GET - Get single variation
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
@@ -40,7 +40,7 @@ export async function GET(
 // PUT - Update variation
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
@@ -109,7 +109,7 @@ export async function PUT(
 // DELETE - Delete variation
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()

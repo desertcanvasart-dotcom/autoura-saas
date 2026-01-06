@@ -35,7 +35,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = createClient()
     const body = await request.json()
     
     const { data, error } = await supabase
@@ -66,7 +66,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const supabase = createClient()
     
     const { error } = await supabase
       .from('cruise_contacts')

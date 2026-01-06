@@ -8,7 +8,7 @@ const supabaseAdmin = createClient(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; paymentId: string } }
+  { params }: { params: Promise<{ id: string; paymentId: string }> }
 ) {
   try {
     const { id, paymentId } = params

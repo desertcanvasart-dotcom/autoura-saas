@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 // GET - Used by VIEW page
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
@@ -48,7 +48,7 @@ export async function GET(
 // PUT - Used by EDIT page AND ResourceAssignment
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
@@ -109,7 +109,7 @@ export async function PUT(
 // DELETE - Delete an itinerary and all related data
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params

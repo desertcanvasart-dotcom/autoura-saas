@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase'
 // GET - Get single day with activities
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
@@ -57,7 +57,7 @@ export async function GET(
 // PUT - Update day
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
@@ -109,7 +109,7 @@ export async function PUT(
 // DELETE - Delete day (and its activities)
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = createClient()
