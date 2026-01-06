@@ -10,10 +10,10 @@ const supabase = createClient(
 // Returns client info + their latest itinerary for template placeholder replacement
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const clientId = params.id
+    const { id: clientId } = await params
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const itineraryId = searchParams.get('itineraryId') // Optional: specific itinerary
