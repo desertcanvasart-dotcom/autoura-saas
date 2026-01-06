@@ -12,7 +12,9 @@ export async function POST(request: NextRequest) {
     const { 
       templateId, 
       channel, 
-      clientId, 
+      clientId,      // Legacy - for clients
+      recipientId,   // New - for any recipient
+      recipientType, // New - 'client', 'hotel', 'cruise', 'transport', 'guide'
       recipient, 
       subject, 
       body: messageBody 
@@ -38,18 +40,35 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Log the send
-    await supabase.from('template_send_log').insert({
+    // Log the send - support both old and new fields
+    const logEntry: any = {
       template_id: templateId,
       channel,
-      client_id: clientId,
       recipient_email: channel === 'email' ? recipient : null,
       recipient_phone: channel === 'whatsapp' ? recipient : null,
       subject,
       body_preview: messageBody.substring(0, 500),
       status: result.success ? 'sent' : 'failed',
       error_message: result.error,
-    })
+    }
+
+    // Add recipient info based on type
+    if (recipientType && recipientId) {
+      logEntry.recipient_type = recipientType
+      logEntry.recipient_id = recipientId
+      
+      // Also set client_id if it's a client (for backwards compatibility)
+      if (recipientType === 'client') {
+        logEntry.client_id = recipientId
+      }
+    } else if (clientId) {
+      // Legacy support
+      logEntry.client_id = clientId
+      logEntry.recipient_type = 'client'
+      logEntry.recipient_id = clientId
+    }
+
+    await supabase.from('template_send_log').insert(logEntry)
 
     // Update template usage count
     if (templateId) {

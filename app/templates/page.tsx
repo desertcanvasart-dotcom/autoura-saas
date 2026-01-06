@@ -20,7 +20,11 @@ import {
   X,
   Eye,
   Filter,
-  Sparkles
+  Sparkles,
+  Ship,
+  Car,
+  Hotel,
+  User
 } from 'lucide-react'
 
 // ============================================
@@ -49,6 +53,14 @@ interface Placeholder {
   description: string
   category: string
   example_value: string
+}
+
+interface Recipient {
+  id: string
+  name: string
+  email?: string
+  phone?: string
+  type: 'client' | 'hotel' | 'cruise' | 'transport' | 'guide'
 }
 
 // ============================================
@@ -86,6 +98,15 @@ const SUBCATEGORY_LABELS: Record<string, string> = {
   handover: 'Handover',
   incident: 'Incident',
   debrief: 'Debrief',
+}
+
+// Map subcategories to partner types
+const SUBCATEGORY_TO_PARTNER_TYPE: Record<string, string> = {
+  rate_request: 'hotel',
+  booking_request: 'hotel',
+  cruise_hold: 'cruise',
+  transport: 'transport',
+  guide_booking: 'guide',
 }
 
 // ============================================
@@ -134,9 +155,7 @@ export default function TemplatesPage() {
       const response = await fetch('/api/templates')
       if (response.ok) {
         const result = await response.json()
-        console.log('Templates API response:', result) // Debug
         
-        // Handle different response formats
         let templateData = []
         if (Array.isArray(result)) {
           templateData = result
@@ -146,10 +165,7 @@ export default function TemplatesPage() {
           templateData = result.data
         }
         
-        console.log('Setting templates:', templateData.length, 'items') // Debug
         setTemplates(templateData)
-      } else {
-        console.error('Templates API error:', response.status)
       }
     } catch (error) {
       console.error('Error fetching templates:', error)
@@ -183,7 +199,6 @@ export default function TemplatesPage() {
     
     const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory
     
-    // Fix channel matching logic
     let matchesChannel = selectedChannel === 'all'
     if (!matchesChannel) {
       if (selectedChannel === 'email') {
@@ -198,20 +213,6 @@ export default function TemplatesPage() {
     return matchesSearch && matchesCategory && matchesChannel
   })
 
-  // Group by subcategory
-  const groupedTemplates = filteredTemplates.reduce((acc, template) => {
-    const key = template.subcategory || 'other'
-    if (!acc[key]) acc[key] = []
-    acc[key].push(template)
-    return acc
-  }, {} as Record<string, Template[]>)
-
-  // Debug logging
-  console.log('Filter state:', { selectedCategory, selectedChannel, searchQuery })
-  console.log('Total templates:', templates.length)
-  console.log('Filtered templates:', filteredTemplates.length)
-  console.log('Grouped keys:', Object.keys(groupedTemplates))
-
   // ============================================
   // ACTIONS
   // ============================================
@@ -225,7 +226,6 @@ export default function TemplatesPage() {
     setCopied(template.id)
     setTimeout(() => setCopied(null), 2000)
     
-    // Update usage count
     fetch(`/api/templates/${template.id}/use`, { method: 'POST' })
   }
 
@@ -729,7 +729,7 @@ export default function TemplatesPage() {
         </div>
       )}
 
-      {/* Send Modal - Will be enhanced with client/itinerary selection */}
+      {/* Send Modal */}
       {showSendModal && selectedTemplate && (
         <SendTemplateModal
           template={selectedTemplate}
@@ -742,7 +742,7 @@ export default function TemplatesPage() {
 }
 
 // ============================================
-// SEND TEMPLATE MODAL
+// SEND TEMPLATE MODAL - UPDATED WITH PARTNER SUPPORT
 // ============================================
 
 interface SendTemplateModalProps {
@@ -752,30 +752,71 @@ interface SendTemplateModalProps {
 }
 
 function SendTemplateModal({ template, onClose, placeholders }: SendTemplateModalProps) {
-  const [clients, setClients] = useState<any[]>([])
-  const [selectedClient, setSelectedClient] = useState<any>(null)
+  const [recipients, setRecipients] = useState<Recipient[]>([])
+  const [selectedRecipient, setSelectedRecipient] = useState<Recipient | null>(null)
   const [filledValues, setFilledValues] = useState<Record<string, string>>({})
   const [preview, setPreview] = useState('')
   const [sending, setSending] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [channel, setChannel] = useState<'email' | 'whatsapp'>(
     template.channel === 'both' ? 'whatsapp' : template.channel
   )
 
+  // Determine recipient type based on template
+  const isPartnerTemplate = template.category === 'partner'
+  const partnerType = SUBCATEGORY_TO_PARTNER_TYPE[template.subcategory] || 'hotel'
+
+  const getRecipientLabel = () => {
+    if (!isPartnerTemplate) return 'Select Client'
+    switch (partnerType) {
+      case 'hotel': return 'Select Hotel'
+      case 'cruise': return 'Select Nile Cruise'
+      case 'transport': return 'Select Transport Supplier'
+      case 'guide': return 'Select Guide'
+      default: return 'Select Partner'
+    }
+  }
+
+  const getRecipientIcon = () => {
+    if (!isPartnerTemplate) return <User className="w-4 h-4" />
+    switch (partnerType) {
+      case 'hotel': return <Hotel className="w-4 h-4" />
+      case 'cruise': return <Ship className="w-4 h-4" />
+      case 'transport': return <Car className="w-4 h-4" />
+      case 'guide': return <User className="w-4 h-4" />
+      default: return <Building2 className="w-4 h-4" />
+    }
+  }
+
   useEffect(() => {
-    fetchClients()
+    fetchRecipients()
   }, [])
 
   useEffect(() => {
-    // Auto-fill from selected client
-    if (selectedClient) {
+    // Auto-fill from selected recipient
+    if (selectedRecipient) {
       const values: Record<string, string> = {}
-      values['{{GuestName}}'] = selectedClient.name || ''
-      values['{{ClientPhone}}'] = selectedClient.phone || ''
-      values['{{ClientEmail}}'] = selectedClient.email || ''
-      values['{{Nationality}}'] = selectedClient.nationality || ''
+      
+      if (isPartnerTemplate) {
+        // Partner placeholders
+        values['{{ProviderName}}'] = selectedRecipient.name || ''
+        values['{{HotelName}}'] = selectedRecipient.name || ''
+        values['{{CruiseName}}'] = selectedRecipient.name || ''
+        values['{{SupplierName}}'] = selectedRecipient.name || ''
+        values['{{GuideName}}'] = selectedRecipient.name || ''
+        values['{{PartnerEmail}}'] = selectedRecipient.email || ''
+        values['{{PartnerPhone}}'] = selectedRecipient.phone || ''
+      } else {
+        // Client placeholders
+        values['{{GuestName}}'] = selectedRecipient.name || ''
+        values['{{ClientName}}'] = selectedRecipient.name || ''
+        values['{{ClientPhone}}'] = selectedRecipient.phone || ''
+        values['{{ClientEmail}}'] = selectedRecipient.email || ''
+      }
+      
       setFilledValues(prev => ({ ...prev, ...values }))
     }
-  }, [selectedClient])
+  }, [selectedRecipient, isPartnerTemplate])
 
   useEffect(() => {
     // Generate preview
@@ -786,26 +827,58 @@ function SendTemplateModal({ template, onClose, placeholders }: SendTemplateModa
     setPreview(text)
   }, [filledValues, template.body])
 
-  const fetchClients = async () => {
+  const fetchRecipients = async () => {
+    setLoading(true)
     try {
-      const response = await fetch('/api/clients?limit=100')
-      if (response.ok) {
-        const data = await response.json()
-        // Handle different response formats
-        if (Array.isArray(data)) {
-          setClients(data)
-        } else if (Array.isArray(data.data)) {
-          setClients(data.data)
-        } else if (Array.isArray(data.clients)) {
-          setClients(data.clients)
-        } else {
-          console.error('Unexpected clients response format:', data)
-          setClients([])
+      let endpoint = '/api/clients?limit=100'
+      
+      if (isPartnerTemplate) {
+        switch (partnerType) {
+          case 'hotel':
+            endpoint = '/api/hotels'
+            break
+          case 'cruise':
+            endpoint = '/api/nile-cruises'
+            break
+          case 'transport':
+            endpoint = '/api/suppliers?type=transport'
+            break
+          case 'guide':
+            endpoint = '/api/guides'
+            break
         }
       }
+
+      const response = await fetch(endpoint)
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Handle different response formats
+        let items: any[] = []
+        if (Array.isArray(data)) {
+          items = data
+        } else if (Array.isArray(data.data)) {
+          items = data.data
+        } else if (data.success && Array.isArray(data.data)) {
+          items = data.data
+        }
+
+        // Normalize to Recipient format
+        const normalized: Recipient[] = items.map(item => ({
+          id: item.id,
+          name: item.name || item.hotel_name || item.cruise_name || item.supplier_name || 'Unknown',
+          email: item.email || item.contact_email || item.reservations_email,
+          phone: item.phone || item.contact_phone || item.whatsapp_number,
+          type: isPartnerTemplate ? partnerType as any : 'client'
+        }))
+
+        setRecipients(normalized)
+      }
     } catch (error) {
-      console.error('Error fetching clients:', error)
-      setClients([])
+      console.error('Error fetching recipients:', error)
+      setRecipients([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -814,17 +887,28 @@ function SendTemplateModal({ template, onClose, placeholders }: SendTemplateModa
   const uniquePlaceholders = [...new Set(templatePlaceholders)]
 
   const handleSend = async () => {
+    if (!selectedRecipient) {
+      alert('Please select a recipient')
+      return
+    }
+
+    const recipientContact = channel === 'email' ? selectedRecipient.email : selectedRecipient.phone
+    if (!recipientContact) {
+      alert(`No ${channel === 'email' ? 'email' : 'phone number'} available for this recipient`)
+      return
+    }
+
     setSending(true)
     try {
-      // Send via appropriate channel
       const response = await fetch('/api/templates/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId: template.id,
           channel,
-          clientId: selectedClient?.id,
-          recipient: channel === 'email' ? selectedClient?.email : selectedClient?.phone,
+          recipientId: selectedRecipient.id,
+          recipientType: selectedRecipient.type,
+          recipient: recipientContact,
           subject: template.subject ? Object.entries(filledValues).reduce(
             (s, [k, v]) => s.replace(new RegExp(k.replace(/[{}]/g, '\\$&'), 'g'), v), 
             template.subject
@@ -896,24 +980,39 @@ function SendTemplateModal({ template, onClose, placeholders }: SendTemplateModa
                 </div>
               )}
 
-              {/* Client Selector */}
+              {/* Recipient Selector */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Client (auto-fill)</label>
-                <select
-                  value={selectedClient?.id || ''}
-                  onChange={(e) => {
-                    const client = clients.find(c => c.id === e.target.value)
-                    setSelectedClient(client)
-                  }}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-                >
-                  <option value="">-- Select a client --</option>
-                  {Array.isArray(clients) && clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name} {client.email ? `(${client.email})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                  {getRecipientIcon()}
+                  {getRecipientLabel()} (auto-fill)
+                </label>
+                {loading ? (
+                  <div className="flex items-center gap-2 px-3 py-2 text-gray-500">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading...
+                  </div>
+                ) : (
+                  <select
+                    value={selectedRecipient?.id || ''}
+                    onChange={(e) => {
+                      const recipient = recipients.find(r => r.id === e.target.value)
+                      setSelectedRecipient(recipient || null)
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
+                  >
+                    <option value="">-- {getRecipientLabel()} --</option>
+                    {recipients.map((recipient) => (
+                      <option key={recipient.id} value={recipient.id}>
+                        {recipient.name} {recipient.email ? `(${recipient.email})` : recipient.phone ? `(${recipient.phone})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {recipients.length === 0 && !loading && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    No {isPartnerTemplate ? 'partners' : 'clients'} found. Add some first.
+                  </p>
+                )}
               </div>
 
               {/* Placeholder Fields */}
@@ -966,11 +1065,11 @@ function SendTemplateModal({ template, onClose, placeholders }: SendTemplateModa
         {/* Footer */}
         <div className="border-t border-gray-200 px-6 py-4 flex justify-between items-center bg-gray-50">
           <div className="text-sm text-gray-500">
-            {selectedClient && (
+            {selectedRecipient && (
               <>
-                Sending to: <strong>{selectedClient.name}</strong>
-                {channel === 'email' && selectedClient.email && ` (${selectedClient.email})`}
-                {channel === 'whatsapp' && selectedClient.phone && ` (${selectedClient.phone})`}
+                Sending to: <strong>{selectedRecipient.name}</strong>
+                {channel === 'email' && selectedRecipient.email && ` (${selectedRecipient.email})`}
+                {channel === 'whatsapp' && selectedRecipient.phone && ` (${selectedRecipient.phone})`}
               </>
             )}
           </div>
@@ -983,7 +1082,7 @@ function SendTemplateModal({ template, onClose, placeholders }: SendTemplateModa
             </button>
             <button
               onClick={handleSend}
-              disabled={sending || !selectedClient}
+              disabled={sending || !selectedRecipient}
               className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
