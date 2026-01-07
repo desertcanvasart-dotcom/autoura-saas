@@ -561,8 +561,8 @@ export default function AnalyticsPage() {
                       borderRadius: '8px',
                       fontSize: '12px'
                     }}
-                    formatter={(value: any, name: string) => [
-                      name === 'revenue' ? formatCurrency(value) : value,
+                    formatter={(value: any, name?: string) => [
+                    name === 'revenue' ? formatCurrency(value) : value,
                       name === 'revenue' ? 'Revenue' : 'Bookings'
                     ]}
                   />
