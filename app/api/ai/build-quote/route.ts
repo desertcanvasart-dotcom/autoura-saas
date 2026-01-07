@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
 
         if (calculated.success && calculated.total_cost > 0) {
           pricingResult = {
-            success: true,
+            
             source: 'database_rates',
             ...calculated
           }
