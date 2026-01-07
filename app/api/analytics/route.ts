@@ -40,8 +40,7 @@ export async function GET(request: NextRequest) {
       .gte('created_at', startDate.toISOString())
 
     // Calculate metrics
-    const totalRevenue = itineraries?.reduce((sum, it) => sum + (it.total_cost || 0), 0) || 0
-    
+    const totalRevenue = itineraries?.reduce((sum: number, it: any) => sum + (it.total_cost || 0), 0) || 0    
     const bookingsByStatus = {
       total: itineraries?.length || 0,
       confirmed: itineraries?.filter(it => it.status === 'confirmed').length || 0,
