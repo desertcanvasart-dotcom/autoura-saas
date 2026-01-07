@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    const formattedPayments = payments?.map(p => ({
+    const formattedPayments = payments?.map((p: any) => ({
       ...p,
       itinerary_code: p.itineraries?.itinerary_code,
       client_name: p.itineraries?.client_name,
