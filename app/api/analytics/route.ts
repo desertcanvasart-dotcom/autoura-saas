@@ -43,14 +43,14 @@ export async function GET(request: NextRequest) {
     const totalRevenue = itineraries?.reduce((sum: number, it: any) => sum + (it.total_cost || 0), 0) || 0    
     const bookingsByStatus = {
       total: itineraries?.length || 0,
-      confirmed: itineraries?.filter(it => it.status === 'confirmed').length || 0,
-      pending: itineraries?.filter(it => it.status === 'sent' || it.status === 'draft').length || 0,
-      cancelled: itineraries?.filter(it => it.status === 'cancelled').length || 0
+      confirmed: itineraries?.filter((it: any) => it.status === 'confirmed').length || 0,
+      pending: itineraries?.filter((it: any) => it.status === 'sent' || it.status === 'draft').length || 0,
+      cancelled: itineraries?.filter((it: any) => it.status === 'cancelled').length || 0
     }
 
     // Monthly revenue
     const monthlyRevenue: Record<string, number> = {}
-    itineraries?.forEach(it => {
+    itineraries?.forEach((it: any) => {
       const month = new Date(it.created_at).toLocaleDateString('en-US', { month: 'short' })
       if (!monthlyRevenue[month]) monthlyRevenue[month] = 0
       monthlyRevenue[month] += it.total_cost || 0
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     // Calculate new clients (last 30 days)
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(now.getDate() - 30)
-    const newClients = clients?.filter(c => new Date(c.created_at) > thirtyDaysAgo).length || 0
+    const newClients = clients?.filter((c: any) => new Date(c.created_at) > thirtyDaysAgo).length || 0
 
     const analytics = {
       revenue: {
