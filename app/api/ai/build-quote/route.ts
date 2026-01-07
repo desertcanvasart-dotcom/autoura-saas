@@ -177,9 +177,8 @@ export async function POST(request: NextRequest) {
           is_euro_passport: isEuroPassport
         })
         pricingResult = {
-          success: true,
-          source: 'fallback_rates',
-          ...fallback
+          ...fallback,
+          source: 'fallback_rates'
         }
       }
     }
