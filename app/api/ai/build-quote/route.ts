@@ -162,9 +162,8 @@ export async function POST(request: NextRequest) {
 
         if (calculated.success && calculated.total_cost > 0) {
           pricingResult = {
-            
-            source: 'database_rates',
-            ...calculated
+            ...calculated,
+            source: 'database_rates'
           }
         } else {
           throw new Error('No rates found')
