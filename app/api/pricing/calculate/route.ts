@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('is_active', true)
 
-    const tips_per_day = fixedCosts?.find(c => c.cost_type === 'Daily Tips')?.cost_per_person_per_day || 5
-    const water_per_day = fixedCosts?.find(c => c.cost_type === 'Water Bottle')?.cost_per_person_per_day || 2
+    const tips_per_day = fixedCosts?.find((c: any) => c.cost_type === 'Daily Tips')?.cost_per_person_per_day || 5
+    const water_per_day = fixedCosts?.find((c: any) => c.cost_type === 'Water Bottle')?.cost_per_person_per_day || 2
 
     // ============================================
     // STEP 4: CALCULATE GROUP COSTS
@@ -124,8 +124,8 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('is_active', true)
 
-    const lunch_cost = meals?.find(m => m.meal_type === 'Lunch')?.cost_per_person || 10
-    const dinner_cost = meals?.find(m => m.meal_type === 'Dinner')?.cost_per_person || 10
+    const lunch_cost = meals?.find((m: any) => m.meal_type === 'Lunch')?.cost_per_person || 10
+    const dinner_cost = meals?.find((m: any) => m.meal_type === 'Dinner')?.cost_per_person || 10
 
     let per_person_per_day = water_per_day + entrance_fees_per_person
     if (includes_lunch) per_person_per_day += lunch_cost
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
     let total_per_person_costs = 0
     total_per_person_costs += num_adults * per_person_per_day * duration_days
 
-    const child_discount = discounts?.find(d => d.rule_type === 'Child Discount')?.discount_percentage || 50
+    const child_discount = discounts?.find((d: any) => d.rule_type === 'Child Discount')?.discount_percentage || 50
     const child_multiplier = 1 - (child_discount / 100)
     total_per_person_costs += num_children * per_person_per_day * duration_days * child_multiplier
 
@@ -168,8 +168,8 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('is_active', true)
 
-    const airport_assistant_cost = assistants?.find(a => a.assistant_type === 'Airport Assistant')?.cost_per_service || 18
-    const hotel_assistant_cost = assistants?.find(a => a.assistant_type === 'Hotel Assistant')?.cost_per_service || 12
+    const airport_assistant_cost = assistants?.find((a: any) => a.assistant_type === 'Airport Assistant')?.cost_per_service || 18
+    const hotel_assistant_cost = assistants?.find((a: any) => a.assistant_type === 'Hotel Assistant')?.cost_per_service || 12
 
     const total_assistant_costs = 
       (airport_transfers * airport_assistant_cost) + 
@@ -276,7 +276,7 @@ export async function POST(request: NextRequest) {
             cost_per_day: vehicle_cost_per_day,
             was_overridden: override_transportation !== null
           },
-          alternatives: alternativeVehicles?.map(v => ({
+          alternatives: alternativeVehicles?.map((v: any) => ({
             service_code: v.service_code,
             type: v.vehicle_type,
             capacity: `${v.capacity_min}-${v.capacity_max} pax`,
