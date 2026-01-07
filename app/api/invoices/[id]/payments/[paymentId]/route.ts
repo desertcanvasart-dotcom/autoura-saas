@@ -11,7 +11,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; paymentId: string }> }
 ) {
   try {
-    const { id, paymentId } = params
+    const { id, paymentId } = await params
 
     // Verify payment belongs to this invoice
     const { data: payment, error: fetchError } = await supabaseAdmin
