@@ -270,7 +270,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     // Categorize by reminder type
-    const reminders = (invoices || []).map(invoice => {
+    const reminders = (invoices || []).map((invoice: any) => {
       const dueDate = new Date(invoice.due_date)
       const daysUntilDue = Math.floor((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
       
