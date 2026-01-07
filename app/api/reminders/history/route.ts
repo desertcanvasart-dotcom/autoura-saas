@@ -42,8 +42,8 @@ export async function GET(request: NextRequest) {
       .from('invoice_reminders')
       .select('status')
 
-    const sentCount = stats?.filter((r: any) => r.status === 'sent').length || 0
-    const failedCount = stats?.filter((r: any) => r.status === 'failed').length || 0
+      const sentCount = stats?.filter((r: any) => r.status === 'sent').length || 0
+      const failedCount = stats?.filter((r: any) => r.status === 'failed').length || 0
 
     return NextResponse.json({
       success: true,
