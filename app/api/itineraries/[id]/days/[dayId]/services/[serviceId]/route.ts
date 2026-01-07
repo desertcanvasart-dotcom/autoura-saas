@@ -9,6 +9,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; dayId: string; serviceId: string }> }
 ) {
   try {
+    const { id, dayId, serviceId } = await params
     const supabase = createClient()
     const body = await request.json()
 
@@ -46,8 +47,8 @@ export async function PUT(
     const { data, error } = await supabase
       .from('itinerary_services')
       .update(updateData)
-      .eq('id', params.serviceId)
-      .eq('day_id', params.dayId)
+      .eq('id', serviceId)
+      .eq('day_id', dayId)
       .select()
       .single()
 
@@ -74,13 +75,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; dayId: string; serviceId: string }> }
 ) {
   try {
+    const { id, dayId, serviceId } = await params
     const supabase = createClient()
 
     const { error } = await supabase
       .from('itinerary_services')
       .delete()
-      .eq('id', params.serviceId)
-      .eq('day_id', params.dayId)
+      .eq('id', serviceId)
+      .eq('day_id', dayId)
 
     if (error) {
       console.error('Error deleting service:', error)
@@ -105,6 +107,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string; dayId: string; serviceId: string }> }
 ) {
   try {
+    const { id, dayId, serviceId } = await params
     const supabase = createClient()
 
     const { data, error } = await supabase
@@ -121,8 +124,8 @@ export async function GET(
           city
         )
       `)
-      .eq('id', params.serviceId)
-      .eq('day_id', params.dayId)
+      .eq('id', serviceId)
+      .eq('day_id', dayId)
       .single()
 
     if (error) {
