@@ -34,7 +34,7 @@ async function sendReminderEmail(params: {
 }
 
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
-  const currencySymbol = { EUR: '€', USD: '$', GBP: '£' }[invoice.currency] || invoice.currency
+  const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
   const balanceDue = `${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`
   const dueDate = new Date(invoice.due_date).toLocaleDateString('en-GB', { 
     day: 'numeric', month: 'long', year: 'numeric' 
