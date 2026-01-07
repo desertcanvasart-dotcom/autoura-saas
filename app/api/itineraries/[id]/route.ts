@@ -134,7 +134,7 @@ export async function DELETE(
       .eq('itinerary_id', id)
 
     if (days && days.length > 0) {
-      const dayIds = days.map(d => d.id)
+      const dayIds = days.map((d: any) => d.id)
       
       // Delete services for these days
       await supabase
