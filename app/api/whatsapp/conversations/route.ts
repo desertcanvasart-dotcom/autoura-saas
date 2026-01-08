@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     // Map to include full_name for convenience
-    const conversations = (data || []).map(conv => ({
+    const conversations = (data || []).map((conv: any) => ({
       ...conv,
       clients: conv.clients ? {
         ...conv.clients,
