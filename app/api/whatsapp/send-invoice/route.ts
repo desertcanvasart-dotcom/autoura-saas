@@ -15,7 +15,7 @@ async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
   const margin = 50
   let y = height - 50
 
-  const currencySymbol = { EUR: '€', USD: '$', GBP: '£' }[invoice.currency] || invoice.currency
+  const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
 
   // Header
   page.drawText('Travel2Egypt', {
@@ -258,7 +258,7 @@ export async function POST(request: NextRequest) {
 
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
     const businessEmail = process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'
-    const currencySymbol = { EUR: '€', USD: '$', GBP: '£' }[invoice.currency] || invoice.currency
+    const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
 
     const issueDate = new Date(invoice.issue_date).toLocaleDateString('en-GB', {
       day: 'numeric', month: 'long', year: 'numeric'
