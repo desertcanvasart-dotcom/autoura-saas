@@ -331,8 +331,8 @@ export default function ResourcesPage() {
   const filterResources = <T extends any>(resourceArray: T[], cityField: string = 'city'): T[] => {
     return resourceArray.filter(resource => {
       const matchesSearch = searchTerm === '' || 
-        Object.values(resource).some(value => {
-          if (typeof value === 'string') {
+      Object.values(resource as Record<string, unknown>).some(value => {
+      if (typeof value === 'string') {
             return value.toLowerCase().includes(searchTerm.toLowerCase())
           }
           if (Array.isArray(value)) {
