@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('message_templates')
         .update({ 
-          usage_count: supabase.sql`usage_count + 1`,
+          usage_count: (template.usage_count || 0) + 1,
           last_used_at: new Date().toISOString()
         })
         .eq('id', templateId)
