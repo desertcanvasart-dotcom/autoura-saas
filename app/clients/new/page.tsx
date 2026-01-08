@@ -101,8 +101,8 @@ export default function NewClientPage() {
   const handleArrayToggle = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
-      [field]: prev[field as keyof typeof prev].includes(value)
-        ? (prev[field as keyof typeof prev] as string[]).filter((item: string) => item !== value)
+      [field]: (prev[field as keyof typeof prev] as string[]).includes(value)
+      ? (prev[field as keyof typeof prev] as string[]).filter((item: string) => item !== value)
         : [...(prev[field as keyof typeof prev] as string[]), value]
     }))
   }
