@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
-            setUser(session?.user ?? null)
+      setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
       } else {
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
