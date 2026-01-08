@@ -72,10 +72,17 @@ export async function POST(request: NextRequest) {
 
     // Update template usage count
     if (templateId) {
+      // Fetch current template to get usage_count
+      const { data: template } = await supabase
+        .from('message_templates')
+        .select('usage_count')
+        .eq('id', templateId)
+        .single()
+
       await supabase
         .from('message_templates')
         .update({ 
-          usage_count: (template.usage_count || 0) + 1,
+          usage_count: (template?.usage_count || 0) + 1,
           last_used_at: new Date().toISOString()
         })
         .eq('id', templateId)
