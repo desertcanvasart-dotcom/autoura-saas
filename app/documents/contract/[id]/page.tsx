@@ -184,7 +184,7 @@ export default function ContractPage() {
       })
       
       // Download the PDF
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
