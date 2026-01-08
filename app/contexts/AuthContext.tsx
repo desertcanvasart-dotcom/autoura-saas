@@ -39,8 +39,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
+            setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
       } else {
