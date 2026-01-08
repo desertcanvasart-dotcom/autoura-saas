@@ -90,8 +90,8 @@ export async function POST(request: NextRequest) {
           .select('current_conversations')
           .eq('id', oldAgentId)
           .single()
-          .then(({ data }) => {
-            if (data) {
+          .then(({ data }: { data: any }) => {
+          if (data) {
               supabase
                 .from('sales_agents')
                 .update({ current_conversations: Math.max(0, (data.current_conversations || 1) - 1) })
