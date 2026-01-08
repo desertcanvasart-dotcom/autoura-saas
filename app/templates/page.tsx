@@ -243,7 +243,7 @@ export default function TemplatesPage() {
     setFormData({
       name: template.name,
       description: template.description || '',
-      category: template.category,
+      category: template.category as 'customer' | 'partner' | 'internal',
       subcategory: template.subcategory || '',
       channel: template.channel,
       subject: template.subject || '',
