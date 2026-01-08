@@ -139,6 +139,7 @@ interface EmailTemplate {
   subject: string
   content: string
   category: string
+  channel?: string 
 }
 
 interface GmailLabel {
