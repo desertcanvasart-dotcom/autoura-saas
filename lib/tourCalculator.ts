@@ -216,9 +216,10 @@ import {
       // Entrance fees (per person)
       if (activity.entrance) {
         // ← FIXED: Use eur_rate and non_eur_rate instead of base_rate_eur/non_eur
-        const entranceRate = isEuroPassport
-          ? activity.entrance.eur_rate
-          : activity.entrance.non_eur_rate
+        const entrance = activity.entrance as any
+       const entranceRate = isEuroPassport
+  ? (entrance.eur_rate || entrance.base_rate_eur || 0)
+  : (entrance.non_eur_rate || entrance.base_rate_non_eur || 0)
         
         totalEntrances += pax * entranceRate
       }
