@@ -199,6 +199,17 @@ export interface Tour {
     child_discount_percent?: number
   }
   
+  export interface BaseRate {
+    id: string
+    city?: string
+    season?: string
+    valid_from?: string
+    valid_to?: string
+    currency?: string
+    created_at?: string
+    updated_at?: string
+  }
+  
   // Transportation
   export interface TransportationRate extends BaseRate {
     vehicle_type: string
