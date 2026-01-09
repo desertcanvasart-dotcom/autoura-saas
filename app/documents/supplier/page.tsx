@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { 
   FileText, Search, Send, Eye, Trash2, Pencil,
   Hotel, Car, Ship, MapPin, Users, CheckCircle,
-  Clock
+  Clock, RotateCcw
 } from 'lucide-react'
 
 interface SupplierDocument {
@@ -364,8 +364,9 @@ export default function SupplierDocumentsPage() {
                             >
                               <Eye className="w-4 h-4" />
                             </Link>
-                            {/* Edit - only for drafts */}
-                            {doc.status === 'draft' && (
+                            
+                            {/* Edit - available for all statuses EXCEPT cancelled */}
+                            {doc.status !== 'cancelled' && (
                               <Link
                                 href={`/documents/supplier/${doc.id}/edit`}
                                 className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
@@ -374,6 +375,7 @@ export default function SupplierDocumentsPage() {
                                 <Pencil className="w-4 h-4" />
                               </Link>
                             )}
+                            
                             {/* Mark as Sent - only for drafts */}
                             {doc.status === 'draft' && (
                               <button
@@ -384,6 +386,7 @@ export default function SupplierDocumentsPage() {
                                 <Send className="w-4 h-4" />
                               </button>
                             )}
+                            
                             {/* Mark as Confirmed - only for sent */}
                             {doc.status === 'sent' && (
                               <button
@@ -394,6 +397,29 @@ export default function SupplierDocumentsPage() {
                                 <CheckCircle className="w-4 h-4" />
                               </button>
                             )}
+                            
+                            {/* Mark as Completed - only for confirmed */}
+                            {doc.status === 'confirmed' && (
+                              <button
+                                onClick={() => handleUpdateStatus(doc.id, 'completed')}
+                                className="p-1.5 text-purple-500 hover:bg-purple-50 rounded"
+                                title="Mark as Completed"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                            
+                            {/* Revert to Draft - for sent/confirmed/completed */}
+                            {['sent', 'confirmed', 'completed'].includes(doc.status) && (
+                              <button
+                                onClick={() => handleUpdateStatus(doc.id, 'draft')}
+                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                title="Revert to Draft"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                            )}
+                            
                             {/* Delete */}
                             <button
                               onClick={() => handleDelete(doc.id)}
