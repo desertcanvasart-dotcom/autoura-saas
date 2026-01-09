@@ -19,7 +19,9 @@ import {
   MapPin,
   Mail,
   CheckCircle,
-  Package
+  Package,
+  CalendarDays,
+  Layers
 } from 'lucide-react'
 
 const supabase = createClient()
@@ -29,10 +31,10 @@ interface DashboardStats {
   activeClients: number
   pendingFollowups: number
   overdueFollowups: number
-  totalItineraries: number
   totalQuotes: number
   quotesSent: number
   quotesConfirmed: number
+  upcomingTrips: number
   recentActivity: number
 }
 
@@ -42,10 +44,10 @@ export default function DashboardPage() {
     activeClients: 0,
     pendingFollowups: 0,
     overdueFollowups: 0,
-    totalItineraries: 0,
     totalQuotes: 0,
     quotesSent: 0,
     quotesConfirmed: 0,
+    upcomingTrips: 0,
     recentActivity: 0
   })
   const [recentClients, setRecentClients] = useState<any[]>([])
@@ -79,10 +81,22 @@ export default function DashboardPage() {
         new Date(f.due_date) < new Date()
       ).length || 0
 
-      // Get itinerary/quote stats
+      // Get itinerary/quote stats (B2C)
       const quotesRes = await fetch('/api/itineraries')
       const quotesData = await quotesRes.json()
       const quotes = quotesData.data || []
+
+      // Get upcoming trips (next 30 days)
+      const today = new Date()
+      const thirtyDaysLater = new Date()
+      thirtyDaysLater.setDate(today.getDate() + 30)
+      
+      // Try to get from itineraries with start_date
+      const upcomingTrips = quotes.filter((q: any) => {
+        if (!q.start_date) return false
+        const startDate = new Date(q.start_date)
+        return startDate >= today && startDate <= thirtyDaysLater && q.status === 'confirmed'
+      }).length
 
       // Get recent clients
       const recentClients = clients?.slice(0, 5) || []
@@ -117,10 +131,10 @@ export default function DashboardPage() {
         activeClients,
         pendingFollowups,
         overdueFollowups,
-        totalItineraries: quotes.length,
         totalQuotes: quotes.length,
         quotesSent: quotes.filter((q: any) => q.status === 'sent' || q.status === 'confirmed').length,
         quotesConfirmed: quotes.filter((q: any) => q.status === 'confirmed').length,
+        upcomingTrips,
         recentActivity: 0
       })
       setRecentClients(recentClients)
@@ -175,9 +189,9 @@ export default function DashboardPage() {
           color="warning"
         />
 
-        {/* Total Quotes */}
+        {/* Client Quotes (B2C) */}
         <StatCard
-          title="Total Quotes"
+          title="Client Quotes"
           value={stats.totalQuotes}
           icon={FileText}
           trend="+8%"
@@ -186,13 +200,13 @@ export default function DashboardPage() {
           color="purple"
         />
 
-        {/* Itineraries - Now reads from itineraries */}
+        {/* Upcoming Trips */}
         <StatCard
-          title="Itineraries"
-          value={stats.totalItineraries}
-          icon={Package}
-          subtitle="Available to sell"
-          href="/itineraries"
+          title="Upcoming Trips"
+          value={stats.upcomingTrips}
+          icon={CalendarDays}
+          subtitle="Next 30 days"
+          href="/calendar"
           color="orange"
         />
       </div>
@@ -270,17 +284,17 @@ export default function DashboardPage() {
             color="bg-purple-500"
           />
           <QuickActionButton
-            icon={FileText}
-            label="All Quotes"
-            href="/itineraries"
-            description="View all itineraries"
+            icon={Layers}
+            label="Rates Hub"
+            href="/rates"
+            description="Manage hotels, guides & services"
             color="bg-primary-600"
           />
           <QuickActionButton
             icon={Package}
-            label="Ready Made Packages"
-            href="/itineraries"
-            description="Browse available packages"
+            label="B2B Packages"
+            href="/tours"
+            description="Ready-made tour packages"
             color="bg-warning"
           />
         </div>
@@ -401,7 +415,7 @@ export default function DashboardPage() {
             <h3 className="text-base font-bold text-gray-900 mb-3">💡 Quick Tips</h3>
             <div className="space-y-2 text-xs text-gray-700">
               <p>• Use AI parser to extract client details from WhatsApp in seconds</p>
-              <p>• Browse ready made packages to find perfect matches quickly</p>
+              <p>• Check the Rates Hub for hotel and guide pricing</p>
               <p>• Send quotes via WhatsApp or Email with one click</p>
               <p>• Track your conversion rates in Analytics</p>
             </div>
@@ -419,7 +433,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600">Ready Made Packages</span>
+                <span className="text-xs text-gray-600">B2B Packages</span>
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-success" />
                   <span className="text-xs font-medium text-gray-700">Active</span>
