@@ -209,7 +209,7 @@ export interface Tour {
     created_at?: string
     updated_at?: string
   }
-  
+
   // Transportation
   export interface TransportationRate extends BaseRate {
     vehicle_type: string
@@ -237,7 +237,7 @@ export interface Tour {
     tour_day_id?: string
     activity_order: number
     entrance_id?: string
-    entrance?: EntranceFee
+    entrance?: EntranceRate
     transportation_id?: string
     transportation?: TransportationRate
     activity_notes?: string
