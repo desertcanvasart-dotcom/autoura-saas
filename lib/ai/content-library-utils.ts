@@ -50,7 +50,7 @@ export async function fetchContentByIds(
   }
 
   return data
-    .map(item => {
+  .map((item: any) => {
       const variation = item.variations?.find(
         (v: ContentVariation) => v.tier === tier && v.is_active
       )
