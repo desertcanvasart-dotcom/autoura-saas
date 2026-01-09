@@ -66,7 +66,7 @@ export async function fetchContentByIds(
         category: item.category?.name || 'Unknown'
       }
     })
-    .filter((item): item is ContentForGeneration => item !== null)
+    .filter((item: any): item is ContentForGeneration => item !== null)
 }
 
 /**
