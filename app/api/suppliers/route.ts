@@ -6,15 +6,17 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// All valid supplier fields (including new ones from migration)
+// All valid supplier fields (including hierarchical fields)
 const VALID_FIELDS = [
   'name', 'type', 'contact_name', 'contact_email', 'contact_phone',
   'phone2', 'whatsapp', 'website', 'address', 'city', 'country',
   'default_commission_rate', 'commission_type', 'payment_terms',
   'bank_details', 'status', 'notes',
-  // New type-specific fields
+  // Type-specific fields
   'languages', 'vehicle_types', 'star_rating', 'property_type',
-  'cuisine_types', 'routes', 'ship_name', 'cabin_count', 'capacity'
+  'cuisine_types', 'routes', 'ship_name', 'cabin_count', 'capacity',
+  // Hierarchical fields (company -> property relationship)
+  'is_property', 'parent_supplier_id'
 ]
 
 // Filter object to only include valid fields
@@ -33,6 +35,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const type = searchParams.get('type')
     const status = searchParams.get('status')
+    const isProperty = searchParams.get('is_property')
+    const parentId = searchParams.get('parent_supplier_id')
 
     let query = supabaseAdmin
       .from('suppliers')
@@ -51,6 +55,18 @@ export async function GET(request: NextRequest) {
     
     if (status) {
       query = query.eq('status', status)
+    }
+
+    // Filter by is_property (true = individual properties, false = parent companies)
+    if (isProperty === 'true') {
+      query = query.eq('is_property', true)
+    } else if (isProperty === 'false') {
+      query = query.eq('is_property', false)
+    }
+
+    // Filter by parent supplier (get all properties under a specific company)
+    if (parentId) {
+      query = query.eq('parent_supplier_id', parentId)
     }
 
     const { data, error } = await query
@@ -82,7 +98,9 @@ export async function POST(request: NextRequest) {
     const newSupplier = {
       ...filterValidFields(body),
       country: body.country || 'Egypt',
-      status: body.status || 'active'
+      status: body.status || 'active',
+      is_property: body.is_property || false,
+      parent_supplier_id: body.parent_supplier_id || null
     }
 
     const { data, error } = await supabaseAdmin

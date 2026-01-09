@@ -452,7 +452,7 @@ export default function HotelsContent() {
   // Fetch hotel suppliers
   const fetchSuppliers = async () => {
     try {
-      const response = await fetch('/api/suppliers?type=hotel&status=active')
+      const response = await fetch('/api/suppliers?type=hotel&status=active&is_property=true')
       const data = await response.json()
       if (data.success) {
         setSuppliers(data.data)
