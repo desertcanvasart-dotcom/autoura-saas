@@ -188,8 +188,8 @@ export default function DayPlanner({
               selectedServices={(currentDay as any).additional_services || []}
               pax={pax}
               isEuroPassport={isEuroPassport}
-              onServicesChange={(services) => handleFieldChange('additional_services', services)}
-            />
+              onServicesChange={(services) => handleFieldChange('additional_services' as any, services)}
+              />
           )}
 
           {/* Activities */}
