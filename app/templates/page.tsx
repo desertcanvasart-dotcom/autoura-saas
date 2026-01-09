@@ -245,7 +245,7 @@ export default function TemplatesPage() {
       description: template.description || '',
       category: template.category as any,
             subcategory: template.subcategory || '',
-      channel: template.channel,
+            channel: template.channel as any,
       subject: template.subject || '',
       body: template.body,
     })
