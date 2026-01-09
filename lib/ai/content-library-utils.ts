@@ -1,16 +1,9 @@
 // =====================================================
 // AI CONTENT LIBRARY UTILITIES
 // =====================================================
-// 📁 COPY TO: lib/ai/content-library-utils.ts
-// =====================================================
-// 
-// These utilities fetch content and rules from your
-// custom library and format them for AI generation.
-// =====================================================
 
 import { createClient } from '@/app/supabase'
 import type {
-  ContentLibraryItem,
   ContentVariation,
   WritingRule,
   PromptTemplate,
@@ -50,7 +43,7 @@ export async function fetchContentByIds(
   }
 
   return data
-  .map((item: any) => {
+    .map((item: any) => {
       const variation = item.variations?.find(
         (v: ContentVariation) => v.tier === tier && v.is_active
       )
@@ -97,10 +90,10 @@ export async function fetchContentByTags(
     
     if (!data) return []
     
-    const filtered = data.filter(item => item.category?.slug === categorySlug)
+    const filtered = data.filter((item: any) => item.category?.slug === categorySlug)
     
     return filtered
-      .map(item => {
+      .map((item: any) => {
         const variation = item.variations?.find(
           (v: ContentVariation) => v.tier === tier && v.is_active
         )
@@ -116,7 +109,7 @@ export async function fetchContentByTags(
           category: item.category?.name || 'Unknown'
         }
       })
-      .filter((item): item is ContentForGeneration => item !== null)
+      .filter((item: any): item is ContentForGeneration => item !== null)
   }
 
   const { data, error } = await query
@@ -127,7 +120,7 @@ export async function fetchContentByTags(
   }
 
   return data
-    .map(item => {
+    .map((item: any) => {
       const variation = item.variations?.find(
         (v: ContentVariation) => v.tier === tier && v.is_active
       )
@@ -143,7 +136,7 @@ export async function fetchContentByTags(
         category: item.category?.name || 'Unknown'
       }
     })
-    .filter((item): item is ContentForGeneration => item !== null)
+    .filter((item: any): item is ContentForGeneration => item !== null)
 }
 
 /**
@@ -180,7 +173,7 @@ export async function fetchContentByCategory(
   }
 
   return data
-    .map(item => {
+    .map((item: any) => {
       const variation = item.variations?.find(
         (v: ContentVariation) => v.tier === tier && v.is_active
       )
@@ -196,7 +189,7 @@ export async function fetchContentByCategory(
         category: category.name
       }
     })
-    .filter((item): item is ContentForGeneration => item !== null)
+    .filter((item: any): item is ContentForGeneration => item !== null)
 }
 
 /**
@@ -227,7 +220,7 @@ export async function searchContent(
   }
 
   return data
-    .map(item => {
+    .map((item: any) => {
       const variation = item.variations?.find(
         (v: ContentVariation) => v.tier === tier && v.is_active
       )
@@ -243,7 +236,7 @@ export async function searchContent(
         category: item.category?.name || 'Unknown'
       }
     })
-    .filter((item): item is ContentForGeneration => item !== null)
+    .filter((item: any): item is ContentForGeneration => item !== null)
 }
 
 // =====================================================
@@ -272,20 +265,20 @@ export async function fetchWritingRules(
   }
 
   // Filter by applies_to
-  const filtered = data.filter(rule => 
+  const filtered = data.filter((rule: any) => 
     rule.applies_to.includes('all') || rule.applies_to.includes(appliesTo)
   )
 
   return {
     enforce: filtered
-      .filter(r => r.rule_type === 'enforce')
-      .map(r => `${r.name}: ${r.description}`),
+      .filter((r: any) => r.rule_type === 'enforce')
+      .map((r: any) => `${r.name}: ${r.description}`),
     prefer: filtered
-      .filter(r => r.rule_type === 'prefer')
-      .map(r => `${r.name}: ${r.description}`),
+      .filter((r: any) => r.rule_type === 'prefer')
+      .map((r: any) => `${r.name}: ${r.description}`),
     avoid: filtered
-      .filter(r => r.rule_type === 'avoid')
-      .map(r => `${r.name}: ${r.description}`)
+      .filter((r: any) => r.rule_type === 'avoid')
+      .map((r: any) => `${r.name}: ${r.description}`)
   }
 }
 
@@ -375,7 +368,7 @@ export async function fetchPromptById(id: string): Promise<PromptTemplate | null
 export function formatContentForPrompt(content: ContentForGeneration[]): string {
   if (content.length === 0) return 'No specific content provided.'
   
-  return content.map(c => `
+  return content.map((c: ContentForGeneration) => `
 ### ${c.name} (${c.tier.toUpperCase()})
 **Category:** ${c.category}
 
@@ -391,15 +384,15 @@ export function formatRulesForPrompt(rules: WritingRulesForGeneration): string {
   let output = ''
   
   if (rules.enforce.length > 0) {
-    output += `\n## MUST FOLLOW (Critical Rules):\n${rules.enforce.map(r => `• ${r}`).join('\n')}`
+    output += `\n## MUST FOLLOW (Critical Rules):\n${rules.enforce.map((r: string) => `• ${r}`).join('\n')}`
   }
   
   if (rules.prefer.length > 0) {
-    output += `\n\n## PREFERRED (Best Practices):\n${rules.prefer.map(r => `• ${r}`).join('\n')}`
+    output += `\n\n## PREFERRED (Best Practices):\n${rules.prefer.map((r: string) => `• ${r}`).join('\n')}`
   }
   
   if (rules.avoid.length > 0) {
-    output += `\n\n## AVOID (Never Do):\n${rules.avoid.map(r => `• ${r}`).join('\n')}`
+    output += `\n\n## AVOID (Never Do):\n${rules.avoid.map((r: string) => `• ${r}`).join('\n')}`
   }
   
   return output || 'No specific writing rules provided.'
@@ -494,7 +487,7 @@ export async function buildGenerationPrompt(options: {
     model: prompt.model,
     temperature: Number(prompt.temperature),
     maxTokens: prompt.max_tokens,
-    contentUsed: content.map(c => c.id),
+    contentUsed: content.map((c: ContentForGeneration) => c.id),
     rulesApplied: rules.enforce.length + rules.prefer.length + rules.avoid.length
   }
 }
@@ -523,7 +516,7 @@ export async function logContentUsage(
 
   if (!variations) return
 
-  const logs = variations.map(v => ({
+  const logs = variations.map((v: any) => ({
     content_id: v.content_id,
     variation_id: v.id,
     itinerary_id: itineraryId || null,
