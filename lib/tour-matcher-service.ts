@@ -108,7 +108,7 @@ export async function matchTourTemplate(
     
     // From explicit cities
     if (input.cities) {
-      input.cities.forEach(c => extractedCities.add(c))
+      input.cities.forEach((c: string) => extractedCities.add(c))
     }
 
     // From tour_requested text
@@ -117,18 +117,18 @@ export async function matchTourTemplate(
       
       for (const [keyword, cities] of Object.entries(ATTRACTION_KEYWORDS)) {
         if (requestLower.includes(keyword)) {
-          cities.forEach(c => extractedCities.add(c))
+          cities.forEach((c: string) => extractedCities.add(c))
         }
       }
     }
 
     // From attractions
     if (input.attractions) {
-      input.attractions.forEach(attr => {
+      input.attractions.forEach((attr: string) => {
         const attrLower = attr.toLowerCase()
         for (const [keyword, cities] of Object.entries(ATTRACTION_KEYWORDS)) {
           if (attrLower.includes(keyword)) {
-            cities.forEach(c => extractedCities.add(c))
+            cities.forEach((c: string) => extractedCities.add(c))
           }
         }
       })
@@ -146,7 +146,7 @@ export async function matchTourTemplate(
       const requestLower = input.tour_requested.toLowerCase()
       
       for (const [type, keywords] of Object.entries(TOUR_TYPE_KEYWORDS)) {
-        if (keywords.some(k => requestLower.includes(k))) {
+        if (keywords.some((k: string) => requestLower.includes(k))) {
           targetTourType = type
           break
         }
@@ -209,7 +209,7 @@ export async function matchTourTemplate(
       // City matching (up to 50 points)
       if (template.cities_covered && targetCities.length > 0) {
         const templateCities = template.cities_covered.map((c: string) => c.toLowerCase())
-        const matchingCities = targetCities.filter(c => 
+        const matchingCities = targetCities.filter((c: string) => 
           templateCities.some((tc: string) => tc.includes(c.toLowerCase()) || c.toLowerCase().includes(tc))
         )
         
@@ -225,8 +225,8 @@ export async function matchTourTemplate(
         const requestWords = input.tour_requested.toLowerCase().split(/\s+/)
         const templateWords = template.template_name.toLowerCase().split(/\s+/)
         
-        const matchingWords = requestWords.filter(w => 
-          templateWords.some(tw => tw.includes(w) || w.includes(tw))
+        const matchingWords = requestWords.filter((w: string) => 
+          templateWords.some((tw: string) => tw.includes(w) || w.includes(tw))
         )
         
         if (matchingWords.length > 0) {
@@ -291,7 +291,7 @@ export async function matchTourTemplate(
     }
 
     // Sort by score descending
-    scoredMatches.sort((a, b) => b.match_score - a.match_score)
+    scoredMatches.sort((a: TourMatch, b: TourMatch) => b.match_score - a.match_score)
 
     // ============================================
     // 5. BUILD RESULT
