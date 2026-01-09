@@ -185,7 +185,7 @@ export default function DayPlanner({
           {currentDay.city && (
             <AdditionalServices
               city={currentDay.city}
-              selectedServices={currentDay.additional_services || []}
+              selectedServices={(currentDay as any).additional_services || []}
               pax={pax}
               isEuroPassport={isEuroPassport}
               onServicesChange={(services) => handleFieldChange('additional_services', services)}
