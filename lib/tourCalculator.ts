@@ -138,9 +138,9 @@ import {
     }
 
     // 5. ADDITIONAL SERVICES  ← ADDED
-    if (day.additional_services && day.additional_services.length > 0) {
+    if ((day as any).additional_services && (day as any).additional_services.length > 0) {
       pricing.additional_services = calculateAdditionalServicesCosts(
-        day.additional_services,
+        (day as any).additional_services,
         pax,
         isEuroPassport
       )
