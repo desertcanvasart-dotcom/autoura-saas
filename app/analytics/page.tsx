@@ -15,7 +15,9 @@ import {
   Clock,
   XCircle,
   Target,
-  Zap
+  Zap,
+  UserPlus,
+  AlertCircle
 } from 'lucide-react'
 import { 
   LineChart, 
@@ -32,6 +34,7 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts'
+import Link from 'next/link'
 
 interface AnalyticsData {
   revenue: {
@@ -44,6 +47,7 @@ interface AnalyticsData {
     confirmed: number
     pending: number
     cancelled: number
+    completed?: number
   }
   clients: {
     total: number
@@ -57,6 +61,14 @@ interface AnalyticsData {
   }[]
   conversionRate: number
   avgDealSize: number
+  pipeline?: {
+    leads: number
+    followups: number
+    pending: number
+    cancelled: number
+    confirmed: number
+    completed: number
+  }
 }
 
 // Helper function to format numbers
@@ -70,6 +82,43 @@ const formatCurrency = (num: number): string => {
 
 const formatPercent = (num: number): string => {
   return `${Number(num).toFixed(1)}%`
+}
+
+// Empty state data - all zeros
+const emptyData: AnalyticsData = {
+  revenue: {
+    total: 0,
+    growth: 0,
+    monthlyData: [
+      { month: 'Week 1', revenue: 0 },
+      { month: 'Week 2', revenue: 0 },
+      { month: 'Week 3', revenue: 0 },
+      { month: 'Week 4', revenue: 0 }
+    ]
+  },
+  bookings: {
+    total: 0,
+    confirmed: 0,
+    pending: 0,
+    cancelled: 0,
+    completed: 0
+  },
+  clients: {
+    total: 0,
+    new: 0,
+    returning: 0
+  },
+  destinations: [],
+  conversionRate: 0,
+  avgDealSize: 0,
+  pipeline: {
+    leads: 0,
+    followups: 0,
+    pending: 0,
+    cancelled: 0,
+    confirmed: 0,
+    completed: 0
+  }
 }
 
 export default function AnalyticsPage() {
@@ -89,52 +138,22 @@ export default function AnalyticsPage() {
       const response = await fetch(`/api/analytics?range=${timeRange}`)
       const data = await response.json()
       
-      if (data.success) {
+      if (data.success && data.data) {
         setAnalytics(data.data)
+      } else {
+        // Use empty data if API fails or returns no data
+        setAnalytics(emptyData)
       }
     } catch (error) {
       console.error('Error fetching analytics:', error)
+      setAnalytics(emptyData)
     } finally {
       setLoading(false)
     }
   }
 
-  // Mock data for demonstration - with minimum 4 weeks
-  const mockData: AnalyticsData = {
-    revenue: {
-      total: 125840,
-      growth: 23.5,
-      monthlyData: [
-        { month: 'Week 1', revenue: 22100 },
-        { month: 'Week 2', revenue: 28400 },
-        { month: 'Week 3', revenue: 31200 },
-        { month: 'Week 4', revenue: 26040 },
-        { month: 'Week 5', revenue: 18100 }
-      ]
-    },
-    bookings: {
-      total: 156,
-      confirmed: 89,
-      pending: 42,
-      cancelled: 25
-    },
-    clients: {
-      total: 234,
-      new: 45,
-      returning: 189
-    },
-    destinations: [
-      { name: 'Cairo', bookings: 78, revenue: 45600 },
-      { name: 'Luxor', bookings: 56, revenue: 32400 },
-      { name: 'Aswan', bookings: 34, revenue: 21200 },
-      { name: 'Hurghada', bookings: 28, revenue: 18900 },
-      { name: 'Sharm El Sheikh', bookings: 22, revenue: 15400 }
-    ],
-    conversionRate: 34.5,
-    avgDealSize: 806
-  }
-
-  const displayData = analytics || mockData
+  // Use analytics data or empty data (never mock data)
+  const displayData = analytics || emptyData
 
   // Color system
   const COLORS = {
@@ -161,9 +180,11 @@ export default function AnalyticsPage() {
   // Calculate insights
   const getInsights = () => {
     const revenueData = displayData.revenue.monthlyData
-    if (revenueData.length === 0) {
+    const hasRevenue = revenueData.some(d => d.revenue > 0)
+    
+    if (!hasRevenue) {
       return {
-        revenueInsight: 'No revenue data available yet.',
+        revenueInsight: 'No revenue data available yet. Start adding confirmed bookings!',
         bookingInsight: 'Start adding bookings to see insights.',
         conversionInsight: 'Conversion data will appear once you have bookings.'
       }
@@ -196,14 +217,14 @@ export default function AnalyticsPage() {
     ? displayData.destinations 
     : displayData.destinations.filter(d => d.name === destinationFilter)
 
-  // Pipeline data - now includes cancelled
-  const pipelineData = {
-    leads: 9,
-    followups: 3,
+  // Pipeline data from API (not hardcoded!)
+  const pipelineData = displayData.pipeline || {
+    leads: 0,
+    followups: 0,
     pending: displayData.bookings.pending,
     cancelled: displayData.bookings.cancelled,
     confirmed: displayData.bookings.confirmed,
-    completed: Math.floor(displayData.bookings.confirmed * 0.8)
+    completed: displayData.bookings.completed || 0
   }
 
   // Pipeline stages configuration
@@ -221,7 +242,14 @@ export default function AnalyticsPage() {
     ? safePercent(displayData.clients.returning, displayData.clients.total)
     : 0
 
-  if (loading && !analytics) {
+  // Check if we have any data at all
+  const hasAnyData = displayData.bookings.total > 0 || 
+                     displayData.clients.total > 0 || 
+                     displayData.revenue.total > 0 ||
+                     (pipelineData.leads > 0) ||
+                     (pipelineData.followups > 0)
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
@@ -262,6 +290,35 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {/* Empty State Banner - shown when no data */}
+      {!hasAnyData && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-semibold text-amber-800">No data yet</h3>
+            <p className="text-sm text-amber-700 mt-1">
+              Start by adding clients and creating itineraries. Your analytics will populate automatically.
+            </p>
+            <div className="flex gap-2 mt-3">
+              <Link 
+                href="/clients"
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition-colors"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                Add Client
+              </Link>
+              <Link 
+                href="/itineraries"
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 transition-colors"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                Create Itinerary
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Key Metrics Cards with Sparklines */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total Revenue - Green tint */}
@@ -275,16 +332,18 @@ export default function AnalyticsPage() {
                 <DollarSign className="w-4 h-4 text-gray-400" />
                 <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.revenue }} />
               </div>
-              {displayData.revenue.growth >= 0 ? (
-                <span className="flex items-center text-xs font-medium" style={{ color: COLORS.revenue }}>
-                  <ArrowUpRight className="w-3 h-3 mr-1" />
-                  {formatNumber(displayData.revenue.growth, 1)}%
-                </span>
-              ) : (
-                <span className="flex items-center text-danger text-xs font-medium">
-                  <ArrowDownRight className="w-3 h-3 mr-1" />
-                  {formatNumber(Math.abs(displayData.revenue.growth), 1)}%
-                </span>
+              {displayData.revenue.total > 0 && (
+                displayData.revenue.growth >= 0 ? (
+                  <span className="flex items-center text-xs font-medium" style={{ color: COLORS.revenue }}>
+                    <ArrowUpRight className="w-3 h-3 mr-1" />
+                    {formatNumber(displayData.revenue.growth, 1)}%
+                  </span>
+                ) : (
+                  <span className="flex items-center text-red-500 text-xs font-medium">
+                    <ArrowDownRight className="w-3 h-3 mr-1" />
+                    {formatNumber(Math.abs(displayData.revenue.growth), 1)}%
+                  </span>
+                )
               )}
             </div>
             <h3 className="text-xs text-gray-600 font-medium mb-1">Total Revenue</h3>
@@ -329,18 +388,28 @@ export default function AnalyticsPage() {
           
           {/* Mini bar indicator */}
           <div className="flex gap-1 mt-2 h-8 items-end">
-            <div className="flex-1 rounded-t" style={{ 
-              backgroundColor: COLORS.confirmed, 
-              height: `${Math.max(20, safePercent(displayData.bookings.confirmed, displayData.bookings.total))}%`
-            }} />
-            <div className="flex-1 rounded-t" style={{ 
-              backgroundColor: COLORS.pending, 
-              height: `${Math.max(15, safePercent(displayData.bookings.pending, displayData.bookings.total))}%`
-            }} />
-            <div className="flex-1 rounded-t" style={{ 
-              backgroundColor: COLORS.cancelled, 
-              height: `${Math.max(10, safePercent(displayData.bookings.cancelled, displayData.bookings.total))}%`
-            }} />
+            {displayData.bookings.total > 0 ? (
+              <>
+                <div className="flex-1 rounded-t" style={{ 
+                  backgroundColor: COLORS.confirmed, 
+                  height: `${Math.max(20, safePercent(displayData.bookings.confirmed, displayData.bookings.total))}%`
+                }} />
+                <div className="flex-1 rounded-t" style={{ 
+                  backgroundColor: COLORS.pending, 
+                  height: `${Math.max(15, safePercent(displayData.bookings.pending, displayData.bookings.total))}%`
+                }} />
+                <div className="flex-1 rounded-t" style={{ 
+                  backgroundColor: COLORS.cancelled, 
+                  height: `${Math.max(10, safePercent(displayData.bookings.cancelled, displayData.bookings.total))}%`
+                }} />
+              </>
+            ) : (
+              <>
+                <div className="flex-1 rounded-t bg-gray-200" style={{ height: '30%' }} />
+                <div className="flex-1 rounded-t bg-gray-200" style={{ height: '20%' }} />
+                <div className="flex-1 rounded-t bg-gray-200" style={{ height: '10%' }} />
+              </>
+            )}
           </div>
         </div>
 
@@ -367,8 +436,8 @@ export default function AnalyticsPage() {
               <div 
                 className="h-2 rounded-full transition-all"
                 style={{ 
-                  backgroundColor: COLORS.clients,
-                  width: `${returningRate}%`
+                  backgroundColor: displayData.clients.total > 0 ? COLORS.clients : '#e5e7eb',
+                  width: displayData.clients.total > 0 ? `${returningRate}%` : '0%'
                 }}
               />
             </div>
@@ -410,7 +479,7 @@ export default function AnalyticsPage() {
                   cx="24"
                   cy="24"
                   r="20"
-                  stroke={COLORS.conversion}
+                  stroke={displayData.conversionRate > 0 ? COLORS.conversion : '#e5e7eb'}
                   strokeWidth="4"
                   fill="transparent"
                   strokeDasharray={`${2 * Math.PI * 20}`}
@@ -424,16 +493,25 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Booking Pipeline - Updated with 6 stages and smaller buttons */}
+      {/* Booking Pipeline - Data from API */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h3 className="text-base font-semibold text-gray-900 mb-3">Booking Pipeline</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-semibold text-gray-900">Booking Pipeline</h3>
+          {!hasAnyData && (
+            <span className="text-xs text-gray-400">Data will appear as you add clients and bookings</span>
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
           {pipelineStages.map((stage, index) => (
             <div key={stage.key} className="flex items-center flex-1 min-w-0">
               <div className="flex-1 text-center">
                 <div 
-                  className="h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg mb-1.5"
-                  style={{ backgroundColor: stage.color }}
+                  className="h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg mb-1.5 transition-all"
+                  style={{ 
+                    backgroundColor: pipelineData[stage.key as keyof typeof pipelineData] > 0 
+                      ? stage.color 
+                      : `${stage.color}60` // Faded when zero
+                  }}
                 >
                   {pipelineData[stage.key as keyof typeof pipelineData]}
                 </div>
@@ -593,44 +671,57 @@ export default function AnalyticsPage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold text-gray-900">Booking Status</h3>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">All Status</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="pending">Pending</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            {displayData.bookings.total > 0 && (
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="all">All Status</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="pending">Pending</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            )}
           </div>
           
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={[
-                  { name: 'Confirmed', value: displayData.bookings.confirmed },
-                  { name: 'Pending', value: displayData.bookings.pending },
-                  { name: 'Cancelled', value: displayData.bookings.cancelled }
-                ]}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {[
-                  { name: 'Confirmed', value: displayData.bookings.confirmed },
-                  { name: 'Pending', value: displayData.bookings.pending },
-                  { name: 'Cancelled', value: displayData.bookings.cancelled }
-                ].map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={PIE_COLORS[index]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value: any) => [value, 'Bookings']} />
-            </PieChart>
-          </ResponsiveContainer>
+          {displayData.bookings.total > 0 ? (
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie
+                  data={[
+                    { name: 'Confirmed', value: displayData.bookings.confirmed },
+                    { name: 'Pending', value: displayData.bookings.pending },
+                    { name: 'Cancelled', value: displayData.bookings.cancelled }
+                  ]}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {[
+                    { name: 'Confirmed', value: displayData.bookings.confirmed },
+                    { name: 'Pending', value: displayData.bookings.pending },
+                    { name: 'Cancelled', value: displayData.bookings.cancelled }
+                  ].map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={PIE_COLORS[index]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value: any) => [value, 'Bookings']} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[200px] flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto rounded-full bg-gray-100 flex items-center justify-center mb-2">
+                  <Calendar className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-xs text-gray-500">No bookings yet</p>
+              </div>
+            </div>
+          )}
           
           {/* Status Legend with Counts */}
           <div className="space-y-2 mt-3">
@@ -711,41 +802,41 @@ export default function AnalyticsPage() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <h3 className="text-base font-semibold text-gray-900 mb-3">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <button className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-primary-300 transition-all text-left group">
+          <Link href="/itineraries" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-primary-300 transition-all text-left group">
             <div className="flex items-center gap-2 mb-2">
               <Activity className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors" />
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.revenue }} />
             </div>
-            <p className="text-sm font-medium text-gray-900">View Reports</p>
-            <p className="text-xs text-gray-500 mt-1">Export detailed reports</p>
-          </button>
+            <p className="text-sm font-medium text-gray-900">View Bookings</p>
+            <p className="text-xs text-gray-500 mt-1">See all itineraries</p>
+          </Link>
           
-          <button className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-blue-300 transition-all text-left group">
+          <Link href="/calendar" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-blue-300 transition-all text-left group">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.clients }} />
             </div>
             <p className="text-sm font-medium text-gray-900">Booking Calendar</p>
-            <p className="text-xs text-gray-500 mt-1">See all bookings</p>
-          </button>
+            <p className="text-xs text-gray-500 mt-1">See schedule</p>
+          </Link>
           
-          <button className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-purple-300 transition-all text-left group">
+          <Link href="/clients" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-purple-300 transition-all text-left group">
             <div className="flex items-center gap-2 mb-2">
               <Users className="w-4 h-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.bookings }} />
             </div>
             <p className="text-sm font-medium text-gray-900">Client Insights</p>
-            <p className="text-xs text-gray-500 mt-1">Top clients & trends</p>
-          </button>
+            <p className="text-xs text-gray-500 mt-1">View all clients</p>
+          </Link>
           
-          <button className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-green-300 transition-all text-left group">
+          <Link href="/follow-ups" className="p-3 border border-gray-200 rounded-lg hover:shadow-md hover:border-green-300 transition-all text-left group">
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
-              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.revenue }} />
+              <Clock className="w-4 h-4 text-gray-400 group-hover:text-green-600 transition-colors" />
+              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: COLORS.followups }} />
             </div>
-            <p className="text-sm font-medium text-gray-900">Revenue Forecast</p>
-            <p className="text-xs text-gray-500 mt-1">Predict next month</p>
-          </button>
+            <p className="text-sm font-medium text-gray-900">Follow-ups</p>
+            <p className="text-xs text-gray-500 mt-1">Pending tasks</p>
+          </Link>
         </div>
       </div>
     </div>
