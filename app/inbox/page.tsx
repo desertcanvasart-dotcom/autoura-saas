@@ -44,6 +44,7 @@ import {
   Expand, 
   Maximize2,
   Sparkles,
+  ChevronDown,
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 
@@ -192,6 +193,11 @@ export default function InboxPage() {
 
   // NEW: State for clients (for template placeholders)
   const [clients, setClients] = useState<Client[]>([])
+
+  // PAGINATION STATE
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   
   const supabase = createClient()
 
@@ -298,17 +304,20 @@ export default function InboxPage() {
     }
   }
 
-  // UPDATED: fetchEmails with caching and attachment parsing
+  // UPDATED: fetchEmails with caching and attachment parsing - RESET pagination
   const fetchEmails = async (query?: string, targetFolder?: FolderType) => {
     if (!user) return
     
     setRefreshing(true)
+    // Reset pagination when fetching fresh
+    setNextPageToken(null)
+    setHasMore(true)
     const currentFolder = targetFolder || folder
 
     try {
       // TRY CACHE FIRST (if no search query)
       if (!query && isCacheReady) {
-        const cached = await getCached(currentFolder, { limit: 50 })
+        const cached = await getCached(currentFolder, { limit: 25 })
         if (cached.fromCache && !cached.isStale) {
           console.log('Using cached emails for', currentFolder)
           setEmails(cached.emails as Email[])
@@ -326,15 +335,20 @@ export default function InboxPage() {
     }
   }
 
-  // NEW: Helper function to fetch fresh emails from API
-  const fetchFreshEmails = async (query?: string, currentFolder?: FolderType, isBackground = false) => {
+  // UPDATED: Helper function to fetch fresh emails from API with pagination support
+  const fetchFreshEmails = async (query?: string, currentFolder?: FolderType, isBackground = false, pageToken?: string) => {
     if (!user) return
     
     try {
       const params = new URLSearchParams({
         userId: user.id,
-        maxResults: '50',
+        maxResults: '25', // Reduced from 50 for faster initial load
       })
+      
+      // Add page token for pagination
+      if (pageToken) {
+        params.append('pageToken', pageToken)
+      }
       
       const folderToUse = currentFolder || folder
       let folderQuery = query || ''
@@ -356,6 +370,10 @@ export default function InboxPage() {
         throw new Error(data.error)
       }
 
+      // Store next page token for pagination
+      setNextPageToken(data.nextPageToken || null)
+      setHasMore(!!data.nextPageToken)
+
       // PARSE ATTACHMENTS from each email
       setEmails(data.messages || [])
       
@@ -369,7 +387,7 @@ export default function InboxPage() {
       setStarredEmails(starred)
       
       // CACHE THE RESULTS
-      if (isCacheReady && !query) {
+      if (isCacheReady && !query && !pageToken) {
         await cache(folderToUse, data.messages, historyId || undefined)
       }
 
@@ -382,6 +400,64 @@ export default function InboxPage() {
       if (!isBackground) {
         setRefreshing(false)
       }
+    }
+  }
+
+  // NEW: Load more emails function for pagination
+  const loadMoreEmails = async () => {
+    if (!user || !nextPageToken || loadingMore) return
+    
+    setLoadingMore(true)
+    
+    try {
+      const params = new URLSearchParams({
+        userId: user.id,
+        maxResults: '25',
+        pageToken: nextPageToken,
+      })
+      
+      let folderQuery = searchQuery || ''
+
+      if (folder === 'sent') {
+        folderQuery = 'from:me ' + folderQuery
+      } else if (folder === 'drafts') {
+        folderQuery = 'in:drafts ' + folderQuery
+      } else {
+        folderQuery = 'in:inbox -from:me ' + folderQuery
+      }
+      
+      if (folderQuery) params.append('query', folderQuery.trim())
+
+      const response = await fetch(`/api/gmail/emails?${params}`)
+      const data = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      // Store next page token
+      setNextPageToken(data.nextPageToken || null)
+      setHasMore(!!data.nextPageToken)
+
+      // APPEND new emails instead of replacing
+      setEmails(prev => {
+        const existingIds = new Set(prev.map(e => e.id))
+        const newEmails = (data.messages || []).filter((e: Email) => !existingIds.has(e.id))
+        return [...prev, ...newEmails]
+      })
+      
+      // Update starred set
+      data.messages.forEach((email: Email) => {
+        if (email.labelIds?.includes('STARRED')) {
+          setStarredEmails(prev => new Set([...prev, email.id]))
+        }
+      })
+
+      setError(null)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -712,11 +788,6 @@ ${bodyText}`
               <h1 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Mail className="w-5 h-5 text-primary-600" />
                 Inbox
-                {/* NEW: Polling indicator - hidden
-               {isPolling && (
-             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Checking for new emails..." />
-               )}
-                */}
                 {/* NEW: Unread count badge */}
                 {unreadCount > 0 && (
                   <span className="text-xs px-2 py-0.5 bg-primary-100 text-primary-700 rounded-full">
@@ -969,11 +1040,18 @@ ${bodyText}`
                   </div>
                 </>
               )}
+              
+              {/* Email count indicator */}
+              {selectedEmails.size === 0 && (
+                <span className="text-xs text-gray-400 ml-auto">
+                  {filteredEmails.length} emails
+                </span>
+              )}
             </div>
           )}
 
           {/* Email List Content */}
-          {filteredEmails.length === 0 ? (
+          {filteredEmails.length === 0 && !refreshing ? (
             <div className="flex items-center justify-center h-64 text-gray-500">
               <div className="text-center">
                 {folder === 'sent' ? (
@@ -1081,6 +1159,36 @@ ${bodyText}`
                   })}
                 </div>
               ))}
+              
+              {/* LOAD MORE BUTTON */}
+              {hasMore && (
+                <div className="p-4 border-t border-gray-100">
+                  <button
+                    onClick={loadMoreEmails}
+                    disabled={loadingMore}
+                    className="w-full py-3 px-4 text-sm font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading more emails...
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-4 h-4" />
+                        Load More Emails
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+              
+              {/* End of list indicator */}
+              {!hasMore && filteredEmails.length > 0 && (
+                <div className="p-4 text-center text-xs text-gray-400">
+                  You've reached the end • {filteredEmails.length} emails loaded
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1250,7 +1358,7 @@ ${bodyText}`
           </div>
         )}
       </div>
-      {/* Expanded Email Modal */}
+{/* Expanded Email Modal */}
 {showExpandedEmail && selectedEmail && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
