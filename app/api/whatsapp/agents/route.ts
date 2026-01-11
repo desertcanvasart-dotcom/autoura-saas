@@ -49,7 +49,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Agent name is required' }, { status: 400 })
     }
 
-    // Check if team member with same email already exists
     if (email) {
       const { data: existing } = await supabase
         .from('team_members')
@@ -137,7 +136,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
     }
 
-    // Soft delete - just deactivate
     const { data, error } = await supabase
       .from('team_members')
       .update({
@@ -151,7 +149,6 @@ export async function DELETE(request: NextRequest) {
 
     if (error) throw error
 
-    // Unassign all conversations from this team member
     await supabase
       .from('whatsapp_conversations')
       .update({
