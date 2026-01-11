@@ -1,150 +1,453 @@
+'use client'
+
+import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { 
-  Layers, 
-  Zap, 
-  Calendar, 
-  Users, 
-  MessageSquare, 
-  DollarSign, 
-  FileText, 
-  Database,
-  Brain,
-  CheckCircle,
-  Globe,
-  Building,
-  ArrowRight,
-  Check,
-  Menu,
-  Receipt,
-  TrendingUp,
-  Wallet,
-  CreditCard,
+  Menu, 
+  X, 
+  Check, 
+  ChevronRight,
+  Calendar,
+  Users,
+  FileText,
+  MessageSquare,
   BarChart3,
-  CheckSquare,
-  ClipboardList
+  Globe,
+  Zap,
+  Shield,
+  Clock,
+  ArrowRight,
+  Star,
+  Play,
+  Building2,
+  Briefcase
 } from 'lucide-react'
 
 export default function HomePage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [language, setLanguage] = useState<'en' | 'ar'>('en')
+
+  const content = {
+    en: {
+      nav: {
+        features: 'Features',
+        pricing: 'Pricing',
+        demo: 'Schedule a Demo'
+      },
+      hero: {
+        badge: 'Travel Operations Platform',
+        title: 'Run your travel business from one place',
+        subtitle: 'Autoura helps tour operators manage bookings, clients, itineraries, and team operations — all in one streamlined platform.',
+        cta: 'Schedule a Demo',
+        secondary: 'Watch Demo'
+      },
+      features: {
+        title: 'Everything you need to run your travel business',
+        subtitle: 'Powerful tools designed specifically for tour operators and travel agencies',
+        items: [
+          {
+            icon: Calendar,
+            title: 'Itinerary Builder',
+            description: 'Create beautiful, detailed itineraries with AI-powered suggestions and real-time pricing calculations.'
+          },
+          {
+            icon: Users,
+            title: 'Client Management',
+            description: 'Keep track of all your clients, their preferences, booking history, and communication in one place.'
+          },
+          {
+            icon: FileText,
+            title: 'Document Generation',
+            description: 'Generate professional invoices, contracts, vouchers, and receipts automatically.'
+          },
+          {
+            icon: MessageSquare,
+            title: 'WhatsApp Integration',
+            description: 'Parse WhatsApp conversations to extract booking details and auto-create itineraries.'
+          },
+          {
+            icon: BarChart3,
+            title: 'Analytics Dashboard',
+            description: 'Track revenue, bookings, conversion rates, and business performance in real-time.'
+          },
+          {
+            icon: Globe,
+            title: 'Multi-Currency Support',
+            description: 'Handle international clients with automatic currency conversion and localized pricing.'
+          }
+        ]
+      },
+      pricing: {
+        title: 'Simple, transparent pricing',
+        subtitle: 'Choose the plan that fits your business. Start with a 14-day free trial.',
+        plans: [
+          {
+            name: 'B2C Operations',
+            description: 'Perfect for tour operators focused on direct-to-consumer sales',
+            price: '$7',
+            period: 'per member/month',
+            minimum: 'Minimum 5 members',
+            features: [
+              'Unlimited itineraries',
+              'Client management (CRM)',
+              'Document generation',
+              'WhatsApp integration',
+              'Email integration',
+              'Analytics dashboard',
+              'Multi-currency support',
+              'Team collaboration',
+              'Mobile access',
+              'Priority support'
+            ],
+            cta: 'Schedule a Demo',
+            popular: false
+          },
+          {
+            name: 'B2C + B2B Operations',
+            description: 'For agencies working with both consumers and trade partners',
+            price: '$10',
+            period: 'per member/month',
+            minimum: 'Minimum 5 members',
+            features: [
+              'Everything in B2C Operations',
+              'B2B partner portal',
+              'Trade partner management',
+              'B2B pricing rules engine',
+              'Commission management',
+              'Partner document templates',
+              'Multi-tier pricing',
+              'White-label options',
+              'API access',
+              'Dedicated account manager'
+            ],
+            cta: 'Schedule a Demo',
+            popular: true
+          }
+        ]
+      },
+      testimonials: {
+        title: 'Trusted by travel operators worldwide',
+        items: [
+          {
+            quote: 'Autoura transformed how we manage our tour operations. What used to take hours now takes minutes.',
+            author: 'Ahmed Hassan',
+            role: 'CEO, Egypt Tours Plus',
+            rating: 5
+          },
+          {
+            quote: 'The WhatsApp integration alone has saved us countless hours. Our team loves how easy it is to use.',
+            author: 'Sarah Mitchell',
+            role: 'Operations Manager, Adventure Seekers',
+            rating: 5
+          },
+          {
+            quote: 'Finally, a platform that understands the unique needs of tour operators. Highly recommended!',
+            author: 'Carlos Rivera',
+            role: 'Founder, Latin Journeys',
+            rating: 5
+          }
+        ]
+      },
+      cta: {
+        title: 'Ready to get your travel operation under control?',
+        subtitle: 'Bring all your tours, clients, and teams into one organised system in the next 7 days.',
+        button: 'Schedule a Demo'
+      },
+      footer: {
+        product: {
+          title: 'Product',
+          links: ['Features', 'Pricing', 'Integrations', 'Changelog']
+        },
+        resources: {
+          title: 'Resources',
+          links: ['Documentation', 'Help Center', 'Blog', 'Templates']
+        },
+        company: {
+          title: 'Company',
+          links: ['About', 'Contact', 'Privacy', 'Terms']
+        },
+        copyright: '© 2026 Autoura. All rights reserved.'
+      }
+    },
+    ar: {
+      nav: {
+        features: 'المميزات',
+        pricing: 'الأسعار',
+        demo: 'احجز عرضاً توضيحياً'
+      },
+      hero: {
+        badge: 'منصة إدارة عمليات السفر',
+        title: 'أدر شركة السفر الخاصة بك من مكان واحد',
+        subtitle: 'تساعد أوتورا منظمي الرحلات على إدارة الحجوزات والعملاء والبرامج السياحية وعمليات الفريق في منصة واحدة متكاملة.',
+        cta: 'احجز عرضاً توضيحياً',
+        secondary: 'شاهد العرض'
+      },
+      features: {
+        title: 'كل ما تحتاجه لإدارة شركة السفر الخاصة بك',
+        subtitle: 'أدوات قوية مصممة خصيصاً لمنظمي الرحلات ووكالات السفر',
+        items: [
+          {
+            icon: Calendar,
+            title: 'منشئ البرامج السياحية',
+            description: 'أنشئ برامج سياحية جميلة ومفصلة مع اقتراحات مدعومة بالذكاء الاصطناعي وحسابات الأسعار الفورية.'
+          },
+          {
+            icon: Users,
+            title: 'إدارة العملاء',
+            description: 'تتبع جميع عملائك وتفضيلاتهم وسجل الحجوزات والتواصل في مكان واحد.'
+          },
+          {
+            icon: FileText,
+            title: 'إنشاء المستندات',
+            description: 'أنشئ فواتير وعقود وقسائم وإيصالات احترافية تلقائياً.'
+          },
+          {
+            icon: MessageSquare,
+            title: 'تكامل واتساب',
+            description: 'حلل محادثات واتساب لاستخراج تفاصيل الحجز وإنشاء البرامج السياحية تلقائياً.'
+          },
+          {
+            icon: BarChart3,
+            title: 'لوحة التحليلات',
+            description: 'تتبع الإيرادات والحجوزات ومعدلات التحويل وأداء الأعمال في الوقت الفعلي.'
+          },
+          {
+            icon: Globe,
+            title: 'دعم العملات المتعددة',
+            description: 'تعامل مع العملاء الدوليين بتحويل العملات التلقائي والتسعير المحلي.'
+          }
+        ]
+      },
+      pricing: {
+        title: 'أسعار بسيطة وشفافة',
+        subtitle: 'اختر الخطة المناسبة لعملك. ابدأ بتجربة مجانية لمدة 14 يوماً.',
+        plans: [
+          {
+            name: 'عمليات B2C',
+            description: 'مثالي لمنظمي الرحلات الذين يركزون على المبيعات المباشرة للمستهلكين',
+            price: '$7',
+            period: 'لكل عضو/شهر',
+            minimum: 'الحد الأدنى 5 أعضاء',
+            features: [
+              'برامج سياحية غير محدودة',
+              'إدارة العملاء (CRM)',
+              'إنشاء المستندات',
+              'تكامل واتساب',
+              'تكامل البريد الإلكتروني',
+              'لوحة التحليلات',
+              'دعم العملات المتعددة',
+              'تعاون الفريق',
+              'الوصول عبر الهاتف',
+              'دعم ذو أولوية'
+            ],
+            cta: 'احجز عرضاً توضيحياً',
+            popular: false
+          },
+          {
+            name: 'عمليات B2C + B2B',
+            description: 'للوكالات التي تعمل مع المستهلكين والشركاء التجاريين',
+            price: '$10',
+            period: 'لكل عضو/شهر',
+            minimum: 'الحد الأدنى 5 أعضاء',
+            features: [
+              'كل شيء في خطة B2C',
+              'بوابة شركاء B2B',
+              'إدارة الشركاء التجاريين',
+              'محرك قواعد تسعير B2B',
+              'إدارة العمولات',
+              'قوالب مستندات الشركاء',
+              'التسعير متعدد المستويات',
+              'خيارات العلامة البيضاء',
+              'الوصول إلى API',
+              'مدير حساب مخصص'
+            ],
+            cta: 'احجز عرضاً توضيحياً',
+            popular: true
+          }
+        ]
+      },
+      testimonials: {
+        title: 'موثوق به من قبل منظمي الرحلات حول العالم',
+        items: [
+          {
+            quote: 'غيرت أوتورا طريقة إدارتنا لعمليات الرحلات. ما كان يستغرق ساعات أصبح يستغرق دقائق.',
+            author: 'أحمد حسن',
+            role: 'الرئيس التنفيذي، إيجيبت تورز بلس',
+            rating: 5
+          },
+          {
+            quote: 'تكامل واتساب وحده وفر لنا ساعات لا حصر لها. فريقنا يحب سهولة الاستخدام.',
+            author: 'سارة ميتشل',
+            role: 'مدير العمليات، أدفنتشر سيكرز',
+            rating: 5
+          },
+          {
+            quote: 'أخيراً، منصة تفهم الاحتياجات الفريدة لمنظمي الرحلات. موصى بها بشدة!',
+            author: 'كارلوس ريفيرا',
+            role: 'مؤسس، لاتين جورنيز',
+            rating: 5
+          }
+        ]
+      },
+      cta: {
+        title: 'مستعد للسيطرة على عملية السفر الخاصة بك؟',
+        subtitle: 'اجمع كل رحلاتك وعملائك وفرقك في نظام منظم واحد خلال 7 أيام.',
+        button: 'احجز عرضاً توضيحياً'
+      },
+      footer: {
+        product: {
+          title: 'المنتج',
+          links: ['المميزات', 'الأسعار', 'التكاملات', 'سجل التغييرات']
+        },
+        resources: {
+          title: 'الموارد',
+          links: ['التوثيق', 'مركز المساعدة', 'المدونة', 'القوالب']
+        },
+        company: {
+          title: 'الشركة',
+          links: ['عن الشركة', 'اتصل بنا', 'الخصوصية', 'الشروط']
+        },
+        copyright: '© 2026 أوتورا. جميع الحقوق محفوظة.'
+      }
+    }
+  }
+
+  const t = content[language]
+  const isRTL = language === 'ar'
+
   return (
-    <div className="min-h-screen bg-[#F7F7F4]">
+    <div className={`min-h-screen bg-white ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
       {/* Navigation */}
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
             {/* Logo */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-[#263A29] flex items-center justify-center">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="white"/>
-                  <path d="M2 17L12 22L22 17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M2 12L12 17L22 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-              <span className="text-[#263A29] text-lg font-semibold">Autoura</span>
-            </div>
+            <Link href="/" className="flex items-center gap-2">
+              <Image 
+                src="/autoura-logo.png" 
+                alt="Autoura" 
+                width={140} 
+                height={36}
+                className="h-9 w-auto"
+              />
+            </Link>
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm text-gray-600 hover:text-[#263A29] transition-colors">Features</a>
-              <a href="#agencies" className="text-sm text-gray-600 hover:text-[#263A29] transition-colors">For Agencies</a>
-              <a href="#pricing" className="text-sm text-gray-600 hover:text-[#263A29] transition-colors">Pricing</a>
-              <a href="#resources" className="text-sm text-gray-600 hover:text-[#263A29] transition-colors">Resources</a>
-              <a href="#support" className="text-sm text-gray-600 hover:text-[#263A29] transition-colors">Support</a>
+              <Link href="#features" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                {t.nav.features}
+              </Link>
+              <Link href="#pricing" className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
+                {t.nav.pricing}
+              </Link>
             </div>
 
-          {/* Demo Button */}
-<div className="hidden md:flex items-center">
-  <a 
-    href="https://calendly.com/autoura" 
-    target="_blank"
-    rel="noopener noreferrer"
-    className="h-10 px-6 flex items-center text-sm font-medium text-white bg-[#263A29] rounded-lg hover:bg-[#1D2B20] transition-colors"
-  >
-    Schedule a Demo
-  </a>
-</div>
+            {/* CTA Button */}
+            <div className="hidden md:flex items-center gap-4">
+              <a
+                href="https://calendly.com/autoura"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-[#2d3b2d] rounded-lg hover:bg-[#3d4b3d] transition-colors"
+              >
+                {t.nav.demo}
+              </a>
+            </div>
 
-            {/* Mobile Menu Button */}
-            <button className="md:hidden text-[#263A29]">
-              <Menu size={24} />
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
+
+        {/* Mobile Navigation */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-white border-t border-gray-100">
+            <div className="px-4 py-4 space-y-3">
+              <Link 
+                href="#features" 
+                className="block px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {t.nav.features}
+              </Link>
+              <Link 
+                href="#pricing" 
+                className="block px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {t.nav.pricing}
+              </Link>
+              <a
+                href="https://calendly.com/autoura"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block px-4 py-2.5 text-sm font-medium text-white bg-[#2d3b2d] rounded-lg text-center"
+              >
+                {t.nav.demo}
+              </a>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-6 lg:px-8 py-16 lg:py-24">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          {/* Left Column - Copy */}
-          <div className="space-y-6">
-            <span className="inline-block px-3 py-1.5 text-xs font-medium text-[#263A29] bg-[#D9E0CF] rounded-full">
-              Operations OS for Travel Professionals
-            </span>
-            
-            <h1 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-900 leading-tight">
-              Autoura – From WhatsApp or Email to Final Price in Under Two Minutes.
-            </h1>
-            
-            <p className="text-base lg:text-lg text-gray-600 leading-relaxed">
-            Autoura reads the entire conversation — WhatsApp or email — any length, any language — and generates a full itinerary with final pricing in seconds.         </p>
-
-            <div className="flex flex-wrap gap-3">
-              <Link 
-                href="/signup" 
-                className="h-12 px-6 flex items-center gap-2 text-sm font-medium text-white bg-[#263A29] rounded-lg hover:bg-[#1D2B20] transition-colors shadow-sm"
-              >
-                Sign up free
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link 
-                href="/login" 
-                className="h-12 px-6 flex items-center text-sm font-medium text-[#263A29] bg-white border-2 border-[#263A29] rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Sign in
-              </Link>
+      <section className="pt-32 pb-20 bg-gradient-to-b from-gray-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-4xl mx-auto">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#2d3b2d]/10 rounded-full mb-6">
+              <Zap className="w-4 h-4 text-[#2d3b2d]" />
+              <span className="text-sm font-medium text-[#2d3b2d]">{t.hero.badge}</span>
             </div>
 
-            <p className="text-sm text-gray-500">
-              No credit card needed · Built for travel agencies and DMCs
+            {/* Title */}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+              {t.hero.title}
+            </h1>
+
+            {/* Subtitle */}
+            <p className="text-lg sm:text-xl text-gray-600 mb-10 max-w-2xl mx-auto">
+              {t.hero.subtitle}
             </p>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a
+                href="https://calendly.com/autoura"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-8 py-4 text-base font-medium text-white bg-[#2d3b2d] rounded-xl hover:bg-[#3d4b3d] transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#2d3b2d]/20"
+              >
+                {t.hero.cta}
+                <ArrowRight className="w-5 h-5" />
+              </a>
+              <button className="w-full sm:w-auto px-8 py-4 text-base font-medium text-gray-700 bg-white border-2 border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                <Play className="w-5 h-5" />
+                {t.hero.secondary}
+              </button>
+            </div>
           </div>
 
-          {/* Right Column - App Preview */}
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#E9E3D2]/50 to-transparent rounded-3xl transform -rotate-3"></div>
-            <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
-              {/* Mock App UI */}
-              <div className="flex">
-                {/* Sidebar */}
-                <div className="w-48 bg-[#263A29] text-white p-4 space-y-3" style={{ minHeight: '320px' }}>
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="w-6 h-6 rounded bg-white/20"></div>
-                    <span className="text-sm font-semibold">Autoura</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="px-3 py-2 rounded bg-white/10 text-xs">Dashboard</div>
-                    <div className="px-3 py-2 rounded text-xs text-white/70">Inquiries</div>
-                    <div className="px-3 py-2 rounded text-xs text-white/70">Itineraries</div>
-                    <div className="px-3 py-2 rounded text-xs text-white/70">Tours</div>
-                    <div className="px-3 py-2 rounded text-xs text-white/70">Clients</div>
-                  </div>
+          {/* Dashboard Preview */}
+          <div className="mt-16 relative">
+            <div className="bg-gradient-to-b from-[#2d3b2d] to-[#1d2b1d] rounded-2xl p-2 shadow-2xl">
+              <div className="bg-gray-900 rounded-xl overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-3 bg-gray-800">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="ml-4 text-sm text-gray-400">autoura.net/dashboard</span>
                 </div>
-                
-                {/* Main Content Area */}
-                <div className="flex-1 p-6 bg-[#F7F7F4]">
-                  <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-full bg-[#D9E0CF]"></div>
-                      <div>
-                        <div className="h-3 w-24 bg-[#E9E3D2] rounded mb-1.5"></div>
-                        <div className="h-2 w-16 bg-[#E9E3D2] rounded"></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-2 w-full bg-[#E9E3D2] rounded"></div>
-                      <div className="h-2 w-4/5 bg-[#E9E3D2] rounded"></div>
-                      <div className="h-2 w-3/5 bg-[#E9E3D2] rounded"></div>
-                    </div>
+                <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+                  <div className="text-center text-gray-500">
+                    <BarChart3 className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">Dashboard Preview</p>
                   </div>
                 </div>
               </div>
@@ -153,472 +456,278 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Audience Strip */}
-      <section className="bg-[#E9E3D2] py-12">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <p className="text-center text-sm font-medium text-[#263A29] mb-8">Built for modern travel professionals</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              { icon: Building, label: 'Travel agencies' },
-              { icon: Globe, label: 'DMCs & specialists' },
-              { icon: Users, label: 'Tour guides & operators' },
-              { icon: Layers, label: 'Transport & transfer companies' }
-            ].map((item, i) => (
-              <div key={i} className="text-center">
-                <div className="w-12 h-12 rounded-full bg-white mx-auto mb-2 flex items-center justify-center shadow-sm">
-                  <item.icon className="w-5 h-5 text-[#263A29]" />
+      {/* Features Section */}
+      <section id="features" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              {t.features.title}
+            </h2>
+            <p className="text-lg text-gray-600">
+              {t.features.subtitle}
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {t.features.items.map((feature, index) => (
+              <div 
+                key={index}
+                className="p-6 bg-gray-50 rounded-2xl hover:bg-gray-100 transition-colors group"
+              >
+                <div className="w-12 h-12 bg-[#2d3b2d] rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                  <feature.icon className="w-6 h-6 text-white" />
                 </div>
-                <p className="text-xs text-[#263A29]">{item.label}</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-gray-600">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Key Benefits */}
-      <section id="features" className="max-w-7xl mx-auto px-6 lg:px-8 py-16 lg:py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-3">Why Autoura</h2>
-          <p className="text-base text-gray-600 max-w-2xl mx-auto">
-            One system that brings together CRM, itineraries, finances, teams, and automation—designed specifically for travel businesses.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            {
-              icon: Layers,
-              title: 'One place for everything',
-              features: ['Leads, clients, suppliers, tours, documents', 'No more switching between tools', 'Everything connected and searchable']
-            },
-            {
-              icon: Brain,
-              title: 'Automation that understands travel',
-              features: ['Auto-itineraries from WhatsApp messages', 'Auto-pricing based on your margins', 'Smart follow-up emails and reminders']
-            },
-            {
-              icon: BarChart3,
-              title: 'Complete financial control',
-              features: ['Profit & loss per trip', 'Accounts receivable & payable', 'Tax summaries & commission reports']
-            },
-            {
-              icon: CheckSquare,
-              title: 'Task & team management',
-              features: ['Assign tasks to team members', 'Track what\'s overdue or due today', 'Link tasks to trips and clients']
-            }
-          ].map((benefit, i) => (
-            <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <div className="w-11 h-11 rounded-xl bg-[#D9E0CF] flex items-center justify-center mb-4">
-                <benefit.icon className="w-5 h-5 text-[#263A29]" />
-              </div>
-              <h3 className="text-base font-semibold text-gray-900 mb-3">{benefit.title}</h3>
-              <ul className="space-y-2">
-                {benefit.features.map((feature, j) => (
-                  <li key={j} className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-[#263A29] mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-gray-600">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Feature Highlight 1 - Itineraries */}
-      <section className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div className="order-2 lg:order-1">
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-              <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                <div className="w-3 h-3 rounded-full bg-green-400"></div>
-              </div>
-              <div className="p-6">
-                <div className="grid grid-cols-7 gap-1 mb-4">
-                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                    <div key={i} className="text-center text-xs text-gray-500 py-1">{d}</div>
-                  ))}
-                  {Array.from({ length: 31 }, (_, i) => (
-                    <div key={i} className={`text-center text-xs py-2 rounded ${i === 14 ? 'bg-[#263A29] text-white' : i >= 12 && i <= 18 ? 'bg-[#D9E0CF] text-[#263A29]' : 'text-gray-600'}`}>
-                      {i + 1}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="order-1 lg:order-2 space-y-4">
-            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">Create beautiful, consistent itineraries in minutes</h2>
-            <p className="text-base text-gray-600">
-              Stop rebuilding the same trips from scratch. Use our drag-and-drop builder with Egypt-specific templates to create professional itineraries that clients love.
+      {/* Pricing Section */}
+      <section id="pricing" className="py-24 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+              {t.pricing.title}
+            </h2>
+            <p className="text-lg text-gray-600">
+              {t.pricing.subtitle}
             </p>
-            <ul className="space-y-3">
-              {['Drag & drop days, activities, and services', 'Built-in Egypt templates', 'Travel-ready PDFs with your branding'].map((item, i) => (
-                <li key={i} className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#263A29]" />
-                  <span className="text-sm text-gray-700">{item}</span>
-                </li>
-              ))}
-            </ul>
           </div>
-        </div>
-      </section>
 
-      {/* Feature Highlight 2 - Accounting */}
-      <section className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-4">
-              <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">Know exactly how profitable each trip is</h2>
-              <p className="text-base text-gray-600">
-                Track every expense, invoice, and payment in one place. See profit margins per trip, aging reports for receivables and payables, and generate financial reports with one click.
-              </p>
-              <ul className="space-y-3">
-                {['Revenue vs costs breakdown per itinerary', 'Aging reports: 30/60/90 days overdue', 'Commission tracking for guides and drivers', 'Monthly & quarterly financial reports'].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#263A29]" />
-                    <span className="text-sm text-gray-700">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <div className="bg-[#F7F7F4] rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                        <TrendingUp className="w-4 h-4 text-green-600" />
-                      </div>
-                      <span className="text-xs text-gray-500">Revenue</span>
-                    </div>
-                    <p className="text-lg font-bold text-gray-900">€24,580</p>
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {t.pricing.plans.map((plan, index) => (
+              <div 
+                key={index}
+                className={`relative p-8 bg-white rounded-2xl shadow-lg border-2 ${
+                  plan.popular ? 'border-[#2d3b2d]' : 'border-transparent'
+                }`}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-[#2d3b2d] text-white text-sm font-medium rounded-full">
+                    Most Popular
                   </div>
-                  <div className="bg-white rounded-lg p-4 shadow-sm">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                        <Receipt className="w-4 h-4 text-red-600" />
-                      </div>
-                      <span className="text-xs text-gray-500">Expenses</span>
-                    </div>
-                    <p className="text-lg font-bold text-gray-900">€18,240</p>
+                )}
+
+                <div className="mb-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    {index === 0 ? (
+                      <Users className="w-6 h-6 text-[#2d3b2d]" />
+                    ) : (
+                      <Building2 className="w-6 h-6 text-[#2d3b2d]" />
+                    )}
+                    <h3 className="text-xl font-bold text-gray-900">{plan.name}</h3>
                   </div>
+                  <p className="text-gray-600 text-sm">{plan.description}</p>
                 </div>
-                <div className="bg-white rounded-lg p-4 shadow-sm">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-gray-500">Profit Margin</span>
-                    <span className="text-sm font-bold text-green-600">+25.8%</span>
+
+                <div className="mb-6">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
+                    <span className="text-gray-500">/{plan.period}</span>
                   </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500 rounded-full" style={{ width: '74%' }}></div>
-                  </div>
+                  <p className="text-sm text-amber-600 font-medium mt-1">{plan.minimum}</p>
                 </div>
+
+                <ul className="space-y-3 mb-8">
+                  {plan.features.map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-[#2d3b2d] flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-600 text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <a
+                  href="https://calendly.com/autoura"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`block w-full py-3 text-center font-medium rounded-xl transition-colors ${
+                    plan.popular
+                      ? 'bg-[#2d3b2d] text-white hover:bg-[#3d4b3d]'
+                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                  }`}
+                >
+                  {plan.cta}
+                </a>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Feature Highlight 3 - Task Management */}
-      <section className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div className="order-2 lg:order-1">
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-semibold text-gray-900">Today's Tasks</h4>
-                <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">3 due</span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { title: 'Confirm hotel for Smith family', assignee: 'Ahmed', priority: 'high', done: false },
-                  { title: 'Send final itinerary to client', assignee: 'Sara', priority: 'medium', done: true },
-                  { title: 'Follow up on payment - INV-2025-042', assignee: 'Ahmed', priority: 'urgent', done: false },
-                ].map((task, i) => (
-                  <div key={i} className={`flex items-center gap-3 p-3 rounded-lg border ${task.done ? 'bg-gray-50 border-gray-100' : 'bg-white border-gray-200'}`}>
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${task.done ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>
-                      {task.done && <Check className="w-3 h-3 text-white" />}
-                    </div>
-                    <div className="flex-1">
-                      <p className={`text-sm ${task.done ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{task.title}</p>
-                      <p className="text-xs text-gray-500">Assigned to {task.assignee}</p>
-                    </div>
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded ${
-                      task.priority === 'urgent' ? 'bg-red-100 text-red-600' :
-                      task.priority === 'high' ? 'bg-orange-100 text-orange-600' :
-                      'bg-blue-100 text-blue-600'
-                    }`}>
-                      {task.priority}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="order-1 lg:order-2 space-y-4">
-            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">Keep your team aligned with task management</h2>
-            <p className="text-base text-gray-600">
-              Assign tasks to team members, track due dates, and link tasks to specific trips or clients. See what's overdue at a glance and never miss a follow-up.
-            </p>
-            <ul className="space-y-3">
-              {['Kanban board: To Do → In Progress → Done', 'Assign to any team member', 'Link tasks to itineraries, clients, or invoices', 'Quick filters: overdue, due today, this week'].map((item, i) => (
-                <li key={i} className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-[#263A29]" />
-                  <span className="text-sm text-gray-700">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
+      {/* Testimonials Section */}
+      <section className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 text-center mb-16">
+            {t.testimonials.title}
+          </h2>
 
-      {/* Feature Highlight 4 - Operations */}
-      <section className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-4">
-              <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">Keep every tour, guide and driver perfectly in sync</h2>
-              <p className="text-base text-gray-600">
-                Never miss a pickup or double-book a guide again. See all your operations in one place, assign staff, and track every detail in real-time.
-              </p>
-              <ul className="space-y-3">
-                {['Task checklists for every day of every tour', 'WhatsApp handover between guides and drivers', 'City-by-city operations overview'].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#263A29]" />
-                    <span className="text-sm text-gray-700">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <div className="bg-[#F7F7F4] rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div className="grid grid-cols-3 gap-4">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-white rounded-lg p-3 shadow-sm">
-                      <div className="w-8 h-8 rounded-full bg-[#D9E0CF] mb-2"></div>
-                      <div className="h-2 w-full bg-gray-100 rounded mb-1"></div>
-                      <div className="h-2 w-2/3 bg-gray-100 rounded"></div>
-                    </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            {t.testimonials.items.map((testimonial, index) => (
+              <div 
+                key={index}
+                className="p-6 bg-gray-50 rounded-2xl"
+              >
+                <div className="flex gap-1 mb-4">
+                  {Array.from({ length: testimonial.rating }).map((_, i) => (
+                    <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
                   ))}
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Grid */}
-      <section className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-3">Everything you need to run your travel operation</h2>
-        </div>
-
-        <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {[
-            { icon: Users, title: 'Client CRM & lead pipeline', desc: 'Track every inquiry from first contact to final payment. Never lose a lead in WhatsApp again.' },
-            { icon: MessageSquare, title: 'WhatsApp & email migration', desc: 'Forward messages and they become organised records, automatically linked to the right tour or client.' },
-            { icon: DollarSign, title: 'Smart pricing engine', desc: 'Set your margins once, then get instant quotes based on group size, season, and services.' },
-            { icon: FileText, title: 'Invoicing & payments', desc: 'Create professional invoices, track payments, and see what\'s outstanding at a glance.' },
-            { icon: Receipt, title: 'Expense tracking', desc: 'Log expenses by category and supplier. Link costs to specific trips for accurate P&L.' },
-            { icon: TrendingUp, title: 'Profit & loss per trip', desc: 'See revenue vs costs for each itinerary. Know your margins before the trip even starts.' },
-            { icon: Wallet, title: 'Accounts receivable', desc: 'Track what clients owe you with aging reports. Send payment reminders with one click.' },
-            { icon: CreditCard, title: 'Accounts payable', desc: 'Track what you owe suppliers. Approve expenses and schedule payments.' },
-            { icon: BarChart3, title: 'Financial reports', desc: 'Monthly revenue, cash flow, tax summaries, and commission reports ready to export.' },
-            { icon: CheckSquare, title: 'Task management', desc: 'Create tasks, assign to team members, set due dates, and track completion.' },
-            { icon: Database, title: 'Supplier & staff database', desc: 'Maintain your network of hotels, guides, drivers, and partners in one searchable place.' },
-            { icon: Brain, title: 'Knowledge base & SOP templates', desc: 'Document your processes, train newcomers, and share best practices for your team.' }
-          ].map((feature, i) => (
-            <div key={i} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-              <div className="w-10 h-10 rounded-lg bg-[#F7F7F4] flex items-center justify-center mb-3 border border-gray-100">
-                <feature.icon className="w-5 h-5 text-[#263A29]" />
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1.5">{feature.title}</h3>
-              <p className="text-xs text-gray-600 leading-relaxed">{feature.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Social Proof */}
-      <section className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <div className="space-y-1 mb-4">
-                <div className="text-4xl font-bold text-[#263A29]">247+</div>
-                <p className="text-sm text-gray-600">Bookings managed through Autoura</p>
-              </div>
-              <div className="space-y-1">
-                <div className="text-4xl font-bold text-[#263A29]">12</div>
-                <p className="text-sm text-gray-600">Active tours in one dashboard</p>
-              </div>
-              <p className="text-sm text-gray-500 mt-4">From first inquiry to final payment in one system</p>
-            </div>
-            <div className="bg-[#F7F7F4] rounded-2xl p-6 border border-gray-100">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-full bg-[#D9E0CF] flex-shrink-0"></div>
+                <p className="text-gray-700 mb-6 italic">
+                  "{testimonial.quote}"
+                </p>
                 <div>
-                  <p className="text-sm text-gray-700 mb-3 italic">
-                    "Autoura replaced five tools and allowed our team to handle complex multi-city itineraries without missing a single detail. Game changer for our DMC."
-                  </p>
-                  <p className="text-sm font-semibold text-gray-900">Sarah Ahmed</p>
-                  <p className="text-xs text-gray-500">Operations Director, Nile Explorers DMC</p>
+                  <p className="font-semibold text-gray-900">{testimonial.author}</p>
+                  <p className="text-sm text-gray-500">{testimonial.role}</p>
                 </div>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="max-w-7xl mx-auto px-6 lg:px-8 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-3">Start free. Scale when you're ready.</h2>
-          <p className="text-base text-gray-600">No credit card required to get started</p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-          {/* Starter */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
-            <span className="inline-block px-2 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded-full mb-3">
-              Just for small teams
-            </span>
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">Starter</h3>
-            <div className="mb-4">
-              <span className="text-3xl font-bold text-gray-900">Free</span>
-            </div>
-            <ul className="space-y-2 mb-6">
-              {['Lead tracking & basic CRM', 'Basic itinerary builder', 'Up to 5 active tours', '1 user'].map((item, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-[#263A29] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-gray-600">{item}</span>
-                </li>
-              ))}
-            </ul>
-            <Link 
-              href="/signup" 
-              className="w-full h-10 flex items-center justify-center text-sm font-medium text-[#263A29] bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Get started free
-            </Link>
-          </div>
-
-          {/* Pro / Agency */}
-          <div className="bg-[#263A29] rounded-2xl p-6 text-white">
-            <span className="inline-block px-2 py-1 text-xs font-medium text-[#263A29] bg-white rounded-full mb-3">
-              For growing operations
-            </span>
-            <h3 className="text-lg font-semibold text-white mb-1">Pro / Agency</h3>
-            <div className="mb-4">
-              <span className="text-3xl font-bold text-white">Custom</span>
-            </div>
-            <ul className="space-y-2 mb-6">
-              {['Unlimited tours & clients', 'Full accounting & P&L', 'Task management & team', 'Multi-user collaboration', 'Financial reporting', 'Automation & AI features', 'Priority support'].map((item, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <CheckCircle className="w-4 h-4 text-[#D9E0CF] flex-shrink-0 mt-0.5" />
-                  <span className="text-sm text-[#E9E3D2]">{item}</span>
-                </li>
-              ))}
-            </ul>
-            <Link 
-              href="/signup" 
-              className="w-full h-10 flex items-center justify-center text-sm font-medium text-[#263A29] bg-white rounded-lg hover:bg-[#E9E3D2] transition-colors"
-            >
-              Talk to us
-            </Link>
-          </div>
-        </div>
-
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Custom enterprise setups available for large DMCs and multi-brand groups
-        </p>
-      </section>
-
-      {/* Final CTA */}
-      <section className="bg-[#263A29] py-16">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center">
-          <h2 className="text-2xl lg:text-3xl font-bold text-white mb-4">Ready to get your travel operation under control?</h2>
-          <p className="text-base text-[#E9E3D2] mb-8 max-w-xl mx-auto">
-            Bring all your tours, clients, and teams into one organised system in the next 7 days.
+      {/* CTA Section */}
+      <section className="py-24 bg-[#2d3b2d]">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+            {t.cta.title}
+          </h2>
+          <p className="text-lg text-gray-300 mb-10">
+            {t.cta.subtitle}
           </p>
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link 
-              href="/signup" 
-              className="h-12 px-6 flex items-center text-sm font-medium text-[#263A29] bg-white rounded-lg hover:bg-[#E9E3D2] transition-colors"
-            >
-              Sign up free
-            </Link>
-            <Link 
-              href="/login" 
-              className="h-12 px-6 flex items-center text-sm font-medium text-white border-2 border-white rounded-lg hover:bg-white/10 transition-colors"
-            >
-              Sign in
-            </Link>
-          </div>
+          <a
+            href="https://calendly.com/autoura"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-8 py-4 text-base font-medium text-[#2d3b2d] bg-white rounded-xl hover:bg-gray-100 transition-colors"
+          >
+            {t.cta.button}
+            <ArrowRight className="w-5 h-5" />
+          </a>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#1D2B20] text-white py-12">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
-          <div className="grid md:grid-cols-5 gap-8 mb-8">
+      <footer className="py-16 bg-[#2d3b2d]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-12 mb-12">
             {/* Logo & Description */}
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="white"/>
-                    <path d="M2 17L12 22L22 17" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M2 12L12 17L22 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-                <span className="text-base font-semibold">Autoura</span>
-              </div>
-              <p className="text-sm text-[#E9E3D2] leading-relaxed">
-                The operations system built for travel professionals who want to focus on creating amazing experiences, not managing spreadsheets.
+            <div className="md:col-span-1">
+              <Image 
+                src="/autoura-logo-white.png" 
+                alt="Autoura" 
+                width={120} 
+                height={32}
+                className="h-8 w-auto mb-4 brightness-0 invert"
+              />
+              <p className="text-gray-400 text-sm">
+                The complete travel operations platform for modern tour operators.
               </p>
             </div>
 
-            {/* Product */}
+            {/* Product Links */}
             <div>
-              <h4 className="text-sm font-semibold mb-3">Product</h4>
-              <ul className="space-y-2">
-                {['Features', 'Pricing', 'Integrations', 'Changelog'].map((item, i) => (
-                  <li key={i}><a href="#" className="text-sm text-[#E9E3D2] hover:text-white transition-colors">{item}</a></li>
-                ))}
+              <h4 className="text-white font-semibold mb-4">{t.footer.product.title}</h4>
+              <ul className="space-y-3">
+                <li>
+                  <Link href="#features" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Features
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#pricing" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Pricing
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Integrations
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Changelog
+                  </Link>
+                </li>
               </ul>
             </div>
 
-            {/* Resources */}
+            {/* Resources Links */}
             <div>
-              <h4 className="text-sm font-semibold mb-3">Resources</h4>
-              <ul className="space-y-2">
-                {['Documentation', 'Help Center', 'Blog', 'Templates'].map((item, i) => (
-                  <li key={i}><a href="#" className="text-sm text-[#E9E3D2] hover:text-white transition-colors">{item}</a></li>
-                ))}
+              <h4 className="text-white font-semibold mb-4">{t.footer.resources.title}</h4>
+              <ul className="space-y-3">
+                <li>
+                  <Link href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Documentation
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Help Center
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Blog
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Templates
+                  </Link>
+                </li>
               </ul>
             </div>
 
-            {/* Company */}
+            {/* Company Links */}
             <div>
-              <h4 className="text-sm font-semibold mb-3">Company</h4>
-              <ul className="space-y-2">
-                {['About', 'Contact', 'Privacy', 'Terms'].map((item, i) => (
-                  <li key={i}><a href="#" className="text-sm text-[#E9E3D2] hover:text-white transition-colors">{item}</a></li>
-                ))}
+              <h4 className="text-white font-semibold mb-4">{t.footer.company.title}</h4>
+              <ul className="space-y-3">
+                <li>
+                  <Link href="/about" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    About
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/contact" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Contact
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Privacy
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
+                    Terms
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
 
           {/* Bottom Bar */}
-          <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm text-[#E9E3D2]">
-              © 2025 Autoura. Made in Egypt for the world of travel.
-            </p>
-            <div className="flex gap-4">
-              <a href="#" className="text-sm text-[#E9E3D2] hover:text-white transition-colors">English</a>
-              <a href="#" className="text-sm text-[#E9E3D2] hover:text-white transition-colors">العربية</a>
+          <div className="pt-8 border-t border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <p className="text-gray-400 text-sm">{t.footer.copyright}</p>
+            
+            {/* Language Switcher */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setLanguage('en')}
+                className={`text-sm transition-colors ${
+                  language === 'en' ? 'text-white font-medium' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                English
+              </button>
             </div>
           </div>
         </div>
