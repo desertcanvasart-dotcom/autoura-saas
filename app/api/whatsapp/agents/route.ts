@@ -1,8 +1,7 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/app/supabase'
 
-// GET /api/whatsapp/agents - List all sales agents
+// GET /api/whatsapp/agents - List all team members (for WhatsApp assignment)
 export async function GET(request: NextRequest) {
   try {
     const supabase = createClient()
@@ -11,8 +10,8 @@ export async function GET(request: NextRequest) {
     const availableOnly = searchParams.get('available_only') === 'true'
 
     let query = supabase
-      .from('sales_agents')
-      .select('*')
+      .from('team_members')
+      .select('id, name, email, phone, avatar_url, role, is_active, is_available, max_conversations, current_conversations, last_assigned_at, created_at, updated_at')
       .order('name', { ascending: true })
 
     if (activeOnly) {
@@ -38,39 +37,40 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/whatsapp/agents - Create new sales agent
+// POST /api/whatsapp/agents - Create new team member / agent
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
     const body = await request.json()
 
-    const { name, email, phone, user_id, avatar_url, max_conversations } = body
+    const { name, email, phone, user_id, avatar_url, max_conversations, role } = body
 
     if (!name) {
       return NextResponse.json({ error: 'Agent name is required' }, { status: 400 })
     }
 
-    // Check if agent with same email already exists
+    // Check if team member with same email already exists
     if (email) {
       const { data: existing } = await supabase
-        .from('sales_agents')
+        .from('team_members')
         .select('id')
         .eq('email', email)
         .single()
 
       if (existing) {
-        return NextResponse.json({ error: 'Agent with this email already exists' }, { status: 400 })
+        return NextResponse.json({ error: 'Team member with this email already exists' }, { status: 400 })
       }
     }
 
     const { data, error } = await supabase
-      .from('sales_agents')
+      .from('team_members')
       .insert({
         name,
         email: email || null,
         phone: phone || null,
         user_id: user_id || null,
         avatar_url: avatar_url || null,
+        role: role || 'sales',
         max_conversations: max_conversations || 50,
         is_active: true,
         is_available: true,
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH /api/whatsapp/agents - Update agent
+// PATCH /api/whatsapp/agents - Update team member / agent
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = createClient()
@@ -104,7 +104,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from('sales_agents')
+      .from('team_members')
       .update({
         ...updates,
         updated_at: new Date().toISOString()
@@ -139,7 +139,7 @@ export async function DELETE(request: NextRequest) {
 
     // Soft delete - just deactivate
     const { data, error } = await supabase
-      .from('sales_agents')
+      .from('team_members')
       .update({
         is_active: false,
         is_available: false,
@@ -151,14 +151,15 @@ export async function DELETE(request: NextRequest) {
 
     if (error) throw error
 
-    // Unassign all conversations from this agent
+    // Unassign all conversations from this team member
     await supabase
       .from('whatsapp_conversations')
       .update({
+        assigned_team_member_id: null,
         assigned_agent_id: null,
         assigned_at: null
       })
-      .eq('assigned_agent_id', id)
+      .eq('assigned_team_member_id', id)
 
     return NextResponse.json({ 
       success: true, 
