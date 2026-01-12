@@ -1525,6 +1525,7 @@ export async function POST(request: NextRequest) {
       })
       totalSupplierCost += dailyTips
       totalClientPrice += withMargin(dailyTips)
+      }
 
       // Entrance fees (only for attractions actually visited)
       if (dayData.attractions?.length > 0 && !isTransferOnly && !isFreeDay) {
