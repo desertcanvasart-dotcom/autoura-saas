@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Bell, Check, X, ExternalLink, Loader2 } from 'lucide-react'
+import { Bell, Check, X, ExternalLink, Loader2, Trash2 } from 'lucide-react'
 
 interface Notification {
   id: string
@@ -110,6 +110,46 @@ export default function NotificationBell() {
     }
   }
 
+  // Delete single notification
+  const deleteNotification = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent triggering other click handlers
+    
+    try {
+      const response = await fetch(`/api/notifications/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        const deletedNotification = notifications.find(n => n.id === id)
+        setNotifications(prev => prev.filter(n => n.id !== id))
+        // Update unread count if the deleted notification was unread
+        if (deletedNotification && !deletedNotification.is_read) {
+          setUnreadCount(prev => Math.max(0, prev - 1))
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error)
+    }
+  }
+
+  // Clear all notifications
+  const clearAllNotifications = async () => {
+    if (notifications.length === 0) return
+    
+    try {
+      // Delete all notifications one by one (or you can create a bulk delete endpoint)
+      const deletePromises = notifications.map(n => 
+        fetch(`/api/notifications/${n.id}`, { method: 'DELETE' })
+      )
+      
+      await Promise.all(deletePromises)
+      setNotifications([])
+      setUnreadCount(0)
+    } catch (error) {
+      console.error('Error clearing all notifications:', error)
+    }
+  }
+
   // Format relative time
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -184,9 +224,20 @@ export default function NotificationBell() {
                   Mark all read
                 </button>
               )}
+              {notifications.length > 0 && (
+                <>
+                  <span className="text-gray-300">•</span>
+                  <button
+                    onClick={clearAllNotifications}
+                    className="text-xs text-red-500 hover:text-red-600 font-medium"
+                  >
+                    Clear all
+                  </button>
+                </>
+              )}
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                className="p-1 hover:bg-gray-200 rounded transition-colors ml-1"
               >
                 <X className="w-4 h-4 text-gray-400" />
               </button>
@@ -208,11 +259,20 @@ export default function NotificationBell() {
               notifications.map(notification => (
                 <div
                   key={notification.id}
-                  className={`px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${
+                  className={`group px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors relative ${
                     !notification.is_read ? 'bg-primary-50/50' : ''
                   }`}
                 >
-                  <div className="flex items-start gap-3">
+                  {/* Delete button - appears on hover */}
+                  <button
+                    onClick={(e) => deleteNotification(notification.id, e)}
+                    className="absolute top-2 right-2 p-1 rounded hover:bg-red-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Delete notification"
+                  >
+                    <X className="w-3.5 h-3.5 text-gray-400 hover:text-red-500" />
+                  </button>
+
+                  <div className="flex items-start gap-3 pr-6">
                     {/* Icon */}
                     <span className="text-lg flex-shrink-0 mt-0.5">
                       {getIcon(notification.type)}
