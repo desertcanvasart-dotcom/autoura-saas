@@ -23,17 +23,12 @@ export async function GET(request: NextRequest) {
           email,
           client_code
         ),
-        assigned_agent:sales_agents!whatsapp_conversations_assigned_agent_id_fkey (
+        assigned_agent:team_members!whatsapp_conversations_assigned_team_member_id_fkey (
           id,
           name,
           email,
           avatar_url,
           is_available
-        ),
-        last_agent:sales_agents!whatsapp_conversations_last_agent_id_fkey (
-          id,
-          name,
-          avatar_url
         )
       `)
       .eq('status', status)
@@ -44,14 +39,14 @@ export async function GET(request: NextRequest) {
       query = query.or('is_hidden.is.null,is_hidden.eq.false')
     }
 
-    // Filter by assigned agent
+    // Filter by assigned agent (use team_member_id)
     if (agentId) {
-      query = query.eq('assigned_agent_id', agentId)
+      query = query.eq('assigned_team_member_id', agentId)
     }
 
     // Filter unassigned only
     if (unassignedOnly) {
-      query = query.is('assigned_agent_id', null)
+      query = query.is('assigned_team_member_id', null)
     }
 
     if (search) {
@@ -121,7 +116,7 @@ export async function POST(request: NextRequest) {
           .eq('id', existing.id)
           .select(`
             *,
-            assigned_agent:sales_agents!whatsapp_conversations_assigned_agent_id_fkey (*)
+            assigned_agent:team_members!whatsapp_conversations_assigned_team_member_id_fkey (*)
           `)
           .single()
 
@@ -132,12 +127,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new conversation
-    let assignedAgentId = null
+    let assignedTeamMemberId = null
 
     // Auto-assign if requested
     if (auto_assign !== false) {
       const { data: nextAgent } = await supabase
-        .from('sales_agents')
+        .from('team_members')
         .select('id')
         .eq('is_active', true)
         .eq('is_available', true)
@@ -147,7 +142,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (nextAgent) {
-        assignedAgentId = nextAgent.id
+        assignedTeamMemberId = nextAgent.id
       }
     }
 
@@ -158,39 +153,41 @@ export async function POST(request: NextRequest) {
         client_name: client_name || null,
         client_id: client_id || null,
         is_hidden: false,
-        assigned_agent_id: assignedAgentId,
-        assigned_at: assignedAgentId ? new Date().toISOString() : null
+        assigned_team_member_id: assignedTeamMemberId,
+        assigned_agent_id: assignedTeamMemberId, // Keep in sync for backwards compatibility
+        assigned_at: assignedTeamMemberId ? new Date().toISOString() : null
       })
       .select(`
         *,
-        assigned_agent:sales_agents!whatsapp_conversations_assigned_agent_id_fkey (*)
+        assigned_agent:team_members!whatsapp_conversations_assigned_team_member_id_fkey (*)
       `)
       .single()
 
     if (error) throw error
 
-    // Update agent's count if assigned
-    if (assignedAgentId) {
-      const { data: agentData } = await supabase
-        .from('sales_agents')
+    // Update team member's count if assigned
+    if (assignedTeamMemberId) {
+      const { data: memberData } = await supabase
+        .from('team_members')
         .select('current_conversations')
-        .eq('id', assignedAgentId)
+        .eq('id', assignedTeamMemberId)
         .single()
 
       await supabase
-        .from('sales_agents')
+        .from('team_members')
         .update({ 
-          current_conversations: (agentData?.current_conversations || 0) + 1,
+          current_conversations: (memberData?.current_conversations || 0) + 1,
           last_assigned_at: new Date().toISOString()
         })
-        .eq('id', assignedAgentId)
+        .eq('id', assignedTeamMemberId)
 
       // Log activity
       await supabase
         .from('conversation_activity')
         .insert({
           conversation_id: newConversation.id,
-          agent_id: assignedAgentId,
+          agent_id: assignedTeamMemberId,
+          team_member_id: assignedTeamMemberId,
           action_type: 'auto_assigned',
           action_details: { source: 'new_conversation' }
         })
@@ -236,7 +233,7 @@ export async function PATCH(request: NextRequest) {
       .eq('id', conversation_id)
       .select(`
         *,
-        assigned_agent:sales_agents!whatsapp_conversations_assigned_agent_id_fkey (*)
+        assigned_agent:team_members!whatsapp_conversations_assigned_team_member_id_fkey (*)
       `)
       .single()
 
@@ -249,6 +246,7 @@ export async function PATCH(request: NextRequest) {
         .insert({
           conversation_id,
           agent_id,
+          team_member_id: agent_id,
           action_type: 'status_changed',
           action_details: { action, updates }
         })
