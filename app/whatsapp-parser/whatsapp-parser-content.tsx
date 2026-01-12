@@ -906,27 +906,38 @@ function WhatsAppParserContent() {
 
   useEffect(() => {
     if (conversationParam) {
+      console.log("=== DECODE DEBUG START ===");
+      console.log("conversationParam length:", conversationParam.length);
+      
       try {
         const isBase64 = new URLSearchParams(window.location.search).get("encoded") === "base64"
+        console.log("isBase64:", isBase64);
+        
         let decoded: string
         
         if (isBase64) {
-          // Proper Unicode base64 decoding
+          console.log("Attempting base64 decode...");
           const binaryString = atob(conversationParam)
+          console.log("binaryString length:", binaryString.length);
           const bytes = new Uint8Array(binaryString.length)
           for (let i = 0; i < binaryString.length; i++) {
             bytes[i] = binaryString.charCodeAt(i)
           }
+          console.log("bytes created, decoding...");
           decoded = new TextDecoder('utf-8').decode(bytes)
+          console.log("decoded result:", decoded.substring(0, 100));
         } else {
+          console.log("Using decodeURIComponent...");
           decoded = decodeURIComponent(conversationParam)
         }
         
+        console.log("Setting conversation state...");
         setConversation(decoded)
         setParsedMessages(parseConversation(decoded))
         setFromInbox(true)
+        console.log("=== DECODE DEBUG SUCCESS ===");
       } catch (e) {
-        console.error('Error decoding conversation:', e)
+        console.error('=== DECODE DEBUG ERROR ===', e)
         setConversation(conversationParam)
         setParsedMessages(parseConversation(conversationParam))
         setFromInbox(true)
