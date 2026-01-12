@@ -1511,21 +1511,20 @@ export async function POST(request: NextRequest) {
         totalSupplierCost += guidePerDay
         totalClientPrice += withMargin(guidePerDay)
 
-        // Tips (only when guide is present)
-        services.push({
-          service_type: 'tips',
-          service_code: 'TIPS',
-          service_name: 'Daily Tips',
-          quantity: 1,
-          rate_eur: dailyTips,
-          rate_non_eur: dailyTips,
-          total_cost: dailyTips,
-          client_price: dailyTips,
-          notes: 'Driver and guide tips'
-        })
-        totalSupplierCost += dailyTips
-        totalClientPrice += dailyTips
-      }
+       // Tips (only when guide is present)
+       services.push({
+        service_type: 'tips',
+        service_code: 'TIPS',
+        service_name: 'Daily Tips',
+        quantity: 1,
+        rate_eur: dailyTips,
+        rate_non_eur: dailyTips,
+        total_cost: dailyTips,
+        client_price: withMargin(dailyTips),
+        notes: 'Driver and guide tips'
+      })
+      totalSupplierCost += dailyTips
+      totalClientPrice += withMargin(dailyTips)
 
       // Entrance fees (only for attractions actually visited)
       if (dayData.attractions?.length > 0 && !isTransferOnly && !isFreeDay) {
@@ -1603,7 +1602,7 @@ export async function POST(request: NextRequest) {
         totalClientPrice += withMargin(dinnerCost)
       }
 
-      // Water (for touring days only)
+       // Water (for touring days only)
       if (!isTransferOnly && !isFreeDay) {
         const waterCost = 2 * totalPax
         services.push({
@@ -1614,11 +1613,11 @@ export async function POST(request: NextRequest) {
           rate_eur: 2,
           rate_non_eur: 2,
           total_cost: waterCost,
-          client_price: waterCost,
+          client_price: withMargin(waterCost),
           notes: 'Bottled water'
         })
         totalSupplierCost += waterCost
-        totalClientPrice += waterCost
+        totalClientPrice += withMargin(waterCost)
       }
 
       // Hotel (only if included and not last day)
