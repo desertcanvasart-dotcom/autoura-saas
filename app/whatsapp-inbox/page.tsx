@@ -782,7 +782,10 @@ export default function WhatsAppInboxPage() {
   const parseConversation = () => {
     if (!selectedConversation || messages.length === 0) return
     const conversationText = messages.map(m => `${m.direction === 'inbound' ? 'Client' : 'Agent'}: ${m.message_body}`).join('\n')
-    const encoded = btoa(unescape(encodeURIComponent(conversationText)))
+    // Proper Unicode base64 encoding
+    const encoder = new TextEncoder()
+    const bytes = encoder.encode(conversationText)
+    const encoded = btoa(String.fromCharCode(...bytes))
     router.push(`/whatsapp-parser?conversation=${encoded}&encoded=base64&clientId=${selectedConversation.client_id || ''}&phone=${selectedConversation.phone_number}`)
   }
 

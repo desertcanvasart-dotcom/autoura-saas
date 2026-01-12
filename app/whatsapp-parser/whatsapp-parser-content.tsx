@@ -908,13 +908,25 @@ function WhatsAppParserContent() {
     if (conversationParam) {
       try {
         const isBase64 = new URLSearchParams(window.location.search).get("encoded") === "base64"
-        const decoded = isBase64
-          ? decodeURIComponent(escape(atob(conversationParam)))
-          : decodeURIComponent(conversationParam)
+        let decoded: string
+        
+        if (isBase64) {
+          // Proper Unicode base64 decoding
+          const binaryString = atob(conversationParam)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+          decoded = new TextDecoder('utf-8').decode(bytes)
+        } else {
+          decoded = decodeURIComponent(conversationParam)
+        }
+        
         setConversation(decoded)
         setParsedMessages(parseConversation(decoded))
         setFromInbox(true)
       } catch (e) {
+        console.error('Error decoding conversation:', e)
         setConversation(conversationParam)
         setParsedMessages(parseConversation(conversationParam))
         setFromInbox(true)
