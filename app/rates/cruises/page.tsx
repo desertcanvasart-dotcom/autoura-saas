@@ -20,7 +20,7 @@ const TIER_OPTIONS = [
 ]
 
 const CITIES = ['Luxor', 'Aswan', 'Cairo']
-const SHIP_CATEGORIES = ['standard', 'deluxe', 'luxury']
+const SHIP_CATEGORIES = ['budget', 'standard', 'deluxe', 'luxury']
 const CABIN_TYPES = ['standard', 'deluxe', 'suite']
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
