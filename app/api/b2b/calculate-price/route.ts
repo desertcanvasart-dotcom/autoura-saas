@@ -2,14 +2,22 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 
 // ============================================
-// B2B TOUR PRICE CALCULATOR - v3
+// B2B TOUR PRICE CALCULATOR - v4
 // File: app/api/b2b/calculate-price/route.ts
 // 
-// Uses B2B-specific pricing tables:
-// - b2b_pricing_rules (felucca boats, tiered discounts)
-// - b2b_transport_packages (cruise sightseeing)
+// NOW USES SHARED B2C RATE TABLES:
+// - vehicles (instead of transportation_rates)
+// - guides (instead of guide_rates)
+// - entrance_fees (instead of activity_rates)
+// - hotel_contacts (instead of accommodation_rates)
+// - meal_rates (shared)
+// - nile_cruises (shared)
 // 
-// Does NOT modify existing rate tables!
+// B2B-SPECIFIC TABLES (kept for tiered pricing):
+// - b2b_pricing_rules (felucca boats, volume discounts)
+// - b2b_transport_packages (cruise sightseeing packages)
+// - b2b_partners (partner margins)
+// - b2b_partner_pricing (partner-specific overrides)
 // ============================================
 
 const supabaseAdmin = createClient(
@@ -17,35 +25,49 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const RATE_TABLES: Record<string, { table: string; eurField: string; nonEurField?: string }> = {
+// Updated to use B2C tables
+const RATE_TABLES: Record<string, { table: string; eurField: string; nonEurField?: string; nameField?: string }> = {
   transportation: {
-    table: 'transportation_rates',
-    eurField: 'base_rate_eur',
-    nonEurField: 'base_rate_non_eur'
+    table: 'vehicles',
+    eurField: 'daily_rate_eur',
+    nonEurField: 'daily_rate_eur',
+    nameField: 'vehicle_type'
   },
   guide: {
-    table: 'guide_rates',
-    eurField: 'base_rate_non_eur',  // Contains EUR rates despite the name
-    nonEurField: 'base_rate_non_eur'
+    table: 'guides',
+    eurField: 'daily_rate_eur',
+    nonEurField: 'daily_rate_eur',
+    nameField: 'name'
   },
   activity: {
-    table: 'activity_rates',
-    eurField: 'base_rate_eur',
-    nonEurField: 'base_rate_non_eur'
+    table: 'entrance_fees',
+    eurField: 'eur_rate',
+    nonEurField: 'non_eur_rate',
+    nameField: 'attraction_name'
+  },
+  entrance: {
+    table: 'entrance_fees',
+    eurField: 'eur_rate',
+    nonEurField: 'non_eur_rate',
+    nameField: 'attraction_name'
   },
   meal: {
     table: 'meal_rates',
-    eurField: 'base_rate_eur',
-    nonEurField: 'base_rate_non_eur'
+    eurField: 'lunch_rate_eur',
+    nonEurField: 'lunch_rate_eur',
+    nameField: 'meal_type'
   },
   accommodation: {
-    table: 'accommodation_rates',
-    eurField: 'rate_low_season_sgl'
+    table: 'hotel_contacts',
+    eurField: 'rate_double_eur',
+    nonEurField: 'rate_double_eur',
+    nameField: 'name'
   },
   cruise: {
     table: 'nile_cruises',
     eurField: 'rate_double_eur',
-    nonEurField: 'rate_double_eur'
+    nonEurField: 'rate_double_eur',
+    nameField: 'ship_name'
   }
 }
 
@@ -91,20 +113,20 @@ function getSeason(date: Date): 'low' | 'high' | 'peak' {
   return 'low'
 }
 
-// Check for B2B pricing rules for an activity
+// Check for B2B pricing rules for an activity (kept for tiered pricing like felucca)
 async function getB2BPricingRule(serviceName: string): Promise<any | null> {
   const { data, error } = await supabaseAdmin
     .from('b2b_pricing_rules')
     .select('*')
     .eq('is_active', true)
-    .ilike('service_name', `%${serviceName.split(' ')[0]}%`)  // Match first word
+    .ilike('service_name', `%${serviceName.split(' ')[0]}%`)
     .limit(1)
 
   if (error || !data || data.length === 0) return null
   return data[0]
 }
 
-// Get transport package for cruise sightseeing
+// Get transport package for cruise sightseeing (kept for package deals)
 async function getTransportPackage(packageType: string, originCity: string, destCity: string): Promise<any | null> {
   const { data, error } = await supabaseAdmin
     .from('b2b_transport_packages')
@@ -119,7 +141,7 @@ async function getTransportPackage(packageType: string, originCity: string, dest
   return data[0]
 }
 
-// Calculate price using B2B pricing rule
+// Calculate price using B2B pricing rule (tiered pricing)
 function applyB2BPricingRule(
   rule: any, 
   numPax: number
@@ -128,7 +150,6 @@ function applyB2BPricingRule(
 
   switch (model) {
     case 'per_unit': {
-      // Per boat, per vehicle - select tier based on group size
       let rate: number
       let label: string
 
@@ -139,7 +160,6 @@ function applyB2BPricingRule(
         rate = rule.tier2_rate_eur
         label = rule.tier2_label || 'Large'
       } else {
-        // Need multiple units
         const largeCapacity = rule.tier2_max_pax || rule.tier1_max_pax || 8
         const largeRate = rule.tier2_rate_eur || rule.tier1_rate_eur
         const unitsNeeded = Math.ceil(numPax / largeCapacity)
@@ -162,7 +182,6 @@ function applyB2BPricingRule(
     }
 
     case 'tiered': {
-      // Volume discounts - per person rate based on group size
       let rate: number
       let label: string
 
@@ -213,6 +232,142 @@ function selectVehicleFromPackage(pkg: any, numPax: number): { rate: number; veh
   }
 }
 
+// NEW: Select appropriate vehicle from vehicles table based on pax count and tier
+async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standard'): Promise<{ rate: number; vehicle: string; id: string } | null> {
+  const { data: vehicles, error } = await supabaseAdmin
+    .from('vehicles')
+    .select('*')
+    .eq('is_active', true)
+    .order('is_preferred', { ascending: false })
+
+  if (error || !vehicles || vehicles.length === 0) return null
+
+  // First try to find a vehicle matching tier and capacity
+  let selectedVehicle = vehicles.find((v: any) => 
+    v.tier === tier && 
+    numPax >= (v.capacity_min || 1) && 
+    numPax <= (v.capacity_max || 99)
+  )
+
+  // Fallback: any vehicle that fits capacity
+  if (!selectedVehicle) {
+    selectedVehicle = vehicles.find((v: any) => 
+      numPax >= (v.capacity_min || 1) && 
+      numPax <= (v.capacity_max || 99)
+    )
+  }
+
+  // Final fallback: largest vehicle
+  if (!selectedVehicle) {
+    selectedVehicle = vehicles[vehicles.length - 1]
+  }
+
+  if (!selectedVehicle) return null
+
+  return {
+    rate: selectedVehicle.daily_rate_eur || 0,
+    vehicle: selectedVehicle.vehicle_type || 'Vehicle',
+    id: selectedVehicle.id
+  }
+}
+
+// NEW: Select guide from guides table based on language and tier
+async function selectGuideFromB2CTable(language: string = 'English', tier: string = 'standard'): Promise<{ rate: number; name: string; id: string } | null> {
+  const { data: guides, error } = await supabaseAdmin
+    .from('guides')
+    .select('*')
+    .eq('is_active', true)
+    .contains('languages', [language])
+    .order('is_preferred', { ascending: false })
+
+  if (error || !guides || guides.length === 0) {
+    // Fallback: any guide
+    const { data: anyGuide } = await supabaseAdmin
+      .from('guides')
+      .select('*')
+      .eq('is_active', true)
+      .order('is_preferred', { ascending: false })
+      .limit(1)
+
+    if (!anyGuide || anyGuide.length === 0) return null
+    
+    return {
+      rate: anyGuide[0].daily_rate_eur || 55,
+      name: anyGuide[0].name || 'Guide',
+      id: anyGuide[0].id
+    }
+  }
+
+  // Find guide matching tier
+  let selectedGuide = guides.find((g: any) => g.tier === tier) || guides[0]
+
+  return {
+    rate: selectedGuide.daily_rate_eur || 55,
+    name: selectedGuide.name || 'Guide',
+    id: selectedGuide.id
+  }
+}
+
+// NEW: Get entrance fee from entrance_fees table
+async function getEntranceFee(attractionName: string, isEurPassport: boolean): Promise<{ rate: number; name: string; id: string } | null> {
+  const { data: fees, error } = await supabaseAdmin
+    .from('entrance_fees')
+    .select('*')
+    .eq('is_active', true)
+    .ilike('attraction_name', `%${attractionName}%`)
+    .limit(1)
+
+  if (error || !fees || fees.length === 0) return null
+
+  const fee = fees[0]
+  const rate = isEurPassport 
+    ? (fee.eur_rate || 0) 
+    : (fee.non_eur_rate || fee.eur_rate || 0)
+
+  return {
+    rate,
+    name: fee.attraction_name,
+    id: fee.id
+  }
+}
+
+// NEW: Get hotel rate from hotel_contacts table
+async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ rate: number; name: string; id: string } | null> {
+  const { data: hotels, error } = await supabaseAdmin
+    .from('hotel_contacts')
+    .select('*')
+    .eq('is_active', true)
+    .ilike('city', `%${city}%`)
+    .eq('tier', tier)
+    .order('is_preferred', { ascending: false })
+    .limit(1)
+
+  if (error || !hotels || hotels.length === 0) {
+    // Fallback: any hotel in city
+    const { data: anyHotel } = await supabaseAdmin
+      .from('hotel_contacts')
+      .select('*')
+      .eq('is_active', true)
+      .ilike('city', `%${city}%`)
+      .order('is_preferred', { ascending: false })
+      .limit(1)
+
+    if (!anyHotel || anyHotel.length === 0) return null
+
+    return {
+      rate: anyHotel[0].rate_double_eur || 80,
+      name: anyHotel[0].name || 'Hotel',
+      id: anyHotel[0].id
+    }
+  }
+
+  return {
+    rate: hotels[0].rate_double_eur || 80,
+    name: hotels[0].name || 'Hotel',
+    id: hotels[0].id
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -223,7 +378,9 @@ export async function POST(request: NextRequest) {
       is_eur_passport = true,
       margin_percent = 25,
       partner_id = null,
-      include_optionals = false
+      include_optionals = false,
+      language = 'English',
+      tier = 'standard'
     } = body
 
     if (!variation_id) {
@@ -245,6 +402,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Variation not found' }, { status: 404 })
     }
 
+    const effectiveTier = variation.tier || tier
+
     // Fetch services for this variation
     const { data: services, error: servError } = await supabaseAdmin
       .from('tour_variation_services')
@@ -260,7 +419,7 @@ export async function POST(request: NextRequest) {
     const travelDate = new Date(travel_date)
     const season = getSeason(travelDate)
 
-    // Determine effective margin
+    // Determine effective margin (partner override)
     let effectiveMargin = margin_percent
     if (partner_id) {
       const { data: partner } = await supabaseAdmin
@@ -300,7 +459,7 @@ export async function POST(request: NextRequest) {
       let effectiveQuantityMode = service.quantity_mode || 'per_pax'
 
       // ============================================
-      // STEP 1: Check for B2B pricing rules first
+      // STEP 1: Check for B2B pricing rules (tiered pricing like felucca)
       // ============================================
       if (service.rate_type === 'activity' && service.service_name) {
         const b2bRule = await getB2BPricingRule(service.service_name)
@@ -313,15 +472,14 @@ export async function POST(request: NextRequest) {
           effectiveQuantityMode = priceResult.quantityMode
           rateSource = 'b2b_rule'
           
-          console.log(`B2B Rule applied: ${service.service_name} -> ${pricingNote}`)
+          console.log(`✅ B2B Rule applied: ${service.service_name} -> ${pricingNote}`)
         }
       }
 
       // ============================================
-      // STEP 2: Check for transport packages
+      // STEP 2: Check for B2B transport packages (cruise sightseeing)
       // ============================================
       if (rateSource === 'manual' && service.service_category === 'transportation') {
-        // Check if this is a cruise sightseeing package
         if (service.service_name?.toLowerCase().includes('sightseeing')) {
           const pkg = await getTransportPackage('cruise_sightseeing', 'Luxor', 'Aswan')
           if (pkg) {
@@ -331,9 +489,9 @@ export async function POST(request: NextRequest) {
             effectiveQuantityMode = 'fixed'
             pricingNote = `${vehicle.vehicle}: €${vehicle.rate} (${num_pax} pax)`
             rateSource = 'b2b_package'
+            console.log(`✅ B2B Package applied: ${service.service_name} -> ${pricingNote}`)
           }
         }
-        // Check if this is cruise transfer
         else if (service.service_name?.toLowerCase().includes('transfer') || 
                  service.service_name?.toLowerCase().includes('airport')) {
           const pkg = await getTransportPackage('cruise_transfer', 'Luxor', 'Aswan')
@@ -349,76 +507,135 @@ export async function POST(request: NextRequest) {
       }
 
       // ============================================
-      // STEP 3: Standard rate table lookup
+      // STEP 3: Use B2C tables for standard lookups
       // ============================================
-      if (rateSource === 'manual' && service.rate_type && service.rate_id) {
-        const rateConfig = RATE_TABLES[service.rate_type]
-        
-        if (rateConfig) {
-          const { data: rate, error: rateError } = await supabaseAdmin
-            .from(rateConfig.table)
-            .select('*')
-            .eq('id', service.rate_id)
-            .single()
+      if (rateSource === 'manual') {
+        const rateType = service.rate_type || service.service_category
 
-          if (rateError) {
-            console.error(`Rate fetch error for ${service.rate_type}/${service.rate_id}:`, rateError)
+        switch (rateType) {
+          case 'transportation': {
+            const vehicle = await selectVehicleFromB2CTable(num_pax, effectiveTier)
+            if (vehicle) {
+              unitCost = vehicle.rate
+              lineTotal = vehicle.rate
+              effectiveQuantityMode = 'fixed'
+              pricingNote = `${vehicle.vehicle}: €${vehicle.rate}/day`
+              rateSource = 'vehicles'
+              console.log(`✅ Vehicle from B2C: ${vehicle.vehicle} -> €${vehicle.rate}`)
+            }
+            break
           }
 
-          if (rate) {
-            rateSource = rateConfig.table
+          case 'guide': {
+            const guide = await selectGuideFromB2CTable(language, effectiveTier)
+            if (guide) {
+              unitCost = guide.rate
+              lineTotal = guide.rate
+              effectiveQuantityMode = 'fixed'
+              pricingNote = `${guide.name}: €${guide.rate}/day`
+              rateSource = 'guides'
+              console.log(`✅ Guide from B2C: ${guide.name} -> €${guide.rate}`)
+            }
+            break
+          }
 
-            // Handle cruise rates (cabin-based)
-            if (service.rate_type === 'cruise') {
-              if (num_pax === 1 && rate.rate_single_eur) {
-                unitCost = rate.rate_single_eur
-                pricingNote = 'Single occupancy'
-              } else if (num_pax >= 3 && rate.rate_triple_eur) {
-                unitCost = rate.rate_triple_eur
-                pricingNote = 'Triple occupancy'
-              } else {
-                unitCost = rate.rate_double_eur || 0
-                pricingNote = 'Double occupancy'
+          case 'activity':
+          case 'entrance': {
+            if (service.service_name) {
+              const fee = await getEntranceFee(service.service_name, is_eur_passport)
+              if (fee) {
+                unitCost = fee.rate
+                lineTotal = fee.rate * num_pax
+                effectiveQuantityMode = 'per_pax'
+                pricingNote = `${fee.name}: €${fee.rate}/pax (${is_eur_passport ? 'EUR' : 'non-EUR'})`
+                rateSource = 'entrance_fees'
+                console.log(`✅ Entrance from B2C: ${fee.name} -> €${fee.rate}/pax`)
               }
             }
-            // Handle transportation (capacity-based)
-            else if (service.rate_type === 'transportation' && rate.capacity_min && rate.capacity_max) {
-              // Check if this vehicle fits the group
-              if (num_pax >= rate.capacity_min && num_pax <= rate.capacity_max) {
-                unitCost = is_eur_passport ? rate.base_rate_eur : rate.base_rate_non_eur
-                pricingNote = `${rate.vehicle_type} (${rate.capacity_min}-${rate.capacity_max} pax)`
-              } else {
-                // Vehicle doesn't fit - just use base rate
-                unitCost = is_eur_passport ? rate.base_rate_eur : rate.base_rate_non_eur
-                pricingNote = `${rate.vehicle_type} (base rate)`
-              }
-            }
-            // Standard rate lookup
-            else {
-              if (!is_eur_passport && rateConfig.nonEurField && rate[rateConfig.nonEurField]) {
-                unitCost = rate[rateConfig.nonEurField]
-              } else {
-                unitCost = rate[rateConfig.eurField] || 0
-              }
-            }
+            break
+          }
 
-            console.log(`Rate lookup: ${service.service_name} -> €${unitCost} (${rateSource})`)
+          case 'accommodation': {
+            const hotel = await getHotelRate(service.city || 'Cairo', effectiveTier)
+            if (hotel) {
+              const roomsNeeded = Math.ceil(num_pax / 2)
+              unitCost = hotel.rate
+              lineTotal = hotel.rate * roomsNeeded
+              effectiveQuantityMode = 'per_room'
+              pricingNote = `${hotel.name}: €${hotel.rate}/room × ${roomsNeeded}`
+              rateSource = 'hotel_contacts'
+              console.log(`✅ Hotel from B2C: ${hotel.name} -> €${hotel.rate}/room`)
+            }
+            break
+          }
+
+          case 'cruise': {
+            // Cruise rates from nile_cruises table
+            if (service.rate_id) {
+              const { data: cruise } = await supabaseAdmin
+                .from('nile_cruises')
+                .select('*')
+                .eq('id', service.rate_id)
+                .single()
+
+              if (cruise) {
+                if (num_pax === 1 && cruise.rate_single_eur) {
+                  unitCost = cruise.rate_single_eur
+                  pricingNote = 'Single occupancy'
+                } else if (num_pax >= 3 && cruise.rate_triple_eur) {
+                  unitCost = cruise.rate_triple_eur
+                  pricingNote = 'Triple occupancy'
+                } else {
+                  unitCost = cruise.rate_double_eur || 0
+                  pricingNote = 'Double occupancy'
+                }
+                lineTotal = unitCost * num_pax
+                effectiveQuantityMode = 'per_pax'
+                rateSource = 'nile_cruises'
+                console.log(`✅ Cruise from B2C: ${cruise.ship_name} -> €${unitCost}/pax`)
+              }
+            }
+            break
+          }
+
+          case 'meal': {
+            const { data: mealRate } = await supabaseAdmin
+              .from('meal_rates')
+              .select('*')
+              .eq('is_active', true)
+              .limit(1)
+              .single()
+
+            if (mealRate) {
+              if (service.service_name?.toLowerCase().includes('dinner')) {
+                unitCost = mealRate.dinner_rate_eur || 18
+              } else {
+                unitCost = mealRate.lunch_rate_eur || 12
+              }
+              lineTotal = unitCost * num_pax
+              effectiveQuantityMode = 'per_pax'
+              pricingNote = `€${unitCost}/pax`
+              rateSource = 'meal_rates'
+              console.log(`✅ Meal from B2C: ${service.service_name} -> €${unitCost}/pax`)
+            }
+            break
           }
         }
       }
-      
+
       // ============================================
       // STEP 4: Fall back to stored cost_per_unit
       // ============================================
       if (rateSource === 'manual' && service.cost_per_unit) {
         unitCost = service.cost_per_unit
         rateSource = 'stored'
+        console.log(`⚠️ Fallback to stored: ${service.service_name} -> €${unitCost}`)
       }
 
       // ============================================
       // STEP 5: Calculate line total if not already set
       // ============================================
-      if (lineTotal === 0) {
+      if (lineTotal === 0 && unitCost > 0) {
         let quantity = service.quantity_value || 1
 
         switch (effectiveQuantityMode) {
@@ -426,6 +643,7 @@ export async function POST(request: NextRequest) {
             quantity = (service.quantity_value || 1) * num_pax
             break
           case 'per_group':
+          case 'fixed':
             quantity = service.quantity_value || 1
             break
           case 'per_day':
@@ -434,8 +652,8 @@ export async function POST(request: NextRequest) {
           case 'per_night':
             quantity = (service.quantity_value || 1) * (((variation.tour_templates as any)?.duration_days || 1) - 1)
             break
-          case 'fixed':
-            quantity = service.quantity_value || 1
+          case 'per_room':
+            quantity = Math.ceil(num_pax / 2)
             break
         }
 
@@ -450,8 +668,8 @@ export async function POST(request: NextRequest) {
         rate_source: rateSource,
         quantity_mode: effectiveQuantityMode,
         quantity: effectiveQuantityMode === 'fixed' ? 1 : (service.quantity_value || 1) * (effectiveQuantityMode === 'per_pax' ? num_pax : 1),
-        unit_cost: unitCost,
-        line_total: lineTotal,
+        unit_cost: Math.round(unitCost * 100) / 100,
+        line_total: Math.round(lineTotal * 100) / 100,
         is_optional: service.is_optional || false,
         day_number: service.day_number,
         pricing_note: pricingNote || undefined
@@ -492,9 +710,17 @@ export async function POST(request: NextRequest) {
       currency: 'EUR'
     }
 
+    console.log('🎉 B2B Price calculated:', {
+      variation: variation.variation_name,
+      numPax: num_pax,
+      cost: totalCost,
+      margin: effectiveMargin + '%',
+      selling: sellingPrice
+    })
+
     return NextResponse.json({ success: true, data: result })
   } catch (error: any) {
-    console.error('Error calculating tour price:', error)
+    console.error('❌ Error calculating tour price:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
