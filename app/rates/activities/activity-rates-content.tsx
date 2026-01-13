@@ -25,7 +25,10 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Info
+  Info,
+  Ship,
+  PersonStanding,
+  Banknote
 } from 'lucide-react'
 
 // Egyptian cities
@@ -48,7 +51,10 @@ const ACTIVITY_CATEGORIES = [
   'Religious Sites',
   'Nature & Wildlife',
   'Entertainment',
-  'Shopping Tours'
+  'Shopping Tours',
+  'Shows & Events',
+  'Nile Experience',
+  'Local Transport'
 ]
 
 const ACTIVITY_TYPES = [
@@ -60,11 +66,15 @@ const ACTIVITY_TYPES = [
   'Experience',
   'Workshop',
   'Show',
-  'Cruise'
+  'Cruise',
+  'Ride',
+  'Activity'
 ]
 
 const DURATIONS = [
+  '30 minutes',
   '1 hour',
+  '1.5 hours',
   '2 hours',
   '3 hours',
   '4 hours',
@@ -72,6 +82,26 @@ const DURATIONS = [
   'Full Day (6-8h)',
   'Extended Day (8-10h)',
   'Multi-Day'
+]
+
+// NEW: Pricing types for add-ons
+const PRICING_TYPES = [
+  { value: 'per_person', label: 'Per Person', description: 'Rate multiplied by number of travelers', icon: PersonStanding },
+  { value: 'per_unit', label: 'Per Unit', description: 'Flat rate per boat/vehicle/ride', icon: Ship },
+  { value: 'flat', label: 'Flat Rate', description: 'Single price regardless of group size', icon: Banknote }
+]
+
+// NEW: Common unit labels
+const UNIT_LABELS = [
+  'boat',
+  'felucca',
+  'ride',
+  'quad',
+  'vehicle',
+  'ticket',
+  'group',
+  'session',
+  'person'
 ]
 
 interface Supplier {
@@ -91,6 +121,12 @@ interface ActivityRate {
   city?: string
   base_rate_eur: number
   base_rate_non_eur: number
+  // NEW: Add-on pricing fields
+  pricing_type?: 'per_person' | 'per_unit' | 'flat'
+  unit_label?: string
+  min_capacity?: number
+  max_capacity?: number
+  // Existing fields
   season?: string
   rate_valid_from?: string
   rate_valid_to?: string
@@ -118,6 +154,7 @@ export default function ActivityRatesContent() {
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSupplier, setSelectedSupplier] = useState(initialSupplierId)
+  const [selectedPricingType, setSelectedPricingType] = useState('')
   const [showInactive, setShowInactive] = useState(false)
 
   // UI State
@@ -166,6 +203,12 @@ export default function ActivityRatesContent() {
     city: '',
     base_rate_eur: 0,
     base_rate_non_eur: 0,
+    // NEW: Add-on pricing fields
+    pricing_type: 'per_person' as 'per_person' | 'per_unit' | 'flat',
+    unit_label: '',
+    min_capacity: 1,
+    max_capacity: 99,
+    // Existing fields
     season: '',
     rate_valid_from: today,
     rate_valid_to: nextYear,
@@ -216,7 +259,7 @@ export default function ActivityRatesContent() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, selectedCity, selectedCategory, selectedSupplier, showInactive, itemsPerPage])
+  }, [searchTerm, selectedCity, selectedCategory, selectedSupplier, selectedPricingType, showInactive, itemsPerPage])
 
   // Handlers
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -248,6 +291,10 @@ export default function ActivityRatesContent() {
       city: '',
       base_rate_eur: 0,
       base_rate_non_eur: 0,
+      pricing_type: 'per_person',
+      unit_label: '',
+      min_capacity: 1,
+      max_capacity: 99,
       season: '',
       rate_valid_from: today,
       rate_valid_to: nextYear,
@@ -270,6 +317,10 @@ export default function ActivityRatesContent() {
       city: rate.city || '',
       base_rate_eur: rate.base_rate_eur || 0,
       base_rate_non_eur: rate.base_rate_non_eur || 0,
+      pricing_type: rate.pricing_type || 'per_person',
+      unit_label: rate.unit_label || '',
+      min_capacity: rate.min_capacity || 1,
+      max_capacity: rate.max_capacity || 99,
       season: rate.season || '',
       rate_valid_from: rate.rate_valid_from || today,
       rate_valid_to: rate.rate_valid_to || nextYear,
@@ -355,9 +406,10 @@ export default function ActivityRatesContent() {
     const matchesCity = selectedCity === '' || rate.city === selectedCity
     const matchesCategory = selectedCategory === '' || rate.activity_category === selectedCategory
     const matchesSupplier = selectedSupplier === '' || rate.supplier_id === selectedSupplier
+    const matchesPricingType = selectedPricingType === '' || rate.pricing_type === selectedPricingType
     const matchesActive = showInactive || rate.is_active
 
-    return matchesSearch && matchesCity && matchesCategory && matchesSupplier && matchesActive
+    return matchesSearch && matchesCity && matchesCategory && matchesSupplier && matchesPricingType && matchesActive
   })
 
   // Pagination
@@ -367,17 +419,21 @@ export default function ActivityRatesContent() {
 
   // Stats
   const activeRates = rates.filter(r => r.is_active).length
-  const linkedRates = rates.filter(r => r.supplier_id).length
-  const avgRate = rates.length > 0
-    ? (rates.reduce((sum, r) => sum + (r.base_rate_eur || 0), 0) / rates.filter(r => (r.base_rate_eur || 0) > 0).length || 0).toFixed(0)
-    : '0'
+  const perPersonRates = rates.filter(r => r.pricing_type === 'per_person' || !r.pricing_type).length
+  const perUnitRates = rates.filter(r => r.pricing_type === 'per_unit').length
+  const flatRates = rates.filter(r => r.pricing_type === 'flat').length
   const uniqueCities = [...new Set(rates.map(r => r.city).filter(Boolean))].length
 
-  // Get supplier name by ID
-  const getSupplierName = (supplierId: string | undefined) => {
-    if (!supplierId) return null
-    const supplier = suppliers.find(s => s.id === supplierId)
-    return supplier?.name || null
+  // Get pricing type badge
+  const getPricingTypeBadge = (pricingType: string | undefined) => {
+    switch (pricingType) {
+      case 'per_unit':
+        return <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Per Unit</span>
+      case 'flat':
+        return <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">Flat</span>
+      default:
+        return <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">Per Person</span>
+    }
   }
 
   // Get notification icon
@@ -497,10 +553,10 @@ export default function ActivityRatesContent() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              Activity Rates
+              Activities & Add-ons
               <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
             </h1>
-            <p className="text-sm text-gray-600">Manage pricing for tours, activities, and attractions</p>
+            <p className="text-sm text-gray-600">Manage pricing for tours, activities, and optional add-ons</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -528,8 +584,8 @@ export default function ActivityRatesContent() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {/* Stats - Updated with pricing type breakdown */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
             <Ticket className="w-4 h-4 text-gray-400" />
@@ -548,19 +604,27 @@ export default function ActivityRatesContent() {
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Users className="w-4 h-4 text-gray-400" />
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+            <PersonStanding className="w-4 h-4 text-gray-400" />
+            <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{linkedRates}</p>
-          <p className="text-xs text-gray-600">Linked</p>
+          <p className="text-2xl font-bold text-gray-900">{perPersonRates}</p>
+          <p className="text-xs text-gray-600">Per Person</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-gray-400 font-bold">€</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+            <Ship className="w-4 h-4 text-gray-400" />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">€{avgRate}</p>
-          <p className="text-xs text-gray-600">Avg. Rate</p>
+          <p className="text-2xl font-bold text-gray-900">{perUnitRates}</p>
+          <p className="text-xs text-gray-600">Per Unit</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Banknote className="w-4 h-4 text-gray-400" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{flatRates}</p>
+          <p className="text-xs text-gray-600">Flat Rate</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
@@ -572,7 +636,7 @@ export default function ActivityRatesContent() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters - Updated with pricing type filter */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
         <div className="flex flex-wrap gap-3">
           {/* Search */}
@@ -589,16 +653,16 @@ export default function ActivityRatesContent() {
             </div>
           </div>
 
-          {/* Supplier Filter */}
+          {/* Pricing Type Filter */}
           <select
-            value={selectedSupplier}
-            onChange={(e) => setSelectedSupplier(e.target.value)}
+            value={selectedPricingType}
+            onChange={(e) => setSelectedPricingType(e.target.value)}
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
           >
-            <option value="">All Suppliers</option>
-            {suppliers.map(supplier => (
-              <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-            ))}
+            <option value="">All Pricing Types</option>
+            <option value="per_person">Per Person</option>
+            <option value="per_unit">Per Unit (Boat/Ride)</option>
+            <option value="flat">Flat Rate</option>
           </select>
 
           {/* Category Filter */}
@@ -678,14 +742,14 @@ export default function ActivityRatesContent() {
         </div>
       </div>
 
-      {/* Rates Table */}
+      {/* Rates Table - Updated with pricing type column */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {paginatedRates.length === 0 ? (
           <div className="p-12 text-center">
             <Ticket className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Rates Found</h3>
             <p className="text-sm text-gray-600 mb-4">
-              {searchTerm || selectedCity || selectedCategory || selectedSupplier
+              {searchTerm || selectedCity || selectedCategory || selectedPricingType
                 ? 'Try adjusting your filters'
                 : 'Get started by adding your first activity rate'}
             </p>
@@ -705,7 +769,8 @@ export default function ActivityRatesContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Activity</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Category</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Duration</th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Pricing</th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Capacity</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
@@ -736,8 +801,22 @@ export default function ActivityRatesContent() {
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-600">{rate.city || '—'}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600">{rate.duration || '—'}</span>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        {getPricingTypeBadge(rate.pricing_type)}
+                        {rate.pricing_type === 'per_unit' && rate.unit_label && (
+                          <span className="text-xs text-gray-500">/{rate.unit_label}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {rate.pricing_type === 'per_unit' ? (
+                        <span className="text-xs text-gray-600">
+                          {rate.min_capacity}-{rate.max_capacity} pax
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm font-bold text-green-600">€{rate.base_rate_eur}</span>
@@ -789,16 +868,26 @@ export default function ActivityRatesContent() {
                   </span>
                 </div>
 
-                {rate.activity_category && (
-                  <p className="text-xs text-purple-600 font-medium mb-2">
-                    <Tag className="w-3 h-3 inline mr-1" />
-                    {rate.activity_category}
-                  </p>
-                )}
+                <div className="flex items-center gap-2 mb-2">
+                  {getPricingTypeBadge(rate.pricing_type)}
+                  {rate.activity_category && (
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                      {rate.activity_category}
+                    </span>
+                  )}
+                </div>
 
                 <div className="space-y-1 text-sm text-gray-600 mb-3">
                   <p><span className="text-gray-400">City:</span> {rate.city || '—'}</p>
-                  <p><span className="text-gray-400">Duration:</span> {rate.duration || '—'}</p>
+                  {rate.pricing_type === 'per_unit' && (
+                    <>
+                      <p><span className="text-gray-400">Unit:</span> {rate.unit_label || 'unit'}</p>
+                      <p><span className="text-gray-400">Capacity:</span> {rate.min_capacity}-{rate.max_capacity} pax</p>
+                    </>
+                  )}
+                  {rate.duration && (
+                    <p><span className="text-gray-400">Duration:</span> {rate.duration}</p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
@@ -832,6 +921,7 @@ export default function ActivityRatesContent() {
                   <Ticket className="w-4 h-4 text-purple-500" />
                   <span className="font-medium text-gray-900">{rate.activity_name}</span>
                   <span className="text-sm text-gray-500">{rate.city || '—'}</span>
+                  {getPricingTypeBadge(rate.pricing_type)}
                   {rate.activity_category && (
                     <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
                       {rate.activity_category}
@@ -859,7 +949,7 @@ export default function ActivityRatesContent() {
           </div>
         )}
 
-        {/* Enhanced Pagination */}
+        {/* Pagination */}
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50">
             <p className="text-sm text-gray-600">
@@ -867,7 +957,6 @@ export default function ActivityRatesContent() {
               <span className="text-gray-400 ml-2">({filteredRates.length} total)</span>
             </p>
             <div className="flex items-center gap-1">
-              {/* First Page */}
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
@@ -875,8 +964,6 @@ export default function ActivityRatesContent() {
               >
                 First
               </button>
-              
-              {/* Previous */}
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
@@ -884,8 +971,6 @@ export default function ActivityRatesContent() {
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-
-              {/* Page Numbers */}
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum: number
@@ -913,8 +998,6 @@ export default function ActivityRatesContent() {
                   )
                 })}
               </div>
-
-              {/* Next */}
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
@@ -922,8 +1005,6 @@ export default function ActivityRatesContent() {
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
-
-              {/* Last Page */}
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
@@ -936,7 +1017,7 @@ export default function ActivityRatesContent() {
         )}
       </div>
 
-      {/* Form Modal */}
+      {/* Form Modal - Updated with pricing type fields */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
@@ -965,7 +1046,7 @@ export default function ActivityRatesContent() {
                       value={formData.activity_name}
                       onChange={handleChange}
                       required
-                      placeholder="e.g., Pyramids of Giza Tour"
+                      placeholder="e.g., Felucca Ride - 1 Hour"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     />
                   </div>
@@ -1038,10 +1119,145 @@ export default function ActivityRatesContent() {
                 </div>
               </div>
 
-              {/* Link to Supplier */}
+              {/* NEW: Pricing Type Section */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">2</span>
+                  Pricing Model
+                </h3>
+                
+                {/* Pricing Type Selection */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {PRICING_TYPES.map((type) => {
+                    const Icon = type.icon
+                    return (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, pricing_type: type.value as any }))}
+                        className={`p-3 border-2 rounded-lg text-left transition-all ${
+                          formData.pricing_type === type.value
+                            ? 'border-primary-600 bg-primary-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Icon className={`w-4 h-4 ${formData.pricing_type === type.value ? 'text-primary-600' : 'text-gray-400'}`} />
+                          <span className={`text-sm font-semibold ${formData.pricing_type === type.value ? 'text-primary-600' : 'text-gray-900'}`}>
+                            {type.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500">{type.description}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Per Unit Settings - Only show when per_unit is selected */}
+                {formData.pricing_type === 'per_unit' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                    <p className="text-xs font-medium text-blue-800 flex items-center gap-2">
+                      <Ship className="w-4 h-4" />
+                      Per Unit Settings (e.g., boat, ride, vehicle)
+                    </p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Unit Label *</label>
+                        <select
+                          name="unit_label"
+                          value={formData.unit_label}
+                          onChange={handleChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        >
+                          <option value="">Select unit</option>
+                          {UNIT_LABELS.map(label => (
+                            <option key={label} value={label}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Min Capacity</label>
+                        <input
+                          type="number"
+                          name="min_capacity"
+                          value={formData.min_capacity}
+                          onChange={handleChange}
+                          min="1"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Max Capacity</label>
+                        <input
+                          type="number"
+                          name="max_capacity"
+                          value={formData.max_capacity}
+                          onChange={handleChange}
+                          min="1"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-blue-600">
+                      💡 Example: Felucca ride costs €25/boat and can hold 1-6 passengers
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Rates */}
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">3</span>
+                  Pricing
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      EUR Rate (€) * 
+                      <span className="text-gray-400 font-normal ml-1">
+                        {formData.pricing_type === 'per_person' && '/ person'}
+                        {formData.pricing_type === 'per_unit' && `/ ${formData.unit_label || 'unit'}`}
+                        {formData.pricing_type === 'flat' && '/ total'}
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      name="base_rate_eur"
+                      value={formData.base_rate_eur}
+                      onChange={handleChange}
+                      required
+                      min="0"
+                      step="0.01"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Non-EUR Rate (€)
+                      <span className="text-gray-400 font-normal ml-1">
+                        {formData.pricing_type === 'per_person' && '/ person'}
+                        {formData.pricing_type === 'per_unit' && `/ ${formData.unit_label || 'unit'}`}
+                        {formData.pricing_type === 'flat' && '/ total'}
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      name="base_rate_non_eur"
+                      value={formData.base_rate_non_eur}
+                      onChange={handleChange}
+                      min="0"
+                      step="0.01"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Link to Supplier */}
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">4</span>
                   Link to Supplier (Optional)
                 </h3>
                 <select
@@ -1059,45 +1275,10 @@ export default function ActivityRatesContent() {
                 </select>
               </div>
 
-              {/* Rates */}
-              <div className="mb-4">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">3</span>
-                  Pricing
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">EUR Rate (€) *</label>
-                    <input
-                      type="number"
-                      name="base_rate_eur"
-                      value={formData.base_rate_eur}
-                      onChange={handleChange}
-                      required
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Non-EUR Rate (€)</label>
-                    <input
-                      type="number"
-                      name="base_rate_non_eur"
-                      value={formData.base_rate_non_eur}
-                      onChange={handleChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Validity */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">4</span>
+                  <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">5</span>
                   Validity Period
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -1132,6 +1313,7 @@ export default function ActivityRatesContent() {
                   value={formData.notes}
                   onChange={handleChange}
                   rows={2}
+                  placeholder="e.g., Includes tea service, best at sunset"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                 />
               </div>
