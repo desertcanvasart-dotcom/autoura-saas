@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const supplierId = searchParams.get('supplier_id')
     const city = searchParams.get('city')
     const category = searchParams.get('category')
+    const pricingType = searchParams.get('pricing_type')
     const activeOnly = searchParams.get('active_only') === 'true'
 
     let query = supabaseAdmin
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
     if (supplierId) query = query.eq('supplier_id', supplierId)
     if (city) query = query.eq('city', city)
     if (category) query = query.eq('activity_category', category)
+    if (pricingType) query = query.eq('pricing_type', pricingType)
     if (activeOnly) query = query.eq('is_active', true)
 
     const { data, error } = await query
@@ -51,6 +53,12 @@ export async function POST(request: NextRequest) {
       city: body.city || null,
       base_rate_eur: parseFloat(body.base_rate_eur) || 0,
       base_rate_non_eur: parseFloat(body.base_rate_non_eur) || 0,
+      // Add-on pricing fields
+      pricing_type: body.pricing_type || 'per_person',
+      unit_label: body.unit_label || null,
+      min_capacity: parseInt(body.min_capacity) || 1,
+      max_capacity: parseInt(body.max_capacity) || 99,
+      // Other fields
       season: body.season || null,
       rate_valid_from: body.rate_valid_from || null,
       rate_valid_to: body.rate_valid_to || null,

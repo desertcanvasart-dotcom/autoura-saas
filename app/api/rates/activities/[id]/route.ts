@@ -20,13 +20,17 @@ export async function GET(
       .single()
 
     if (error) {
-      console.error('GET activity_rate error:', error)
+      console.error('GET activity_rates by id error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    }
+
+    if (!data) {
+      return NextResponse.json({ success: false, error: 'Rate not found' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('GET activity_rate catch error:', error)
+    console.error('GET activity_rates by id catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
@@ -39,23 +43,30 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    const updateData: Record<string, any> = {}
-
-    if (body.service_code !== undefined) updateData.service_code = body.service_code
-    if (body.activity_name !== undefined) updateData.activity_name = body.activity_name
-    if (body.activity_category !== undefined) updateData.activity_category = body.activity_category || null
-    if (body.activity_type !== undefined) updateData.activity_type = body.activity_type || null
-    if (body.duration !== undefined) updateData.duration = body.duration || null
-    if (body.city !== undefined) updateData.city = body.city || null
-    if (body.base_rate_eur !== undefined) updateData.base_rate_eur = parseFloat(body.base_rate_eur) || 0
-    if (body.base_rate_non_eur !== undefined) updateData.base_rate_non_eur = parseFloat(body.base_rate_non_eur) || 0
-    if (body.season !== undefined) updateData.season = body.season || null
-    if (body.rate_valid_from !== undefined) updateData.rate_valid_from = body.rate_valid_from || null
-    if (body.rate_valid_to !== undefined) updateData.rate_valid_to = body.rate_valid_to || null
-    if (body.supplier_id !== undefined) updateData.supplier_id = body.supplier_id || null
-    if (body.supplier_name !== undefined) updateData.supplier_name = body.supplier_name || null
-    if (body.notes !== undefined) updateData.notes = body.notes || null
-    if (body.is_active !== undefined) updateData.is_active = body.is_active
+    const updateData = {
+      service_code: body.service_code,
+      activity_name: body.activity_name,
+      activity_category: body.activity_category || null,
+      activity_type: body.activity_type || null,
+      duration: body.duration || null,
+      city: body.city || null,
+      base_rate_eur: parseFloat(body.base_rate_eur) || 0,
+      base_rate_non_eur: parseFloat(body.base_rate_non_eur) || 0,
+      // Add-on pricing fields
+      pricing_type: body.pricing_type || 'per_person',
+      unit_label: body.unit_label || null,
+      min_capacity: parseInt(body.min_capacity) || 1,
+      max_capacity: parseInt(body.max_capacity) || 99,
+      // Other fields
+      season: body.season || null,
+      rate_valid_from: body.rate_valid_from || null,
+      rate_valid_to: body.rate_valid_to || null,
+      supplier_id: body.supplier_id || null,
+      supplier_name: body.supplier_name || null,
+      notes: body.notes || null,
+      is_active: body.is_active !== false,
+      updated_at: new Date().toISOString()
+    }
 
     const { data, error } = await supabaseAdmin
       .from('activity_rates')
@@ -65,13 +76,13 @@ export async function PUT(
       .single()
 
     if (error) {
-      console.error('PUT activity_rate error:', error)
+      console.error('PUT activity_rates error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('PUT activity_rate catch error:', error)
+    console.error('PUT activity_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
@@ -89,13 +100,13 @@ export async function DELETE(
       .eq('id', id)
 
     if (error) {
-      console.error('DELETE activity_rate error:', error)
+      console.error('DELETE activity_rates error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, message: 'Rate deleted successfully' })
   } catch (error: any) {
-    console.error('DELETE activity_rate catch error:', error)
+    console.error('DELETE activity_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
