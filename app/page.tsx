@@ -26,7 +26,9 @@ import {
   Ship,
   Languages,
   FileSearch,
-  Clock
+  Clock,
+  Menu,
+  XIcon
 } from 'lucide-react'
 
 // Animation hook for scroll reveal
@@ -155,6 +157,7 @@ const modules = [
   {
     id: "whatsapp-inbox",
     title: "WhatsApp Business Inbox",
+    shortTitle: "WhatsApp",
     icon: MessageSquare,
     badge: "AI-Powered",
     badgeColor: "bg-emerald-100 text-emerald-700",
@@ -174,6 +177,7 @@ const modules = [
   {
     id: "itinerary-builder",
     title: "Smart Itinerary Builder",
+    shortTitle: "Itinerary",
     icon: FileText,
     badge: "AI-Powered",
     badgeColor: "bg-emerald-100 text-emerald-700",
@@ -193,6 +197,7 @@ const modules = [
   {
     id: "crm",
     title: "Client Management",
+    shortTitle: "CRM",
     icon: Users,
     badge: "Core",
     badgeColor: "bg-slate-100 text-slate-700",
@@ -212,6 +217,7 @@ const modules = [
   {
     id: "pricing-engine",
     title: "Rate Database & Pricing",
+    shortTitle: "Pricing",
     icon: DollarSign,
     badge: "Core",
     badgeColor: "bg-slate-100 text-slate-700",
@@ -231,6 +237,7 @@ const modules = [
   {
     id: "supplier-management",
     title: "Supplier Management",
+    shortTitle: "Suppliers",
     icon: Building2,
     badge: "Core",
     badgeColor: "bg-slate-100 text-slate-700",
@@ -250,6 +257,7 @@ const modules = [
   {
     id: "invoicing",
     title: "Invoicing & Payments",
+    shortTitle: "Invoicing",
     icon: FileSearch,
     badge: "Core",
     badgeColor: "bg-slate-100 text-slate-700",
@@ -348,13 +356,14 @@ const testimonials = [
 export default function AutouraHomepage() {
   const [activeModule, setActiveModule] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     setIsLoaded(true)
   }, [])
 
   return (
-    <div className="min-h-screen bg-stone-50 overflow-hidden">
+    <div className="min-h-screen bg-stone-50 overflow-x-hidden">
       {/* Decorative background elements */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#647C47]/5 rounded-full blur-3xl" />
@@ -364,7 +373,7 @@ export default function AutouraHomepage() {
 
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-stone-200/50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-[#647C47] to-[#4a5c35] rounded-lg flex items-center justify-center">
@@ -373,6 +382,7 @@ export default function AutouraHomepage() {
               <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>
             </Link>
 
+            {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-sm text-stone-600 hover:text-stone-900 transition-colors">Features</a>
               <a href="#how-it-works" className="text-sm text-stone-600 hover:text-stone-900 transition-colors">How It Works</a>
@@ -390,52 +400,76 @@ export default function AutouraHomepage() {
                 Start Free Trial
               </Link>
             </div>
+
+            {/* Mobile Menu Button */}
+            <button 
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 text-stone-600 hover:text-stone-900"
+            >
+              {mobileMenuOpen ? <XIcon className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           </div>
+
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <div className="md:hidden pt-4 pb-2 border-t border-stone-200 mt-4 space-y-3">
+              <a href="#features" className="block text-sm text-stone-600 hover:text-stone-900 py-2">Features</a>
+              <a href="#how-it-works" className="block text-sm text-stone-600 hover:text-stone-900 py-2">How It Works</a>
+              <a href="#pricing" className="block text-sm text-stone-600 hover:text-stone-900 py-2">Pricing</a>
+              <Link href="/login" className="block text-sm text-stone-600 hover:text-stone-900 py-2">Sign In</Link>
+              <Link 
+                href="/register"
+                className="block w-full px-4 py-2 bg-[#647C47] text-white text-sm font-medium rounded-lg text-center hover:bg-[#4a5c35]"
+              >
+                Start Free Trial
+              </Link>
+            </div>
+          )}
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-6">
+      <section className="relative pt-28 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="max-w-4xl mx-auto text-center">
             <div 
               className={`transition-all duration-1000 ease-out ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
             >
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#647C47]/10 rounded-full mb-8">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#647C47]/10 rounded-full mb-6 sm:mb-8">
                 <Sparkles className="w-4 h-4 text-[#647C47]" />
                 <span className="text-sm font-medium text-[#647C47]">AI-Powered Travel Operations</span>
               </div>
 
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-stone-900 leading-tight tracking-tight mb-6">
+              <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl font-bold text-stone-900 leading-tight tracking-tight mb-4 sm:mb-6">
                 Stop Running Your Travel Business from{' '}
                 <span className="relative">
                   <span className="relative z-10 text-[#647C47]">WhatsApp and Excel</span>
-                  <span className="absolute bottom-2 left-0 right-0 h-3 bg-[#647C47]/20 -z-0" />
+                  <span className="absolute bottom-1 sm:bottom-2 left-0 right-0 h-2 sm:h-3 bg-[#647C47]/20 -z-0" />
                 </span>
               </h1>
 
-              <p className="text-lg md:text-xl text-stone-600 max-w-3xl mx-auto mb-10 leading-relaxed">
+              <p className="text-base sm:text-lg md:text-xl text-stone-600 max-w-3xl mx-auto mb-8 sm:mb-10 leading-relaxed px-2">
                 {heroContent.subheadline}
               </p>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-8 sm:mb-12">
                 <Link 
                   href="/register"
-                  className="group px-8 py-4 bg-[#647C47] text-white font-semibold rounded-xl hover:bg-[#4a5c35] transition-all hover:shadow-xl hover:shadow-[#647C47]/30 flex items-center gap-2"
+                  className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-[#647C47] text-white font-semibold rounded-xl hover:bg-[#4a5c35] transition-all hover:shadow-xl hover:shadow-[#647C47]/30 flex items-center justify-center gap-2"
                 >
                   Start Free Trial
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
-                <button className="group px-8 py-4 bg-white text-stone-700 font-semibold rounded-xl border border-stone-200 hover:border-stone-300 hover:shadow-lg transition-all flex items-center gap-2">
+                <button className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-stone-700 font-semibold rounded-xl border border-stone-200 hover:border-stone-300 hover:shadow-lg transition-all flex items-center justify-center gap-2">
                   <Play className="w-4 h-4 text-[#647C47]" />
                   See How It Works
                 </button>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-stone-500">
+              <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 sm:gap-6 text-sm text-stone-500">
                 {heroContent.trustSignals.map((signal, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-[#647C47]" />
+                    <Check className="w-4 h-4 text-[#647C47] flex-shrink-0" />
                     <span>{signal}</span>
                   </div>
                 ))}
@@ -445,30 +479,31 @@ export default function AutouraHomepage() {
 
           {/* Hero Image/Dashboard Preview */}
           <div 
-            className={`mt-16 transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+            className={`mt-12 sm:mt-16 transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
           >
             <div className="relative max-w-6xl mx-auto">
               <div className="absolute inset-0 bg-gradient-to-t from-stone-50 via-transparent to-transparent z-10 pointer-events-none" />
-              <div className="bg-white rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/50 overflow-hidden">
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl shadow-stone-900/10 border border-stone-200/50 overflow-hidden">
                 <div className="bg-stone-100 px-4 py-3 flex items-center gap-2 border-b border-stone-200">
                   <div className="w-3 h-3 rounded-full bg-red-400" />
                   <div className="w-3 h-3 rounded-full bg-amber-400" />
                   <div className="w-3 h-3 rounded-full bg-green-400" />
-                  <span className="ml-4 text-xs text-stone-400">autoura.net/dashboard</span>
+                  <span className="ml-4 text-xs text-stone-400 hidden sm:inline">autoura.net/dashboard</span>
                 </div>
-                <div className="p-8 bg-gradient-to-br from-stone-50 to-white min-h-[400px] flex items-center justify-center">
-                  <div className="grid grid-cols-3 gap-6 w-full max-w-4xl">
+                <div className="p-4 sm:p-8 bg-gradient-to-br from-stone-50 to-white min-h-[300px] sm:min-h-[400px] flex items-center justify-center">
+                  {/* FIXED: Changed grid-cols-3 to grid-cols-1 md:grid-cols-3 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full max-w-4xl">
                     {pillars.map((pillar, i) => (
                       <div 
                         key={i}
-                        className="bg-white rounded-xl p-6 shadow-lg border border-stone-100 hover:shadow-xl transition-shadow"
+                        className="bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-stone-100 hover:shadow-xl transition-shadow"
                         style={{ animationDelay: `${i * 100}ms` }}
                       >
-                        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${pillar.color} flex items-center justify-center mb-4`}>
-                          <pillar.icon className="w-6 h-6 text-white" />
+                        <div className={`w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-gradient-to-br ${pillar.color} flex items-center justify-center mb-3 sm:mb-4`}>
+                          <pillar.icon className="w-5 sm:w-6 h-5 sm:h-6 text-white" />
                         </div>
                         <h3 className="font-semibold text-stone-900 mb-2">{pillar.title}</h3>
-                        <p className="text-sm text-stone-500 line-clamp-3">{pillar.description}</p>
+                        <p className="text-sm text-stone-500">{pillar.description}</p>
                       </div>
                     ))}
                   </div>
@@ -480,7 +515,7 @@ export default function AutouraHomepage() {
       </section>
 
       {/* Problem Section */}
-      <section className="py-24 px-6 bg-stone-900 relative overflow-hidden">
+      <section className="py-16 sm:py-24 px-4 sm:px-6 bg-stone-900 relative overflow-hidden">
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-0 left-1/4 w-64 h-64 bg-red-500/20 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-amber-500/20 rounded-full blur-3xl" />
@@ -488,25 +523,25 @@ export default function AutouraHomepage() {
 
         <div className="max-w-7xl mx-auto relative">
           <AnimatedSection>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white mb-4 sm:mb-6">
                 Your Current Stack Is Held Together by <span className="text-red-400">Copy-Paste</span>
               </h2>
-              <p className="text-stone-400 text-lg max-w-2xl mx-auto">
+              <p className="text-stone-400 text-base sm:text-lg max-w-2xl mx-auto">
                 Sound familiar? Every tour operator knows these problems.
               </p>
             </div>
           </AnimatedSection>
 
-          <div className="grid md:grid-cols-2 gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 max-w-5xl mx-auto">
             {painPoints.map((point, i) => (
               <AnimatedSection key={i} delay={i * 50}>
-                <div className="group p-5 bg-stone-800/50 backdrop-blur border border-stone-700/50 rounded-xl hover:bg-stone-800 transition-all hover:border-red-500/30">
-                  <div className="flex items-start gap-4">
+                <div className="group p-4 sm:p-5 bg-stone-800/50 backdrop-blur border border-stone-700/50 rounded-xl hover:bg-stone-800 transition-all hover:border-red-500/30">
+                  <div className="flex items-start gap-3 sm:gap-4">
                     <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 group-hover:bg-red-500/30 transition-colors">
                       <X className="w-4 h-4 text-red-400" />
                     </div>
-                    <p className="text-stone-300 leading-relaxed">{point}</p>
+                    <p className="text-stone-300 leading-relaxed text-sm sm:text-base">{point}</p>
                   </div>
                 </div>
               </AnimatedSection>
@@ -514,7 +549,7 @@ export default function AutouraHomepage() {
           </div>
 
           <AnimatedSection delay={400}>
-            <p className="text-center text-xl text-stone-300 mt-16 max-w-3xl mx-auto">
+            <p className="text-center text-lg sm:text-xl text-stone-300 mt-12 sm:mt-16 max-w-3xl mx-auto px-2">
               You didn't start a travel business to be a <span className="text-white font-semibold">data entry specialist</span>. 
               Autoura handles the operations so you can focus on the travel.
             </p>
@@ -523,30 +558,31 @@ export default function AutouraHomepage() {
       </section>
 
       {/* Platform Overview */}
-      <section id="features" className="py-24 px-6">
+      <section id="features" className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <AnimatedSection>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-stone-900 mb-6">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-stone-900 mb-4 sm:mb-6">
                 One Platform for <span className="text-[#647C47]">Everything</span>
               </h2>
-              <p className="text-stone-600 text-lg max-w-2xl mx-auto">
+              <p className="text-stone-600 text-base sm:text-lg max-w-2xl mx-auto">
                 From the first WhatsApp message to the final payment receipt — a single system designed for how tour operators actually work.
               </p>
             </div>
           </AnimatedSection>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          {/* FIXED: Added grid-cols-1 for mobile */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             {pillars.map((pillar, i) => (
               <AnimatedSection key={i} delay={i * 100}>
                 <div className="group relative">
                   <div className={`absolute inset-0 bg-gradient-to-br ${pillar.color} rounded-2xl blur-xl opacity-0 group-hover:opacity-20 transition-opacity`} />
-                  <div className="relative bg-white rounded-2xl p-8 shadow-lg border border-stone-100 hover:shadow-xl hover:border-stone-200 transition-all h-full">
-                    <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${pillar.color} flex items-center justify-center mb-6 shadow-lg`}>
-                      <pillar.icon className="w-7 h-7 text-white" />
+                  <div className="relative bg-white rounded-2xl p-6 sm:p-8 shadow-lg border border-stone-100 hover:shadow-xl hover:border-stone-200 transition-all h-full">
+                    <div className={`w-12 sm:w-14 h-12 sm:h-14 rounded-xl bg-gradient-to-br ${pillar.color} flex items-center justify-center mb-4 sm:mb-6 shadow-lg`}>
+                      <pillar.icon className="w-6 sm:w-7 h-6 sm:h-7 text-white" />
                     </div>
-                    <h3 className="text-xl font-bold text-stone-900 mb-3">{pillar.title}</h3>
-                    <p className="text-stone-600 leading-relaxed">{pillar.description}</p>
+                    <h3 className="text-lg sm:text-xl font-bold text-stone-900 mb-2 sm:mb-3">{pillar.title}</h3>
+                    <p className="text-stone-600 leading-relaxed text-sm sm:text-base">{pillar.description}</p>
                   </div>
                 </div>
               </AnimatedSection>
@@ -556,14 +592,14 @@ export default function AutouraHomepage() {
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="py-24 px-6 bg-gradient-to-b from-stone-100 to-stone-50">
+      <section id="how-it-works" className="py-16 sm:py-24 px-4 sm:px-6 bg-gradient-to-b from-stone-100 to-stone-50">
         <div className="max-w-7xl mx-auto">
           <AnimatedSection>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-stone-900 mb-6">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-stone-900 mb-4 sm:mb-6">
                 From Inquiry to Invoice in <span className="text-[#647C47]">One Flow</span>
               </h2>
-              <p className="text-stone-600 text-lg max-w-2xl mx-auto">
+              <p className="text-stone-600 text-base sm:text-lg max-w-2xl mx-auto">
                 See how a typical booking moves through Autoura — from first contact to completed tour.
               </p>
             </div>
@@ -573,21 +609,21 @@ export default function AutouraHomepage() {
             {/* Connecting line */}
             <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#647C47] via-[#647C47]/50 to-transparent hidden md:block" />
 
-            <div className="space-y-8">
+            <div className="space-y-6 sm:space-y-8">
               {steps.map((step, i) => (
                 <AnimatedSection key={i} delay={i * 100}>
-                  <div className="flex items-start gap-6 group">
+                  <div className="flex items-start gap-4 sm:gap-6 group">
                     <div className="relative flex-shrink-0">
-                      <div className="w-16 h-16 rounded-2xl bg-white shadow-lg border border-stone-200 flex items-center justify-center group-hover:shadow-xl group-hover:border-[#647C47]/30 transition-all">
-                        <step.icon className="w-7 h-7 text-[#647C47]" />
+                      <div className="w-12 sm:w-16 h-12 sm:h-16 rounded-xl sm:rounded-2xl bg-white shadow-lg border border-stone-200 flex items-center justify-center group-hover:shadow-xl group-hover:border-[#647C47]/30 transition-all">
+                        <step.icon className="w-5 sm:w-7 h-5 sm:h-7 text-[#647C47]" />
                       </div>
-                      <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-[#647C47] text-white text-xs font-bold flex items-center justify-center shadow-md">
+                      <div className="absolute -top-1 sm:-top-2 -right-1 sm:-right-2 w-5 sm:w-6 h-5 sm:h-6 rounded-full bg-[#647C47] text-white text-xs font-bold flex items-center justify-center shadow-md">
                         {i + 1}
                       </div>
                     </div>
-                    <div className="bg-white rounded-xl p-6 shadow-md border border-stone-100 flex-1 group-hover:shadow-lg transition-shadow">
-                      <h3 className="text-lg font-bold text-stone-900 mb-2">{step.title}</h3>
-                      <p className="text-stone-600">{step.description}</p>
+                    <div className="bg-white rounded-xl p-4 sm:p-6 shadow-md border border-stone-100 flex-1 group-hover:shadow-lg transition-shadow min-w-0">
+                      <h3 className="text-base sm:text-lg font-bold text-stone-900 mb-1 sm:mb-2">{step.title}</h3>
+                      <p className="text-stone-600 text-sm sm:text-base">{step.description}</p>
                     </div>
                   </div>
                 </AnimatedSection>
@@ -598,32 +634,33 @@ export default function AutouraHomepage() {
       </section>
 
       {/* Core Modules - Before/After */}
-      <section className="py-24 px-6">
+      <section className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <AnimatedSection>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-stone-900 mb-6">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-stone-900 mb-4 sm:mb-6">
                 Every Module Built for <span className="text-[#647C47]">Real Operations</span>
               </h2>
-              <p className="text-stone-600 text-lg max-w-2xl mx-auto">
+              <p className="text-stone-600 text-base sm:text-lg max-w-2xl mx-auto">
                 See the before and after for each part of your workflow.
               </p>
             </div>
           </AnimatedSection>
 
-          {/* Module Tabs */}
-          <div className="flex flex-wrap justify-center gap-2 mb-12">
+          {/* Module Tabs - FIXED: Better mobile scrolling */}
+          <div className="flex overflow-x-auto pb-2 mb-8 sm:mb-12 gap-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center scrollbar-hide">
             {modules.map((module, i) => (
               <button
                 key={module.id}
                 onClick={() => setActiveModule(i)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                className={`flex-shrink-0 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
                   activeModule === i 
                     ? 'bg-[#647C47] text-white shadow-lg shadow-[#647C47]/30' 
                     : 'bg-white text-stone-600 border border-stone-200 hover:border-stone-300'
                 }`}
               >
                 <module.icon className="w-4 h-4" />
+                <span className="sm:hidden">{module.shortTitle}</span>
                 <span className="hidden sm:inline">{module.title}</span>
               </button>
             ))}
@@ -631,17 +668,17 @@ export default function AutouraHomepage() {
 
           {/* Active Module Content */}
           <AnimatedSection key={activeModule}>
-            <div className="bg-white rounded-2xl shadow-xl border border-stone-200 overflow-hidden max-w-5xl mx-auto">
-              <div className="p-6 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-[#647C47] flex items-center justify-center">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl border border-stone-200 overflow-hidden max-w-5xl mx-auto">
+              <div className="p-4 sm:p-6 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-[#647C47] flex items-center justify-center">
                     {(() => {
                       const IconComponent = modules[activeModule].icon
-                      return <IconComponent className="w-6 h-6 text-white" />
+                      return <IconComponent className="w-5 sm:w-6 h-5 sm:h-6 text-white" />
                     })()}
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-stone-900">{modules[activeModule].title}</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-stone-900">{modules[activeModule].title}</h3>
                     <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${modules[activeModule].badgeColor}`}>
                       {modules[activeModule].badge}
                     </span>
@@ -649,18 +686,18 @@ export default function AutouraHomepage() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-stone-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-stone-200">
                 {/* Before */}
-                <div className="p-8">
-                  <div className="flex items-center gap-2 mb-6">
+                <div className="p-4 sm:p-8">
+                  <div className="flex items-center gap-2 mb-4 sm:mb-6">
                     <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
                       <X className="w-4 h-4 text-red-600" />
                     </div>
                     <h4 className="font-semibold text-red-700">Before Autoura</h4>
                   </div>
-                  <ul className="space-y-4">
+                  <ul className="space-y-3 sm:space-y-4">
                     {modules[activeModule].before.map((point, i) => (
-                      <li key={i} className="flex items-start gap-3 text-stone-600">
+                      <li key={i} className="flex items-start gap-3 text-stone-600 text-sm sm:text-base">
                         <X className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
                         <span>{point}</span>
                       </li>
@@ -669,16 +706,16 @@ export default function AutouraHomepage() {
                 </div>
 
                 {/* After */}
-                <div className="p-8 bg-gradient-to-br from-[#647C47]/5 to-transparent">
-                  <div className="flex items-center gap-2 mb-6">
+                <div className="p-4 sm:p-8 bg-gradient-to-br from-[#647C47]/5 to-transparent">
+                  <div className="flex items-center gap-2 mb-4 sm:mb-6">
                     <div className="w-8 h-8 rounded-lg bg-[#647C47]/20 flex items-center justify-center">
                       <Check className="w-4 h-4 text-[#647C47]" />
                     </div>
                     <h4 className="font-semibold text-[#647C47]">With Autoura</h4>
                   </div>
-                  <ul className="space-y-4">
+                  <ul className="space-y-3 sm:space-y-4">
                     {modules[activeModule].after.map((point, i) => (
-                      <li key={i} className="flex items-start gap-3 text-stone-700">
+                      <li key={i} className="flex items-start gap-3 text-stone-700 text-sm sm:text-base">
                         <Check className="w-5 h-5 text-[#647C47] flex-shrink-0 mt-0.5" />
                         <span>{point}</span>
                       </li>
@@ -692,7 +729,7 @@ export default function AutouraHomepage() {
       </section>
 
       {/* Differentiators */}
-      <section className="py-24 px-6 bg-gradient-to-b from-[#647C47] to-[#4a5c35] relative overflow-hidden">
+      <section className="py-16 sm:py-24 px-4 sm:px-6 bg-gradient-to-b from-[#647C47] to-[#4a5c35] relative overflow-hidden">
         <div className="absolute inset-0 opacity-20">
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl" />
@@ -700,25 +737,26 @@ export default function AutouraHomepage() {
 
         <div className="max-w-7xl mx-auto relative">
           <AnimatedSection>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white mb-4 sm:mb-6">
                 Why Tour Operators Choose Autoura
               </h2>
-              <p className="text-white/70 text-lg max-w-2xl mx-auto">
+              <p className="text-white/70 text-base sm:text-lg max-w-2xl mx-auto">
                 This isn't generic SaaS. It's built for the specific chaos of travel operations.
               </p>
             </div>
           </AnimatedSection>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* FIXED: Added grid-cols-1 for mobile */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {differentiators.map((item, i) => (
               <AnimatedSection key={i} delay={i * 50}>
-                <div className="group bg-white/10 backdrop-blur border border-white/20 rounded-xl p-6 hover:bg-white/20 transition-all">
-                  <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-                    <item.icon className="w-6 h-6 text-white" />
+                <div className="group bg-white/10 backdrop-blur border border-white/20 rounded-xl p-4 sm:p-6 hover:bg-white/20 transition-all">
+                  <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-white/20 flex items-center justify-center mb-3 sm:mb-4 group-hover:bg-white/30 transition-colors">
+                    <item.icon className="w-5 sm:w-6 h-5 sm:h-6 text-white" />
                   </div>
-                  <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
-                  <p className="text-white/70">{item.description}</p>
+                  <h3 className="text-base sm:text-lg font-bold text-white mb-2">{item.title}</h3>
+                  <p className="text-white/70 text-sm sm:text-base">{item.description}</p>
                 </div>
               </AnimatedSection>
             ))}
@@ -727,36 +765,37 @@ export default function AutouraHomepage() {
       </section>
 
       {/* Egypt-Specific Features */}
-      <section className="py-24 px-6">
+      <section className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <AnimatedSection>
-            <div className="flex items-center justify-center gap-4 mb-16">
+            <div className="flex items-center justify-center gap-4 mb-12 sm:mb-16">
               <div className="text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 rounded-full mb-6">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 rounded-full mb-4 sm:mb-6">
                   <MapPin className="w-4 h-4 text-amber-700" />
                   <span className="text-sm font-medium text-amber-700">Made for Egypt</span>
                 </div>
-                <h2 className="text-3xl md:text-5xl font-bold text-stone-900 mb-6">
+                <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-stone-900 mb-4 sm:mb-6">
                   Egypt-Specific Features <span className="text-amber-600">Built In</span>
                 </h2>
-                <p className="text-stone-600 text-lg max-w-2xl mx-auto">
+                <p className="text-stone-600 text-base sm:text-lg max-w-2xl mx-auto">
                   Not adapted from generic software — built from the ground up for Egyptian tour operators.
                 </p>
               </div>
             </div>
           </AnimatedSection>
 
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          {/* FIXED: Added grid-cols-1 for mobile */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
             {egyptFeatures.map((feature, i) => (
               <AnimatedSection key={i} delay={i * 100}>
-                <div className="group bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-200/50 hover:shadow-lg transition-all">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0 shadow-lg">
-                      <feature.icon className="w-6 h-6 text-white" />
+                <div className="group bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 sm:p-6 border border-amber-200/50 hover:shadow-lg transition-all">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0 shadow-lg">
+                      <feature.icon className="w-5 sm:w-6 h-5 sm:h-6 text-white" />
                     </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-stone-900 mb-2">{feature.title}</h3>
-                      <p className="text-stone-600">{feature.description}</p>
+                    <div className="min-w-0">
+                      <h3 className="text-base sm:text-lg font-bold text-stone-900 mb-1 sm:mb-2">{feature.title}</h3>
+                      <p className="text-stone-600 text-sm sm:text-base">{feature.description}</p>
                     </div>
                   </div>
                 </div>
@@ -767,29 +806,30 @@ export default function AutouraHomepage() {
       </section>
 
       {/* Testimonials */}
-      <section className="py-24 px-6 bg-stone-100">
+      <section className="py-16 sm:py-24 px-4 sm:px-6 bg-stone-100">
         <div className="max-w-7xl mx-auto">
           <AnimatedSection>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-stone-900 mb-6">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-stone-900 mb-4 sm:mb-6">
                 What Operators Are Saying
               </h2>
             </div>
           </AnimatedSection>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          {/* FIXED: Added grid-cols-1 for mobile */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             {testimonials.map((testimonial, i) => (
               <AnimatedSection key={i} delay={i * 100}>
-                <div className="bg-white rounded-2xl p-8 shadow-lg border border-stone-200 h-full flex flex-col">
-                  <div className="flex items-center gap-1 mb-6">
+                <div className="bg-white rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg border border-stone-200 h-full flex flex-col">
+                  <div className="flex items-center gap-1 mb-4 sm:mb-6">
                     {[...Array(5)].map((_, j) => (
-                      <Star key={j} className="w-5 h-5 text-amber-400 fill-amber-400" />
+                      <Star key={j} className="w-4 sm:w-5 h-4 sm:h-5 text-amber-400 fill-amber-400" />
                     ))}
                   </div>
-                  <blockquote className="text-stone-700 text-lg leading-relaxed mb-6 flex-1">
+                  <blockquote className="text-stone-700 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 flex-1">
                     "{testimonial.quote}"
                   </blockquote>
-                  <div className="border-t border-stone-100 pt-6">
+                  <div className="border-t border-stone-100 pt-4 sm:pt-6">
                     <p className="font-semibold text-stone-900">{testimonial.author}</p>
                     <p className="text-sm text-stone-500">{testimonial.role}, {testimonial.company}</p>
                   </div>
@@ -801,27 +841,27 @@ export default function AutouraHomepage() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-24 px-6">
+      <section className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto">
           <AnimatedSection>
-            <div className="relative bg-gradient-to-br from-stone-900 to-stone-800 rounded-3xl p-12 md:p-16 overflow-hidden">
+            <div className="relative bg-gradient-to-br from-stone-900 to-stone-800 rounded-2xl sm:rounded-3xl p-8 sm:p-12 md:p-16 overflow-hidden">
               <div className="absolute inset-0 opacity-30">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-[#647C47]/30 rounded-full blur-3xl" />
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-500/20 rounded-full blur-3xl" />
               </div>
 
               <div className="relative text-center">
-                <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
+                <h2 className="text-2xl sm:text-3xl md:text-5xl font-bold text-white mb-4 sm:mb-6">
                   Your Competitors Are Still Using Spreadsheets
                 </h2>
-                <p className="text-stone-300 text-lg max-w-2xl mx-auto mb-10 leading-relaxed">
+                <p className="text-stone-300 text-base sm:text-lg max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
                   While they're copying entrance fees by hand and scrolling through WhatsApp looking for passport details, 
                   you could be sending quotes in minutes and tracking real profit margins.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                   <Link 
                     href="/register"
-                    className="group px-8 py-4 bg-[#647C47] text-white font-semibold rounded-xl hover:bg-[#5a7040] transition-all hover:shadow-xl hover:shadow-[#647C47]/30 flex items-center gap-2"
+                    className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-[#647C47] text-white font-semibold rounded-xl hover:bg-[#5a7040] transition-all hover:shadow-xl hover:shadow-[#647C47]/30 flex items-center justify-center gap-2"
                   >
                     Start Free Trial
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -835,7 +875,7 @@ export default function AutouraHomepage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-6 border-t border-stone-200">
+      <footer className="py-8 sm:py-12 px-4 sm:px-6 border-t border-stone-200">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
@@ -844,7 +884,7 @@ export default function AutouraHomepage() {
               </div>
               <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>
             </div>
-            <div className="flex items-center gap-8 text-sm text-stone-500">
+            <div className="flex items-center gap-6 sm:gap-8 text-sm text-stone-500">
               <Link href="/privacy" className="hover:text-stone-700 transition-colors">Privacy</Link>
               <Link href="/terms" className="hover:text-stone-700 transition-colors">Terms</Link>
               <Link href="/contact" className="hover:text-stone-700 transition-colors">Contact</Link>

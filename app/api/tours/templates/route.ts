@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 // GET - List all tour templates with variations
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
-
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category_id')
     const tourType = searchParams.get('tour_type')
     const isActive = searchParams.get('is_active')
 
     // First get templates
-    let query = supabase
+    let query = supabaseAdmin
       .from('tour_templates')
       .select(`
         *,
@@ -46,7 +49,7 @@ export async function GET(request: NextRequest) {
     if (templates && templates.length > 0) {
       const templateIds = templates.map(t => t.id)
       
-      const { data: variations, error: variationsError } = await supabase
+      const { data: variations, error: variationsError } = await supabaseAdmin
         .from('tour_variations')
         .select('*')
         .in('template_id', templateIds)
@@ -85,7 +88,6 @@ export async function GET(request: NextRequest) {
 // POST - Create new tour template
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
     const body = await request.json()
 
     if (!body.template_name || !body.tour_type) {
@@ -127,7 +129,7 @@ export async function POST(request: NextRequest) {
       transportation_city: body.transportation_city || 'Cairo'
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('tour_templates')
       .insert([templateData])
       .select()
