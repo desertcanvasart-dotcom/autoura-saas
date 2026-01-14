@@ -1020,30 +1020,28 @@ export default function AutouraHomepage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 sm:py-12 px-4 sm:px-6 border-t border-stone-200">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2">
-                    <img 
-                    src="/autoura-logo.png" 
-                     alt="Autoura" 
-                     className="w-8 h-8 object-contain"
-                       />
-            <div className="flex items-center gap-6 sm:gap-8 text-sm text-stone-500">
-              <Link href="/about" className="hover:text-stone-700 transition-colors">About</Link>
-              <Link href="/integrations" className="hover:text-stone-700 transition-colors">Integrations</Link>
-              <Link href="/privacy" className="hover:text-stone-700 transition-colors">Privacy</Link>
-              <Link href="/terms" className="hover:text-stone-700 transition-colors">Terms</Link>
-              <Link href="/contact" className="hover:text-stone-700 transition-colors">Contact</Link>
-            </div>
-            <p className="text-sm text-stone-400">
-              © {new Date().getFullYear()} Autoura. Built in Cairo.
-            </p>
-          </div>
-        </div>
-      </footer>
+ {/* Footer */}
+<footer className="py-8 sm:py-12 px-4 sm:px-6 border-t border-stone-200">
+  <div className="max-w-7xl mx-auto">
+    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="flex items-center gap-2">
+        <img 
+          src="/autoura-logo.png" 
+          alt="Autoura" 
+          className="w-8 h-8 object-contain"
+        />
+        <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>
+      </div>
+      <div className="flex items-center gap-6 sm:gap-8 text-sm text-stone-500">
+        <Link href="/about" className="hover:text-stone-700 transition-colors">About</Link>
+        <Link href="/integrations" className="hover:text-stone-700 transition-colors">Integrations</Link>
+        <Link href="/privacy" className="hover:text-stone-700 transition-colors">Privacy</Link>
+        <Link href="/terms" className="hover:text-stone-700 transition-colors">Terms</Link>
+        <Link href="/contact" className="hover:text-stone-700 transition-colors">Contact</Link>
+      </div>
+      <p className="text-sm text-stone-400">
+        © {new Date().getFullYear()} Autoura. Built in Cairo.
+      </p>
     </div>
-  )
-}
+  </div>
+</footer>
