@@ -509,9 +509,11 @@ export default function AutouraHomepage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-[#647C47] to-[#4a5c35] rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">A</span>
-              </div>
+            <img 
+              src="/autoura-logo.png" 
+                alt="Autoura" 
+                className="w-8 h-8 object-contain"
+                   />
               <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>
             </Link>
 
