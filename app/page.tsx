@@ -508,12 +508,16 @@ export default function AutouraHomepage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-stone-200/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-               <img 
-              src="/autoura-logo.png" 
-              alt="Autoura" 
-              className="w-10 h-10 object-contain"
-                   />
+          <Link href="/" className="flex items-center gap-2">
+  <img 
+    src="/autoura-logo.png" 
+    alt="Autoura" 
+    className="w-10 h-10 object-contain"
+  />
+  <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>
+</Link>
+
+{/* Desktop Navigation */}
 
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
