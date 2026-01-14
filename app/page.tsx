@@ -89,8 +89,7 @@ const heroContent = {
   subheadline: "Autoura is the operations platform built for tour operators who are tired of copying prices between spreadsheets, losing client requests in chat threads, and manually creating the same itinerary PDF for the hundredth time.",
   trustSignals: [
     "Built by a tour operator with 30+ years in Egypt tourism",
-    "Processing real bookings since 2025",
-    "No credit card required"
+    "Processing real bookings since 2025"
   ]
 }
 
@@ -393,12 +392,14 @@ export default function AutouraHomepage() {
               >
                 Sign In
               </Link>
-              <Link 
-                href="/register"
+              <a 
+                href="https://calendly.com/autoura"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="px-4 py-2 bg-[#647C47] text-white text-sm font-medium rounded-lg hover:bg-[#4a5c35] transition-all hover:shadow-lg hover:shadow-[#647C47]/20"
               >
-                Start Free Trial
-              </Link>
+                Book a Free Demo
+              </a>
             </div>
 
             {/* Mobile Menu Button */}
@@ -417,12 +418,14 @@ export default function AutouraHomepage() {
               <a href="#how-it-works" className="block text-sm text-stone-600 hover:text-stone-900 py-2">How It Works</a>
               <a href="#pricing" className="block text-sm text-stone-600 hover:text-stone-900 py-2">Pricing</a>
               <Link href="/login" className="block text-sm text-stone-600 hover:text-stone-900 py-2">Sign In</Link>
-              <Link 
-                href="/register"
+              <a 
+                href="https://calendly.com/autoura"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="block w-full px-4 py-2 bg-[#647C47] text-white text-sm font-medium rounded-lg text-center hover:bg-[#4a5c35]"
               >
-                Start Free Trial
-              </Link>
+                Book a Free Demo
+              </a>
             </div>
           )}
         </div>
@@ -453,13 +456,15 @@ export default function AutouraHomepage() {
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-8 sm:mb-12">
-                <Link 
-                  href="/register"
+                <a 
+                  href="https://calendly.com/autoura"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-[#647C47] text-white font-semibold rounded-xl hover:bg-[#4a5c35] transition-all hover:shadow-xl hover:shadow-[#647C47]/30 flex items-center justify-center gap-2"
                 >
-                  Start Free Trial
+                  Book a Free Demo
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                </a>
                 <button className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-stone-700 font-semibold rounded-xl border border-stone-200 hover:border-stone-300 hover:shadow-lg transition-all flex items-center justify-center gap-2">
                   <Play className="w-4 h-4 text-[#647C47]" />
                   See How It Works
@@ -859,14 +864,15 @@ export default function AutouraHomepage() {
                   you could be sending quotes in minutes and tracking real profit margins.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                  <Link 
-                    href="/register"
+                  <a 
+                    href="https://calendly.com/autoura"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-[#647C47] text-white font-semibold rounded-xl hover:bg-[#5a7040] transition-all hover:shadow-xl hover:shadow-[#647C47]/30 flex items-center justify-center gap-2"
                   >
-                    Start Free Trial
+                    Book a Free Demo
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                  <p className="text-stone-400 text-sm">No credit card required</p>
+                  </a>
                 </div>
               </div>
             </div>

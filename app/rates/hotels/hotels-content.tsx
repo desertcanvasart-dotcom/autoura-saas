@@ -451,7 +451,7 @@ export default function HotelsContent() {
   // Fetch rates
   const fetchRates = async () => {
     try {
-      const response = await fetch('/api/resources/hotels')
+      const response = await fetch('/api/rates/hotels')
       const data = await response.json()
       if (data.success) {
         setRates(data.data)
@@ -673,8 +673,8 @@ export default function HotelsContent() {
     
     try {
       const url = editingRate 
-        ? `/api/resources/hotels/${editingRate.id}`
-        : '/api/resources/hotels'
+  ? `/api/rates/hotels/${editingRate.id}`
+  : '/api/rates/hotels'
       
       const method = editingRate ? 'PUT' : 'POST'
       
@@ -719,8 +719,8 @@ export default function HotelsContent() {
     if (!confirmed) return
     
     try {
-      const response = await fetch(`/api/resources/hotels/${id}`, {
-        method: 'DELETE'
+      const response = await fetch(`/api/rates/hotels/${id}`, {
+      method: 'DELETE'
       })
       
       const data = await response.json()
