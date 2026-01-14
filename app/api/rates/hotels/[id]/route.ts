@@ -14,7 +14,7 @@ export async function GET(
     const { id } = await params
 
     const { data, error } = await supabaseAdmin
-      .from('hotel_contacts')
+      .from('accommodation_rates')
       .select(`
         *,
         supplier:suppliers(id, name, city, contact_phone, contact_email)
@@ -23,13 +23,13 @@ export async function GET(
       .single()
 
     if (error) {
-      console.error('GET hotel_contacts by id error:', error)
+      console.error('GET accommodation_rates by id error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('GET hotel_contacts by id catch error:', error)
+    console.error('GET accommodation_rates by id catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
@@ -123,20 +123,20 @@ export async function PUT(
     }
 
     const { data, error } = await supabaseAdmin
-      .from('hotel_contacts')
+      .from('accommodation_rates')
       .update(updateData)
       .eq('id', id)
       .select('*')
       .single()
 
     if (error) {
-      console.error('PUT hotel_contacts error:', error)
+      console.error('PUT accommodation_rates error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('PUT hotel_contacts catch error:', error)
+    console.error('PUT accommodation_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
@@ -149,18 +149,18 @@ export async function DELETE(
     const { id } = await params
 
     const { error } = await supabaseAdmin
-      .from('hotel_contacts')
+      .from('accommodation_rates')
       .delete()
       .eq('id', id)
 
     if (error) {
-      console.error('DELETE hotel_contacts error:', error)
+      console.error('DELETE accommodation_rates error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, message: 'Hotel deleted successfully' })
   } catch (error: any) {
-    console.error('DELETE hotel_contacts catch error:', error)
+    console.error('DELETE accommodation_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }

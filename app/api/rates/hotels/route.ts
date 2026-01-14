@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active_only') === 'true'
 
     let query = supabaseAdmin
-      .from('hotel_contacts')
+      .from('accommodation_rates')
       .select(`
         *,
         supplier:suppliers(id, name, city, contact_phone, contact_email)
@@ -30,13 +30,13 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      console.error('GET hotel_contacts error:', error)
+      console.error('GET accommodation_rates error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, data: data || [] })
   } catch (error: any) {
-    console.error('GET hotel_contacts catch error:', error)
+    console.error('GET accommodation_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
@@ -125,19 +125,19 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabaseAdmin
-      .from('hotel_contacts')
+      .from('accommodation_rates')
       .insert(newHotel)
       .select('*')
       .single()
 
     if (error) {
-      console.error('POST hotel_contacts error:', error)
+      console.error('POST accommodation_rates error:', error)
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('POST hotel_contacts catch error:', error)
+    console.error('POST accommodation_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
