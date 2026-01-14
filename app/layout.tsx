@@ -18,7 +18,7 @@ export default function RootLayout({
   const pathname = usePathname()
   
   // Pages that should NOT show the sidebar (public pages)
-  const publicPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password']
+  const publicPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/terms', '/privacy', '/contact', '/integrations', '/about']
   const isPublicPage = publicPages.includes(pathname)
 
   return (
