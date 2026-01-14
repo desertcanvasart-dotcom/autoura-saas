@@ -509,7 +509,7 @@ export default function AutouraHomepage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
-              <img src="/autoura-logo.png" alt="Autoura" className="w-10 h-10 object-contain" />
+              <img src="/autoura-logo.png" alt="Autoura" className="w-14 h-14 object-contain" />
               <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>
             </Link>
 
@@ -1019,7 +1019,7 @@ export default function AutouraHomepage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
-              <img src="/autoura-logo.png" alt="Autoura" className="w-8 h-8 object-contain" />
+              <img src="/autoura-logo.png" alt="Autoura" className="w-12 h-12 object-contain" />
               <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>
             </div>
             <div className="flex items-center gap-6 sm:gap-8 text-sm text-stone-500">
