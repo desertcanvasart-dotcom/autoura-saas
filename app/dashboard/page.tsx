@@ -54,10 +54,40 @@ export default function DashboardPage() {
   const [upcomingFollowups, setUpcomingFollowups] = useState<any[]>([])
   const [recentQuotes, setRecentQuotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [userName, setUserName] = useState<string>('')
 
   useEffect(() => {
+    loadUserProfile()
     loadDashboardData()
   }, [])
+
+  async function loadUserProfile() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        // Try to get profile name first
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, first_name')
+          .eq('id', user.id)
+          .single()
+        
+        if (profile?.full_name) {
+          // Get first name from full name
+          setUserName(profile.full_name.split(' ')[0])
+        } else if (profile?.first_name) {
+          setUserName(profile.first_name)
+        } else if (user.user_metadata?.full_name) {
+          setUserName(user.user_metadata.full_name.split(' ')[0])
+        } else if (user.email) {
+          // Fallback to email username
+          setUserName(user.email.split('@')[0])
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error)
+    }
+  }
 
   async function loadDashboardData() {
     try {
@@ -159,7 +189,9 @@ export default function DashboardPage() {
     <div className="p-4 lg:p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Welcome Back, Islam! 👋</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Welcome Back{userName ? `, ${userName}` : ''}! 👋
+        </h1>
         <p className="text-sm text-gray-600 mt-1">
           Here's what's happening with your travel operations today.
         </p>
@@ -454,7 +486,7 @@ export default function DashboardPage() {
   )
 }
 
-// Stat Card Component
+// Stat Card Component with consistent height
 interface StatCardProps {
   title: string
   value: string | number
@@ -490,8 +522,8 @@ function StatCard({
 
   return (
     <Link href={href} className="block group">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-        <div className="flex items-start justify-between">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow h-full min-h-[120px] flex flex-col">
+        <div className="flex items-start justify-between flex-1">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <p className="text-xs text-gray-600">{title}</p>
