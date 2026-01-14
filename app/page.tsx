@@ -28,7 +28,14 @@ import {
   FileSearch,
   Clock,
   Menu,
-  XIcon
+  XIcon,
+  Bot,
+  BookOpen,
+  Package,
+  PieChart,
+  Lock,
+  UserCheck,
+  Timer
 } from 'lucide-react'
 
 // Animation hook for scroll reveal
@@ -152,6 +159,7 @@ const steps = [
   }
 ]
 
+// Updated modules array with 11 total modules (6 existing + 5 new)
 const modules = [
   {
     id: "whatsapp-inbox",
@@ -160,6 +168,7 @@ const modules = [
     icon: MessageSquare,
     badge: "AI-Powered",
     badgeColor: "bg-emerald-100 text-emerald-700",
+    category: "SALES",
     before: [
       "Scroll through 50+ chats to find that client",
       "Screenshot conversations to remember details",
@@ -174,12 +183,37 @@ const modules = [
     ]
   },
   {
+    id: "lead-processing",
+    title: "Lead Processing",
+    shortTitle: "Leads",
+    icon: Bot,
+    badge: "AI-Powered",
+    badgeColor: "bg-emerald-100 text-emerald-700",
+    category: "SALES",
+    highlight: "30 sec vs 15 min",
+    before: [
+      "Reading through long WhatsApp threads",
+      "Manually extracting dates, pax, budget",
+      "Typing everything into spreadsheets",
+      "Missing details buried in messages",
+      "Inconsistent data across team members"
+    ],
+    after: [
+      "Paste any WhatsApp conversation",
+      "AI extracts name, dates, pax, budget, nationality",
+      "Auto-created client profile instantly",
+      "Confidence scores show accuracy",
+      "Consistent structure every single time"
+    ]
+  },
+  {
     id: "itinerary-builder",
     title: "Smart Itinerary Builder",
     shortTitle: "Itinerary",
     icon: FileText,
     badge: "AI-Powered",
     badgeColor: "bg-emerald-100 text-emerald-700",
+    category: "SALES",
     before: [
       "Copy-paste from old Word documents",
       "Manually look up entrance fees",
@@ -194,12 +228,37 @@ const modules = [
     ]
   },
   {
+    id: "content-library",
+    title: "Content Library",
+    shortTitle: "Content",
+    icon: BookOpen,
+    badge: "Core",
+    badgeColor: "bg-slate-100 text-slate-700",
+    category: "SALES",
+    highlight: "Your voice, always",
+    before: [
+      "Generic descriptions that sound like everyone else",
+      "Inconsistent tone across itineraries",
+      "Copy-pasting from old documents",
+      "No tier differentiation — luxury sounds like budget",
+      "Hours rewriting AI-generated content"
+    ],
+    after: [
+      "Your own descriptions for sites, hotels, experiences",
+      "4 tier variations — Budget to Luxury, each unique",
+      "Writing rules enforce your brand voice",
+      "AI uses YOUR content — not generic output",
+      "Consistent quality across every itinerary"
+    ]
+  },
+  {
     id: "crm",
     title: "Client Management",
     shortTitle: "CRM",
     icon: Users,
     badge: "Core",
     badgeColor: "bg-slate-100 text-slate-700",
+    category: "SALES",
     before: [
       "Client info scattered everywhere",
       "No record of past trips or preferences",
@@ -220,6 +279,7 @@ const modules = [
     icon: DollarSign,
     badge: "Core",
     badgeColor: "bg-slate-100 text-slate-700",
+    category: "OPERATIONS",
     before: [
       "Rates in multiple Excel files",
       "Seasonal changes require manual updates",
@@ -234,12 +294,37 @@ const modules = [
     ]
   },
   {
+    id: "resource-assignment",
+    title: "Resource Assignment",
+    shortTitle: "Resources",
+    icon: Package,
+    badge: "Core",
+    badgeColor: "bg-slate-100 text-slate-700",
+    category: "OPERATIONS",
+    highlight: "1 click vs 10+ msgs",
+    before: [
+      "Calling guides and drivers one by one",
+      "Individual messages to each supplier",
+      "No confirmation if they saw it",
+      "Hotel bookings in separate sheets",
+      "Last-minute confusion about assignments"
+    ],
+    after: [
+      "Assign all resources directly to itinerary",
+      "One-click WhatsApp with full details",
+      "Confirmation tracking — know who's confirmed",
+      "All assignments visible in one place",
+      "Staff included — airport, hotel, all covered"
+    ]
+  },
+  {
     id: "supplier-management",
     title: "Supplier Management",
     shortTitle: "Suppliers",
     icon: Building2,
     badge: "Core",
     badgeColor: "bg-slate-100 text-slate-700",
+    category: "OPERATIONS",
     before: [
       "Contacts saved in personal phones",
       "No record of which supplier served which booking",
@@ -260,6 +345,7 @@ const modules = [
     icon: FileSearch,
     badge: "Core",
     badgeColor: "bg-slate-100 text-slate-700",
+    category: "FINANCE",
     before: [
       "Create invoices manually in Word",
       "Track payments in spreadsheets",
@@ -271,6 +357,54 @@ const modules = [
       "Record deposits and balances",
       "Automatic payment status tracking",
       "Send reminders via WhatsApp"
+    ]
+  },
+  {
+    id: "financial-management",
+    title: "Financial Management",
+    shortTitle: "Finance",
+    icon: PieChart,
+    badge: "Core",
+    badgeColor: "bg-slate-100 text-slate-700",
+    category: "FINANCE",
+    highlight: "Know daily",
+    before: [
+      "Paper receipts in a shoebox",
+      "Trip profitability unknown until months later",
+      "Chasing clients for overdue payments",
+      "Forgetting to pay suppliers on time",
+      "Hours building monthly reports"
+    ],
+    after: [
+      "Expenses linked to itineraries instantly",
+      "P&L per trip before departure",
+      "AR aging reports (30/60/90 days)",
+      "Payment scheduling for suppliers",
+      "One-click financial reports"
+    ]
+  },
+  {
+    id: "team-security",
+    title: "Team Management & Security",
+    shortTitle: "Team",
+    icon: Shield,
+    badge: "Core",
+    badgeColor: "bg-slate-100 text-slate-700",
+    category: "FINANCE",
+    highlight: "Secure",
+    before: [
+      "Everyone using same credentials",
+      "Can't control who sees what",
+      "No record of who made changes",
+      "Onboarding takes days",
+      "No way to revoke access quickly"
+    ],
+    after: [
+      "4 roles: Admin, Manager, Agent, Viewer",
+      "Each person sees only what they need",
+      "Full audit log of every action",
+      "1-click invites for new team members",
+      "Instant deactivation when staff leave"
     ]
   }
 ]
@@ -370,7 +504,7 @@ export default function AutouraHomepage() {
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-500/5 rounded-full blur-3xl" />
       </div>
 
-      {/* Navigation */}
+      {/* Navigation - UPDATED: Removed Pricing & Sign In, Added About & Integrations */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-stone-200/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
@@ -385,13 +519,8 @@ export default function AutouraHomepage() {
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-sm text-stone-600 hover:text-stone-900 transition-colors">Features</a>
               <a href="#how-it-works" className="text-sm text-stone-600 hover:text-stone-900 transition-colors">How It Works</a>
-              <a href="#pricing" className="text-sm text-stone-600 hover:text-stone-900 transition-colors">Pricing</a>
-              <Link 
-                href="/login"
-                className="text-sm text-stone-600 hover:text-stone-900 transition-colors"
-              >
-                Sign In
-              </Link>
+              <Link href="/integrations" className="text-sm text-stone-600 hover:text-stone-900 transition-colors">Integrations</Link>
+              <Link href="/about" className="text-sm text-stone-600 hover:text-stone-900 transition-colors">About</Link>
               <a 
                 href="https://calendly.com/autoura"
                 target="_blank"
@@ -411,13 +540,13 @@ export default function AutouraHomepage() {
             </button>
           </div>
 
-          {/* Mobile Navigation */}
+          {/* Mobile Navigation - UPDATED */}
           {mobileMenuOpen && (
             <div className="md:hidden pt-4 pb-2 border-t border-stone-200 mt-4 space-y-3">
               <a href="#features" className="block text-sm text-stone-600 hover:text-stone-900 py-2">Features</a>
               <a href="#how-it-works" className="block text-sm text-stone-600 hover:text-stone-900 py-2">How It Works</a>
-              <a href="#pricing" className="block text-sm text-stone-600 hover:text-stone-900 py-2">Pricing</a>
-              <Link href="/login" className="block text-sm text-stone-600 hover:text-stone-900 py-2">Sign In</Link>
+              <Link href="/integrations" className="block text-sm text-stone-600 hover:text-stone-900 py-2">Integrations</Link>
+              <Link href="/about" className="block text-sm text-stone-600 hover:text-stone-900 py-2">About</Link>
               <a 
                 href="https://calendly.com/autoura"
                 target="_blank"
@@ -496,7 +625,6 @@ export default function AutouraHomepage() {
                   <span className="ml-4 text-xs text-stone-400 hidden sm:inline">autoura.net/dashboard</span>
                 </div>
                 <div className="p-4 sm:p-8 bg-gradient-to-br from-stone-50 to-white min-h-[300px] sm:min-h-[400px] flex items-center justify-center">
-                  {/* FIXED: Changed grid-cols-3 to grid-cols-1 md:grid-cols-3 */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full max-w-4xl">
                     {pillars.map((pillar, i) => (
                       <div 
@@ -576,7 +704,6 @@ export default function AutouraHomepage() {
             </div>
           </AnimatedSection>
 
-          {/* FIXED: Added grid-cols-1 for mobile */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             {pillars.map((pillar, i) => (
               <AnimatedSection key={i} delay={i * 100}>
@@ -638,7 +765,7 @@ export default function AutouraHomepage() {
         </div>
       </section>
 
-      {/* Core Modules - Before/After */}
+      {/* Core Modules - Before/After - NOW WITH 11 MODULES */}
       <section className="py-16 sm:py-24 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <AnimatedSection>
@@ -652,7 +779,7 @@ export default function AutouraHomepage() {
             </div>
           </AnimatedSection>
 
-          {/* Module Tabs - FIXED: Better mobile scrolling */}
+          {/* Module Tabs - Updated for 11 modules with better scrolling */}
           <div className="flex overflow-x-auto pb-2 mb-8 sm:mb-12 gap-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center scrollbar-hide">
             {modules.map((module, i) => (
               <button
@@ -674,7 +801,7 @@ export default function AutouraHomepage() {
           {/* Active Module Content */}
           <AnimatedSection key={activeModule}>
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-xl border border-stone-200 overflow-hidden max-w-5xl mx-auto">
-              <div className="p-4 sm:p-6 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+              <div className="p-4 sm:p-6 bg-stone-50 border-b border-stone-200 flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-3 sm:gap-4">
                   <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-xl bg-[#647C47] flex items-center justify-center">
                     {(() => {
@@ -684,21 +811,33 @@ export default function AutouraHomepage() {
                   </div>
                   <div>
                     <h3 className="text-lg sm:text-xl font-bold text-stone-900">{modules[activeModule].title}</h3>
-                    <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${modules[activeModule].badgeColor}`}>
-                      {modules[activeModule].badge}
-                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${modules[activeModule].badgeColor}`}>
+                        {modules[activeModule].badge}
+                      </span>
+                      <span className="inline-block px-2 py-0.5 text-xs font-medium rounded bg-stone-100 text-stone-600">
+                        {modules[activeModule].category}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                {/* Highlight badge for new modules */}
+                {modules[activeModule].highlight && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#647C47] text-white rounded-full text-sm font-medium">
+                    <Timer className="w-4 h-4" />
+                    {modules[activeModule].highlight}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-stone-200">
                 {/* Before */}
-                <div className="p-4 sm:p-8">
+                <div className="p-4 sm:p-8 bg-red-50/30">
                   <div className="flex items-center gap-2 mb-4 sm:mb-6">
                     <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
                       <X className="w-4 h-4 text-red-600" />
                     </div>
-                    <h4 className="font-semibold text-red-700">Before Autoura</h4>
+                    <h4 className="font-semibold text-red-700 uppercase text-sm tracking-wide">Before Autoura</h4>
                   </div>
                   <ul className="space-y-3 sm:space-y-4">
                     {modules[activeModule].before.map((point, i) => (
@@ -716,7 +855,7 @@ export default function AutouraHomepage() {
                     <div className="w-8 h-8 rounded-lg bg-[#647C47]/20 flex items-center justify-center">
                       <Check className="w-4 h-4 text-[#647C47]" />
                     </div>
-                    <h4 className="font-semibold text-[#647C47]">With Autoura</h4>
+                    <h4 className="font-semibold text-[#647C47] uppercase text-sm tracking-wide">With Autoura</h4>
                   </div>
                   <ul className="space-y-3 sm:space-y-4">
                     {modules[activeModule].after.map((point, i) => (
@@ -752,7 +891,6 @@ export default function AutouraHomepage() {
             </div>
           </AnimatedSection>
 
-          {/* FIXED: Added grid-cols-1 for mobile */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {differentiators.map((item, i) => (
               <AnimatedSection key={i} delay={i * 50}>
@@ -789,7 +927,6 @@ export default function AutouraHomepage() {
             </div>
           </AnimatedSection>
 
-          {/* FIXED: Added grid-cols-1 for mobile */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto">
             {egyptFeatures.map((feature, i) => (
               <AnimatedSection key={i} delay={i * 100}>
@@ -821,7 +958,6 @@ export default function AutouraHomepage() {
             </div>
           </AnimatedSection>
 
-          {/* FIXED: Added grid-cols-1 for mobile */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
             {testimonials.map((testimonial, i) => (
               <AnimatedSection key={i} delay={i * 100}>
@@ -891,6 +1027,8 @@ export default function AutouraHomepage() {
               <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>
             </div>
             <div className="flex items-center gap-6 sm:gap-8 text-sm text-stone-500">
+              <Link href="/about" className="hover:text-stone-700 transition-colors">About</Link>
+              <Link href="/integrations" className="hover:text-stone-700 transition-colors">Integrations</Link>
               <Link href="/privacy" className="hover:text-stone-700 transition-colors">Privacy</Link>
               <Link href="/terms" className="hover:text-stone-700 transition-colors">Terms</Link>
               <Link href="/contact" className="hover:text-stone-700 transition-colors">Contact</Link>
