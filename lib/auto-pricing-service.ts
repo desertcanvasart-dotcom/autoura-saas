@@ -116,42 +116,59 @@ async function selectVehicle(
   tier: ServiceTier
 ): Promise<{ id: string; name: string; rate: number } | null> {
   try {
+    // FIXED: Use correct column names (daily_rate, passenger_capacity)
     const { data: vehicles } = await supabaseAdmin
       .from('vehicles')
-      .select('id, vehicle_type, daily_rate_eur, capacity_min, capacity_max, tier')
+      .select('id, vehicle_type, name, daily_rate, passenger_capacity, tier, is_preferred')
       .eq('is_active', true)
       .order('is_preferred', { ascending: false })
 
-    if (!vehicles?.length) return null
+    if (!vehicles?.length) {
+      console.log('⚠️ No vehicles found, using default rate')
+      return {
+        id: 'default',
+        name: 'Vehicle',
+        rate: DEFAULT_RATES[tier].vehicle
+      }
+    }
 
     // First: match tier and capacity
     let selected = vehicles.find(v => 
       v.tier === tier && 
-      numPax >= (v.capacity_min || 1) && 
-      numPax <= (v.capacity_max || 99)
+      numPax <= (v.passenger_capacity || 99)
     )
 
     // Fallback: any vehicle that fits
     if (!selected) {
       selected = vehicles.find(v => 
-        numPax >= (v.capacity_min || 1) && 
-        numPax <= (v.capacity_max || 99)
+        numPax <= (v.passenger_capacity || 99)
       )
     }
 
     // Final fallback: largest vehicle
     if (!selected) {
-      selected = vehicles[vehicles.length - 1]
+      selected = vehicles.sort((a, b) => 
+        (b.passenger_capacity || 0) - (a.passenger_capacity || 0)
+      )[0]
     }
 
-    return selected ? {
-      id: selected.id,
-      name: selected.vehicle_type || 'Vehicle',
-      rate: selected.daily_rate_eur || DEFAULT_RATES[tier].vehicle
-    } : null
+    const vehicleName = selected?.vehicle_type || selected?.name || 'Vehicle'
+    const rate = selected?.daily_rate || DEFAULT_RATES[tier].vehicle
+
+    console.log(`✅ Selected vehicle: ${vehicleName} @ €${rate}`)
+
+    return {
+      id: selected?.id || 'default',
+      name: vehicleName,
+      rate
+    }
   } catch (err) {
     console.error('Error selecting vehicle:', err)
-    return null
+    return {
+      id: 'default',
+      name: 'Vehicle',
+      rate: DEFAULT_RATES[tier].vehicle
+    }
   }
 }
 
@@ -160,9 +177,10 @@ async function selectGuide(
   tier: ServiceTier
 ): Promise<{ id: string; name: string; rate: number } | null> {
   try {
+    // FIXED: Use correct column name (daily_rate)
     const { data: guides } = await supabaseAdmin
       .from('guides')
-      .select('id, name, daily_rate_eur, languages, tier')
+      .select('id, name, daily_rate, languages, tier, is_preferred')
       .eq('is_active', true)
       .contains('languages', [language])
       .order('is_preferred', { ascending: false })
@@ -171,32 +189,46 @@ async function selectGuide(
       // Fallback: any guide
       const { data: anyGuide } = await supabaseAdmin
         .from('guides')
-        .select('id, name, daily_rate_eur, tier')
+        .select('id, name, daily_rate, tier')
         .eq('is_active', true)
         .order('is_preferred', { ascending: false })
         .limit(1)
 
-      if (!anyGuide?.length) return null
+      if (!anyGuide?.length) {
+        console.log('⚠️ No guides found, using default rate')
+        return {
+          id: 'default',
+          name: 'Guide',
+          rate: DEFAULT_RATES[tier].guide
+        }
+      }
       
       const g = anyGuide[0]
+      console.log(`✅ Selected guide (any): ${g.name} @ €${g.daily_rate}`)
       return {
         id: g.id,
         name: g.name || 'Guide',
-        rate: g.daily_rate_eur || DEFAULT_RATES[tier].guide
+        rate: g.daily_rate || DEFAULT_RATES[tier].guide
       }
     }
 
     // Prefer matching tier
     const selected = guides.find(g => g.tier === tier) || guides[0]
 
+    console.log(`✅ Selected guide: ${selected.name} @ €${selected.daily_rate}`)
+
     return {
       id: selected.id,
       name: selected.name || 'Guide',
-      rate: selected.daily_rate_eur || DEFAULT_RATES[tier].guide
+      rate: selected.daily_rate || DEFAULT_RATES[tier].guide
     }
   } catch (err) {
     console.error('Error selecting guide:', err)
-    return null
+    return {
+      id: 'default',
+      name: 'Guide',
+      rate: DEFAULT_RATES[tier].guide
+    }
   }
 }
 
@@ -207,23 +239,60 @@ async function getEntranceFee(
   try {
     const { data: fees } = await supabaseAdmin
       .from('entrance_fees')
-      .select('id, attraction_name, eur_rate, non_eur_rate')
+      .select('id, attraction_name, eur_rate, non_eur_rate, is_addon')
       .eq('is_active', true)
-      .eq('is_addon', false) // Exclude add-ons
 
-    if (!fees?.length) return null
+    if (!fees?.length) {
+      console.log('⚠️ No entrance fees in database')
+      return null
+    }
 
-    // Fuzzy match on attraction name
-    const fee = fees.find(f => 
-      f.attraction_name.toLowerCase().includes(attractionName.toLowerCase()) ||
-      attractionName.toLowerCase().includes(f.attraction_name.toLowerCase())
-    )
+    // Filter out add-ons (handle null/undefined is_addon)
+    const mainFees = fees.filter(f => f.is_addon !== true)
 
-    if (!fee) return null
+    // IMPROVED: Better fuzzy matching with keyword overlap
+    const searchKeywords = attractionName.toLowerCase().split(/\s+/).filter(k => k.length > 2)
+    
+    let fee = mainFees.find(f => {
+      const feeKeywords = f.attraction_name.toLowerCase().split(/\s+/).filter(k => k.length > 2)
+      
+      // Exact contains match (original logic)
+      if (f.attraction_name.toLowerCase().includes(attractionName.toLowerCase()) ||
+          attractionName.toLowerCase().includes(f.attraction_name.toLowerCase())) {
+        return true
+      }
+      
+      // Keyword overlap match (new logic)
+      const overlap = searchKeywords.filter(sk => 
+        feeKeywords.some(fk => fk.includes(sk) || sk.includes(fk))
+      )
+      return overlap.length >= 2
+    })
+
+    // Special case: "Pyramids" should match "Giza Pyramids Complex"
+    if (!fee) {
+      const lowerName = attractionName.toLowerCase()
+      if (lowerName.includes('pyramid')) {
+        fee = mainFees.find(f => f.attraction_name.toLowerCase().includes('pyramid'))
+      } else if (lowerName.includes('sphinx')) {
+        fee = mainFees.find(f => f.attraction_name.toLowerCase().includes('sphinx'))
+      } else if (lowerName.includes('museum')) {
+        fee = mainFees.find(f => f.attraction_name.toLowerCase().includes('museum'))
+      } else if (lowerName.includes('temple')) {
+        fee = mainFees.find(f => f.attraction_name.toLowerCase().includes('temple'))
+      }
+    }
+
+    if (!fee) {
+      console.log(`⚠️ No entrance fee found for "${attractionName}"`)
+      return null
+    }
 
     const rate = isEurPassport 
       ? (fee.eur_rate || 0)
       : (fee.non_eur_rate || fee.eur_rate || 0)
+
+    console.log(`✅ Entrance fee: ${fee.attraction_name} @ €${rate} (${isEurPassport ? 'EUR' : 'non-EUR'})`)
 
     return {
       id: fee.id,
@@ -243,7 +312,7 @@ async function getHotelRate(
   try {
     const { data: hotels } = await supabaseAdmin
       .from('hotel_contacts')
-      .select('id, name, rate_double_eur, city, tier')
+      .select('id, name, rate_double_eur, city, tier, is_preferred')
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
       .eq('tier', tier)
@@ -350,6 +419,8 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     includeAccommodation = false
   } = params
 
+  console.log('🚀 Starting auto-pricing:', { templateId, tier, numPax, isEurPassport })
+
   const warnings: string[] = []
   const services: PricedService[] = []
   const optionalServices: PricedService[] = []
@@ -373,6 +444,7 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     .single()
 
   if (templateError || !template) {
+    console.error('❌ Template not found:', templateId)
     return {
       success: false,
       templateId,
@@ -395,10 +467,12 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     }
   }
 
+  console.log('📋 Template found:', template.template_name)
+
   const totalDays = template.duration_days || 1
 
   // Fetch day activities
-  const { data: dayActivities } = await supabaseAdmin
+  const { data: dayActivities, error: activitiesError } = await supabaseAdmin
     .from('tour_day_activities')
     .select(`
       id,
@@ -412,21 +486,13 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
       is_optional,
       is_included,
       requires_guide,
-      notes,
-      content_library (
-        id,
-        name,
-        short_description,
-        location,
-        content_categories (
-          slug,
-          name
-        )
-      )
+      notes
     `)
     .eq('template_id', templateId)
     .order('day_number')
     .order('sequence_order')
+
+  console.log(`📅 Found ${dayActivities?.length || 0} activities`)
 
   // ============================================
   // STEP 2: Fetch template defaults (or use system defaults)
@@ -484,6 +550,8 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     const isTransferOnly = dayActs.length === 0 || 
       dayActs.every(a => a.activity_type === 'transfer' || a.activity_type === 'flight')
     const needsGuide = dayActs.some(a => a.requires_guide) || hasAttractions
+
+    console.log(`📆 Day ${dayNum}: ${dayActs.length} activities, hasAttractions=${hasAttractions}, needsGuide=${needsGuide}`)
 
     // ============================================
     // Transportation (daily)
@@ -549,8 +617,8 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
           continue
         }
 
-        // Get attraction name from content library or activity
-        const attractionName = (activity.content_library as any)?.name || activity.activity_name
+        // Get attraction name from activity
+        const attractionName = activity.activity_name
 
         const entranceFee = await getEntranceFee(attractionName, isEurPassport)
         
@@ -575,6 +643,9 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
           } else {
             services.push(service)
           }
+        } else if (entranceFee && entranceFee.rate === 0) {
+          // Free entrance, just note it
+          console.log(`ℹ️ ${attractionName} has no entrance fee`)
         } else {
           warnings.push(`No entrance fee found for "${attractionName}"`)
         }
@@ -764,7 +835,7 @@ export async function getTemplatePriceRange(
   let maxPrice = 0
 
   for (const [tier, result] of results) {
-    if (result.success) {
+    if (result.success && result.pricePerPerson > 0) {
       if (result.pricePerPerson < minPrice) {
         minPrice = result.pricePerPerson
         minTier = tier
