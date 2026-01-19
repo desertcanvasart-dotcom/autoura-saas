@@ -12,8 +12,6 @@ import {
   Trash2,
   X,
   Check,
-  Download,
-  Upload,
   LayoutGrid,
   List,
   Table2,
@@ -29,7 +27,8 @@ import {
   Layers,
   MapPin,
   Calculator,
-  Link2
+  Link2,
+  Loader2
 } from 'lucide-react'
 import ServiceRateLinker from '@/components/ServiceRateLinker'
 
@@ -64,32 +63,6 @@ interface TourVariation {
   is_active: boolean
 }
 
-interface TourDay {
-  id: string
-  template_id: string
-  day_number: number
-  title: string
-  description?: string
-  city?: string
-  overnight_city?: string
-  meals_included?: string[]
-  activities?: TourDayActivity[]
-}
-
-interface TourDayActivity {
-  id: string
-  tour_day_id: string
-  activity_name: string
-  activity_type: string
-  sequence_order: number
-  duration_minutes?: number
-  location?: string
-  description?: string
-  attraction_id?: string
-  restaurant_id?: string
-  is_optional: boolean
-}
-
 interface TourTemplate {
   id: string
   template_code: string
@@ -98,8 +71,6 @@ interface TourTemplate {
   tour_type: string
   duration_days: number
   duration_nights?: number
-  primary_destination_id?: string
-  destinations_covered?: string[]
   cities_covered?: string[]
   short_description?: string
   long_description?: string
@@ -107,20 +78,12 @@ interface TourTemplate {
   main_attractions?: string[]
   best_for?: string[]
   physical_level?: string
-  age_suitability?: string
-  pickup_required?: boolean
-  accommodation_nights?: number
-  meals_included?: string[]
   image_url?: string
   is_featured: boolean
   is_active: boolean
-  popularity_score?: number
-  default_transportation_service?: string
-  transportation_city?: string
   created_at: string
   category?: TourCategory
   variations?: TourVariation[]
-  days?: TourDay[]
 }
 
 interface Toast {
@@ -132,7 +95,7 @@ interface Toast {
 type ViewMode = 'table' | 'cards' | 'compact'
 
 // ============================================
-// EGYPTIAN CITIES
+// CONSTANTS
 // ============================================
 const EGYPTIAN_CITIES = [
   'Cairo', 'Giza', 'Alexandria', 'Luxor', 'Aswan', 'Hurghada',
@@ -165,6 +128,57 @@ const BEST_FOR_OPTIONS = [
   'History Buffs', 'Adventure Seekers', 'Photography', 'Relaxation',
   'First-time Visitors', 'Repeat Visitors', 'Luxury Travelers', 'Budget Travelers'
 ]
+
+const TIER_CONFIG = {
+  budget: {
+    label: 'Budget',
+    icon: '💰',
+    description: 'Essential experience at best value',
+    bgColor: 'bg-emerald-50',
+    textColor: 'text-emerald-700',
+    borderColor: 'border-emerald-200',
+    defaults: {
+      min_pax: 1,
+      max_pax: 15,
+      group_type: 'shared' as const,
+      vehicle_type: 'standard_van',
+      accommodation_standard: '3_star',
+      meal_quality: 'basic'
+    }
+  },
+  standard: {
+    label: 'Standard',
+    icon: '💎',
+    description: 'Comfortable experience with quality services',
+    bgColor: 'bg-blue-50',
+    textColor: 'text-blue-700',
+    borderColor: 'border-blue-200',
+    defaults: {
+      min_pax: 1,
+      max_pax: 10,
+      group_type: 'private' as const,
+      vehicle_type: 'modern_van',
+      accommodation_standard: '4_star',
+      meal_quality: 'good'
+    }
+  },
+  luxury: {
+    label: 'Luxury',
+    icon: '👑',
+    description: 'Premium experience with exclusive perks',
+    bgColor: 'bg-amber-50',
+    textColor: 'text-amber-700',
+    borderColor: 'border-amber-200',
+    defaults: {
+      min_pax: 1,
+      max_pax: 6,
+      group_type: 'private' as const,
+      vehicle_type: 'luxury_suv',
+      accommodation_standard: '5_star',
+      meal_quality: 'gourmet'
+    }
+  }
+}
 
 // ============================================
 // TOAST COMPONENT
@@ -203,6 +217,200 @@ function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => vo
 }
 
 // ============================================
+// ADD VARIATION MODAL COMPONENT
+// ============================================
+interface AddVariationModalProps {
+  template: TourTemplate
+  onClose: () => void
+  onSuccess: () => void
+  showToast: (type: 'success' | 'error' | 'info', message: string) => void
+}
+
+function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVariationModalProps) {
+  const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set(['standard']))
+  const [groupTypes, setGroupTypes] = useState<Record<string, 'private' | 'shared'>>({
+    budget: 'shared',
+    standard: 'private',
+    luxury: 'private'
+  })
+  const [saving, setSaving] = useState(false)
+
+  const toggleTier = (tier: string) => {
+    const newSet = new Set(selectedTiers)
+    if (newSet.has(tier)) {
+      newSet.delete(tier)
+    } else {
+      newSet.add(tier)
+    }
+    setSelectedTiers(newSet)
+  }
+
+  const handleCreate = async () => {
+    if (selectedTiers.size === 0) {
+      showToast('error', 'Please select at least one tier')
+      return
+    }
+
+    setSaving(true)
+    
+    const variations = Array.from(selectedTiers).map(tier => {
+      const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG]
+      const groupType = groupTypes[tier]
+      
+      return {
+        template_id: template.id,
+        variation_name: `${template.template_name} - ${config.label}`,
+        tier: tier,
+        group_type: groupType,
+        min_pax: config.defaults.min_pax,
+        max_pax: config.defaults.max_pax,
+        vehicle_type: config.defaults.vehicle_type,
+        accommodation_standard: config.defaults.accommodation_standard,
+        meal_quality: config.defaults.meal_quality
+      }
+    })
+
+    try {
+      const response = await fetch('/api/tours/variations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(variations)
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        showToast('success', `Created ${data.data.length} variation(s) for ${template.template_name}`)
+        onSuccess()
+        onClose()
+      } else {
+        showToast('error', data.error || 'Failed to create variations')
+      }
+    } catch (error) {
+      showToast('error', 'Failed to create variations')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-lg max-w-lg w-full">
+        <div className="px-4 py-3 border-b flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Add Variations</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{template.template_name}</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        <div className="p-4">
+          <p className="text-sm text-gray-600 mb-4">
+            Select the pricing tiers you want to offer for this tour:
+          </p>
+
+          <div className="space-y-3">
+            {(Object.entries(TIER_CONFIG) as [string, typeof TIER_CONFIG.budget][]).map(([tier, config]) => (
+              <div
+                key={tier}
+                className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                  selectedTiers.has(tier)
+                    ? `${config.borderColor} ${config.bgColor}`
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => toggleTier(tier)}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedTiers.has(tier)}
+                    onChange={() => toggleTier(tier)}
+                    className="mt-1 w-4 h-4 text-green-600 border-gray-300 rounded"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{config.icon}</span>
+                      <span className={`font-medium ${selectedTiers.has(tier) ? config.textColor : 'text-gray-900'}`}>
+                        {config.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{config.description}</p>
+                    
+                    {selectedTiers.has(tier) && (
+                      <div className="mt-3 pt-3 border-t border-gray-200" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`group-${tier}`}
+                              checked={groupTypes[tier] === 'private'}
+                              onChange={() => setGroupTypes(prev => ({ ...prev, [tier]: 'private' }))}
+                              className="w-4 h-4 text-green-600"
+                            />
+                            <span className="text-sm text-gray-700">🔒 Private</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name={`group-${tier}`}
+                              checked={groupTypes[tier] === 'shared'}
+                              onChange={() => setGroupTypes(prev => ({ ...prev, [tier]: 'shared' }))}
+                              className="w-4 h-4 text-green-600"
+                            />
+                            <span className="text-sm text-gray-700">👥 Shared</span>
+                          </label>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-500">
+                          Pax: {config.defaults.min_pax}-{config.defaults.max_pax} • 
+                          Vehicle: {config.defaults.vehicle_type.replace('_', ' ')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="px-4 py-3 border-t bg-gray-50 flex items-center justify-between">
+          <p className="text-sm text-gray-500">
+            {selectedTiers.size} tier{selectedTiers.size !== 1 ? 's' : ''} selected
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-600 font-medium hover:bg-gray-100 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={saving || selectedTiers.size === 0}
+              className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  Create Variations
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -220,10 +428,21 @@ export default function TourManagerContent() {
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [toasts, setToasts] = useState<Toast[]>([])
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'basic' | 'days' | 'variations'>('basic')
+  const [activeTab, setActiveTab] = useState<'basic' | 'details' | 'variations'>('basic')
   
   // SERVICE RATE LINKER STATE
   const [serviceLinkerVariation, setServiceLinkerVariation] = useState<string | null>(null)
+  
+  // ADD VARIATION MODAL STATE
+  const [addVariationTemplate, setAddVariationTemplate] = useState<TourTemplate | null>(null)
+  
+  // NEW TEMPLATE VARIATIONS STATE (for creating with template)
+  const [newTemplateVariations, setNewTemplateVariations] = useState<Set<string>>(new Set(['standard']))
+  const [newTemplateGroupTypes, setNewTemplateGroupTypes] = useState<Record<string, 'private' | 'shared'>>({
+    budget: 'shared',
+    standard: 'private',
+    luxury: 'private'
+  })
   
   const [formData, setFormData] = useState({
     template_code: '',
@@ -399,6 +618,12 @@ export default function TourManagerContent() {
       default_transportation_service: 'day_tour',
       transportation_city: 'Cairo'
     })
+    setNewTemplateVariations(new Set(['standard']))
+    setNewTemplateGroupTypes({
+      budget: 'shared',
+      standard: 'private',
+      luxury: 'private'
+    })
     setActiveTab('basic')
     setShowModal(true)
   }
@@ -419,14 +644,14 @@ export default function TourManagerContent() {
       main_attractions: template.main_attractions || [],
       best_for: template.best_for || [],
       physical_level: template.physical_level || 'moderate',
-      age_suitability: template.age_suitability || 'all_ages',
-      pickup_required: template.pickup_required !== false,
-      meals_included: template.meals_included || [],
+      age_suitability: 'all_ages',
+      pickup_required: true,
+      meals_included: [],
       image_url: template.image_url || '',
       is_featured: template.is_featured,
       is_active: template.is_active,
-      default_transportation_service: template.default_transportation_service || 'day_tour',
-      transportation_city: template.transportation_city || 'Cairo'
+      default_transportation_service: 'day_tour',
+      transportation_city: 'Cairo'
     })
     setActiveTab('basic')
     setShowModal(true)
@@ -484,9 +709,42 @@ export default function TourManagerContent() {
       const data = await response.json()
       
       if (data.success) {
-        showToast('success', editingTemplate 
-          ? `${formData.template_name} updated!` 
-          : `${formData.template_name} created!`)
+        // If creating new template AND variations are selected, create them
+        if (!editingTemplate && newTemplateVariations.size > 0 && data.data?.id) {
+          const variations = Array.from(newTemplateVariations).map(tier => {
+            const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG]
+            return {
+              template_id: data.data.id,
+              variation_name: `${formData.template_name} - ${config.label}`,
+              tier: tier,
+              group_type: newTemplateGroupTypes[tier],
+              min_pax: config.defaults.min_pax,
+              max_pax: config.defaults.max_pax,
+              vehicle_type: config.defaults.vehicle_type,
+              accommodation_standard: config.defaults.accommodation_standard,
+              meal_quality: config.defaults.meal_quality
+            }
+          })
+
+          const varResponse = await fetch('/api/tours/variations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(variations)
+          })
+          
+          const varData = await varResponse.json()
+          
+          if (varData.success) {
+            showToast('success', `${formData.template_name} created with ${varData.data.length} variation(s)!`)
+          } else {
+            showToast('info', `Template created, but failed to create variations: ${varData.error}`)
+          }
+        } else {
+          showToast('success', editingTemplate 
+            ? `${formData.template_name} updated!` 
+            : `${formData.template_name} created!`)
+        }
+        
         setShowModal(false)
         fetchTemplates()
       } else {
@@ -536,17 +794,22 @@ export default function TourManagerContent() {
   const featuredCount = templates.filter(t => t.is_featured).length
 
   const getTierBadge = (tier: string) => {
-    const styles: Record<string, string> = {
-      budget: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      standard: 'bg-blue-50 text-blue-700 border-blue-200',
-      luxury: 'bg-amber-50 text-amber-700 border-amber-200'
+    const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG]
+    if (!config) return { style: 'bg-gray-50 text-gray-700', icon: '' }
+    return { 
+      style: `${config.bgColor} ${config.textColor} ${config.borderColor}`, 
+      icon: config.icon 
     }
-    const icons: Record<string, string> = {
-      budget: '💰',
-      standard: '💎',
-      luxury: '👑'
+  }
+
+  const toggleNewVariationTier = (tier: string) => {
+    const newSet = new Set(newTemplateVariations)
+    if (newSet.has(tier)) {
+      newSet.delete(tier)
+    } else {
+      newSet.add(tier)
     }
-    return { style: styles[tier] || 'bg-gray-50 text-gray-700', icon: icons[tier] || '' }
+    setNewTemplateVariations(newSet)
   }
 
   if (loading) {
@@ -581,7 +844,7 @@ export default function TourManagerContent() {
               <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg- green-700 transition-colors font-medium">
+              <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
                 <Plus className="w-4 h-4" />
                 Add Template
               </button>
@@ -770,7 +1033,17 @@ export default function TourManagerContent() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className="text-sm font-medium text-purple-600">{template.variations?.length || 0}</span>
+                          {(template.variations?.length || 0) > 0 ? (
+                            <span className="text-sm font-medium text-purple-600">{template.variations?.length || 0}</span>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setAddVariationTemplate(template) }}
+                              className="text-xs text-amber-600 hover:text-amber-800 font-medium flex items-center gap-1 mx-auto"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add
+                            </button>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -806,44 +1079,64 @@ export default function TourManagerContent() {
                         </td>
                       </tr>
                       {/* Expanded Row - Variations */}
-                      {expandedTemplate === template.id && template.variations && template.variations.length > 0 && (
+                      {expandedTemplate === template.id && (
                         <tr className="bg-gray-50">
                           <td colSpan={7} className="px-8 py-3">
                             <div className="flex items-center gap-2 mb-2">
                               <Layers className="w-4 h-4 text-purple-600" />
                               <span className="text-sm font-medium text-gray-700">Variations</span>
+                              <button
+                                onClick={() => setAddVariationTemplate(template)}
+                                className="ml-2 text-xs text-green-600 hover:text-green-800 font-medium flex items-center gap-1"
+                              >
+                                <Plus className="w-3 h-3" />
+                                Add Variation
+                              </button>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              {template.variations.map(variation => {
-                                const { style, icon } = getTierBadge(variation.tier)
-                                return (
-                                  <div key={variation.id} className={`px-3 py-2 rounded-lg border ${style} flex items-center gap-2`}>
-                                    <span>{icon}</span>
-                                    <div className="flex-1">
-                                      <p className="text-xs font-medium">{variation.variation_name}</p>
-                                      <p className="text-xs opacity-75">{variation.group_type} • {variation.min_pax}-{variation.max_pax} pax</p>
+                            {template.variations && template.variations.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {template.variations.map(variation => {
+                                  const { style, icon } = getTierBadge(variation.tier)
+                                  return (
+                                    <div key={variation.id} className={`px-3 py-2 rounded-lg border ${style} flex items-center gap-2`}>
+                                      <span>{icon}</span>
+                                      <div className="flex-1">
+                                        <p className="text-xs font-medium">{variation.variation_name}</p>
+                                        <p className="text-xs opacity-75">{variation.group_type} • {variation.min_pax}-{variation.max_pax} pax</p>
+                                      </div>
+                                      <div className="flex items-center gap-1 ml-2">
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); setServiceLinkerVariation(variation.id) }}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                          title="Link Services to Rates"
+                                        >
+                                          <Link2 className="w-4 h-4" />
+                                        </button>
+                                        <Link
+                                          href={`/b2b/calculator/${variation.id}`}
+                                          className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors"
+                                          title="Calculate Price"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <Calculator className="w-4 h-4" />
+                                        </Link>
+                                      </div>
                                     </div>
-                                    <div className="flex items-center gap-1 ml-2">
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); setServiceLinkerVariation(variation.id) }}
-                                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                        title="Link Services to Rates"
-                                      >
-                                        <Link2 className="w-4 h-4" />
-                                      </button>
-                                      <Link
-                                        href={`/b2b/calculator/${variation.id}`}
-                                        className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors"
-                                        title="Calculate Price"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <Calculator className="w-4 h-4" />
-                                      </Link>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
+                                  )
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 border-2 border-dashed border-gray-200 rounded-lg">
+                                <p className="text-sm text-gray-500 mb-2">No variations yet</p>
+                                <button
+                                  onClick={() => setAddVariationTemplate(template)}
+                                  className="text-sm text-green-600 hover:text-green-800 font-medium flex items-center gap-1 mx-auto"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Add Budget / Standard / Luxury Variations
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       )}
@@ -854,7 +1147,7 @@ export default function TourManagerContent() {
                       <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                         <Map className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                         <p className="text-sm font-medium">No tour templates found</p>
-                        <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg- green-700">
+                        <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
                           Create Your First Template
                         </button>
                       </td>
@@ -901,6 +1194,14 @@ export default function TourManagerContent() {
                     <div className="flex items-center gap-2 text-gray-600">
                       <Layers className="w-4 h-4" />
                       <span>{template.variations?.length || 0} variations</span>
+                      {(template.variations?.length || 0) === 0 && (
+                        <button
+                          onClick={() => setAddVariationTemplate(template)}
+                          className="text-xs text-green-600 hover:text-green-800 font-medium"
+                        >
+                          + Add
+                        </button>
+                      )}
                     </div>
                   </div>
                   {template.variations && template.variations.length > 0 && (
@@ -945,7 +1246,7 @@ export default function TourManagerContent() {
               <div className="col-span-full bg-white rounded-lg shadow-md border border-gray-200 p-12 text-center">
                 <Map className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm font-medium text-gray-500">No tour templates found</p>
-                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg- green-700">
+                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
                   Create Your First Template
                 </button>
               </div>
@@ -971,8 +1272,17 @@ export default function TourManagerContent() {
                   <div className="hidden md:block">
                     <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{template.duration_days}D</span>
                   </div>
-                  <div className="hidden md:block">
-                    <span className="text-xs text-purple-600 font-medium">{template.variations?.length || 0} var</span>
+                  <div className="hidden md:flex items-center gap-1">
+                    {(template.variations?.length || 0) > 0 ? (
+                      <span className="text-xs text-purple-600 font-medium">{template.variations?.length || 0} var</span>
+                    ) : (
+                      <button
+                        onClick={() => setAddVariationTemplate(template)}
+                        className="text-xs text-amber-600 hover:text-amber-800"
+                      >
+                        + Add var
+                      </button>
+                    )}
                   </div>
                   {template.is_featured && <Star className="w-4 h-4 text-amber-500 fill-amber-500" />}
                 </div>
@@ -993,7 +1303,7 @@ export default function TourManagerContent() {
               <div className="p-12 text-center">
                 <Map className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm font-medium text-gray-500">No tour templates found</p>
-                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg- green-700">
+                <button onClick={handleAddNew} className="mt-3 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">
                   Create Your First Template
                 </button>
               </div>
@@ -1002,7 +1312,7 @@ export default function TourManagerContent() {
         )}
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Template Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -1014,131 +1324,157 @@ export default function TourManagerContent() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Tab Navigation (only show for new templates) */}
+            {!editingTemplate && (
+              <div className="px-4 pt-3 border-b">
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setActiveTab('basic')}
+                    className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'basic'
+                        ? 'border-green-600 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    1. Basic Info
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('details')}
+                    className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'details'
+                        ? 'border-green-600 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    2. Details
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('variations')}
+                    className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'variations'
+                        ? 'border-green-600 text-green-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    3. Variations
+                  </button>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="p-4">
-              {/* Basic Information */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">1</span>
-                  Basic Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Template Name *</label>
-                    <input
-                      type="text"
-                      name="template_name"
-                      value={formData.template_name}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                      placeholder="e.g., Memphis, Sakkara & Dahshur Day Trip"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Template Code</label>
-                    <input
-                      type="text"
-                      name="template_code"
-                      value={formData.template_code}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm font-mono"
-                      placeholder="Auto-generated if empty"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
-                    <select
-                      name="category_id"
-                      value={formData.category_id}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                    >
-                      <option value="">Select Category...</option>
-                      {categories.map(cat => (
-                        <option key={cat.id} value={cat.id}>{cat.category_name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tour Type *</label>
-                    <select
-                      name="tour_type"
-                      value={formData.tour_type}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                    >
-                      {TOUR_TYPES.map(type => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Days) *</label>
-                    <input
-                      type="number"
-                      name="duration_days"
-                      value={formData.duration_days}
-                      onChange={handleChange}
-                      min="1"
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Nights)</label>
-                    <input
-                      type="number"
-                      name="duration_nights"
-                      value={formData.duration_nights}
-                      onChange={handleChange}
-                      min="0"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Physical Level</label>
-                    <select
-                      name="physical_level"
-                      value={formData.physical_level}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600  focus:border-transparent shadow-sm"
-                    >
-                      {PHYSICAL_LEVELS.map(level => (
-                        <option key={level.value} value={level.value}>{level.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Cities Covered */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">2</span>
-                  Cities Covered
-                </h3>
-                <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
-                  {EGYPTIAN_CITIES.map(city => (
-                    <label key={city} className="flex items-center gap-2 cursor-pointer">
+              {/* Basic Information Tab */}
+              {(activeTab === 'basic' || editingTemplate) && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Template Name *</label>
                       <input
-                        type="checkbox"
-                        checked={formData.cities_covered.includes(city)}
-                        onChange={() => toggleCity(city)}
-                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-600"
+                        type="text"
+                        name="template_name"
+                        value={formData.template_name}
+                        onChange={handleChange}
+                        required
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                        placeholder="e.g., Memphis, Sakkara & Dahshur Day Trip"
                       />
-                      <span className="text-xs text-gray-700">{city}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Template Code</label>
+                      <input
+                        type="text"
+                        name="template_code"
+                        value={formData.template_code}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono"
+                        placeholder="Auto-generated if empty"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
+                      <select
+                        name="category_id"
+                        value={formData.category_id}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      >
+                        <option value="">Select Category...</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.category_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Tour Type *</label>
+                      <select
+                        name="tour_type"
+                        value={formData.tour_type}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      >
+                        {TOUR_TYPES.map(type => (
+                          <option key={type.value} value={type.value}>{type.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Days) *</label>
+                      <input
+                        type="number"
+                        name="duration_days"
+                        value={formData.duration_days}
+                        onChange={handleChange}
+                        min="1"
+                        required
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Nights)</label>
+                      <input
+                        type="number"
+                        name="duration_nights"
+                        value={formData.duration_nights}
+                        onChange={handleChange}
+                        min="0"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Physical Level</label>
+                      <select
+                        name="physical_level"
+                        value={formData.physical_level}
+                        onChange={handleChange}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      >
+                        {PHYSICAL_LEVELS.map(level => (
+                          <option key={level.value} value={level.value}>{level.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
 
-              {/* Descriptions */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">3</span>
-                  Descriptions
-                </h3>
-                <div className="space-y-3">
+                  {/* Cities */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">Cities Covered</label>
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+                      {EGYPTIAN_CITIES.map(city => (
+                        <label key={city} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.cities_covered.includes(city)}
+                            onChange={() => toggleCity(city)}
+                            className="w-4 h-4 text-green-600 border-gray-300 rounded"
+                          />
+                          <span className="text-xs text-gray-700">{city}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Descriptions */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Short Description</label>
                     <input
@@ -1146,212 +1482,265 @@ export default function TourManagerContent() {
                       name="short_description"
                       value={formData.short_description}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                       placeholder="Brief summary for cards and listings"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Full Description</label>
-                    <textarea
-                      name="long_description"
-                      value={formData.long_description}
-                      onChange={handleChange}
-                      rows={4}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                      placeholder="Detailed tour description..."
-                    />
-                  </div>
-                </div>
-              </div>
 
-              {/* Highlights */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-xs font-bold">4</span>
-                  Highlights
-                </h3>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={highlightInput}
-                    onChange={(e) => setHighlightInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addHighlight())}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                    placeholder="Add a highlight and press Enter"
-                  />
-                  <button type="button" onClick={addHighlight} className="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-sm font-medium">
-                    Add
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.highlights.map((h, i) => (
-                    <span key={i} className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded text-xs border border-amber-200">
-                      ✨ {h}
-                      <button type="button" onClick={() => removeHighlight(i)} className="text-amber-500 hover:text-amber-700">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Main Attractions */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">5</span>
-                  Main Attractions
-                </h3>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={attractionInput}
-                    onChange={(e) => setAttractionInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addAttraction())}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                    placeholder="Add an attraction and press Enter"
-                  />
-                  <button type="button" onClick={addAttraction} className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm font-medium">
-                    Add
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.main_attractions.map((a, i) => (
-                    <span key={i} className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs border border-green-200">
-                      🏛️ {a}
-                      <button type="button" onClick={() => removeAttraction(i)} className="text-green-500 hover:text-green-700">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Best For */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">6</span>
-                  Best For
-                </h3>
-                <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-                  {BEST_FOR_OPTIONS.map(option => (
-                    <label key={option} className="flex items-center gap-2 cursor-pointer">
+                  {/* Options Row */}
+                  <div className="flex items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={formData.best_for.includes(option)}
-                        onChange={() => toggleBestFor(option)}
-                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-600"
+                        name="is_featured"
+                        checked={formData.is_featured}
+                        onChange={handleCheckboxChange}
+                        className="w-4 h-4 text-green-600 border-gray-300 rounded"
                       />
-                      <span className="text-xs text-gray-700">{option}</span>
+                      <span className="text-xs text-gray-700">⭐ Featured Tour</span>
                     </label>
-                  ))}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="is_active"
+                        checked={formData.is_active}
+                        onChange={handleCheckboxChange}
+                        className="w-4 h-4 text-green-600 border-gray-300 rounded"
+                      />
+                      <span className="text-xs text-gray-700">Active</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Meals & Options */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">7</span>
-                  Meals & Options
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Details Tab (only for new templates) */}
+              {activeTab === 'details' && !editingTemplate && (
+                <div className="space-y-4">
+                  {/* Highlights */}
                   <div>
-                    <p className="text-xs font-medium text-gray-600 mb-2">Meals Included</p>
-                    <div className="space-y-1">
+                    <label className="block text-xs font-medium text-gray-600 mb-2">Highlights</label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={highlightInput}
+                        onChange={(e) => setHighlightInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addHighlight())}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        placeholder="Add a highlight and press Enter"
+                      />
+                      <button type="button" onClick={addHighlight} className="px-3 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 text-sm font-medium">
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.highlights.map((h, i) => (
+                        <span key={i} className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded text-xs border border-amber-200">
+                          ✨ {h}
+                          <button type="button" onClick={() => removeHighlight(i)} className="text-amber-500 hover:text-amber-700">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Attractions */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">Main Attractions</label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={attractionInput}
+                        onChange={(e) => setAttractionInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addAttraction())}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        placeholder="Add an attraction and press Enter"
+                      />
+                      <button type="button" onClick={addAttraction} className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm font-medium">
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.main_attractions.map((a, i) => (
+                        <span key={i} className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs border border-green-200">
+                          🏛️ {a}
+                          <button type="button" onClick={() => removeAttraction(i)} className="text-green-500 hover:text-green-700">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Best For */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">Best For</label>
+                    <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
+                      {BEST_FOR_OPTIONS.map(option => (
+                        <label key={option} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formData.best_for.includes(option)}
+                            onChange={() => toggleBestFor(option)}
+                            className="w-4 h-4 text-green-600 border-gray-300 rounded"
+                          />
+                          <span className="text-xs text-gray-700">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Meals */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">Meals Included</label>
+                    <div className="flex gap-4">
                       {['Breakfast', 'Lunch', 'Dinner'].map(meal => (
                         <label key={meal} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={formData.meals_included.includes(meal)}
                             onChange={() => toggleMeal(meal)}
-                            className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-600"
+                            className="w-4 h-4 text-green-600 border-gray-300 rounded"
                           />
                           <span className="text-xs text-gray-700">{meal}</span>
                         </label>
                       ))}
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-medium text-gray-600 mb-2">Options</p>
-                    <div className="space-y-1">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          name="pickup_required"
-                          checked={formData.pickup_required}
-                          onChange={handleCheckboxChange}
-                          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-600"
-                        />
-                        <span className="text-xs text-gray-700">Pickup Required</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          name="is_featured"
-                          checked={formData.is_featured}
-                          onChange={handleCheckboxChange}
-                          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-600"
-                        />
-                        <span className="text-xs text-gray-700">Featured Tour ⭐</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          name="is_active"
-                          checked={formData.is_active}
-                          onChange={handleCheckboxChange}
-                          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-600"
-                        />
-                        <span className="text-xs text-gray-700">Active</span>
-                      </label>
-                    </div>
+                </div>
+              )}
+
+              {/* Variations Tab (only for new templates) */}
+              {activeTab === 'variations' && !editingTemplate && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>💡 Tip:</strong> Select the pricing tiers you want to offer. You can link services to rates after creating the template.
+                    </p>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Transportation City</label>
-                    <select
-                      name="transportation_city"
-                      value={formData.transportation_city}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                    >
-                      {EGYPTIAN_CITIES.map(city => (
-                        <option key={city} value={city}>{city}</option>
-                      ))}
-                    </select>
+
+                  <div className="space-y-3">
+                    {(Object.entries(TIER_CONFIG) as [string, typeof TIER_CONFIG.budget][]).map(([tier, config]) => (
+                      <div
+                        key={tier}
+                        className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                          newTemplateVariations.has(tier)
+                            ? `${config.borderColor} ${config.bgColor}`
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => toggleNewVariationTier(tier)}
+                      >
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={newTemplateVariations.has(tier)}
+                            onChange={() => toggleNewVariationTier(tier)}
+                            className="mt-1 w-4 h-4 text-green-600 border-gray-300 rounded"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{config.icon}</span>
+                              <span className={`font-medium ${newTemplateVariations.has(tier) ? config.textColor : 'text-gray-900'}`}>
+                                {config.label}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{config.description}</p>
+                            
+                            {newTemplateVariations.has(tier) && (
+                              <div className="mt-3 pt-3 border-t border-gray-200" onClick={e => e.stopPropagation()}>
+                                <div className="flex items-center gap-4">
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`new-group-${tier}`}
+                                      checked={newTemplateGroupTypes[tier] === 'private'}
+                                      onChange={() => setNewTemplateGroupTypes(prev => ({ ...prev, [tier]: 'private' }))}
+                                      className="w-4 h-4 text-green-600"
+                                    />
+                                    <span className="text-sm text-gray-700">🔒 Private</span>
+                                  </label>
+                                  <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="radio"
+                                      name={`new-group-${tier}`}
+                                      checked={newTemplateGroupTypes[tier] === 'shared'}
+                                      onChange={() => setNewTemplateGroupTypes(prev => ({ ...prev, [tier]: 'shared' }))}
+                                      className="w-4 h-4 text-green-600"
+                                    />
+                                    <span className="text-sm text-gray-700">👥 Shared</span>
+                                  </label>
+                                </div>
+                                <div className="mt-2 text-xs text-gray-500">
+                                  Default: {config.defaults.min_pax}-{config.defaults.max_pax} pax • 
+                                  Vehicle: {config.defaults.vehicle_type.replace('_', ' ')} • 
+                                  {config.defaults.accommodation_standard.replace('_', ' ')}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Image URL</label>
-                    <input
-                      type="url"
-                      name="image_url"
-                      value={formData.image_url}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
-                      placeholder="https://..."
-                    />
+
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-sm text-gray-600">
+                      {newTemplateVariations.size} variation{newTemplateVariations.size !== 1 ? 's' : ''} will be created with this template
+                    </p>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Buttons */}
-              <div className="flex gap-2 pt-3 border-t">
+              <div className="flex gap-2 pt-4 mt-4 border-t">
+                {!editingTemplate && activeTab !== 'basic' && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(activeTab === 'variations' ? 'details' : 'basic')}
+                    className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+                  >
+                    ← Back
+                  </button>
+                )}
+                <div className="flex-1" />
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                  className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg- green-700 font-medium transition-colors flex items-center justify-center gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  {editingTemplate ? 'Update Template' : 'Create Template'}
-                </button>
+                {!editingTemplate && activeTab !== 'variations' ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab(activeTab === 'basic' ? 'details' : 'variations')}
+                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                  >
+                    Next →
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    {editingTemplate ? 'Update Template' : 'Create Template & Variations'}
+                  </button>
+                )}
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {/* ADD VARIATION MODAL (for existing templates) */}
+      {addVariationTemplate && (
+        <AddVariationModal
+          template={addVariationTemplate}
+          onClose={() => setAddVariationTemplate(null)}
+          onSuccess={fetchTemplates}
+          showToast={showToast}
+        />
       )}
 
       {/* SERVICE RATE LINKER MODAL */}

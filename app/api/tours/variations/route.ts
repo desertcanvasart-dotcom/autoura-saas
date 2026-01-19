@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
 
+// ============================================
+// TOUR VARIATIONS API - ENHANCED
+// File: app/api/tours/variations/route.ts
+// 
+// Changes from original:
+// 1. POST now supports batch creation (array of variations)
+// 2. Added smart tier-based defaults for inclusions, vehicle, etc.
+// ============================================
+
 // GET - List all variations (optionally filter by template_id)
 export async function GET(request: NextRequest) {
   try {
@@ -43,69 +52,107 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new variation
+// POST - Create new variation(s) - NOW SUPPORTS BATCH CREATION
 export async function POST(request: NextRequest) {
   try {
     const supabase = createClient()
     const body = await request.json()
 
-    if (!body.template_id || !body.variation_name || !body.tier) {
+    // Support both single variation and batch creation
+    const variations = Array.isArray(body) ? body : [body]
+
+    if (variations.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Template ID, variation name, and tier are required' },
+        { success: false, error: 'No variations provided' },
         { status: 400 }
       )
     }
 
-    // Generate variation code
-    const variationCode = body.variation_code || 
-      `${body.variation_name.toUpperCase().replace(/\s+/g, '-').substring(0, 20)}-${body.tier.toUpperCase()}`
-
-    const variationData = {
-      template_id: body.template_id,
-      variation_code: variationCode,
-      variation_name: body.variation_name,
-      tier: body.tier, // budget, standard, luxury
-      group_type: body.group_type || 'private', // private, shared
-      min_pax: body.min_pax || 1,
-      max_pax: body.max_pax || 20,
-      optimal_pax: body.optimal_pax || null,
-      inclusions: body.inclusions || [],
-      exclusions: body.exclusions || [],
-      optional_extras: body.optional_extras || [],
-      guide_type: body.guide_type || null,
-      guide_languages: body.guide_languages || ['English'],
-      vehicle_type: body.vehicle_type || null,
-      accommodation_standard: body.accommodation_standard || null,
-      meal_quality: body.meal_quality || null,
-      private_experience: body.private_experience || false,
-      skip_line_access: body.skip_line_access || false,
-      vip_treatment: body.vip_treatment || false,
-      flexible_itinerary: body.flexible_itinerary || false,
-      typical_start_time: body.typical_start_time || null,
-      typical_end_time: body.typical_end_time || null,
-      pickup_time_range: body.pickup_time_range || null,
-      is_active: body.is_active !== false,
-      available_seasons: body.available_seasons || []
+    // Validate required fields for each variation
+    for (const v of variations) {
+      if (!v.template_id) {
+        return NextResponse.json(
+          { success: false, error: 'template_id is required for all variations' },
+          { status: 400 }
+        )
+      }
+      if (!v.variation_name) {
+        return NextResponse.json(
+          { success: false, error: 'variation_name is required for all variations' },
+          { status: 400 }
+        )
+      }
+      if (!v.tier) {
+        return NextResponse.json(
+          { success: false, error: 'tier is required (budget, standard, or luxury)' },
+          { status: 400 }
+        )
+      }
     }
+
+    // Prepare variation data with smart defaults
+    const variationsToInsert = variations.map(v => {
+      // Generate variation code
+      const variationCode = v.variation_code || 
+        `${v.variation_name.toUpperCase().replace(/\s+/g, '-').substring(0, 20)}-${v.tier.toUpperCase()}`
+
+      return {
+        template_id: v.template_id,
+        variation_code: variationCode,
+        variation_name: v.variation_name,
+        tier: v.tier,
+        group_type: v.group_type || getDefaultGroupType(v.tier),
+        min_pax: v.min_pax || getDefaultMinPax(v.tier),
+        max_pax: v.max_pax || getDefaultMaxPax(v.tier),
+        optimal_pax: v.optimal_pax || null,
+        inclusions: v.inclusions || getDefaultInclusions(v.tier),
+        exclusions: v.exclusions || getDefaultExclusions(),
+        optional_extras: v.optional_extras || [],
+        guide_type: v.guide_type || 'egyptologist',
+        guide_languages: v.guide_languages || ['English'],
+        vehicle_type: v.vehicle_type || getDefaultVehicle(v.tier),
+        accommodation_standard: v.accommodation_standard || getDefaultAccommodation(v.tier),
+        meal_quality: v.meal_quality || getDefaultMealQuality(v.tier),
+        private_experience: v.private_experience ?? (v.group_type === 'private' || v.tier !== 'budget'),
+        skip_line_access: v.skip_line_access ?? (v.tier === 'luxury'),
+        vip_treatment: v.vip_treatment ?? (v.tier === 'luxury'),
+        flexible_itinerary: v.flexible_itinerary ?? (v.tier !== 'budget'),
+        typical_start_time: v.typical_start_time || null,
+        typical_end_time: v.typical_end_time || null,
+        pickup_time_range: v.pickup_time_range || null,
+        is_active: v.is_active !== false,
+        available_seasons: v.available_seasons || []
+      }
+    })
 
     const { data, error } = await supabase
       .from('tour_variations')
-      .insert([variationData])
+      .insert(variationsToInsert)
       .select()
-      .single()
 
     if (error) {
-      console.error('Error creating variation:', error)
+      console.error('Error creating variations:', error)
       return NextResponse.json(
-        { success: false, error: 'Failed to create variation' },
+        { success: false, error: 'Failed to create variations: ' + error.message },
         { status: 500 }
       )
     }
 
+    // Return appropriate response based on single vs batch
+    if (!Array.isArray(body) && data && data.length === 1) {
+      // Single variation - match original response format
+      return NextResponse.json({
+        success: true,
+        data: data[0],
+        message: 'Variation created successfully'
+      }, { status: 201 })
+    }
+
+    // Batch creation response
     return NextResponse.json({
       success: true,
       data: data,
-      message: 'Variation created successfully'
+      message: `${data?.length || 0} variation(s) created successfully`
     }, { status: 201 })
 
   } catch (error) {
@@ -114,5 +161,90 @@ export async function POST(request: NextRequest) {
       { success: false, error: 'Internal server error' },
       { status: 500 }
     )
+  }
+}
+
+// ============================================
+// SMART DEFAULT HELPERS
+// ============================================
+
+function getDefaultGroupType(tier: string): 'private' | 'shared' {
+  return tier === 'budget' ? 'shared' : 'private'
+}
+
+function getDefaultMinPax(tier: string): number {
+  return 1
+}
+
+function getDefaultMaxPax(tier: string): number {
+  switch (tier) {
+    case 'luxury': return 6
+    case 'standard': return 10
+    default: return 15
+  }
+}
+
+function getDefaultInclusions(tier: string): string[] {
+  const base = [
+    'Pick-up and drop-off from hotel',
+    'Professional Egyptologist guide',
+    'All entrance fees as per itinerary',
+    'Bottled water during tour'
+  ]
+  
+  if (tier === 'standard') {
+    return [
+      ...base,
+      'Lunch at local restaurant',
+      'Air-conditioned vehicle'
+    ]
+  }
+  
+  if (tier === 'luxury') {
+    return [
+      ...base,
+      'Gourmet lunch at premium restaurant',
+      'Luxury air-conditioned vehicle',
+      'Skip-the-line access',
+      'Cold towels and refreshments',
+      'Gratuities included'
+    ]
+  }
+  
+  // Budget
+  return base
+}
+
+function getDefaultExclusions(): string[] {
+  return [
+    'International flights',
+    'Travel insurance',
+    'Personal expenses',
+    'Optional activities not mentioned',
+    'Camera fees inside sites (where applicable)'
+  ]
+}
+
+function getDefaultVehicle(tier: string): string {
+  switch (tier) {
+    case 'luxury': return 'luxury_suv'
+    case 'standard': return 'modern_van'
+    default: return 'standard_van'
+  }
+}
+
+function getDefaultAccommodation(tier: string): string {
+  switch (tier) {
+    case 'luxury': return '5_star'
+    case 'standard': return '4_star'
+    default: return '3_star'
+  }
+}
+
+function getDefaultMealQuality(tier: string): string {
+  switch (tier) {
+    case 'luxury': return 'gourmet'
+    case 'standard': return 'good'
+    default: return 'basic'
   }
 }
