@@ -188,15 +188,15 @@ export default function DayBuilder({
         setDays(data.data.days)
       }
 
-      // Expand all days that have activities
-      const daysWithActivities = new Set(
-        data.data.days
-          .filter((d: DayData) => d.activities.length > 0)
-          .map((d: DayData) => d.day_number)
-      )
-      if (daysWithActivities.size > 0) {
-        setExpandedDays(daysWithActivities)
-      }
+     // Expand all days that have activities
+const daysWithActivities = new Set<number>(
+    data.data.days
+      .filter((d: DayData) => d.activities.length > 0)
+      .map((d: DayData) => d.day_number)
+  )
+  if (daysWithActivities.size > 0) {
+    setExpandedDays(daysWithActivities)
+  }
     } catch (err: any) {
       setError(err.message)
     } finally {
