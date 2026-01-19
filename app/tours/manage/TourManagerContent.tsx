@@ -27,9 +27,11 @@ import {
   Layers,
   MapPin,
   Calculator,
-  Link2,
   Loader2
 } from 'lucide-react'
+
+// Import DayBuilder component
+import DayBuilder from './DayBuilder'
 
 // ============================================
 // INTERFACES
@@ -46,7 +48,7 @@ interface TourVariation {
   template_id: string
   variation_code: string
   variation_name: string
-  tier: 'budget' | 'standard' | 'luxury'
+  tier: 'budget' | 'standard' | 'deluxe' | 'luxury'
   group_type: 'private' | 'shared'
   min_pax: number
   max_pax: number
@@ -81,6 +83,8 @@ interface TourTemplate {
   is_featured: boolean
   is_active: boolean
   created_at: string
+  uses_day_builder?: boolean
+  pricing_mode?: string
   category?: TourCategory
   variations?: TourVariation[]
 }
@@ -128,6 +132,7 @@ const BEST_FOR_OPTIONS = [
   'First-time Visitors', 'Repeat Visitors', 'Luxury Travelers', 'Budget Travelers'
 ]
 
+// UPDATED: Now includes all 4 tiers including Deluxe
 const TIER_CONFIG = {
   budget: {
     label: 'Budget',
@@ -159,6 +164,22 @@ const TIER_CONFIG = {
       vehicle_type: 'modern_van',
       accommodation_standard: '4_star',
       meal_quality: 'good'
+    }
+  },
+  deluxe: {
+    label: 'Deluxe',
+    icon: '✨',
+    description: 'Enhanced experience with premium touches',
+    bgColor: 'bg-purple-50',
+    textColor: 'text-purple-700',
+    borderColor: 'border-purple-200',
+    defaults: {
+      min_pax: 1,
+      max_pax: 8,
+      group_type: 'private' as const,
+      vehicle_type: 'premium_van',
+      accommodation_standard: '4_star_plus',
+      meal_quality: 'premium'
     }
   },
   luxury: {
@@ -230,6 +251,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
   const [groupTypes, setGroupTypes] = useState<Record<string, 'private' | 'shared'>>({
     budget: 'shared',
     standard: 'private',
+    deluxe: 'private',
     luxury: 'private'
   })
   const [saving, setSaving] = useState(false)
@@ -410,6 +432,42 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
 }
 
 // ============================================
+// DAY BUILDER MODAL COMPONENT
+// ============================================
+interface DayBuilderModalProps {
+  template: TourTemplate
+  onClose: () => void
+  onSave?: () => void
+}
+
+function DayBuilderModal({ template, onClose, onSave }: DayBuilderModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="px-4 py-3 border-b flex items-center justify-between bg-white">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Day Builder</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{template.template_name} • {template.duration_days} days</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          <DayBuilder
+            templateId={template.id}
+            templateName={template.template_name}
+            durationDays={template.duration_days}
+            onClose={onClose}
+            onSave={onSave}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // MAIN COMPONENT
 // ============================================
 
@@ -432,11 +490,15 @@ export default function TourManagerContent() {
   // ADD VARIATION MODAL STATE
   const [addVariationTemplate, setAddVariationTemplate] = useState<TourTemplate | null>(null)
   
+  // DAY BUILDER MODAL STATE
+  const [dayBuilderTemplate, setDayBuilderTemplate] = useState<TourTemplate | null>(null)
+  
   // NEW TEMPLATE VARIATIONS STATE (for creating with template)
   const [newTemplateVariations, setNewTemplateVariations] = useState<Set<string>>(new Set(['standard']))
   const [newTemplateGroupTypes, setNewTemplateGroupTypes] = useState<Record<string, 'private' | 'shared'>>({
     budget: 'shared',
     standard: 'private',
+    deluxe: 'private',
     luxury: 'private'
   })
   
@@ -460,6 +522,8 @@ export default function TourManagerContent() {
     image_url: '',
     is_featured: false,
     is_active: true,
+    uses_day_builder: true,
+    pricing_mode: 'auto',
     default_transportation_service: 'day_tour',
     transportation_city: 'Cairo'
   })
@@ -611,6 +675,8 @@ export default function TourManagerContent() {
       image_url: '',
       is_featured: false,
       is_active: true,
+      uses_day_builder: true,
+      pricing_mode: 'auto',
       default_transportation_service: 'day_tour',
       transportation_city: 'Cairo'
     })
@@ -618,6 +684,7 @@ export default function TourManagerContent() {
     setNewTemplateGroupTypes({
       budget: 'shared',
       standard: 'private',
+      deluxe: 'private',
       luxury: 'private'
     })
     setActiveTab('basic')
@@ -646,6 +713,8 @@ export default function TourManagerContent() {
       image_url: template.image_url || '',
       is_featured: template.is_featured,
       is_active: template.is_active,
+      uses_day_builder: template.uses_day_builder ?? true,
+      pricing_mode: template.pricing_mode || 'auto',
       default_transportation_service: 'day_tour',
       transportation_city: 'Cairo'
     })
@@ -732,6 +801,15 @@ export default function TourManagerContent() {
           
           if (varData.success) {
             showToast('success', `${formData.template_name} created with ${varData.data.length} variation(s)!`)
+            // Ask to open Day Builder
+            if (data.data) {
+              const newTemplate = { ...data.data, duration_days: formData.duration_days }
+              setTimeout(() => {
+                if (confirm('Would you like to add activities to this tour now?')) {
+                  setDayBuilderTemplate(newTemplate)
+                }
+              }, 500)
+            }
           } else {
             showToast('info', `Template created, but failed to create variations: ${varData.error}`)
           }
@@ -1004,6 +1082,9 @@ export default function TourManagerContent() {
                               <p className="text-xs text-gray-500 font-mono">{template.template_code}</p>
                             </div>
                             {template.is_featured && <Star className="w-4 h-4 text-amber-500 fill-amber-500" />}
+                            {template.uses_day_builder && (
+                              <span className="px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px] font-medium">Auto</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -1051,6 +1132,13 @@ export default function TourManagerContent() {
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center gap-1">
                             <button
+                              onClick={() => setDayBuilderTemplate(template)}
+                              className="p-1.5 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                              title="Day Builder"
+                            >
+                              <Calendar className="w-4 h-4" />
+                            </button>
+                            <button
                               onClick={() => handleEdit(template)}
                               className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
                               title="Edit"
@@ -1088,6 +1176,13 @@ export default function TourManagerContent() {
                                 <Plus className="w-3 h-3" />
                                 Add Variation
                               </button>
+                              <button
+                                onClick={() => setDayBuilderTemplate(template)}
+                                className="ml-2 text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1"
+                              >
+                                <Calendar className="w-3 h-3" />
+                                Edit Days
+                              </button>
                             </div>
                             {template.variations && template.variations.length > 0 ? (
                               <div className="flex flex-wrap gap-2">
@@ -1101,7 +1196,6 @@ export default function TourManagerContent() {
                                         <p className="text-xs opacity-75">{variation.group_type} • {variation.min_pax}-{variation.max_pax} pax</p>
                                       </div>
                                       <div className="flex items-center gap-1 ml-2">
-                                      
                                         <Link
                                           href={`/b2b/calculator/${variation.id}`}
                                           className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors"
@@ -1123,7 +1217,7 @@ export default function TourManagerContent() {
                                   className="text-sm text-green-600 hover:text-green-800 font-medium flex items-center gap-1 mx-auto"
                                 >
                                   <Plus className="w-4 h-4" />
-                                  Add Budget / Standard / Luxury Variations
+                                  Add Budget / Standard / Deluxe / Luxury Variations
                                 </button>
                               </div>
                             )}
@@ -1212,6 +1306,12 @@ export default function TourManagerContent() {
                 </div>
                 <div className="flex border-t border-gray-200 divide-x divide-gray-200">
                   <button
+                    onClick={() => setDayBuilderTemplate(template)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-purple-600 hover:bg-purple-50 transition-colors"
+                  >
+                    <Calendar className="w-4 h-4" />Days
+                  </button>
+                  <button
                     onClick={() => handleEdit(template)}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                   >
@@ -1277,6 +1377,9 @@ export default function TourManagerContent() {
                   {template.is_featured && <Star className="w-4 h-4 text-amber-500 fill-amber-500" />}
                 </div>
                 <div className="flex items-center gap-1 ml-4">
+                  <button onClick={() => setDayBuilderTemplate(template)} className="p-1 text-gray-400 hover:text-purple-600 transition-colors">
+                    <Calendar className="w-4 h-4" />
+                  </button>
                   <button onClick={() => handleEdit(template)} className="p-1 text-gray-400 hover:text-green-600 transition-colors">
                     <Edit className="w-4 h-4" />
                   </button>
@@ -1499,6 +1602,16 @@ export default function TourManagerContent() {
                       />
                       <span className="text-xs text-gray-700">Active</span>
                     </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="uses_day_builder"
+                        checked={formData.uses_day_builder}
+                        onChange={handleCheckboxChange}
+                        className="w-4 h-4 text-purple-600 border-gray-300 rounded"
+                      />
+                      <span className="text-xs text-gray-700">⚡ Auto-Pricing (Day Builder)</span>
+                    </label>
                   </div>
                 </div>
               )}
@@ -1605,7 +1718,7 @@ export default function TourManagerContent() {
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                     <p className="text-sm text-blue-800">
-                      <strong>💡 Tip:</strong> Select the pricing tiers you want to offer. You can link services to rates after creating the template.
+                      <strong>💡 Tip:</strong> Select the pricing tiers you want to offer. After creating the template, use the Day Builder to add activities and enable auto-pricing.
                     </p>
                   </div>
 
@@ -1730,6 +1843,15 @@ export default function TourManagerContent() {
           onClose={() => setAddVariationTemplate(null)}
           onSuccess={fetchTemplates}
           showToast={showToast}
+        />
+      )}
+
+      {/* DAY BUILDER MODAL */}
+      {dayBuilderTemplate && (
+        <DayBuilderModal
+          template={dayBuilderTemplate}
+          onClose={() => setDayBuilderTemplate(null)}
+          onSave={fetchTemplates}
         />
       )}
 
