@@ -1101,13 +1101,7 @@ export default function TourManagerContent() {
                                         <p className="text-xs opacity-75">{variation.group_type} • {variation.min_pax}-{variation.max_pax} pax</p>
                                       </div>
                                       <div className="flex items-center gap-1 ml-2">
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); setServiceLinkerVariation(variation.id) }}
-                                          className="p-1.5 text-blue-600 hover:bg-blue-100 rounded transition-colors"
-                                          title="Link Services to Rates"
-                                        >
-                                          <Link2 className="w-4 h-4" />
-                                        </button>
+                                      
                                         <Link
                                           href={`/b2b/calculator/${variation.id}`}
                                           className="p-1.5 text-green-600 hover:bg-green-100 rounded transition-colors"
