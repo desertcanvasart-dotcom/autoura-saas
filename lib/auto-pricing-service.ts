@@ -251,10 +251,10 @@ async function getEntranceFee(
     const mainFees = fees.filter(f => f.is_addon !== true)
 
     // IMPROVED: Better fuzzy matching with keyword overlap
-    const searchKeywords = attractionName.toLowerCase().split(/\s+/).filter(k => k.length > 2)
+    const searchKeywords = attractionName.toLowerCase().split(/\s+/).filter((k: string) => k.length > 2)
     
     let fee = mainFees.find(f => {
-      const feeKeywords = f.attraction_name.toLowerCase().split(/\s+/).filter(k => k.length > 2)
+      const feeKeywords = f.attraction_name.toLowerCase().split(/\s+/).filter((k: string) => k.length > 2)
       
       // Exact contains match (original logic)
       if (f.attraction_name.toLowerCase().includes(attractionName.toLowerCase()) ||
@@ -263,8 +263,8 @@ async function getEntranceFee(
       }
       
       // Keyword overlap match (new logic)
-      const overlap = searchKeywords.filter(sk => 
-        feeKeywords.some(fk => fk.includes(sk) || sk.includes(fk))
+      const overlap = searchKeywords.filter((sk: string) => 
+        feeKeywords.some((fk: string) => fk.includes(sk) || sk.includes(fk))
       )
       return overlap.length >= 2
     })
