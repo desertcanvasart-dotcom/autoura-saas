@@ -30,7 +30,6 @@ import {
   Link2,
   Loader2
 } from 'lucide-react'
-import ServiceRateLinker from '@/components/ServiceRateLinker'
 
 // ============================================
 // INTERFACES
@@ -429,9 +428,6 @@ export default function TourManagerContent() {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'basic' | 'details' | 'variations'>('basic')
-  
-  // SERVICE RATE LINKER STATE
-  const [serviceLinkerVariation, setServiceLinkerVariation] = useState<string | null>(null)
   
   // ADD VARIATION MODAL STATE
   const [addVariationTemplate, setAddVariationTemplate] = useState<TourTemplate | null>(null)
@@ -1740,18 +1736,6 @@ export default function TourManagerContent() {
           onClose={() => setAddVariationTemplate(null)}
           onSuccess={fetchTemplates}
           showToast={showToast}
-        />
-      )}
-
-      {/* SERVICE RATE LINKER MODAL */}
-      {serviceLinkerVariation && (
-        <ServiceRateLinker
-          variationId={serviceLinkerVariation}
-          onClose={() => setServiceLinkerVariation(null)}
-          onSave={() => {
-            fetchTemplates()
-            showToast('success', 'Services saved successfully!')
-          }}
         />
       )}
 
