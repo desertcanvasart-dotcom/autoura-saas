@@ -1,75 +1,26 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { calculateAutoPricing, ServiceTier } from '@/lib/auto-pricing-service'
 
 // ============================================
-// B2B TOUR PRICE CALCULATOR - v4
+// B2B TOUR PRICE CALCULATOR - v5
 // File: app/api/b2b/calculate-price/route.ts
 // 
-// NOW USES SHARED B2C RATE TABLES:
-// - vehicles (instead of transportation_rates)
-// - guides (instead of guide_rates)
-// - entrance_fees (instead of activity_rates)
-// - hotel_contacts (instead of accommodation_rates)
-// - meal_rates (shared)
-// - nile_cruises (shared)
+// NOW WITH AUTO-PRICING FALLBACK:
+// If tour_variation_services is empty, uses auto-pricing
+// from tour_day_activities (via auto-pricing-service.ts)
+//
+// SHARED B2C RATE TABLES:
+// - vehicles, guides, entrance_fees, hotel_contacts, meal_rates, nile_cruises
 // 
 // B2B-SPECIFIC TABLES (kept for tiered pricing):
-// - b2b_pricing_rules (felucca boats, volume discounts)
-// - b2b_transport_packages (cruise sightseeing packages)
-// - b2b_partners (partner margins)
-// - b2b_partner_pricing (partner-specific overrides)
+// - b2b_pricing_rules, b2b_transport_packages, b2b_partners, b2b_partner_pricing
 // ============================================
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-// Updated to use B2C tables
-const RATE_TABLES: Record<string, { table: string; eurField: string; nonEurField?: string; nameField?: string }> = {
-  transportation: {
-    table: 'vehicles',
-    eurField: 'daily_rate_eur',
-    nonEurField: 'daily_rate_eur',
-    nameField: 'vehicle_type'
-  },
-  guide: {
-    table: 'guides',
-    eurField: 'daily_rate_eur',
-    nonEurField: 'daily_rate_eur',
-    nameField: 'name'
-  },
-  activity: {
-    table: 'entrance_fees',
-    eurField: 'eur_rate',
-    nonEurField: 'non_eur_rate',
-    nameField: 'attraction_name'
-  },
-  entrance: {
-    table: 'entrance_fees',
-    eurField: 'eur_rate',
-    nonEurField: 'non_eur_rate',
-    nameField: 'attraction_name'
-  },
-  meal: {
-    table: 'meal_rates',
-    eurField: 'lunch_rate_eur',
-    nonEurField: 'lunch_rate_eur',
-    nameField: 'meal_type'
-  },
-  accommodation: {
-    table: 'hotel_contacts',
-    eurField: 'rate_double_eur',
-    nonEurField: 'rate_double_eur',
-    nameField: 'name'
-  },
-  cruise: {
-    table: 'nile_cruises',
-    eurField: 'rate_double_eur',
-    nonEurField: 'rate_double_eur',
-    nameField: 'ship_name'
-  }
-}
 
 interface CalculatedService {
   service_id: string
@@ -232,11 +183,11 @@ function selectVehicleFromPackage(pkg: any, numPax: number): { rate: number; veh
   }
 }
 
-// NEW: Select appropriate vehicle from vehicles table based on pax count and tier
+// Select appropriate vehicle from vehicles table based on pax count and tier
 async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standard'): Promise<{ rate: number; vehicle: string; id: string } | null> {
   const { data: vehicles, error } = await supabaseAdmin
     .from('vehicles')
-    .select('*')
+    .select('id, vehicle_type, name, daily_rate, passenger_capacity, tier, is_preferred')
     .eq('is_active', true)
     .order('is_preferred', { ascending: false })
 
@@ -245,15 +196,13 @@ async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standar
   // First try to find a vehicle matching tier and capacity
   let selectedVehicle = vehicles.find((v: any) => 
     v.tier === tier && 
-    numPax >= (v.capacity_min || 1) && 
-    numPax <= (v.capacity_max || 99)
+    numPax <= (v.passenger_capacity || 99)
   )
 
   // Fallback: any vehicle that fits capacity
   if (!selectedVehicle) {
     selectedVehicle = vehicles.find((v: any) => 
-      numPax >= (v.capacity_min || 1) && 
-      numPax <= (v.capacity_max || 99)
+      numPax <= (v.passenger_capacity || 99)
     )
   }
 
@@ -265,17 +214,17 @@ async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standar
   if (!selectedVehicle) return null
 
   return {
-    rate: selectedVehicle.daily_rate_eur || 0,
-    vehicle: selectedVehicle.vehicle_type || 'Vehicle',
+    rate: selectedVehicle.daily_rate || 0,
+    vehicle: selectedVehicle.vehicle_type || selectedVehicle.name || 'Vehicle',
     id: selectedVehicle.id
   }
 }
 
-// NEW: Select guide from guides table based on language and tier
+// Select guide from guides table based on language and tier
 async function selectGuideFromB2CTable(language: string = 'English', tier: string = 'standard'): Promise<{ rate: number; name: string; id: string } | null> {
   const { data: guides, error } = await supabaseAdmin
     .from('guides')
-    .select('*')
+    .select('id, name, daily_rate, languages, tier, is_preferred')
     .eq('is_active', true)
     .contains('languages', [language])
     .order('is_preferred', { ascending: false })
@@ -284,7 +233,7 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
     // Fallback: any guide
     const { data: anyGuide } = await supabaseAdmin
       .from('guides')
-      .select('*')
+      .select('id, name, daily_rate, tier')
       .eq('is_active', true)
       .order('is_preferred', { ascending: false })
       .limit(1)
@@ -292,7 +241,7 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
     if (!anyGuide || anyGuide.length === 0) return null
     
     return {
-      rate: anyGuide[0].daily_rate_eur || 55,
+      rate: anyGuide[0].daily_rate || 55,
       name: anyGuide[0].name || 'Guide',
       id: anyGuide[0].id
     }
@@ -302,17 +251,17 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
   let selectedGuide = guides.find((g: any) => g.tier === tier) || guides[0]
 
   return {
-    rate: selectedGuide.daily_rate_eur || 55,
+    rate: selectedGuide.daily_rate || 55,
     name: selectedGuide.name || 'Guide',
     id: selectedGuide.id
   }
 }
 
-// NEW: Get entrance fee from entrance_fees table
+// Get entrance fee from entrance_fees table
 async function getEntranceFee(attractionName: string, isEurPassport: boolean): Promise<{ rate: number; name: string; id: string } | null> {
   const { data: fees, error } = await supabaseAdmin
     .from('entrance_fees')
-    .select('*')
+    .select('id, attraction_name, eur_rate, non_eur_rate')
     .eq('is_active', true)
     .ilike('attraction_name', `%${attractionName}%`)
     .limit(1)
@@ -331,11 +280,11 @@ async function getEntranceFee(attractionName: string, isEurPassport: boolean): P
   }
 }
 
-// NEW: Get hotel rate from hotel_contacts table
+// Get hotel rate from hotel_contacts table
 async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ rate: number; name: string; id: string } | null> {
   const { data: hotels, error } = await supabaseAdmin
     .from('hotel_contacts')
-    .select('*')
+    .select('id, name, rate_double_eur, city, tier, is_preferred')
     .eq('is_active', true)
     .ilike('city', `%${city}%`)
     .eq('tier', tier)
@@ -346,7 +295,7 @@ async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ 
     // Fallback: any hotel in city
     const { data: anyHotel } = await supabaseAdmin
       .from('hotel_contacts')
-      .select('*')
+      .select('id, name, rate_double_eur')
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
       .order('is_preferred', { ascending: false })
@@ -392,7 +341,7 @@ export async function POST(request: NextRequest) {
       .from('tour_variations')
       .select(`
         id, variation_name, variation_code, tier, group_type, min_pax, max_pax,
-        tour_templates (id, template_name, template_code, duration_days)
+        tour_templates (id, template_name, template_code, duration_days, uses_day_builder, pricing_mode)
       `)
       .eq('id', variation_id)
       .single()
@@ -402,7 +351,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Variation not found' }, { status: 404 })
     }
 
-    const effectiveTier = variation.tier || tier
+    const effectiveTier = (variation.tier || tier) as ServiceTier
+    const template = variation.tour_templates as any
+    const templateId = template?.id
 
     // Fetch services for this variation
     const { data: services, error: servError } = await supabaseAdmin
@@ -415,6 +366,115 @@ export async function POST(request: NextRequest) {
       console.error('Services fetch error:', servError)
       return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 })
     }
+
+    // ============================================
+    // AUTO-PRICING FALLBACK
+    // If no services AND template uses day builder, use auto-pricing
+    // ============================================
+    if ((!services || services.length === 0) && templateId) {
+      console.log('📊 No variation services found, using auto-pricing fallback')
+      
+      // Determine effective margin (partner override)
+      let effectiveMargin = margin_percent
+      if (partner_id) {
+        const { data: partner } = await supabaseAdmin
+          .from('b2b_partners')
+          .select('default_margin_percent')
+          .eq('id', partner_id)
+          .single()
+        
+        if (partner?.default_margin_percent) {
+          effectiveMargin = partner.default_margin_percent
+        }
+      }
+
+      // Call auto-pricing service
+      const autoPriceResult = await calculateAutoPricing({
+        templateId,
+        tier: effectiveTier,
+        numPax: num_pax,
+        isEurPassport: is_eur_passport,
+        language,
+        marginPercent: effectiveMargin,
+        mealPlan: 'lunch_only',
+        includeAccommodation: (template?.duration_days || 1) > 1
+      })
+
+      if (!autoPriceResult.success) {
+        return NextResponse.json({ 
+          error: 'Auto-pricing failed', 
+          warnings: autoPriceResult.warnings 
+        }, { status: 500 })
+      }
+
+      // Convert auto-pricing result to B2B format
+      const travelDate = new Date(travel_date)
+      const season = getSeason(travelDate)
+
+      const convertedServices: CalculatedService[] = autoPriceResult.services.map(s => ({
+        service_id: s.id,
+        service_name: s.serviceName,
+        service_category: s.serviceType,
+        rate_type: s.serviceType,
+        rate_source: s.rateSource,
+        quantity_mode: s.quantityMode,
+        quantity: s.quantity,
+        unit_cost: s.unitCost,
+        line_total: s.lineTotal,
+        is_optional: s.isOptional,
+        day_number: s.dayNumber,
+        pricing_note: s.notes
+      }))
+
+      const convertedOptional: CalculatedService[] = autoPriceResult.optionalServices.map(s => ({
+        service_id: s.id,
+        service_name: s.serviceName,
+        service_category: s.serviceType,
+        rate_type: s.serviceType,
+        rate_source: s.rateSource,
+        quantity_mode: s.quantityMode,
+        quantity: s.quantity,
+        unit_cost: s.unitCost,
+        line_total: s.lineTotal,
+        is_optional: true,
+        day_number: s.dayNumber,
+        pricing_note: s.notes
+      }))
+
+      const result: PriceCalculationResult = {
+        variation_id: variation.id,
+        variation_name: variation.variation_name,
+        template_name: template?.template_name || '',
+        num_pax,
+        travel_date,
+        season,
+        is_eur_passport,
+        services: convertedServices,
+        optional_services: convertedOptional,
+        subtotal_cost: autoPriceResult.subtotalCost,
+        optional_total: autoPriceResult.optionalTotal,
+        total_cost: autoPriceResult.totalCost,
+        margin_percent: autoPriceResult.marginPercent,
+        margin_amount: autoPriceResult.marginAmount,
+        selling_price: autoPriceResult.sellingPrice,
+        price_per_person: autoPriceResult.pricePerPerson,
+        currency: autoPriceResult.currency
+      }
+
+      console.log('🎉 B2B Price calculated via auto-pricing:', {
+        variation: variation.variation_name,
+        numPax: num_pax,
+        cost: result.total_cost,
+        margin: effectiveMargin + '%',
+        selling: result.selling_price
+      })
+
+      return NextResponse.json({ success: true, data: result })
+    }
+
+    // ============================================
+    // ORIGINAL LOGIC: Process tour_variation_services
+    // ============================================
 
     const travelDate = new Date(travel_date)
     const season = getSeason(travelDate)
@@ -647,10 +707,10 @@ export async function POST(request: NextRequest) {
             quantity = service.quantity_value || 1
             break
           case 'per_day':
-            quantity = (service.quantity_value || 1) * ((variation.tour_templates as any)?.duration_days || 1)
+            quantity = (service.quantity_value || 1) * (template?.duration_days || 1)
             break
           case 'per_night':
-            quantity = (service.quantity_value || 1) * (((variation.tour_templates as any)?.duration_days || 1) - 1)
+            quantity = (service.quantity_value || 1) * ((template?.duration_days || 1) - 1)
             break
           case 'per_room':
             quantity = Math.ceil(num_pax / 2)
@@ -693,7 +753,7 @@ export async function POST(request: NextRequest) {
     const result: PriceCalculationResult = {
       variation_id: variation.id,
       variation_name: variation.variation_name,
-      template_name: (variation.tour_templates as any)?.template_name || '',
+      template_name: template?.template_name || '',
       num_pax,
       travel_date,
       season,
