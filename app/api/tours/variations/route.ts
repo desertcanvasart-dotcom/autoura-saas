@@ -1,24 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 // ============================================
-// TOUR VARIATIONS API - ENHANCED
-// File: app/api/tours/variations/route.ts
-// 
-// Changes from original:
-// 1. POST now supports batch creation (array of variations)
-// 2. Added smart tier-based defaults for inclusions, vehicle, etc.
+// TOUR VARIATIONS API - FIXED
+// Uses service role key to bypass RLS (same as templates API)
 // ============================================
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 // GET - List all variations (optionally filter by template_id)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
-
     const { searchParams } = new URL(request.url)
     const templateId = searchParams.get('template_id')
 
-    let query = supabase
+    let query = supabaseAdmin
       .from('tour_variations')
       .select('*')
       .order('tier', { ascending: true })
@@ -52,10 +51,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new variation(s) - NOW SUPPORTS BATCH CREATION
+// POST - Create new variation(s) - SUPPORTS BATCH CREATION
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
     const body = await request.json()
 
     // Support both single variation and batch creation
@@ -125,7 +123,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('tour_variations')
       .insert(variationsToInsert)
       .select()
