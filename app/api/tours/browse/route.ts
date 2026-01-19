@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         highlights,
         short_description,
         is_featured,
-        cover_image_url,
+        image_url,
         uses_day_builder,
         pricing_mode,
         tour_categories (
@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
           highlights: template.highlights || [],
           short_description: template.short_description,
           is_featured: template.is_featured,
-          cover_image_url: template.cover_image_url,
+          cover_image_url: template.image_url,
           category: template.tour_categories,
           
           // Variations summary
