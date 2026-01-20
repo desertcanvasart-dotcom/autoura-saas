@@ -1186,6 +1186,20 @@ export async function calculateDayBasedPricing(
     const hotelRate = hotelRatesMap.get(day.city)
     if (hotelRate) {
       accommodationPPD += hotelRate.ppdNight
+      services.push({
+        id: `day${day.day}-hotel`,
+        dayNumber: day.day,
+        serviceType: 'accommodation',
+        serviceName: `Hotel - ${hotelRate.hotelName} (${day.city})`,
+        quantity: 1,
+        quantityMode: 'per_pax',
+        unitCost: hotelRate.ppdNight,
+        lineTotal: hotelRate.ppdNight,
+        rateSource: 'hotel_contacts',
+        isPerPax: true,
+        isOptional: false,
+        notes: 'PPD (Per Person Double)'
+      })
     } else {
       accommodationPPD += DEFAULT_RATES[tier].hotelPPD
     }
@@ -1194,6 +1208,20 @@ export async function calculateDayBasedPricing(
   // Cruise PPD
   if (cruiseRates && cruiseNights > 0) {
     accommodationPPD += cruiseRates.ppdNight * cruiseNights
+    services.push({
+      id: `cruise-accommodation`,
+      dayNumber: cruiseDays[0]?.day || 1,
+      serviceType: 'cruise',
+      serviceName: `Nile Cruise - ${cruiseRates.shipName} (${cruiseNights} nights)`,
+      quantity: cruiseNights,
+      quantityMode: 'per_pax',
+      unitCost: cruiseRates.ppdNight,
+      lineTotal: cruiseRates.ppdNight * cruiseNights,
+      rateSource: 'nile_cruises',
+      isPerPax: true,
+      isOptional: false,
+      notes: `PPD €${cruiseRates.ppdNight.toFixed(2)}/night × ${cruiseNights} nights`
+    })
   }
 
   // ----- Entrance Fees (per pax) -----
@@ -1269,13 +1297,80 @@ export async function calculateDayBasedPricing(
   }
 
   // ----- Water (per pax per sightseeing day) -----
-  const sightseeingDays = itinerary.filter(d => d.services.guide_required || d.attractions.length > 0).length
+  const sightseeingDaysList = itinerary.filter(d => d.services.guide_required || d.attractions.length > 0)
+  const sightseeingDays = sightseeingDaysList.length
   const waterPerPax = waterCostPerPax * sightseeingDays
+
+  // Add water service
+  if (sightseeingDays > 0) {
+    services.push({
+      id: `water-all-days`,
+      dayNumber: 1,
+      serviceType: 'water',
+      serviceName: `Bottled Water (${sightseeingDays} sightseeing days)`,
+      quantity: sightseeingDays,
+      quantityMode: 'per_pax',
+      unitCost: waterCostPerPax,
+      lineTotal: waterPerPax,
+      rateSource: 'fixed',
+      isPerPax: true,
+      isOptional: false,
+      notes: `€${waterCostPerPax}/day × ${sightseeingDays} days`
+    })
+  }
 
   // ----- Total per-pax costs -----
   const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax
 
   console.log(`📊 Fixed costs: €${fixedCosts.toFixed(2)} | Per-pax costs: €${perPaxCosts.toFixed(2)}`)
+
+  // ============================================
+  // STEP 6b: Calculate base transport cost (for 2 pax, for services display)
+  // ============================================
+  let baseTransportCost = 0
+  const baseVehicleType = getVehicleTypeByPax(2) // Minivan for 2 pax
+  
+  for (const day of itinerary) {
+    const hasSightseeing = day.services.guide_required || day.attractions.length > 0
+    if (!hasSightseeing) continue
+    
+    const transport = await getTransportRate(baseVehicleType, day.city)
+    if (transport) {
+      baseTransportCost += transport.rate
+      services.push({
+        id: `day${day.day}-transport`,
+        dayNumber: day.day,
+        serviceType: 'transportation',
+        serviceName: `${baseVehicleType} - ${day.city} Sightseeing`,
+        quantity: 1,
+        quantityMode: 'fixed',
+        unitCost: transport.rate,
+        lineTotal: transport.rate,
+        rateSource: 'transportation_rates',
+        isPerPax: false,
+        isOptional: false,
+        notes: `Vehicle: ${baseVehicleType}`
+      })
+    } else {
+      baseTransportCost += DEFAULT_RATES[tier].vehicle
+      services.push({
+        id: `day${day.day}-transport`,
+        dayNumber: day.day,
+        serviceType: 'transportation',
+        serviceName: `Vehicle - ${day.city} Sightseeing`,
+        quantity: 1,
+        quantityMode: 'fixed',
+        unitCost: DEFAULT_RATES[tier].vehicle,
+        lineTotal: DEFAULT_RATES[tier].vehicle,
+        rateSource: 'default',
+        isPerPax: false,
+        isOptional: false,
+        notes: 'Default rate used'
+      })
+    }
+  }
+
+  console.log(`🚗 Base transport cost (2 pax): €${baseTransportCost.toFixed(2)}`)
 
   // ============================================
   // STEP 7: Calculate for each pax count
