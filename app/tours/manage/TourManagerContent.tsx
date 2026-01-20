@@ -87,6 +87,15 @@ interface TourTemplate {
   pricing_mode?: string
   category?: TourCategory
   variations?: TourVariation[]
+  itinerary?: ItineraryDay[]  // NEW
+}
+
+// NEW: Itinerary Day interface
+interface ItineraryDay {
+  day: number
+  title: string
+  description: string
+  meals: string[]
 }
 
 interface Toast {
@@ -366,6 +375,131 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
         {selectedAttractions.length === 0 && (
           <span className="text-xs text-gray-400 italic">No attractions selected</span>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// NEW: ITINERARY DAY COMPONENT
+// ============================================
+interface ItineraryEditorProps {
+  itinerary: ItineraryDay[]
+  durationDays: number
+  onChange: (itinerary: ItineraryDay[]) => void
+}
+
+function ItineraryEditor({ itinerary, durationDays, onChange }: ItineraryEditorProps) {
+  // Ensure we have the right number of days
+  useEffect(() => {
+    if (itinerary.length !== durationDays) {
+      const newItinerary: ItineraryDay[] = []
+      for (let i = 1; i <= durationDays; i++) {
+        const existingDay = itinerary.find(d => d.day === i)
+        newItinerary.push(existingDay || {
+          day: i,
+          title: '',
+          description: '',
+          meals: []
+        })
+      }
+      onChange(newItinerary)
+    }
+  }, [durationDays, itinerary, onChange])
+
+  const updateDay = (dayIndex: number, field: keyof ItineraryDay, value: any) => {
+    const newItinerary = [...itinerary]
+    newItinerary[dayIndex] = { ...newItinerary[dayIndex], [field]: value }
+    onChange(newItinerary)
+  }
+
+  const toggleMeal = (dayIndex: number, meal: string) => {
+    const day = itinerary[dayIndex]
+    const meals = day.meals || []
+    const newMeals = meals.includes(meal)
+      ? meals.filter(m => m !== meal)
+      : [...meals, meal]
+    updateDay(dayIndex, 'meals', newMeals)
+  }
+
+  if (durationDays === 0) {
+    return (
+      <div className="text-center py-6 text-gray-500 text-sm">
+        Set Duration (Days) in Basic Info to add itinerary
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-medium text-gray-600">
+          Day-by-Day Itinerary
+          <span className="ml-2 text-gray-400 font-normal">({durationDays} day{durationDays > 1 ? 's' : ''})</span>
+        </label>
+      </div>
+
+      <div className="space-y-3">
+        {Array.from({ length: durationDays }, (_, i) => {
+          const day = itinerary[i] || { day: i + 1, title: '', description: '', meals: [] }
+          return (
+            <div 
+              key={i} 
+              className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-white transition-colors"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded-full text-sm font-bold">
+                  {i + 1}
+                </span>
+                <span className="text-sm font-medium text-gray-700">Day {i + 1}</span>
+              </div>
+
+              <div className="space-y-3">
+                {/* Day Title */}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={day.title || ''}
+                    onChange={(e) => updateDay(i, 'title', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                    placeholder={`e.g., Cairo - Pyramids & Sphinx`}
+                  />
+                </div>
+
+                {/* Day Description */}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Description</label>
+                  <textarea
+                    value={day.description || ''}
+                    onChange={(e) => updateDay(i, 'description', e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent resize-none"
+                    placeholder="Describe the activities for this day..."
+                  />
+                </div>
+
+                {/* Meals */}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Meals Included</label>
+                  <div className="flex gap-4">
+                    {['Breakfast', 'Lunch', 'Dinner'].map(meal => (
+                      <label key={meal} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={(day.meals || []).includes(meal)}
+                          onChange={() => toggleMeal(i, meal)}
+                          className="w-4 h-4 text-green-600 border-gray-300 rounded"
+                        />
+                        <span className="text-xs text-gray-700">{meal}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -661,7 +795,8 @@ export default function TourManagerContent() {
     uses_day_builder: true,
     pricing_mode: 'auto',
     default_transportation_service: 'day_tour',
-    transportation_city: 'Cairo'
+    transportation_city: 'Cairo',
+    itinerary: [] as ItineraryDay[]  // NEW: Itinerary field
   })
 
   const [highlightInput, setHighlightInput] = useState('')
@@ -798,6 +933,14 @@ export default function TourManagerContent() {
     }))
   }
 
+  // NEW: Handle itinerary changes
+  const handleItineraryChange = (itinerary: ItineraryDay[]) => {
+    setFormData(prev => ({
+      ...prev,
+      itinerary
+    }))
+  }
+
   const generateTemplateCode = () => {
     const city = formData.cities_covered[0] || 'EGYPT'
     const type = formData.tour_type.toUpperCase().replace('_', '-')
@@ -830,7 +973,8 @@ export default function TourManagerContent() {
       uses_day_builder: true,
       pricing_mode: 'auto',
       default_transportation_service: 'day_tour',
-      transportation_city: 'Cairo'
+      transportation_city: 'Cairo',
+      itinerary: []  // NEW: Reset itinerary
     })
     setNewTemplateVariations(new Set(['standard']))
     setNewTemplateGroupTypes({
@@ -868,7 +1012,8 @@ export default function TourManagerContent() {
       uses_day_builder: template.uses_day_builder ?? true,
       pricing_mode: template.pricing_mode || 'auto',
       default_transportation_service: 'day_tour',
-      transportation_city: 'Cairo'
+      transportation_city: 'Cairo',
+      itinerary: template.itinerary || []  // NEW: Load existing itinerary
     })
     setActiveTab('basic')
     setShowModal(true)
@@ -1573,30 +1718,30 @@ export default function TourManagerContent() {
               </button>
             </div>
 
-            {/* Tab Navigation (only show for new templates) */}
-            {!editingTemplate && (
-              <div className="px-4 pt-3 border-b">
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => setActiveTab('basic')}
-                    className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === 'basic'
-                        ? 'border-green-600 text-green-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    1. Basic Info
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('details')}
-                    className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-                      activeTab === 'details'
-                        ? 'border-green-600 text-green-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    2. Details
-                  </button>
+            {/* Tab Navigation */}
+            <div className="px-4 pt-3 border-b">
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setActiveTab('basic')}
+                  className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'basic'
+                      ? 'border-green-600 text-green-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  1. Basic Info
+                </button>
+                <button
+                  onClick={() => setActiveTab('details')}
+                  className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+                    activeTab === 'details'
+                      ? 'border-green-600 text-green-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  2. Details
+                </button>
+                {!editingTemplate && (
                   <button
                     onClick={() => setActiveTab('variations')}
                     className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
@@ -1607,13 +1752,13 @@ export default function TourManagerContent() {
                   >
                     3. Variations
                   </button>
-                </div>
+                )}
               </div>
-            )}
+            </div>
 
             <form onSubmit={handleSubmit} className="p-4">
               {/* Basic Information Tab */}
-              {(activeTab === 'basic' || editingTemplate) && (
+              {activeTab === 'basic' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="md:col-span-2">
@@ -1771,9 +1916,9 @@ export default function TourManagerContent() {
                 </div>
               )}
 
-              {/* Details Tab (only for new templates) */}
-              {activeTab === 'details' && !editingTemplate && (
-                <div className="space-y-4">
+              {/* Details Tab */}
+              {activeTab === 'details' && (
+                <div className="space-y-6">
                   {/* Highlights */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-2">Highlights</label>
@@ -1802,7 +1947,7 @@ export default function TourManagerContent() {
                     </div>
                   </div>
 
-                  {/* NEW: Attractions Dropdown */}
+                  {/* Attractions Dropdown */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-2">
                       Main Attractions
@@ -1834,7 +1979,7 @@ export default function TourManagerContent() {
                     </div>
                   </div>
 
-                  {/* Meals */}
+                  {/* Overall Meals (kept for backward compatibility) */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-2">Meals Included</label>
                     <div className="flex gap-4">
@@ -1850,6 +1995,15 @@ export default function TourManagerContent() {
                         </label>
                       ))}
                     </div>
+                  </div>
+
+                  {/* NEW: Day-by-Day Itinerary */}
+                  <div className="border-t pt-6">
+                    <ItineraryEditor
+                      itinerary={formData.itinerary}
+                      durationDays={formData.duration_days}
+                      onChange={handleItineraryChange}
+                    />
                   </div>
                 </div>
               )}
@@ -1937,7 +2091,7 @@ export default function TourManagerContent() {
 
               {/* Buttons */}
               <div className="flex gap-2 pt-4 mt-4 border-t">
-                {!editingTemplate && activeTab !== 'basic' && (
+                {activeTab !== 'basic' && (
                   <button
                     type="button"
                     onClick={() => setActiveTab(activeTab === 'variations' ? 'details' : 'basic')}
