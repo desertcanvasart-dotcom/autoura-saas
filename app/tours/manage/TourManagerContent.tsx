@@ -95,6 +95,15 @@ interface Toast {
   message: string
 }
 
+// NEW: Attraction interface from entrance_fees
+interface Attraction {
+  id: string
+  attraction_name: string
+  city: string
+  eur_rate: number
+  non_eur_rate: number
+}
+
 type ViewMode = 'table' | 'cards' | 'compact'
 
 // ============================================
@@ -232,6 +241,132 @@ function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => vo
       <button onClick={onClose} className={`ml-2 ${iconColor} hover:opacity-70`}>
         <X className="w-4 h-4" />
       </button>
+    </div>
+  )
+}
+
+// ============================================
+// ATTRACTION SEARCH DROPDOWN COMPONENT
+// ============================================
+interface AttractionDropdownProps {
+  attractions: Attraction[]
+  selectedAttractions: string[]
+  onSelect: (attractionName: string) => void
+  onRemove: (index: number) => void
+}
+
+function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemove }: AttractionDropdownProps) {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // Filter attractions based on search term and exclude already selected
+  const filteredAttractions = attractions.filter(a => 
+    a.attraction_name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+    !selectedAttractions.includes(a.attraction_name)
+  )
+
+  // Group by city
+  const groupedAttractions = filteredAttractions.reduce((acc, attr) => {
+    const city = attr.city || 'Other'
+    if (!acc[city]) acc[city] = []
+    acc[city].push(attr)
+    return acc
+  }, {} as Record<string, Attraction[]>)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleSelect = (attractionName: string) => {
+    onSelect(attractionName)
+    setSearchTerm('')
+    setIsOpen(false)
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Search Input with Dropdown */}
+      <div className="relative" ref={dropdownRef}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              setIsOpen(true)
+            }}
+            onFocus={() => setIsOpen(true)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+            placeholder="Search attractions to add..."
+          />
+        </div>
+
+        {/* Dropdown */}
+        {isOpen && (
+          <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+            {Object.keys(groupedAttractions).length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-500">
+                {searchTerm ? 'No attractions found' : 'Type to search attractions...'}
+              </div>
+            ) : (
+              Object.entries(groupedAttractions).map(([city, cityAttractions]) => (
+                <div key={city}>
+                  <div className="px-3 py-1.5 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    {city}
+                  </div>
+                  {cityAttractions.map(attr => (
+                    <button
+                      key={attr.id}
+                      type="button"
+                      onClick={() => handleSelect(attr.attraction_name)}
+                      className="w-full px-4 py-2 text-left hover:bg-green-50 transition-colors flex items-center justify-between group"
+                    >
+                      <div>
+                        <p className="text-sm text-gray-900">{attr.attraction_name}</p>
+                        <p className="text-xs text-gray-500">
+                          EUR: €{attr.eur_rate} / Non-EUR: €{attr.non_eur_rate}
+                        </p>
+                      </div>
+                      <Plus className="w-4 h-4 text-gray-400 group-hover:text-green-600" />
+                    </button>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Selected Attractions Tags */}
+      <div className="flex flex-wrap gap-2">
+        {selectedAttractions.map((attraction, index) => (
+          <span 
+            key={index} 
+            className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs border border-green-200"
+          >
+            🏛️ {attraction}
+            <button 
+              type="button" 
+              onClick={() => onRemove(index)} 
+              className="text-green-500 hover:text-green-700 ml-1"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        ))}
+        {selectedAttractions.length === 0 && (
+          <span className="text-xs text-gray-400 italic">No attractions selected</span>
+        )}
+      </div>
     </div>
   )
 }
@@ -475,6 +610,7 @@ export default function TourManagerContent() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [templates, setTemplates] = useState<TourTemplate[]>([])
   const [categories, setCategories] = useState<TourCategory[]>([])
+  const [attractions, setAttractions] = useState<Attraction[]>([])  // NEW: Attractions from DB
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -529,7 +665,6 @@ export default function TourManagerContent() {
   })
 
   const [highlightInput, setHighlightInput] = useState('')
-  const [attractionInput, setAttractionInput] = useState('')
 
   const showToast = (type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
@@ -565,8 +700,27 @@ export default function TourManagerContent() {
     }
   }
 
+  // NEW: Fetch attractions from entrance_fees table
+  const fetchAttractions = async () => {
+    try {
+      const response = await fetch('/api/rates/entrance-fees?limit=500')
+      const data = await response.json()
+      if (data.success && data.data) {
+        // Filter out add-ons, keep only main attractions
+        const mainAttractions = data.data.filter((a: any) => !a.is_addon)
+        setAttractions(mainAttractions)
+      }
+    } catch (error) {
+      console.error('Error fetching attractions:', error)
+    }
+  }
+
   useEffect(() => {
-    Promise.all([fetchTemplates(), fetchCategories()]).finally(() => setLoading(false))
+    Promise.all([
+      fetchTemplates(), 
+      fetchCategories(),
+      fetchAttractions()  // NEW: Fetch attractions on load
+    ]).finally(() => setLoading(false))
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -629,14 +783,12 @@ export default function TourManagerContent() {
     }))
   }
 
-  const addAttraction = () => {
-    if (attractionInput.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        main_attractions: [...prev.main_attractions, attractionInput.trim()]
-      }))
-      setAttractionInput('')
-    }
+  // NEW: Add attraction from dropdown
+  const addAttraction = (attractionName: string) => {
+    setFormData(prev => ({
+      ...prev,
+      main_attractions: [...prev.main_attractions, attractionName]
+    }))
   }
 
   const removeAttraction = (index: number) => {
@@ -1047,6 +1199,9 @@ export default function TourManagerContent() {
           <div className="mt-3 pt-3 border-t border-gray-200">
             <p className="text-xs text-gray-600">
               Showing <span className="font-bold text-gray-900">{filteredTemplates.length}</span> of {templates.length} templates
+              {attractions.length > 0 && (
+                <span className="ml-2 text-gray-400">• {attractions.length} attractions loaded</span>
+              )}
             </p>
           </div>
         </div>
@@ -1647,32 +1802,18 @@ export default function TourManagerContent() {
                     </div>
                   </div>
 
-                  {/* Attractions */}
+                  {/* NEW: Attractions Dropdown */}
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-2">Main Attractions</label>
-                    <div className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        value={attractionInput}
-                        onChange={(e) => setAttractionInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addAttraction())}
-                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                        placeholder="Add an attraction and press Enter"
-                      />
-                      <button type="button" onClick={addAttraction} className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm font-medium">
-                        Add
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.main_attractions.map((a, i) => (
-                        <span key={i} className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs border border-green-200">
-                          🏛️ {a}
-                          <button type="button" onClick={() => removeAttraction(i)} className="text-green-500 hover:text-green-700">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
+                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                      Main Attractions
+                      <span className="ml-2 text-gray-400 font-normal">({attractions.length} available)</span>
+                    </label>
+                    <AttractionDropdown
+                      attractions={attractions}
+                      selectedAttractions={formData.main_attractions}
+                      onSelect={addAttraction}
+                      onRemove={removeAttraction}
+                    />
                   </div>
 
                   {/* Best For */}
