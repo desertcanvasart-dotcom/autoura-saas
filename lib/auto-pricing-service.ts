@@ -94,6 +94,7 @@ export interface PricedService {
   lineTotal: number
   rateSource: string
   isPerPax: boolean  // true = scales with pax, false = fixed cost
+  isOptional?: boolean  // true = optional add-on service
   notes?: string
 }
 
@@ -1071,7 +1072,8 @@ export async function calculateDayBasedPricing(
         unitCost: guideRate.dailyRate,
         lineTotal: guideRate.dailyRate,
         rateSource: 'guides',
-        isPerPax: false
+        isPerPax: false,
+        isOptional: false
       })
     }
 
@@ -1088,7 +1090,8 @@ export async function calculateDayBasedPricing(
         unitCost: tippingRate,
         lineTotal: tippingRate,
         rateSource: 'tipping_rates',
-        isPerPax: false
+        isPerPax: false,
+        isOptional: false
       })
     }
 
@@ -1107,7 +1110,8 @@ export async function calculateDayBasedPricing(
         unitCost: rate,
         lineTotal: rate,
         rateSource: 'airport_staff_rates',
-        isPerPax: false
+        isPerPax: false,
+        isOptional: false
       })
     }
 
@@ -1125,7 +1129,8 @@ export async function calculateDayBasedPricing(
         unitCost: rate,
         lineTotal: rate,
         rateSource: 'airport_staff_rates',
-        isPerPax: false
+        isPerPax: false,
+        isOptional: false
       })
     }
 
@@ -1143,7 +1148,8 @@ export async function calculateDayBasedPricing(
         unitCost: rate,
         lineTotal: rate,
         rateSource: 'hotel_staff_rates',
-        isPerPax: false
+        isPerPax: false,
+        isOptional: false
       })
     }
 
@@ -1160,7 +1166,8 @@ export async function calculateDayBasedPricing(
         unitCost: rate,
         lineTotal: rate,
         rateSource: 'hotel_staff_rates',
-        isPerPax: false
+        isPerPax: false,
+        isOptional: false
       })
     }
   }
@@ -1213,6 +1220,7 @@ export async function calculateDayBasedPricing(
           lineTotal: fee.rate,  // Per pax
           rateSource: 'entrance_fees',
           isPerPax: true,
+          isOptional: false,
           notes: isEurPassport ? 'EUR rate' : 'non-EUR rate'
         })
       } else {
@@ -1237,7 +1245,8 @@ export async function calculateDayBasedPricing(
         unitCost: mealRates.lunch,
         lineTotal: mealRates.lunch,
         rateSource: 'meal_rates',
-        isPerPax: true
+        isPerPax: true,
+        isOptional: false
       })
     }
 
@@ -1253,7 +1262,8 @@ export async function calculateDayBasedPricing(
         unitCost: mealRates.dinner,
         lineTotal: mealRates.dinner,
         rateSource: 'meal_rates',
-        isPerPax: true
+        isPerPax: true,
+        isOptional: false
       })
     }
   }
