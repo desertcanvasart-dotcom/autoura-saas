@@ -381,126 +381,162 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
 }
 
 // ============================================
-// NEW: ITINERARY DAY COMPONENT
+// ITINERARY EDITOR - Add one day at a time (like Highlights)
 // ============================================
 interface ItineraryEditorProps {
   itinerary: ItineraryDay[]
-  durationDays: number
   onChange: (itinerary: ItineraryDay[]) => void
 }
 
-function ItineraryEditor({ itinerary, durationDays, onChange }: ItineraryEditorProps) {
-  // Ensure we have the right number of days
-  useEffect(() => {
-    if (itinerary.length !== durationDays) {
-      const newItinerary: ItineraryDay[] = []
-      for (let i = 1; i <= durationDays; i++) {
-        const existingDay = itinerary.find(d => d.day === i)
-        newItinerary.push(existingDay || {
-          day: i,
-          title: '',
-          description: '',
-          meals: []
-        })
-      }
-      onChange(newItinerary)
-    }
-  }, [durationDays, itinerary, onChange])
+function ItineraryEditor({ itinerary, onChange }: ItineraryEditorProps) {
+  const [dayTitle, setDayTitle] = useState('')
+  const [dayDescription, setDayDescription] = useState('')
+  const [dayMeals, setDayMeals] = useState<string[]>([])
 
-  const updateDay = (dayIndex: number, field: keyof ItineraryDay, value: any) => {
-    const newItinerary = [...itinerary]
-    newItinerary[dayIndex] = { ...newItinerary[dayIndex], [field]: value }
-    onChange(newItinerary)
-  }
-
-  const toggleMeal = (dayIndex: number, meal: string) => {
-    const day = itinerary[dayIndex]
-    const meals = day.meals || []
-    const newMeals = meals.includes(meal)
-      ? meals.filter(m => m !== meal)
-      : [...meals, meal]
-    updateDay(dayIndex, 'meals', newMeals)
-  }
-
-  if (durationDays === 0) {
-    return (
-      <div className="text-center py-6 text-gray-500 text-sm">
-        Set Duration (Days) in Basic Info to add itinerary
-      </div>
+  const toggleMeal = (meal: string) => {
+    setDayMeals(prev => 
+      prev.includes(meal) 
+        ? prev.filter(m => m !== meal) 
+        : [...prev, meal]
     )
   }
 
+  const addDay = () => {
+    if (!dayTitle.trim()) return
+    
+    const newDay: ItineraryDay = {
+      day: itinerary.length + 1,
+      title: dayTitle.trim(),
+      description: dayDescription.trim(),
+      meals: dayMeals
+    }
+    
+    onChange([...itinerary, newDay])
+    
+    // Reset form
+    setDayTitle('')
+    setDayDescription('')
+    setDayMeals([])
+  }
+
+  const removeDay = (index: number) => {
+    const newItinerary = itinerary
+      .filter((_, i) => i !== index)
+      .map((day, i) => ({ ...day, day: i + 1 })) // Re-number days
+    onChange(newItinerary)
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      addDay()
+    }
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <label className="block text-xs font-medium text-gray-600">
-          Day-by-Day Itinerary
-          <span className="ml-2 text-gray-400 font-normal">({durationDays} day{durationDays > 1 ? 's' : ''})</span>
-        </label>
+    <div className="space-y-3">
+      <label className="block text-xs font-medium text-gray-600">
+        Day-by-Day Itinerary
+        <span className="ml-2 text-gray-400 font-normal">({itinerary.length} day{itinerary.length !== 1 ? 's' : ''} added)</span>
+      </label>
+
+      {/* Add Day Form */}
+      <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="flex items-center justify-center w-7 h-7 bg-green-100 text-green-700 rounded-full text-sm font-bold">
+            {itinerary.length + 1}
+          </span>
+          <span className="text-sm font-medium text-gray-600">Day {itinerary.length + 1}</span>
+        </div>
+
+        {/* Title */}
+        <div>
+          <input
+            type="text"
+            value={dayTitle}
+            onChange={(e) => setDayTitle(e.target.value)}
+            onKeyPress={handleKeyPress}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+            placeholder="Day title (e.g., Cairo - Pyramids & Sphinx)"
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <textarea
+            value={dayDescription}
+            onChange={(e) => setDayDescription(e.target.value)}
+            rows={2}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent resize-none"
+            placeholder="Day description (optional)"
+          />
+        </div>
+
+        {/* Meals */}
+        <div className="flex items-center gap-4">
+          <span className="text-xs text-gray-500">Meals:</span>
+          {['Breakfast', 'Lunch', 'Dinner'].map(meal => (
+            <label key={meal} className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={dayMeals.includes(meal)}
+                onChange={() => toggleMeal(meal)}
+                className="w-4 h-4 text-green-600 border-gray-300 rounded"
+              />
+              <span className="text-xs text-gray-700">{meal}</span>
+            </label>
+          ))}
+        </div>
+
+        {/* Add Button */}
+        <button
+          type="button"
+          onClick={addDay}
+          disabled={!dayTitle.trim()}
+          className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          + Add Day {itinerary.length + 1}
+        </button>
       </div>
 
-      <div className="space-y-3">
-        {Array.from({ length: durationDays }, (_, i) => {
-          const day = itinerary[i] || { day: i + 1, title: '', description: '', meals: [] }
-          return (
+      {/* Added Days List */}
+      {itinerary.length > 0 && (
+        <div className="space-y-2">
+          {itinerary.map((day, index) => (
             <div 
-              key={i} 
-              className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-white transition-colors"
+              key={index}
+              className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg group"
             >
-              <div className="flex items-center gap-2 mb-3">
-                <span className="flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded-full text-sm font-bold">
-                  {i + 1}
-                </span>
-                <span className="text-sm font-medium text-gray-700">Day {i + 1}</span>
+              <span className="flex items-center justify-center w-6 h-6 bg-blue-200 text-blue-800 rounded-full text-xs font-bold flex-shrink-0 mt-0.5">
+                {day.day}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900">{day.title}</p>
+                {day.description && (
+                  <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{day.description}</p>
+                )}
+                {day.meals && day.meals.length > 0 && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    🍽️ {day.meals.join(', ')}
+                  </p>
+                )}
               </div>
-
-              <div className="space-y-3">
-                {/* Day Title */}
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Title</label>
-                  <input
-                    type="text"
-                    value={day.title || ''}
-                    onChange={(e) => updateDay(i, 'title', e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
-                    placeholder={`e.g., Cairo - Pyramids & Sphinx`}
-                  />
-                </div>
-
-                {/* Day Description */}
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Description</label>
-                  <textarea
-                    value={day.description || ''}
-                    onChange={(e) => updateDay(i, 'description', e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent resize-none"
-                    placeholder="Describe the activities for this day..."
-                  />
-                </div>
-
-                {/* Meals */}
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Meals Included</label>
-                  <div className="flex gap-4">
-                    {['Breakfast', 'Lunch', 'Dinner'].map(meal => (
-                      <label key={meal} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={(day.meals || []).includes(meal)}
-                          onChange={() => toggleMeal(i, meal)}
-                          className="w-4 h-4 text-green-600 border-gray-300 rounded"
-                        />
-                        <span className="text-xs text-gray-700">{meal}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => removeDay(index)}
+                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remove day"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {itinerary.length === 0 && (
+        <p className="text-xs text-gray-400 italic">No days added yet. Add your first day above.</p>
+      )}
     </div>
   )
 }
@@ -1919,7 +1955,7 @@ export default function TourManagerContent() {
               {/* Details Tab */}
               {activeTab === 'details' && (
                 <div className="space-y-6">
-                  {/* Highlights */}
+                  {/* 1. Highlights */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-2">Highlights</label>
                     <div className="flex gap-2 mb-2">
@@ -1947,7 +1983,7 @@ export default function TourManagerContent() {
                     </div>
                   </div>
 
-                  {/* Attractions Dropdown */}
+                  {/* 2. Attractions Dropdown */}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-2">
                       Main Attractions
@@ -1961,8 +1997,16 @@ export default function TourManagerContent() {
                     />
                   </div>
 
-                  {/* Best For */}
-                  <div>
+                  {/* 3. Day-by-Day Itinerary (with meals per day) */}
+                  <div className="border-t pt-6">
+                    <ItineraryEditor
+                      itinerary={formData.itinerary}
+                      onChange={handleItineraryChange}
+                    />
+                  </div>
+
+                  {/* 4. Best For (at the end) */}
+                  <div className="border-t pt-6">
                     <label className="block text-xs font-medium text-gray-600 mb-2">Best For</label>
                     <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
                       {BEST_FOR_OPTIONS.map(option => (
@@ -1977,33 +2021,6 @@ export default function TourManagerContent() {
                         </label>
                       ))}
                     </div>
-                  </div>
-
-                  {/* Overall Meals (kept for backward compatibility) */}
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-2">Meals Included</label>
-                    <div className="flex gap-4">
-                      {['Breakfast', 'Lunch', 'Dinner'].map(meal => (
-                        <label key={meal} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData.meals_included.includes(meal)}
-                            onChange={() => toggleMeal(meal)}
-                            className="w-4 h-4 text-green-600 border-gray-300 rounded"
-                          />
-                          <span className="text-xs text-gray-700">{meal}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* NEW: Day-by-Day Itinerary */}
-                  <div className="border-t pt-6">
-                    <ItineraryEditor
-                      itinerary={formData.itinerary}
-                      durationDays={formData.duration_days}
-                      onChange={handleItineraryChange}
-                    />
                   </div>
                 </div>
               )}
