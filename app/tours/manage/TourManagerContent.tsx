@@ -37,9 +37,9 @@ import DayBuilder from './DayBuilder'
 // INTERFACES
 // ============================================
 
-interface TourCategory {
+interface TourTheme {
   id: string
-  category_name: string
+  category_name: string  // Keep DB field name, just rename interface
   category_code: string
 }
 
@@ -85,9 +85,11 @@ interface TourTemplate {
   created_at: string
   uses_day_builder?: boolean
   pricing_mode?: string
-  category?: TourCategory
+  category?: TourTheme  // Renamed to theme conceptually, DB field stays same
   variations?: TourVariation[]
-  itinerary?: ItineraryDay[]  // NEW
+  itinerary?: ItineraryDay[]
+  inclusions?: string[]   // NEW: What's included
+  exclusions?: string[]   // NEW: What's not included
 }
 
 // NEW: Itinerary Day interface
@@ -127,14 +129,9 @@ const EGYPTIAN_CITIES = [
 ]
 
 const TOUR_TYPES = [
-  { value: 'day_tour', label: 'Day Tour' },
-  { value: 'full_day', label: 'Full Day' },
-  { value: 'multi_day', label: 'Multi-Day Tour' },
-  { value: 'cruise', label: 'Nile Cruise' },
-  { value: 'safari', label: 'Desert Safari' },
-  { value: 'diving', label: 'Diving Trip' },
-  { value: 'cultural', label: 'Cultural Experience' },
-  { value: 'adventure', label: 'Adventure Tour' }
+  { value: 'day_tour', label: 'Day Tour', minDays: 1, maxDays: 1 },
+  { value: 'multi_day', label: 'Multi-Day Tour', minDays: 2, maxDays: 99 },
+  { value: 'stopover', label: 'Stopover Tour', minDays: 1, maxDays: 1 }
 ]
 
 const PHYSICAL_LEVELS = [
@@ -779,11 +776,11 @@ function DayBuilderModal({ template, onClose, onSave }: DayBuilderModalProps) {
 export default function TourManagerContent() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [templates, setTemplates] = useState<TourTemplate[]>([])
-  const [categories, setCategories] = useState<TourCategory[]>([])
+  const [themes, setThemes] = useState<TourTheme[]>([])  // Renamed from categories
   const [attractions, setAttractions] = useState<Attraction[]>([])  // NEW: Attractions from DB
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedTheme, setSelectedTheme] = useState('all')  // Renamed from selectedCategory
   const [selectedType, setSelectedType] = useState('all')
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -832,10 +829,14 @@ export default function TourManagerContent() {
     pricing_mode: 'auto',
     default_transportation_service: 'day_tour',
     transportation_city: 'Cairo',
-    itinerary: [] as ItineraryDay[]  // NEW: Itinerary field
+    itinerary: [] as ItineraryDay[],
+    inclusions: [] as string[],   // NEW: What's included
+    exclusions: [] as string[]    // NEW: What's not included
   })
 
   const [highlightInput, setHighlightInput] = useState('')
+  const [inclusionInput, setInclusionInput] = useState('')   // NEW
+  const [exclusionInput, setExclusionInput] = useState('')   // NEW
 
   const showToast = (type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
@@ -859,15 +860,15 @@ export default function TourManagerContent() {
     }
   }
 
-  const fetchCategories = async () => {
+  const fetchThemes = async () => {  // Renamed from fetchCategories
     try {
-      const response = await fetch('/api/tours/categories')
+      const response = await fetch('/api/tours/categories')  // API endpoint stays same
       const data = await response.json()
       if (data.success) {
-        setCategories(data.data)
+        setThemes(data.data)
       }
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      console.error('Error fetching themes:', error)
     }
   }
 
@@ -889,17 +890,35 @@ export default function TourManagerContent() {
   useEffect(() => {
     Promise.all([
       fetchTemplates(), 
-      fetchCategories(),
+      fetchThemes(),  // Renamed from fetchCategories
       fetchAttractions()  // NEW: Fetch attractions on load
     ]).finally(() => setLoading(false))
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? parseInt(value) || 0 : value
-    }))
+    const parsedValue = type === 'number' ? parseInt(value) || 0 : value
+    
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [name]: parsedValue
+      }
+      
+      // Auto-suggest tour_type based on duration_days
+      if (name === 'duration_days' && typeof parsedValue === 'number') {
+        if (parsedValue === 1) {
+          // Keep current type if it's day_tour or stopover, otherwise suggest day_tour
+          if (prev.tour_type !== 'day_tour' && prev.tour_type !== 'stopover') {
+            updated.tour_type = 'day_tour'
+          }
+        } else if (parsedValue >= 2) {
+          updated.tour_type = 'multi_day'
+        }
+      }
+      
+      return updated
+    })
   }
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -954,6 +973,42 @@ export default function TourManagerContent() {
     }))
   }
 
+  // NEW: Inclusions functions
+  const addInclusion = () => {
+    if (inclusionInput.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        inclusions: [...prev.inclusions, inclusionInput.trim()]
+      }))
+      setInclusionInput('')
+    }
+  }
+
+  const removeInclusion = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      inclusions: prev.inclusions.filter((_, i) => i !== index)
+    }))
+  }
+
+  // NEW: Exclusions functions
+  const addExclusion = () => {
+    if (exclusionInput.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        exclusions: [...prev.exclusions, exclusionInput.trim()]
+      }))
+      setExclusionInput('')
+    }
+  }
+
+  const removeExclusion = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      exclusions: prev.exclusions.filter((_, i) => i !== index)
+    }))
+  }
+
   // NEW: Add attraction from dropdown
   const addAttraction = (attractionName: string) => {
     setFormData(prev => ({
@@ -989,7 +1044,7 @@ export default function TourManagerContent() {
     setFormData({
       template_code: '',
       template_name: '',
-      category_id: categories[0]?.id || '',
+      category_id: themes[0]?.id || '',
       tour_type: 'day_tour',
       duration_days: 1,
       duration_nights: 0,
@@ -1010,7 +1065,9 @@ export default function TourManagerContent() {
       pricing_mode: 'auto',
       default_transportation_service: 'day_tour',
       transportation_city: 'Cairo',
-      itinerary: []  // NEW: Reset itinerary
+      itinerary: [],
+      inclusions: [],   // NEW: Reset inclusions
+      exclusions: []    // NEW: Reset exclusions
     })
     setNewTemplateVariations(new Set(['standard']))
     setNewTemplateGroupTypes({
@@ -1049,7 +1106,9 @@ export default function TourManagerContent() {
       pricing_mode: template.pricing_mode || 'auto',
       default_transportation_service: 'day_tour',
       transportation_city: 'Cairo',
-      itinerary: template.itinerary || []  // NEW: Load existing itinerary
+      itinerary: template.itinerary || [],
+      inclusions: template.inclusions || [],   // NEW: Load inclusions
+      exclusions: template.exclusions || []    // NEW: Load exclusions
     })
     setActiveTab('basic')
     setShowModal(true)
@@ -1189,11 +1248,11 @@ export default function TourManagerContent() {
       template.template_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       template.cities_covered?.some(c => c.toLowerCase().includes(searchTerm.toLowerCase()))
     
-    const matchesCategory = selectedCategory === 'all' || template.category_id === selectedCategory
+    const matchesTheme = selectedTheme === 'all' || template.category_id === selectedTheme
     const matchesType = selectedType === 'all' || template.tour_type === selectedType
     const matchesActive = showInactive || template.is_active
     
-    return matchesSearch && matchesCategory && matchesType && matchesActive
+    return matchesSearch && matchesTheme && matchesType && matchesActive
   })
 
   const activeTemplates = templates.filter(t => t.is_active).length
@@ -1319,13 +1378,13 @@ export default function TourManagerContent() {
             </div>
             <div className="md:w-48 relative">
               <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
+                value={selectedTheme}
+                onChange={(e) => setSelectedTheme(e.target.value)}
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm appearance-none"
               >
-                <option value="all">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.category_name}</option>
+                <option value="all">All Themes</option>
+                {themes.map(theme => (
+                  <option key={theme.id} value={theme.id}>{theme.category_name}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -1821,16 +1880,16 @@ export default function TourManagerContent() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Theme</label>
                       <select
                         name="category_id"
                         value={formData.category_id}
                         onChange={handleChange}
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                       >
-                        <option value="">Select Category...</option>
-                        {categories.map(cat => (
-                          <option key={cat.id} value={cat.id}>{cat.category_name}</option>
+                        <option value="">Select Theme...</option>
+                        {themes.map(theme => (
+                          <option key={theme.id} value={theme.id}>{theme.category_name}</option>
                         ))}
                       </select>
                     </div>
@@ -2005,7 +2064,75 @@ export default function TourManagerContent() {
                     />
                   </div>
 
-                  {/* 4. Best For (at the end) */}
+                  {/* 4. Inclusions - What's included */}
+                  <div className="border-t pt-6">
+                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                      Inclusions
+                      <span className="ml-2 text-gray-400 font-normal">(What's included in the rate)</span>
+                    </label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={inclusionInput}
+                        onChange={(e) => setInclusionInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addInclusion())}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        placeholder="e.g., Private air-conditioned vehicle"
+                      />
+                      <button type="button" onClick={addInclusion} className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm font-medium">
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.inclusions.map((item, i) => (
+                        <span key={i} className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs border border-green-200">
+                          ✓ {item}
+                          <button type="button" onClick={() => removeInclusion(i)} className="text-green-500 hover:text-green-700">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                      {formData.inclusions.length === 0 && (
+                        <span className="text-xs text-gray-400 italic">No inclusions added yet</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 5. Exclusions - What's not included */}
+                  <div className="border-t pt-6">
+                    <label className="block text-xs font-medium text-gray-600 mb-2">
+                      Exclusions
+                      <span className="ml-2 text-gray-400 font-normal">(What's not included)</span>
+                    </label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={exclusionInput}
+                        onChange={(e) => setExclusionInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addExclusion())}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        placeholder="e.g., International flights"
+                      />
+                      <button type="button" onClick={addExclusion} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm font-medium">
+                        Add
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.exclusions.map((item, i) => (
+                        <span key={i} className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded text-xs border border-red-200">
+                          ✗ {item}
+                          <button type="button" onClick={() => removeExclusion(i)} className="text-red-500 hover:text-red-700">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                      {formData.exclusions.length === 0 && (
+                        <span className="text-xs text-gray-400 italic">No exclusions added yet</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 6. Best For (at the end) */}
                   <div className="border-t pt-6">
                     <label className="block text-xs font-medium text-gray-600 mb-2">Best For</label>
                     <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
