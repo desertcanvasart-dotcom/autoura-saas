@@ -3,23 +3,36 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-interface TourOverview {
+// Updated interface to match the new API response structure
+interface TourTemplate {
+  id: string
   template_code: string
   template_name: string
-  category_name: string
-  destination_name: string
+  tour_type: string
   duration_days: number
-  variation_code: string
-  tier: string
-  group_type: string
+  cities_covered: string[]
+  highlights: string[]
+  short_description: string | null
+  is_featured: boolean
+  cover_image_url: string | null
+  category: {
+    id: string
+    category_name: string
+    category_code: string
+  } | null
+  variations_count: number
+  available_tiers: string[]
   min_pax: number
   max_pax: number
-  price_from: number
-  is_featured: boolean
+  starting_from: number
+  starting_from_tier: string
+  currency: string
+  uses_day_builder: boolean
+  pricing_mode: string
 }
 
-export default function ToursBrowserPage() {
-  const [tours, setTours] = useState<TourOverview[]>([])
+export default function ToursBrowsePage() {
+  const [tours, setTours] = useState<TourTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filterTier, setFilterTier] = useState<string>('all')
@@ -36,9 +49,10 @@ export default function ToursBrowserPage() {
       const data = await response.json()
 
       if (data.success) {
-        setTours(data.data)
+        // API now returns { data: { templates: [...], pagination: {...} } }
+        setTours(data.data?.templates || [])
       } else {
-        setError('Failed to load tours')
+        setError(data.error || 'Failed to load tours')
       }
     } catch (err) {
       setError('Error loading tours')
@@ -49,22 +63,43 @@ export default function ToursBrowserPage() {
   }
 
   const filteredTours = tours.filter(tour => {
-    const matchesTier = filterTier === 'all' || tour.tier === filterTier
-    const matchesCategory = filterCategory === 'all' || tour.category_name === filterCategory
-    const matchesSearch = tour.template_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         tour.destination_name.toLowerCase().includes(searchQuery.toLowerCase())
+    // Filter by tier - check if the tour has the selected tier available
+    const matchesTier = filterTier === 'all' || tour.available_tiers?.includes(filterTier)
+    
+    // Filter by category
+    const matchesCategory = filterCategory === 'all' || tour.category?.category_name === filterCategory
+    
+    // Search by name, description, or cities
+    const searchLower = searchQuery.toLowerCase()
+    const matchesSearch = 
+      tour.template_name.toLowerCase().includes(searchLower) ||
+      (tour.short_description?.toLowerCase().includes(searchLower)) ||
+      (tour.cities_covered?.some(city => city.toLowerCase().includes(searchLower)))
+    
     return matchesTier && matchesCategory && matchesSearch
   })
 
-  const uniqueCategories = [...new Set(tours.map(t => t.category_name))]
+  // Get unique categories from the tours
+  const uniqueCategories = [...new Set(tours.map(t => t.category?.category_name).filter(Boolean))]
 
   const getTierBadge = (tier: string) => {
-    const styles = {
+    const styles: Record<string, string> = {
       budget: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
       standard: 'bg-blue-50 text-blue-700 border border-blue-200',
+      deluxe: 'bg-purple-50 text-purple-700 border border-purple-200',
       luxury: 'bg-amber-50 text-amber-700 border border-amber-200'
     }
-    return styles[tier as keyof typeof styles] || 'bg-gray-50 text-gray-700 border border-gray-200'
+    return styles[tier] || 'bg-gray-50 text-gray-700 border border-gray-200'
+  }
+
+  const getTierIcon = (tier: string) => {
+    const icons: Record<string, string> = {
+      budget: '💰',
+      standard: '💎',
+      deluxe: '✨',
+      luxury: '👑'
+    }
+    return icons[tier] || '📋'
   }
 
   if (loading) {
@@ -86,6 +121,12 @@ export default function ToursBrowserPage() {
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md">
           <p className="text-sm font-medium text-red-800 mb-1">Error Loading Tours</p>
           <p className="text-sm text-red-600">{error}</p>
+          <button 
+            onClick={() => { setError(null); fetchTours(); }}
+            className="mt-3 text-sm text-red-700 underline hover:no-underline"
+          >
+            Try again
+          </button>
         </div>
       </div>
     )
@@ -104,6 +145,12 @@ export default function ToursBrowserPage() {
             <p className="text-sm text-gray-500">Browse available tours and pricing</p>
           </div>
         </div>
+        <Link 
+          href="/tours/manage"
+          className="px-4 py-2 text-sm bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] transition-colors font-medium"
+        >
+          Manage Tours
+        </Link>
       </div>
 
       {/* Stats Row */}
@@ -113,7 +160,7 @@ export default function ToursBrowserPage() {
             <span className="text-lg">🎯</span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
           </div>
-          <p className="text-xs text-gray-500 mb-1">Total Variations</p>
+          <p className="text-xs text-gray-500 mb-1">Tour Packages</p>
           <p className="text-2xl font-semibold text-gray-900">{tours.length}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -121,9 +168,9 @@ export default function ToursBrowserPage() {
             <span className="text-lg">📋</span>
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
           </div>
-          <p className="text-xs text-gray-500 mb-1">Templates</p>
+          <p className="text-xs text-gray-500 mb-1">With Auto-Pricing</p>
           <p className="text-2xl font-semibold text-gray-900">
-            {new Set(tours.map(t => t.template_code)).size}
+            {tours.filter(t => t.uses_day_builder || t.pricing_mode === 'auto').length}
           </p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -141,7 +188,7 @@ export default function ToursBrowserPage() {
           </div>
           <p className="text-xs text-gray-500 mb-1">Starting From</p>
           <p className="text-2xl font-semibold text-gray-900">
-            €{Math.min(...tours.map(t => t.price_from || 999))}
+            €{tours.length > 0 ? Math.min(...tours.map(t => t.starting_from || 9999)).toLocaleString() : '—'}
           </p>
         </div>
       </div>
@@ -153,7 +200,7 @@ export default function ToursBrowserPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name or destination..."
+            placeholder="Search by name, description, or city..."
             className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none"
           />
         </div>
@@ -165,6 +212,7 @@ export default function ToursBrowserPage() {
           <option value="all">All Tiers</option>
           <option value="budget">💰 Budget</option>
           <option value="standard">💎 Standard</option>
+          <option value="deluxe">✨ Deluxe</option>
           <option value="luxury">👑 Luxury</option>
         </select>
         <select
@@ -198,12 +246,12 @@ export default function ToursBrowserPage() {
 
       {/* Tour Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredTours.map((tour, idx) => (
+        {filteredTours.map((tour) => (
           <div 
-            key={idx} 
+            key={tour.id} 
             className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-[#647C47] transition-colors"
           >
-            {/* Card Header - WHITE background */}
+            {/* Card Header */}
             <div className="p-4 border-b border-gray-100">
               <div className="flex items-start justify-between gap-2 mb-1">
                 <h3 className="text-sm font-semibold text-gray-900 leading-tight">{tour.template_name}</h3>
@@ -211,21 +259,29 @@ export default function ToursBrowserPage() {
                   <span className="text-amber-500 text-xs">⭐</span>
                 )}
               </div>
-              <p className="text-xs text-gray-500">{tour.destination_name}</p>
+              <p className="text-xs text-gray-500">
+                {tour.cities_covered?.join(', ') || 'Egypt'}
+              </p>
             </div>
 
             {/* Card Body */}
             <div className="p-4">
-              {/* Badges */}
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`px-2 py-1 rounded text-xs font-medium ${getTierBadge(tour.tier)}`}>
-                  {tour.tier === 'budget' && '💰'} 
-                  {tour.tier === 'standard' && '💎'} 
-                  {tour.tier === 'luxury' && '👑'} {tour.tier.charAt(0).toUpperCase() + tour.tier.slice(1)}
-                </span>
-                <span className="px-2 py-1 bg-gray-50 text-gray-600 border border-gray-200 rounded text-xs">
-                  {tour.group_type === 'private' ? '🔒 Private' : '👥 Shared'}
-                </span>
+              {/* Available Tiers */}
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                {tour.available_tiers?.length > 0 ? (
+                  tour.available_tiers.map(tier => (
+                    <span 
+                      key={tier}
+                      className={`px-2 py-1 rounded text-xs font-medium ${getTierBadge(tier)}`}
+                    >
+                      {getTierIcon(tier)} {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                    </span>
+                  ))
+                ) : (
+                  <span className="px-2 py-1 bg-gray-50 text-gray-600 border border-gray-200 rounded text-xs">
+                    No variations yet
+                  </span>
+                )}
               </div>
 
               {/* Tour Details */}
@@ -236,35 +292,55 @@ export default function ToursBrowserPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-gray-400">👥</span>
-                  <span>{tour.min_pax}-{tour.max_pax} passengers</span>
+                  <span>{tour.min_pax || 1}-{tour.max_pax || 15} passengers</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400">🏷️</span>
-                  <span className="text-gray-500 text-xs">{tour.category_name}</span>
-                </div>
+                {tour.category && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">🏷️</span>
+                    <span className="text-gray-500 text-xs">{tour.category.category_name}</span>
+                  </div>
+                )}
+                {tour.uses_day_builder && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">⚡</span>
+                    <span className="text-[#647C47] text-xs font-medium">Auto-Pricing</span>
+                  </div>
+                )}
               </div>
+
+              {/* Short Description */}
+              {tour.short_description && (
+                <p className="text-xs text-gray-500 mb-4 line-clamp-2">
+                  {tour.short_description}
+                </p>
+              )}
 
               {/* Price & Action */}
               <div className="flex items-end justify-between pt-3 border-t border-gray-100">
                 <div>
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">Starting from</p>
                   <p className="text-xl font-semibold text-[#647C47]">
-                    €{tour.price_from ? tour.price_from.toFixed(0) : 'N/A'}
+                    €{tour.starting_from ? tour.starting_from.toLocaleString() : 'N/A'}
                   </p>
-                  <p className="text-[10px] text-gray-400">per person</p>
+                  <p className="text-[10px] text-gray-400">
+                    per person • {tour.starting_from_tier || 'standard'}
+                  </p>
                 </div>
                 <Link 
-                  href={`/tours/${tour.variation_code}`}
+                  href={`/tours/${tour.id}`}
                   className="bg-[#647C47] text-white px-4 py-2 rounded-lg hover:bg-[#4a5c35] transition-colors text-xs font-medium"
                 >
-                  Details
+                  View Details
                 </Link>
               </div>
             </div>
 
             {/* Card Footer */}
-            <div className="bg-gray-50 px-4 py-2 border-t border-gray-100">
-              <p className="text-[10px] text-gray-400 font-mono uppercase">{tour.variation_code}</p>
+            <div className="bg-gray-50 px-4 py-2 border-t border-gray-100 flex items-center justify-between">
+              <p className="text-[10px] text-gray-400 font-mono uppercase">{tour.template_code}</p>
+              <p className="text-[10px] text-gray-400">
+                {tour.variations_count || 0} variation{tour.variations_count !== 1 ? 's' : ''}
+              </p>
             </div>
           </div>
         ))}
@@ -275,13 +351,19 @@ export default function ToursBrowserPage() {
         <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
           <div className="text-4xl mb-3">🔍</div>
           <h3 className="text-sm font-medium text-gray-900 mb-1">No tours found</h3>
-          <p className="text-xs text-gray-500">Try adjusting your filters or search terms</p>
+          <p className="text-xs text-gray-500 mb-4">Try adjusting your filters or search terms</p>
+          <Link 
+            href="/tours/manage"
+            className="text-sm text-[#647C47] hover:text-[#4a5c35] font-medium"
+          >
+            Create a new tour →
+          </Link>
         </div>
       )}
 
       {/* Footer */}
       <div className="mt-8 text-center">
-        <p className="text-xs text-gray-400">© 2024 Autoura Operations System</p>
+        <p className="text-xs text-gray-400">© 2026 Autoura Operations System</p>
       </div>
     </div>
   )
