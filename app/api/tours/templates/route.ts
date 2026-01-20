@@ -126,7 +126,11 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== false,
       popularity_score: body.popularity_score || 0,
       default_transportation_service: body.default_transportation_service || 'day_tour',
-      transportation_city: body.transportation_city || 'Cairo'
+      transportation_city: body.transportation_city || 'Cairo',
+      // NEW FIELDS
+      itinerary: body.itinerary || [],
+      inclusions: body.inclusions || [],
+      exclusions: body.exclusions || []
     }
 
     const { data, error } = await supabaseAdmin

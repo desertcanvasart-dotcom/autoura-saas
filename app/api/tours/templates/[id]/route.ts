@@ -129,6 +129,11 @@ export async function PUT(
     if (body.popularity_score !== undefined) updateData.popularity_score = body.popularity_score
     if (body.default_transportation_service !== undefined) updateData.default_transportation_service = body.default_transportation_service
     if (body.transportation_city !== undefined) updateData.transportation_city = body.transportation_city
+    
+    // NEW FIELDS
+    if (body.itinerary !== undefined) updateData.itinerary = body.itinerary
+    if (body.inclusions !== undefined) updateData.inclusions = body.inclusions
+    if (body.exclusions !== undefined) updateData.exclusions = body.exclusions
 
     // Add updated_at
     updateData.updated_at = new Date().toISOString()
