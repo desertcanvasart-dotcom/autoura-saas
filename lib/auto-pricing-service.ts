@@ -1739,9 +1739,7 @@ export async function getTemplatePriceRange(
 }
 
 // ============================================
-// VEHICLE HELPER (backward compatible export)
+// ADDITIONAL TYPES (backward compatible)
 // ============================================
-
-export { getVehicleTypeByPax }
 
 export type MealPlan = 'none' | 'breakfast_only' | 'lunch_only' | 'dinner_only' | 'half_board' | 'full_board'
