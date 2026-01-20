@@ -3,12 +3,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { calculateAutoPricing, ServiceTier } from '@/lib/auto-pricing-service'
 
 // ============================================
-// B2B TOUR PRICE CALCULATOR - v5
+// B2B TOUR PRICE CALCULATOR - v6
 // File: app/api/b2b/calculate-price/route.ts
 // 
+// UPDATES in v6:
+// - Added tour_leader_included parameter
+// - Returns single_supplement in response
+// - Returns pax_pricing_table for rate sheet generation
+//
 // NOW WITH AUTO-PRICING FALLBACK:
 // If tour_variation_services is empty, uses auto-pricing
-// from tour_day_activities (via auto-pricing-service.ts)
+// from tour_templates.itinerary (via auto-pricing-service.ts)
 //
 // SHARED B2C RATE TABLES:
 // - vehicles, guides, entrance_fees, hotel_contacts, meal_rates, nile_cruises
@@ -45,16 +50,20 @@ interface PriceCalculationResult {
   travel_date: string
   season: string
   is_eur_passport: boolean
+  tour_leader_included: boolean  // NEW
   services: CalculatedService[]
   optional_services: CalculatedService[]
   subtotal_cost: number
   optional_total: number
   total_cost: number
+  tour_leader_cost: number  // NEW
   margin_percent: number
   margin_amount: number
   selling_price: number
   price_per_person: number
+  single_supplement: number  // NEW
   currency: string
+  pax_pricing_table?: any[]  // NEW - for rate sheet
 }
 
 function getSeason(date: Date): 'low' | 'high' | 'peak' {
@@ -329,8 +338,17 @@ export async function POST(request: NextRequest) {
       partner_id = null,
       include_optionals = false,
       language = 'English',
-      tier = 'standard'
+      tier = 'standard',
+      tour_leader_included = false  // NEW: Added tour leader parameter
     } = body
+
+    console.log('📥 B2B Calculate Price Request:', {
+      variation_id,
+      num_pax,
+      tour_leader_included,  // Log this
+      is_eur_passport,
+      margin_percent
+    })
 
     if (!variation_id) {
       return NextResponse.json({ error: 'variation_id is required' }, { status: 400 })
@@ -373,6 +391,7 @@ export async function POST(request: NextRequest) {
     // ============================================
     if ((!services || services.length === 0) && templateId) {
       console.log('📊 No variation services found, using auto-pricing fallback')
+      console.log(`   tourLeaderIncluded: ${tour_leader_included}`)
       
       // Determine effective margin (partner override)
       let effectiveMargin = margin_percent
@@ -388,7 +407,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Call auto-pricing service
+      // Call auto-pricing service with tour leader parameter
       const autoPriceResult = await calculateAutoPricing({
         templateId,
         tier: effectiveTier,
@@ -397,7 +416,8 @@ export async function POST(request: NextRequest) {
         language,
         marginPercent: effectiveMargin,
         mealPlan: 'lunch_only',
-        includeAccommodation: (template?.duration_days || 1) > 1
+        includeAccommodation: (template?.duration_days || 1) > 1,
+        tourLeaderIncluded: tour_leader_included  // NEW: Pass tour leader flag
       })
 
       if (!autoPriceResult.success) {
@@ -449,24 +469,32 @@ export async function POST(request: NextRequest) {
         travel_date,
         season,
         is_eur_passport,
+        tour_leader_included,  // NEW
         services: convertedServices,
         optional_services: convertedOptional,
         subtotal_cost: autoPriceResult.subtotalCost,
         optional_total: autoPriceResult.optionalTotal,
         total_cost: autoPriceResult.totalCost,
+        tour_leader_cost: autoPriceResult.tourLeaderCost,  // NEW
         margin_percent: autoPriceResult.marginPercent,
         margin_amount: autoPriceResult.marginAmount,
         selling_price: autoPriceResult.sellingPrice,
         price_per_person: autoPriceResult.pricePerPerson,
-        currency: autoPriceResult.currency
+        single_supplement: autoPriceResult.singleSupplement || 0,  // NEW
+        currency: autoPriceResult.currency,
+        pax_pricing_table: autoPriceResult.paxPricingTable  // NEW - for rate sheet
       }
 
       console.log('🎉 B2B Price calculated via auto-pricing:', {
         variation: variation.variation_name,
         numPax: num_pax,
+        tourLeader: tour_leader_included,
         cost: result.total_cost,
+        tourLeaderCost: result.tour_leader_cost,
         margin: effectiveMargin + '%',
-        selling: result.selling_price
+        selling: result.selling_price,
+        perPerson: result.price_per_person,
+        singleSupplement: result.single_supplement
       })
 
       return NextResponse.json({ success: true, data: result })
@@ -758,15 +786,18 @@ export async function POST(request: NextRequest) {
       travel_date,
       season,
       is_eur_passport,
+      tour_leader_included,  // NEW
       services: calculatedServices,
       optional_services: optionalServices,
       subtotal_cost: Math.round(subtotalCost * 100) / 100,
       optional_total: Math.round(optionalTotal * 100) / 100,
       total_cost: Math.round(totalCost * 100) / 100,
+      tour_leader_cost: 0,  // Not calculated in legacy mode
       margin_percent: effectiveMargin,
       margin_amount: Math.round(marginAmount * 100) / 100,
       selling_price: Math.round(sellingPrice * 100) / 100,
       price_per_person: Math.round(pricePerPerson * 100) / 100,
+      single_supplement: 0,  // Not calculated in legacy mode
       currency: 'EUR'
     }
 
@@ -793,6 +824,7 @@ export async function GET(request: NextRequest) {
   const travel_date = searchParams.get('travel_date') || new Date().toISOString().split('T')[0]
   const is_eur = searchParams.get('is_eur') !== 'false'
   const margin = parseFloat(searchParams.get('margin') || '25')
+  const tour_leader = searchParams.get('tour_leader') === 'true'  // NEW
 
   if (!variation_id) {
     return NextResponse.json({ error: 'variation_id is required' }, { status: 400 })
@@ -800,7 +832,14 @@ export async function GET(request: NextRequest) {
 
   const mockRequest = new NextRequest(request.url, {
     method: 'POST',
-    body: JSON.stringify({ variation_id, num_pax, travel_date, is_eur_passport: is_eur, margin_percent: margin })
+    body: JSON.stringify({ 
+      variation_id, 
+      num_pax, 
+      travel_date, 
+      is_eur_passport: is_eur, 
+      margin_percent: margin,
+      tour_leader_included: tour_leader  // NEW
+    })
   })
 
   return POST(mockRequest)
