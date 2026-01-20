@@ -775,40 +775,53 @@ export async function getTransportRate(
   serviceType: string = 'day_tour'
 ): Promise<{ id: string; rate: number; routeName: string } | null> {
   try {
+    // First, try to find exact match: vehicle type + city + service type
     const { data: rates, error } = await supabaseAdmin
       .from('transportation_rates')
       .select('*')
       .eq('is_active', true)
       .eq('vehicle_type', vehicleType)
+      .eq('service_type', serviceType)  // Filter by day_tour to avoid intercity rates
       .ilike('city', `%${city}%`)
       .limit(1)
 
-    if (error || !rates || rates.length === 0) {
-      // Fallback: any rate for this vehicle type
-      const { data: fallback } = await supabaseAdmin
+    if (!error && rates && rates.length > 0) {
+      const rate = rates[0]
+      console.log(`✅ Transport: ${rate.service_code} | €${rate.base_rate_eur}`)
+      return {
+        id: rate.id,
+        rate: rate.base_rate_eur || 0,
+        routeName: rate.service_code || `${vehicleType} - ${city}`
+      }
+    }
+
+    // Fallback 1: Try same vehicle type + service type in nearby cities (Luxor rates for Edfu/Kom Ombo)
+    // For cruise stops like Edfu/Kom Ombo, use Luxor rates as fallback
+    const fallbackCities = ['Luxor', 'Aswan']
+    for (const fallbackCity of fallbackCities) {
+      const { data: fallbackRates } = await supabaseAdmin
         .from('transportation_rates')
         .select('*')
         .eq('is_active', true)
         .eq('vehicle_type', vehicleType)
+        .eq('service_type', serviceType)
+        .ilike('city', `%${fallbackCity}%`)
         .limit(1)
 
-      if (!fallback || fallback.length === 0) {
-        return null
-      }
-
-      return {
-        id: fallback[0].id,
-        rate: fallback[0].base_rate_eur || 0,
-        routeName: `${vehicleType} - ${city}`
+      if (fallbackRates && fallbackRates.length > 0) {
+        const rate = fallbackRates[0]
+        console.log(`⚠️ Transport fallback: Using ${fallbackCity} rate for ${city} | €${rate.base_rate_eur}`)
+        return {
+          id: rate.id,
+          rate: rate.base_rate_eur || 0,
+          routeName: `${vehicleType} - ${city} (${fallbackCity} rate)`
+        }
       }
     }
 
-    const rate = rates[0]
-    return {
-      id: rate.id,
-      rate: rate.base_rate_eur || 0,
-      routeName: rate.service_code || `${vehicleType} - ${city}`
-    }
+    // Fallback 2: Return null (will use default rate)
+    console.log(`⚠️ No transport rate found for ${vehicleType} in ${city}`)
+    return null
   } catch (err) {
     console.error('Error fetching transport rate:', err)
     return null
@@ -1650,6 +1663,8 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
   } = params
 
   console.log('🔄 calculateAutoPricing called (using new day-based engine)')
+  console.log(`   tourLeaderIncluded: ${tourLeaderIncluded}`)
+  console.log(`   numPax: ${numPax}`)
 
   // Call the new day-based pricing engine
   const dayResult = await calculateDayBasedPricing({
@@ -1700,6 +1715,13 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
 
   // Select +0 or +1 pricing based on tourLeaderIncluded
   const pricing = tourLeaderIncluded ? paxResult.withLeader : paxResult.withoutLeader
+  
+  console.log(`   Selected pricing: ${tourLeaderIncluded ? '+1 (withLeader)' : '+0 (withoutLeader)'}`)
+  console.log(`   totalCost: €${pricing.totalCost}`)
+  console.log(`   pricePerPerson: €${pricing.pricePerPerson}`)
+  if (tourLeaderIncluded) {
+    console.log(`   tourLeaderCost: €${paxResult.withLeader.tourLeaderCost}`)
+  }
 
   // Build ratesUsed object for display
   const ratesUsed: PricingResult['ratesUsed'] = {}
@@ -1751,7 +1773,17 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     numPayingPax: numPax,
     tourLeaderIncluded,
     totalDays: dayResult.totalDays,
-    services: dayResult.services.filter(s => !s.notes?.includes('optional')),
+    // Sort services: fixed (per-group) costs first, then per-pax costs
+    services: dayResult.services
+      .filter(s => !s.notes?.includes('optional'))
+      .sort((a, b) => {
+        // Fixed costs first (isPerPax = false), per-pax costs last
+        if (a.isPerPax === b.isPerPax) {
+          // Within same category, sort by day number
+          return a.dayNumber - b.dayNumber
+        }
+        return a.isPerPax ? 1 : -1
+      }),
     optionalServices: dayResult.services.filter(s => s.notes?.includes('optional')),
     subtotalCost: pricing.totalCost - (tourLeaderIncluded ? paxResult.withLeader.tourLeaderCost : 0),
     optionalTotal: 0,
