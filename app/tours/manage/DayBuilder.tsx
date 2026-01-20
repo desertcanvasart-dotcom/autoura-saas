@@ -16,15 +16,19 @@ import { AlertCircle } from 'lucide-react'
 
 interface DayBuilderProps {
   templateId?: string
+  templateName?: string
   variationId?: string
+  durationDays?: number
   onSave?: () => void
   onClose?: () => void
   isOpen?: boolean
 }
 
 export default function DayBuilder({ 
-  templateId, 
+  templateId,
+  templateName,
   variationId, 
+  durationDays,
   onSave, 
   onClose,
   isOpen 
@@ -47,8 +51,10 @@ export default function DayBuilder({
         
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
           <p className="text-sm text-amber-800">
+            <strong>Template:</strong> {templateName || 'N/A'}<br />
             <strong>Template ID:</strong> {templateId || 'N/A'}<br />
-            <strong>Variation ID:</strong> {variationId || 'N/A'}
+            <strong>Variation ID:</strong> {variationId || 'N/A'}<br />
+            <strong>Duration:</strong> {durationDays || 'N/A'} days
           </p>
         </div>
         
