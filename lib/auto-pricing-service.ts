@@ -94,7 +94,7 @@ export interface PricedService {
   lineTotal: number
   rateSource: string
   isPerPax: boolean  // true = scales with pax, false = fixed cost
-  isOptional?: boolean  // true = optional add-on service
+  isOptional: boolean  // true = optional add-on service
   notes?: string
 }
 
