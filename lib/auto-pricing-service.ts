@@ -1338,6 +1338,48 @@ export async function calculateDayBasedPricing(
   console.log(`📊 Fixed costs: €${fixedCosts.toFixed(2)} | Per-pax costs: €${perPaxCosts.toFixed(2)}`)
 
   // ============================================
+  // STEP 6a: Pre-fetch ALL transport rates (PERFORMANCE FIX)
+  // ============================================
+  // Single query replaces 300+ individual queries in the pax loop
+  
+  const { data: allTransportRates } = await supabaseAdmin
+    .from('transportation_rates')
+    .select('vehicle_type, city, base_rate_eur, service_code')
+    .eq('is_active', true)
+    .eq('service_type', 'day_tour')
+
+  // Build lookup map: "Sedan-luxor" -> { rate, code }
+  const transportCache = new Map<string, { rate: number; code: string }>()
+  if (allTransportRates) {
+    for (const r of allTransportRates) {
+      const key = `${r.vehicle_type}-${r.city.toLowerCase()}`
+      transportCache.set(key, { rate: r.base_rate_eur || 0, code: r.service_code || '' })
+    }
+  }
+  console.log(`📦 Cached ${transportCache.size} transport rates`)
+
+  // Sync lookup function with fallbacks (no DB calls)
+  const getCachedTransportRate = (vehicleType: VehicleType, city: string): { rate: number; code: string } | null => {
+    const cityLower = city.toLowerCase()
+    
+    // Try exact match
+    const exactKey = `${vehicleType}-${cityLower}`
+    if (transportCache.has(exactKey)) {
+      return transportCache.get(exactKey)!
+    }
+    
+    // Fallback: Luxor then Aswan (for Edfu, Kom Ombo, etc.)
+    for (const fallbackCity of ['luxor', 'aswan']) {
+      const fallbackKey = `${vehicleType}-${fallbackCity}`
+      if (transportCache.has(fallbackKey)) {
+        return transportCache.get(fallbackKey)!
+      }
+    }
+    
+    return null
+  }
+
+  // ============================================
   // STEP 6b: Calculate base transport cost (for 2 pax, for services display)
   // ============================================
   let baseTransportCost = 0
@@ -1347,7 +1389,7 @@ export async function calculateDayBasedPricing(
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0
     if (!hasSightseeing) continue
     
-    const transport = await getTransportRate(baseVehicleType, day.city)
+    const transport = getCachedTransportRate(baseVehicleType, day.city)
     if (transport) {
       baseTransportCost += transport.rate
       services.push({
@@ -1401,7 +1443,7 @@ export async function calculateDayBasedPricing(
 
       // Get vehicle for this pax count (without tour leader for +0)
       const vehicleType = getVehicleTypeByPax(numPax)
-      const transport = await getTransportRate(vehicleType, day.city)
+      const transport = getCachedTransportRate(vehicleType, day.city)
       
       if (transport) {
         transportCost += transport.rate
@@ -1426,7 +1468,7 @@ export async function calculateDayBasedPricing(
       const hasSightseeing = day.services.guide_required || day.attractions.length > 0
       if (!hasSightseeing) continue
 
-      const transport = await getTransportRate(vehicleTypeWithLeader, day.city)
+      const transport = getCachedTransportRate(vehicleTypeWithLeader, day.city)
       if (transport) {
         transportCostWithLeader += transport.rate
       } else {
