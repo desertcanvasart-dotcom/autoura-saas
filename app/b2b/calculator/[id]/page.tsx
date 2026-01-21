@@ -10,6 +10,7 @@ import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileS
 // File: app/b2b/calculator/[id]/page.tsx
 // 
 // Updated: Added +0/+1 Tour Leader toggle
+// Updated: Added Single Supplement display
 // ============================================
 
 interface PricingResult {
@@ -24,7 +25,15 @@ interface PricingResult {
   season: string
   is_eur_passport: boolean
   services: Array<{
-    // ...
+    service_id: string
+    service_name: string
+    service_category: string
+    rate_type: string | null
+    rate_source: string
+    quantity_mode: string
+    quantity: number
+    unit_cost: number
+    line_total: number
   }>
   subtotal_cost: number
   total_cost: number
@@ -32,6 +41,7 @@ interface PricingResult {
   margin_amount: number
   selling_price: number
   price_per_person: number
+  single_supplement?: number
   currency: string
 }
 
@@ -60,7 +70,7 @@ export default function TourPriceCalculator() {
   const [isEurPassport, setIsEurPassport] = useState(true)
   const [marginPercent, setMarginPercent] = useState(25)
   const [includeOptionals, setIncludeOptionals] = useState(false)
-  const [tourLeaderIncluded, setTourLeaderIncluded] = useState(false) // NEW: +0/+1 toggle
+  const [tourLeaderIncluded, setTourLeaderIncluded] = useState(false)
 
   const calculatePrice = async () => {
     setLoading(true)
@@ -76,7 +86,7 @@ export default function TourPriceCalculator() {
           is_eur_passport: isEurPassport,
           margin_percent: marginPercent,
           include_optionals: includeOptionals,
-          tour_leader_included: tourLeaderIncluded // NEW: pass to API
+          tour_leader_included: tourLeaderIncluded
         })
       })
       const data = await res.json()
@@ -92,13 +102,12 @@ export default function TourPriceCalculator() {
   const generateRateSheet = async () => {
     setGeneratingSheet(true)
     try {
-      // Single API call - backend returns full pax_pricing_table
       const res = await fetch('/api/b2b/calculate-price', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           variation_id: variationId,
-          num_pax: 2, // Any number works - we use the table
+          num_pax: 2,
           travel_date: travelDate,
           is_eur_passport: isEurPassport,
           margin_percent: marginPercent,
@@ -108,9 +117,8 @@ export default function TourPriceCalculator() {
       const data = await res.json()
       
       if (data.success && data.data.pax_pricing_table) {
-        // Use the pre-calculated table (1-40 pax already computed)
         const sheet: RateSheetRow[] = data.data.pax_pricing_table
-          .filter((row: any) => row.numPax <= 10) // Show 1-10 pax
+          .filter((row: any) => row.numPax <= 10)
           .map((row: any) => {
             const pricing = tourLeaderIncluded ? row.withLeader : row.withoutLeader
             return {
@@ -131,6 +139,7 @@ export default function TourPriceCalculator() {
       setGeneratingSheet(false)
     }
   }
+
   const exportToCSV = () => {
     if (rateSheet.length === 0) return
     const tourLeaderSuffix = tourLeaderIncluded ? ' (+1 TL)' : ' (+0)'
@@ -198,7 +207,7 @@ export default function TourPriceCalculator() {
                 />
               </div>
 
-              {/* NEW: Tour Leader Toggle (+0/+1) */}
+              {/* Tour Leader Toggle (+0/+1) */}
               <div className="bg-gray-50 rounded-lg p-3">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <UserPlus className="w-4 h-4 inline mr-1" />Tour Leader
@@ -337,7 +346,6 @@ export default function TourPriceCalculator() {
                     <p className="text-sm text-gray-500">{result.variation_name}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* NEW: Show tour leader badge if included */}
                     {result.tour_leader_included && (
                       <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                         +1 Tour Leader
@@ -349,7 +357,6 @@ export default function TourPriceCalculator() {
                   </div>
                 </div>
 
-                {/* NEW: Show paying pax vs total pax if tour leader included */}
                 {result.tour_leader_included && result.num_paying_pax && (
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
                     <strong>Group:</strong> {result.num_pax} total ({result.num_paying_pax} paying guests + 1 tour leader)
@@ -377,8 +384,8 @@ export default function TourPriceCalculator() {
                     <p className="text-xl font-bold text-[#647C47]">€{result.price_per_person.toFixed(2)}</p>
                   </div>
                 </div>
-              </div>
-                 {/* Single Supplement Display */}
+
+                {/* Single Supplement Display */}
                 {result.single_supplement && result.single_supplement > 0 && (
                   <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <div className="flex items-center justify-between">
@@ -394,7 +401,8 @@ export default function TourPriceCalculator() {
                     </p>
                   </div>
                 )}
-                
+              </div>
+
               {/* Cost Breakdown Table */}
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <h3 className="text-base font-semibold mb-4">Cost Breakdown</h3>
@@ -436,7 +444,6 @@ export default function TourPriceCalculator() {
                       <td colSpan={5} className="px-4 py-2 text-right">Subtotal:</td>
                       <td className="px-4 py-2 text-right">€{result.subtotal_cost.toFixed(2)}</td>
                     </tr>
-                    {/* NEW: Show tour leader cost as separate line */}
                     {result.tour_leader_included && result.tour_leader_cost && (
                       <tr>
                         <td colSpan={5} className="px-4 py-2 text-right text-blue-600">Tour Leader Cost:</td>
