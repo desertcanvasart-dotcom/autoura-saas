@@ -24,15 +24,7 @@ interface PricingResult {
   season: string
   is_eur_passport: boolean
   services: Array<{
-    service_id: string
-    service_name: string
-    service_category: string
-    rate_type: string | null
-    rate_source: string
-    quantity_mode: string
-    quantity: number
-    unit_cost: number
-    line_total: number
+    // ...
   }>
   subtotal_cost: number
   total_cost: number
@@ -49,6 +41,7 @@ interface RateSheetRow {
   margin_amount: number
   selling_price: number
   price_per_person: number
+  single_supplement?: number
 }
 
 export default function TourPriceCalculator() {
@@ -385,7 +378,23 @@ export default function TourPriceCalculator() {
                   </div>
                 </div>
               </div>
-
+                 {/* Single Supplement Display */}
+                {result.single_supplement && result.single_supplement > 0 && (
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-amber-800">
+                        Single Supplement (for solo travelers)
+                      </span>
+                      <span className="text-lg font-bold text-amber-700">
+                        €{result.single_supplement.toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-600 mt-1">
+                      Additional charge per person for single room occupancy
+                    </p>
+                  </div>
+                )}
+                
               {/* Cost Breakdown Table */}
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <h3 className="text-base font-semibold mb-4">Cost Breakdown</h3>
