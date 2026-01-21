@@ -129,8 +129,8 @@ export interface DayPricingResult {
 // CONSTANTS
 // ============================================
 
-// Pax counts to calculate
-export const PAX_COUNTS = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
+// Generate pax counts 1-40 (supports solo travelers through large groups)
+export const PAX_COUNTS = Array.from({ length: 40 }, (_, i) => i + 1)
 
 // Vehicle capacity tiers
 export const VEHICLE_CAPACITY = {
@@ -1431,11 +1431,11 @@ export async function calculateDayBasedPricing(
         transportCostWithLeader += transport.rate
       } else {
         transportCostWithLeader += DEFAULT_RATES[tier].vehicle
-      }
+    
     }
-
-    // Tour leader costs (single supplement + their own per-pax costs)
-    const tourLeaderCost = singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax
+    // Tour leader costs: single room (PPD + single supplement) + their own per-pax costs
+    // Tour leader gets a single room, which costs: PPD + Single Supplement
+    const tourLeaderCost = accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax
 
     const totalCostWithLeader = fixedCosts + transportCostWithLeader + (perPaxCosts * numPax) + tourLeaderCost
     const marginWithLeader = totalCostWithLeader * (marginPercent / 100)
