@@ -1431,7 +1431,7 @@ export async function calculateDayBasedPricing(
         transportCostWithLeader += transport.rate
       } else {
         transportCostWithLeader += DEFAULT_RATES[tier].vehicle
-    
+      }
     }
     // Tour leader costs: single room (PPD + single supplement) + their own per-pax costs
     // Tour leader gets a single room, which costs: PPD + Single Supplement
