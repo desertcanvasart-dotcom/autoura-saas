@@ -98,40 +98,46 @@ export default function TourPriceCalculator() {
 
   const generateRateSheet = async () => {
     setGeneratingSheet(true)
-    const sheet: RateSheetRow[] = []
     try {
-      for (let pax = 1; pax <= 10; pax++) {
-        const res = await fetch('/api/b2b/calculate-price', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            variation_id: variationId,
-            num_pax: pax,
-            travel_date: travelDate,
-            is_eur_passport: isEurPassport,
-            margin_percent: marginPercent,
-            tour_leader_included: tourLeaderIncluded // NEW: include in rate sheet
-          })
+      // Single API call - backend returns full pax_pricing_table
+      const res = await fetch('/api/b2b/calculate-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          variation_id: variationId,
+          num_pax: 2, // Any number works - we use the table
+          travel_date: travelDate,
+          is_eur_passport: isEurPassport,
+          margin_percent: marginPercent,
+          tour_leader_included: tourLeaderIncluded
         })
-        const data = await res.json()
-        if (data.success) {
-          sheet.push({
-            pax,
-            total_cost: data.data.total_cost,
-            margin_amount: data.data.margin_amount,
-            selling_price: data.data.selling_price,
-            price_per_person: data.data.price_per_person
+      })
+      const data = await res.json()
+      
+      if (data.success && data.data.pax_pricing_table) {
+        // Use the pre-calculated table (1-40 pax already computed)
+        const sheet: RateSheetRow[] = data.data.pax_pricing_table
+          .filter((row: any) => row.numPax <= 10) // Show 1-10 pax
+          .map((row: any) => {
+            const pricing = tourLeaderIncluded ? row.withLeader : row.withoutLeader
+            return {
+              pax: row.numPax,
+              total_cost: pricing.totalCost,
+              margin_amount: pricing.marginAmount,
+              selling_price: pricing.sellingPrice,
+              price_per_person: pricing.pricePerPerson
+            }
           })
-        }
+        setRateSheet(sheet)
+      } else {
+        setError(data.error || 'Failed to generate rate sheet')
       }
-      setRateSheet(sheet)
     } catch (err) {
       setError('Failed to generate rate sheet')
     } finally {
       setGeneratingSheet(false)
     }
   }
-
   const exportToCSV = () => {
     if (rateSheet.length === 0) return
     const tourLeaderSuffix = tourLeaderIncluded ? ' (+1 TL)' : ' (+0)'
