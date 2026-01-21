@@ -48,6 +48,145 @@ const TIER_DESCRIPTIONS: Record<ServiceTier, string> = {
 }
 
 // ============================================
+// COMPREHENSIVE EGYPT TRAVEL ABBREVIATIONS
+// ============================================
+
+const EGYPT_TRAVEL_GLOSSARY = `
+=================================================================
+EGYPTIAN TRAVEL INDUSTRY ABBREVIATIONS - COMPREHENSIVE GLOSSARY
+=================================================================
+
+You MUST decode these abbreviations used by Egyptian travel agents.
+This is CRITICAL for understanding the itinerary correctly.
+
+-----------------------------------------------------------------
+AIRPORT & CITY CODES (IATA CODES)
+-----------------------------------------------------------------
+CAI = Cairo (Cairo International Airport)
+ALX / ALY = Alexandria (Borg El Arab Airport)
+ASW = Aswan (Aswan International Airport)
+LXR = Luxor (Luxor International Airport)
+HRG = Hurghada (Hurghada International Airport)
+SSH = Sharm El Sheikh (Sharm El Sheikh International Airport)
+RMF = Marsa Alam (Marsa Alam International Airport)
+ABS = Abu Simbel (Abu Simbel Airport)
+ATZ = Assiut (Assiut Airport)
+MUH = Marsa Matrouh (Marsa Matrouh Airport)
+PSD = Port Said (Port Said Airport)
+TCP = Taba (Taba International Airport)
+SKV = St. Catherine (St. Catherine International Airport)
+HMB = Sohag (Sohag International Airport)
+SPX = Sphinx/Giza (Sphinx International Airport)
+DBB = Dahab / El Alamein area
+DAK = Dakhla Oasis (Dakhla Oasis Airport)
+AAC = El Arish (El Arish International Airport)
+EGH = El Gora (El Gora Airport)
+UVL = El Kharga (El Kharga Airport)
+
+COMMON CITY ABBREVIATIONS (non-IATA):
+GZA = Giza
+KOM = Kom Ombo
+EDU / EDFU = Edfu
+ESN = Esna
+ABY = Abydos
+DEN = Dendera
+SAQ = Saqqara / Sakkara
+MEM = Memphis
+FAY = Fayoum
+SIW = Siwa Oasis
+
+-----------------------------------------------------------------
+ACCOMMODATION CODES
+-----------------------------------------------------------------
+NTS = Nights (e.g., "3NTS" = 3 nights stay)
+HTL = Hotel
+CRZ = Cruise / Nile Cruise
+OVN = Overnight
+C/IN = Check-in
+C/OUT = Check-out
+
+MEAL PLANS:
+RO = Room Only (no meals)
+BB = Bed & Breakfast (breakfast only)
+HB = Half Board (breakfast + dinner)
+FB = Full Board (breakfast + lunch + dinner)
+AI = All Inclusive (all meals + drinks + snacks)
+UAI = Ultra All Inclusive (premium AI with top-shelf drinks, room service)
+SC = Self Catering
+
+-----------------------------------------------------------------
+DAY & TIME NOTATION
+-----------------------------------------------------------------
+D1, D2, D3... = Day 1, Day 2, Day 3...
+"D1 CAI" = Day 1 in Cairo
+"D3 CAI/ASW" = Day 3: Travel from Cairo to Aswan
+"/" between cities = transfer/travel between those cities
+@ = at (time), e.g., "arrive @05:10" = arrive at 05:10
+
+-----------------------------------------------------------------
+TRANSPORT CODES
+-----------------------------------------------------------------
+TRF = Transfer
+DOM = Domestic (flight)
+INT = International (flight)
+MS = EgyptAir flight prefix (e.g., MS956 = EgyptAir flight 956)
+FZ = FlyDubai
+EK = Emirates
+QR = Qatar Airways
+TK = Turkish Airlines
+LH = Lufthansa
+
+-----------------------------------------------------------------
+ATTRACTION MARKERS
+-----------------------------------------------------------------
+(INSIDE) = Entrance fee included, going inside
+(OUTSIDE) = Photo stop only, viewing from outside, NO entrance
+* = Optional / Add-on (not included in base price)
+
+-----------------------------------------------------------------
+MEAL CODES IN ITINERARY
+-----------------------------------------------------------------
+B = Breakfast
+L = Lunch  
+D = Dinner
+"B, L" = Breakfast and Lunch included
+"L, D" = Lunch and Dinner included
+
+-----------------------------------------------------------------
+COMMON PATTERNS - EXAMPLES
+-----------------------------------------------------------------
+"2NTS CAI + 3NTS CRZ + 3NTS HRG"
+= 2 nights Cairo + 3 nights Cruise + 3 nights Hurghada
+= Total: 2+3+3 = 8 nights = 9 DAYS
+
+"D1 CAI/ALX/CAI" = Day 1: Cairo to Alexandria, return to Cairo
+
+"OVERNIGHT AT CAIRO HOTEL" = Sleep in Cairo hotel
+
+"check in CRZ" = Board the Nile Cruise ship
+
+"c/out CRZ" = Disembark from cruise ship
+
+"D4 CRZ" = Day 4 spent on cruise (full day sailing)
+
+"Arrive CAI by MS956@05:10" = Arrive Cairo on EgyptAir flight 956 at 05:10
+
+"DEPARTED BY MS955@23:20" = Depart on EgyptAir 955 at 23:20
+
+-----------------------------------------------------------------
+IMPORTANT CALCULATION RULE
+-----------------------------------------------------------------
+Number of DAYS = Number of NIGHTS + 1
+
+Example: "2NTS CAI + 3NTS CRZ + 3NTS HRG"
+- Nights: 2 + 3 + 3 = 8 nights
+- Days: 8 + 1 = 9 days (D1 through D9)
+
+Always count the day numbers (D1, D2...) to determine total days.
+=================================================================
+`
+
+// ============================================
 // EXTRACTED DAY STRUCTURE (from parser)
 // ============================================
 interface ExtractedDay {
@@ -98,6 +237,47 @@ function normalizeTier(value: string | null | undefined): ServiceTier {
 }
 
 // ============================================
+// CALCULATE EXPECTED DAYS FROM RAW ITINERARY
+// ============================================
+
+function calculateExpectedDays(rawItinerary: string, extractedDays: ExtractedDay[] | null): number {
+  // Method 1: Count day markers (D1, D2, D3... or Day 1, Day 2...)
+  const dayMarkerPattern = /\b[Dd](?:ay)?\s*(\d+)\b/g
+  let maxDayNumber = 0
+  let match
+  while ((match = dayMarkerPattern.exec(rawItinerary)) !== null) {
+    const dayNum = parseInt(match[1])
+    if (dayNum > maxDayNumber) {
+      maxDayNumber = dayNum
+    }
+  }
+
+  // Method 2: Sum up NTS (nights) patterns like "2NTS CAI + 3NTS CRZ"
+  const ntsPattern = /(\d+)\s*NTS/gi
+  let totalNights = 0
+  while ((match = ntsPattern.exec(rawItinerary)) !== null) {
+    totalNights += parseInt(match[1])
+  }
+  const daysFromNights = totalNights > 0 ? totalNights + 1 : 0
+
+  // Method 3: Use extracted days array length
+  const extractedCount = extractedDays?.length || 0
+
+  // Take the maximum of all methods
+  const expectedDays = Math.max(maxDayNumber, daysFromNights, extractedCount)
+
+  console.log(`📊 Day calculation:`, {
+    maxDayFromMarkers: maxDayNumber,
+    totalNights,
+    daysFromNightsFormula: daysFromNights,
+    extractedDaysCount: extractedCount,
+    finalExpectedDays: expectedDays
+  })
+
+  return expectedDays || 1 // Default to 1 if nothing found
+}
+
+// ============================================
 // CRUISE DETECTION SYSTEM
 // ============================================
 
@@ -109,8 +289,9 @@ interface CruiseDetectionResult {
   startCity: string | null
   endCity: string | null
   keywords: string[]
-  // NEW: Detect if trip also includes land (hotels)
   includesLand: boolean
+  cruiseNights: number
+  landNights: number
 }
 
 function detectCruiseRequest(
@@ -118,24 +299,51 @@ function detectCruiseRequest(
   interests: string[],
   cities: string[],
   specialRequests: string[],
-  durationDays: number
+  durationDays: number,
+  rawItinerary?: string
 ): CruiseDetectionResult {
   const allText = [
     tourRequested || '',
+    rawItinerary || '',
     ...(interests || []),
     ...(cities || []),
     ...(specialRequests || [])
   ].join(' ').toLowerCase()
 
-  // Cruise keywords
+  // Cruise keywords - includes abbreviations
   const cruiseKeywords = [
     'nile cruise', 'cruise', 'river cruise', 'boat cruise',
     'felucca', 'dahabiya', 'sailing', 'cruise ship',
-    'lake nasser', 'floating hotel'
+    'lake nasser', 'floating hotel',
+    'crz', 'nts crz', 'check in crz', 'c/in crz', 'on board'
   ]
 
   const matchedKeywords = cruiseKeywords.filter(keyword => allText.includes(keyword))
   const isCruise = matchedKeywords.length > 0
+
+  // Calculate cruise nights from "XNTs CRZ" pattern
+  let cruiseNights = 0
+  const cruiseNtsMatch = allText.match(/(\d+)\s*nts?\s*crz/i)
+  if (cruiseNtsMatch) {
+    cruiseNights = parseInt(cruiseNtsMatch[1])
+  }
+
+  // Calculate land nights
+  let landNights = 0
+  const landPatterns = [
+    /(\d+)\s*nts?\s*cai/gi,  // Cairo nights
+    /(\d+)\s*nts?\s*hrg/gi,  // Hurghada nights
+    /(\d+)\s*nts?\s*ssh/gi,  // Sharm nights
+    /(\d+)\s*nts?\s*alx/gi,  // Alexandria nights
+    /(\d+)\s*nts?\s*htl/gi   // Generic hotel nights
+  ]
+  
+  for (const pattern of landPatterns) {
+    let match
+    while ((match = pattern.exec(allText)) !== null) {
+      landNights += parseInt(match[1])
+    }
+  }
 
   if (!isCruise) {
     return {
@@ -146,7 +354,9 @@ function detectCruiseRequest(
       startCity: null,
       endCity: null,
       keywords: [],
-      includesLand: false
+      includesLand: false,
+      cruiseNights: 0,
+      landNights: 0
     }
   }
 
@@ -161,47 +371,43 @@ function detectCruiseRequest(
   let startCity: string | null = null
   let endCity: string | null = null
 
-  if (allText.includes('luxor to aswan') || allText.includes('luxor-aswan') || allText.includes('luxor aswan')) {
-    route = 'luxor-aswan'
-    startCity = 'Luxor'
-    endCity = 'Aswan'
-  } else if (allText.includes('aswan to luxor') || allText.includes('aswan-luxor') || allText.includes('aswan luxor')) {
-    route = 'aswan-luxor'
-    startCity = 'Aswan'
-    endCity = 'Luxor'
-  } else if (allText.includes('round trip') || allText.includes('round-trip')) {
-    route = 'round-trip'
-    startCity = 'Luxor'
-    endCity = 'Luxor'
-  } else if (cruiseType === 'lake-nasser') {
-    route = 'aswan-abu-simbel'
-    startCity = 'Aswan'
-    endCity = 'Abu Simbel'
+  // Check various route patterns
+  const routePatterns = [
+    { pattern: /luxor\s*(?:to|-|\/)\s*aswan|lxr\s*(?:to|-|\/)\s*asw/i, route: 'luxor-aswan', start: 'Luxor', end: 'Aswan' },
+    { pattern: /aswan\s*(?:to|-|\/)\s*luxor|asw\s*(?:to|-|\/)\s*lxr/i, route: 'aswan-luxor', start: 'Aswan', end: 'Luxor' },
+    { pattern: /round\s*trip/i, route: 'round-trip', start: 'Luxor', end: 'Luxor' }
+  ]
+
+  for (const { pattern, route: r, start, end } of routePatterns) {
+    if (pattern.test(allText)) {
+      route = r
+      startCity = start
+      endCity = end
+      break
+    }
   }
 
-  // If no explicit route, infer from cities
-  if (!route && cities && cities.length > 0) {
-    const citiesLower = cities.map(c => c.toLowerCase())
-    if (citiesLower.includes('luxor') && citiesLower.includes('aswan')) {
+  // If no explicit route, infer from cities or default
+  if (!route) {
+    const citiesLower = (cities || []).map(c => c.toLowerCase())
+    if (citiesLower.some(c => c.includes('luxor') || c.includes('lxr'))) {
       route = 'luxor-aswan'
       startCity = 'Luxor'
       endCity = 'Aswan'
-    } else if (citiesLower.includes('luxor')) {
-      route = 'luxor-aswan'
-      startCity = 'Luxor'
-      endCity = 'Aswan'
-    } else if (citiesLower.includes('aswan')) {
+    } else if (citiesLower.some(c => c.includes('aswan') || c.includes('asw'))) {
+      route = 'aswan-luxor'
+      startCity = 'Aswan'
+      endCity = 'Luxor'
+    } else if (cruiseType === 'lake-nasser') {
+      route = 'aswan-abu-simbel'
+      startCity = 'Aswan'
+      endCity = 'Abu Simbel'
+    } else {
+      // Default to aswan-luxor (most common)
       route = 'aswan-luxor'
       startCity = 'Aswan'
       endCity = 'Luxor'
     }
-  }
-
-  // Default route if still not determined
-  if (!route) {
-    route = 'luxor-aswan'
-    startCity = 'Luxor'
-    endCity = 'Aswan'
   }
 
   // Detect duration from text
@@ -210,7 +416,8 @@ function detectCruiseRequest(
     { pattern: /(\d+)\s*night/i, addOne: true },
     { pattern: /(\d+)\s*day/i, addOne: false },
     { pattern: /(\d+)-night/i, addOne: true },
-    { pattern: /(\d+)-day/i, addOne: false }
+    { pattern: /(\d+)-day/i, addOne: false },
+    { pattern: /(\d+)\s*nts?\s*crz/i, addOne: true }
   ]
 
   for (const { pattern, addOne } of durationPatterns) {
@@ -222,28 +429,28 @@ function detectCruiseRequest(
     }
   }
 
-  // NEW: Detect if trip includes land (hotels) - cruise+land package
-  // Check for non-cruise cities like Cairo, Alexandria, Hurghada, Sharm El Sheikh
-  const landCities = ['cairo', 'alexandria', 'hurghada', 'sharm', 'giza', 'dahab', 'marsa alam']
-  const cruiseCities = ['luxor', 'aswan', 'edfu', 'kom ombo', 'esna']
+  // Detect if trip includes land (hotels)
+  const landCities = ['cairo', 'alexandria', 'hurghada', 'sharm', 'giza', 'dahab', 'marsa alam', 
+                      'cai', 'alx', 'hrg', 'ssh', 'gza', 'rmf']
   
   const citiesLower = (cities || []).map(c => c.toLowerCase())
   const hasLandCities = citiesLower.some(city => 
     landCities.some(lc => city.includes(lc))
-  )
+  ) || landCities.some(lc => allText.includes(lc + ' hotel') || allText.includes('nts ' + lc))
   
-  // Also check if duration suggests more than just cruise (typical cruise is 3-5 days)
-  const typicalCruiseDays = cruiseType === 'lake-nasser' ? 4 : 5
-  const includesLand = hasLandCities || (durationDays > typicalCruiseDays + 1)
+  const includesLand = hasLandCities || landNights > 0 || (durationDays > (cruiseNights + 1))
 
-  console.log(`🚢 CRUISE DETECTED:`, {
+  console.log(`🚢 CRUISE DETECTION:`, {
+    isCruise: true,
     type: cruiseType,
     route,
     startCity,
     endCity,
+    cruiseNights,
+    landNights,
+    includesLand,
     detectedDuration,
-    keywords: matchedKeywords,
-    includesLand
+    keywords: matchedKeywords
   })
 
   return {
@@ -254,7 +461,9 @@ function detectCruiseRequest(
     startCity,
     endCity,
     keywords: matchedKeywords,
-    includesLand
+    includesLand,
+    cruiseNights,
+    landNights
   }
 }
 
@@ -734,83 +943,124 @@ async function generateFromStructuredInput(
     language: string
     attractionNames: string[]
     writingRules: WritingRule[]
+    packageType?: PackageType
   }
 ): Promise<any> {
-  const { tier, totalPax, language, attractionNames, writingRules } = params
+  const { tier, totalPax, language, attractionNames, writingRules, packageType } = params
   const writingContext = buildWritingRulesContext(writingRules)
 
-  const prompt = `You are a travel operations assistant. The user has provided a SPECIFIC day-by-day itinerary that you must FOLLOW EXACTLY.
+  // Calculate expected number of days
+  const expectedDays = calculateExpectedDays(rawItinerary, extractedDays)
 
-CRITICAL INSTRUCTION: You are NOT creating an itinerary. You are CONVERTING the provided plan into the required JSON format while:
-1. PRESERVING the exact structure (same number of days, same dates)
-2. PRESERVING the exact activities for each day
-3. ONLY adding professional descriptions - never changing the content
-4. Matching attraction names to our database where possible
+  console.log(`📋 STRUCTURED MODE: Generating ${expectedDays} days from raw itinerary`)
 
-PROVIDED ITINERARY:
+  const prompt = `You are a travel operations assistant specializing in Egyptian tourism.
+
+${EGYPT_TRAVEL_GLOSSARY}
+
+=================================================================
+YOUR TASK
+=================================================================
+
+Convert the following travel agent's abbreviated itinerary into a complete, detailed JSON format.
+
+CRITICAL REQUIREMENTS:
+1. You MUST generate exactly ${expectedDays} days (D1 through D${expectedDays})
+2. DO NOT skip any days - every day from D1 to D${expectedDays} must be included
+3. Decode ALL abbreviations using the glossary above
+4. Identify which days are CRUISE days vs HOTEL days
+5. Mark entrance fees: (INSIDE) = entrance included, (OUTSIDE) = photo stop only
+
+=================================================================
+RAW ITINERARY FROM TRAVEL AGENT
+=================================================================
+
 ${rawItinerary}
 
-PARSED STRUCTURE (for reference):
+${extractedDays && extractedDays.length > 0 ? `
+=================================================================
+PARSER'S PARTIAL EXTRACTION (may be incomplete - use raw text as primary source)
+=================================================================
 ${JSON.stringify(extractedDays, null, 2)}
+` : ''}
 
-AVAILABLE ATTRACTIONS IN OUR DATABASE (use exact names when matching):
+=================================================================
+AVAILABLE ATTRACTIONS IN DATABASE (use exact names when matching)
+=================================================================
 ${attractionNames.join(', ')}
 
+=================================================================
+TRIP CONFIGURATION
+=================================================================
 SERVICE TIER: ${tier.toUpperCase()} (${TIER_DESCRIPTIONS[tier]})
 TRAVELERS: ${totalPax} people
 GUIDE LANGUAGE: ${language}
+PACKAGE TYPE: ${packageType || 'cruise-land'}
 ${writingContext}
 
-YOUR TASK:
-Convert this into our JSON format. For each day:
-1. Keep the EXACT date and activities from the input
-2. Write a professional 2-3 sentence description
-3. Match attractions to our database names (use closest match)
-4. Set guide_required ONLY if explicitly mentioned in the original OR if it's a sightseeing day with attractions
-5. Set includes_lunch/includes_dinner ONLY if explicitly mentioned
-6. For transfer-only days: keep activities minimal, description brief, guide_required: false
+=================================================================
+OUTPUT REQUIREMENTS
+=================================================================
+
+For each day, determine:
+1. CITY: Decode abbreviations (CAI=Cairo, HRG=Hurghada, etc.)
+2. ACCOMMODATION TYPE:
+   - "cruise" for days with CRZ, "on board", or between cruise ports
+   - "hotel" for days with hotel stays in cities like CAI, HRG, SSH
+   - null for departure day (last day)
+3. ATTRACTIONS: 
+   - List with (INSIDE) as entrance_included
+   - List with (OUTSIDE) as photo_stops
+4. MEALS: L=Lunch, D=Dinner included
+5. TRANSPORT: Note flights (MS956, etc.) and transfers
 
 STRICT RULES:
-- Do NOT add attractions not in the original itinerary
-- Do NOT add meals unless explicitly mentioned
-- Do NOT reorder or combine days
-- Do NOT skip any days from the input
-- If original says "transfer to hotel" - that's the ONLY activity
-- Arrival days with just transfer = is_transfer_only: true
+- Generate ALL ${expectedDays} days - do NOT combine or skip
+- Day numbering must go D1, D2, D3... D${expectedDays}
+- Last day (D${expectedDays}) should have accommodation_type: null
+- Decode EVERY abbreviation
 
-Return ONLY valid JSON:
+Return ONLY valid JSON in this exact format:
 {
-  "trip_name": "descriptive name based on the itinerary",
-  "total_days": ${extractedDays.length},
+  "trip_name": "Descriptive name for the full trip",
+  "total_days": ${expectedDays},
   "days": [
     {
       "day_number": 1,
-      "date": "YYYY-MM-DD or null",
-      "title": "Day 1: [title from input]",
-      "description": "Professional 2-3 sentence description",
-      "city": "city name",
-      "overnight_city": "overnight city",
-      "is_arrival": true/false,
-      "is_departure": true/false,
-      "is_transfer_only": true/false,
-      "is_free_day": true/false,
-      "attractions": ["Exact Attraction Name from database"],
-      "activities": ["activity descriptions from input"],
-      "guide_required": true/false,
+      "date": null,
+      "title": "Day 1: [Decoded title - e.g., 'Arrival in Cairo & Alexandria Excursion']",
+      "description": "Professional 2-3 sentence description of this day's activities",
+      "city": "Full city name",
+      "overnight_city": "City where guest sleeps (or 'On board' for cruise)",
+      "accommodation_type": "hotel" | "cruise" | null,
+      "is_arrival": true,
+      "is_departure": false,
+      "is_transfer_only": false,
+      "is_free_day": false,
+      "is_cruise_day": false,
+      "attractions": ["All attractions visited"],
+      "entrance_included": ["Attractions marked INSIDE"],
+      "photo_stops": ["Attractions marked OUTSIDE"],
+      "activities": ["Decoded activity descriptions"],
+      "guide_required": true,
       "includes_lunch": true/false,
       "includes_dinner": true/false,
       "includes_hotel": true/false,
-      "transport_notes": "flight/transfer info if any",
-      "hotel_name": "hotel if mentioned"
+      "transport_notes": "Flight MS956 arriving 05:10" or "Private transfer",
+      "flight_info": "MS956" if applicable,
+      "meal_plan": "FB" | "HB" | "BB" | "AI" | null
     }
+    // ... MUST continue for ALL ${expectedDays} days
   ]
 }
 
-Remember: Your job is to FORMAT the provided itinerary, not to CREATE a new one.`
+IMPORTANT: Count your output to ensure you have exactly ${expectedDays} day objects before responding.`
+
+  console.log('🤖 Sending structured prompt to AI...')
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 8192,
+    max_tokens: 16384, // Increased for longer itineraries
     messages: [
       {
         role: 'user',
@@ -827,10 +1077,20 @@ Remember: Your job is to FORMAT the provided itinerary, not to CREATE a new one.
   // Parse JSON
   const jsonMatch = responseText.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {
+    console.error('❌ Failed to parse AI response:', responseText.substring(0, 500))
     throw new Error('Failed to parse AI response as JSON')
   }
 
-  return JSON.parse(jsonMatch[0])
+  const result = JSON.parse(jsonMatch[0])
+  
+  // Validate day count
+  if (result.days && result.days.length < expectedDays) {
+    console.warn(`⚠️ AI returned ${result.days.length} days but expected ${expectedDays}`)
+  } else {
+    console.log(`✅ AI successfully generated ${result.days?.length || 0} days`)
+  }
+
+  return result
 }
 
 // ============================================
@@ -867,6 +1127,8 @@ async function generateCreativeItinerary(
   } = params
 
   const prompt = `Create a ${durationDays}-day Egypt itinerary.
+
+${EGYPT_TRAVEL_GLOSSARY}
 
 CLIENT: ${clientName}
 TOUR: ${tourName}
@@ -955,9 +1217,13 @@ function determinePackageType(
   requestedPackageType: string,
   cruiseDetection: CruiseDetectionResult
 ): PackageType {
-  // If not a cruise, use the requested package type (or land-package as default)
+  // If explicitly requested cruise-land, use it
+  if (requestedPackageType === 'cruise-land') {
+    return 'cruise-land'
+  }
+
+  // If not a cruise detected, use the requested package type (or land-package as default)
   if (!cruiseDetection.isCruise) {
-    // Map old 'full-package' to 'land-package'
     if (requestedPackageType === 'full-package') {
       return 'land-package'
     }
@@ -1042,23 +1308,38 @@ export async function POST(request: NextRequest) {
       inputMode = 'creative'
     } else if (is_structured_input && extracted_days && extracted_days.length > 0) {
       inputMode = 'structured'
+    } else if (raw_itinerary && /\b[Dd](?:ay)?\s*\d+|NTS\s+\w{3}/i.test(raw_itinerary)) {
+      // Auto-detect structured input from raw itinerary patterns
+      inputMode = 'structured'
+      console.log('🔍 Auto-detected structured input from patterns')
     }
 
     console.log('🤖 Input Mode:', inputMode)
 
     let duration_days = parseInt(raw_duration_days) || 1
     
-    // For structured mode, use extracted days count
-    if (inputMode === 'structured' && extracted_days?.length) {
+    // For structured mode, calculate days from raw itinerary
+    if (inputMode === 'structured' && raw_itinerary) {
+      const calculatedDays = calculateExpectedDays(raw_itinerary, extracted_days)
+      if (calculatedDays > duration_days) {
+        duration_days = calculatedDays
+        console.log(`📊 Adjusted duration to ${duration_days} days based on itinerary analysis`)
+      }
+    } else if (inputMode === 'structured' && extracted_days?.length) {
       duration_days = extracted_days.length
     }
 
     // ============================================
-    // CRUISE DETECTION (only for creative mode)
+    // CRUISE DETECTION (for both modes now)
     // ============================================
-    const cruiseDetection = inputMode === 'creative' 
-      ? detectCruiseRequest(finalTourName, interests, cities, special_requests, duration_days)
-      : { isCruise: false, cruiseType: null, route: null, detectedDuration: null, startCity: null, endCity: null, keywords: [], includesLand: false }
+    const cruiseDetection = detectCruiseRequest(
+      finalTourName, 
+      interests, 
+      cities, 
+      special_requests, 
+      duration_days,
+      raw_itinerary || '' // Pass raw itinerary for better detection
+    )
 
     // Adjust duration for cruise if needed
     if (cruiseDetection.isCruise && duration_days === 1) {
@@ -1111,10 +1392,10 @@ export async function POST(request: NextRequest) {
     const withMargin = (cost: number) => Math.round(cost * marginMultiplier * 100) / 100
 
     // ============================================
-    // CRUISE PATH (only for creative mode)
+    // CRUISE-ONLY PATH (creative mode, pure cruise)
     // ============================================
-    if (cruiseDetection.isCruise && inputMode === 'creative') {
-      console.log('🚢 Processing as CRUISE itinerary...')
+    if (cruiseDetection.isCruise && inputMode === 'creative' && effectivePackageType === 'cruise-package') {
+      console.log('🚢 Processing as PURE CRUISE itinerary (creative mode)...')
       
       const cruiseContent = await findCruiseContent(cruiseDetection, tier, duration_days)
       
@@ -1306,9 +1587,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // LAND TOUR PATH (STRUCTURED OR CREATIVE)
+    // LAND TOUR / CRUISE+LAND PATH (STRUCTURED OR CREATIVE)
     // ============================================
-    console.log(`🏛️ Processing as LAND TOUR itinerary (${inputMode} mode)...`)
+    console.log(`🏛️ Processing as ${effectivePackageType} itinerary (${inputMode} mode)...`)
 
     // Fetch rates and content
     const searchCities = cities.length > 0 ? cities : [effectiveCity]
@@ -1369,18 +1650,19 @@ export async function POST(request: NextRequest) {
 
     let itineraryData: any
 
-    if (inputMode === 'structured' && extracted_days && raw_itinerary) {
+    if (inputMode === 'structured' && raw_itinerary) {
       console.log('📋 Using STRUCTURED mode - following provided itinerary')
       
       itineraryData = await generateFromStructuredInput(
-        extracted_days,
+        extracted_days || [],
         raw_itinerary,
         {
           tier,
           totalPax,
           language: finalLanguage,
           attractionNames,
-          writingRules
+          writingRules,
+          packageType: effectivePackageType
         }
       )
     } else {
@@ -1409,15 +1691,16 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    console.log('✅ AI generated itinerary:', {
-      tripName: itineraryData.trip_name,
-      days: itineraryData.days?.length
-    })
+    // Update duration from AI result
+    if (itineraryData.total_days) {
+      duration_days = itineraryData.total_days
+    }
 
-    // ============================================
-    // CREATE ITINERARY IN DATABASE
-    // ============================================
+    // Recalculate end date
+    const finalEndDate = new Date(startDateObj)
+    finalEndDate.setDate(startDateObj.getDate() + duration_days - 1)
 
+    // Create itinerary record - UPDATED: Use effectivePackageType
     const { data: itinerary, error: itineraryError } = await supabase
       .from('itineraries')
       .insert({
@@ -1425,9 +1708,9 @@ export async function POST(request: NextRequest) {
         client_name,
         client_email: client_email || null,
         client_phone: client_phone || null,
-        trip_name: itineraryData.trip_name,
+        trip_name: itineraryData.trip_name || finalTourName,
         start_date,
-        end_date: endDate.toISOString().split('T')[0],
+        end_date: finalEndDate.toISOString().split('T')[0],
         total_days: duration_days,
         num_adults,
         num_children,
@@ -1435,7 +1718,7 @@ export async function POST(request: NextRequest) {
         total_cost: 0,
         total_revenue: 0,
         margin_percent,
-        status: 'draft',
+        status: skip_pricing ? 'draft' : 'quoted',
         tier,
         package_type: effectivePackageType,
         cost_mode,
@@ -1445,47 +1728,40 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (itineraryError) throw new Error(`Failed to create itinerary: ${itineraryError.message}`)
+    if (itineraryError) {
+      console.error('❌ Failed to create itinerary:', itineraryError)
+      throw new Error(`Failed to create itinerary: ${itineraryError.message}`)
+    }
 
-    console.log('📝 Created itinerary:', itinerary.id)
+    console.log(`✅ Created itinerary ${itinerary.id} with ${duration_days} days`)
 
-    // ============================================
-    // CREATE DAYS AND SERVICES
-    // ============================================
-
+    // Create days and services
     let totalSupplierCost = 0
     let totalClientPrice = 0
 
-    for (const dayData of itineraryData.days) {
+    for (const dayData of itineraryData.days || []) {
+      const dayNumber = dayData.day_number || 1
       const dayDate = new Date(startDateObj)
-      dayDate.setDate(startDateObj.getDate() + dayData.day_number - 1)
+      dayDate.setDate(startDateObj.getDate() + dayNumber - 1)
 
-      const isLastDay = dayData.day_number === duration_days
-      const isTransferOnly = dayData.is_transfer_only || (dayData.is_arrival && (!dayData.attractions || dayData.attractions.length === 0))
+      const isLastDay = dayNumber === duration_days
+      const isTransferOnly = dayData.is_transfer_only || false
       const isFreeDay = dayData.is_free_day || false
-      const includesHotelForDay = dayData.includes_hotel !== false && !isLastDay && includeAccommodationFinal
-      
-      // Use day-specific settings if in structured mode
-      const dayIncludesLunch = inputMode === 'structured' 
-        ? dayData.includes_lunch === true 
-        : include_lunch && !isTransferOnly && !isFreeDay
-      
-      const dayIncludesDinner = inputMode === 'structured'
-        ? dayData.includes_dinner === true
-        : include_dinner && !isTransferOnly && !isFreeDay
-      
-      const dayNeedsGuide = inputMode === 'structured'
-        ? dayData.guide_required === true
-        : !isTransferOnly && !isFreeDay
+      const isCruiseDay = dayData.is_cruise_day || dayData.accommodation_type === 'cruise'
+      const dayNeedsGuide = dayData.guide_required !== false && !isTransferOnly && !isFreeDay
+      const dayIncludesLunch = dayData.includes_lunch ?? include_lunch
+      const dayIncludesDinner = dayData.includes_dinner ?? include_dinner
+      const includesHotelForDay = !isLastDay && includeAccommodationFinal && !isCruiseDay && (dayData.includes_hotel !== false)
 
+      // Create day record
       const { data: day, error: dayError } = await supabase
         .from('itinerary_days')
         .insert({
           itinerary_id: itinerary.id,
-          day_number: dayData.day_number,
-          date: dayData.date || dayDate.toISOString().split('T')[0],
-          title: dayData.title,
-          description: dayData.description,
+          day_number: dayNumber,
+          date: dayDate.toISOString().split('T')[0],
+          title: dayData.title || `Day ${dayNumber}`,
+          description: dayData.description || '',
           city: dayData.city || effectiveCity,
           overnight_city: dayData.overnight_city || dayData.city || effectiveCity,
           attractions: dayData.attractions || [],
@@ -1498,17 +1774,15 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (dayError) {
-        console.error(`❌ Error creating day ${dayData.day_number}:`, dayError)
+        console.error(`❌ Error creating day ${dayNumber}:`, dayError)
         continue
       }
 
-      // Skip pricing if requested
       if (skip_pricing) continue
 
-      // Skip most services for departure-only days
+      // Handle departure day - only transfer
       if (dayData.is_departure && isTransferOnly) {
-        // Only add transfer service
-        const transferCost = vehiclePerDay * 0.5 // Half day for airport transfer
+        const transferCost = vehiclePerDay * 0.5
         await supabase.from('itinerary_services').insert({
           itinerary_day_id: day.id,
           service_type: 'transportation',
@@ -1675,7 +1949,7 @@ export async function POST(request: NextRequest) {
         totalClientPrice += withMargin(waterCost)
       }
 
-      // Hotel (only if included and not last day)
+      // Hotel (only if included and not last day and not cruise day)
       if (includesHotelForDay && hotelRate > 0) {
         const hotelCost = hotelRate * roomsNeeded
         services.push({
@@ -1692,6 +1966,26 @@ export async function POST(request: NextRequest) {
         })
         totalSupplierCost += hotelCost
         totalClientPrice += withMargin(hotelCost)
+      }
+
+      // Cruise accommodation (for cruise days)
+      if (isCruiseDay && !isLastDay) {
+        const cruiseRate = await getCruiseRate(tier, [], supabase)
+        const nightCost = cruiseRate.perPersonPerNight * totalPax
+        services.push({
+          service_type: 'cruise',
+          service_code: cruiseRate.supplierId || 'CRUISE',
+          service_name: `${cruiseRate.shipName} - Full Board`,
+          supplier_name: cruiseRate.shipName,
+          quantity: totalPax,
+          rate_eur: cruiseRate.perPersonPerNight,
+          rate_non_eur: cruiseRate.perPersonPerNight,
+          total_cost: nightCost,
+          client_price: withMargin(nightCost),
+          notes: `Night ${dayNumber}: On board`
+        })
+        totalSupplierCost += nightCost
+        totalClientPrice += withMargin(nightCost)
       }
 
       // Insert all services
@@ -1732,7 +2026,7 @@ export async function POST(request: NextRequest) {
         trip_name: itineraryData.trip_name,
         tier,
         package_type: effectivePackageType,
-        is_cruise: false,
+        is_cruise: cruiseDetection.isCruise,
         generation_mode: inputMode,
         mode: skip_pricing ? 'draft' : 'quoted',
         redirect_to: skip_pricing ? `/itineraries/${itinerary.id}/edit` : `/itineraries/${itinerary.id}`,
