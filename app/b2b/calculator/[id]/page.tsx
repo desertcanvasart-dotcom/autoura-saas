@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus } from 'lucide-react'
+import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText } from 'lucide-react'
 
 // ============================================
 // B2B TOUR PRICE CALCULATOR PAGE
@@ -11,6 +11,7 @@ import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileS
 // 
 // Updated: Added +0/+1 Tour Leader toggle
 // Updated: Added Single Supplement display
+// Updated: Added Save Quote functionality
 // ============================================
 
 interface PricingResult {
@@ -54,6 +55,17 @@ interface RateSheetRow {
   single_supplement?: number
 }
 
+interface Partner {
+  id: string
+  company_name: string
+  partner_code: string
+}
+
+interface SavedQuote {
+  id: string
+  quote_number: string
+}
+
 export default function TourPriceCalculator() {
   const params = useParams()
   const variationId = params?.id as string
@@ -72,9 +84,41 @@ export default function TourPriceCalculator() {
   const [includeOptionals, setIncludeOptionals] = useState(false)
   const [tourLeaderIncluded, setTourLeaderIncluded] = useState(false)
 
+  // Save Quote state
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedQuote, setSavedQuote] = useState<SavedQuote | null>(null)
+  const [partners, setPartners] = useState<Partner[]>([])
+  const [quoteForm, setQuoteForm] = useState({
+    partner_id: '',
+    client_name: '',
+    client_email: '',
+    client_phone: '',
+    client_nationality: '',
+    notes: ''
+  })
+
+  // Fetch partners on mount
+  useEffect(() => {
+    fetchPartners()
+  }, [])
+
+  const fetchPartners = async () => {
+    try {
+      const res = await fetch('/api/b2b/partners?active_only=true')
+      const data = await res.json()
+      if (data.success) {
+        setPartners(data.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch partners:', err)
+    }
+  }
+
   const calculatePrice = async () => {
     setLoading(true)
     setError(null)
+    setSavedQuote(null)
     try {
       const res = await fetch('/api/b2b/calculate-price', {
         method: 'POST',
@@ -140,6 +184,68 @@ export default function TourPriceCalculator() {
     }
   }
 
+  const handleSaveQuote = async () => {
+    if (!result) return
+    
+    setSaving(true)
+    setError(null)
+    
+    try {
+      const res = await fetch('/api/b2b/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          variation_id: variationId,
+          partner_id: quoteForm.partner_id || null,
+          client_name: quoteForm.client_name || null,
+          client_email: quoteForm.client_email || null,
+          client_phone: quoteForm.client_phone || null,
+          client_nationality: quoteForm.client_nationality || null,
+          travel_date: travelDate,
+          num_adults: numPax,
+          num_children: 0,
+          services_snapshot: result.services,
+          total_cost: result.total_cost,
+          margin_percent: result.margin_percent,
+          margin_amount: result.margin_amount,
+          selling_price: result.selling_price,
+          price_per_person: result.price_per_person,
+          tour_leader_included: tourLeaderIncluded,
+          tour_leader_cost: result.tour_leader_cost || null,
+          single_supplement: result.single_supplement || null,
+          is_eur_passport: isEurPassport,
+          season: result.season,
+          notes: quoteForm.notes || null
+        })
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        setSavedQuote({
+          id: data.data.id,
+          quote_number: data.data.quote_number
+        })
+        setShowSaveModal(false)
+        // Reset form
+        setQuoteForm({
+          partner_id: '',
+          client_name: '',
+          client_email: '',
+          client_phone: '',
+          client_nationality: '',
+          notes: ''
+        })
+      } else {
+        setError(data.error || 'Failed to save quote')
+      }
+    } catch (err) {
+      setError('Failed to save quote')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const exportToCSV = () => {
     if (rateSheet.length === 0) return
     const tourLeaderSuffix = tourLeaderIncluded ? ' (+1 TL)' : ' (+0)'
@@ -184,7 +290,33 @@ export default function TourPriceCalculator() {
             <p className="text-sm text-gray-500">Calculate dynamic pricing based on actual rates</p>
           </div>
         </div>
+        <Link 
+          href="/b2b/quotes" 
+          className="flex items-center gap-2 px-4 py-2 text-sm border rounded-lg hover:bg-gray-50"
+        >
+          <FileText className="w-4 h-4" />
+          View Saved Quotes
+        </Link>
       </div>
+
+      {/* Success Message */}
+      {savedQuote && (
+        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <div>
+              <p className="text-sm font-medium text-green-800">Quote saved successfully!</p>
+              <p className="text-sm text-green-600">Reference: <span className="font-mono font-bold">{savedQuote.quote_number}</span></p>
+            </div>
+          </div>
+          <Link
+            href={`/b2b/quotes/${savedQuote.id}`}
+            className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            View Quote
+          </Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calculator Panel */}
@@ -401,6 +533,17 @@ export default function TourPriceCalculator() {
                     </p>
                   </div>
                 )}
+
+                {/* Save Quote Button */}
+                <div className="mt-4 pt-4 border-t">
+                  <button
+                    onClick={() => setShowSaveModal(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  >
+                    <Save className="w-4 h-4" />
+                    Save as Quote
+                  </button>
+                </div>
               </div>
 
               {/* Cost Breakdown Table */}
@@ -510,6 +653,153 @@ export default function TourPriceCalculator() {
           )}
         </div>
       </div>
+
+      {/* Save Quote Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Save className="w-5 h-5 text-[#647C47]" />
+                Save Quote
+              </h2>
+              <button onClick={() => setShowSaveModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {/* Partner Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <Building2 className="w-4 h-4 inline mr-1" />Partner (Optional)
+                </label>
+                <select
+                  value={quoteForm.partner_id}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, partner_id: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg bg-white focus:ring-2 focus:ring-[#647C47] outline-none"
+                >
+                  <option value="">No partner / Direct client</option>
+                  {partners.map(partner => (
+                    <option key={partner.id} value={partner.id}>
+                      {partner.company_name} ({partner.partner_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-gray-700 mb-3">Client Details (Optional)</p>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-600 mb-1">
+                      <User className="w-3 h-3 inline mr-1" />Client Name
+                    </label>
+                    <input
+                      type="text"
+                      value={quoteForm.client_name}
+                      onChange={(e) => setQuoteForm({ ...quoteForm, client_name: e.target.value })}
+                      placeholder="John Smith"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      <Mail className="w-3 h-3 inline mr-1" />Email
+                    </label>
+                    <input
+                      type="email"
+                      value={quoteForm.client_email}
+                      onChange={(e) => setQuoteForm({ ...quoteForm, client_email: e.target.value })}
+                      placeholder="john@example.com"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      <Phone className="w-3 h-3 inline mr-1" />Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={quoteForm.client_phone}
+                      onChange={(e) => setQuoteForm({ ...quoteForm, client_phone: e.target.value })}
+                      placeholder="+1 234 567 8900"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                    />
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <label className="block text-xs text-gray-600 mb-1">
+                      <Globe className="w-3 h-3 inline mr-1" />Nationality
+                    </label>
+                    <input
+                      type="text"
+                      value={quoteForm.client_nationality}
+                      onChange={(e) => setQuoteForm({ ...quoteForm, client_nationality: e.target.value })}
+                      placeholder="American, British, etc."
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Notes</label>
+                <textarea
+                  value={quoteForm.notes}
+                  onChange={(e) => setQuoteForm({ ...quoteForm, notes: e.target.value })}
+                  placeholder="Any special requests or notes..."
+                  rows={2}
+                  className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-[#647C47] outline-none resize-none"
+                />
+              </div>
+
+              {/* Quote Summary */}
+              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-600">Tour:</span>
+                  <span className="font-medium">{result?.template_name}</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-600">Pax:</span>
+                  <span className="font-medium">{numPax} {tourLeaderIncluded ? '(+1 TL)' : ''}</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-600">Travel Date:</span>
+                  <span className="font-medium">{travelDate}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t mt-2">
+                  <span className="text-gray-600">Selling Price:</span>
+                  <span className="font-bold text-[#647C47]">€{result?.selling_price.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-lg">
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="flex-1 px-4 py-2 text-sm border rounded-lg hover:bg-white font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveQuote}
+                disabled={saving}
+                className="flex-1 px-4 py-2 text-sm bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" />Saving...</>
+                ) : (
+                  <><Save className="w-4 h-4" />Save Quote</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
