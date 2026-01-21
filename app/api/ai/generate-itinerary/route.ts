@@ -22,6 +22,9 @@ const DEFAULT_MARGIN_PERCENT = 25
 type ServiceTier = 'budget' | 'standard' | 'deluxe' | 'luxury'
 type InputMode = 'creative' | 'structured'
 
+// UPDATED: New package types
+type PackageType = 'day-trips' | 'tours-only' | 'land-package' | 'cruise-package' | 'cruise-land'
+
 const VALID_TIERS: ServiceTier[] = ['budget', 'standard', 'deluxe', 'luxury']
 
 // Map legacy budget_level values to new tier system
@@ -106,13 +109,16 @@ interface CruiseDetectionResult {
   startCity: string | null
   endCity: string | null
   keywords: string[]
+  // NEW: Detect if trip also includes land (hotels)
+  includesLand: boolean
 }
 
 function detectCruiseRequest(
   tourRequested: string,
   interests: string[],
   cities: string[],
-  specialRequests: string[]
+  specialRequests: string[],
+  durationDays: number
 ): CruiseDetectionResult {
   const allText = [
     tourRequested || '',
@@ -139,7 +145,8 @@ function detectCruiseRequest(
       detectedDuration: null,
       startCity: null,
       endCity: null,
-      keywords: []
+      keywords: [],
+      includesLand: false
     }
   }
 
@@ -215,13 +222,28 @@ function detectCruiseRequest(
     }
   }
 
+  // NEW: Detect if trip includes land (hotels) - cruise+land package
+  // Check for non-cruise cities like Cairo, Alexandria, Hurghada, Sharm El Sheikh
+  const landCities = ['cairo', 'alexandria', 'hurghada', 'sharm', 'giza', 'dahab', 'marsa alam']
+  const cruiseCities = ['luxor', 'aswan', 'edfu', 'kom ombo', 'esna']
+  
+  const citiesLower = (cities || []).map(c => c.toLowerCase())
+  const hasLandCities = citiesLower.some(city => 
+    landCities.some(lc => city.includes(lc))
+  )
+  
+  // Also check if duration suggests more than just cruise (typical cruise is 3-5 days)
+  const typicalCruiseDays = cruiseType === 'lake-nasser' ? 4 : 5
+  const includesLand = hasLandCities || (durationDays > typicalCruiseDays + 1)
+
   console.log(`🚢 CRUISE DETECTED:`, {
     type: cruiseType,
     route,
     startCity,
     endCity,
     detectedDuration,
-    keywords: matchedKeywords
+    keywords: matchedKeywords,
+    includesLand
   })
 
   return {
@@ -231,7 +253,8 @@ function detectCruiseRequest(
     detectedDuration,
     startCity,
     endCity,
-    keywords: matchedKeywords
+    keywords: matchedKeywords,
+    includesLand
   }
 }
 
@@ -925,6 +948,31 @@ Use EXACT attraction names from the provided list. Set includes_hotel to false o
 }
 
 // ============================================
+// DETERMINE EFFECTIVE PACKAGE TYPE
+// ============================================
+
+function determinePackageType(
+  requestedPackageType: string,
+  cruiseDetection: CruiseDetectionResult
+): PackageType {
+  // If not a cruise, use the requested package type (or land-package as default)
+  if (!cruiseDetection.isCruise) {
+    // Map old 'full-package' to 'land-package'
+    if (requestedPackageType === 'full-package') {
+      return 'land-package'
+    }
+    return (requestedPackageType as PackageType) || 'land-package'
+  }
+
+  // It's a cruise - determine if cruise-only or cruise+land
+  if (cruiseDetection.includesLand) {
+    return 'cruise-land'
+  }
+  
+  return 'cruise-package'
+}
+
+// ============================================
 // MAIN API HANDLER
 // ============================================
 
@@ -962,7 +1010,7 @@ export async function POST(request: NextRequest) {
       margin_percent = userPrefs.default_margin_percent,
       currency = userPrefs.default_currency,
       cost_mode = userPrefs.default_cost_mode,
-      package_type = 'full-package',
+      package_type: requested_package_type = 'land-package',
       skip_pricing = false,
       
       // NEW: Structured input parameters from parser
@@ -998,24 +1046,29 @@ export async function POST(request: NextRequest) {
 
     console.log('🤖 Input Mode:', inputMode)
 
-    // ============================================
-    // CRUISE DETECTION (only for creative mode)
-    // ============================================
-    const cruiseDetection = inputMode === 'creative' 
-      ? detectCruiseRequest(finalTourName, interests, cities, special_requests)
-      : { isCruise: false, cruiseType: null, route: null, detectedDuration: null, startCity: null, endCity: null, keywords: [] }
-
     let duration_days = parseInt(raw_duration_days) || 1
     
     // For structured mode, use extracted days count
     if (inputMode === 'structured' && extracted_days?.length) {
       duration_days = extracted_days.length
     }
+
+    // ============================================
+    // CRUISE DETECTION (only for creative mode)
+    // ============================================
+    const cruiseDetection = inputMode === 'creative' 
+      ? detectCruiseRequest(finalTourName, interests, cities, special_requests, duration_days)
+      : { isCruise: false, cruiseType: null, route: null, detectedDuration: null, startCity: null, endCity: null, keywords: [], includesLand: false }
+
     // Adjust duration for cruise if needed
-    else if (cruiseDetection.isCruise && duration_days === 1) {
+    if (cruiseDetection.isCruise && duration_days === 1) {
       duration_days = cruiseDetection.detectedDuration || (cruiseDetection.cruiseType === 'lake-nasser' ? 4 : 5)
       console.log(`🚢 Adjusted cruise duration to ${duration_days} days`)
     }
+
+    // UPDATED: Determine effective package type
+    const effectivePackageType = determinePackageType(requested_package_type, cruiseDetection)
+    console.log(`📦 Package type: ${effectivePackageType}`)
 
     let effectiveCity = city
     if (cruiseDetection.isCruise && cruiseDetection.startCity) {
@@ -1028,6 +1081,7 @@ export async function POST(request: NextRequest) {
       client: client_name,
       inputMode,
       isCruise: cruiseDetection.isCruise,
+      packageType: effectivePackageType,
       tier,
       duration: duration_days,
       startCity: effectiveCity
@@ -1077,7 +1131,7 @@ export async function POST(request: NextRequest) {
 
         const nights = duration_days - 1
         
-        // Create itinerary
+        // Create itinerary - UPDATED: Use effectivePackageType
         const { data: itinerary, error: itineraryError } = await supabase
           .from('itineraries')
           .insert({
@@ -1097,7 +1151,7 @@ export async function POST(request: NextRequest) {
             margin_percent,
             status: skip_pricing ? 'draft' : 'quoted',
             tier,
-            package_type: 'nile-cruise',
+            package_type: effectivePackageType,
             cost_mode,
             notes: special_requests.length > 0 ? special_requests.join('; ') : null,
             client_id
@@ -1227,7 +1281,7 @@ export async function POST(request: NextRequest) {
             itinerary_code: itinerary.itinerary_code,
             trip_name: cruiseContent.variation.title || cruiseContent.content.name,
             tier,
-            package_type: 'nile-cruise',
+            package_type: effectivePackageType,
             is_cruise: true,
             cruise_ship: cruiseRate.shipName,
             generation_mode: 'creative',
@@ -1266,7 +1320,7 @@ export async function POST(request: NextRequest) {
 
     // Determine inclusions based on package type
     let includeAccommodationFinal = include_accommodation
-    if (package_type === 'day-trips' || package_type === 'tours-only') {
+    if (effectivePackageType === 'day-trips' || effectivePackageType === 'tours-only') {
       includeAccommodationFinal = false
     }
 
@@ -1383,7 +1437,7 @@ export async function POST(request: NextRequest) {
         margin_percent,
         status: 'draft',
         tier,
-        package_type,
+        package_type: effectivePackageType,
         cost_mode,
         notes: special_requests.length > 0 ? special_requests.join('; ') : null,
         client_id
@@ -1663,6 +1717,7 @@ export async function POST(request: NextRequest) {
     console.log('🎉 Land tour itinerary complete!', {
       id: itinerary.id,
       mode: inputMode,
+      packageType: effectivePackageType,
       days: duration_days,
       supplierCost: totalSupplierCost,
       clientPrice: totalClientPrice
@@ -1676,7 +1731,7 @@ export async function POST(request: NextRequest) {
         itinerary_code: itinerary.itinerary_code,
         trip_name: itineraryData.trip_name,
         tier,
-        package_type,
+        package_type: effectivePackageType,
         is_cruise: false,
         generation_mode: inputMode,
         mode: skip_pricing ? 'draft' : 'quoted',

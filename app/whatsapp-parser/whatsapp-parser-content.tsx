@@ -88,7 +88,8 @@ interface ExistingClient {
   phone: string
 }
 
-type PackageType = 'day-trips' | 'tours-only' | 'land-package' | 'full-package' | 'cruise-land' | 'shore-excursions'
+// UPDATED: Package types
+type PackageType = 'day-trips' | 'tours-only' | 'land-package' | 'cruise-package' | 'cruise-land'
 type GenerationStep = 'idle' | 'creating-client' | 'checking-suppliers' | 'building-route' | 'calculating-margins' | 'finalizing' | 'complete'
 type ClientStep = 'pending' | 'confirming' | 'confirmed' | 'existing-selected'
 type GenerationMode = 'edit' | 'quick'
@@ -107,10 +108,13 @@ const TIER_OPTIONS = [
   { value: 'luxury', label: 'Luxury', icon: Crown, color: 'amber', description: 'Top-tier VIP experience' }
 ]
 
+// UPDATED: New package types
 const PACKAGE_TYPES = [
   { slug: 'day-trips', name: 'Day Trips', icon: Sun, description: 'No accommodation', color: 'amber' },
   { slug: 'tours-only', name: 'Tours Only', icon: Map, description: 'Client has own hotel', color: 'blue' },
-  { slug: 'full-package', name: 'Full Package', icon: Package, description: 'Everything included', color: 'primary' },
+  { slug: 'land-package', name: 'Land Package', icon: Hotel, description: 'Tours + Hotels', color: 'emerald' },
+  { slug: 'cruise-package', name: 'Cruise Package', icon: Ship, description: 'Nile Cruise only', color: 'cyan' },
+  { slug: 'cruise-land', name: 'Cruise + Land', icon: Package, description: 'Cruise + Hotels', color: 'primary' },
 ]
 
 const DEFAULT_PREFERENCES: UserPreferences = {
@@ -828,8 +832,8 @@ function WhatsAppParserContent() {
   const [error, setError] = useState<string | null>(null)
 
   const [selectedTier, setSelectedTier] = useState<string>('standard')
-  const [packageType, setPackageType] = useState<PackageType>('full-package')
-  // Package type state
+  // UPDATED: Default to land-package
+  const [packageType, setPackageType] = useState<PackageType>('land-package')
 
   const [generationMode, setGenerationMode] = useState<GenerationMode>('edit')
   
@@ -967,7 +971,7 @@ function WhatsAppParserContent() {
     setClientStep('pending')
     setSelectedClientId(null)
     setSelectedTier(userPreferences.default_tier)
-    setPackageType('full-package')
+    setPackageType('land-package')
     setInputMode('creative')
     setAutoDetectedMode(null)
   }
@@ -1522,14 +1526,14 @@ function WhatsAppParserContent() {
                   </div>
                 </div>
 
-                {/* Package Type Selection */}
+                {/* UPDATED: Package Type Selection with 5 options */}
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
                     <Package className="w-4 h-4 text-primary-500" />
                     Package Type
                   </h3>
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-5 gap-2">
                     {PACKAGE_TYPES.map((pkg) => {
                       const isSelected = packageType === pkg.slug
                       return (
@@ -1544,9 +1548,9 @@ function WhatsAppParserContent() {
                         >
                           <div className="flex items-center gap-2 mb-1">
                             <pkg.icon className={`w-4 h-4 ${isSelected ? 'text-primary-600' : 'text-gray-400'}`} />
-                            <span className={`text-sm font-semibold ${isSelected ? 'text-primary-700' : 'text-gray-700'}`}>{pkg.name}</span>
                           </div>
-                          <p className="text-xs text-gray-500">{pkg.description}</p>
+                          <span className={`text-xs font-semibold ${isSelected ? 'text-primary-700' : 'text-gray-700'}`}>{pkg.name}</span>
+                          <p className="text-[10px] text-gray-500 mt-0.5">{pkg.description}</p>
                         </button>
                       )
                     })}

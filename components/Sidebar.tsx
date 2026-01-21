@@ -185,6 +185,7 @@ const navigation: NavSection[] = [
       { label: 'Tour Builder', href: '/tours/manage', icon: LayoutTemplate },
       { label: 'Ready Made Packages', href: '/tours', icon: Package },
       { label: 'Partners', href: '/b2b/partners', icon: Handshake },
+      { label: 'Quotes', href: '/b2b/quotes', icon: FileText },
       { label: 'Pricing Rules', href: '/b2b/pricing-rules', icon: Tags },
     ]
   },
