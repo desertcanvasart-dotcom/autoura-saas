@@ -1,5 +1,5 @@
 // ============================================
-// AUTO-PRICING SERVICE - v3 (Day-Based Engine)
+// AUTO-PRICING SERVICE - v4 (Smart Transport)
 // File: lib/auto-pricing-service.ts
 //
 // Holistic B2B pricing engine that processes
@@ -9,11 +9,19 @@
 // - PPD (Per Person Double) + Single Supplement model
 // - Mixed itineraries (Hotel + Cruise)
 // - Tour Leader (+0/+1) support
-// - Multi-pax calculation (2-30)
+// - Multi-pax calculation (1-40)
+// - Smart transportation selection (duration, area)
 // - All service types (accommodation, meals, entrances, transport, guide, airport, hotel services)
 //
+// v4 Changes:
+// - Smart transport type detection (airport, intercity, day_tour)
+// - Duration detection (full_day, half_day)
+// - Area-based transport matching (east_bank, west_bank, etc.)
+// - Special vehicle handling (Horse Carriage for Edfu)
+// - Itinerary-level transport overrides
+//
 // BACKWARD COMPATIBLE:
-// - Exports calculateAutoPricing() with same interface as v2
+// - Exports calculateAutoPricing() with same interface as v2/v3
 // - New: calculateDayBasedPricing() returns full pricing table
 // ============================================
 
@@ -31,6 +39,27 @@ const supabaseAdmin = createClient(
 export type ServiceTier = 'budget' | 'standard' | 'deluxe' | 'luxury'
 export type AccommodationType = 'hotel' | 'cruise' | 'none'
 export type MealStatus = 'included' | 'external' | 'none'
+
+// Transport service types (normalized)
+export type TransportServiceType = 
+  | 'airport_transfer'
+  | 'city_transfer'
+  | 'day_tour'
+  | 'dinner_transfer'
+  | 'intercity_transfer'
+  | 'sound_light_transfer'
+
+export type TransportDuration = 'full_day' | 'half_day' | 'one_way'
+
+export type TransportArea = 
+  | 'east_bank'
+  | 'west_bank'
+  | 'pyramids'
+  | 'islamic_cairo'
+  | 'old_cairo'
+  | 'temple_visit'
+  | 'nubian_village'
+  | null
 
 // Enhanced Itinerary Day Structure
 export interface ItineraryDay {
@@ -51,6 +80,13 @@ export interface ItineraryDay {
     hotel_checkin: boolean
     hotel_checkout: boolean
     guide_required: boolean
+  }
+  // NEW: Transport overrides (optional)
+  transport?: {
+    service_type?: TransportServiceType
+    duration?: TransportDuration
+    area?: TransportArea
+    vehicle_type?: string // e.g., 'Horse Carriage' for Edfu
   }
 }
 
@@ -125,6 +161,25 @@ export interface DayPricingResult {
   warnings: string[]
 }
 
+// Transport rate from database
+interface TransportRate {
+  id: string
+  service_code: string
+  service_type: string
+  vehicle_type: string
+  city: string | null
+  origin_city: string | null
+  destination_city: string | null
+  duration: string | null
+  area: string | null
+  route_name: string | null
+  base_rate_eur: number
+  base_rate_non_eur: number
+  capacity_min: number | null
+  capacity_max: number | null
+  is_active: boolean
+}
+
 // ============================================
 // CONSTANTS
 // ============================================
@@ -134,14 +189,51 @@ export const PAX_COUNTS = Array.from({ length: 40 }, (_, i) => i + 1)
 
 // Vehicle capacity tiers
 export const VEHICLE_CAPACITY = {
-  Sedan: { min: 1, max: 2 },
-  Minivan: { min: 3, max: 7 },
-  Van: { min: 8, max: 14 },
-  Minibus: { min: 15, max: 20 },
-  Bus: { min: 21, max: 45 }
+  'Sedan': { min: 1, max: 2 },
+  'Minivan': { min: 3, max: 7 },
+  'Van': { min: 8, max: 14 },
+  'Minibus': { min: 15, max: 20 },
+  'Bus': { min: 21, max: 45 },
+  'Horse Carriage': { min: 1, max: 4 }  // Special for Edfu
 } as const
 
 export type VehicleType = keyof typeof VEHICLE_CAPACITY
+
+// Area to attractions mapping (for auto-detection)
+const AREA_ATTRACTIONS: Record<string, string[]> = {
+  'east_bank': [
+    'karnak', 'karnak temple', 'luxor temple'
+  ],
+  'west_bank': [
+    'valley of the kings', 'valley of kings', 'hatshepsut', 'hatshepsut temple',
+    'colossi of memnon', 'medinet habu', 'valley of the queens',
+    'deir el-medina', 'ramesseum'
+  ],
+  'pyramids': [
+    'pyramids', 'pyramid', 'giza', 'sphinx', 'great sphinx',
+    'solar boat', 'khufu', 'khafre', 'menkaure'
+  ],
+  'islamic_cairo': [
+    'citadel', 'saladin citadel', 'khan el khalili', 'khan el-khalili',
+    'al-azhar', 'hussein mosque', 'old cairo bazaar'
+  ],
+  'old_cairo': [
+    'coptic cairo', 'hanging church', 'ben ezra', 'coptic museum',
+    'st. sergius', 'church of st. george'
+  ],
+  'temple_visit': [
+    'edfu', 'edfu temple', 'kom ombo', 'kom ombo temple',
+    'horus temple', 'sobek temple'
+  ],
+  'nubian_village': [
+    'nubian', 'nubian village', 'elephantine', 'elephantine island'
+  ]
+}
+
+// Cities that use special vehicles
+const SPECIAL_VEHICLE_CITIES: Record<string, VehicleType> = {
+  'edfu': 'Horse Carriage'
+}
 
 // Default rates (fallback)
 const DEFAULT_RATES: Record<ServiceTier, {
@@ -218,7 +310,12 @@ const DEFAULT_RATES: Record<ServiceTier, {
 /**
  * Get vehicle type based on pax count (including tour leader if applicable)
  */
-export function getVehicleTypeByPax(totalPax: number): VehicleType {
+export function getVehicleTypeByPax(totalPax: number, city?: string): VehicleType {
+  // Check for special vehicle cities first
+  if (city && SPECIAL_VEHICLE_CITIES[city.toLowerCase()]) {
+    return SPECIAL_VEHICLE_CITIES[city.toLowerCase()]
+  }
+  
   if (totalPax <= 2) return 'Sedan'
   if (totalPax <= 7) return 'Minivan'
   if (totalPax <= 14) return 'Van'
@@ -237,7 +334,8 @@ export function getAirportCode(city: string): string {
     'hurghada': 'HRG',
     'sharm el-sheikh': 'SSH',
     'sharm': 'SSH',
-    'alexandria': 'ALY'
+    'alexandria': 'ALY',
+    'abu simbel': 'ABS'
   }
   return cityMap[city.toLowerCase()] || 'CAI'
 }
@@ -249,6 +347,127 @@ export function getTierCategory(tier: ServiceTier): string {
   if (tier === 'budget') return 'budget'
   if (tier === 'luxury') return 'luxury'
   return 'standard'  // standard and deluxe both map to standard
+}
+
+/**
+ * Detect area from attractions list
+ */
+export function detectAreaFromAttractions(attractions: string[]): TransportArea {
+  if (!attractions || attractions.length === 0) return null
+  
+  const attractionsLower = attractions.map(a => a.toLowerCase())
+  
+  for (const [area, keywords] of Object.entries(AREA_ATTRACTIONS)) {
+    for (const keyword of keywords) {
+      for (const attraction of attractionsLower) {
+        if (attraction.includes(keyword)) {
+          return area as TransportArea
+        }
+      }
+    }
+  }
+  
+  return null
+}
+
+/**
+ * Detect duration from number of attractions
+ */
+export function detectDurationFromAttractions(attractions: string[]): TransportDuration {
+  if (!attractions || attractions.length === 0) return 'half_day'
+  if (attractions.length >= 3) return 'full_day'
+  return 'half_day'
+}
+
+/**
+ * Determine transport requirements for a day
+ */
+export function determineTransportNeeds(
+  day: ItineraryDay,
+  previousDay: ItineraryDay | null,
+  nextDay: ItineraryDay | null
+): {
+  serviceType: TransportServiceType
+  duration: TransportDuration
+  area: TransportArea
+  useSpecialVehicle: boolean
+  specialVehicleType?: VehicleType
+} {
+  // Check for explicit overrides first
+  if (day.transport?.service_type) {
+    return {
+      serviceType: day.transport.service_type,
+      duration: day.transport.duration || 'full_day',
+      area: day.transport.area || null,
+      useSpecialVehicle: !!day.transport.vehicle_type,
+      specialVehicleType: day.transport.vehicle_type as VehicleType
+    }
+  }
+  
+  const cityLower = day.city.toLowerCase()
+  
+  // Check for special vehicle cities (e.g., Edfu → Horse Carriage)
+  const useSpecialVehicle = !!SPECIAL_VEHICLE_CITIES[cityLower]
+  const specialVehicleType = SPECIAL_VEHICLE_CITIES[cityLower]
+  
+  // Airport arrival
+  if (day.services.airport_arrival) {
+    return {
+      serviceType: 'airport_transfer',
+      duration: 'one_way',
+      area: null,
+      useSpecialVehicle: false
+    }
+  }
+  
+  // Airport departure
+  if (day.services.airport_departure) {
+    return {
+      serviceType: 'airport_transfer',
+      duration: 'one_way',
+      area: null,
+      useSpecialVehicle: false
+    }
+  }
+  
+  // Intercity transfer (city changed from previous day, and not a cruise)
+  if (previousDay && 
+      previousDay.city.toLowerCase() !== cityLower &&
+      day.accommodation_type !== 'cruise' &&
+      previousDay.accommodation_type !== 'cruise') {
+    return {
+      serviceType: 'intercity_transfer',
+      duration: 'one_way',
+      area: null,
+      useSpecialVehicle: false
+    }
+  }
+  
+  // Regular sightseeing day
+  const hasAttractions = day.attractions && day.attractions.length > 0
+  const guideRequired = day.services.guide_required
+  
+  if (hasAttractions || guideRequired) {
+    const area = detectAreaFromAttractions(day.attractions)
+    const duration = detectDurationFromAttractions(day.attractions)
+    
+    return {
+      serviceType: 'day_tour',
+      duration,
+      area,
+      useSpecialVehicle,
+      specialVehicleType
+    }
+  }
+  
+  // Default: day tour full day
+  return {
+    serviceType: 'day_tour',
+    duration: 'full_day',
+    area: null,
+    useSpecialVehicle,
+    specialVehicleType
+  }
 }
 
 /**
@@ -293,15 +512,14 @@ export function parseItinerary(itineraryData: any): ItineraryDay[] {
     const services = day.services || {
       airport_arrival: isFirstDay,
       airport_departure: isLastDay,
-      hotel_checkin: false,
-      hotel_checkout: false,
+      hotel_checkin: isFirstDay,
+      hotel_checkout: isLastDay,
       guide_required: hasAttractions
     }
 
     // Extract attractions from title if not provided
     let attractions = day.attractions || []
     if (attractions.length === 0 && day.title) {
-      // Try to extract from title
       attractions = extractAttractionsFromTitle(day.title)
     }
 
@@ -313,7 +531,9 @@ export function parseItinerary(itineraryData: any): ItineraryDay[] {
       accommodation_type: day.accommodation_type || inferAccommodationType(day, itineraryData),
       meals,
       attractions,
-      services
+      services,
+      // Parse transport overrides if present
+      transport: day.transport || undefined
     }
   })
 }
@@ -339,6 +559,8 @@ function extractAttractionsFromTitle(title: string): string[] {
     /sphinx/i,
     /egyptian museum/i,
     /cairo museum/i,
+    /grand egyptian museum/i,
+    /gem/i,
     /citadel/i,
     /khan el[- ]?khalili/i,
     /abu simbel/i
@@ -346,7 +568,6 @@ function extractAttractionsFromTitle(title: string): string[] {
 
   for (const pattern of patterns) {
     if (pattern.test(title)) {
-      // Get the matched attraction name
       const match = title.match(pattern)
       if (match) {
         attractions.push(normalizeAttractionName(match[0]))
@@ -366,7 +587,6 @@ function normalizeAttractionName(name: string): string {
     .replace(/temple$/i, 'Temple')
     .trim()
 
-  // Map common variations
   const nameMap: Record<string, string> = {
     'karnak': 'Karnak Temple',
     'luxor temple': 'Luxor Temple',
@@ -387,6 +607,8 @@ function normalizeAttractionName(name: string): string {
     'sphinx': 'Great Sphinx',
     'egyptian museum': 'Egyptian Museum',
     'cairo museum': 'Egyptian Museum',
+    'grand egyptian museum': 'Grand Egyptian Museum',
+    'gem': 'Grand Egyptian Museum',
     'citadel': 'Saladin Citadel',
     'khan el khalili': 'Khan El Khalili',
     'khan el-khalili': 'Khan El Khalili',
@@ -437,7 +659,6 @@ function inferCityFromTitle(title: string): string {
  * Infer accommodation type from day data and context
  */
 function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
-  // If explicitly set, use it
   if (day.accommodation_type) {
     return day.accommodation_type
   }
@@ -449,13 +670,13 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
   // Check for cruise indicators
   if (combined.includes('cruise') || combined.includes('cruiser') || 
       combined.includes('sail') || combined.includes('aboard') ||
-      combined.includes('on board') || combined.includes('nile')) {
+      combined.includes('on board') || combined.includes('embark')) {
     return 'cruise'
   }
 
   // Check if it's a departure day (usually last day)
   if (combined.includes('departure') || combined.includes('fly out') ||
-      combined.includes('transfer to airport')) {
+      combined.includes('transfer to airport') || combined.includes('end of')) {
     return 'none'
   }
 
@@ -465,14 +686,12 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
   )
 
   if (hasCruiseDays) {
-    // If this tour has cruise days, assume cruise unless it's arrival/departure
     const isArrival = title.includes('arrival')
     const isDeparture = title.includes('departure')
     if (isDeparture) return 'none'
     return 'cruise'
   }
 
-  // Default to hotel for multi-day tours
   return 'hotel'
 }
 
@@ -482,15 +701,14 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
 
 /**
  * Get cruise rates for a tier
- * Returns PPD per night and Single Supplement per night
  */
 export async function getCruiseRates(
   tier: ServiceTier,
   embarkCity?: string
 ): Promise<{
   shipName: string
-  ppdNight: number  // Per Person Double per night
-  singleSuppNight: number  // Single Supplement per night
+  ppdNight: number
+  singleSuppNight: number
   durationNights: number
 } | null> {
   try {
@@ -517,11 +735,8 @@ export async function getCruiseRates(
     }
 
     const cruise = cruises[0]
-    
-    // Calculate PPD and Single Supplement
     const ppdTrip = cruise.rate_double_eur / 2
     const ppdNight = ppdTrip / cruise.duration_nights
-    
     const singleSuppTrip = cruise.rate_single_eur - ppdTrip
     const singleSuppNight = singleSuppTrip / cruise.duration_nights
 
@@ -541,15 +756,14 @@ export async function getCruiseRates(
 
 /**
  * Get hotel rates for a city and tier
- * Returns PPD per night and Single Supplement per night
  */
 export async function getHotelRates(
   city: string,
   tier: ServiceTier
 ): Promise<{
   hotelName: string
-  ppdNight: number  // Per Person Double per night
-  singleSuppNight: number  // Single Supplement per night
+  ppdNight: number
+  singleSuppNight: number
 } | null> {
   try {
     const { data: hotels, error } = await supabaseAdmin
@@ -562,7 +776,6 @@ export async function getHotelRates(
       .limit(1)
 
     if (error || !hotels || hotels.length === 0) {
-      // Try without tier filter
       const { data: anyHotel } = await supabaseAdmin
         .from('hotel_contacts')
         .select('*')
@@ -616,7 +829,6 @@ export async function getEntranceFee(
   isEurPassport: boolean
 ): Promise<{ id: string; name: string; rate: number } | null> {
   try {
-    // Try exact match first
     let { data: fees, error } = await supabaseAdmin
       .from('entrance_fees')
       .select('id, attraction_name, eur_rate, non_eur_rate')
@@ -625,7 +837,6 @@ export async function getEntranceFee(
       .limit(1)
 
     if (error || !fees || fees.length === 0) {
-      // Try fuzzy match with keywords
       const keywords = attractionName.toLowerCase().split(/\s+/).filter(k => k.length > 3)
       
       for (const keyword of keywords) {
@@ -682,7 +893,6 @@ export async function getGuideRate(
       .order('is_preferred', { ascending: false })
 
     if (error || !guides || guides.length === 0) {
-      // Fallback to any guide
       const { data: anyGuide } = await supabaseAdmin
         .from('guides')
         .select('id, name, daily_rate')
@@ -705,7 +915,6 @@ export async function getGuideRate(
       }
     }
 
-    // Prefer matching tier
     const selected = guides.find(g => g.tier === tier) || guides[0]
 
     console.log(`✅ Guide: ${selected.name} | €${selected.daily_rate}/day`)
@@ -746,7 +955,6 @@ export async function getMealRates(
       }
     }
 
-    // Apply tier multiplier
     const multipliers: Record<ServiceTier, number> = {
       budget: 0.8,
       standard: 1.0,
@@ -763,68 +971,6 @@ export async function getMealRates(
       lunch: DEFAULT_RATES[tier].lunch,
       dinner: DEFAULT_RATES[tier].dinner
     }
-  }
-}
-
-/**
- * Get transportation rate
- */
-export async function getTransportRate(
-  vehicleType: VehicleType,
-  city: string,
-  serviceType: string = 'day_tour'
-): Promise<{ id: string; rate: number; routeName: string } | null> {
-  try {
-    // First, try to find exact match: vehicle type + city + service type
-    const { data: rates, error } = await supabaseAdmin
-      .from('transportation_rates')
-      .select('*')
-      .eq('is_active', true)
-      .eq('vehicle_type', vehicleType)
-      .eq('service_type', serviceType)  // Filter by day_tour to avoid intercity rates
-      .ilike('city', `%${city}%`)
-      .limit(1)
-
-    if (!error && rates && rates.length > 0) {
-      const rate = rates[0]
-      console.log(`✅ Transport: ${rate.service_code} | €${rate.base_rate_eur}`)
-      return {
-        id: rate.id,
-        rate: rate.base_rate_eur || 0,
-        routeName: rate.service_code || `${vehicleType} - ${city}`
-      }
-    }
-
-    // Fallback 1: Try same vehicle type + service type in nearby cities (Luxor rates for Edfu/Kom Ombo)
-    // For cruise stops like Edfu/Kom Ombo, use Luxor rates as fallback
-    const fallbackCities = ['Luxor', 'Aswan']
-    for (const fallbackCity of fallbackCities) {
-      const { data: fallbackRates } = await supabaseAdmin
-        .from('transportation_rates')
-        .select('*')
-        .eq('is_active', true)
-        .eq('vehicle_type', vehicleType)
-        .eq('service_type', serviceType)
-        .ilike('city', `%${fallbackCity}%`)
-        .limit(1)
-
-      if (fallbackRates && fallbackRates.length > 0) {
-        const rate = fallbackRates[0]
-        console.log(`⚠️ Transport fallback: Using ${fallbackCity} rate for ${city} | €${rate.base_rate_eur}`)
-        return {
-          id: rate.id,
-          rate: rate.base_rate_eur || 0,
-          routeName: `${vehicleType} - ${city} (${fallbackCity} rate)`
-        }
-      }
-    }
-
-    // Fallback 2: Return null (will use default rate)
-    console.log(`⚠️ No transport rate found for ${vehicleType} in ${city}`)
-    return null
-  } catch (err) {
-    console.error('Error fetching transport rate:', err)
-    return null
   }
 }
 
@@ -897,12 +1043,10 @@ export async function getTippingRate(tier: ServiceTier): Promise<number> {
       return DEFAULT_RATES[tier].tips
     }
 
-    // Sum daily tips
     const dailyTotal = rates.reduce((sum, r) => 
       r.rate_unit === 'per_day' ? sum + (r.rate_eur || 0) : sum, 0
     )
 
-    // Apply tier multiplier
     const multipliers: Record<ServiceTier, number> = {
       budget: 0.8,
       standard: 1.0,
@@ -917,12 +1061,135 @@ export async function getTippingRate(tier: ServiceTier): Promise<number> {
 }
 
 // ============================================
+// SMART TRANSPORT RATE LOOKUP
+// ============================================
+
+/**
+ * Build transport cache from database
+ * Key format: "service_type|city|duration|area|vehicle_type"
+ */
+export async function buildTransportCache(): Promise<Map<string, TransportRate>> {
+  const { data: allRates } = await supabaseAdmin
+    .from('transportation_rates')
+    .select('*')
+    .eq('is_active', true)
+
+  const cache = new Map<string, TransportRate>()
+  
+  if (!allRates) return cache
+
+  for (const rate of allRates) {
+    // Build multiple keys for flexible lookup
+    const baseKey = [
+      rate.service_type || '',
+      (rate.city || '').toLowerCase(),
+      rate.duration || '',
+      rate.area || '',
+      rate.vehicle_type || ''
+    ].join('|')
+    
+    cache.set(baseKey, rate)
+    
+    // Also cache without area for fallback
+    const keyNoArea = [
+      rate.service_type || '',
+      (rate.city || '').toLowerCase(),
+      rate.duration || '',
+      '',
+      rate.vehicle_type || ''
+    ].join('|')
+    
+    if (!cache.has(keyNoArea)) {
+      cache.set(keyNoArea, rate)
+    }
+    
+    // For intercity, also cache by origin-destination
+    if (rate.service_type === 'intercity_transfer' && rate.origin_city && rate.destination_city) {
+      const intercityKey = [
+        'intercity_transfer',
+        (rate.origin_city || '').toLowerCase(),
+        (rate.destination_city || '').toLowerCase(),
+        rate.vehicle_type || ''
+      ].join('|')
+      cache.set(intercityKey, rate)
+    }
+  }
+
+  console.log(`📦 Built transport cache with ${cache.size} entries`)
+  return cache
+}
+
+/**
+ * Smart transport rate lookup with fallbacks
+ */
+export function findTransportRate(
+  cache: Map<string, TransportRate>,
+  params: {
+    serviceType: TransportServiceType
+    city: string
+    duration: TransportDuration
+    area: TransportArea
+    vehicleType: VehicleType
+    originCity?: string
+    destinationCity?: string
+  }
+): TransportRate | null {
+  const { serviceType, city, duration, area, vehicleType, originCity, destinationCity } = params
+  const cityLower = city.toLowerCase()
+
+  // Priority 1: Exact match (service_type + city + duration + area + vehicle)
+  const exactKey = [serviceType, cityLower, duration, area || '', vehicleType].join('|')
+  if (cache.has(exactKey)) {
+    console.log(`✅ Transport exact match: ${exactKey}`)
+    return cache.get(exactKey)!
+  }
+
+  // Priority 2: Match without area
+  const noAreaKey = [serviceType, cityLower, duration, '', vehicleType].join('|')
+  if (cache.has(noAreaKey)) {
+    console.log(`✅ Transport match (no area): ${noAreaKey}`)
+    return cache.get(noAreaKey)!
+  }
+
+  // Priority 3: Match without duration (for cities with only one duration option)
+  const noDurationKey = [serviceType, cityLower, '', '', vehicleType].join('|')
+  if (cache.has(noDurationKey)) {
+    console.log(`⚠️ Transport fallback (no duration): ${noDurationKey}`)
+    return cache.get(noDurationKey)!
+  }
+
+  // Priority 4: Intercity lookup
+  if (serviceType === 'intercity_transfer' && originCity && destinationCity) {
+    const intercityKey = ['intercity_transfer', originCity.toLowerCase(), destinationCity.toLowerCase(), vehicleType].join('|')
+    if (cache.has(intercityKey)) {
+      console.log(`✅ Transport intercity match: ${intercityKey}`)
+      return cache.get(intercityKey)!
+    }
+  }
+
+  // Priority 5: Fallback to nearby cities (Luxor for Edfu/Kom Ombo)
+  const fallbackCities = ['luxor', 'aswan', 'cairo']
+  for (const fallbackCity of fallbackCities) {
+    if (fallbackCity === cityLower) continue
+    
+    const fallbackKey = [serviceType, fallbackCity, duration, '', vehicleType].join('|')
+    if (cache.has(fallbackKey)) {
+      console.log(`⚠️ Transport fallback city: ${fallbackCity} for ${city}`)
+      return cache.get(fallbackKey)!
+    }
+  }
+
+  console.log(`❌ No transport rate found for: ${serviceType} | ${city} | ${duration} | ${area} | ${vehicleType}`)
+  return null
+}
+
+// ============================================
 // MAIN PRICING CALCULATION
 // ============================================
 
 /**
  * Calculate B2B pricing for a tour template
- * Returns pricing for all pax counts (2-30) with +0 and +1 options
+ * Returns pricing for all pax counts (1-40) with +0 and +1 options
  */
 export async function calculateDayBasedPricing(
   params: DayPricingParams
@@ -935,7 +1202,7 @@ export async function calculateDayBasedPricing(
     marginPercent = 25
   } = params
 
-  console.log('🚀 Starting day-based pricing calculation:', { templateId, tier, isEurPassport })
+  console.log('🚀 Starting day-based pricing calculation (v4):', { templateId, tier, isEurPassport })
 
   const warnings: string[] = []
   const services: PricedService[] = []
@@ -983,7 +1250,6 @@ export async function calculateDayBasedPricing(
 
   console.log('📋 Template found:', template.template_name)
 
-  // Parse itinerary
   const itinerary = parseItinerary(template.itinerary)
   const totalDays = itinerary.length || template.duration_days || 1
 
@@ -1005,17 +1271,21 @@ export async function calculateDayBasedPricing(
   console.log(`🏨 Hotel nights: ${hotelNights} | 🚢 Cruise nights: ${cruiseNights}`)
 
   // ============================================
-  // STEP 3: Fetch all required rates
+  // STEP 3: Build transport cache
   // ============================================
 
-  // Cruise rates (if applicable)
+  const transportCache = await buildTransportCache()
+
+  // ============================================
+  // STEP 4: Fetch all required rates
+  // ============================================
+
   let cruiseRates: Awaited<ReturnType<typeof getCruiseRates>> = null
   if (cruiseNights > 0) {
     const firstCruiseDay = cruiseDays[0]
     cruiseRates = await getCruiseRates(tier, firstCruiseDay?.city)
   }
 
-  // Hotel rates (group by city)
   const hotelCities = [...new Set(hotelDays.map(d => d.city))]
   const hotelRatesMap = new Map<string, Awaited<ReturnType<typeof getHotelRates>>>()
   for (const city of hotelCities) {
@@ -1025,25 +1295,17 @@ export async function calculateDayBasedPricing(
     }
   }
 
-  // Guide rate
   const guideRate = await getGuideRate(language, tier)
-
-  // Meal rates
   const mealRates = await getMealRates(tier)
-
-  // Tipping rate
   const tippingRate = await getTippingRate(tier)
-
-  // Water cost (fixed)
   const waterCostPerPax = 2
 
   // ============================================
-  // STEP 4: Calculate Single Supplement (whole tour)
+  // STEP 5: Calculate Single Supplement (whole tour)
   // ============================================
 
   let singleSupplement = 0
 
-  // Hotel single supplement
   for (const day of hotelDays) {
     const hotelRate = hotelRatesMap.get(day.city)
     if (hotelRate) {
@@ -1053,7 +1315,6 @@ export async function calculateDayBasedPricing(
     }
   }
 
-  // Cruise single supplement
   if (cruiseRates && cruiseNights > 0) {
     singleSupplement += cruiseRates.singleSuppNight * cruiseNights
   }
@@ -1061,15 +1322,15 @@ export async function calculateDayBasedPricing(
   console.log(`💰 Total Single Supplement: €${singleSupplement.toFixed(2)}`)
 
   // ============================================
-  // STEP 5: Calculate FIXED costs (don't scale with pax)
+  // STEP 6: Calculate FIXED costs (don't scale with pax)
   // ============================================
 
   let fixedCosts = 0
-  let serviceIndex = 0
 
-  // Process each day for fixed costs
-  for (const day of itinerary) {
-    const isLastDay = day.day === totalDays
+  for (let i = 0; i < itinerary.length; i++) {
+    const day = itinerary[i]
+    const previousDay = i > 0 ? itinerary[i - 1] : null
+    const nextDay = i < itinerary.length - 1 ? itinerary[i + 1] : null
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0
 
     // ----- GUIDE (fixed per day) -----
@@ -1186,12 +1447,9 @@ export async function calculateDayBasedPricing(
   }
 
   // ============================================
-  // STEP 6: Calculate PER-PAX costs (base rates)
+  // STEP 7: Calculate PER-PAX costs (base rates)
   // ============================================
 
-  // These are the per-person costs that scale with pax count
-
-  // ----- Accommodation PPD -----
   let accommodationPPD = 0
 
   // Hotel PPD
@@ -1243,7 +1501,6 @@ export async function calculateDayBasedPricing(
 
   for (const day of itinerary) {
     for (const attraction of day.attractions) {
-      // Avoid duplicate charges for same attraction
       if (processedAttractions.has(attraction.toLowerCase())) continue
       processedAttractions.add(attraction.toLowerCase())
 
@@ -1255,10 +1512,10 @@ export async function calculateDayBasedPricing(
           dayNumber: day.day,
           serviceType: 'entrance',
           serviceName: fee.name,
-          quantity: 1,  // Will be multiplied by pax
+          quantity: 1,
           quantityMode: 'per_pax',
           unitCost: fee.rate,
-          lineTotal: fee.rate,  // Per pax
+          lineTotal: fee.rate,
           rateSource: 'entrance_fees',
           isPerPax: true,
           isOptional: false,
@@ -1314,7 +1571,6 @@ export async function calculateDayBasedPricing(
   const sightseeingDays = sightseeingDaysList.length
   const waterPerPax = waterCostPerPax * sightseeingDays
 
-  // Add water service
   if (sightseeingDays > 0) {
     services.push({
       id: `water-all-days`,
@@ -1332,87 +1588,110 @@ export async function calculateDayBasedPricing(
     })
   }
 
-  // ----- Total per-pax costs -----
   const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax
 
   console.log(`📊 Fixed costs: €${fixedCosts.toFixed(2)} | Per-pax costs: €${perPaxCosts.toFixed(2)}`)
 
   // ============================================
-  // STEP 6a: Pre-fetch ALL transport rates (PERFORMANCE FIX)
+  // STEP 8: Analyze transport needs per day
   // ============================================
-  // Single query replaces 300+ individual queries in the pax loop
-  
-  const { data: allTransportRates } = await supabaseAdmin
-    .from('transportation_rates')
-    .select('vehicle_type, city, base_rate_eur, service_code')
-    .eq('is_active', true)
-    .eq('service_type', 'day_tour')
 
-  // Build lookup map: "Sedan-luxor" -> { rate, code }
-  const transportCache = new Map<string, { rate: number; code: string }>()
-  if (allTransportRates) {
-    for (const r of allTransportRates) {
-      const key = `${r.vehicle_type}-${r.city.toLowerCase()}`
-      transportCache.set(key, { rate: r.base_rate_eur || 0, code: r.service_code || '' })
-    }
-  }
-  console.log(`📦 Cached ${transportCache.size} transport rates`)
-
-  // Sync lookup function with fallbacks (no DB calls)
-  const getCachedTransportRate = (vehicleType: VehicleType, city: string): { rate: number; code: string } | null => {
-    const cityLower = city.toLowerCase()
-    
-    // Try exact match
-    const exactKey = `${vehicleType}-${cityLower}`
-    if (transportCache.has(exactKey)) {
-      return transportCache.get(exactKey)!
-    }
-    
-    // Fallback: Luxor then Aswan (for Edfu, Kom Ombo, etc.)
-    for (const fallbackCity of ['luxor', 'aswan']) {
-      const fallbackKey = `${vehicleType}-${fallbackCity}`
-      if (transportCache.has(fallbackKey)) {
-        return transportCache.get(fallbackKey)!
-      }
-    }
-    
-    return null
+  interface DayTransportInfo {
+    day: number
+    city: string
+    needs: ReturnType<typeof determineTransportNeeds>
+    requiresTransport: boolean
   }
 
-  // ============================================
-  // STEP 6b: Calculate base transport cost (for 2 pax, for services display)
-  // ============================================
-  let baseTransportCost = 0
-  const baseVehicleType = getVehicleTypeByPax(2) // Minivan for 2 pax
-  
-  for (const day of itinerary) {
+  const transportInfoByDay: DayTransportInfo[] = []
+
+  for (let i = 0; i < itinerary.length; i++) {
+    const day = itinerary[i]
+    const previousDay = i > 0 ? itinerary[i - 1] : null
+    const nextDay = i < itinerary.length - 1 ? itinerary[i + 1] : null
+    
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0
-    if (!hasSightseeing) continue
+    const hasAirportService = day.services.airport_arrival || day.services.airport_departure
+    const isIntercityDay = previousDay && 
+                           previousDay.city.toLowerCase() !== day.city.toLowerCase() &&
+                           day.accommodation_type !== 'cruise' &&
+                           previousDay.accommodation_type !== 'cruise'
     
-    const transport = getCachedTransportRate(baseVehicleType, day.city)
-    if (transport) {
-      baseTransportCost += transport.rate
+    // Determine if this day requires transport
+    const requiresTransport = hasSightseeing || hasAirportService || isIntercityDay
+
+    if (requiresTransport) {
+      const needs = determineTransportNeeds(day, previousDay, nextDay)
+      transportInfoByDay.push({
+        day: day.day,
+        city: day.city,
+        needs,
+        requiresTransport: true
+      })
+
+      console.log(`🚗 Day ${day.day} (${day.city}): ${needs.serviceType} | ${needs.duration} | area: ${needs.area || 'none'} | special: ${needs.useSpecialVehicle ? needs.specialVehicleType : 'no'}`)
+    } else {
+      transportInfoByDay.push({
+        day: day.day,
+        city: day.city,
+        needs: determineTransportNeeds(day, previousDay, nextDay),
+        requiresTransport: false
+      })
+    }
+  }
+
+  // ============================================
+  // STEP 9: Add transport services (for 2 pax baseline)
+  // ============================================
+
+  const baseVehicleType = getVehicleTypeByPax(2)
+  let baseTransportCost = 0
+
+  for (const info of transportInfoByDay) {
+    if (!info.requiresTransport) continue
+
+    const { needs } = info
+    
+    // Determine vehicle type
+    let vehicleType: VehicleType = baseVehicleType
+    if (needs.useSpecialVehicle && needs.specialVehicleType) {
+      vehicleType = needs.specialVehicleType
+    }
+
+    // Find transport rate
+    const rate = findTransportRate(transportCache, {
+      serviceType: needs.serviceType,
+      city: info.city,
+      duration: needs.duration,
+      area: needs.area,
+      vehicleType,
+      originCity: itinerary[info.day - 2]?.city, // Previous day city for intercity
+      destinationCity: info.city
+    })
+
+    if (rate) {
+      baseTransportCost += rate.base_rate_eur
       services.push({
-        id: `day${day.day}-transport`,
-        dayNumber: day.day,
+        id: `day${info.day}-transport`,
+        dayNumber: info.day,
         serviceType: 'transportation',
-        serviceName: `${baseVehicleType} - ${day.city} Sightseeing`,
+        serviceName: rate.route_name || `${vehicleType} - ${info.city}`,
         quantity: 1,
         quantityMode: 'fixed',
-        unitCost: transport.rate,
-        lineTotal: transport.rate,
+        unitCost: rate.base_rate_eur,
+        lineTotal: rate.base_rate_eur,
         rateSource: 'transportation_rates',
         isPerPax: false,
         isOptional: false,
-        notes: `Vehicle: ${baseVehicleType}`
+        notes: `${needs.serviceType} | ${needs.duration}${needs.area ? ` | ${needs.area}` : ''}`
       })
     } else {
       baseTransportCost += DEFAULT_RATES[tier].vehicle
       services.push({
-        id: `day${day.day}-transport`,
-        dayNumber: day.day,
+        id: `day${info.day}-transport`,
+        dayNumber: info.day,
         serviceType: 'transportation',
-        serviceName: `Vehicle - ${day.city} Sightseeing`,
+        serviceName: `${vehicleType} - ${info.city}`,
         quantity: 1,
         quantityMode: 'fixed',
         unitCost: DEFAULT_RATES[tier].vehicle,
@@ -1420,15 +1699,16 @@ export async function calculateDayBasedPricing(
         rateSource: 'default',
         isPerPax: false,
         isOptional: false,
-        notes: 'Default rate used'
+        notes: `Default rate (no match found)`
       })
+      warnings.push(`No transport rate for ${vehicleType} in ${info.city} (${needs.serviceType}/${needs.duration})`)
     }
   }
 
   console.log(`🚗 Base transport cost (2 pax): €${baseTransportCost.toFixed(2)}`)
 
   // ============================================
-  // STEP 7: Calculate for each pax count
+  // STEP 10: Calculate for each pax count
   // ============================================
 
   const paxPricing: PaxPricingResult[] = []
@@ -1437,19 +1717,33 @@ export async function calculateDayBasedPricing(
     // ----- Transport cost (varies with vehicle size) -----
     let transportCost = 0
     
-    for (const day of itinerary) {
-      const hasSightseeing = day.services.guide_required || day.attractions.length > 0
-      if (!hasSightseeing) continue  // No transport needed for pure transfer/departure days
+    for (const info of transportInfoByDay) {
+      if (!info.requiresTransport) continue
 
-      // Get vehicle for this pax count (without tour leader for +0)
-      const vehicleType = getVehicleTypeByPax(numPax)
-      const transport = getCachedTransportRate(vehicleType, day.city)
+      const { needs } = info
       
-      if (transport) {
-        transportCost += transport.rate
+      // Determine vehicle type for this pax count
+      let vehicleType: VehicleType
+      if (needs.useSpecialVehicle && needs.specialVehicleType) {
+        vehicleType = needs.specialVehicleType
+      } else {
+        vehicleType = getVehicleTypeByPax(numPax, info.city)
+      }
+
+      const rate = findTransportRate(transportCache, {
+        serviceType: needs.serviceType,
+        city: info.city,
+        duration: needs.duration,
+        area: needs.area,
+        vehicleType,
+        originCity: itinerary[info.day - 2]?.city,
+        destinationCity: info.city
+      })
+      
+      if (rate) {
+        transportCost += rate.base_rate_eur
       } else {
         transportCost += DEFAULT_RATES[tier].vehicle
-        warnings.push(`No transport rate found for ${vehicleType} in ${day.city}`)
       }
     }
 
@@ -1460,29 +1754,43 @@ export async function calculateDayBasedPricing(
     const perPersonWithoutLeader = sellingWithoutLeader / numPax
 
     // ----- WITH Tour Leader (+1) -----
-    // Vehicle needs to fit numPax + 1 tour leader
-    const vehicleTypeWithLeader = getVehicleTypeByPax(numPax + 1)
     let transportCostWithLeader = 0
     
-    for (const day of itinerary) {
-      const hasSightseeing = day.services.guide_required || day.attractions.length > 0
-      if (!hasSightseeing) continue
+    for (const info of transportInfoByDay) {
+      if (!info.requiresTransport) continue
 
-      const transport = getCachedTransportRate(vehicleTypeWithLeader, day.city)
-      if (transport) {
-        transportCostWithLeader += transport.rate
+      const { needs } = info
+      
+      let vehicleType: VehicleType
+      if (needs.useSpecialVehicle && needs.specialVehicleType) {
+        vehicleType = needs.specialVehicleType
+      } else {
+        vehicleType = getVehicleTypeByPax(numPax + 1, info.city) // +1 for tour leader
+      }
+
+      const rate = findTransportRate(transportCache, {
+        serviceType: needs.serviceType,
+        city: info.city,
+        duration: needs.duration,
+        area: needs.area,
+        vehicleType,
+        originCity: itinerary[info.day - 2]?.city,
+        destinationCity: info.city
+      })
+      
+      if (rate) {
+        transportCostWithLeader += rate.base_rate_eur
       } else {
         transportCostWithLeader += DEFAULT_RATES[tier].vehicle
       }
     }
+
     // Tour leader costs: single room (PPD + single supplement) + their own per-pax costs
-    // Tour leader gets a single room, which costs: PPD + Single Supplement
     const tourLeaderCost = accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax
 
     const totalCostWithLeader = fixedCosts + transportCostWithLeader + (perPaxCosts * numPax) + tourLeaderCost
     const marginWithLeader = totalCostWithLeader * (marginPercent / 100)
     const sellingWithLeader = totalCostWithLeader + marginWithLeader
-    // Price per person: divide by PAYING pax only (tour leader doesn't pay)
     const perPersonWithLeader = sellingWithLeader / numPax
 
     paxPricing.push({
@@ -1504,14 +1812,14 @@ export async function calculateDayBasedPricing(
   }
 
   // ============================================
-  // STEP 8: Return result
+  // STEP 11: Return result
   // ============================================
 
-  console.log('✅ Day-based pricing complete')
+  console.log('✅ Day-based pricing complete (v4)')
   console.log(`   Template: ${template.template_name}`)
   console.log(`   Single Supplement: €${singleSupplement.toFixed(2)}`)
-  console.log(`   Sample (2 pax +0): €${paxPricing[0]?.withoutLeader.pricePerPerson}/person`)
-  console.log(`   Sample (2 pax +1): €${paxPricing[0]?.withLeader.pricePerPerson}/person`)
+  console.log(`   Sample (2 pax +0): €${paxPricing[1]?.withoutLeader.pricePerPerson}/person`)
+  console.log(`   Sample (2 pax +1): €${paxPricing[1]?.withLeader.pricePerPerson}/person`)
 
   return {
     success: true,
@@ -1566,12 +1874,9 @@ export async function calculateSinglePaxPricing(
     }
   }
 
-  // Find the matching pax count
   const paxResult = result.paxPricing.find(p => p.numPax === params.numPax)
   
   if (!paxResult) {
-    // Calculate for custom pax count if not in standard list
-    // For now, return closest match
     const closest = result.paxPricing.reduce((prev, curr) => 
       Math.abs(curr.numPax - params.numPax) < Math.abs(prev.numPax - params.numPax) ? curr : prev
     )
@@ -1619,7 +1924,7 @@ export function formatPricingTable(result: DayPricingResult): string[][] {
       pax.numPax.toString(),
       `€${pax.withoutLeader.pricePerPerson.toFixed(0)}`,
       `€${pax.withLeader.pricePerPerson.toFixed(0)}`,
-      pax.numPax === 2 ? `€${result.singleSupplement.toFixed(0)}` : ''  // Only show on first row
+      pax.numPax === 2 ? `€${result.singleSupplement.toFixed(0)}` : ''
     ])
   }
 
@@ -1629,12 +1934,7 @@ export function formatPricingTable(result: DayPricingResult): string[][] {
 // ============================================
 // BACKWARD COMPATIBILITY LAYER
 // ============================================
-// These exports maintain compatibility with the existing
-// calculate-price/route.ts API that imports from this file
 
-/**
- * Legacy PricingParams interface (for backward compatibility)
- */
 export interface PricingParams {
   templateId: string
   tier: ServiceTier
@@ -1650,9 +1950,6 @@ export interface PricingParams {
   tourLeaderIncluded?: boolean
 }
 
-/**
- * Legacy PricingResult interface (for backward compatibility)
- */
 export interface PricingResult {
   success: boolean
   templateId: string
@@ -1680,18 +1977,12 @@ export interface PricingResult {
     cruise?: { name: string; ppdNight: number; singleSuppNight: number }
   }
   warnings: string[]
-  // NEW: Include full pricing table for B2B display
   paxPricingTable?: PaxPricingResult[]
   singleSupplement?: number
 }
 
 /**
  * BACKWARD COMPATIBLE FUNCTION
- * 
- * This maintains the same interface as the old calculateAutoPricing
- * but uses the new day-based pricing logic internally.
- * 
- * Called by: app/api/b2b/calculate-price/route.ts
  */
 export async function calculateAutoPricing(params: PricingParams): Promise<PricingResult> {
   const {
@@ -1704,11 +1995,10 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     tourLeaderIncluded = false
   } = params
 
-  console.log('🔄 calculateAutoPricing called (using new day-based engine)')
+  console.log('🔄 calculateAutoPricing called (v4 - smart transport)')
   console.log(`   tourLeaderIncluded: ${tourLeaderIncluded}`)
   console.log(`   numPax: ${numPax}`)
 
-  // Call the new day-based pricing engine
   const dayResult = await calculateDayBasedPricing({
     templateId,
     tier,
@@ -1743,19 +2033,15 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     }
   }
 
-  // Find the matching pax count in the results
   let paxResult = dayResult.paxPricing.find(p => p.numPax === numPax)
 
-  // If exact match not found, calculate for this specific pax count
   if (!paxResult) {
-    // Find closest match for now
     paxResult = dayResult.paxPricing.reduce((prev, curr) =>
       Math.abs(curr.numPax - numPax) < Math.abs(prev.numPax - numPax) ? curr : prev
     )
     dayResult.warnings.push(`Pax count ${numPax} not in standard list, using closest match ${paxResult.numPax}`)
   }
 
-  // Select +0 or +1 pricing based on tourLeaderIncluded
   const pricing = tourLeaderIncluded ? paxResult.withLeader : paxResult.withoutLeader
   
   console.log(`   Selected pricing: ${tourLeaderIncluded ? '+1 (withLeader)' : '+0 (withoutLeader)'}`)
@@ -1765,10 +2051,8 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     console.log(`   tourLeaderCost: €${paxResult.withLeader.tourLeaderCost}`)
   }
 
-  // Build ratesUsed object for display
   const ratesUsed: PricingResult['ratesUsed'] = {}
   
-  // Extract vehicle info from services
   const vehicleService = dayResult.services.find(s => s.serviceType === 'transportation')
   if (vehicleService) {
     ratesUsed.vehicle = {
@@ -1778,7 +2062,6 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     }
   }
 
-  // Extract guide info
   const guideService = dayResult.services.find(s => s.serviceType === 'guide')
   if (guideService) {
     ratesUsed.guide = {
@@ -1787,7 +2070,6 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     }
   }
 
-  // Extract hotel info
   const hotelService = dayResult.services.find(s => s.serviceType === 'accommodation' && s.serviceName.toLowerCase().includes('hotel'))
   if (hotelService) {
     ratesUsed.hotel = {
@@ -1796,12 +2078,11 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     }
   }
 
-  // Add cruise info if applicable
   if (dayResult.cruiseNights > 0) {
     const cruiseService = dayResult.services.find(s => s.serviceType === 'cruise')
     ratesUsed.cruise = {
       name: cruiseService?.serviceName || 'Nile Cruise',
-      ppdNight: 0, // Would need to track this
+      ppdNight: 0,
       singleSuppNight: dayResult.singleSupplement / dayResult.cruiseNights
     }
   }
@@ -1815,13 +2096,10 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     numPayingPax: numPax,
     tourLeaderIncluded,
     totalDays: dayResult.totalDays,
-    // Sort services: fixed (per-group) costs first, then per-pax costs
     services: dayResult.services
       .filter(s => !s.notes?.includes('optional'))
       .sort((a, b) => {
-        // Fixed costs first (isPerPax = false), per-pax costs last
         if (a.isPerPax === b.isPerPax) {
-          // Within same category, sort by day number
           return a.dayNumber - b.dayNumber
         }
         return a.isPerPax ? 1 : -1
@@ -1838,7 +2116,6 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     currency: dayResult.currency,
     ratesUsed,
     warnings: dayResult.warnings,
-    // NEW: Include full pricing table for B2B display
     paxPricingTable: dayResult.paxPricing,
     singleSupplement: dayResult.singleSupplement
   }
@@ -1882,7 +2159,7 @@ export async function getTemplatePriceRange(
   const results = await calculateMultiTierPricing(
     templateId,
     tiers,
-    2, // Standard 2 pax for comparison
+    2,
     isEurPassport
   )
 
@@ -1906,9 +2183,5 @@ export async function getTemplatePriceRange(
 
   return { minPrice, maxPrice, tier: minTier }
 }
-
-// ============================================
-// ADDITIONAL TYPES (backward compatible)
-// ============================================
 
 export type MealPlan = 'none' | 'breakfast_only' | 'lunch_only' | 'dinner_only' | 'half_board' | 'full_board'
