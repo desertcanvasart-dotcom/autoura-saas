@@ -210,15 +210,9 @@ function SettingsContent() {
   const fetchPreferences = async () => {
     try {
       const supabase = createClient()
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       
-      console.log('🔍 Fetching preferences for user:', user?.id)
-      console.log('🔍 Auth error:', authError)
-      
-      if (!user) {
-        console.log('❌ No user found')
-        return
-      }
+      if (!user) return
   
       const { data, error } = await supabase
         .from('user_preferences')
@@ -226,16 +220,7 @@ function SettingsContent() {
         .eq('user_id', user.id)
         .single()
   
-      console.log('📊 Preferences from DB:', data)
-      console.log('📊 DB error:', error)
-  
       if (data) {
-        console.log('✅ Setting preferences:', {
-          tier: data.default_tier,
-          margin: data.default_margin_percent,
-          currency: data.default_currency
-        })
-        
         setUserPreferences({
           id: data.id,
           user_id: data.user_id,
@@ -244,32 +229,9 @@ function SettingsContent() {
           default_margin_percent: data.default_margin_percent || 25,
           default_currency: data.default_currency || 'EUR'
         })
-      } else {
-        console.log('⚠️ No preferences found in DB, using defaults')
       }
     } catch (error) {
-      console.error('❌ Error fetching preferences:', error)
-    }
-  }
-
-  const fetchEmailSettings = async () => {
-    try {
-      const response = await fetch('/api/settings/email')
-      if (response.ok) {
-        const data = await response.json()
-        setEmailSettings(data)
-      } else {
-        setEmailSettings({
-          gmail_connected: false,
-          auto_reply_enabled: false
-        })
-      }
-    } catch (error) {
-      console.error('Error fetching email settings:', error)
-      setEmailSettings({
-        gmail_connected: false,
-        auto_reply_enabled: false
-      })
+      console.error('Error fetching preferences:', error)
     }
   }
 
