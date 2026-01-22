@@ -210,9 +210,15 @@ function SettingsContent() {
   const fetchPreferences = async () => {
     try {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
       
-      if (!user) return
+      console.log('🔍 Fetching preferences for user:', user?.id)
+      console.log('🔍 Auth error:', authError)
+      
+      if (!user) {
+        console.log('❌ No user found')
+        return
+      }
   
       const { data, error } = await supabase
         .from('user_preferences')
@@ -220,7 +226,16 @@ function SettingsContent() {
         .eq('user_id', user.id)
         .single()
   
+      console.log('📊 Preferences from DB:', data)
+      console.log('📊 DB error:', error)
+  
       if (data) {
+        console.log('✅ Setting preferences:', {
+          tier: data.default_tier,
+          margin: data.default_margin_percent,
+          currency: data.default_currency
+        })
+        
         setUserPreferences({
           id: data.id,
           user_id: data.user_id,
@@ -229,9 +244,11 @@ function SettingsContent() {
           default_margin_percent: data.default_margin_percent || 25,
           default_currency: data.default_currency || 'EUR'
         })
+      } else {
+        console.log('⚠️ No preferences found in DB, using defaults')
       }
     } catch (error) {
-      console.error('Error fetching preferences:', error)
+      console.error('❌ Error fetching preferences:', error)
     }
   }
 
