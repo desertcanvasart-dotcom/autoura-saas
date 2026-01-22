@@ -990,6 +990,37 @@ async function fetchAttractionsList(supabase: any): Promise<string[]> {
 // STRUCTURED MODE: FOLLOW PROVIDED ITINERARY
 // ============================================
 
+// ============================================
+// PRE-PARSE RAW ITINERARY INTO DAY SEGMENTS
+// ============================================
+function preParseRawItinerary(rawItinerary: string): { dayNumber: number; rawContent: string }[] {
+  const segments: { dayNumber: number; rawContent: string }[] = []
+  
+  // Split by D1, D2, D3... or Day 1, Day 2... patterns
+  const dayPattern = /(?:^|\n)\s*(D(\d+)|Day\s*(\d+))\b/gi
+  const matches = [...rawItinerary.matchAll(dayPattern)]
+  
+  if (matches.length === 0) {
+    // No day markers found, return entire content as day 1
+    return [{ dayNumber: 1, rawContent: rawItinerary.trim() }]
+  }
+  
+  for (let i = 0; i < matches.length; i++) {
+    const match = matches[i]
+    const dayNum = parseInt(match[2] || match[3])
+    const startIdx = match.index!
+    const endIdx = i < matches.length - 1 ? matches[i + 1].index! : rawItinerary.length
+    
+    const content = rawItinerary.substring(startIdx, endIdx).trim()
+    segments.push({ dayNumber: dayNum, rawContent: content })
+  }
+  
+  // Sort by day number
+  segments.sort((a, b) => a.dayNumber - b.dayNumber)
+  
+  return segments
+}
+
 async function generateFromStructuredInput(
   extractedDays: ExtractedDay[],
   rawItinerary: string,
@@ -1008,83 +1039,118 @@ async function generateFromStructuredInput(
   // Calculate expected number of days
   const expectedDays = calculateExpectedDays(rawItinerary, extractedDays)
 
-  console.log(`📋 STRUCTURED MODE: Generating ${expectedDays} days from raw itinerary`)
+  // PRE-PARSE the raw itinerary into day segments
+  const daySegments = preParseRawItinerary(rawItinerary)
+  
+  console.log(`📋 STRUCTURED MODE: Pre-parsed ${daySegments.length} day segments, expecting ${expectedDays} days`)
+  daySegments.forEach(seg => {
+    console.log(`  Day ${seg.dayNumber}: ${seg.rawContent.substring(0, 80)}...`)
+  })
 
-  const prompt = `You are a travel operations assistant. Your ONLY job is to CONVERT the travel agent's itinerary into JSON format.
+  // Build the day-by-day mapping section
+  const dayMappingSection = daySegments.map(seg => {
+    return `
+DAY ${seg.dayNumber} INPUT (CONVERT THIS EXACTLY):
+───────────────────────────────────────
+${seg.rawContent}
+───────────────────────────────────────`
+  }).join('\n')
+
+  const prompt = `You are a DATA CONVERTER. Your ONLY task is to convert travel agent shorthand into JSON format.
+
+⛔ THIS IS NOT A CREATIVE TASK ⛔
+You are NOT designing an itinerary. You are CONVERTING an existing one.
 
 ${EGYPT_TRAVEL_GLOSSARY}
 
-=================================================================
-CRITICAL RULES - READ VERY CAREFULLY
-=================================================================
+═══════════════════════════════════════════════════════════════
+⛔ FORBIDDEN ACTIONS - VIOLATING THESE IS A CRITICAL ERROR ⛔
+═══════════════════════════════════════════════════════════════
 
-1. FOLLOW THE ITINERARY EXACTLY AS WRITTEN
-   - Do NOT add any attractions that are not mentioned
-   - Do NOT remove any activities
-   - Do NOT reorder days or activities
-   - Do NOT "improve" or "enhance" the itinerary
-   - If Abu Simbel is NOT mentioned, do NOT add it!
+1. FORBIDDEN: Adding attractions NOT in the input
+   - If Abu Simbel is not mentioned → DO NOT ADD IT
+   - If Unfinished Obelisk is not mentioned → DO NOT ADD IT
+   - If Grand Museum is not mentioned → DO NOT ADD IT
+   
+2. FORBIDDEN: Removing or skipping activities from input
+   - If D1 says "Alexandria tour" → Day 1 MUST include Alexandria
+   - If D2 says "Pyramids & Museum" → Day 2 MUST include BOTH
+   
+3. FORBIDDEN: Reordering days or activities
+   - D1 content goes in day_number: 1
+   - D2 content goes in day_number: 2
+   - NEVER put D1 content in day_number: 2
+   
+4. FORBIDDEN: "Improving" the itinerary
+   - Do NOT add sites you think they "should" visit
+   - Do NOT rearrange for "better flow"
+   - Do NOT combine or split days
 
-2. GENERATE ALL ${expectedDays} DAYS
-   - Every day from D1 to D${expectedDays} must be in your output
-   - If a day just shows "CRZ" or city code with nothing else, it's a FREE DAY
+═══════════════════════════════════════════════════════════════
+📋 EXACT DAY-BY-DAY INPUT TO CONVERT
+═══════════════════════════════════════════════════════════════
+${dayMappingSection}
 
-3. ENTRANCE FEES - INSIDE vs OUTSIDE
-   - "(INSIDE)" = Entrance fee required, add to entrance_included array
-   - "(OUTSIDE)" = Photo stop only, add to photo_stops array, NO entrance fee
-   - Example: "Library (OUTSIDE)" = just viewing, no ticket
-
-4. FREE DAYS AND SAILING DAYS
-   - "D5 CRZ" with no activities = Sailing day (is_free_day: true)
-   - "D8 HRG" with no activities = Free day (is_free_day: true)
-
-5. MULTI-CITY DAYS
-   - "D1 CAI/ALX/CAI" = Arrive Cairo, tour Alexandria, return to Cairo (3 cities!)
-   - This is NOT just arrival - it includes a FULL DAY TOUR
-
-6. AIRPORT & HOTEL SERVICES
-   - International flight arrival = needs_airport_service: true
-   - Domestic flight = needs_airport_service: true
-   - Hotel/Cruise check-in or check-out = needs_hotel_service: true
-
-=================================================================
-RAW ITINERARY TO CONVERT
-=================================================================
-
+═══════════════════════════════════════════════════════════════
+📋 FULL RAW ITINERARY (for reference)
+═══════════════════════════════════════════════════════════════
 ${rawItinerary}
 
-=================================================================
-AVAILABLE ATTRACTIONS (match names exactly)
-=================================================================
-${attractionNames.join(', ')}
+═══════════════════════════════════════════════════════════════
+🔍 DECODING RULES
+═══════════════════════════════════════════════════════════════
 
-=================================================================
-CONFIGURATION
-=================================================================
+CITY CODES:
+CAI=Cairo, ALX=Alexandria, ASW=Aswan, LXR=Luxor, HRG=Hurghada, CRZ=Cruise
+
+MULTI-CITY PATTERN:
+"D1 CAI/ALX/CAI" = Day trip: Arrive Cairo → Visit Alexandria → Return Cairo
+This is NOT just "Arrival" - it's arrival PLUS a FULL DAY TOUR!
+
+ENTRANCE MARKERS:
+(INSIDE) = Entrance fee required → add to entrance_included[]
+(OUTSIDE) = Photo stop only → add to photo_stops[] (NO entrance fee)
+
+FREE DAYS:
+"D5 CRZ" with nothing else = Sailing day → is_free_day: true, is_sailing_day: true
+"D8 HRG" with nothing else = Free day → is_free_day: true
+
+MEALS:
+L = Lunch included
+D = Dinner included
+"Chinese Dinner" = Dinner at Chinese restaurant
+"Pigeon Lunch" = Lunch with Egyptian pigeon dish
+
+FLIGHTS:
+MS956@05:10 = EgyptAir flight 956 at 05:10
+"DEPARTED BY MS955@23:20" = Departure flight at 23:20
+
+═══════════════════════════════════════════════════════════════
+⚙️ CONFIGURATION
+═══════════════════════════════════════════════════════════════
+TOTAL DAYS: ${expectedDays}
 TIER: ${tier.toUpperCase()}
 TRAVELERS: ${totalPax}
 LANGUAGE: ${language}
 PACKAGE: ${packageType || 'cruise-land'}
-${writingContext}
 
-=================================================================
-OUTPUT FORMAT
-=================================================================
+═══════════════════════════════════════════════════════════════
+📤 OUTPUT FORMAT (Return ONLY valid JSON)
+═══════════════════════════════════════════════════════════════
 
-Return ONLY valid JSON:
 {
-  "trip_name": "Descriptive trip name based on the actual itinerary",
+  "trip_name": "Egypt: Cairo, Nile Cruise & Hurghada",
   "total_days": ${expectedDays},
   "days": [
     {
       "day_number": 1,
       "date": null,
-      "title": "Day 1: [Title based on ACTUAL activities in input]",
-      "description": "2-3 sentence description of ONLY the activities mentioned",
-      "city": "Main city",
+      "title": "Day 1: Arrival & Alexandria Day Trip",
+      "description": "2-3 sentences describing ONLY what is in the input",
+      "city": "Cairo",
       "cities_visited": ["Cairo", "Alexandria"],
       "overnight_city": "Cairo",
-      "accommodation_type": "hotel" | "cruise" | null,
+      "accommodation_type": "hotel",
       
       "is_arrival": true,
       "is_departure": false,
@@ -1093,19 +1159,19 @@ Return ONLY valid JSON:
       "is_cruise_day": false,
       "is_sailing_day": false,
       
-      "attractions": ["All sites mentioned in the input"],
-      "entrance_included": ["Sites marked INSIDE - charge entrance fee"],
-      "photo_stops": ["Sites marked OUTSIDE - NO entrance fee"],
+      "attractions": ["Pompey's Pillar", "Qaitbay Citadel", "Alexandria Library", "Montazah Park"],
+      "entrance_included": ["Pompey's Pillar", "Qaitbay Citadel", "Montazah Park"],
+      "photo_stops": ["Alexandria Library"],
       
-      "activities": ["Decoded activities from the raw text"],
+      "activities": ["Airport arrival", "Transfer to Alexandria", "Visit Pompey's Pillar", "Visit Qaitbay Citadel", "Photo stop at Alexandria Library", "Visit Montazah Park", "Lunch", "Return to Cairo", "Dinner"],
       "guide_required": true,
       
       "includes_lunch": true,
-      "includes_dinner": false,
-      "meal_notes": "Chinese Dinner" or null,
+      "includes_dinner": true,
+      "meal_notes": null,
       
-      "flight_info": "MS956 @05:10" or null,
-      "transport_type": "flight" | "drive" | null,
+      "flight_info": "MS956 arriving 05:10",
+      "transport_type": "flight",
       
       "needs_airport_service": true,
       "needs_hotel_service": true
@@ -1113,19 +1179,24 @@ Return ONLY valid JSON:
   ]
 }
 
-=================================================================
-VERIFICATION BEFORE RESPONDING
-=================================================================
-[ ] Total days = ${expectedDays}
-[ ] Day 1 includes ALL activities from D1 input (not just "arrival")
-[ ] Free/sailing days have is_free_day: true
-[ ] INSIDE attractions in entrance_included
-[ ] OUTSIDE attractions in photo_stops (no entrance fee)
-[ ] No attractions added that aren't in original input
+═══════════════════════════════════════════════════════════════
+✅ VERIFICATION CHECKLIST (Complete before responding)
+═══════════════════════════════════════════════════════════════
 
-CONVERT THE ITINERARY NOW:`
+□ I have exactly ${expectedDays} day objects in my response
+□ Day 1 contains ALL activities from D1 input (not just "arrival")
+□ Day 2 contains ALL activities from D2 input
+□ Each day's content matches ONLY what was in that day's input
+□ I did NOT add Abu Simbel, Unfinished Obelisk, or other sites not mentioned
+□ Free/sailing days have is_free_day: true
+□ INSIDE attractions are in entrance_included (with fee)
+□ OUTSIDE attractions are in photo_stops (NO fee)
+□ Flight arrivals have needs_airport_service: true
+□ The last day with activities includes everything mentioned (not just "departure")
 
-  console.log('🤖 Sending structured prompt to AI...')
+NOW CONVERT THE ITINERARY TO JSON:`
+
+  console.log('🤖 Sending STRICT structured prompt to AI...')
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -1157,6 +1228,15 @@ CONVERT THE ITINERARY NOW:`
     console.warn(`⚠️ AI returned ${result.days.length} days but expected ${expectedDays}`)
   } else {
     console.log(`✅ AI successfully generated ${result.days?.length || 0} days`)
+  }
+  
+  // Log first day for debugging
+  if (result.days && result.days[0]) {
+    console.log('📍 Day 1 generated:', {
+      title: result.days[0].title,
+      attractions: result.days[0].attractions,
+      cities_visited: result.days[0].cities_visited
+    })
   }
 
   return result
@@ -1377,13 +1457,24 @@ export async function POST(request: NextRequest) {
       inputMode = 'creative'
     } else if (is_structured_input && extracted_days && extracted_days.length > 0) {
       inputMode = 'structured'
-    } else if (raw_itinerary && /\b[Dd](?:ay)?\s*\d+|NTS\s+\w{3}/i.test(raw_itinerary)) {
+    } else if (raw_itinerary) {
       // Auto-detect structured input from raw itinerary patterns
-      inputMode = 'structured'
-      console.log('🔍 Auto-detected structured input from patterns')
+      // D1, D2, D3... OR 2NTS CAI, 3NTS CRZ... OR Day 1:, Day 2:...
+      const structuredPatterns = [
+        /\bD\d+\b/i,                    // D1, D2, D3...
+        /\d+\s*NTS?\s*[A-Z]{2,4}/i,     // 2NTS CAI, 3NTS CRZ
+        /\bDay\s*\d+\s*[:\-–]/i,        // Day 1:, Day 2:
+        /PROGRAM\s*:/i,                  // PROGRAM: header
+        /\b[A-Z]{3}\/[A-Z]{3}\b/        // CAI/ALX, LXR/HRG city transitions
+      ]
+      
+      if (structuredPatterns.some(pattern => pattern.test(raw_itinerary))) {
+        inputMode = 'structured'
+        console.log('🔍 Auto-detected structured input from patterns in raw_itinerary')
+      }
     }
 
-    console.log('🤖 Input Mode:', inputMode)
+    console.log('🤖 Input Mode:', inputMode, '| Override:', input_mode_override, '| is_structured_input:', is_structured_input)
 
     let duration_days = parseInt(raw_duration_days) || 1
     
