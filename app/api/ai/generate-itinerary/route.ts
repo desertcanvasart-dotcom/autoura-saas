@@ -56,8 +56,8 @@ const EGYPT_TRAVEL_GLOSSARY = `
 EGYPTIAN TRAVEL INDUSTRY ABBREVIATIONS - COMPREHENSIVE GLOSSARY
 =================================================================
 
-You MUST decode these abbreviations used by Egyptian travel agents.
-This is CRITICAL for understanding the itinerary correctly.
+CRITICAL: You MUST decode these abbreviations and follow the itinerary EXACTLY as written.
+DO NOT add, remove, or reorder any activities. Convert ONLY what is written.
 
 -----------------------------------------------------------------
 AIRPORT & CITY CODES (IATA CODES)
@@ -77,7 +77,7 @@ TCP = Taba (Taba International Airport)
 SKV = St. Catherine (St. Catherine International Airport)
 HMB = Sohag (Sohag International Airport)
 SPX = Sphinx/Giza (Sphinx International Airport)
-DBB = Dahab / El Alamein area
+DBB = Dabaa / El Alamein area
 DAK = Dakhla Oasis (Dakhla Oasis Airport)
 AAC = El Arish (El Arish International Airport)
 EGH = El Gora (El Gora Airport)
@@ -96,6 +96,38 @@ FAY = Fayoum
 SIW = Siwa Oasis
 
 -----------------------------------------------------------------
+AIRLINE CODES (IATA)
+-----------------------------------------------------------------
+MS = EgyptAir (Egypt's national carrier)
+BA = British Airways
+TK = Turkish Airlines
+QR = Qatar Airways
+EK = Emirates
+EY = Etihad Airways
+LH = Lufthansa
+AF = Air France
+KL = KLM Royal Dutch
+IB = Iberia
+AZ = Alitalia / ITA Airways
+SU = Aeroflot
+FZ = FlyDubai
+G9 = Air Arabia
+XY = flynas
+SV = Saudia (Saudi Arabian Airlines)
+RJ = Royal Jordanian
+ME = Middle East Airlines
+GF = Gulf Air
+WY = Oman Air
+KU = Kuwait Airways
+OS = Austrian Airlines
+LX = Swiss International
+SK = Scandinavian Airlines
+AY = Finnair
+LO = LOT Polish Airlines
+NP = Nile Air (Egyptian low-cost)
+SM = Air Cairo
+
+-----------------------------------------------------------------
 ACCOMMODATION CODES
 -----------------------------------------------------------------
 NTS = Nights (e.g., "3NTS" = 3 nights stay)
@@ -103,7 +135,7 @@ HTL = Hotel
 CRZ = Cruise / Nile Cruise
 OVN = Overnight
 C/IN = Check-in
-C/OUT = Check-out
+C/OUT = Check-out (disembarkation from cruise)
 
 MEAL PLANS:
 RO = Room Only (no meals)
@@ -124,33 +156,52 @@ D1, D2, D3... = Day 1, Day 2, Day 3...
 @ = at (time), e.g., "arrive @05:10" = arrive at 05:10
 
 -----------------------------------------------------------------
-TRANSPORT CODES
+CRITICAL: ENTRANCE FEE MARKERS
 -----------------------------------------------------------------
-TRF = Transfer
-DOM = Domestic (flight)
-INT = International (flight)
-MS = EgyptAir flight prefix (e.g., MS956 = EgyptAir flight 956)
-FZ = FlyDubai
-EK = Emirates
-QR = Qatar Airways
-TK = Turkish Airlines
-LH = Lufthansa
+(INSIDE) = Entrance fee REQUIRED - guests will enter the site
+(OUTSIDE) = NO entrance fee - photo stop only, viewing from outside
+
+Examples:
+- "Alexandria Library (OUTSIDE)" = Photo stop, NO entrance fee
+- "Pompey's Pillar (INSIDE)" = Entrance fee required
+- "Pyramids" with no marker = Assume entrance included
 
 -----------------------------------------------------------------
-ATTRACTION MARKERS
+FREE DAYS AND SAILING DAYS
 -----------------------------------------------------------------
-(INSIDE) = Entrance fee included, going inside
-(OUTSIDE) = Photo stop only, viewing from outside, NO entrance
-* = Optional / Add-on (not included in base price)
+When a day shows ONLY the location with NO activities:
+- "D5 CRZ" = Sailing day on cruise (no tours, relaxing on board)
+- "D8 HRG" = Free day in Hurghada (no scheduled activities)
+
+Convert these to:
+- Sailing days: title = "Sailing Day" or "Day at Leisure on Nile"
+- Free days: title = "Free Day" or "Day at Leisure"
 
 -----------------------------------------------------------------
-MEAL CODES IN ITINERARY
+MEALS IN ITINERARY
 -----------------------------------------------------------------
 B = Breakfast
-L = Lunch  
+L = Lunch
 D = Dinner
-"B, L" = Breakfast and Lunch included
-"L, D" = Lunch and Dinner included
+"L" at end of day = Lunch included
+"Chinese Dinner" = Dinner at Chinese restaurant
+"Pigeon Lunch" = Lunch featuring Egyptian pigeon dish
+
+-----------------------------------------------------------------
+AIRPORT & HOTEL SERVICES (EGYPT TRAVEL INDUSTRY STANDARD)
+-----------------------------------------------------------------
+
+AIRPORT SERVICES (add when flights arrive/depart):
+- International arrival: Airport meet & assist, visa assistance, luggage help, transfer to vehicle
+- Domestic arrival: Airport meet & assist, luggage help, transfer to vehicle
+- Departure: Hotel to airport transfer, check-in assistance
+
+HOTEL SERVICES (add when):
+- Check-in to hotel (first time in a city)
+- Check-out from hotel (leaving city)
+- Check-in to cruise (C/IN CRZ, "check in CRZ")
+- Check-out from cruise (C/OUT CRZ)
+- Moving from one city to another
 
 -----------------------------------------------------------------
 COMMON PATTERNS - EXAMPLES
@@ -159,19 +210,17 @@ COMMON PATTERNS - EXAMPLES
 = 2 nights Cairo + 3 nights Cruise + 3 nights Hurghada
 = Total: 2+3+3 = 8 nights = 9 DAYS
 
-"D1 CAI/ALX/CAI" = Day 1: Cairo to Alexandria, return to Cairo
+"D1 CAI/ALX/CAI Arrive MS956@05:10, Pompey's Pillar (INSIDE), Library (OUTSIDE), L, back to CAI"
+= Day 1: Arrive Cairo, then FULL DAY TRIP to Alexandria with sites, lunch, return to Cairo
+= This is NOT just arrival - it's arrival + full day tour!
 
-"OVERNIGHT AT CAIRO HOTEL" = Sleep in Cairo hotel
+"D5 CRZ" (with nothing else)
+= Day 5: Sailing day, no activities, relaxing on cruise
 
-"check in CRZ" = Board the Nile Cruise ship
+"D8 HRG" (with nothing else)
+= Day 8: Free day in Hurghada, no scheduled activities
 
-"c/out CRZ" = Disembark from cruise ship
-
-"D4 CRZ" = Day 4 spent on cruise (full day sailing)
-
-"Arrive CAI by MS956@05:10" = Arrive Cairo on EgyptAir flight 956 at 05:10
-
-"DEPARTED BY MS955@23:20" = Depart on EgyptAir 955 at 23:20
+"C/OUT CRZ, LXR/HRG" = Check out of cruise, then travel from Luxor to Hurghada
 
 -----------------------------------------------------------------
 IMPORTANT CALCULATION RULE
@@ -182,7 +231,14 @@ Example: "2NTS CAI + 3NTS CRZ + 3NTS HRG"
 - Nights: 2 + 3 + 3 = 8 nights
 - Days: 8 + 1 = 9 days (D1 through D9)
 
-Always count the day numbers (D1, D2...) to determine total days.
+-----------------------------------------------------------------
+CRITICAL RULE: FOLLOW EXACTLY
+-----------------------------------------------------------------
+DO NOT add attractions not mentioned in the original!
+DO NOT reorder days!
+DO NOT skip any day!
+If Abu Simbel is NOT mentioned, do NOT add it!
+If a day just says "CRZ", it's a SAILING day with NO tours!
 =================================================================
 `
 
@@ -954,113 +1010,126 @@ async function generateFromStructuredInput(
 
   console.log(`📋 STRUCTURED MODE: Generating ${expectedDays} days from raw itinerary`)
 
-  const prompt = `You are a travel operations assistant specializing in Egyptian tourism.
+  const prompt = `You are a travel operations assistant. Your ONLY job is to CONVERT the travel agent's itinerary into JSON format.
 
 ${EGYPT_TRAVEL_GLOSSARY}
 
 =================================================================
-YOUR TASK
+CRITICAL RULES - READ VERY CAREFULLY
 =================================================================
 
-Convert the following travel agent's abbreviated itinerary into a complete, detailed JSON format.
+1. FOLLOW THE ITINERARY EXACTLY AS WRITTEN
+   - Do NOT add any attractions that are not mentioned
+   - Do NOT remove any activities
+   - Do NOT reorder days or activities
+   - Do NOT "improve" or "enhance" the itinerary
+   - If Abu Simbel is NOT mentioned, do NOT add it!
 
-CRITICAL REQUIREMENTS:
-1. You MUST generate exactly ${expectedDays} days (D1 through D${expectedDays})
-2. DO NOT skip any days - every day from D1 to D${expectedDays} must be included
-3. Decode ALL abbreviations using the glossary above
-4. Identify which days are CRUISE days vs HOTEL days
-5. Mark entrance fees: (INSIDE) = entrance included, (OUTSIDE) = photo stop only
+2. GENERATE ALL ${expectedDays} DAYS
+   - Every day from D1 to D${expectedDays} must be in your output
+   - If a day just shows "CRZ" or city code with nothing else, it's a FREE DAY
+
+3. ENTRANCE FEES - INSIDE vs OUTSIDE
+   - "(INSIDE)" = Entrance fee required, add to entrance_included array
+   - "(OUTSIDE)" = Photo stop only, add to photo_stops array, NO entrance fee
+   - Example: "Library (OUTSIDE)" = just viewing, no ticket
+
+4. FREE DAYS AND SAILING DAYS
+   - "D5 CRZ" with no activities = Sailing day (is_free_day: true)
+   - "D8 HRG" with no activities = Free day (is_free_day: true)
+
+5. MULTI-CITY DAYS
+   - "D1 CAI/ALX/CAI" = Arrive Cairo, tour Alexandria, return to Cairo (3 cities!)
+   - This is NOT just arrival - it includes a FULL DAY TOUR
+
+6. AIRPORT & HOTEL SERVICES
+   - International flight arrival = needs_airport_service: true
+   - Domestic flight = needs_airport_service: true
+   - Hotel/Cruise check-in or check-out = needs_hotel_service: true
 
 =================================================================
-RAW ITINERARY FROM TRAVEL AGENT
+RAW ITINERARY TO CONVERT
 =================================================================
 
 ${rawItinerary}
 
-${extractedDays && extractedDays.length > 0 ? `
 =================================================================
-PARSER'S PARTIAL EXTRACTION (may be incomplete - use raw text as primary source)
-=================================================================
-${JSON.stringify(extractedDays, null, 2)}
-` : ''}
-
-=================================================================
-AVAILABLE ATTRACTIONS IN DATABASE (use exact names when matching)
+AVAILABLE ATTRACTIONS (match names exactly)
 =================================================================
 ${attractionNames.join(', ')}
 
 =================================================================
-TRIP CONFIGURATION
+CONFIGURATION
 =================================================================
-SERVICE TIER: ${tier.toUpperCase()} (${TIER_DESCRIPTIONS[tier]})
-TRAVELERS: ${totalPax} people
-GUIDE LANGUAGE: ${language}
-PACKAGE TYPE: ${packageType || 'cruise-land'}
+TIER: ${tier.toUpperCase()}
+TRAVELERS: ${totalPax}
+LANGUAGE: ${language}
+PACKAGE: ${packageType || 'cruise-land'}
 ${writingContext}
 
 =================================================================
-OUTPUT REQUIREMENTS
+OUTPUT FORMAT
 =================================================================
 
-For each day, determine:
-1. CITY: Decode abbreviations (CAI=Cairo, HRG=Hurghada, etc.)
-2. ACCOMMODATION TYPE:
-   - "cruise" for days with CRZ, "on board", or between cruise ports
-   - "hotel" for days with hotel stays in cities like CAI, HRG, SSH
-   - null for departure day (last day)
-3. ATTRACTIONS: 
-   - List with (INSIDE) as entrance_included
-   - List with (OUTSIDE) as photo_stops
-4. MEALS: L=Lunch, D=Dinner included
-5. TRANSPORT: Note flights (MS956, etc.) and transfers
-
-STRICT RULES:
-- Generate ALL ${expectedDays} days - do NOT combine or skip
-- Day numbering must go D1, D2, D3... D${expectedDays}
-- Last day (D${expectedDays}) should have accommodation_type: null
-- Decode EVERY abbreviation
-
-Return ONLY valid JSON in this exact format:
+Return ONLY valid JSON:
 {
-  "trip_name": "Descriptive name for the full trip",
+  "trip_name": "Descriptive trip name based on the actual itinerary",
   "total_days": ${expectedDays},
   "days": [
     {
       "day_number": 1,
       "date": null,
-      "title": "Day 1: [Decoded title - e.g., 'Arrival in Cairo & Alexandria Excursion']",
-      "description": "Professional 2-3 sentence description of this day's activities",
-      "city": "Full city name",
-      "overnight_city": "City where guest sleeps (or 'On board' for cruise)",
+      "title": "Day 1: [Title based on ACTUAL activities in input]",
+      "description": "2-3 sentence description of ONLY the activities mentioned",
+      "city": "Main city",
+      "cities_visited": ["Cairo", "Alexandria"],
+      "overnight_city": "Cairo",
       "accommodation_type": "hotel" | "cruise" | null,
+      
       "is_arrival": true,
       "is_departure": false,
       "is_transfer_only": false,
       "is_free_day": false,
       "is_cruise_day": false,
-      "attractions": ["All attractions visited"],
-      "entrance_included": ["Attractions marked INSIDE"],
-      "photo_stops": ["Attractions marked OUTSIDE"],
-      "activities": ["Decoded activity descriptions"],
+      "is_sailing_day": false,
+      
+      "attractions": ["All sites mentioned in the input"],
+      "entrance_included": ["Sites marked INSIDE - charge entrance fee"],
+      "photo_stops": ["Sites marked OUTSIDE - NO entrance fee"],
+      
+      "activities": ["Decoded activities from the raw text"],
       "guide_required": true,
-      "includes_lunch": true/false,
-      "includes_dinner": true/false,
-      "includes_hotel": true/false,
-      "transport_notes": "Flight MS956 arriving 05:10" or "Private transfer",
-      "flight_info": "MS956" if applicable,
-      "meal_plan": "FB" | "HB" | "BB" | "AI" | null
+      
+      "includes_lunch": true,
+      "includes_dinner": false,
+      "meal_notes": "Chinese Dinner" or null,
+      
+      "flight_info": "MS956 @05:10" or null,
+      "transport_type": "flight" | "drive" | null,
+      
+      "needs_airport_service": true,
+      "needs_hotel_service": true
     }
-    // ... MUST continue for ALL ${expectedDays} days
   ]
 }
 
-IMPORTANT: Count your output to ensure you have exactly ${expectedDays} day objects before responding.`
+=================================================================
+VERIFICATION BEFORE RESPONDING
+=================================================================
+[ ] Total days = ${expectedDays}
+[ ] Day 1 includes ALL activities from D1 input (not just "arrival")
+[ ] Free/sailing days have is_free_day: true
+[ ] INSIDE attractions in entrance_included
+[ ] OUTSIDE attractions in photo_stops (no entrance fee)
+[ ] No attractions added that aren't in original input
+
+CONVERT THE ITINERARY NOW:`
 
   console.log('🤖 Sending structured prompt to AI...')
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
-    max_tokens: 16384, // Increased for longer itineraries
+    max_tokens: 16384,
     messages: [
       {
         role: 'user',
@@ -1619,6 +1688,14 @@ export async function POST(request: NextRequest) {
     let lunchRate = Math.round(toNumber(mealRates?.[0]?.lunch_rate_eur, 12) * tierMealMultiplier[tier])
     let dinnerRate = Math.round(toNumber(mealRates?.[0]?.dinner_rate_eur, 18) * tierMealMultiplier[tier])
 
+    // Fetch airport services rates
+    const { data: airportServicesData } = await supabase.from('airport_services').select('*').eq('is_active', true)
+    const airportServiceRate = airportServicesData?.reduce((sum: number, s: any) => sum + toNumber(s.rate_eur, 0), 0) || 25
+
+    // Fetch hotel services rates
+    const { data: hotelServicesData } = await supabase.from('hotel_services').select('*').eq('is_active', true)
+    const hotelServiceRate = hotelServicesData?.reduce((sum: number, s: any) => sum + toNumber(s.rate_eur, 0), 0) || 15
+
     let hotelRate = 0
     let hotelName_final = hotel_name || 'Standard Hotel'
     let selectedHotel = null
@@ -1746,12 +1823,21 @@ export async function POST(request: NextRequest) {
 
       const isLastDay = dayNumber === duration_days
       const isTransferOnly = dayData.is_transfer_only || false
-      const isFreeDay = dayData.is_free_day || false
+      const isSailingDay = dayData.is_sailing_day || false
+      const isFreeDay = dayData.is_free_day || isSailingDay || false
       const isCruiseDay = dayData.is_cruise_day || dayData.accommodation_type === 'cruise'
       const dayNeedsGuide = dayData.guide_required !== false && !isTransferOnly && !isFreeDay
-      const dayIncludesLunch = dayData.includes_lunch ?? include_lunch
+      const dayIncludesLunch = isFreeDay ? false : (dayData.includes_lunch ?? include_lunch)
       const dayIncludesDinner = dayData.includes_dinner ?? include_dinner
       const includesHotelForDay = !isLastDay && includeAccommodationFinal && !isCruiseDay && (dayData.includes_hotel !== false)
+
+      // Generate appropriate title for free/sailing days
+      let dayTitle = dayData.title || `Day ${dayNumber}`
+      if (isSailingDay && !dayTitle.toLowerCase().includes('sailing')) {
+        dayTitle = `Day ${dayNumber}: Sailing Day on the Nile`
+      } else if (isFreeDay && !isSailingDay && !dayTitle.toLowerCase().includes('free') && !dayTitle.toLowerCase().includes('leisure')) {
+        dayTitle = `Day ${dayNumber}: Day at Leisure`
+      }
 
       // Create day record
       const { data: day, error: dayError } = await supabase
@@ -1760,7 +1846,7 @@ export async function POST(request: NextRequest) {
           itinerary_id: itinerary.id,
           day_number: dayNumber,
           date: dayDate.toISOString().split('T')[0],
-          title: dayData.title || `Day ${dayNumber}`,
+          title: dayTitle,
           description: dayData.description || '',
           city: dayData.city || effectiveCity,
           overnight_city: dayData.overnight_city || dayData.city || effectiveCity,
@@ -1802,6 +1888,44 @@ export async function POST(request: NextRequest) {
 
       // Services array
       const services: any[] = []
+
+      // Airport Services (for arrivals/departures/domestic flights)
+      if (dayData.needs_airport_service || dayData.is_arrival || dayData.is_departure || dayData.flight_info) {
+        const isInternational = dayData.is_arrival || dayData.is_departure
+        const serviceDesc = isInternational ? 'Airport Meet & Assist (International)' : 'Airport Meet & Assist (Domestic)'
+        
+        services.push({
+          service_type: 'airport_service',
+          service_code: 'AIRPORT',
+          service_name: serviceDesc,
+          quantity: 1,
+          rate_eur: airportServiceRate,
+          rate_non_eur: airportServiceRate,
+          total_cost: airportServiceRate,
+          client_price: withMargin(airportServiceRate),
+          notes: dayData.flight_info ? `Flight: ${dayData.flight_info}` : 'Airport assistance'
+        })
+        totalSupplierCost += airportServiceRate
+        totalClientPrice += withMargin(airportServiceRate)
+      }
+
+      // Hotel Services (for check-in/check-out including cruise)
+      if (dayData.needs_hotel_service && !isFreeDay) {
+        const isCruiseService = dayData.accommodation_type === 'cruise' || dayData.is_cruise_day
+        services.push({
+          service_type: 'hotel_service',
+          service_code: 'HOTEL-SVC',
+          service_name: isCruiseService ? 'Cruise Boarding Assistance' : 'Hotel Porterage & Assistance',
+          quantity: 1,
+          rate_eur: hotelServiceRate,
+          rate_non_eur: hotelServiceRate,
+          total_cost: hotelServiceRate,
+          client_price: withMargin(hotelServiceRate),
+          notes: isCruiseService ? 'Cruise embarkation/disembarkation assistance' : 'Hotel check-in/out assistance'
+        })
+        totalSupplierCost += hotelServiceRate
+        totalClientPrice += withMargin(hotelServiceRate)
+      }
 
       // Transportation (always included unless it's a free day)
       if (!isFreeDay) {
@@ -1855,12 +1979,20 @@ export async function POST(request: NextRequest) {
       totalClientPrice += withMargin(dailyTips)
       }
 
-      // Entrance fees (only for attractions actually visited)
-      if (dayData.attractions?.length > 0 && !isTransferOnly && !isFreeDay) {
+      // Entrance fees (ONLY for INSIDE attractions, not OUTSIDE photo stops)
+      const entranceAttractions = dayData.entrance_included || dayData.attractions || []
+      const photoStops = dayData.photo_stops || []
+      
+      if (entranceAttractions.length > 0 && !isTransferOnly && !isFreeDay) {
         let dayEntranceTotal = 0
         const matchedAttractions: string[] = []
         
-        for (const attr of dayData.attractions) {
+        for (const attr of entranceAttractions) {
+          // Skip if this attraction is in photo_stops (OUTSIDE)
+          if (photoStops.some((ps: string) => ps.toLowerCase() === attr.toLowerCase())) {
+            continue
+          }
+          
           const fee = allEntranceFees?.find((ef: any) =>
             ef.attraction_name.toLowerCase().includes(attr.toLowerCase()) ||
             attr.toLowerCase().includes(ef.attraction_name.toLowerCase())
@@ -1879,6 +2011,10 @@ export async function POST(request: NextRequest) {
         }
         
         if (dayEntranceTotal > 0) {
+          const notesText = photoStops.length > 0 
+            ? `Inside: ${matchedAttractions.join(', ')} | Photo stops: ${photoStops.join(', ')}`
+            : `Sites: ${matchedAttractions.join(', ')}`
+          
           services.push({
             service_type: 'entrance',
             service_code: 'ENTRANCE',
@@ -1888,7 +2024,7 @@ export async function POST(request: NextRequest) {
             rate_non_eur: dayEntranceTotal / totalPax,
             total_cost: dayEntranceTotal,
             client_price: withMargin(dayEntranceTotal),
-            notes: `Sites: ${matchedAttractions.join(', ')}`
+            notes: notesText
           })
           totalSupplierCost += dayEntranceTotal
           totalClientPrice += withMargin(dayEntranceTotal)
