@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 // POST /api/whatsapp/conversations/assign - Assign or claim a conversation
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const body = await request.json()
     const { conversation_id, agent_id, team_member_id, action } = body
 
@@ -14,9 +23,6 @@ export async function POST(request: NextRequest) {
     if (!conversation_id) {
       return NextResponse.json({ error: 'Conversation ID is required' }, { status: 400 })
     }
-
-    // Get current user for audit
-    const { data: { user } } = await supabase.auth.getUser()
 
     // Get current conversation state
     const { data: conversation, error: convError } = await supabase
@@ -142,7 +148,7 @@ export async function POST(request: NextRequest) {
           team_member_id: newAssigneeId,
           action_type: actionType,
           action_details: {
-            assigned_by: user?.id || null,
+            assigned_by: user.id,
             previous_assignee_id: oldAssigneeId,
             action: action || 'assign'
           }
@@ -187,7 +193,16 @@ export async function POST(request: NextRequest) {
 // GET /api/whatsapp/conversations/assign - Get assignment info
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const conversationId = searchParams.get('conversation_id')
 

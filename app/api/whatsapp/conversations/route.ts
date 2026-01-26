@@ -289,7 +289,16 @@ export async function PATCH(request: NextRequest) {
 // DELETE /api/whatsapp/conversations - Hide (soft delete) a conversation
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const conversationId = searchParams.get('id')
 
@@ -297,16 +306,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation ID required' }, { status: 400 })
     }
 
-    // Get current user for audit trail
-    const { data: { user } } = await supabase.auth.getUser()
-
     // Soft delete - just hide the conversation
     const { data, error } = await supabase
       .from('whatsapp_conversations')
       .update({
         is_hidden: true,
         hidden_at: new Date().toISOString(),
-        hidden_by: user?.id || null,
+        hidden_by: user.id,
         updated_at: new Date().toISOString()
       })
       .eq('id', conversationId)

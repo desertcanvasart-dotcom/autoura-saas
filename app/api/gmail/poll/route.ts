@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,12 +12,25 @@ const supabase = createClient(
 // Poll for new emails since last history ID
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate user first
+    const authClient = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const historyId = searchParams.get('historyId')
 
     if (!userId) {
       return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+    }
+
+    // Verify authenticated user matches requested userId
+    if (user.id !== userId) {
+      return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
     // Get user's Gmail tokens
@@ -200,11 +214,24 @@ export async function GET(request: NextRequest) {
 // Get unread count
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user first
+    const authClient = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
     const body = await request.json()
     const { userId } = body
 
     if (!userId) {
       return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
+    }
+
+    // Verify authenticated user matches requested userId
+    if (user.id !== userId) {
+      return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
     // Get user's Gmail tokens

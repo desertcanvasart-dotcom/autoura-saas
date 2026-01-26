@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { refreshAccessToken } from '@/lib/gmail'
 import { google } from 'googleapis'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,10 +23,23 @@ interface Attachment {
 
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user first
+    const authClient = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
     const { userId, to, subject, body, threadId, attachments } = await request.json()
 
     if (!userId || !to || !subject || !body) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Verify authenticated user matches requested userId
+    if (user.id !== userId) {
+      return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
     // Get user's tokens

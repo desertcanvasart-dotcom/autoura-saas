@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import twilio from 'twilio'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,17 +9,50 @@ const supabaseAdmin = createClient(
 
 // POST - Twilio Status Callback
 // This endpoint receives message delivery status updates from Twilio
+// SECURITY: Validates Twilio signature before processing
 export async function POST(request: NextRequest) {
   try {
+    // ============================================
+    // SECURITY: Validate Twilio Signature
+    // ============================================
+    const signature = request.headers.get('x-twilio-signature')
+    const url = request.url
+
+    if (!signature) {
+      console.error('❌ Missing Twilio signature header on status callback')
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+
+    // Parse form data for signature validation
     const formData = await request.formData()
-    
-    // Extract status callback data
-    const messageSid = formData.get('MessageSid') as string
-    const messageStatus = formData.get('MessageStatus') as string
-    const errorCode = formData.get('ErrorCode') as string | null
-    const errorMessage = formData.get('ErrorMessage') as string | null
-    const to = formData.get('To') as string
-    const from = formData.get('From') as string
+    const params: Record<string, string> = {}
+    formData.forEach((value, key) => {
+      params[key] = value.toString()
+    })
+
+    // Validate signature
+    const authToken = process.env.TWILIO_AUTH_TOKEN
+    if (!authToken) {
+      console.error('❌ TWILIO_AUTH_TOKEN not configured')
+      return new NextResponse('Server Error', { status: 500 })
+    }
+
+    const isValid = twilio.validateRequest(authToken, signature, url, params)
+
+    if (!isValid) {
+      console.error('❌ Invalid Twilio signature on status callback - possible unauthorized request')
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+
+    console.log('✅ Twilio signature validated for status callback')
+
+    // Extract status callback data from already-parsed params
+    const messageSid = params['MessageSid']
+    const messageStatus = params['MessageStatus']
+    const errorCode = params['ErrorCode'] || null
+    const errorMessage = params['ErrorMessage'] || null
+    const to = params['To']
+    const from = params['From']
 
     console.log('📊 Status Callback:', {
       messageSid,

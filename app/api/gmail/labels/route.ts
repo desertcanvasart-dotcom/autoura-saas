@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { google } from 'googleapis'
 import { refreshAccessToken } from '@/lib/gmail'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,10 +18,23 @@ const oauth2Client = new google.auth.OAuth2(
 // GET - Fetch all labels
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate user first
+    const authClient = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
     const userId = request.nextUrl.searchParams.get('userId')
-    
+
     if (!userId) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+    }
+
+    // Verify authenticated user matches requested userId
+    if (user.id !== userId) {
+      return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
     const { data: tokenData, error: tokenError } = await supabase
@@ -69,10 +83,23 @@ export async function GET(request: NextRequest) {
 // POST - Create new label
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user first
+    const authClient = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
     const { userId, name, backgroundColor, textColor } = await request.json()
 
     if (!userId || !name) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Verify authenticated user matches requested userId
+    if (user.id !== userId) {
+      return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
     const { data: tokenData, error: tokenError } = await supabase
@@ -118,10 +145,23 @@ export async function POST(request: NextRequest) {
 // DELETE - Delete a label
 export async function DELETE(request: NextRequest) {
   try {
+    // Authenticate user first
+    const authClient = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
     const { userId, labelId } = await request.json()
 
     if (!userId || !labelId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Verify authenticated user matches requested userId
+    if (user.id !== userId) {
+      return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
     const { data: tokenData } = await supabase

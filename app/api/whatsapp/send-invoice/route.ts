@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { requireAuth } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
@@ -170,6 +171,17 @@ async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication - sends WhatsApp messages (costs money)
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
+
     const body = await request.json()
     const { invoiceId } = body
 
@@ -182,9 +194,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = createClient(
+    // Use admin client for storage operations only (authenticated supabase for queries)
+    const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
     // Get invoice
@@ -232,11 +245,11 @@ export async function POST(request: NextRequest) {
     console.log('📄 Generating invoice PDF...')
     const pdfBytes = await generateInvoicePDF(invoice)
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage (use admin client for storage)
     console.log('📤 Uploading PDF to storage...')
     const fileName = `invoices/invoice-${invoice.invoice_number}-${Date.now()}.pdf`
-    
-    const { error: uploadError } = await supabase.storage
+
+    const { error: uploadError } = await supabaseAdmin.storage
       .from('documents')
       .upload(fileName, pdfBytes, {
         contentType: 'application/pdf',
@@ -249,7 +262,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get public URL
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = supabaseAdmin.storage
       .from('documents')
       .getPublicUrl(fileName)
 

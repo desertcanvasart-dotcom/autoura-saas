@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication - sends WhatsApp messages (costs money)
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
+
     const { paymentId } = await request.json()
 
     if (!paymentId) {
       return NextResponse.json({ success: false, error: 'Payment ID required' }, { status: 400 })
     }
-
-    const supabase = createClient()
 
     // Get payment details with itinerary
     const { data: payment, error: paymentError } = await supabase
