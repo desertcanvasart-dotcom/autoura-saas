@@ -1,12 +1,11 @@
 'use client'
 
-import { 
-  Users, UserPlus, Search, Filter, Star, TrendingUp, Calendar,
-  Phone, Mail, MessageSquare, AlertCircle, CheckCircle, Clock,
-  Trash2, SlidersHorizontal, X, Globe, Smartphone
+import {
+  Users, UserPlus, Search, Star, TrendingUp,
+  AlertCircle, CheckCircle, Trash2, SlidersHorizontal, X
 } from 'lucide-react'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
 import RequireFeature from '@/components/RequireFeature'
@@ -77,21 +76,38 @@ export default function ClientsPage() {
 
   const supabase = createClient()
 
+  // Debounced search value
+  const [debouncedSearch, setDebouncedSearch] = useState(filters.search)
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search)
+    }, 300) // 300ms debounce
+
+    return () => clearTimeout(timer)
+  }, [filters.search])
+
+  // Fetch clients when filters change (but use debounced search)
   useEffect(() => {
     fetchClients()
+  }, [debouncedSearch, filters.status, filters.clientType, filters.leadSource, filters.vipOnly, filters.sortBy, filters.dateFrom, filters.dateTo])
+
+  // Fetch stats only once on mount
+  useEffect(() => {
     fetchStats()
-  }, [filters])
+  }, [])
 
   const fetchClients = async () => {
     try {
       setLoading(true)
       let query = supabase
         .from('clients')
-        .select('*')
+        .select('id, client_code, full_name, email, phone, whatsapp, nationality, client_type, vip_status, status, lead_source, created_at')
 
-      // Apply search filter
-      if (filters.search) {
-        query = query.or(`full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,client_code.ilike.%${filters.search}%`)
+      // Apply search filter (use debounced value)
+      if (debouncedSearch) {
+        query = query.or(`full_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%,client_code.ilike.%${debouncedSearch}%`)
       }
 
       // Apply status filter

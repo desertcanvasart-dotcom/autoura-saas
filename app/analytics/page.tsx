@@ -1,19 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
+import {
+  TrendingUp,
+  Users,
+  DollarSign,
   Calendar,
   MapPin,
   ArrowUpRight,
   ArrowDownRight,
   Activity,
-  FileText,
-  CheckCircle,
   Clock,
-  XCircle,
   Target,
   Zap,
   UserPlus,

@@ -7,16 +7,12 @@ import {
   Users,
   CheckSquare,
   FileText,
-  TrendingUp,
   Clock,
   ArrowRight,
   AlertCircle,
-  Calendar,
   MessageSquare,
-  DollarSign,
   Activity,
   Sparkles,
-  MapPin,
   Mail,
   CheckCircle,
   Package,
@@ -91,61 +87,79 @@ export default function DashboardPage() {
 
   async function loadDashboardData() {
     try {
-      // Get client stats
-      const { data: clients } = await supabase
-        .from('clients')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      const totalClients = clients?.length || 0
-      const activeClients = clients?.filter(c => c.status === 'active').length || 0
-
-      // Get followup stats
-      const { data: followups } = await supabase
-        .from('client_followups')
-        .select('*')
-        .eq('status', 'pending')
-
-      const pendingFollowups = followups?.length || 0
-      const overdueFollowups = followups?.filter(f =>
-        new Date(f.due_date) < new Date()
-      ).length || 0
-
-      // Get itinerary/quote stats (B2C)
-      const quotesRes = await fetch('/api/itineraries')
-      const quotesData = await quotesRes.json()
-      const quotes = quotesData.data || []
-
-      // Get upcoming trips (next 30 days)
       const today = new Date()
       const thirtyDaysLater = new Date()
       thirtyDaysLater.setDate(today.getDate() + 30)
-      
-      // Try to get from itineraries with start_date
+
+      // Run all queries in parallel for better performance
+      const [
+        clientsResult,
+        activeClientsResult,
+        pendingFollowupsResult,
+        overdueFollowupsResult,
+        upcomingFollowupsResult,
+        quotesRes
+      ] = await Promise.all([
+        // Total clients count + recent 5
+        supabase
+          .from('clients')
+          .select('id, full_name, email, phone, status, created_at')
+          .order('created_at', { ascending: false })
+          .limit(100),
+
+        // Active clients count (filtered in DB)
+        supabase
+          .from('clients')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'active'),
+
+        // Pending followups count
+        supabase
+          .from('client_followups')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+
+        // Overdue followups count (filtered in DB)
+        supabase
+          .from('client_followups')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending')
+          .lt('due_date', today.toISOString()),
+
+        // Upcoming followups with client details
+        supabase
+          .from('client_followups')
+          .select(`
+            id, description, due_date, priority, client_id, status,
+            clients (id, full_name, email)
+          `)
+          .eq('status', 'pending')
+          .gte('due_date', today.toISOString())
+          .order('due_date', { ascending: true })
+          .limit(5),
+
+        // Quotes/itineraries
+        fetch('/api/itineraries?limit=50')
+      ])
+
+      const clients = clientsResult.data || []
+      const totalClients = clients.length
+      const activeClients = activeClientsResult.count || 0
+      const pendingFollowups = pendingFollowupsResult.count || 0
+      const overdueFollowups = overdueFollowupsResult.count || 0
+
+      const quotesData = await quotesRes.json()
+      const quotes = quotesData.data || []
+
+      // Calculate upcoming trips (confirmed trips in next 30 days)
       const upcomingTrips = quotes.filter((q: any) => {
         if (!q.start_date) return false
         const startDate = new Date(q.start_date)
         return startDate >= today && startDate <= thirtyDaysLater && q.status === 'confirmed'
       }).length
 
-      // Get recent clients
-      const recentClients = clients?.slice(0, 5) || []
-
-      // Get upcoming followups
-      const { data: upcoming } = await supabase
-        .from('client_followups')
-        .select(`
-          *,
-          clients (
-            id,
-            full_name,
-            email
-          )
-        `)
-        .eq('status', 'pending')
-        .gte('due_date', new Date().toISOString())
-        .order('due_date', { ascending: true })
-        .limit(5)
+      // Get recent clients (already sorted by created_at)
+      const recentClients = clients.slice(0, 5)
 
       // Get recent quotes
       const recentQuotes = quotes.slice(0, 5).map((q: any) => ({
@@ -167,7 +181,7 @@ export default function DashboardPage() {
         recentActivity: 0
       })
       setRecentClients(recentClients)
-      setUpcomingFollowups(upcoming || [])
+      setUpcomingFollowups(upcomingFollowupsResult.data || [])
       setRecentQuotes(recentQuotes)
     } catch (error) {
       console.error('Error loading dashboard:', error)

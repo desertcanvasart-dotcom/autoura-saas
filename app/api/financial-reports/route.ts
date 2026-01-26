@@ -76,54 +76,72 @@ export async function GET(request: NextRequest) {
     const quarter = searchParams.get('quarter') // Q1, Q2, Q3, Q4
     const month = searchParams.get('month') // 1-12
 
-    // Fetch all invoices (RLS filters to tenant's invoices only)
-    const { data: invoices, error: invError } = await supabase
-      .from('invoices')
-      .select('*')
-      .order('issue_date', { ascending: true })
+    // Date boundaries for efficient database filtering
+    const yearStart = `${year}-01-01`
+    const yearEnd = `${year}-12-31`
+    const prevYear = year - 1
+    const prevYearStart = `${prevYear}-01-01`
+    const prevYearEnd = `${prevYear}-12-31`
 
-    if (invError) {
-      console.error('❌ Error fetching invoices:', invError)
-    }
+    // Run all queries in parallel with date filtering at database level
+    const [
+      yearInvoicesResult,
+      yearExpensesResult,
+      yearTripsResult,
+      prevYearInvoicesResult,
+      prevYearExpensesResult,
+      availableYearsResult
+    ] = await Promise.all([
+      // Current year invoices - only needed columns
+      supabase
+        .from('invoices')
+        .select('id, issue_date, total_amount, amount_paid, balance_due, status')
+        .gte('issue_date', yearStart)
+        .lte('issue_date', yearEnd)
+        .order('issue_date', { ascending: true }),
 
-    // Fetch all expenses (RLS filters to tenant's expenses only)
-    const { data: expenses, error: expError } = await supabase
-      .from('expenses')
-      .select('*')
-      .order('expense_date', { ascending: true })
+      // Current year expenses - only needed columns
+      supabase
+        .from('expenses')
+        .select('id, expense_date, amount, status, category, supplier_name')
+        .gte('expense_date', yearStart)
+        .lte('expense_date', yearEnd)
+        .order('expense_date', { ascending: true }),
 
-    if (expError) {
-      console.error('❌ Error fetching expenses:', expError)
-    }
+      // Current year itineraries - only needed columns
+      supabase
+        .from('itineraries')
+        .select('id, start_date, status')
+        .gte('start_date', yearStart)
+        .lte('start_date', yearEnd),
 
-    // Fetch itineraries for trip count (RLS filters to tenant's itineraries only)
-    const { data: itineraries, error: itinError } = await supabase
-      .from('itineraries')
-      .select('id, start_date, status, total_cost')
+      // Previous year invoices for YoY comparison
+      supabase
+        .from('invoices')
+        .select('id, total_amount')
+        .gte('issue_date', prevYearStart)
+        .lte('issue_date', prevYearEnd),
 
-    if (itinError) {
-      console.error('❌ Error fetching itineraries:', itinError)
-    }
+      // Previous year expenses for YoY comparison
+      supabase
+        .from('expenses')
+        .select('id, amount')
+        .gte('expense_date', prevYearStart)
+        .lte('expense_date', prevYearEnd),
 
-    const allInvoices = invoices || []
-    const allExpenses = expenses || []
-    const allItineraries = itineraries || []
+      // Get available years (distinct years from invoices/expenses)
+      supabase
+        .from('invoices')
+        .select('issue_date')
+        .order('issue_date', { ascending: false })
+        .limit(1000)
+    ])
 
-    // Filter by year
-    const yearInvoices = allInvoices.filter(inv => {
-      const invYear = new Date(inv.issue_date).getFullYear()
-      return invYear === year
-    })
-
-    const yearExpenses = allExpenses.filter(exp => {
-      const expYear = new Date(exp.expense_date).getFullYear()
-      return expYear === year
-    })
-
-    const yearTrips = allItineraries.filter(itin => {
-      const tripYear = new Date(itin.start_date).getFullYear()
-      return tripYear === year
-    })
+    const yearInvoices = yearInvoicesResult.data || []
+    const yearExpenses = yearExpensesResult.data || []
+    const yearTrips = yearTripsResult.data || []
+    const prevYearInvoices = prevYearInvoicesResult.data || []
+    const prevYearExpensesList = prevYearExpensesResult.data || []
 
     // Generate monthly data
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -308,19 +326,9 @@ export async function GET(request: NextRequest) {
       recipients: commissionData
     }
 
-    // Year-over-year comparison
-    const prevYear = year - 1
-    const prevYearInvoices = allInvoices.filter(inv => {
-      const invYear = new Date(inv.issue_date).getFullYear()
-      return invYear === prevYear
-    })
-    const prevYearExpenses = allExpenses.filter(exp => {
-      const expYear = new Date(exp.expense_date).getFullYear()
-      return expYear === prevYear
-    })
-
+    // Year-over-year comparison (using pre-fetched data)
     const prevYearRevenue = prevYearInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0)
-    const prevYearExpenseTotal = prevYearExpenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
+    const prevYearExpenseTotal = prevYearExpensesList.reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
 
     const yearOverYear = {
       current_year: year,
@@ -357,9 +365,10 @@ export async function GET(request: NextRequest) {
       commissionSummary,
       yearOverYear,
       availableYears: [...new Set([
-        ...allInvoices.map(inv => new Date(inv.issue_date).getFullYear()),
-        ...allExpenses.map(exp => new Date(exp.expense_date).getFullYear())
-      ])].sort((a, b) => b - a)
+        ...(availableYearsResult.data || []).map(inv => new Date(inv.issue_date).getFullYear()),
+        year, // Always include current year
+        prevYear // Always include previous year
+      ])].filter(y => y > 2020).sort((a, b) => b - a)
     })
   } catch (error) {
     console.error('❌ Error in Financial Reports GET:', error)

@@ -4,17 +4,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/app/supabase'
-import { 
-  MessageSquare, 
-  FileText, 
-  Users, 
-  DollarSign, 
-  Calendar, 
-  Truck,
+import {
+  MessageSquare,
+  FileText,
+  Users,
+  DollarSign,
+  Calendar,
   ClipboardList,
   BarChart3,
   Building2,
-  ChevronRight,
   Check,
   X,
   Sparkles,
@@ -28,15 +26,12 @@ import {
   Ship,
   Languages,
   FileSearch,
-  Clock,
   Menu,
   XIcon,
   Bot,
   BookOpen,
   Package,
   PieChart,
-  Lock,
-  UserCheck,
   Timer
 } from 'lucide-react'
 
