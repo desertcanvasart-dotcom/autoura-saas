@@ -69,93 +69,53 @@ export default function TenantSwitcher({ isCollapsed }: TenantSwitcherProps) {
     }
   }
 
+  // Collapsed state: show role icon only
   if (isCollapsed) {
     return (
-      <div className="px-3 py-2 mb-4">
-        <button
-          onClick={() => isAdmin && router.push('/settings/tenant')}
-          className="w-full flex items-center justify-center p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
-          title={`${tenant.company_name} (${tenantMember.role})`}
+      <div className="px-2 py-2 mb-2">
+        <div
+          className={`flex items-center justify-center p-1.5 rounded-md border ${getRoleBadgeColor(tenantMember.role)}`}
+          title={`${tenantMember.role}`}
         >
-          {tenant.logo_url ? (
-            <div className="relative w-8 h-8">
-              <Image
-                src={tenant.logo_url}
-                alt={tenant.company_name}
-                fill
-                className="object-contain"
-              />
-            </div>
-          ) : (
-            <Building2 className="w-5 h-5 text-blue-600" />
-          )}
-        </button>
+          {getRoleIcon(tenantMember.role)}
+        </div>
       </div>
     )
   }
 
+  // Expanded state: show role badge and action buttons (tenant name is now in header)
   return (
-    <div className="px-3 py-2 mb-4">
-      <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
-        {/* Tenant Name */}
-        <div className="flex items-start gap-2">
-          {tenant.logo_url ? (
-            <div className="relative w-10 h-10 flex-shrink-0 bg-gray-50 rounded-md overflow-hidden">
-              <Image
-                src={tenant.logo_url}
-                alt={tenant.company_name}
-                fill
-                className="object-contain p-1"
-              />
-            </div>
-          ) : (
-            <Building2 className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-gray-900 truncate">
-              {tenant.company_name}
-            </p>
-            {getBusinessTypeDisplay() && (
-              <p className="text-xs text-gray-500">
-                {getBusinessTypeDisplay()}
-              </p>
-            )}
-          </div>
-        </div>
-
+    <div className="px-3 py-2 mb-2">
+      <div className="flex items-center justify-between gap-2">
         {/* Role Badge */}
-        <div className="flex items-center gap-2">
-          <div
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-medium ${getRoleBadgeColor(
-              tenantMember.role
-            )}`}
-          >
-            {getRoleIcon(tenantMember.role)}
-            <span className="capitalize">{tenantMember.role}</span>
-          </div>
+        <div
+          className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-medium ${getRoleBadgeColor(
+            tenantMember.role
+          )}`}
+        >
+          {getRoleIcon(tenantMember.role)}
+          <span className="capitalize">{tenantMember.role}</span>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2 pt-1">
-          {isAdmin && (
+        {isAdmin && (
+          <div className="flex gap-1">
             <button
               onClick={() => router.push('/settings/tenant')}
-              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              title="Organization Settings"
             >
-              <Settings className="w-3.5 h-3.5" />
-              <span>Settings</span>
+              <Settings className="w-4 h-4" />
             </button>
-          )}
-          {isAdmin && (
             <button
               onClick={() => router.push('/settings/team')}
-              className="flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              title="Team Management"
             >
-              <Users className="w-3.5 h-3.5" />
-              <span>Team</span>
+              <Users className="w-4 h-4" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -76,23 +76,31 @@ const TenantContext = createContext<TenantContextType | undefined>(undefined)
 const supabase = createClient()
 
 export function TenantProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [tenantMember, setTenantMember] = useState<TenantMember | null>(null)
   const [features, setFeatures] = useState<TenantFeatures | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Fetch tenant data when user is authenticated
+  // Wait for auth to finish loading before making decisions
   useEffect(() => {
+    // If auth is still loading, keep tenant loading true to prevent flash
+    if (authLoading) {
+      setLoading(true)
+      return
+    }
+
     if (user) {
       fetchTenantData()
     } else {
+      // Auth is done loading and there's no user - clear data
       setTenant(null)
       setTenantMember(null)
       setFeatures(null)
       setLoading(false)
     }
-  }, [user])
+  }, [user, authLoading])
 
   const fetchTenantData = async () => {
     if (!user) {

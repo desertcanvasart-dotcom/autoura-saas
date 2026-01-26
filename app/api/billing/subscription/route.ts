@@ -34,13 +34,17 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Mock subscription based on current features
-    // This is a simplified version - in production you'd have a real subscriptions table
+    // Return subscription based on current tenant features
+    const currentTier = features.current_pricing_tier || 'professional'
+
+    // Format plan name from tier slug
+    const planName = currentTier.charAt(0).toUpperCase() + currentTier.slice(1)
+
     return NextResponse.json({
       success: true,
       subscription: {
-        plan_name: 'Professional',
-        plan_slug: 'professional',
+        plan_name: planName,
+        plan_slug: currentTier,
         status: 'active'
       },
       has_subscription: true

@@ -417,9 +417,9 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
           ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
       >
-        {/* Logo Header with Notification Bell */}
+        {/* Logo Header with Tenant Name and Notification Bell */}
         <div className="flex items-center justify-between h-14 px-3 border-b border-gray-200 flex-shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/dashboard" className="flex items-center gap-2 min-w-0 flex-1">
             <div className="w-7 h-7 flex-shrink-0">
               <img
                 src="/autoura-logo.png"
@@ -427,16 +427,16 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                 className="w-full h-full object-contain"
               />
             </div>
-            {!isCollapsed && (
-              <span className="text-lg font-semibold text-primary-600">
-                Autoura
+            {!isCollapsed && tenant && (
+              <span className="text-sm font-semibold text-gray-900 truncate">
+                {tenant.company_name}
               </span>
             )}
           </Link>
-          
-          <div className="flex items-center gap-1">
+
+          <div className="flex items-center gap-1 flex-shrink-0">
             {!isCollapsed && <NotificationBell />}
-            
+
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="hidden lg:block p-1 hover:bg-gray-100 rounded transition-colors"

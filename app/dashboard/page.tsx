@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { useTenant } from '@/app/contexts/TenantContext'
 import Link from 'next/link'
 import {
   Users,
@@ -17,7 +18,8 @@ import {
   CheckCircle,
   Package,
   CalendarDays,
-  Layers
+  Layers,
+  Route
 } from 'lucide-react'
 
 const supabase = createClient()
@@ -31,10 +33,12 @@ interface DashboardStats {
   quotesSent: number
   quotesConfirmed: number
   upcomingTrips: number
+  upcomingBookings: number
   recentActivity: number
 }
 
 export default function DashboardPage() {
+  const { hasB2B, hasB2C } = useTenant()
   const [stats, setStats] = useState<DashboardStats>({
     totalClients: 0,
     activeClients: 0,
@@ -44,6 +48,7 @@ export default function DashboardPage() {
     quotesSent: 0,
     quotesConfirmed: 0,
     upcomingTrips: 0,
+    upcomingBookings: 0,
     recentActivity: 0
   })
   const [recentClients, setRecentClients] = useState<any[]>([])
@@ -98,7 +103,8 @@ export default function DashboardPage() {
         pendingFollowupsResult,
         overdueFollowupsResult,
         upcomingFollowupsResult,
-        quotesRes
+        quotesRes,
+        bookingsRes
       ] = await Promise.all([
         // Total clients count + recent 5
         supabase
@@ -138,8 +144,11 @@ export default function DashboardPage() {
           .order('due_date', { ascending: true })
           .limit(5),
 
-        // Quotes/itineraries
-        fetch('/api/itineraries?limit=50')
+        // B2C Quotes
+        fetch('/api/quotes/b2c?limit=50'),
+
+        // Bookings (upcoming in next 30 days)
+        fetch('/api/bookings?limit=50')
       ])
 
       const clients = clientsResult.data || []
@@ -148,15 +157,35 @@ export default function DashboardPage() {
       const pendingFollowups = pendingFollowupsResult.count || 0
       const overdueFollowups = overdueFollowupsResult.count || 0
 
-      const quotesData = await quotesRes.json()
-      const quotes = quotesData.data || []
+      // Process B2C quotes
+      let quotes: any[] = []
+      try {
+        const quotesData = await quotesRes.json()
+        quotes = quotesData.data || quotesData.quotes || []
+      } catch (e) {
+        console.log('Could not fetch quotes, falling back to itineraries')
+        // Fallback to itineraries if quotes API doesn't exist yet
+        const fallbackRes = await fetch('/api/itineraries?limit=50')
+        const fallbackData = await fallbackRes.json()
+        quotes = fallbackData.data || []
+      }
 
-      // Calculate upcoming trips (confirmed trips in next 30 days)
-      const upcomingTrips = quotes.filter((q: any) => {
-        if (!q.start_date) return false
-        const startDate = new Date(q.start_date)
-        return startDate >= today && startDate <= thirtyDaysLater && q.status === 'confirmed'
-      }).length
+      // Process bookings for upcoming trips
+      let bookings: any[] = []
+      let upcomingBookings = 0
+      try {
+        const bookingsData = await bookingsRes.json()
+        bookings = bookingsData.data || bookingsData.bookings || []
+        // Count upcoming bookings (confirmed, in next 30 days)
+        upcomingBookings = bookings.filter((b: any) => {
+          if (!b.start_date && !b.travel_date) return false
+          const startDate = new Date(b.start_date || b.travel_date)
+          return startDate >= today && startDate <= thirtyDaysLater &&
+                 (b.status === 'confirmed' || b.status === 'active')
+        }).length
+      } catch (e) {
+        console.log('Bookings API not available yet')
+      }
 
       // Get recent clients (already sorted by created_at)
       const recentClients = clients.slice(0, 5)
@@ -164,7 +193,7 @@ export default function DashboardPage() {
       // Get recent quotes
       const recentQuotes = quotes.slice(0, 5).map((q: any) => ({
         id: q.id,
-        action: `Quote ${q.itinerary_code} for ${q.client_name}`,
+        action: `Quote ${q.quote_number || q.itinerary_code || q.id} for ${q.client_name || 'Client'}`,
         time: new Date(q.created_at).toLocaleString(),
         status: q.status
       }))
@@ -175,9 +204,10 @@ export default function DashboardPage() {
         pendingFollowups,
         overdueFollowups,
         totalQuotes: quotes.length,
-        quotesSent: quotes.filter((q: any) => q.status === 'sent' || q.status === 'confirmed').length,
-        quotesConfirmed: quotes.filter((q: any) => q.status === 'confirmed').length,
-        upcomingTrips,
+        quotesSent: quotes.filter((q: any) => q.status === 'sent' || q.status === 'confirmed' || q.status === 'accepted').length,
+        quotesConfirmed: quotes.filter((q: any) => q.status === 'confirmed' || q.status === 'accepted').length,
+        upcomingTrips: 0, // Legacy field
+        upcomingBookings,
         recentActivity: 0
       })
       setRecentClients(recentClients)
@@ -241,17 +271,17 @@ export default function DashboardPage() {
           icon={FileText}
           trend="+8%"
           trendUp={true}
-          href="/itineraries"
+          href="/quotes/b2c"
           color="purple"
         />
 
-        {/* Upcoming Trips */}
+        {/* Upcoming Bookings */}
         <StatCard
           title="Upcoming Trips"
-          value={stats.upcomingTrips}
+          value={stats.upcomingBookings}
           icon={CalendarDays}
           subtitle="Next 30 days"
-          href="/calendar"
+          href="/bookings"
           color="orange"
         />
       </div>
@@ -313,7 +343,7 @@ export default function DashboardPage() {
         <h3 className="text-base font-semibold text-gray-900 mb-3">
           Quick Actions
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${hasB2B ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
           <QuickActionButton
             icon={MessageSquare}
             label="Parse WhatsApp"
@@ -324,8 +354,8 @@ export default function DashboardPage() {
           <QuickActionButton
             icon={Sparkles}
             label="New Quote"
-            href="/itineraries/new"
-            description="Create itinerary from scratch"
+            href={hasB2C ? "/itineraries/new" : "/tours/manage"}
+            description={hasB2C ? "Create itinerary from scratch" : "Create B2B package"}
             color="bg-purple-500"
           />
           <QuickActionButton
@@ -335,13 +365,15 @@ export default function DashboardPage() {
             description="Manage hotels, guides & services"
             color="bg-primary-600"
           />
-          <QuickActionButton
-            icon={Package}
-            label="B2B Packages"
-            href="/tours"
-            description="Ready-made tour packages"
-            color="bg-warning"
-          />
+          {hasB2B && (
+            <QuickActionButton
+              icon={Package}
+              label="B2B Packages"
+              href="/tours/manage"
+              description="Ready-made tour packages"
+              color="bg-warning"
+            />
+          )}
         </div>
       </div>
 
@@ -355,7 +387,7 @@ export default function DashboardPage() {
                 Recent Activity
               </h3>
               <Link
-                href="/itineraries"
+                href="/quotes/b2c"
                 className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
               >
                 View all
@@ -389,8 +421,8 @@ export default function DashboardPage() {
                       <p className="text-sm font-medium text-gray-900">{activity.action}</p>
                       <p className="text-xs text-gray-500">{activity.time}</p>
                     </div>
-                    <Link 
-                      href={`/itineraries/${activity.id}`}
+                    <Link
+                      href={`/quotes/b2c/${activity.id}`}
                       className="text-primary-600 hover:text-primary-700 text-sm font-medium whitespace-nowrap"
                     >
                       View →
@@ -477,13 +509,15 @@ export default function DashboardPage() {
                   <span className="text-xs font-medium text-gray-700">Online</span>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600">B2B Packages</span>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                  <span className="text-xs font-medium text-gray-700">Active</span>
+              {hasB2B && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-600">B2B Packages</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                    <span className="text-xs font-medium text-gray-700">Active</span>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-600">Email Service</span>
                 <div className="flex items-center gap-1.5">

@@ -850,6 +850,10 @@ export default function TourManagerContent() {
   const fetchTemplates = async () => {
     try {
       const response = await fetch('/api/tours/templates')
+      if (!response.ok) {
+        console.error('Templates API error:', response.status)
+        return
+      }
       const data = await response.json()
       if (data.success) {
         setTemplates(data.data)
@@ -863,6 +867,10 @@ export default function TourManagerContent() {
   const fetchThemes = async () => {  // Renamed from fetchCategories
     try {
       const response = await fetch('/api/tours/categories')  // API endpoint stays same
+      if (!response.ok) {
+        console.error('Categories API error:', response.status)
+        return
+      }
       const data = await response.json()
       if (data.success) {
         setThemes(data.data)
@@ -876,6 +884,10 @@ export default function TourManagerContent() {
   const fetchAttractions = async () => {
     try {
       const response = await fetch('/api/rates/entrance-fees?limit=500')
+      if (!response.ok) {
+        console.error('Entrance fees API error:', response.status)
+        return
+      }
       const data = await response.json()
       if (data.success && data.data) {
         // Filter out add-ons, keep only main attractions
@@ -888,11 +900,22 @@ export default function TourManagerContent() {
   }
 
   useEffect(() => {
+    // Set a timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      setLoading(false)
+      console.warn('Tour manager loading timeout reached')
+    }, 10000) // 10 second timeout
+
     Promise.all([
-      fetchTemplates(), 
+      fetchTemplates(),
       fetchThemes(),  // Renamed from fetchCategories
       fetchAttractions()  // NEW: Fetch attractions on load
-    ]).finally(() => setLoading(false))
+    ]).finally(() => {
+      clearTimeout(loadingTimeout)
+      setLoading(false)
+    })
+
+    return () => clearTimeout(loadingTimeout)
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

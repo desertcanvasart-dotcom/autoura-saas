@@ -6,8 +6,9 @@ import Link from 'next/link'
 import {
   BookOpen, User, Calendar, Eye, DollarSign, Filter, Search,
   ChevronRight, AlertCircle, Loader2, Clock, CheckCircle2,
-  Plane, PartyPopper, XCircle
+  Plane, PartyPopper, XCircle, Users, Building2
 } from 'lucide-react'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 interface Booking {
   id: string
@@ -61,15 +62,20 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function BookingsPage() {
   const router = useRouter()
+  const { hasB2C, hasB2B } = useTenant()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Determine default booking type based on tenant mode
+  const defaultBookingType = hasB2C && hasB2B ? 'all' : hasB2C ? 'b2c' : 'b2b'
+  const [bookingType, setBookingType] = useState<'all' | 'b2c' | 'b2b'>(defaultBookingType)
+
   useEffect(() => {
     fetchBookings()
-  }, [statusFilter])
+  }, [statusFilter, bookingType])
 
   const fetchBookings = async () => {
     try {
@@ -77,6 +83,9 @@ export default function BookingsPage() {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') {
         params.append('status', statusFilter)
+      }
+      if (bookingType !== 'all') {
+        params.append('quote_type', bookingType)
       }
 
       const response = await fetch(`/api/bookings?${params.toString()}`)
@@ -124,6 +133,9 @@ export default function BookingsPage() {
     completed: statusCounts.completed
   }
 
+  // Show tabs only if tenant has both B2C and B2B
+  const showBookingTypeTabs = hasB2C && hasB2B
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -140,6 +152,47 @@ export default function BookingsPage() {
               </div>
             </div>
           </div>
+
+          {/* B2C/B2B Tabs - Only show if tenant has both */}
+          {showBookingTypeTabs && (
+            <div className="flex items-center gap-2 mt-4 border-b border-gray-200">
+              <button
+                type="button"
+                onClick={() => setBookingType('all')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  bookingType === 'all'
+                    ? 'border-green-600 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                All Bookings
+              </button>
+              <button
+                type="button"
+                onClick={() => setBookingType('b2c')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                  bookingType === 'b2c'
+                    ? 'border-green-600 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                B2C (Direct Clients)
+              </button>
+              <button
+                type="button"
+                onClick={() => setBookingType('b2b')}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+                  bookingType === 'b2b'
+                    ? 'border-green-600 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                B2B (Partners)
+              </button>
+            </div>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-5 gap-4 mt-4">
