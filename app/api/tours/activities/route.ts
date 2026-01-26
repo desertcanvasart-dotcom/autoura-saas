@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
-
-// ============================================
-// ACTIVITIES COLLECTION ROUTE
-// File: app/api/tours/activities/route.ts
-// ============================================
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - List all activities (optionally filter by tour_day_id)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
 
     const { searchParams } = new URL(request.url)
     const dayId = searchParams.get('tour_day_id')
@@ -55,13 +51,43 @@ export async function GET(request: NextRequest) {
 // POST - Create new activity
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
-    if (!body.tour_day_id || body.activity_order === undefined) {
+    if (!body.tour_day_id) {
       return NextResponse.json(
-        { success: false, error: 'Day ID and activity order are required' },
+        { success: false, error: 'Day ID is required' },
         { status: 400 }
+      )
+    }
+
+    // Verify tour day belongs to this tenant
+    const { data: day } = await supabase
+      .from('tour_days')
+      .select('id, tenant_id')
+      .eq('id', body.tour_day_id)
+      .single()
+
+    if (!day) {
+      return NextResponse.json(
+        { success: false, error: 'Tour day not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    if (day.tenant_id !== tenant_id) {
+      return NextResponse.json(
+        { success: false, error: 'Cannot create activity for day from another tenant' },
+        { status: 403 }
       )
     }
 
@@ -75,12 +101,13 @@ export async function POST(request: NextRequest) {
         .order('activity_order', { ascending: false })
         .limit(1)
 
-      activityOrder = existingActivities && existingActivities.length > 0 
-        ? (existingActivities[0].activity_order || 0) + 1 
+      activityOrder = existingActivities && existingActivities.length > 0
+        ? (existingActivities[0].activity_order || 0) + 1
         : 1
     }
 
     const activityData = {
+      tenant_id, // ✅ Explicit tenant_id
       tour_day_id: body.tour_day_id,
       activity_order: activityOrder,
       entrance_id: body.entrance_id || null,

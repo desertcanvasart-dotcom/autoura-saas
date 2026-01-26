@@ -574,10 +574,21 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
         if (res.ok) {
           const data = await res.json()
           
-          // Ensure all tiers exist
+          // Ensure all tiers exist with proper defaults
           const variations = TIERS.map(tier => {
             const existing = data.variations?.find((v: ContentVariation) => v.tier === tier)
-            return existing || {
+            if (existing) {
+              return {
+                ...existing,
+                title: existing.title || '',
+                description: existing.description || '',
+                highlights: existing.highlights || [],
+                inclusions: existing.inclusions || [],
+                internal_notes: existing.internal_notes || '',
+                is_active: existing.is_active ?? true
+              }
+            }
+            return {
               tier,
               title: '',
               description: '',
@@ -590,7 +601,14 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
 
           setFormData({
             ...data,
+            name: data.name || '',
+            slug: data.slug || '',
+            short_description: data.short_description || '',
+            location: data.location || '',
+            duration: data.duration || '',
+            tags: data.tags || [],
             metadata: data.metadata || {},
+            is_active: data.is_active ?? true,
             variations
           })
 
@@ -686,10 +704,16 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
       const url = isNew ? '/api/content-library' : `/api/content-library/${id}`
       const method = isNew ? 'POST' : 'PUT'
 
+      // Only include variations that have actual content (description filled)
+      const variationsToSave = formData.variations.filter(v => v.description && v.description.trim() !== '')
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          variations: variationsToSave
+        })
       })
 
       if (res.ok) {

@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
-import { 
+import {
   TrendingUp,
   TrendingDown,
   DollarSign,
@@ -19,6 +18,7 @@ import {
   Building,
   Percent
 } from 'lucide-react'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface MonthlyData {
   month: string
@@ -146,6 +146,15 @@ export default function FinancialReportsPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [activeTab, setActiveTab] = useState<'overview' | 'revenue' | 'cashflow' | 'tax' | 'commission'>('overview')
 
+  // Currency conversion hook
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+
+  // Helper to format currency with conversion
+  const formatAmount = (amount: number) => {
+    const converted = convert(amount)
+    return `${symbol}${converted.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
@@ -200,7 +209,7 @@ export default function FinancialReportsPage() {
 
   const maxMonthlyRevenue = Math.max(...monthly.map(m => Math.max(m.revenue, m.expenses)), 1)
 
-  if (loading) {
+  if (loading || currencyLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
@@ -272,7 +281,7 @@ export default function FinancialReportsPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Revenue</p>
-              <p className="text-2xl font-semibold text-blue-600">€{summary.total_revenue.toLocaleString()}</p>
+              <p className="text-2xl font-semibold text-blue-600">{formatAmount(summary.total_revenue)}</p>
               {yearOverYear && (
                 <p className={`text-xs mt-1 flex items-center gap-1 ${getChangeColor(yearOverYear.revenue_change_percent)}`}>
                   {getChangeIcon(yearOverYear.revenue_change_percent)}
@@ -287,7 +296,7 @@ export default function FinancialReportsPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
-              <p className="text-2xl font-semibold text-red-600">€{summary.total_expenses.toLocaleString()}</p>
+              <p className="text-2xl font-semibold text-red-600">{formatAmount(summary.total_expenses)}</p>
               {yearOverYear && (
                 <p className={`text-xs mt-1 flex items-center gap-1 ${getChangeColor(-yearOverYear.expense_change_percent)}`}>
                   {getChangeIcon(yearOverYear.expense_change_percent)}
@@ -303,7 +312,7 @@ export default function FinancialReportsPage() {
               </div>
               <p className="text-xs text-gray-500 mb-1">Gross Profit</p>
               <p className={`text-2xl font-semibold ${summary.gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                €{summary.gross_profit.toLocaleString()}
+                {formatAmount(summary.gross_profit)}
               </p>
               <p className="text-xs text-gray-400 mt-1">{summary.profit_margin.toFixed(1)}% margin</p>
             </div>
@@ -314,7 +323,7 @@ export default function FinancialReportsPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               </div>
               <p className="text-xs text-gray-500 mb-1">Collected</p>
-              <p className="text-2xl font-semibold text-emerald-600">€{summary.total_collected.toLocaleString()}</p>
+              <p className="text-2xl font-semibold text-emerald-600">{formatAmount(summary.total_collected)}</p>
               <p className="text-xs text-gray-400 mt-1">{summary.collection_rate.toFixed(1)}% collected</p>
             </div>
 
@@ -325,7 +334,7 @@ export default function FinancialReportsPage() {
               </div>
               <p className="text-xs text-gray-500 mb-1">Trips</p>
               <p className="text-2xl font-semibold text-purple-600">{summary.trip_count}</p>
-              <p className="text-xs text-gray-400 mt-1">€{summary.average_trip_value.toLocaleString()} avg</p>
+              <p className="text-xs text-gray-400 mt-1">{formatAmount(summary.average_trip_value)} avg</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -358,16 +367,16 @@ export default function FinancialReportsPage() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Revenue</span>
-                      <span className="font-medium text-blue-600">€{q.revenue.toLocaleString()}</span>
+                      <span className="font-medium text-blue-600">{formatAmount(q.revenue)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Expenses</span>
-                      <span className="font-medium text-red-600">€{q.expenses.toLocaleString()}</span>
+                      <span className="font-medium text-red-600">{formatAmount(q.expenses)}</span>
                     </div>
                     <div className="flex justify-between text-sm border-t border-gray-200 pt-2">
                       <span className="text-gray-500">Profit</span>
                       <span className={`font-semibold ${q.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        €{q.net_profit.toLocaleString()}
+                        {formatAmount(q.net_profit)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -401,15 +410,15 @@ export default function FinancialReportsPage() {
               {monthly.map(m => (
                 <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
                   <div className="w-full flex gap-0.5 items-end h-40">
-                    <div 
+                    <div
                       className="flex-1 bg-blue-500 rounded-t transition-all"
                       style={{ height: `${(m.revenue / maxMonthlyRevenue) * 100}%` }}
-                      title={`Revenue: €${m.revenue.toLocaleString()}`}
+                      title={`Revenue: ${formatAmount(m.revenue)}`}
                     />
-                    <div 
+                    <div
                       className="flex-1 bg-red-400 rounded-t transition-all"
                       style={{ height: `${(m.expenses / maxMonthlyRevenue) * 100}%` }}
-                      title={`Expenses: €${m.expenses.toLocaleString()}`}
+                      title={`Expenses: ${formatAmount(m.expenses)}`}
                     />
                   </div>
                   <span className="text-xs text-gray-500">{m.month}</span>
@@ -450,11 +459,11 @@ export default function FinancialReportsPage() {
                 {monthly.map(m => (
                   <tr key={m.month} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{m.month} {m.year}</td>
-                    <td className="px-4 py-3 text-sm text-right text-blue-600">€{m.invoiced.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-right text-emerald-600">€{m.collected.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-right text-red-600">€{m.expenses.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-right text-blue-600">{formatAmount(m.invoiced)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-emerald-600">{formatAmount(m.collected)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-red-600">{formatAmount(m.expenses)}</td>
                     <td className={`px-4 py-3 text-sm text-right font-semibold ${m.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      €{m.net_profit.toLocaleString()}
+                      {formatAmount(m.net_profit)}
                     </td>
                     <td className="px-4 py-3 text-sm text-center text-gray-600">{m.trip_count}</td>
                     <td className="px-4 py-3 text-sm text-center text-gray-600">{m.invoice_count}</td>
@@ -463,16 +472,16 @@ export default function FinancialReportsPage() {
                 <tr className="bg-gray-50 font-semibold">
                   <td className="px-4 py-3 text-sm text-gray-900">Total</td>
                   <td className="px-4 py-3 text-sm text-right text-blue-600">
-                    €{monthly.reduce((sum, m) => sum + m.invoiced, 0).toLocaleString()}
+                    {formatAmount(monthly.reduce((sum, m) => sum + m.invoiced, 0))}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-emerald-600">
-                    €{monthly.reduce((sum, m) => sum + m.collected, 0).toLocaleString()}
+                    {formatAmount(monthly.reduce((sum, m) => sum + m.collected, 0))}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-red-600">
-                    €{monthly.reduce((sum, m) => sum + m.expenses, 0).toLocaleString()}
+                    {formatAmount(monthly.reduce((sum, m) => sum + m.expenses, 0))}
                   </td>
                   <td className={`px-4 py-3 text-sm text-right ${summary && summary.gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    €{monthly.reduce((sum, m) => sum + m.net_profit, 0).toLocaleString()}
+                    {formatAmount(monthly.reduce((sum, m) => sum + m.net_profit, 0))}
                   </td>
                   <td className="px-4 py-3 text-sm text-center text-gray-600">
                     {monthly.reduce((sum, m) => sum + m.trip_count, 0)}
@@ -494,30 +503,30 @@ export default function FinancialReportsPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Cash Inflows</p>
-              <p className="text-xl font-semibold text-green-600">€{cashFlow.inflows.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-green-600">{formatAmount(cashFlow.inflows)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Cash Outflows</p>
-              <p className="text-xl font-semibold text-red-600">€{cashFlow.outflows.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-red-600">{formatAmount(cashFlow.outflows)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Net Cash Flow</p>
               <p className={`text-xl font-semibold ${cashFlow.net_cash_flow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                €{cashFlow.net_cash_flow.toLocaleString()}
+                {formatAmount(cashFlow.net_cash_flow)}
               </p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Pending Receivables</p>
-              <p className="text-xl font-semibold text-blue-600">€{cashFlow.pending_receivables.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-blue-600">{formatAmount(cashFlow.pending_receivables)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Pending Payables</p>
-              <p className="text-xl font-semibold text-orange-600">€{cashFlow.pending_payables.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-orange-600">{formatAmount(cashFlow.pending_payables)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Projected Cash</p>
               <p className={`text-xl font-semibold ${cashFlow.projected_cash >= 0 ? 'text-purple-600' : 'text-red-600'}`}>
-                €{cashFlow.projected_cash.toLocaleString()}
+                {formatAmount(cashFlow.projected_cash)}
               </p>
             </div>
           </div>
@@ -547,10 +556,10 @@ export default function FinancialReportsPage() {
                 {cashFlow.monthly_cash_flow.map(m => (
                   <tr key={m.month} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{m.month}</td>
-                    <td className="px-4 py-3 text-sm text-right text-green-600">€{m.inflow.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-right text-red-600">€{m.outflow.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-right text-green-600">{formatAmount(m.inflow)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-red-600">{formatAmount(m.outflow)}</td>
                     <td className={`px-4 py-3 text-sm text-right font-semibold ${m.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      €{m.net.toLocaleString()}
+                      {formatAmount(m.net)}
                     </td>
                   </tr>
                 ))}
@@ -567,19 +576,19 @@ export default function FinancialReportsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Gross Revenue</p>
-              <p className="text-xl font-semibold text-blue-600">€{taxSummary.gross_revenue.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-blue-600">{formatAmount(taxSummary.gross_revenue)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
-              <p className="text-xl font-semibold text-red-600">€{taxSummary.total_expenses.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-red-600">{formatAmount(taxSummary.total_expenses)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Deductible Expenses</p>
-              <p className="text-xl font-semibold text-green-600">€{taxSummary.deductible_expenses.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-green-600">{formatAmount(taxSummary.deductible_expenses)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Taxable Income</p>
-              <p className="text-xl font-semibold text-purple-600">€{taxSummary.taxable_income.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-purple-600">{formatAmount(taxSummary.taxable_income)}</p>
             </div>
           </div>
 
@@ -589,18 +598,18 @@ export default function FinancialReportsPage() {
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 bg-blue-50 rounded-lg">
                 <p className="text-xs text-blue-600 mb-1">VAT Collected</p>
-                <p className="text-lg font-semibold text-blue-700">€{taxSummary.estimated_vat_collected.toLocaleString()}</p>
+                <p className="text-lg font-semibold text-blue-700">{formatAmount(taxSummary.estimated_vat_collected)}</p>
               </div>
               <div className="p-4 bg-red-50 rounded-lg">
                 <p className="text-xs text-red-600 mb-1">VAT Paid</p>
-                <p className="text-lg font-semibold text-red-700">€{taxSummary.estimated_vat_paid.toLocaleString()}</p>
+                <p className="text-lg font-semibold text-red-700">{formatAmount(taxSummary.estimated_vat_paid)}</p>
               </div>
               <div className={`p-4 rounded-lg ${taxSummary.net_vat >= 0 ? 'bg-green-50' : 'bg-orange-50'}`}>
                 <p className={`text-xs mb-1 ${taxSummary.net_vat >= 0 ? 'text-green-600' : 'text-orange-600'}`}>
                   Net VAT {taxSummary.net_vat >= 0 ? 'Payable' : 'Receivable'}
                 </p>
                 <p className={`text-lg font-semibold ${taxSummary.net_vat >= 0 ? 'text-green-700' : 'text-orange-700'}`}>
-                  €{Math.abs(taxSummary.net_vat).toLocaleString()}
+                  {formatAmount(Math.abs(taxSummary.net_vat))}
                 </p>
               </div>
             </div>
@@ -630,11 +639,11 @@ export default function FinancialReportsPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-gray-500">{cat.percentage.toFixed(1)}%</span>
-                        <span className="font-medium text-gray-900">€{cat.amount.toLocaleString()}</span>
+                        <span className="font-medium text-gray-900">{formatAmount(cat.amount)}</span>
                       </div>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-[#647C47] rounded-full transition-all"
                         style={{ width: `${cat.percentage}%` }}
                       />
@@ -654,15 +663,15 @@ export default function FinancialReportsPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Total Commissions</p>
-              <p className="text-xl font-semibold text-blue-600">€{commissionSummary.total_commissions.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-blue-600">{formatAmount(commissionSummary.total_commissions)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Paid</p>
-              <p className="text-xl font-semibold text-green-600">€{commissionSummary.total_paid.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-green-600">{formatAmount(commissionSummary.total_paid)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Pending</p>
-              <p className="text-xl font-semibold text-orange-600">€{commissionSummary.total_pending.toLocaleString()}</p>
+              <p className="text-xl font-semibold text-orange-600">{formatAmount(commissionSummary.total_pending)}</p>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4">
               <p className="text-xs text-gray-500 mb-1">Recipients</p>
@@ -680,7 +689,7 @@ export default function FinancialReportsPage() {
                   <div key={type.type} className="p-4 bg-gray-50 rounded-lg text-center">
                     <span className="text-2xl">{config.icon}</span>
                     <p className="text-xs text-gray-500 mt-2">{config.label}</p>
-                    <p className="text-lg font-semibold text-gray-900 mt-1">€{type.amount.toLocaleString()}</p>
+                    <p className="text-lg font-semibold text-gray-900 mt-1">{formatAmount(type.amount)}</p>
                     <p className="text-xs text-gray-400">{type.count} payments</p>
                   </div>
                 )
@@ -738,13 +747,13 @@ export default function FinancialReportsPage() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">{config.label}</td>
                         <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
-                          €{recipient.total_earned.toLocaleString()}
+                          {formatAmount(recipient.total_earned)}
                         </td>
                         <td className="px-4 py-3 text-sm text-right text-green-600">
-                          €{recipient.total_paid.toLocaleString()}
+                          {formatAmount(recipient.total_paid)}
                         </td>
                         <td className="px-4 py-3 text-sm text-right text-orange-600">
-                          €{recipient.total_pending.toLocaleString()}
+                          {formatAmount(recipient.total_pending)}
                         </td>
                         <td className="px-4 py-3 text-sm text-center text-gray-600">{recipient.trip_count}</td>
                       </tr>

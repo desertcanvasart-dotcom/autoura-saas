@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useRole, UserRole } from '@/hooks/useRole'
 import NotificationBell from '@/components/NotificationBell'
+import TenantSwitcher from '@/components/TenantSwitcher'
 import {
   LayoutDashboard,
   Users,
@@ -44,7 +46,6 @@ import {
   UserCog,
   Shield,
   BookOpen,
-  Wand2,
   Handshake,
   Send,
   Route,
@@ -71,6 +72,7 @@ interface NavItem {
   icon: any
   roles?: UserRole[]
   children?: NavSubItem[]
+  businessTypes?: string[] // Which business types can see this item
 }
 
 interface NavSection {
@@ -95,7 +97,7 @@ const navigation: NavSection[] = [
     key: 'crm',
     roles: ['admin', 'manager', 'agent'],
     items: [
-      { label: 'Clients', href: '/clients', icon: Users },
+      { label: 'Clients', href: '/clients', icon: Users, businessTypes: ['b2c_only', 'b2c_and_b2b'] },
       { label: 'Staff', href: '/contacts?type=staff', icon: UserCog },
       { label: 'Follow-ups', href: '/followups', icon: CheckSquare },
       { label: 'Calendar', href: '/calendar', icon: Calendar },
@@ -124,6 +126,33 @@ const navigation: NavSection[] = [
     ]
   },
   {
+    title: 'Quotes',
+    key: 'quotes',
+    roles: ['admin', 'manager', 'agent'],
+    items: [
+      {
+        label: 'B2C Quotes',
+        href: '/quotes/b2c',
+        icon: User,
+        businessTypes: ['b2c_only', 'b2c_and_b2b']
+      },
+      {
+        label: 'B2B Quotes',
+        href: '/quotes/b2b',
+        icon: Building,
+        businessTypes: ['b2b_only', 'b2c_and_b2b']
+      },
+    ]
+  },
+  {
+    title: 'Bookings',
+    key: 'bookings',
+    roles: ['admin', 'manager', 'agent'],
+    items: [
+      { label: 'All Bookings', href: '/bookings', icon: BookOpen },
+    ]
+  },
+  {
     title: 'Rates & Pricing',
     key: 'rates',
     roles: ['admin', 'manager'],
@@ -132,6 +161,7 @@ const navigation: NavSection[] = [
       { label: 'Hotels', href: '/rates/hotels', icon: Hotel },
       { label: 'Nile Cruises', href: '/rates/cruises', icon: Ship },
       { label: 'Sleeping Trains', href: '/rates/sleeping-train', icon: BedDouble },
+      { label: 'Flights', href: '/rates/flights', icon: Plane },
       { label: 'Trains', href: '/rates/trains', icon: Train },
       { label: 'Meals', href: '/rates/meals', icon: UtensilsCrossed },
       { label: 'Attractions', href: '/rates/attractions', icon: Building },
@@ -165,7 +195,6 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Content Library', href: '/content-library', icon: Library },
       { label: 'Writing Rules', href: '/content-library/rules', icon: BookOpen },
-      { label: 'AI Prompts', href: '/content-library/prompts', icon: Wand2 },
       { label: 'Documents', href: '/documents', icon: FileText },
     ]
   },
@@ -195,6 +224,9 @@ const navigation: NavSection[] = [
     roles: ['admin'],
     items: [
       { label: 'Settings', href: '/settings', icon: Settings },
+      { label: 'Organization', href: '/settings/tenant', icon: Building },
+      { label: 'Team Management', href: '/settings/team', icon: Users },
+      { label: 'Billing and Subscriptions', href: '/settings/billing', icon: CreditCard },
       { label: 'User Management', href: '/users', icon: Shield },
     ]
   }
@@ -221,22 +253,48 @@ const ROLE_LABELS: Record<UserRole, string> = {
 export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname()
   const { profile, signOut } = useAuth()
+  const { tenant, hasB2B, hasB2C } = useTenant()
   const { role, canAccess } = useRole()
-  
+
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'crm', 'trips'])
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['Contacts'])
   const [currentUrl, setCurrentUrl] = useState('')
 
-  // Filter navigation based on user role
+  // Filter navigation based on user role AND feature flags
   const filteredNavigation = navigation.filter(section => {
-    if (!section.roles) return true
-    return canAccess(section.roles)
+    // Filter by role
+    if (section.roles && !canAccess(section.roles)) return false
+
+    // Filter by feature flags
+    if (section.key === 'b2b' && !hasB2B) return false
+
+    return true
   }).map(section => ({
     ...section,
     items: section.items.filter(item => {
-      if (!item.roles) return true
-      return canAccess(item.roles)
+      // Filter by role
+      if (item.roles && !canAccess(item.roles)) return false
+
+      // Filter by feature flags instead of business type
+      if (item.businessTypes) {
+        // Determine current business type from feature flags
+        let currentBusinessType: string
+        if (hasB2C && hasB2B) {
+          currentBusinessType = 'b2c_and_b2b'
+        } else if (hasB2C && !hasB2B) {
+          currentBusinessType = 'b2c_only'
+        } else if (!hasB2C && hasB2B) {
+          currentBusinessType = 'b2b_only'
+        } else {
+          return false // No features enabled
+        }
+
+        // Show item if current business type matches any allowed type
+        return item.businessTypes.includes(currentBusinessType)
+      }
+
+      return true
     })
   }))
 
@@ -399,6 +457,9 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
           </div>
         )}
 
+        {/* Tenant Switcher */}
+        <TenantSwitcher isCollapsed={isCollapsed} />
+
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400">
           {filteredNavigation.map((section) => {
@@ -552,8 +613,8 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
               ${isCollapsed ? 'justify-center' : ''}
             `}
           >
-            <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
-              <User className="w-3.5 h-3.5 text-primary-600" />
+            <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+              <User className="w-3.5 h-3.5 text-green-700" />
             </div>
             {!isCollapsed && (
               <div className="flex-1 text-left min-w-0">

@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { 
-  Search, 
-  Plus, 
-  Edit2, 
-  Trash2, 
+import {
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
   X,
   Car,
   ChevronDown,
@@ -13,9 +13,13 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Building2
+  Building2,
+  Copy,
+  Download,
+  Upload
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface TransportationRate {
   id: string
@@ -91,11 +95,15 @@ const initialFormData: FormData = {
 
 const SERVICE_TYPES = [
   { value: 'airport_transfer', label: 'Airport Transfer', needsDestination: false },
-  { value: 'day_tour', label: 'Day Tour', needsDestination: false },
-  { value: 'multi_day', label: 'Multi-Day', needsDestination: false },
   { value: 'city_transfer', label: 'City Transfer', needsDestination: true },
-  { value: 'intercity', label: 'Intercity', needsDestination: true },
+  { value: 'day_tour', label: 'Day Tour', needsDestination: false },
   { value: 'half_day', label: 'Half Day', needsDestination: false },
+  { value: 'intercity_day_trip', label: 'Intercity Day Trip', needsDestination: true },
+  { value: 'intercity_dropoff', label: 'Intercity Drop-off', needsDestination: true },
+  { value: 'intercity_overnight', label: 'Intercity Overnight', needsDestination: true },
+  { value: 'long_day_tour', label: 'Long Day Tour', needsDestination: false },
+  { value: 'multi_day', label: 'Multi-Day', needsDestination: false },
+  { value: 'outside_dinner', label: 'Outside Dinner Transfer', needsDestination: false },
   { value: 'sound_light', label: 'Sound & Light Transfer', needsDestination: false },
 ]
 
@@ -115,7 +123,8 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function TransportationContent() {
   const dialog = useConfirmDialog()
-  
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+
   const [rates, setRates] = useState<TransportationRate[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])  // NEW: suppliers list
   const [loading, setLoading] = useState(true)
@@ -347,10 +356,10 @@ export default function TransportationContent() {
   }
 
   const handleDelete = async (rate: TransportationRate) => {
-    const confirmed = await dialog.confirmDelete('Transportation Rate', 
+    const confirmed = await dialog.confirmDelete('Transportation Rate',
       `Are you sure you want to delete "${rate.service_code}"? This action cannot be undone.`
     )
-    
+
     if (!confirmed) return
 
     try {
@@ -368,6 +377,187 @@ export default function TransportationContent() {
       console.error('Error deleting transportation rate:', error)
       await dialog.alert('Error', 'Failed to delete transportation rate. Please try again.', 'warning')
     }
+  }
+
+  // Clone a rate - copy all fields to form and open modal for new entry
+  const handleClone = (rate: TransportationRate) => {
+    setEditingRate(null)
+    setError(null)
+    setFormData({
+      service_code: rate.service_code + '-COPY',
+      service_type: rate.service_type,
+      vehicle_type: rate.vehicle_type,
+      capacity_min: rate.capacity_min,
+      capacity_max: rate.capacity_max,
+      city: rate.city,
+      destination_city: rate.destination_city || '',
+      base_rate_eur: rate.base_rate_eur,
+      base_rate_non: rate.base_rate_non || rate.base_rate_non_eur || 0,
+      season: rate.season || '',
+      rate_valid_from: rate.rate_valid_from,
+      rate_valid_to: rate.rate_valid_to,
+      supplier_id: rate.supplier_id || '',
+      supplier_name: rate.supplier_name || rate.suppliers?.name || '',
+      notes: rate.notes || '',
+      is_active: rate.is_active
+    })
+    setIsModalOpen(true)
+  }
+
+  // Export filtered rates to CSV
+  const handleExportCSV = () => {
+    if (filteredRates.length === 0) {
+      dialog.alert('No Data', 'No rates to export.', 'warning')
+      return
+    }
+
+    const headers = [
+      'service_code',
+      'service_type',
+      'vehicle_type',
+      'capacity_min',
+      'capacity_max',
+      'city',
+      'destination_city',
+      'base_rate_eur',
+      'base_rate_non',
+      'season',
+      'rate_valid_from',
+      'rate_valid_to',
+      'supplier_id',
+      'supplier_name',
+      'notes',
+      'is_active'
+    ]
+
+    const csvRows = [
+      headers.join(','),
+      ...filteredRates.map(rate => {
+        const values = [
+          `"${rate.service_code || ''}"`,
+          `"${rate.service_type || ''}"`,
+          `"${rate.vehicle_type || ''}"`,
+          rate.capacity_min || 1,
+          rate.capacity_max || 2,
+          `"${rate.city || ''}"`,
+          `"${rate.destination_city || ''}"`,
+          rate.base_rate_eur || 0,
+          rate.base_rate_non || rate.base_rate_non_eur || 0,
+          `"${rate.season || ''}"`,
+          `"${rate.rate_valid_from || ''}"`,
+          `"${rate.rate_valid_to || ''}"`,
+          `"${rate.supplier_id || ''}"`,
+          `"${rate.supplier_name || rate.suppliers?.name || ''}"`,
+          `"${(rate.notes || '').replace(/"/g, '""')}"`,
+          rate.is_active ? 'true' : 'false'
+        ]
+        return values.join(',')
+      })
+    ]
+
+    const csvContent = csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `transportation-rates-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // Import rates from CSV file
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+
+        if (lines.length < 2) {
+          await dialog.alert('Invalid File', 'CSV file must have a header row and at least one data row.', 'warning')
+          return
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+        const requiredHeaders = ['service_code', 'service_type', 'vehicle_type', 'city', 'base_rate_eur']
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
+
+        if (missingHeaders.length > 0) {
+          await dialog.alert('Missing Headers', `CSV is missing required headers: ${missingHeaders.join(', ')}`, 'warning')
+          return
+        }
+
+        let successCount = 0
+        let errorCount = 0
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].match(/("([^"]|"")*"|[^,]*)/g)?.map(v =>
+            v.trim().replace(/^"|"$/g, '').replace(/""/g, '"')
+          ) || []
+
+          if (values.length < headers.length) continue
+
+          const record: Record<string, string | number | boolean | null> = {}
+          headers.forEach((header, index) => {
+            record[header] = values[index] || ''
+          })
+
+          const rateData = {
+            service_code: record.service_code as string,
+            service_type: record.service_type as string,
+            vehicle_type: record.vehicle_type as string,
+            capacity_min: parseInt(record.capacity_min as string) || 1,
+            capacity_max: parseInt(record.capacity_max as string) || 2,
+            city: record.city as string,
+            destination_city: record.destination_city as string || null,
+            base_rate_eur: parseFloat(record.base_rate_eur as string) || 0,
+            base_rate_non: parseFloat(record.base_rate_non as string) || 0,
+            season: record.season as string || null,
+            rate_valid_from: record.rate_valid_from as string || new Date().toISOString().split('T')[0],
+            rate_valid_to: record.rate_valid_to as string || '2099-12-31',
+            supplier_id: record.supplier_id as string || null,
+            supplier_name: record.supplier_name as string || null,
+            notes: record.notes as string || null,
+            is_active: record.is_active === 'true' || record.is_active === '1'
+          }
+
+          try {
+            const response = await fetch('/api/resources/transportation', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(rateData)
+            })
+
+            if (response.ok) {
+              successCount++
+            } else {
+              errorCount++
+            }
+          } catch {
+            errorCount++
+          }
+        }
+
+        await dialog.alert(
+          'Import Complete',
+          `Successfully imported ${successCount} rates. ${errorCount > 0 ? `Failed: ${errorCount}` : ''}`,
+          successCount > 0 ? 'success' : 'warning'
+        )
+
+        fetchRates()
+      } catch (error) {
+        console.error('Error importing CSV:', error)
+        await dialog.alert('Import Error', 'Failed to parse CSV file. Please check the format.', 'warning')
+      }
+    }
+
+    reader.readAsText(file)
+    event.target.value = ''
   }
 
   // Filter rates
@@ -423,13 +613,28 @@ export default function TransportationContent() {
           <Car className="h-5 w-5 text-blue-600" />
           <h1 className="text-lg font-semibold text-gray-900">Transportation Rates</h1>
         </div>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-sm rounded-md hover:bg-[#4f6238] transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Rate
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 font-medium"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+          <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 font-medium cursor-pointer">
+            <Upload className="w-4 h-4" />
+            Import
+            <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+          </label>
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-sm rounded-md hover:bg-[#4f6238] transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Rate
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards - UPDATED: added linked suppliers stat */}
@@ -572,7 +777,7 @@ export default function TransportationContent() {
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Vehicle</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Capacity</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Route</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">EUR Rate</th>
+              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">{userCurrency} Rate</th>
               <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Status</th>
               <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Actions</th>
             </tr>
@@ -627,7 +832,7 @@ export default function TransportationContent() {
                       )}
                     </td>
                     <td className="px-4 py-2 text-right">
-                      <span className="text-sm font-medium text-gray-900">€{Number(rate.base_rate_eur).toFixed(2)}</span>
+                      <span className="text-sm font-medium text-gray-900">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-2 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -641,6 +846,7 @@ export default function TransportationContent() {
                     <td className="px-4 py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
+                          type="button"
                           onClick={() => openEditModal(rate)}
                           className="p-1 text-gray-400 hover:text-[#647C47] transition-colors"
                           title="Edit"
@@ -648,6 +854,15 @@ export default function TransportationContent() {
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
+                          type="button"
+                          onClick={() => handleClone(rate)}
+                          className="p-1 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded"
+                          title="Duplicate"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDelete(rate)}
                           className="p-1 text-gray-400 hover:text-red-600 transition-colors"
                           title="Delete"
@@ -952,12 +1167,15 @@ export default function TransportationContent() {
 
               {/* Pricing */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-700 border-b pb-2">Pricing</h3>
-                
+                <div className="flex items-center justify-between border-b pb-2">
+                  <h3 className="text-sm font-medium text-gray-700">Pricing</h3>
+                  <span className="text-xs text-gray-400">Enter rates in EUR (base currency)</span>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      EUR Rate <span className="text-red-500">*</span>
+                      EU Passport Rate <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">€</span>
@@ -975,10 +1193,10 @@ export default function TransportationContent() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Non-EUR Rate
+                      Non-EU Passport Rate
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">€</span>
                       <input
                         type="number"
                         value={formData.base_rate_non}

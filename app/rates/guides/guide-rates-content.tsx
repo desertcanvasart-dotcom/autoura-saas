@@ -12,6 +12,8 @@ import {
   X,
   Check,
   Download,
+  Upload,
+  Copy,
   Filter,
   Globe,
   MapPin,
@@ -28,6 +30,7 @@ import {
   XCircle,
   Info
 } from 'lucide-react'
+import { useCurrency } from '@/hooks/useCurrency'
 
 // Egyptian cities
 const EGYPT_CITIES = [
@@ -48,7 +51,9 @@ const GUIDE_TYPES = [
   { value: 'egyptologist', label: 'Egyptologist' },
   { value: 'local', label: 'Local Guide' },
   { value: 'specialist', label: 'Specialist' },
-  { value: 'driver_guide', label: 'Driver Guide' }
+  { value: 'driver_guide', label: 'Driver Guide' },
+  { value: 'birdwatching', label: 'Birdwatching Guide' },
+  { value: 'bedouin', label: 'Bedouin Guide' }
 ]
 
 const TOUR_DURATIONS = [
@@ -119,11 +124,14 @@ export default function GuideRatesContent() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   // Toast/Notification
-  const [notification, setNotification] = useState<{ 
+  const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'info' | 'warning'
     title: string
-    message: string 
+    message: string
   } | null>(null)
+
+  // Currency conversion
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
   const showNotification = (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string) => {
     setNotification({ type, title, message })
@@ -259,6 +267,199 @@ export default function GuideRatesContent() {
       is_active: rate.is_active
     })
     setShowModal(true)
+  }
+
+  // Clone a rate - copy all fields, clear ID/code, open modal for new entry
+  const handleClone = (rate: GuideRate) => {
+    setEditingRate(null) // This will be a new record
+    setFormData({
+      service_code: generateServiceCode(), // Generate new code
+      guide_language: rate.guide_language || 'English',
+      guide_type: rate.guide_type || 'licensed',
+      city: rate.city || '',
+      tour_duration: rate.tour_duration || 'full_day',
+      base_rate_eur: rate.base_rate_eur || 0,
+      base_rate_non_eur: rate.base_rate_non_eur || 0,
+      season: rate.season || '',
+      rate_valid_from: rate.rate_valid_from || today,
+      rate_valid_to: rate.rate_valid_to || nextYear,
+      supplier_id: rate.supplier_id || '',
+      notes: rate.notes || '',
+      is_active: rate.is_active
+    })
+    setShowModal(true)
+  }
+
+  // Export filtered rates to CSV
+  const handleExportCSV = () => {
+    if (filteredRates.length === 0) {
+      showNotification('warning', 'No Data', 'No rates to export. Adjust your filters and try again.')
+      return
+    }
+
+    const headers = [
+      'Service Code',
+      'Language',
+      'Guide Type',
+      'City',
+      'Tour Duration',
+      'EUR Rate',
+      'Non-EUR Rate',
+      'Season',
+      'Valid From',
+      'Valid To',
+      'Supplier ID',
+      'Notes',
+      'Active'
+    ]
+
+    const rows = filteredRates.map(rate => [
+      rate.service_code || '',
+      rate.guide_language || '',
+      rate.guide_type || '',
+      rate.city || '',
+      rate.tour_duration || '',
+      rate.base_rate_eur?.toString() || '0',
+      rate.base_rate_non_eur?.toString() || '0',
+      rate.season || '',
+      rate.rate_valid_from || '',
+      rate.rate_valid_to || '',
+      rate.supplier_id || '',
+      (rate.notes || '').replace(/"/g, '""'), // Escape quotes in notes
+      rate.is_active ? 'true' : 'false'
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `guide-rates-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    showNotification('success', 'Export Complete', `Exported ${filteredRates.length} guide rates to CSV.`)
+  }
+
+  // Import rates from CSV file
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+
+        if (lines.length < 2) {
+          showNotification('error', 'Invalid File', 'CSV file must have a header row and at least one data row.')
+          return
+        }
+
+        // Parse header to get column indices
+        const headerLine = lines[0]
+        const headers = headerLine.split(',').map(h => h.replace(/"/g, '').trim().toLowerCase())
+
+        const getIndex = (name: string) => headers.findIndex(h => h.includes(name))
+        const serviceCodeIdx = getIndex('service code')
+        const languageIdx = getIndex('language')
+        const guideTypeIdx = getIndex('guide type')
+        const cityIdx = getIndex('city')
+        const durationIdx = getIndex('duration')
+        const eurRateIdx = getIndex('eur rate')
+        const nonEurRateIdx = getIndex('non-eur')
+        const seasonIdx = getIndex('season')
+        const validFromIdx = getIndex('valid from')
+        const validToIdx = getIndex('valid to')
+        const supplierIdIdx = getIndex('supplier')
+        const notesIdx = getIndex('notes')
+        const activeIdx = getIndex('active')
+
+        let successCount = 0
+        let errorCount = 0
+
+        // Process each data row
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim()
+          if (!line) continue
+
+          // Parse CSV line (handle quoted values with commas)
+          const values: string[] = []
+          let current = ''
+          let inQuotes = false
+          for (const char of line) {
+            if (char === '"') {
+              inQuotes = !inQuotes
+            } else if (char === ',' && !inQuotes) {
+              values.push(current.trim())
+              current = ''
+            } else {
+              current += char
+            }
+          }
+          values.push(current.trim())
+
+          const getValue = (idx: number) => idx >= 0 && idx < values.length ? values[idx].replace(/"/g, '') : ''
+
+          const rateData = {
+            service_code: getValue(serviceCodeIdx) || generateServiceCode(),
+            guide_language: getValue(languageIdx) || 'English',
+            guide_type: getValue(guideTypeIdx) || 'licensed',
+            city: getValue(cityIdx) || '',
+            tour_duration: getValue(durationIdx) || 'full_day',
+            base_rate_eur: parseFloat(getValue(eurRateIdx)) || 0,
+            base_rate_non_eur: parseFloat(getValue(nonEurRateIdx)) || 0,
+            season: getValue(seasonIdx) || '',
+            rate_valid_from: getValue(validFromIdx) || today,
+            rate_valid_to: getValue(validToIdx) || nextYear,
+            supplier_id: getValue(supplierIdIdx) || '',
+            notes: getValue(notesIdx) || '',
+            is_active: getValue(activeIdx).toLowerCase() !== 'false'
+          }
+
+          try {
+            const response = await fetch('/api/rates/guides', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(rateData)
+            })
+
+            if (response.ok) {
+              successCount++
+            } else {
+              errorCount++
+            }
+          } catch {
+            errorCount++
+          }
+        }
+
+        // Reset file input
+        event.target.value = ''
+
+        // Refresh the rates list
+        fetchRates()
+
+        if (errorCount === 0) {
+          showNotification('success', 'Import Complete', `Successfully imported ${successCount} guide rates.`)
+        } else {
+          showNotification('warning', 'Import Partial', `Imported ${successCount} rates. ${errorCount} failed.`)
+        }
+      } catch (error) {
+        console.error('Error parsing CSV:', error)
+        showNotification('error', 'Import Failed', 'Failed to parse CSV file. Please check the format.')
+        event.target.value = ''
+      }
+    }
+
+    reader.readAsText(file)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -490,12 +691,22 @@ export default function GuideRatesContent() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {/* Export CSV */}}
+            onClick={handleExportCSV}
             className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
             <Download className="w-4 h-4" />
             Export
           </button>
+          <label className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer">
+            <Upload className="w-4 h-4" />
+            Import
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+            />
+          </label>
           <button
             onClick={handleAddNew}
             className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
@@ -704,8 +915,8 @@ export default function GuideRatesContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Type</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Duration</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Non-EU</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
                 </tr>
@@ -743,10 +954,10 @@ export default function GuideRatesContent() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-bold text-green-600">€{rate.base_rate_eur}</span>
+                      <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-gray-600">€{rate.base_rate_non_eur}</span>
+                      <span className="text-sm text-gray-600">{symbol}{convert(Number(rate.base_rate_non_eur)).toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -760,12 +971,21 @@ export default function GuideRatesContent() {
                         <button
                           onClick={() => handleEdit(rate)}
                           className="p-1.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
+                          title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => handleClone(rate)}
+                          className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Clone"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => confirmDelete(rate.id, rate.guide_language)}
                           className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -807,19 +1027,28 @@ export default function GuideRatesContent() {
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
-                    <p className="text-xs text-gray-500">EUR Rate</p>
-                    <p className="text-lg font-bold text-green-600">€{rate.base_rate_eur}</p>
+                    <p className="text-xs text-gray-500">{userCurrency} Rate</p>
+                    <p className="text-lg font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleEdit(rate)}
                       className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
+                      title="Edit"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => handleClone(rate)}
+                      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      title="Clone"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => confirmDelete(rate.id, rate.guide_language)}
                       className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="Delete"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -841,17 +1070,20 @@ export default function GuideRatesContent() {
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-green-600">€{rate.base_rate_eur}</span>
+                  <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}>
                     {rate.is_active ? 'Active' : 'Inactive'}
                   </span>
                   <div className="flex gap-1">
-                    <button onClick={() => handleEdit(rate)} className="p-1 text-gray-400 hover:text-primary-600">
+                    <button onClick={() => handleEdit(rate)} className="p-1 text-gray-400 hover:text-primary-600" title="Edit">
                       <Edit className="w-4 h-4" />
                     </button>
-                    <button onClick={() => confirmDelete(rate.id, rate.guide_language)} className="p-1 text-gray-400 hover:text-red-600">
+                    <button onClick={() => handleClone(rate)} className="p-1 text-gray-400 hover:text-blue-600" title="Clone">
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => confirmDelete(rate.id, rate.guide_language)} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -1056,29 +1288,37 @@ export default function GuideRatesContent() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">EUR Rate (€) *</label>
-                    <input
-                      type="number"
-                      name="base_rate_eur"
-                      value={formData.base_rate_eur}
-                      onChange={handleChange}
-                      required
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    />
+                    <label htmlFor="base_rate_eur" className="block text-xs font-medium text-gray-600 mb-1">EU Client Rate (EUR) *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">€</span>
+                      <input
+                        type="number"
+                        id="base_rate_eur"
+                        name="base_rate_eur"
+                        value={formData.base_rate_eur}
+                        onChange={handleChange}
+                        required
+                        min="0"
+                        step="0.01"
+                        className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Non-EUR Rate (€)</label>
-                    <input
-                      type="number"
-                      name="base_rate_non_eur"
-                      value={formData.base_rate_non_eur}
-                      onChange={handleChange}
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    />
+                    <label htmlFor="base_rate_non_eur" className="block text-xs font-medium text-gray-600 mb-1">Non-EU Client Rate (EUR)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">€</span>
+                      <input
+                        type="number"
+                        id="base_rate_non_eur"
+                        name="base_rate_non_eur"
+                        value={formData.base_rate_non_eur}
+                        onChange={handleChange}
+                        min="0"
+                        step="0.01"
+                        className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

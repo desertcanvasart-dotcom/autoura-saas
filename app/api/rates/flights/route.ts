@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '@/lib/supabase-server'
 
 // ============================================
 // FLIGHT RATES API - Full CRUD
 // File: app/api/rates/flights/route.ts
 // ============================================
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 // Valid enum values
 const FLIGHT_TYPES = ['domestic', 'international'] as const
@@ -47,6 +42,16 @@ const FREQUENCIES = [
 // GET - List flight rates with filters
 export async function GET(request: NextRequest) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const searchParams = request.nextUrl.searchParams
     const routeFrom = searchParams.get('route_from')
     const routeTo = searchParams.get('route_to')
@@ -56,7 +61,10 @@ export async function GET(request: NextRequest) {
     const supplierId = searchParams.get('supplier_id')
     const activeOnly = searchParams.get('active_only') !== 'false' // Default true
 
-    let query = supabaseAdmin
+    // ✅ MULTI-TENANT: RLS policies automatically filter by tenant_id
+    // See migration: 007_create_tours_templates_tables.sql
+    // Only returns rates belonging to authenticated user's tenant
+    let query = supabase
       .from('flight_rates')
       .select(`
         *,
@@ -103,6 +111,16 @@ export async function GET(request: NextRequest) {
 // POST - Create new flight rate
 export async function POST(request: NextRequest) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const body = await request.json()
 
     // Generate service code if not provided
@@ -114,6 +132,10 @@ export async function POST(request: NextRequest) {
     // Get airline code
     const airlineCode = body.airline_code || getAirlineCode(body.airline)
 
+    // ✅ MULTI-TENANT: tenant_id is auto-populated by database trigger
+    // See migration: 007_create_tours_templates_tables.sql (creates auto_set_tenant_id trigger)
+    // The trigger automatically sets tenant_id from the authenticated user's session
+    // RLS policies enforce that users can only insert rates for their own tenant
     const newRate = {
       service_code: serviceCode,
       route_from: body.route_from,
@@ -157,7 +179,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'route_from and route_to must be different' }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('flight_rates')
       .insert(newRate)
       .select('*')
@@ -187,6 +209,16 @@ export async function POST(request: NextRequest) {
 // PUT - Update flight rate (by ID in body)
 export async function PUT(request: NextRequest) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const body = await request.json()
     const { id, ...updates } = body
 
@@ -196,7 +228,7 @@ export async function PUT(request: NextRequest) {
 
     // Regenerate route_name if route fields changed
     if (updates.route_from || updates.route_to) {
-      const { data: current } = await supabaseAdmin
+      const { data: current } = await supabase
         .from('flight_rates')
         .select('*')
         .eq('id', id)
@@ -238,7 +270,7 @@ export async function PUT(request: NextRequest) {
 
     updates.updated_at = new Date().toISOString()
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('flight_rates')
       .update(updates)
       .eq('id', id)
@@ -260,6 +292,16 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete flight rate (by query param)
 export async function DELETE(request: NextRequest) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')
 
@@ -267,7 +309,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 })
     }
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('flight_rates')
       .delete()
       .eq('id', id)

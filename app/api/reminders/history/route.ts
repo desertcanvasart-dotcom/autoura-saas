@@ -1,15 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Authenticate user
+    const supabase = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
-    
+
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
     const status = searchParams.get('status')
 
+    // Query with RLS - automatically filters by tenant
     let query = supabase
       .from('invoice_reminders')
       .select(`

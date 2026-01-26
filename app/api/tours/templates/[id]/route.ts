@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Admin client for all operations (bypasses RLS)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - Get single template with variations and days
 export async function GET(
@@ -15,8 +9,11 @@ export async function GET(
   try {
     const { id } = await params
 
-    // Get template with category
-    const { data: template, error: templateError } = await supabaseAdmin
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Get template with category (RLS filters to tenant's templates only)
+    const { data: template, error: templateError } = await supabase
       .from('tour_templates')
       .select(`
         *,
@@ -40,15 +37,15 @@ export async function GET(
       )
     }
 
-    // Get variations
-    const { data: variations } = await supabaseAdmin
+    // Get variations (RLS filters to tenant's variations only)
+    const { data: variations } = await supabase
       .from('tour_variations')
       .select('*')
       .eq('template_id', id)
       .order('tier', { ascending: true })
 
-    // Get days with activities
-    const { data: days } = await supabaseAdmin
+    // Get days with activities (RLS filters automatically)
+    const { data: days } = await supabase
       .from('tour_days')
       .select(`
         *,
@@ -65,8 +62,8 @@ export async function GET(
       .eq('tour_id', id)
       .order('day_number', { ascending: true })
 
-    // Get pricing
-    const { data: pricing } = await supabaseAdmin
+    // Get pricing (RLS filters to tenant's pricing only)
+    const { data: pricing } = await supabase
       .from('tour_pricing')
       .select('*')
       .eq('tour_id', id)
@@ -98,10 +95,21 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
+
+    // Require authentication - RLS will enforce tenant boundaries
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
 
     const updateData: any = {}
-    
+
     // Only update fields that are provided
     if (body.template_code !== undefined) updateData.template_code = body.template_code
     if (body.template_name !== undefined) updateData.template_name = body.template_name
@@ -129,7 +137,7 @@ export async function PUT(
     if (body.popularity_score !== undefined) updateData.popularity_score = body.popularity_score
     if (body.default_transportation_service !== undefined) updateData.default_transportation_service = body.default_transportation_service
     if (body.transportation_city !== undefined) updateData.transportation_city = body.transportation_city
-    
+
     // NEW FIELDS
     if (body.itinerary !== undefined) updateData.itinerary = body.itinerary
     if (body.inclusions !== undefined) updateData.inclusions = body.inclusions
@@ -138,10 +146,13 @@ export async function PUT(
     // Add updated_at
     updateData.updated_at = new Date().toISOString()
 
+    // Do NOT include tenant_id in update (prevents tenant switching)
+    delete updateData.tenant_id
+
     console.log('Updating template:', id, 'with fields:', Object.keys(updateData))
 
-    // Update template
-    const { data, error } = await supabaseAdmin
+    // Update template (RLS enforces tenant boundaries)
+    const { data, error } = await supabase
       .from('tour_templates')
       .update(updateData)
       .eq('id', id)
@@ -185,56 +196,67 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    // Get all days first
-    const { data: days } = await supabaseAdmin
+    // Require authentication - RLS policies enforce manager role
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
+
+    // Get all days first (RLS filters to tenant's days only)
+    const { data: days } = await supabase
       .from('tour_days')
       .select('id')
       .eq('tour_id', id)
 
     if (days && days.length > 0) {
       const dayIds = days.map(d => d.id)
-      
-      // Delete activities for these days
-      await supabaseAdmin
+
+      // Delete activities for these days (RLS enforced)
+      await supabase
         .from('tour_day_activities')
         .delete()
         .in('tour_day_id', dayIds)
     }
 
-    // Delete days
-    await supabaseAdmin
+    // Delete days (RLS enforced)
+    await supabase
       .from('tour_days')
       .delete()
       .eq('tour_id', id)
 
-    // Delete variation services first
-    const { data: variations } = await supabaseAdmin
+    // Delete variation services first (RLS filters to tenant's variations only)
+    const { data: variations } = await supabase
       .from('tour_variations')
       .select('id')
       .eq('template_id', id)
 
     if (variations && variations.length > 0) {
       const variationIds = variations.map(v => v.id)
-      await supabaseAdmin
-        .from('tour_variation_services')
+      await supabase
+        .from('variation_services')
         .delete()
         .in('variation_id', variationIds)
     }
 
-    // Delete variations
-    await supabaseAdmin
+    // Delete variations (RLS enforced)
+    await supabase
       .from('tour_variations')
       .delete()
       .eq('template_id', id)
 
-    // Delete pricing
-    await supabaseAdmin
+    // Delete pricing (RLS enforced)
+    await supabase
       .from('tour_pricing')
       .delete()
       .eq('tour_id', id)
 
-    // Delete template
-    const { error } = await supabaseAdmin
+    // Delete template (RLS requires manager role)
+    const { error } = await supabase
       .from('tour_templates')
       .delete()
       .eq('id', id)

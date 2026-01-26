@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
-
-// ============================================
-// ACTIVITY SINGLE OPERATIONS
-// File: app/api/tours/activities/[id]/route.ts
-// ============================================
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - Get single activity
 export async function GET(
@@ -12,8 +7,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
     const { id } = await params
+
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
 
     const { data, error } = await supabase
       .from('tour_day_activities')
@@ -52,16 +49,29 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
     const { id } = await params
+
+    // Require authentication - RLS will enforce tenant boundaries
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
 
     const updateData: any = {}
-    
+
     if (body.activity_order !== undefined) updateData.activity_order = body.activity_order
     if (body.entrance_id !== undefined) updateData.entrance_id = body.entrance_id
     if (body.transportation_id !== undefined) updateData.transportation_id = body.transportation_id
     if (body.activity_notes !== undefined) updateData.activity_notes = body.activity_notes
+
+    // Do NOT include tenant_id in update (prevents tenant switching)
+    delete updateData.tenant_id
 
     const { data, error } = await supabase
       .from('tour_day_activities')
@@ -99,8 +109,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
     const { id } = await params
+
+    // Require authentication - RLS policies enforce manager role
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
 
     const { error } = await supabase
       .from('tour_day_activities')
@@ -109,6 +129,13 @@ export async function DELETE(
 
     if (error) {
       console.error('Error deleting activity:', error)
+      // RLS will return error if not manager role or wrong tenant
+      if (error.code === 'PGRST116' || error.message?.includes('permission')) {
+        return NextResponse.json(
+          { success: false, error: 'Activity not found or you do not have permission to delete it' },
+          { status: 403 }
+        )
+      }
       return NextResponse.json(
         { success: false, error: 'Failed to delete activity' },
         { status: 500 }

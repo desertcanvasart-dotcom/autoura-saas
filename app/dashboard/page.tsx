@@ -67,7 +67,7 @@ export default function DashboardPage() {
       if (user) {
         // Try to get profile name first
         const { data: profile } = await supabase
-          .from('profiles')
+          .from('user_profiles')
           .select('full_name, first_name')
           .eq('id', user.id)
           .single()
@@ -107,7 +107,7 @@ export default function DashboardPage() {
         .eq('status', 'pending')
 
       const pendingFollowups = followups?.length || 0
-      const overdueFollowups = followups?.filter(f => 
+      const overdueFollowups = followups?.filter(f =>
         new Date(f.due_date) < new Date()
       ).length || 0
 
@@ -138,8 +138,7 @@ export default function DashboardPage() {
           *,
           clients (
             id,
-            first_name,
-            last_name,
+            full_name,
             email
           )
         `)
@@ -594,7 +593,7 @@ function FollowupCard({ followup }: any) {
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900 group-hover:text-primary-700">
-            {followup.clients?.first_name} {followup.clients?.last_name}
+            {followup.clients?.full_name}
           </p>
           <p className="text-xs text-gray-600 mt-1 line-clamp-2">
             {followup.description}

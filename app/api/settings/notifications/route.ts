@@ -1,21 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - Fetch notification preferences
 export async function GET(request: NextRequest) {
   try {
-    // For now, return default preferences
-    // In production, you'd fetch from a user_settings table
-    
-    // Try to get from user_settings table if it exists
+    // Use authenticated client - RLS automatically filters by user
+    const supabase = await createAuthenticatedClient()
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      )
+    }
+
+    // Try to get from user_settings table
     const { data, error } = await supabase
       .from('user_settings')
       .select('notification_preferences')
+      .eq('user_id', user.id)
       .single()
 
     if (data?.notification_preferences) {
@@ -48,7 +53,26 @@ export async function GET(request: NextRequest) {
 // PUT - Update notification preferences
 export async function PUT(request: NextRequest) {
   try {
+    // Require authentication and get user info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const preferences = await request.json()
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Not authenticated' },
+        { status: 401 }
+      )
+    }
 
     // Validate the preferences object
     const validPrefs = {
@@ -60,19 +84,21 @@ export async function PUT(request: NextRequest) {
       in_app_enabled: Boolean(preferences.in_app_enabled)
     }
 
-    // Try to upsert to user_settings table
+    // Upsert to user_settings table (scoped to current user)
     const { error } = await supabase
       .from('user_settings')
       .upsert({
-        id: 'default', // Use user ID in production
+        user_id: user.id, // ✅ Explicit user_id
         notification_preferences: validPrefs,
         updated_at: new Date().toISOString()
       })
 
     if (error) {
       console.error('Error saving notification settings:', error)
-      // Still return success since we validated the preferences
-      // The settings will be stored next time the table exists
+      return NextResponse.json(
+        { success: false, error: 'Failed to save notification settings' },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({

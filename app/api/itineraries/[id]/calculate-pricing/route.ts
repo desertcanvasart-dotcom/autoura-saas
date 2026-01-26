@@ -9,14 +9,8 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { cookies } from 'next/headers'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 // ============================================
 // TYPES
@@ -68,9 +62,9 @@ const DEFAULT_CURRENCY = 'EUR'
 // GET USER PREFERENCES
 // ============================================
 
-async function getUserPreferences(userId: string): Promise<UserPreferences | null> {
+async function getUserPreferences(supabase: any, userId: string): Promise<UserPreferences | null> {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', userId)
@@ -144,14 +138,14 @@ function applyMarkup(cost: number, marginPercent: number): number {
 // RATE FETCHING
 // ============================================
 
-async function getTransportationRate(city: string, tier: string, pax: number) {
+async function getTransportationRate(supabase: any, city: string, tier: string, pax: number) {
   let vehicleType = 'sedan'
   if (pax > 3) vehicleType = 'minivan'
   if (pax > 7) vehicleType = 'minibus'
   if (pax > 15) vehicleType = 'bus'
 
   // Try transportation_rates table first
-  const { data: rate } = await supabaseAdmin
+  const { data: rate } = await supabase
     .from('transportation_rates')
     .select('*')
     .eq('is_active', true)
@@ -172,7 +166,7 @@ async function getTransportationRate(city: string, tier: string, pax: number) {
   }
 
   // Try vehicles table
-  const { data: vehicle } = await supabaseAdmin
+  const { data: vehicle } = await supabase
     .from('vehicles')
     .select('*')
     .eq('is_active', true)
@@ -206,9 +200,9 @@ async function getTransportationRate(city: string, tier: string, pax: number) {
   }
 }
 
-async function getGuideRate(city: string, tier: string, language: string = 'English') {
+async function getGuideRate(supabase: any, city: string, tier: string, language: string = 'English') {
   // Try guide_rates table
-  const { data: rate } = await supabaseAdmin
+  const { data: rate } = await supabase
     .from('guide_rates')
     .select('*')
     .eq('is_active', true)
@@ -227,7 +221,7 @@ async function getGuideRate(city: string, tier: string, language: string = 'Engl
   }
 
   // Try guides table
-  const { data: guide } = await supabaseAdmin
+  const { data: guide } = await supabase
     .from('guides')
     .select('*')
     .eq('is_active', true)
@@ -269,13 +263,13 @@ interface EntranceFeeResult {
   addonNote?: string // NEW: Optional note about the add-on
 }
 
-async function getEntranceFee(attractionName: string, isEuroPassport: boolean): Promise<EntranceFeeResult> {
+async function getEntranceFee(supabase: any, attractionName: string, isEuroPassport: boolean): Promise<EntranceFeeResult> {
   // Try entrance_fees table first (PRIMARY TABLE)
   // Use exact match first, then fall back to fuzzy match
   let fee = null
   
   // First try exact match
-  const { data: exactFee } = await supabaseAdmin
+  const { data: exactFee } = await supabase
     .from('entrance_fees')
     .select('*')
     .eq('is_active', true)
@@ -287,7 +281,7 @@ async function getEntranceFee(attractionName: string, isEuroPassport: boolean): 
     fee = exactFee
   } else {
     // Fall back to fuzzy match
-    const { data: fuzzyFee } = await supabaseAdmin
+    const { data: fuzzyFee } = await supabase
       .from('entrance_fees')
       .select('*')
       .eq('is_active', true)
@@ -312,7 +306,7 @@ async function getEntranceFee(attractionName: string, isEuroPassport: boolean): 
   }
 
   // Try activity_rates table as secondary
-  const { data: activity } = await supabaseAdmin
+  const { data: activity } = await supabase
     .from('activity_rates')
     .select('*')
     .eq('is_active', true)
@@ -346,8 +340,8 @@ async function getEntranceFee(attractionName: string, isEuroPassport: boolean): 
   }
 }
 
-async function getMealRate(city: string, mealType: 'lunch' | 'dinner', tier: string) {
-  const { data: rate } = await supabaseAdmin
+async function getMealRate(supabase: any, city: string, mealType: 'lunch' | 'dinner', tier: string) {
+  const { data: rate } = await supabase
     .from('meal_rates')
     .select('*')
     .eq('is_active', true)
@@ -379,8 +373,8 @@ async function getMealRate(city: string, mealType: 'lunch' | 'dinner', tier: str
   }
 }
 
-async function getHotelRate(city: string, tier: string) {
-  const { data: hotel } = await supabaseAdmin
+async function getHotelRate(supabase: any, city: string, tier: string) {
+  const { data: hotel } = await supabase
     .from('hotel_contacts')
     .select('*')
     .eq('is_active', true)
@@ -401,7 +395,7 @@ async function getHotelRate(city: string, tier: string) {
   }
 
   // Fallback without tier filter
-  const { data: anyHotel } = await supabaseAdmin
+  const { data: anyHotel } = await supabase
     .from('hotel_contacts')
     .select('*')
     .eq('is_active', true)
@@ -433,8 +427,8 @@ async function getHotelRate(city: string, tier: string) {
   }
 }
 
-async function getTippingRate(tier: string) {
-  const { data: rates } = await supabaseAdmin
+async function getTippingRate(supabase: any, tier: string) {
+  const { data: rates } = await supabase
     .from('tipping_rates')
     .select('*')
     .eq('is_active', true)
@@ -470,6 +464,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase: supabase } = authResult // Use authenticated client
+
     // Next.js 15: params is now a Promise
     const { id: itineraryId } = await params
     const body: PricingRequest = await request.json()
@@ -498,13 +503,13 @@ export async function POST(
     let userPrefs: UserPreferences | null = null
     
     if (userId) {
-      userPrefs = await getUserPreferences(userId)
+      userPrefs = await getUserPreferences(supabase, userId)
     }
 
     // ============================================
     // GET ITINERARY & DETERMINE MARGIN
     // ============================================
-    const { data: itinerary } = await supabaseAdmin
+    const { data: itinerary } = await supabase
       .from('itineraries')
       .select('margin_percent, currency, created_by')
       .eq('id', itineraryId)
@@ -520,7 +525,7 @@ export async function POST(
       console.log(`[Pricing] Using user preference margin: ${marginPercent}%`)
       
       // Also save this margin to the itinerary for future reference
-      await supabaseAdmin
+      await supabase
         .from('itineraries')
         .update({ margin_percent: marginPercent })
         .eq('id', itineraryId)
@@ -532,7 +537,7 @@ export async function POST(
     const currency = itinerary?.currency || userPrefs?.default_currency || DEFAULT_CURRENCY
 
     // Get existing days (to get their IDs)
-    const { data: existingDays, error: daysError } = await supabaseAdmin
+    const { data: existingDays, error: daysError } = await supabase
       .from('itinerary_days')
       .select('id, day_number')
       .eq('itinerary_id', itineraryId)
@@ -547,7 +552,7 @@ export async function POST(
 
     // Delete existing services
     const dayIds = existingDays.map(d => d.id)
-    await supabaseAdmin
+    await supabase
       .from('itinerary_services')
       .delete()
       .in('itinerary_day_id', dayIds)
@@ -560,7 +565,7 @@ export async function POST(
     // NEW: Track skipped add-ons for reporting
     const skippedAddons: string[] = []
 
-    const tipping = await getTippingRate(tier)
+    const tipping = await getTippingRate(supabase, tier)
     const waterRate = 2
     const roomsNeeded = Math.ceil(totalPax / 2)
 
@@ -577,7 +582,7 @@ export async function POST(
       const { city, attractions, services, overnight_city } = day
 
       // TRANSPORTATION
-      const transport = await getTransportationRate(city, tier, totalPax)
+      const transport = await getTransportationRate(supabase, city, tier, totalPax)
       const transportClient = applyMarkup(transport.rate, marginPercent)
       allServices.push({
         itinerary_day_id: dayId,
@@ -597,7 +602,7 @@ export async function POST(
 
       // GUIDE
       if (services.guide) {
-        const guide = await getGuideRate(city, tier)
+        const guide = await getGuideRate(supabase, city, tier)
         const guideClient = applyMarkup(guide.rate, marginPercent)
         allServices.push({
           itinerary_day_id: dayId,
@@ -618,7 +623,7 @@ export async function POST(
 
       // ENTRANCE FEES - NOW WITH ADD-ON CHECK
       for (const attraction of attractions) {
-        const entrance = await getEntranceFee(attraction, isEuroPassport)
+        const entrance = await getEntranceFee(supabase, attraction, isEuroPassport)
         
         // NEW: Skip add-ons if not explicitly included
         if (entrance.isAddon && !include_addons) {
@@ -649,7 +654,7 @@ export async function POST(
 
       // LUNCH
       if (services.lunch) {
-        const meal = await getMealRate(city, 'lunch', tier)
+        const meal = await getMealRate(supabase, city, 'lunch', tier)
         const mealTotal = meal.rate * totalPax
         const mealClient = applyMarkup(mealTotal, marginPercent)
         allServices.push({
@@ -671,7 +676,7 @@ export async function POST(
 
       // DINNER
       if (services.dinner) {
-        const meal = await getMealRate(city, 'dinner', tier)
+        const meal = await getMealRate(supabase, city, 'dinner', tier)
         const mealTotal = meal.rate * totalPax
         const mealClient = applyMarkup(mealTotal, marginPercent)
         allServices.push({
@@ -728,7 +733,7 @@ export async function POST(
       // HOTEL
       const isLastDay = day.day_number === days.length
       if (services.hotel && overnight_city && includeAccommodation && !isLastDay) {
-        const hotel = await getHotelRate(overnight_city, tier)
+        const hotel = await getHotelRate(supabase, overnight_city, tier)
         const hotelTotal = hotel.rate * roomsNeeded
         const hotelClient = applyMarkup(hotelTotal, marginPercent)
         allServices.push({
@@ -751,7 +756,7 @@ export async function POST(
 
     // Insert services
     if (allServices.length > 0) {
-      const { error: insertError } = await supabaseAdmin
+      const { error: insertError } = await supabase
         .from('itinerary_services')
         .insert(allServices)
 
@@ -768,7 +773,7 @@ export async function POST(
       : '0'
 
     // Update itinerary totals
-    await supabaseAdmin
+    await supabase
       .from('itineraries')
       .update({
         total_cost: totalClientPrice,

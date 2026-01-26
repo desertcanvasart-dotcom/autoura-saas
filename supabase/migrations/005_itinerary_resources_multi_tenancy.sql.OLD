@@ -1,0 +1,207 @@
+-- =====================================================================
+-- Autoura: Itinerary Resources Multi-Tenancy Security Fix
+-- Description: Adds tenant_id to itinerary_resources table and RLS policies
+-- Version: 1.0
+-- Date: 2026-01-23
+-- =====================================================================
+--
+-- CRITICAL SECURITY FIX:
+-- This migration addresses a security vulnerability where itinerary_resources
+-- were not tenant-isolated, allowing cross-tenant data access and modification.
+-- =====================================================================
+
+-- =====================================================================
+-- 1. ADD TENANT_ID COLUMN
+-- =====================================================================
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'itinerary_resources' AND column_name = 'tenant_id'
+  ) THEN
+    ALTER TABLE itinerary_resources ADD COLUMN tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;
+    RAISE NOTICE '✅ Added tenant_id column to itinerary_resources';
+  ELSE
+    RAISE NOTICE 'ℹ️  tenant_id column already exists in itinerary_resources';
+  END IF;
+END $$;
+
+-- =====================================================================
+-- 2. POPULATE TENANT_ID FROM ITINERARIES
+-- =====================================================================
+
+UPDATE itinerary_resources ir
+SET tenant_id = (
+  SELECT i.tenant_id
+  FROM itineraries i
+  WHERE i.id = ir.itinerary_id
+)
+WHERE ir.tenant_id IS NULL;
+
+-- Log how many records were updated
+DO $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM itinerary_resources WHERE tenant_id IS NOT NULL;
+  RAISE NOTICE '✅ Populated tenant_id for % itinerary_resources records', v_count;
+END $$;
+
+-- =====================================================================
+-- 3. MAKE TENANT_ID REQUIRED
+-- =====================================================================
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'itinerary_resources'
+    AND column_name = 'tenant_id'
+    AND is_nullable = 'YES'
+  ) THEN
+    ALTER TABLE itinerary_resources ALTER COLUMN tenant_id SET NOT NULL;
+    RAISE NOTICE '✅ Made tenant_id NOT NULL on itinerary_resources';
+  END IF;
+END $$;
+
+-- =====================================================================
+-- 4. CREATE INDEXES
+-- =====================================================================
+
+CREATE INDEX IF NOT EXISTS idx_itinerary_resources_tenant
+  ON itinerary_resources(tenant_id);
+
+CREATE INDEX IF NOT EXISTS idx_itinerary_resources_tenant_itinerary
+  ON itinerary_resources(tenant_id, itinerary_id);
+
+-- =====================================================================
+-- 5. ENABLE ROW LEVEL SECURITY
+-- =====================================================================
+
+ALTER TABLE itinerary_resources ENABLE ROW LEVEL SECURITY;
+
+-- =====================================================================
+-- 6. DROP EXISTING POLICIES (IF ANY)
+-- =====================================================================
+
+DROP POLICY IF EXISTS "Users can view own tenant resources" ON itinerary_resources;
+DROP POLICY IF EXISTS "Users can insert own tenant resources" ON itinerary_resources;
+DROP POLICY IF EXISTS "Users can update own tenant resources" ON itinerary_resources;
+DROP POLICY IF EXISTS "Users can delete own tenant resources" ON itinerary_resources;
+
+-- =====================================================================
+-- 7. CREATE RLS POLICIES
+-- =====================================================================
+
+-- SELECT: Users can view their own tenant's resource assignments
+CREATE POLICY "Users can view own tenant resources"
+  ON itinerary_resources
+  FOR SELECT
+  USING (tenant_id = get_user_tenant_id());
+
+-- INSERT: Users can create resource assignments for their own tenant
+CREATE POLICY "Users can insert own tenant resources"
+  ON itinerary_resources
+  FOR INSERT
+  WITH CHECK (tenant_id = get_user_tenant_id());
+
+-- UPDATE: Managers and above can update their tenant's resource assignments
+CREATE POLICY "Users can update own tenant resources"
+  ON itinerary_resources
+  FOR UPDATE
+  USING (tenant_id = get_user_tenant_id() AND user_has_role('manager'));
+
+-- DELETE: Managers and above can delete their tenant's resource assignments
+CREATE POLICY "Users can delete own tenant resources"
+  ON itinerary_resources
+  FOR DELETE
+  USING (tenant_id = get_user_tenant_id() AND user_has_role('manager'));
+
+-- =====================================================================
+-- 8. ADD TRIGGER FOR AUTO-POPULATING TENANT_ID
+-- =====================================================================
+
+-- Function to auto-populate tenant_id from itinerary
+CREATE OR REPLACE FUNCTION auto_populate_resource_tenant_id()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- If tenant_id is not provided, get it from the itinerary
+  IF NEW.tenant_id IS NULL THEN
+    SELECT tenant_id INTO NEW.tenant_id
+    FROM itineraries
+    WHERE id = NEW.itinerary_id;
+
+    IF NEW.tenant_id IS NULL THEN
+      RAISE EXCEPTION 'Cannot determine tenant_id for itinerary_id %', NEW.itinerary_id;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger
+DROP TRIGGER IF EXISTS ensure_resource_tenant_id ON itinerary_resources;
+CREATE TRIGGER ensure_resource_tenant_id
+  BEFORE INSERT ON itinerary_resources
+  FOR EACH ROW
+  EXECUTE FUNCTION auto_populate_resource_tenant_id();
+
+-- =====================================================================
+-- 9. VERIFICATION AND SUMMARY
+-- =====================================================================
+
+DO $$
+DECLARE
+  v_total INTEGER;
+  v_with_tenant INTEGER;
+  v_orphans INTEGER;
+BEGIN
+  -- Count total records
+  SELECT COUNT(*) INTO v_total FROM itinerary_resources;
+
+  -- Count records with tenant_id
+  SELECT COUNT(*) INTO v_with_tenant FROM itinerary_resources WHERE tenant_id IS NOT NULL;
+
+  -- Count orphaned records (itinerary doesn't exist)
+  SELECT COUNT(*) INTO v_orphans
+  FROM itinerary_resources ir
+  WHERE NOT EXISTS (SELECT 1 FROM itineraries i WHERE i.id = ir.itinerary_id);
+
+  RAISE NOTICE '';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '✅ MIGRATION COMPLETE';
+  RAISE NOTICE '========================================';
+  RAISE NOTICE '';
+  RAISE NOTICE '📊 Statistics:';
+  RAISE NOTICE '   Total itinerary_resources: %', v_total;
+  RAISE NOTICE '   Records with tenant_id: %', v_with_tenant;
+  RAISE NOTICE '   Orphaned records: %', v_orphans;
+  RAISE NOTICE '';
+
+  IF v_orphans > 0 THEN
+    RAISE WARNING '⚠️  Found % orphaned itinerary_resources (itinerary no longer exists)', v_orphans;
+  END IF;
+
+  IF v_with_tenant = v_total THEN
+    RAISE NOTICE '✅ All records have tenant_id';
+  ELSE
+    RAISE WARNING '⚠️  Some records missing tenant_id: %', v_total - v_with_tenant;
+  END IF;
+
+  RAISE NOTICE '';
+  RAISE NOTICE '✅ Applied changes:';
+  RAISE NOTICE '   • Added tenant_id column';
+  RAISE NOTICE '   • Populated from parent itineraries';
+  RAISE NOTICE '   • Created indexes';
+  RAISE NOTICE '   • Enabled Row Level Security';
+  RAISE NOTICE '   • Created 4 RLS policies';
+  RAISE NOTICE '   • Added auto-populate trigger';
+  RAISE NOTICE '';
+  RAISE NOTICE '🔒 Security Status:';
+  RAISE NOTICE '   • Tenants can only see their own resources';
+  RAISE NOTICE '   • Cross-tenant access is BLOCKED';
+  RAISE NOTICE '   • Authentication required for all operations';
+  RAISE NOTICE '';
+END $$;

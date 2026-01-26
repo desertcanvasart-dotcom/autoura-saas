@@ -1,12 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { 
+import {
   Settings2, Plus, Edit, Trash2, X, Save, Loader2,
   Car, Ticket, AlertCircle, CheckCircle2,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Building2, XCircle
 } from 'lucide-react'
+import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { useModal } from '@/app/contexts/ModalContext'
 
 // ============================================
 // B2B PRICING RULES MANAGEMENT
@@ -185,11 +189,16 @@ const DEFAULT_PACKAGE_FORM: PackageFormData = {
 }
 
 export default function B2BPricingRulesPage() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
+  const { tenant, loading: tenantLoading, isAdmin } = useTenant()
+  const modal = useModal()
+
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([])
   const [transportPackages, setTransportPackages] = useState<TransportPackage[]>([])
   const [loading, setLoading] = useState(true)
   const [toasts, setToasts] = useState<Toast[]>([])
-  
+
   const [showRuleModal, setShowRuleModal] = useState(false)
   const [showPackageModal, setShowPackageModal] = useState(false)
   const [editingRule, setEditingRule] = useState<PricingRule | null>(null)
@@ -201,6 +210,13 @@ export default function B2BPricingRulesPage() {
 
   const [ruleForm, setRuleForm] = useState<RuleFormData>(DEFAULT_RULE_FORM)
   const [packageForm, setPackageForm] = useState<PackageFormData>(DEFAULT_PACKAGE_FORM)
+
+  // Authentication check
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
 
   const showToast = (type: 'success' | 'error', message: string) => {
     const id = Date.now().toString()
@@ -231,8 +247,10 @@ export default function B2BPricingRulesPage() {
   }
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    if (user && tenant) {
+      fetchData()
+    }
+  }, [user, tenant])
 
   // ============================================
   // PRICING RULES HANDLERS
@@ -321,7 +339,17 @@ export default function B2BPricingRulesPage() {
   }
 
   const handleDeleteRule = async (rule: PricingRule) => {
-    if (!confirm(`Delete pricing rule for "${rule.service_name}"?`)) return
+    if (!isAdmin) {
+      showToast('error', 'You don\'t have permission to delete pricing rules')
+      return
+    }
+
+    const confirmed = await modal.confirmDestructive(
+      'Delete Pricing Rule',
+      `Are you sure you want to delete the pricing rule for "${rule.service_name}"?`,
+      { confirmText: 'Delete Rule', cancelText: 'Cancel' }
+    )
+    if (!confirmed) return
 
     try {
       const res = await fetch(`/api/b2b/pricing-rules/${rule.id}`, { method: 'DELETE' })
@@ -410,7 +438,17 @@ export default function B2BPricingRulesPage() {
   }
 
   const handleDeletePackage = async (pkg: TransportPackage) => {
-    if (!confirm(`Delete transport package "${pkg.package_name}"?`)) return
+    if (!isAdmin) {
+      showToast('error', 'You don\'t have permission to delete transport packages')
+      return
+    }
+
+    const confirmed = await modal.confirmDestructive(
+      'Delete Transport Package',
+      `Are you sure you want to delete the transport package "${pkg.package_name}"?`,
+      { confirmText: 'Delete Package', cancelText: 'Cancel' }
+    )
+    if (!confirmed) return
 
     try {
       const res = await fetch(`/api/b2b/transport-packages/${pkg.id}`, { method: 'DELETE' })
@@ -430,6 +468,45 @@ export default function B2BPricingRulesPage() {
   // RENDER
   // ============================================
 
+  // Show loading state while checking auth/tenant
+  if (authLoading || tenantLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
+          <p className="text-sm text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Prevent flash of content before redirect
+  if (!user || !tenant) {
+    return null
+  }
+
+  // Authorization check - Pricing rules require admin access
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-4">You need admin permissions to manage pricing rules.</p>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35]"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -443,6 +520,14 @@ export default function B2BPricingRulesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Tenant Context */}
+      <div className="container mx-auto px-4 lg:px-6 pt-4">
+        <div className="flex items-center gap-2 text-sm text-gray-600">
+          <Building2 className="w-4 h-4" />
+          <span>{tenant.company_name}</span>
+        </div>
+      </div>
+
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map(toast => (

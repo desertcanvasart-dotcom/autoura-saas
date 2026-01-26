@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { 
+import {
   Ship, Plus, Search, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Crown, Star,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Calendar
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy, Download, Upload
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useCurrency } from '@/hooks/useCurrency'
 
 // ============================================
 // CONSTANTS
@@ -19,7 +20,8 @@ const TIER_OPTIONS = [
   { value: 'luxury', label: 'Luxury', color: 'bg-amber-100 text-amber-700' }
 ]
 
-const CITIES = ['Luxor', 'Aswan', 'Cairo']
+const CITIES = ['Luxor', 'Aswan', 'Cairo', 'Abu Simbel']
+const DURATION_OPTIONS = [3, 4, 7, 10, 12, 13, 14]
 const SHIP_CATEGORIES = ['budget', 'standard', 'deluxe', 'luxury']
 const CABIN_TYPES = ['standard', 'deluxe', 'suite']
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
@@ -43,47 +45,44 @@ interface Cruise {
   route_name: string
   embark_city: string
   disembark_city: string
-  duration_nights: number
+  duration_nights: number | number[]
   cabin_type: 'standard' | 'deluxe' | 'suite'
-  // Legacy single-rate fields (kept for backward compatibility)
+  // Legacy single-rate fields (kept for backward compatibility / display)
   rate_single_eur: number
   rate_double_eur: number
   rate_triple_eur: number | null
-  // Seasonal rates - Low Season
+  // PPD Model - Low Season
+  ppd_eur?: number
+  ppd_non_eur?: number
+  single_supplement_eur?: number
+  single_supplement_non_eur?: number
+  triple_reduction_eur?: number
+  triple_reduction_non_eur?: number
+  // Low Season dates
   low_season_start: string | null
   low_season_end: string | null
-  rate_low_single_eur: number
-  rate_low_double_eur: number
-  rate_low_triple_eur: number
-  rate_low_suite_eur: number
-  rate_low_single_non_eur: number
-  rate_low_double_non_eur: number
-  rate_low_triple_non_eur: number
-  rate_low_suite_non_eur: number
-  // Seasonal rates - High Season
+  // PPD Model - High Season
+  high_season_ppd_eur?: number
+  high_season_ppd_non_eur?: number
+  high_season_single_supplement_eur?: number
+  high_season_single_supplement_non_eur?: number
+  high_season_triple_reduction_eur?: number
+  high_season_triple_reduction_non_eur?: number
+  // High Season dates
   high_season_start: string | null
   high_season_end: string | null
-  rate_high_single_eur: number
-  rate_high_double_eur: number
-  rate_high_triple_eur: number
-  rate_high_suite_eur: number
-  rate_high_single_non_eur: number
-  rate_high_double_non_eur: number
-  rate_high_triple_non_eur: number
-  rate_high_suite_non_eur: number
-  // Seasonal rates - Peak Season
+  // PPD Model - Peak Season
+  peak_season_ppd_eur?: number
+  peak_season_ppd_non_eur?: number
+  peak_season_single_supplement_eur?: number
+  peak_season_single_supplement_non_eur?: number
+  peak_season_triple_reduction_eur?: number
+  peak_season_triple_reduction_non_eur?: number
+  // Peak Season dates
   peak_season_1_start: string | null
   peak_season_1_end: string | null
   peak_season_2_start: string | null
   peak_season_2_end: string | null
-  rate_peak_single_eur: number
-  rate_peak_double_eur: number
-  rate_peak_triple_eur: number
-  rate_peak_suite_eur: number
-  rate_peak_single_non_eur: number
-  rate_peak_double_non_eur: number
-  rate_peak_triple_non_eur: number
-  rate_peak_suite_non_eur: number
   // Rate validity
   rate_valid_from: string | null
   rate_valid_to: string | null
@@ -116,47 +115,40 @@ interface CruiseFormData {
   route_name: string
   embark_city: string
   disembark_city: string
-  duration_nights: number
+  duration_nights: number[]
   cabin_type: 'standard' | 'deluxe' | 'suite'
-  // Legacy rates (for display/backward compatibility)
-  rate_single_eur: number
-  rate_double_eur: number
-  rate_triple_eur: number
-  // Low Season
+  // PPD Model - Low Season
+  ppd_eur: number
+  ppd_non_eur: number
+  single_supplement_eur: number
+  single_supplement_non_eur: number
+  triple_reduction_eur: number
+  triple_reduction_non_eur: number
+  // Low Season dates
   low_season_start: string
   low_season_end: string
-  rate_low_single_eur: number
-  rate_low_double_eur: number
-  rate_low_triple_eur: number
-  rate_low_suite_eur: number
-  rate_low_single_non_eur: number
-  rate_low_double_non_eur: number
-  rate_low_triple_non_eur: number
-  rate_low_suite_non_eur: number
-  // High Season
+  // PPD Model - High Season
+  high_season_ppd_eur: number
+  high_season_ppd_non_eur: number
+  high_season_single_supplement_eur: number
+  high_season_single_supplement_non_eur: number
+  high_season_triple_reduction_eur: number
+  high_season_triple_reduction_non_eur: number
+  // High Season dates
   high_season_start: string
   high_season_end: string
-  rate_high_single_eur: number
-  rate_high_double_eur: number
-  rate_high_triple_eur: number
-  rate_high_suite_eur: number
-  rate_high_single_non_eur: number
-  rate_high_double_non_eur: number
-  rate_high_triple_non_eur: number
-  rate_high_suite_non_eur: number
-  // Peak Season
+  // PPD Model - Peak Season
+  peak_season_ppd_eur: number
+  peak_season_ppd_non_eur: number
+  peak_season_single_supplement_eur: number
+  peak_season_single_supplement_non_eur: number
+  peak_season_triple_reduction_eur: number
+  peak_season_triple_reduction_non_eur: number
+  // Peak Season dates
   peak_season_1_start: string
   peak_season_1_end: string
   peak_season_2_start: string
   peak_season_2_end: string
-  rate_peak_single_eur: number
-  rate_peak_double_eur: number
-  rate_peak_triple_eur: number
-  rate_peak_suite_eur: number
-  rate_peak_single_non_eur: number
-  rate_peak_double_non_eur: number
-  rate_peak_triple_non_eur: number
-  rate_peak_suite_non_eur: number
   // Rate validity
   rate_valid_from: string
   rate_valid_to: string
@@ -181,6 +173,81 @@ function TierBadge({ tier }: { tier: string | null }) {
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tierConfig.color}`}>
       {tierConfig.label}
     </span>
+  )
+}
+
+// Multi-select component for duration
+function DurationMultiSelect({
+  value,
+  onChange
+}: {
+  value: number[]
+  onChange: (v: number[]) => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const toggleDuration = (nights: number) => {
+    if (value.includes(nights)) {
+      onChange(value.filter(v => v !== nights))
+    } else {
+      onChange([...value, nights].sort((a, b) => a - b))
+    }
+  }
+
+  return (
+    <div className="relative">
+      <div
+        role="button"
+        tabIndex={0}
+        title="Select cruise durations"
+        aria-label="Select cruise durations"
+        onClick={() => setIsOpen(!isOpen)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setIsOpen(!isOpen) }}
+        className="w-full min-h-[40px] px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-left flex items-center justify-between gap-2 cursor-pointer hover:border-gray-400 focus:ring-2 focus:ring-blue-600"
+      >
+        <div className="flex-1 flex flex-wrap gap-1">
+          {value.length === 0 ? (
+            <span className="text-gray-400">Select durations...</span>
+          ) : (
+            value.map(v => (
+              <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                {v}N
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onChange(value.filter(x => x !== v)) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onChange(value.filter(x => x !== v)) } }}
+                  className="hover:text-blue-900 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </span>
+              </span>
+            ))
+          )}
+        </div>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
+          <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+            {DURATION_OPTIONS.map(nights => (
+              <div
+                key={nights}
+                role="button"
+                tabIndex={0}
+                onClick={() => toggleDuration(nights)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleDuration(nights) }}
+                className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 flex items-center justify-between cursor-pointer"
+              >
+                <span>{nights} Nights</span>
+                {value.includes(nights) && <Check className="w-4 h-4 text-blue-600" />}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -301,10 +368,10 @@ function Pagination({
 }
 
 // ============================================
-// SEASONAL RATE SECTION COMPONENT
+// PPD SEASONAL RATE SECTION COMPONENT
 // ============================================
 
-function SeasonalRateSection({
+function PPDSeasonalRateSection({
   title,
   seasonNumber,
   startDate,
@@ -332,14 +399,12 @@ function SeasonalRateSection({
   onStartDate2Change?: (value: string) => void
   onEndDate2Change?: (value: string) => void
   rates: {
-    single_eur: number
-    double_eur: number
-    triple_eur: number
-    suite_eur: number
-    single_non_eur: number
-    double_non_eur: number
-    triple_non_eur: number
-    suite_non_eur: number
+    ppd_eur: number
+    ppd_non_eur: number
+    single_supplement_eur: number
+    single_supplement_non_eur: number
+    triple_reduction_eur: number
+    triple_reduction_non_eur: number
   }
   onRateChange: (field: string, value: number) => void
   showSecondPeriod?: boolean
@@ -401,106 +466,111 @@ function SeasonalRateSection({
         </div>
       )}
 
+      {/* PPD Explanation */}
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-xs text-blue-800">
+          <strong>PPD Model:</strong> Enter Per Person Double rate (base rate per person sharing a cabin).
+          Single = PPD + Supplement | Triple = PPD - Reduction
+        </p>
+      </div>
+
       {/* EUR Passport Rates */}
       <div className="mb-3">
         <label className="block text-xs font-medium text-gray-500 mb-2">EUR Passport Holders</label>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Single (€)</label>
+            <label className="block text-xs text-blue-600 font-medium mb-1">PPD (€) *</label>
             <input
               type="number"
-              value={rates.single_eur}
-              onChange={(e) => onRateChange('single_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
+              value={rates.ppd_eur}
+              onChange={(e) => onRateChange('ppd_eur', parseFloat(e.target.value) || 0)}
+              className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-blue-50 font-medium"
               min="0"
               step="0.01"
+              placeholder="Per Person Double"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Double (€)</label>
+            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp (€)</label>
             <input
               type="number"
-              value={rates.double_eur}
-              onChange={(e) => onRateChange('double_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
+              value={rates.single_supplement_eur}
+              onChange={(e) => onRateChange('single_supplement_eur', parseFloat(e.target.value) || 0)}
+              className="w-full px-2 py-1.5 text-sm border border-green-300 rounded-lg"
               min="0"
               step="0.01"
+              placeholder="+ for single"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Triple (€)</label>
+            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red (€)</label>
             <input
               type="number"
-              value={rates.triple_eur}
-              onChange={(e) => onRateChange('triple_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
+              value={rates.triple_reduction_eur}
+              onChange={(e) => onRateChange('triple_reduction_eur', parseFloat(e.target.value) || 0)}
+              className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg"
               min="0"
               step="0.01"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Suite (€)</label>
-            <input
-              type="number"
-              value={rates.suite_eur}
-              onChange={(e) => onRateChange('suite_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
-              min="0"
-              step="0.01"
+              placeholder="- for triple"
             />
           </div>
         </div>
+        {/* Calculated rates display */}
+        {rates.ppd_eur > 0 && (
+          <div className="mt-2 text-xs text-gray-500 flex gap-4">
+            <span>Single: €{(rates.ppd_eur + rates.single_supplement_eur).toFixed(2)}</span>
+            <span>Double: €{(rates.ppd_eur * 2).toFixed(2)}</span>
+            <span>Triple: €{((rates.ppd_eur - rates.triple_reduction_eur) * 3).toFixed(2)}</span>
+          </div>
+        )}
       </div>
 
       {/* Non-EUR Passport Rates */}
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-2">Non-EUR Passport Holders</label>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Single (€)</label>
+            <label className="block text-xs text-blue-600 font-medium mb-1">PPD (€) *</label>
             <input
               type="number"
-              value={rates.single_non_eur}
-              onChange={(e) => onRateChange('single_non_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
+              value={rates.ppd_non_eur}
+              onChange={(e) => onRateChange('ppd_non_eur', parseFloat(e.target.value) || 0)}
+              className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-blue-50 font-medium"
               min="0"
               step="0.01"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Double (€)</label>
+            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp (€)</label>
             <input
               type="number"
-              value={rates.double_non_eur}
-              onChange={(e) => onRateChange('double_non_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
+              value={rates.single_supplement_non_eur}
+              onChange={(e) => onRateChange('single_supplement_non_eur', parseFloat(e.target.value) || 0)}
+              className="w-full px-2 py-1.5 text-sm border border-green-300 rounded-lg"
               min="0"
               step="0.01"
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">Triple (€)</label>
+            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red (€)</label>
             <input
               type="number"
-              value={rates.triple_non_eur}
-              onChange={(e) => onRateChange('triple_non_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Suite (€)</label>
-            <input
-              type="number"
-              value={rates.suite_non_eur}
-              onChange={(e) => onRateChange('suite_non_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg"
+              value={rates.triple_reduction_non_eur}
+              onChange={(e) => onRateChange('triple_reduction_non_eur', parseFloat(e.target.value) || 0)}
+              className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg"
               min="0"
               step="0.01"
             />
           </div>
         </div>
+        {/* Calculated rates display */}
+        {rates.ppd_non_eur > 0 && (
+          <div className="mt-2 text-xs text-gray-500 flex gap-4">
+            <span>Single: €{(rates.ppd_non_eur + rates.single_supplement_non_eur).toFixed(2)}</span>
+            <span>Double: €{(rates.ppd_non_eur * 2).toFixed(2)}</span>
+            <span>Triple: €{((rates.ppd_non_eur - rates.triple_reduction_non_eur) * 3).toFixed(2)}</span>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -512,7 +582,8 @@ function SeasonalRateSection({
 
 export default function CruisesPage() {
   const dialog = useConfirmDialog()
-  
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+
   const [cruises, setCruises] = useState<Cruise[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -529,10 +600,6 @@ export default function CruisesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
 
-  // Default dates for seasons
-  const currentYear = new Date().getFullYear()
-  const nextYear = currentYear + 1
-
   const getDefaultFormData = (): CruiseFormData => ({
     cruise_code: '',
     ship_name: '',
@@ -540,50 +607,40 @@ export default function CruisesPage() {
     route_name: '',
     embark_city: 'Luxor',
     disembark_city: 'Aswan',
-    duration_nights: 4,
+    duration_nights: [4],
     cabin_type: 'standard',
-    // Legacy rates
-    rate_single_eur: 0,
-    rate_double_eur: 0,
-    rate_triple_eur: 0,
-    // Low Season (May 1 - Sep 30)
-    low_season_start: `${currentYear}-05-01`,
-    low_season_end: `${currentYear}-09-30`,
-    rate_low_single_eur: 0,
-    rate_low_double_eur: 0,
-    rate_low_triple_eur: 0,
-    rate_low_suite_eur: 0,
-    rate_low_single_non_eur: 0,
-    rate_low_double_non_eur: 0,
-    rate_low_triple_non_eur: 0,
-    rate_low_suite_non_eur: 0,
-    // High Season (Oct 1 - Apr 30)
-    high_season_start: `${currentYear}-10-01`,
-    high_season_end: `${nextYear}-04-30`,
-    rate_high_single_eur: 0,
-    rate_high_double_eur: 0,
-    rate_high_triple_eur: 0,
-    rate_high_suite_eur: 0,
-    rate_high_single_non_eur: 0,
-    rate_high_double_non_eur: 0,
-    rate_high_triple_non_eur: 0,
-    rate_high_suite_non_eur: 0,
-    // Peak Season (Christmas/New Year, Easter)
-    peak_season_1_start: `${currentYear}-12-20`,
-    peak_season_1_end: `${nextYear}-01-05`,
+    // PPD Model - Low Season
+    ppd_eur: 0,
+    ppd_non_eur: 0,
+    single_supplement_eur: 0,
+    single_supplement_non_eur: 0,
+    triple_reduction_eur: 0,
+    triple_reduction_non_eur: 0,
+    low_season_start: '',
+    low_season_end: '',
+    // PPD Model - High Season
+    high_season_ppd_eur: 0,
+    high_season_ppd_non_eur: 0,
+    high_season_single_supplement_eur: 0,
+    high_season_single_supplement_non_eur: 0,
+    high_season_triple_reduction_eur: 0,
+    high_season_triple_reduction_non_eur: 0,
+    high_season_start: '',
+    high_season_end: '',
+    // PPD Model - Peak Season
+    peak_season_ppd_eur: 0,
+    peak_season_ppd_non_eur: 0,
+    peak_season_single_supplement_eur: 0,
+    peak_season_single_supplement_non_eur: 0,
+    peak_season_triple_reduction_eur: 0,
+    peak_season_triple_reduction_non_eur: 0,
+    peak_season_1_start: '',
+    peak_season_1_end: '',
     peak_season_2_start: '',
     peak_season_2_end: '',
-    rate_peak_single_eur: 0,
-    rate_peak_double_eur: 0,
-    rate_peak_triple_eur: 0,
-    rate_peak_suite_eur: 0,
-    rate_peak_single_non_eur: 0,
-    rate_peak_double_non_eur: 0,
-    rate_peak_triple_non_eur: 0,
-    rate_peak_suite_non_eur: 0,
     // Rate validity
-    rate_valid_from: `${currentYear}-01-01`,
-    rate_valid_to: `${nextYear}-12-31`,
+    rate_valid_from: '',
+    rate_valid_to: '',
     // Other
     meals_included: 'full_board',
     sightseeing_included: false,
@@ -663,7 +720,7 @@ export default function CruisesPage() {
 
   const generateCode = () => {
     const ship = formData.ship_name.substring(0, 8).toUpperCase().replace(/\s+/g, '')
-    const nights = formData.duration_nights
+    const nights = formData.duration_nights.join('-')
     const cabin = formData.cabin_type.substring(0, 3).toUpperCase()
     return `CRUISE-${ship}-${nights}N-${cabin}`
   }
@@ -683,50 +740,40 @@ export default function CruisesPage() {
       route_name: cruise.route_name,
       embark_city: cruise.embark_city,
       disembark_city: cruise.disembark_city,
-      duration_nights: cruise.duration_nights,
+      duration_nights: Array.isArray(cruise.duration_nights) ? cruise.duration_nights : [cruise.duration_nights],
       cabin_type: cruise.cabin_type,
-      // Legacy rates
-      rate_single_eur: cruise.rate_single_eur || 0,
-      rate_double_eur: cruise.rate_double_eur || 0,
-      rate_triple_eur: cruise.rate_triple_eur || 0,
-      // Low Season
-      low_season_start: cruise.low_season_start || `${currentYear}-05-01`,
-      low_season_end: cruise.low_season_end || `${currentYear}-09-30`,
-      rate_low_single_eur: cruise.rate_low_single_eur || cruise.rate_single_eur || 0,
-      rate_low_double_eur: cruise.rate_low_double_eur || cruise.rate_double_eur || 0,
-      rate_low_triple_eur: cruise.rate_low_triple_eur || cruise.rate_triple_eur || 0,
-      rate_low_suite_eur: cruise.rate_low_suite_eur || 0,
-      rate_low_single_non_eur: cruise.rate_low_single_non_eur || 0,
-      rate_low_double_non_eur: cruise.rate_low_double_non_eur || 0,
-      rate_low_triple_non_eur: cruise.rate_low_triple_non_eur || 0,
-      rate_low_suite_non_eur: cruise.rate_low_suite_non_eur || 0,
-      // High Season
-      high_season_start: cruise.high_season_start || `${currentYear}-10-01`,
-      high_season_end: cruise.high_season_end || `${nextYear}-04-30`,
-      rate_high_single_eur: cruise.rate_high_single_eur || 0,
-      rate_high_double_eur: cruise.rate_high_double_eur || 0,
-      rate_high_triple_eur: cruise.rate_high_triple_eur || 0,
-      rate_high_suite_eur: cruise.rate_high_suite_eur || 0,
-      rate_high_single_non_eur: cruise.rate_high_single_non_eur || 0,
-      rate_high_double_non_eur: cruise.rate_high_double_non_eur || 0,
-      rate_high_triple_non_eur: cruise.rate_high_triple_non_eur || 0,
-      rate_high_suite_non_eur: cruise.rate_high_suite_non_eur || 0,
-      // Peak Season
-      peak_season_1_start: cruise.peak_season_1_start || `${currentYear}-12-20`,
-      peak_season_1_end: cruise.peak_season_1_end || `${nextYear}-01-05`,
+      // PPD Model - Low Season
+      ppd_eur: cruise.ppd_eur || 0,
+      ppd_non_eur: cruise.ppd_non_eur || 0,
+      single_supplement_eur: cruise.single_supplement_eur || 0,
+      single_supplement_non_eur: cruise.single_supplement_non_eur || 0,
+      triple_reduction_eur: cruise.triple_reduction_eur || 0,
+      triple_reduction_non_eur: cruise.triple_reduction_non_eur || 0,
+      low_season_start: cruise.low_season_start || '',
+      low_season_end: cruise.low_season_end || '',
+      // PPD Model - High Season
+      high_season_ppd_eur: cruise.high_season_ppd_eur || 0,
+      high_season_ppd_non_eur: cruise.high_season_ppd_non_eur || 0,
+      high_season_single_supplement_eur: cruise.high_season_single_supplement_eur || 0,
+      high_season_single_supplement_non_eur: cruise.high_season_single_supplement_non_eur || 0,
+      high_season_triple_reduction_eur: cruise.high_season_triple_reduction_eur || 0,
+      high_season_triple_reduction_non_eur: cruise.high_season_triple_reduction_non_eur || 0,
+      high_season_start: cruise.high_season_start || '',
+      high_season_end: cruise.high_season_end || '',
+      // PPD Model - Peak Season
+      peak_season_ppd_eur: cruise.peak_season_ppd_eur || 0,
+      peak_season_ppd_non_eur: cruise.peak_season_ppd_non_eur || 0,
+      peak_season_single_supplement_eur: cruise.peak_season_single_supplement_eur || 0,
+      peak_season_single_supplement_non_eur: cruise.peak_season_single_supplement_non_eur || 0,
+      peak_season_triple_reduction_eur: cruise.peak_season_triple_reduction_eur || 0,
+      peak_season_triple_reduction_non_eur: cruise.peak_season_triple_reduction_non_eur || 0,
+      peak_season_1_start: cruise.peak_season_1_start || '',
+      peak_season_1_end: cruise.peak_season_1_end || '',
       peak_season_2_start: cruise.peak_season_2_start || '',
       peak_season_2_end: cruise.peak_season_2_end || '',
-      rate_peak_single_eur: cruise.rate_peak_single_eur || 0,
-      rate_peak_double_eur: cruise.rate_peak_double_eur || 0,
-      rate_peak_triple_eur: cruise.rate_peak_triple_eur || 0,
-      rate_peak_suite_eur: cruise.rate_peak_suite_eur || 0,
-      rate_peak_single_non_eur: cruise.rate_peak_single_non_eur || 0,
-      rate_peak_double_non_eur: cruise.rate_peak_double_non_eur || 0,
-      rate_peak_triple_non_eur: cruise.rate_peak_triple_non_eur || 0,
-      rate_peak_suite_non_eur: cruise.rate_peak_suite_non_eur || 0,
       // Rate validity
-      rate_valid_from: cruise.rate_valid_from || `${currentYear}-01-01`,
-      rate_valid_to: cruise.rate_valid_to || `${nextYear}-12-31`,
+      rate_valid_from: cruise.rate_valid_from || '',
+      rate_valid_to: cruise.rate_valid_to || '',
       // Other
       meals_included: cruise.meals_included || 'full_board',
       sightseeing_included: cruise.sightseeing_included,
@@ -740,21 +787,310 @@ export default function CruisesPage() {
     setShowModal(true)
   }
 
+  // Clone/Duplicate a cruise
+  const handleClone = (cruise: Cruise) => {
+    setEditingCruise(null) // This is a new record
+    setFormData({
+      cruise_code: '', // Will be auto-generated
+      ship_name: cruise.ship_name,
+      ship_category: cruise.ship_category,
+      route_name: cruise.route_name,
+      embark_city: cruise.embark_city,
+      disembark_city: cruise.disembark_city,
+      duration_nights: Array.isArray(cruise.duration_nights) ? cruise.duration_nights : [cruise.duration_nights],
+      cabin_type: cruise.cabin_type,
+      // PPD Model - Low Season
+      ppd_eur: cruise.ppd_eur || 0,
+      ppd_non_eur: cruise.ppd_non_eur || 0,
+      single_supplement_eur: cruise.single_supplement_eur || 0,
+      single_supplement_non_eur: cruise.single_supplement_non_eur || 0,
+      triple_reduction_eur: cruise.triple_reduction_eur || 0,
+      triple_reduction_non_eur: cruise.triple_reduction_non_eur || 0,
+      low_season_start: cruise.low_season_start || '',
+      low_season_end: cruise.low_season_end || '',
+      // PPD Model - High Season
+      high_season_ppd_eur: cruise.high_season_ppd_eur || 0,
+      high_season_ppd_non_eur: cruise.high_season_ppd_non_eur || 0,
+      high_season_single_supplement_eur: cruise.high_season_single_supplement_eur || 0,
+      high_season_single_supplement_non_eur: cruise.high_season_single_supplement_non_eur || 0,
+      high_season_triple_reduction_eur: cruise.high_season_triple_reduction_eur || 0,
+      high_season_triple_reduction_non_eur: cruise.high_season_triple_reduction_non_eur || 0,
+      high_season_start: cruise.high_season_start || '',
+      high_season_end: cruise.high_season_end || '',
+      // PPD Model - Peak Season
+      peak_season_ppd_eur: cruise.peak_season_ppd_eur || 0,
+      peak_season_ppd_non_eur: cruise.peak_season_ppd_non_eur || 0,
+      peak_season_single_supplement_eur: cruise.peak_season_single_supplement_eur || 0,
+      peak_season_single_supplement_non_eur: cruise.peak_season_single_supplement_non_eur || 0,
+      peak_season_triple_reduction_eur: cruise.peak_season_triple_reduction_eur || 0,
+      peak_season_triple_reduction_non_eur: cruise.peak_season_triple_reduction_non_eur || 0,
+      peak_season_1_start: cruise.peak_season_1_start || '',
+      peak_season_1_end: cruise.peak_season_1_end || '',
+      peak_season_2_start: cruise.peak_season_2_start || '',
+      peak_season_2_end: cruise.peak_season_2_end || '',
+      // Rate validity
+      rate_valid_from: cruise.rate_valid_from || '',
+      rate_valid_to: cruise.rate_valid_to || '',
+      // Other
+      meals_included: cruise.meals_included || 'full_board',
+      sightseeing_included: cruise.sightseeing_included,
+      description: cruise.description || '',
+      notes: cruise.notes || '',
+      is_active: cruise.is_active,
+      tier: cruise.tier || 'standard',
+      is_preferred: cruise.is_preferred || false,
+      supplier_id: cruise.supplier_id || ''
+    })
+    setShowModal(true)
+    showToast('success', 'Cruise duplicated - modify and save as new')
+  }
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    const headers = [
+      'Cruise Code', 'Ship Name', 'Ship Category', 'Embark City', 'Disembark City',
+      'Duration (Nights)', 'Cabin Type', 'Tier', 'Is Preferred', 'Is Active',
+      'PPD EUR', 'PPD Non-EUR', 'Single Supp EUR', 'Single Supp Non-EUR',
+      'Triple Red EUR', 'Triple Red Non-EUR',
+      'Low Season Start', 'Low Season End',
+      'High Season PPD EUR', 'High Season PPD Non-EUR',
+      'High Season Single Supp EUR', 'High Season Single Supp Non-EUR',
+      'High Season Triple Red EUR', 'High Season Triple Red Non-EUR',
+      'High Season Start', 'High Season End',
+      'Peak Season PPD EUR', 'Peak Season PPD Non-EUR',
+      'Peak Season Single Supp EUR', 'Peak Season Single Supp Non-EUR',
+      'Peak Season Triple Red EUR', 'Peak Season Triple Red Non-EUR',
+      'Peak Season 1 Start', 'Peak Season 1 End',
+      'Peak Season 2 Start', 'Peak Season 2 End',
+      'Rate Valid From', 'Rate Valid To',
+      'Meals Included', 'Sightseeing Included', 'Notes'
+    ]
+
+    const rows = filteredCruises.map(c => [
+      c.cruise_code,
+      c.ship_name,
+      c.ship_category,
+      c.embark_city,
+      c.disembark_city,
+      Array.isArray(c.duration_nights) ? c.duration_nights.join(';') : c.duration_nights,
+      c.cabin_type,
+      c.tier || 'standard',
+      c.is_preferred ? 'Yes' : 'No',
+      c.is_active ? 'Yes' : 'No',
+      c.ppd_eur || 0,
+      c.ppd_non_eur || 0,
+      c.single_supplement_eur || 0,
+      c.single_supplement_non_eur || 0,
+      c.triple_reduction_eur || 0,
+      c.triple_reduction_non_eur || 0,
+      c.low_season_start || '',
+      c.low_season_end || '',
+      c.high_season_ppd_eur || 0,
+      c.high_season_ppd_non_eur || 0,
+      c.high_season_single_supplement_eur || 0,
+      c.high_season_single_supplement_non_eur || 0,
+      c.high_season_triple_reduction_eur || 0,
+      c.high_season_triple_reduction_non_eur || 0,
+      c.high_season_start || '',
+      c.high_season_end || '',
+      c.peak_season_ppd_eur || 0,
+      c.peak_season_ppd_non_eur || 0,
+      c.peak_season_single_supplement_eur || 0,
+      c.peak_season_single_supplement_non_eur || 0,
+      c.peak_season_triple_reduction_eur || 0,
+      c.peak_season_triple_reduction_non_eur || 0,
+      c.peak_season_1_start || '',
+      c.peak_season_1_end || '',
+      c.peak_season_2_start || '',
+      c.peak_season_2_end || '',
+      c.rate_valid_from || '',
+      c.rate_valid_to || '',
+      c.meals_included || 'full_board',
+      c.sightseeing_included ? 'Yes' : 'No',
+      (c.notes || '').replace(/"/g, '""')
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `cruise-rates-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    showToast('success', `Exported ${filteredCruises.length} cruise rates`)
+  }
+
+  // Import from CSV
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+
+        if (lines.length < 2) {
+          showToast('error', 'CSV file is empty or invalid')
+          return
+        }
+
+        const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim())
+        const importedCruises: any[] = []
+        let errors = 0
+
+        for (let i = 1; i < lines.length; i++) {
+          try {
+            // Parse CSV line handling quoted values
+            const values: string[] = []
+            let current = ''
+            let inQuotes = false
+
+            for (const char of lines[i]) {
+              if (char === '"') {
+                inQuotes = !inQuotes
+              } else if (char === ',' && !inQuotes) {
+                values.push(current.trim())
+                current = ''
+              } else {
+                current += char
+              }
+            }
+            values.push(current.trim())
+
+            const row: Record<string, string> = {}
+            headers.forEach((h, idx) => {
+              row[h] = values[idx] || ''
+            })
+
+            // Map CSV columns to database fields
+            const cruiseData = {
+              cruise_code: row['Cruise Code'] || '',
+              ship_name: row['Ship Name'] || '',
+              ship_category: row['Ship Category'] || 'deluxe',
+              embark_city: row['Embark City'] || 'Luxor',
+              disembark_city: row['Disembark City'] || 'Aswan',
+              duration_nights: row['Duration (Nights)']?.includes(';')
+                ? row['Duration (Nights)'].split(';').map(Number)
+                : [parseInt(row['Duration (Nights)']) || 4],
+              cabin_type: row['Cabin Type'] || 'standard',
+              tier: row['Tier'] || 'standard',
+              is_preferred: row['Is Preferred']?.toLowerCase() === 'yes',
+              is_active: row['Is Active']?.toLowerCase() !== 'no',
+              // PPD Model - Low Season
+              ppd_eur: parseFloat(row['PPD EUR']) || 0,
+              ppd_non_eur: parseFloat(row['PPD Non-EUR']) || 0,
+              single_supplement_eur: parseFloat(row['Single Supp EUR']) || 0,
+              single_supplement_non_eur: parseFloat(row['Single Supp Non-EUR']) || 0,
+              triple_reduction_eur: parseFloat(row['Triple Red EUR']) || 0,
+              triple_reduction_non_eur: parseFloat(row['Triple Red Non-EUR']) || 0,
+              low_season_start: row['Low Season Start'] || null,
+              low_season_end: row['Low Season End'] || null,
+              // PPD Model - High Season
+              high_season_ppd_eur: parseFloat(row['High Season PPD EUR']) || 0,
+              high_season_ppd_non_eur: parseFloat(row['High Season PPD Non-EUR']) || 0,
+              high_season_single_supplement_eur: parseFloat(row['High Season Single Supp EUR']) || 0,
+              high_season_single_supplement_non_eur: parseFloat(row['High Season Single Supp Non-EUR']) || 0,
+              high_season_triple_reduction_eur: parseFloat(row['High Season Triple Red EUR']) || 0,
+              high_season_triple_reduction_non_eur: parseFloat(row['High Season Triple Red Non-EUR']) || 0,
+              high_season_start: row['High Season Start'] || null,
+              high_season_end: row['High Season End'] || null,
+              // PPD Model - Peak Season
+              peak_season_ppd_eur: parseFloat(row['Peak Season PPD EUR']) || 0,
+              peak_season_ppd_non_eur: parseFloat(row['Peak Season PPD Non-EUR']) || 0,
+              peak_season_single_supplement_eur: parseFloat(row['Peak Season Single Supp EUR']) || 0,
+              peak_season_single_supplement_non_eur: parseFloat(row['Peak Season Single Supp Non-EUR']) || 0,
+              peak_season_triple_reduction_eur: parseFloat(row['Peak Season Triple Red EUR']) || 0,
+              peak_season_triple_reduction_non_eur: parseFloat(row['Peak Season Triple Red Non-EUR']) || 0,
+              peak_season_1_start: row['Peak Season 1 Start'] || null,
+              peak_season_1_end: row['Peak Season 1 End'] || null,
+              peak_season_2_start: row['Peak Season 2 Start'] || null,
+              peak_season_2_end: row['Peak Season 2 End'] || null,
+              rate_valid_from: row['Rate Valid From'] || null,
+              rate_valid_to: row['Rate Valid To'] || null,
+              meals_included: row['Meals Included'] || 'full_board',
+              sightseeing_included: row['Sightseeing Included']?.toLowerCase() === 'yes',
+              notes: row['Notes'] || ''
+            }
+
+            if (cruiseData.ship_name) {
+              importedCruises.push(cruiseData)
+            }
+          } catch (err) {
+            errors++
+            console.error(`Error parsing row ${i}:`, err)
+          }
+        }
+
+        if (importedCruises.length === 0) {
+          showToast('error', 'No valid cruise data found in CSV')
+          return
+        }
+
+        // Import cruises one by one
+        let successCount = 0
+        for (const cruiseData of importedCruises) {
+          try {
+            const response = await fetch('/api/rates/cruises', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(cruiseData)
+            })
+            if (response.ok) {
+              successCount++
+            } else {
+              errors++
+            }
+          } catch (err) {
+            errors++
+          }
+        }
+
+        showToast('success', `Imported ${successCount} cruises${errors > 0 ? `, ${errors} failed` : ''}`)
+        fetchCruises()
+      } catch (error) {
+        console.error('Import error:', error)
+        showToast('error', 'Failed to parse CSV file')
+      }
+    }
+    reader.readAsText(file)
+
+    // Reset input so same file can be imported again
+    event.target.value = ''
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    // Use low season rates as the "default" legacy rates for backward compatibility
+
+    // Calculate legacy rates from PPD for backward compatibility
+    const singleEur = formData.ppd_eur + formData.single_supplement_eur
+    const doubleEur = formData.ppd_eur * 2
+    const tripleEur = (formData.ppd_eur - formData.triple_reduction_eur) * 3
+
     const submitData = {
       ...formData,
       cruise_code: formData.cruise_code || generateCode(),
       route_name: formData.route_name || `${formData.embark_city} to ${formData.disembark_city}`,
-      // Set legacy rates from low season for backward compatibility
-      rate_single_eur: formData.rate_low_single_eur || formData.rate_single_eur,
-      rate_double_eur: formData.rate_low_double_eur || formData.rate_double_eur,
-      rate_triple_eur: formData.rate_low_triple_eur || formData.rate_triple_eur || null,
+      // Set legacy rates from PPD for backward compatibility
+      rate_single_eur: singleEur,
+      rate_double_eur: doubleEur,
+      rate_triple_eur: tripleEur > 0 ? tripleEur : null,
       supplier_id: formData.supplier_id || null,
+      // Convert empty date strings to null (PostgreSQL requires null, not empty strings for DATE fields)
+      low_season_start: formData.low_season_start || null,
+      low_season_end: formData.low_season_end || null,
+      high_season_start: formData.high_season_start || null,
+      high_season_end: formData.high_season_end || null,
+      peak_season_1_start: formData.peak_season_1_start || null,
+      peak_season_1_end: formData.peak_season_1_end || null,
       peak_season_2_start: formData.peak_season_2_start || null,
-      peak_season_2_end: formData.peak_season_2_end || null
+      peak_season_2_end: formData.peak_season_2_end || null,
+      rate_valid_from: formData.rate_valid_from || null,
+      rate_valid_to: formData.rate_valid_to || null
     }
 
     try {
@@ -830,8 +1166,8 @@ export default function CruisesPage() {
     active: cruises.filter(c => c.is_active).length,
     preferred: cruises.filter(c => c.is_preferred).length,
     ships: new Set(cruises.map(c => c.ship_name)).size,
-    avgRate: cruises.length > 0 
-      ? Math.round(cruises.reduce((sum, c) => sum + c.rate_double_eur, 0) / cruises.length)
+    avgPPD: cruises.length > 0
+      ? Math.round(cruises.reduce((sum, c) => sum + (c.ppd_eur || c.rate_double_eur || 0), 0) / cruises.length)
       : 0
   }
 
@@ -877,6 +1213,24 @@ export default function CruisesPage() {
                 <Plus className="w-4 h-4" />
                 Add Cruise
               </button>
+              <button
+                onClick={handleExportCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 font-medium"
+                title="Export to CSV"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 font-medium cursor-pointer">
+                <Upload className="w-4 h-4" />
+                Import
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleImportCSV}
+                  className="hidden"
+                />
+              </label>
               <Link href="/suppliers?type=cruise" className="px-3 py-1.5 text-sm border border-indigo-300 text-indigo-700 rounded-lg hover:bg-indigo-50 font-medium">
                 Cruise Suppliers
               </Link>
@@ -911,8 +1265,8 @@ export default function CruisesPage() {
             <p className="text-2xl font-bold text-blue-600">{stats.ships}</p>
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Avg. Double Rate</p>
-            <p className="text-2xl font-bold text-purple-600">€{stats.avgRate}</p>
+            <p className="text-xs text-gray-600">Avg. PPD Rate ({userCurrency})</p>
+            <p className="text-2xl font-bold text-purple-600">{symbol}{convert(stats.avgPPD).toFixed(0)}</p>
           </div>
         </div>
 
@@ -986,9 +1340,9 @@ export default function CruisesPage() {
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Nights</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Cabin</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Tier</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">Single</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">Double</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">Triple</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">PPD ({userCurrency})</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">Single Supp ({userCurrency})</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">Triple Red ({userCurrency})</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Actions</th>
                 </tr>
@@ -1018,9 +1372,13 @@ export default function CruisesPage() {
                       {cruise.embark_city} → {cruise.disembark_city}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                        {cruise.duration_nights}N
-                      </span>
+                      <div className="flex flex-wrap gap-1 justify-center">
+                        {(Array.isArray(cruise.duration_nights) ? cruise.duration_nights : [cruise.duration_nights]).map(n => (
+                          <span key={n} className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                            {n}N
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${
@@ -1034,14 +1392,14 @@ export default function CruisesPage() {
                     <td className="px-4 py-3 text-center">
                       <TierBadge tier={cruise.tier} />
                     </td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                      €{cruise.rate_single_eur}
-                    </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-blue-600">
-                      €{cruise.rate_double_eur}
+                      {symbol}{convert(cruise.ppd_eur || cruise.rate_double_eur || 0).toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
+                      {cruise.single_supplement_eur ? `+${symbol}${convert(cruise.single_supplement_eur).toFixed(2)}` : '-'}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-purple-600">
-                      {cruise.rate_triple_eur ? `€${cruise.rate_triple_eur}` : '-'}
+                      {cruise.triple_reduction_eur ? `-${symbol}${convert(cruise.triple_reduction_eur).toFixed(2)}` : '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1052,10 +1410,13 @@ export default function CruisesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => handleEdit(cruise)} className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded">
+                        <button onClick={() => handleEdit(cruise)} className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="Edit">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button onClick={() => handleDelete(cruise)} className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded">
+                        <button onClick={() => handleClone(cruise)} className="p-1 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded" title="Duplicate">
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(cruise)} className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded" title="Delete">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -1183,15 +1544,11 @@ export default function CruisesPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Nights) *</label>
-                  <input
-                    type="number"
-                    name="duration_nights"
+                  <DurationMultiSelect
                     value={formData.duration_nights}
-                    onChange={handleChange}
-                    min="1"
-                    required
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+                    onChange={(durations) => setFormData({ ...formData, duration_nights: durations })}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Select all applicable durations for this cruise</p>
                 </div>
               </div>
 
@@ -1260,8 +1617,8 @@ export default function CruisesPage() {
                 </div>
               </div>
 
-              {/* Section 6: Low Season Rates */}
-              <SeasonalRateSection
+              {/* Section 6: Low Season Rates (PPD Model) */}
+              <PPDSeasonalRateSection
                 title="Low Season Rates"
                 seasonNumber={3}
                 startDate={formData.low_season_start}
@@ -1269,22 +1626,20 @@ export default function CruisesPage() {
                 onStartDateChange={(value) => setFormData({ ...formData, low_season_start: value })}
                 onEndDateChange={(value) => setFormData({ ...formData, low_season_end: value })}
                 rates={{
-                  single_eur: formData.rate_low_single_eur,
-                  double_eur: formData.rate_low_double_eur,
-                  triple_eur: formData.rate_low_triple_eur,
-                  suite_eur: formData.rate_low_suite_eur,
-                  single_non_eur: formData.rate_low_single_non_eur,
-                  double_non_eur: formData.rate_low_double_non_eur,
-                  triple_non_eur: formData.rate_low_triple_non_eur,
-                  suite_non_eur: formData.rate_low_suite_non_eur
+                  ppd_eur: formData.ppd_eur,
+                  ppd_non_eur: formData.ppd_non_eur,
+                  single_supplement_eur: formData.single_supplement_eur,
+                  single_supplement_non_eur: formData.single_supplement_non_eur,
+                  triple_reduction_eur: formData.triple_reduction_eur,
+                  triple_reduction_non_eur: formData.triple_reduction_non_eur
                 }}
-                onRateChange={(field, value) => setFormData({ ...formData, [`rate_low_${field}`]: value })}
+                onRateChange={(field, value) => setFormData({ ...formData, [field]: value })}
                 borderColor="border-green-200"
                 bgColor="bg-green-50/30"
               />
 
-              {/* Section 7: High Season Rates */}
-              <SeasonalRateSection
+              {/* Section 7: High Season Rates (PPD Model) */}
+              <PPDSeasonalRateSection
                 title="High Season Rates"
                 seasonNumber={4}
                 startDate={formData.high_season_start}
@@ -1292,22 +1647,20 @@ export default function CruisesPage() {
                 onStartDateChange={(value) => setFormData({ ...formData, high_season_start: value })}
                 onEndDateChange={(value) => setFormData({ ...formData, high_season_end: value })}
                 rates={{
-                  single_eur: formData.rate_high_single_eur,
-                  double_eur: formData.rate_high_double_eur,
-                  triple_eur: formData.rate_high_triple_eur,
-                  suite_eur: formData.rate_high_suite_eur,
-                  single_non_eur: formData.rate_high_single_non_eur,
-                  double_non_eur: formData.rate_high_double_non_eur,
-                  triple_non_eur: formData.rate_high_triple_non_eur,
-                  suite_non_eur: formData.rate_high_suite_non_eur
+                  ppd_eur: formData.high_season_ppd_eur,
+                  ppd_non_eur: formData.high_season_ppd_non_eur,
+                  single_supplement_eur: formData.high_season_single_supplement_eur,
+                  single_supplement_non_eur: formData.high_season_single_supplement_non_eur,
+                  triple_reduction_eur: formData.high_season_triple_reduction_eur,
+                  triple_reduction_non_eur: formData.high_season_triple_reduction_non_eur
                 }}
-                onRateChange={(field, value) => setFormData({ ...formData, [`rate_high_${field}`]: value })}
+                onRateChange={(field, value) => setFormData({ ...formData, [`high_season_${field}`]: value })}
                 borderColor="border-blue-200"
                 bgColor="bg-blue-50/30"
               />
 
-              {/* Section 8: Peak Season Rates */}
-              <SeasonalRateSection
+              {/* Section 8: Peak Season Rates (PPD Model) */}
+              <PPDSeasonalRateSection
                 title="Peak Season Rates"
                 seasonNumber={5}
                 startDate={formData.peak_season_1_start}
@@ -1319,16 +1672,14 @@ export default function CruisesPage() {
                 onStartDate2Change={(value) => setFormData({ ...formData, peak_season_2_start: value })}
                 onEndDate2Change={(value) => setFormData({ ...formData, peak_season_2_end: value })}
                 rates={{
-                  single_eur: formData.rate_peak_single_eur,
-                  double_eur: formData.rate_peak_double_eur,
-                  triple_eur: formData.rate_peak_triple_eur,
-                  suite_eur: formData.rate_peak_suite_eur,
-                  single_non_eur: formData.rate_peak_single_non_eur,
-                  double_non_eur: formData.rate_peak_double_non_eur,
-                  triple_non_eur: formData.rate_peak_triple_non_eur,
-                  suite_non_eur: formData.rate_peak_suite_non_eur
+                  ppd_eur: formData.peak_season_ppd_eur,
+                  ppd_non_eur: formData.peak_season_ppd_non_eur,
+                  single_supplement_eur: formData.peak_season_single_supplement_eur,
+                  single_supplement_non_eur: formData.peak_season_single_supplement_non_eur,
+                  triple_reduction_eur: formData.peak_season_triple_reduction_eur,
+                  triple_reduction_non_eur: formData.peak_season_triple_reduction_non_eur
                 }}
-                onRateChange={(field, value) => setFormData({ ...formData, [`rate_peak_${field}`]: value })}
+                onRateChange={(field, value) => setFormData({ ...formData, [`peak_season_${field}`]: value })}
                 showSecondPeriod={true}
                 borderColor="border-orange-200"
                 bgColor="bg-orange-50/30"

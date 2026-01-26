@@ -9,9 +9,9 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
-import { 
-  Search, 
-  Plus, 
+import {
+  Search,
+  Plus,
   Landmark,
   Hotel,
   Sparkles,
@@ -26,7 +26,6 @@ import {
   Eye,
   ChevronRight,
   BookOpen,
-  Wand2,
   AlertCircle,
   CheckCircle2,
   X,
@@ -176,13 +175,6 @@ export default function ContentLibraryPage() {
               >
                 <BookOpen className="w-4 h-4" />
                 Writing Rules
-              </Link>
-              <Link
-                href="/content-library/prompts"
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <Wand2 className="w-4 h-4" />
-                AI Prompts
               </Link>
               <Link
                 href="/content-library/new"
@@ -382,18 +374,27 @@ export default function ContentLibraryPage() {
                         )}
                       </div>
                       
-                      {/* Tier Badges */}
-                      <div className="flex gap-1">
-                        {['budget', 'standard', 'deluxe', 'luxury'].map(tier => {
-                          const hasTier = !item.missing_tiers.includes(tier)
+                      {/* Tier Indicators - B S D L */}
+                      <div className="flex gap-0.5">
+                        {[
+                          { key: 'budget', label: 'B', color: 'bg-emerald-500' },
+                          { key: 'standard', label: 'S', color: 'bg-blue-500' },
+                          { key: 'deluxe', label: 'D', color: 'bg-purple-500' },
+                          { key: 'luxury', label: 'L', color: 'bg-amber-500' }
+                        ].map(tier => {
+                          const hasTier = !item.missing_tiers.includes(tier.key)
                           return (
                             <div
-                              key={tier}
-                              className={`w-2 h-2 rounded-full ${
-                                hasTier ? TIER_COLORS[tier].bg.replace('50', '400') : 'bg-gray-200'
+                              key={tier.key}
+                              className={`w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center ${
+                                hasTier
+                                  ? `${tier.color} text-white`
+                                  : 'bg-gray-200 text-gray-400'
                               }`}
-                              title={`${tier}: ${hasTier ? '✓' : '✗'}`}
-                            />
+                              title={`${tier.key.charAt(0).toUpperCase() + tier.key.slice(1)}: ${hasTier ? 'Complete' : 'Missing'}`}
+                            >
+                              {tier.label}
+                            </div>
                           )
                         })}
                       </div>

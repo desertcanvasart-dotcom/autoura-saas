@@ -43,9 +43,7 @@ export async function GET(
       .select(`
         *,
         category:content_categories(*),
-        variations:content_variations(*),
-        created_by_user:user_profiles!content_library_created_by_fkey(id, full_name, email),
-        updated_by_user:user_profiles!content_library_updated_by_fkey(id, full_name, email)
+        variations:content_variations(*)
       `)
       .eq('id', id)
       .single()
@@ -142,9 +140,23 @@ export async function PUT(
         existingVariations?.map(v => [v.tier, v.id]) || []
       )
 
+      // Get tiers being submitted (only ones with content)
+      const submittedTiers = new Set(variations.map(v => v.tier))
+
+      // Delete variations that are no longer being submitted (user cleared description)
+      for (const [tier, variationId] of existingTierMap) {
+        if (!submittedTiers.has(tier)) {
+          await supabase
+            .from('content_variations')
+            .delete()
+            .eq('id', variationId)
+        }
+      }
+
+      // Update or insert submitted variations
       for (const variation of variations) {
         const existingId = existingTierMap.get(variation.tier)
-        
+
         if (existingId) {
           // Update existing
           await supabase

@@ -1,21 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - List all tour templates with variations
 export async function GET(request: NextRequest) {
   try {
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category_id')
     const tourType = searchParams.get('tour_type')
     const isActive = searchParams.get('is_active')
 
-    // First get templates
-    let query = supabaseAdmin
+    // Get templates (RLS filters to tenant's templates only)
+    let query = supabase
       .from('tour_templates')
       .select(`
         *,
@@ -45,11 +43,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get all variations for these templates
+    // Get all variations for these templates (RLS filters to tenant's variations only)
     if (templates && templates.length > 0) {
       const templateIds = templates.map(t => t.id)
-      
-      const { data: variations, error: variationsError } = await supabaseAdmin
+
+      const { data: variations, error: variationsError } = await supabase
         .from('tour_variations')
         .select('*')
         .in('template_id', templateIds)
@@ -88,6 +86,16 @@ export async function GET(request: NextRequest) {
 // POST - Create new tour template
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     if (!body.template_name || !body.tour_type) {
@@ -101,6 +109,7 @@ export async function POST(request: NextRequest) {
     const templateCode = body.template_code || generateTemplateCode(body)
 
     const templateData = {
+      tenant_id, // ✅ Explicit tenant_id
       template_code: templateCode,
       template_name: body.template_name,
       category_id: body.category_id || null,
@@ -133,7 +142,7 @@ export async function POST(request: NextRequest) {
       exclusions: body.exclusions || []
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('tour_templates')
       .insert([templateData])
       .select()

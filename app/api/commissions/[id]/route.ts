@@ -1,19 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    // RLS automatically filters by tenant_id
+    const { data, error } = await supabase
       .from('commissions')
       .select(`
         *,
@@ -41,6 +47,16 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id } = await params
     const body = await request.json()
 
@@ -49,7 +65,8 @@ export async function PUT(
       body.paid_date = new Date().toISOString().split('T')[0]
     }
 
-    const { data, error } = await supabaseAdmin
+    // RLS ensures only tenant's commissions can be updated
+    const { data, error } = await supabase
       .from('commissions')
       .update(body)
       .eq('id', id)
@@ -77,9 +94,20 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id } = await params
 
-    const { error } = await supabaseAdmin
+    // RLS ensures only tenant's commissions can be deleted
+    const { error } = await supabase
       .from('commissions')
       .delete()
       .eq('id', id)

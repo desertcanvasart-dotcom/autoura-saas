@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // Generate unique itinerary code
 function generateItineraryCode(): string {
@@ -18,10 +18,16 @@ function calculateTotalDays(startDate: string, endDate: string): number {
   return diffDays + 1 // Include both start and end day
 }
 
+/**
+ * GET /api/itineraries
+ * List all itineraries for the authenticated user's tenant
+ * RLS policies automatically filter by tenant_id
+ */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
-    
+    // Use authenticated client - RLS will automatically filter by tenant
+    const supabase = await createAuthenticatedClient()
+
     const { data, error } = await supabase
       .from('itineraries')
       .select('*')
@@ -47,9 +53,23 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST /api/itineraries
+ * Create a new itinerary for the authenticated user's tenant
+ * RLS policies will validate tenant_id
+ */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     // Generate itinerary_code if not provided
@@ -75,7 +95,8 @@ export async function POST(request: NextRequest) {
     body.total_cost = body.total_cost || 0
     body.currency = body.currency || 'EUR'
 
-    // Set timestamps
+    // Set tenant_id and timestamps
+    body.tenant_id = tenant_id
     const now = new Date().toISOString()
     body.created_at = body.created_at || now
     body.updated_at = now

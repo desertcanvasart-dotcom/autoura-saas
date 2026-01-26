@@ -1,16 +1,10 @@
 // =====================================================
-// WRITING RULES API
-// =====================================================
-// 📁 COPY TO: app/api/content-library/writing-rules/route.ts
+// WRITING RULES API - SIMPLIFIED
 // =====================================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-
-const VALID_CATEGORIES = ['tone', 'vocabulary', 'structure', 'formatting', 'brand']
-const VALID_RULE_TYPES = ['enforce', 'prefer', 'avoid']
-const VALID_APPLIES_TO = ['itinerary', 'email', 'whatsapp', 'all']
 
 // Helper to create Supabase client
 async function createClient() {
@@ -34,76 +28,39 @@ async function createClient() {
 }
 
 // GET - List writing rules
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const supabase = await createClient()
-    const { searchParams } = new URL(request.url)
-    
-    // Parse filters
-    const category = searchParams.get('category')
-    const ruleType = searchParams.get('rule_type')
-    const appliesTo = searchParams.get('applies_to')
-    const activeOnly = searchParams.get('active_only') !== 'false'
-    const minPriority = searchParams.get('min_priority')
-    const forPrompt = searchParams.get('for_prompt') === 'true'
 
-    let query = supabase
+    const { data, error } = await supabase
       .from('writing_rules')
       .select('*')
+      .eq('is_active', true)
       .order('priority', { ascending: false })
-      .order('name', { ascending: true })
-
-    // Apply filters
-    if (activeOnly) {
-      query = query.eq('is_active', true)
-    }
-
-    if (category && VALID_CATEGORIES.includes(category)) {
-      query = query.eq('category', category)
-    }
-
-    if (ruleType && VALID_RULE_TYPES.includes(ruleType)) {
-      query = query.eq('rule_type', ruleType)
-    }
-
-    if (appliesTo && VALID_APPLIES_TO.includes(appliesTo)) {
-      query = query.or(`applies_to.cs.{${appliesTo}},applies_to.cs.{all}`)
-    }
-
-    if (minPriority) {
-      query = query.gte('priority', parseInt(minPriority))
-    }
-
-    const { data, error } = await query
+      .order('sort_order', { ascending: true })
 
     if (error) {
       console.error('Error fetching writing rules:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // If for_prompt, format for AI consumption
-    if (forPrompt && data) {
-      const grouped = {
-        enforce: data.filter(r => r.rule_type === 'enforce').map(r => ({
-          name: r.name,
-          description: r.description,
-          examples: r.examples
-        })),
-        prefer: data.filter(r => r.rule_type === 'prefer').map(r => ({
-          name: r.name,
-          description: r.description,
-          examples: r.examples
-        })),
-        avoid: data.filter(r => r.rule_type === 'avoid').map(r => ({
-          name: r.name,
-          description: r.description,
-          examples: r.examples
-        }))
-      }
-      return NextResponse.json(grouped)
-    }
+    // Transform data to match UI expectations
+    const transformed = (data || []).map(rule => ({
+      ...rule,
+      // Use examples_json if available, otherwise convert examples array
+      examples: rule.examples_json || {
+        good: rule.examples || [],
+        bad: []
+      },
+      // Ensure rule_type has a default
+      rule_type: rule.rule_type || 'enforce',
+      // Ensure priority has a default
+      priority: rule.priority || 5,
+      // Map applies_to from applies_to_tiers if not set
+      applies_to: rule.applies_to || ['all']
+    }))
 
-    return NextResponse.json(data)
+    return NextResponse.json(transformed)
   } catch (error) {
     console.error('Writing rules GET error:', error)
     return NextResponse.json(
@@ -117,7 +74,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    
+
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
@@ -132,59 +89,38 @@ export async function POST(request: NextRequest) {
       description,
       examples,
       priority,
-      applies_to
+      applies_to,
+      applies_to_tiers,
+      sort_order
     } = body
 
-    // Validation
-    if (!name || !category || !rule_type || !description) {
+    if (!name || !description) {
       return NextResponse.json(
-        { error: 'name, category, rule_type, and description are required' },
+        { error: 'name and description are required' },
         { status: 400 }
       )
     }
 
-    if (!VALID_CATEGORIES.includes(category)) {
-      return NextResponse.json(
-        { error: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}` },
-        { status: 400 }
-      )
-    }
-
-    if (!VALID_RULE_TYPES.includes(rule_type)) {
-      return NextResponse.json(
-        { error: `Invalid rule_type. Must be one of: ${VALID_RULE_TYPES.join(', ')}` },
-        { status: 400 }
-      )
-    }
-
-    // Validate applies_to
-    const finalAppliesTo = applies_to || ['all']
-    if (!finalAppliesTo.every((a: string) => VALID_APPLIES_TO.includes(a))) {
-      return NextResponse.json(
-        { error: `Invalid applies_to values. Must be from: ${VALID_APPLIES_TO.join(', ')}` },
-        { status: 400 }
-      )
-    }
-
-    // Validate priority
-    const finalPriority = priority ?? 5
-    if (finalPriority < 1 || finalPriority > 10) {
-      return NextResponse.json(
-        { error: 'Priority must be between 1 and 10' },
-        { status: 400 }
-      )
-    }
+    // Get tenant_id from user's profile
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
 
     const { data, error } = await supabase
       .from('writing_rules')
       .insert({
+        tenant_id: profile?.tenant_id,
         name,
-        category,
-        rule_type,
+        category: category || 'general',
+        rule_type: rule_type || 'enforce',
         description,
-        examples: examples || {},
-        priority: finalPriority,
-        applies_to: finalAppliesTo,
+        examples_json: examples || { good: [], bad: [] },
+        priority: priority || 5,
+        applies_to: applies_to || ['all'],
+        applies_to_tiers: applies_to_tiers || ['budget', 'standard', 'deluxe', 'luxury'],
+        sort_order: sort_order || 0,
         created_by: user.id
       })
       .select()
@@ -195,7 +131,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data, { status: 201 })
+    // Transform response to match UI expectations
+    const transformed = {
+      ...data,
+      examples: data.examples_json || { good: [], bad: [] },
+      rule_type: data.rule_type || 'enforce',
+      priority: data.priority || 5,
+      applies_to: data.applies_to || ['all']
+    }
+
+    return NextResponse.json(transformed, { status: 201 })
   } catch (error) {
     console.error('Writing rules POST error:', error)
     return NextResponse.json(
@@ -209,7 +154,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
-    
+
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
@@ -217,7 +162,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, ...updates } = body
+    const { id, examples, ...updates } = body
 
     if (!id) {
       return NextResponse.json(
@@ -226,33 +171,17 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    // Validate category if provided
-    if (updates.category && !VALID_CATEGORIES.includes(updates.category)) {
-      return NextResponse.json(
-        { error: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(', ')}` },
-        { status: 400 }
-      )
-    }
-
-    // Validate rule_type if provided
-    if (updates.rule_type && !VALID_RULE_TYPES.includes(updates.rule_type)) {
-      return NextResponse.json(
-        { error: `Invalid rule_type. Must be one of: ${VALID_RULE_TYPES.join(', ')}` },
-        { status: 400 }
-      )
-    }
-
-    // Validate priority if provided
-    if (updates.priority !== undefined && (updates.priority < 1 || updates.priority > 10)) {
-      return NextResponse.json(
-        { error: 'Priority must be between 1 and 10' },
-        { status: 400 }
-      )
-    }
-
     // Remove fields that shouldn't be updated
     delete updates.created_at
     delete updates.created_by
+    delete updates.tenant_id
+
+    // Map examples to examples_json for storage
+    if (examples) {
+      updates.examples_json = examples
+    }
+
+    updates.updated_by = user.id
 
     const { data, error } = await supabase
       .from('writing_rules')
@@ -266,7 +195,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data)
+    // Transform response to match UI expectations
+    const transformed = {
+      ...data,
+      examples: data.examples_json || { good: [], bad: [] },
+      rule_type: data.rule_type || 'enforce',
+      priority: data.priority || 5,
+      applies_to: data.applies_to || ['all']
+    }
+
+    return NextResponse.json(transformed)
   } catch (error) {
     console.error('Writing rules PATCH error:', error)
     return NextResponse.json(
@@ -280,7 +218,7 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient()
-    
+
     // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {

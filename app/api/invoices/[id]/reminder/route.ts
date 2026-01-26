@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // Reuse the email generation from the main route
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
@@ -132,10 +132,20 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const supabase = createClient()
+    // Authenticate user and get Supabase client
+    const authResult = await requireAuth()
 
-    // Get invoice
+    if (authResult.error) {
+      return NextResponse.json({
+        success: false,
+        error: authResult.error
+      }, { status: authResult.status })
+    }
+
+    const { supabase } = authResult
+    const { id } = await params
+
+    // Get invoice - RLS automatically filters by tenant
     const { data: invoice, error } = await supabase
       .from('invoices')
       .select('*')
@@ -243,9 +253,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const supabase = createClient()
+    // Authenticate user
+    const supabase = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
 
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
+    const { id } = await params
+
+    // Query with RLS - automatically filters by tenant
     const { data: reminders, error } = await supabase
       .from('invoice_reminders')
       .select('*')

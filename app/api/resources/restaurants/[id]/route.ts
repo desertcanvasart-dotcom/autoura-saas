@@ -5,7 +5,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - Get single restaurant
 export async function GET(
@@ -13,9 +13,21 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    // Use authenticated client - RLS filters by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Not authenticated' },
+        { status: 401 }
+      )
+    }
+
     const { id } = await params
 
+    // RLS ensures user can only access their tenant's restaurants
     const { data, error } = await supabase
       .from('restaurant_contacts')
       .select('*')
@@ -49,12 +61,21 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id } = await params
     const body = await request.json()
 
     const updateData: any = {}
-    
+
     // Basic fields
     if (body.name !== undefined) updateData.name = body.name
     if (body.restaurant_type !== undefined) updateData.restaurant_type = body.restaurant_type
@@ -70,6 +91,8 @@ export async function PUT(
     if (body.dietary_options !== undefined) updateData.dietary_options = body.dietary_options
     if (body.notes !== undefined) updateData.notes = body.notes
     if (body.is_active !== undefined) updateData.is_active = body.is_active
+    if (body.tier !== undefined) updateData.tier = body.tier
+    if (body.is_preferred !== undefined) updateData.is_preferred = body.is_preferred
 
     // Rate fields - EUR
     if (body.rate_per_person_eur !== undefined) updateData.rate_per_person_eur = body.rate_per_person_eur || null
@@ -96,6 +119,10 @@ export async function PUT(
     if (body.rate_valid_from !== undefined) updateData.rate_valid_from = body.rate_valid_from || null
     if (body.rate_valid_to !== undefined) updateData.rate_valid_to = body.rate_valid_to || null
 
+    // Block tenant_id changes
+    delete updateData.tenant_id
+
+    // RLS ensures user can only update their tenant's restaurants
     const { data, error } = await supabase
       .from('restaurant_contacts')
       .update(updateData)
@@ -139,10 +166,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id } = await params
 
-    // Check if restaurant has assigned itineraries
+    // Check if restaurant has assigned itineraries (RLS filters by tenant)
     const { data: itineraries, error: checkError } = await supabase
       .from('itineraries')
       .select('id')
@@ -158,14 +194,15 @@ export async function DELETE(
 
     if (itineraries && itineraries.length > 0) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Cannot delete restaurant with assigned bookings. Please unassign bookings first or set restaurant to inactive.' 
+        {
+          success: false,
+          error: 'Cannot delete restaurant with assigned bookings. Please unassign bookings first or set restaurant to inactive.'
         },
         { status: 409 }
       )
     }
 
+    // RLS ensures user can only delete their tenant's restaurants
     const { error } = await supabase
       .from('restaurant_contacts')
       .delete()

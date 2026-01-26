@@ -1,16 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get user info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Not authenticated' },
+        { status: 401 }
+      )
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const userId = formData.get('userId') as string
+    const requestedUserId = formData.get('userId') as string
 
     if (!file) {
       return NextResponse.json(
@@ -19,10 +34,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!userId) {
+    // Security: Ensure user can only upload their own avatar
+    if (requestedUserId && requestedUserId !== user.id) {
       return NextResponse.json(
-        { success: false, error: 'User ID is required' },
-        { status: 400 }
+        { success: false, error: 'Unauthorized: Cannot upload avatar for another user' },
+        { status: 403 }
       )
     }
 
@@ -44,16 +60,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate unique filename
+    // Generate unique filename using authenticated user's ID
     const fileExt = file.name.split('.').pop()
-    const fileName = `${userId}-${Date.now()}.${fileExt}`
+    const fileName = `${user.id}-${Date.now()}.${fileExt}`
     const filePath = `avatars/${fileName}`
 
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage using authenticated client
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('avatars')
       .upload(filePath, buffer, {
@@ -63,31 +79,16 @@ export async function POST(request: NextRequest) {
 
     if (uploadError) {
       console.error('Upload error:', uploadError)
-      
-      // If bucket doesn't exist, create it
+
+      // If bucket doesn't exist, try to create it (this will fail if not admin, which is fine)
       if (uploadError.message?.includes('Bucket not found')) {
-        // Try to create the bucket
-        const { error: bucketError } = await supabase.storage.createBucket('avatars', {
-          public: true,
-          fileSizeLimit: 2 * 1024 * 1024 // 2MB
-        })
-
-        if (bucketError && !bucketError.message?.includes('already exists')) {
-          throw bucketError
-        }
-
-        // Retry upload
-        const { data: retryData, error: retryError } = await supabase.storage
-          .from('avatars')
-          .upload(filePath, buffer, {
-            contentType: file.type,
-            upsert: true
-          })
-
-        if (retryError) throw retryError
-      } else {
-        throw uploadError
+        return NextResponse.json(
+          { success: false, error: 'Avatar storage bucket not configured. Please contact administrator.' },
+          { status: 500 }
+        )
       }
+
+      throw uploadError
     }
 
     // Get public URL
@@ -97,11 +98,11 @@ export async function POST(request: NextRequest) {
 
     const avatarUrl = urlData.publicUrl
 
-    // Update user profile with new avatar URL
+    // Update user profile with new avatar URL (RLS ensures user can only update their own profile)
     const { error: updateError } = await supabase
       .from('user_profiles')
       .update({ avatar_url: avatarUrl })
-      .eq('id', userId)
+      .eq('id', user.id)
 
     if (updateError) {
       console.error('Profile update error:', updateError)

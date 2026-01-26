@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { matchTourTemplate, getTemplateWithPricing } from '@/lib/tour-matcher-service'
 import { calculatePricingFromRates, getFallbackRates } from '@/lib/rate-lookup-service'
 
@@ -15,6 +15,17 @@ import { calculatePricingFromRates, getFallbackRates } from '@/lib/rate-lookup-s
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication - accesses pricing data and templates
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
+
     const body = await request.json()
     const {
       // From WhatsApp parser
@@ -38,7 +49,6 @@ export async function POST(request: NextRequest) {
       template_id = null    // Force specific template
     } = body
 
-    const supabase = createClient()
     const totalPax = num_adults + num_children
 
     // ============================================

@@ -12,6 +12,8 @@ import {
   X,
   Check,
   Download,
+  Upload,
+  Copy,
   MapPin,
   Users,
   ChevronLeft,
@@ -24,6 +26,7 @@ import {
   XCircle,
   Info
 } from 'lucide-react'
+import { useCurrency } from '@/hooks/useCurrency'
 
 // Egyptian cities
 const EGYPT_CITIES = [
@@ -55,7 +58,11 @@ const CUISINE_TYPES = [
   'Seafood',
   'Lebanese',
   'Turkish',
-  'Indian'
+  'Indian',
+  'Korean',
+  'Chinese',
+  'Japanese',
+  'French'
 ]
 
 const RESTAURANT_TYPES = [
@@ -129,6 +136,8 @@ export default function MealRatesContent() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -322,6 +331,198 @@ export default function MealRatesContent() {
       is_active: rate.is_active
     })
     setShowModal(true)
+  }
+
+  const handleClone = (rate: MealRate) => {
+    setEditingRate(null)
+    setFormData({
+      service_code: generateServiceCode(),
+      restaurant_name: rate.restaurant_name || '',
+      meal_type: rate.meal_type || '',
+      cuisine_type: rate.cuisine_type || '',
+      restaurant_type: rate.restaurant_type || '',
+      city: rate.city || '',
+      base_rate_eur: rate.base_rate_eur || 0,
+      base_rate_non_eur: rate.base_rate_non_eur || 0,
+      season: rate.season || '',
+      rate_valid_from: rate.rate_valid_from || today,
+      rate_valid_to: rate.rate_valid_to || nextYear,
+      supplier_id: rate.supplier_id || '',
+      supplier_name: rate.supplier_name || '',
+      tier: rate.tier || 'standard',
+      meal_category: rate.meal_category || '',
+      dietary_options: rate.dietary_options || [],
+      per_person_rate: rate.per_person_rate !== false,
+      minimum_pax: rate.minimum_pax || 1,
+      notes: rate.notes || '',
+      is_active: rate.is_active
+    })
+    setShowModal(true)
+  }
+
+  const handleExportCSV = () => {
+    const headers = [
+      'service_code',
+      'restaurant_name',
+      'meal_type',
+      'cuisine_type',
+      'restaurant_type',
+      'city',
+      'base_rate_eur',
+      'base_rate_non_eur',
+      'season',
+      'rate_valid_from',
+      'rate_valid_to',
+      'supplier_id',
+      'supplier_name',
+      'tier',
+      'meal_category',
+      'dietary_options',
+      'per_person_rate',
+      'minimum_pax',
+      'notes',
+      'is_active'
+    ]
+
+    const csvRows = [
+      headers.join(','),
+      ...filteredRates.map(rate => [
+        rate.service_code || '',
+        `"${(rate.restaurant_name || '').replace(/"/g, '""')}"`,
+        rate.meal_type || '',
+        rate.cuisine_type || '',
+        rate.restaurant_type || '',
+        rate.city || '',
+        rate.base_rate_eur || 0,
+        rate.base_rate_non_eur || 0,
+        rate.season || '',
+        rate.rate_valid_from || '',
+        rate.rate_valid_to || '',
+        rate.supplier_id || '',
+        `"${(rate.supplier_name || '').replace(/"/g, '""')}"`,
+        rate.tier || '',
+        rate.meal_category || '',
+        `"${(rate.dietary_options || []).join(';')}"`,
+        rate.per_person_rate ? 'true' : 'false',
+        rate.minimum_pax || 1,
+        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        rate.is_active ? 'true' : 'false'
+      ].join(','))
+    ]
+
+    const csvContent = csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `meal-rates-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    showNotification('success', 'Export Complete', `Exported ${filteredRates.length} meal rates to CSV`)
+  }
+
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+
+        if (lines.length < 2) {
+          showNotification('error', 'Import Failed', 'CSV file is empty or has no data rows')
+          return
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+        let successCount = 0
+        let errorCount = 0
+
+        for (let i = 1; i < lines.length; i++) {
+          const values: string[] = []
+          let current = ''
+          let inQuotes = false
+
+          for (const char of lines[i]) {
+            if (char === '"') {
+              inQuotes = !inQuotes
+            } else if (char === ',' && !inQuotes) {
+              values.push(current.trim())
+              current = ''
+            } else {
+              current += char
+            }
+          }
+          values.push(current.trim())
+
+          const row: Record<string, string> = {}
+          headers.forEach((header, index) => {
+            row[header] = values[index] || ''
+          })
+
+          const rateData = {
+            service_code: row.service_code || generateServiceCode(),
+            restaurant_name: row.restaurant_name || '',
+            meal_type: row.meal_type || '',
+            cuisine_type: row.cuisine_type || '',
+            restaurant_type: row.restaurant_type || '',
+            city: row.city || '',
+            base_rate_eur: parseFloat(row.base_rate_eur) || 0,
+            base_rate_non_eur: parseFloat(row.base_rate_non_eur) || 0,
+            season: row.season || '',
+            rate_valid_from: row.rate_valid_from || today,
+            rate_valid_to: row.rate_valid_to || nextYear,
+            supplier_id: row.supplier_id || '',
+            supplier_name: row.supplier_name || '',
+            tier: row.tier || 'standard',
+            meal_category: row.meal_category || '',
+            dietary_options: row.dietary_options ? row.dietary_options.split(';').filter(Boolean) : [],
+            per_person_rate: row.per_person_rate !== 'false',
+            minimum_pax: parseInt(row.minimum_pax) || 1,
+            notes: row.notes || '',
+            is_active: row.is_active !== 'false'
+          }
+
+          if (!rateData.restaurant_name) {
+            errorCount++
+            continue
+          }
+
+          try {
+            const response = await fetch('/api/rates/meals', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(rateData)
+            })
+
+            if (response.ok) {
+              successCount++
+            } else {
+              errorCount++
+            }
+          } catch {
+            errorCount++
+          }
+        }
+
+        fetchRates()
+        showNotification(
+          errorCount === 0 ? 'success' : 'warning',
+          'Import Complete',
+          `Successfully imported ${successCount} rates${errorCount > 0 ? `, ${errorCount} failed` : ''}`
+        )
+      } catch (error) {
+        console.error('Import error:', error)
+        showNotification('error', 'Import Failed', 'Failed to parse CSV file')
+      }
+    }
+
+    reader.readAsText(file)
+    event.target.value = ''
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -553,12 +754,22 @@ export default function MealRatesContent() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {/* Export CSV */}}
+            onClick={handleExportCSV}
             className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
             <Download className="w-4 h-4" />
             Export
           </button>
+          <label className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer">
+            <Upload className="w-4 h-4" />
+            Import
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+            />
+          </label>
           <button
             onClick={handleAddNew}
             className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
@@ -604,10 +815,10 @@ export default function MealRatesContent() {
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-gray-400 font-bold">€</span>
+            <span className="text-gray-400 font-bold">{symbol}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">€{avgRate}</p>
+          <p className="text-2xl font-bold text-gray-900">{symbol}{convert(Number(avgRate)).toFixed(0)}</p>
           <p className="text-xs text-gray-600">Avg. Rate</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -754,7 +965,7 @@ export default function MealRatesContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Meal Type</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Tier</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Rate</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
@@ -788,11 +999,11 @@ export default function MealRatesContent() {
                       {getTierBadge(rate.tier)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-bold text-green-600">€{rate.base_rate_eur}</span>
+                      <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
                       {rate.per_person_rate && <span className="text-xs text-gray-400">/pp</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-gray-600">€{rate.base_rate_non_eur}</span>
+                      <span className="text-sm text-gray-600">{symbol}{convert(Number(rate.base_rate_non_eur)).toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -806,12 +1017,21 @@ export default function MealRatesContent() {
                         <button
                           onClick={() => handleEdit(rate)}
                           className="p-1.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
+                          title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => handleClone(rate)}
+                          className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Clone"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => confirmDelete(rate.id, rate.restaurant_name)}
                           className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -854,19 +1074,28 @@ export default function MealRatesContent() {
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
-                    <p className="text-xs text-gray-500">EUR Rate {rate.per_person_rate && '(per person)'}</p>
-                    <p className="text-lg font-bold text-green-600">€{rate.base_rate_eur}</p>
+                    <p className="text-xs text-gray-500">{userCurrency} Rate {rate.per_person_rate && '(per person)'}</p>
+                    <p className="text-lg font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleEdit(rate)}
                       className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
+                      title="Edit"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => handleClone(rate)}
+                      className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      title="Clone"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => confirmDelete(rate.id, rate.restaurant_name)}
                       className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="Delete"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -891,17 +1120,20 @@ export default function MealRatesContent() {
                   {getTierBadge(rate.tier)}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-green-600">€{rate.base_rate_eur}</span>
+                  <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}>
                     {rate.is_active ? 'Active' : 'Inactive'}
                   </span>
                   <div className="flex gap-1">
-                    <button onClick={() => handleEdit(rate)} className="p-1 text-gray-400 hover:text-primary-600">
+                    <button onClick={() => handleEdit(rate)} className="p-1 text-gray-400 hover:text-primary-600" title="Edit">
                       <Edit className="w-4 h-4" />
                     </button>
-                    <button onClick={() => confirmDelete(rate.id, rate.restaurant_name)} className="p-1 text-gray-400 hover:text-red-600">
+                    <button onClick={() => handleClone(rate)} className="p-1 text-gray-400 hover:text-blue-600" title="Clone">
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => confirmDelete(rate.id, rate.restaurant_name)} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -1155,7 +1387,7 @@ export default function MealRatesContent() {
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">EUR Rate (€) *</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Base Rate - EUR Clients (€) *</label>
                     <input
                       type="number"
                       name="base_rate_eur"
@@ -1164,11 +1396,13 @@ export default function MealRatesContent() {
                       required
                       min="0"
                       step="0.01"
+                      placeholder="Enter rate in EUR"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Stored in EUR, displayed in your preferred currency</p>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Non-EUR Rate (€)</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Base Rate - Non-EUR Clients (€)</label>
                     <input
                       type="number"
                       name="base_rate_non_eur"
@@ -1176,8 +1410,10 @@ export default function MealRatesContent() {
                       onChange={handleChange}
                       min="0"
                       step="0.01"
+                      placeholder="Enter rate in EUR"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     />
+                    <p className="text-xs text-gray-500 mt-1">Stored in EUR, displayed in your preferred currency</p>
                   </div>
                   <div>
                     <label className="flex items-center gap-2 cursor-pointer">

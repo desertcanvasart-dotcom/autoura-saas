@@ -97,6 +97,9 @@ type GenerationMode = 'edit' | 'quick'
 // NEW: Input mode type
 type InputMode = 'creative' | 'structured'
 
+// NEW: Quote type
+type QuoteType = 'b2c' | 'b2b' | 'both' | 'none'
+
 // ============================================
 // CONSTANTS
 // ============================================
@@ -718,6 +721,158 @@ function GenerationModeSelector({
 }
 
 // ============================================
+// QUOTE TYPE SELECTOR COMPONENT
+// ============================================
+
+function QuoteTypeSelector({
+  quoteType,
+  onChange
+}: {
+  quoteType: QuoteType
+  onChange: (type: QuoteType) => void
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+      <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+        <FileText className="w-4 h-4 text-gray-500" />
+        Quote Type
+      </h3>
+
+      <div className="grid grid-cols-4 gap-3">
+        {/* B2C - Direct Client */}
+        <button
+          onClick={() => onChange('b2c')}
+          className={`p-4 rounded-xl border-2 text-left transition-all ${
+            quoteType === 'b2c'
+              ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500 ring-offset-1'
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              quoteType === 'b2c' ? 'bg-blue-100' : 'bg-gray-100'
+            }`}>
+              <User className={`w-4 h-4 ${quoteType === 'b2c' ? 'text-blue-600' : 'text-gray-500'}`} />
+            </div>
+            <span className={`text-sm font-semibold ${quoteType === 'b2c' ? 'text-blue-700' : 'text-gray-700'}`}>
+              B2C
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Direct client quote with margin pricing
+          </p>
+        </button>
+
+        {/* B2B - Tour Operator */}
+        <button
+          onClick={() => onChange('b2b')}
+          className={`p-4 rounded-xl border-2 text-left transition-all ${
+            quoteType === 'b2b'
+              ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-500 ring-offset-1'
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              quoteType === 'b2b' ? 'bg-purple-100' : 'bg-gray-100'
+            }`}>
+              <Building2 className={`w-4 h-4 ${quoteType === 'b2b' ? 'text-purple-600' : 'text-gray-500'}`} />
+            </div>
+            <span className={`text-sm font-semibold ${quoteType === 'b2b' ? 'text-purple-700' : 'text-gray-700'}`}>
+              B2B
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Tour operator rate sheet with multi-pax pricing
+          </p>
+        </button>
+
+        {/* Both */}
+        <button
+          onClick={() => onChange('both')}
+          className={`p-4 rounded-xl border-2 text-left transition-all ${
+            quoteType === 'both'
+              ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500 ring-offset-1'
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              quoteType === 'both' ? 'bg-emerald-100' : 'bg-gray-100'
+            }`}>
+              <Users className={`w-4 h-4 ${quoteType === 'both' ? 'text-emerald-600' : 'text-gray-500'}`} />
+            </div>
+            <span className={`text-sm font-semibold ${quoteType === 'both' ? 'text-emerald-700' : 'text-gray-700'}`}>
+              Both
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Generate B2C + B2B quotes together
+          </p>
+        </button>
+
+        {/* None (Itinerary Only) */}
+        <button
+          onClick={() => onChange('none')}
+          className={`p-4 rounded-xl border-2 text-left transition-all ${
+            quoteType === 'none'
+              ? 'border-gray-500 bg-gray-50 ring-2 ring-gray-500 ring-offset-1'
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              quoteType === 'none' ? 'bg-gray-200' : 'bg-gray-100'
+            }`}>
+              <Map className={`w-4 h-4 ${quoteType === 'none' ? 'text-gray-600' : 'text-gray-500'}`} />
+            </div>
+            <span className={`text-sm font-semibold ${quoteType === 'none' ? 'text-gray-700' : 'text-gray-700'}`}>
+              None
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Itinerary only, no quote
+          </p>
+        </button>
+      </div>
+
+      {/* Info boxes for each type */}
+      {quoteType === 'b2c' && (
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+          <p>
+            <strong>💼 B2C Quote:</strong> Includes cost breakdown, margin-based pricing, and per-person price. Perfect for sending directly to clients.
+          </p>
+        </div>
+      )}
+
+      {quoteType === 'b2b' && (
+        <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
+          <p>
+            <strong>🏢 B2B Quote:</strong> Generates multi-pax pricing table (2-30 passengers), PPD + Single Supplement breakdown, optional Tour Leader support.
+          </p>
+        </div>
+      )}
+
+      {quoteType === 'both' && (
+        <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700">
+          <p>
+            <strong>📊 Both Quotes:</strong> Creates one itinerary with two pricing wrappers - B2C for direct sales and B2B for tour operator partnerships.
+          </p>
+        </div>
+      )}
+
+      {quoteType === 'none' && (
+        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+          <p>
+            <strong>📝 Itinerary Only:</strong> Generate itinerary content without pricing. You can add quotes later from the itinerary detail page.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================
 // EXTRACTED DAYS PREVIEW COMPONENT
 // ============================================
 
@@ -840,6 +995,9 @@ function WhatsAppParserContent() {
   // NEW: Input mode state
   const [inputMode, setInputMode] = useState<InputMode>('creative')
   const [autoDetectedMode, setAutoDetectedMode] = useState<InputMode | null>(null)
+
+  // NEW: Quote type state
+  const [quoteType, setQuoteType] = useState<QuoteType>('b2c')
 
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
@@ -974,6 +1132,7 @@ function WhatsAppParserContent() {
     setPackageType('land-package')
     setInputMode('creative')
     setAutoDetectedMode(null)
+    setQuoteType('b2c')
   }
 
   const analyzeConversation = async () => {
@@ -1216,7 +1375,8 @@ function WhatsAppParserContent() {
           input_mode_override: inputMode,
           is_structured_input: data.is_structured_input,
           extracted_days: data.extracted_days,
-          raw_itinerary: data.raw_itinerary
+          raw_itinerary: data.raw_itinerary,
+          quote_type: quoteType
         })
       })
 
@@ -1556,6 +1716,9 @@ function WhatsAppParserContent() {
                     })}
                   </div>
                 </div>
+
+                {/* Quote Type Selection */}
+                <QuoteTypeSelector quoteType={quoteType} onChange={setQuoteType} />
 
                 {/* Generation Mode */}
                 <GenerationModeSelector mode={generationMode} onChange={setGenerationMode} />

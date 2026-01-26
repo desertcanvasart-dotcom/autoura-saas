@@ -1,7 +1,7 @@
 // API Route: /api/itineraries/[id]/days/[dayId]/services/[serviceId]/route.ts
 // Updated to handle transport-specific fields
 
-import { createClient } from '@/lib/supabase/server'
+import { requireAuth } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 
 export async function PUT(
@@ -9,8 +9,17 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; dayId: string; serviceId: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id, dayId, serviceId } = await params
-    const supabase = createClient()
     const body = await request.json()
 
     // Extract all fields including transport-specific ones
@@ -75,9 +84,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; dayId: string; serviceId: string }> }
 ) {
   try {
-    const { id, dayId, serviceId } = await params
-    const supabase = createClient()
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
 
+    const { supabase } = authResult
+    const { id, dayId, serviceId } = await params
+
+    // RLS ensures user can only delete their tenant's services
     const { error } = await supabase
       .from('itinerary_services')
       .delete()
@@ -107,9 +126,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string; dayId: string; serviceId: string }> }
 ) {
   try {
-    const { id, dayId, serviceId } = await params
-    const supabase = createClient()
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
 
+    const { supabase } = authResult
+    const { id, dayId, serviceId } = await params
+
+    // RLS ensures user can only view their tenant's services
     const { data, error } = await supabase
       .from('itinerary_services')
       .select(`

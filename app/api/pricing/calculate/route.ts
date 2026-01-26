@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { requireAuth } from '@/lib/supabase-server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -27,6 +27,17 @@ async function createAuthClient() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication - accesses rate tables and pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
+
     const body = await request.json()
     const {
       num_adults,
@@ -49,7 +60,6 @@ export async function POST(request: NextRequest) {
       userId = null,
     } = body
 
-    const supabase = createClient()
     const total_travelers = num_adults + num_children
 
     console.log('🚗 Vehicle Selection:', { 

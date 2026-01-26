@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase'
+import { requireAuth } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Document number prefixes
@@ -36,9 +37,13 @@ async function generateDocumentNumber(supabase: any, docType: string): Promise<s
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = createClient()
+  // Authenticate and get tenant context
+  const authResult = await requireAuth()
+  if (authResult.error) return authResult.response
+
+  const { supabase } = authResult
   const { searchParams } = new URL(request.url)
-  
+
   // Filter parameters
   const type = searchParams.get('type')
   const status = searchParams.get('status')
@@ -47,7 +52,7 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search')
   const startDate = searchParams.get('startDate')
   const endDate = searchParams.get('endDate')
-  
+
   let query = supabase
     .from('supplier_documents')
     .select(`
@@ -118,16 +123,23 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient()
-  
+  // Authenticate and get tenant context
+  const authResult = await requireAuth()
+  if (authResult.error) return authResult.response
+
+  const { supabase, tenant_id } = authResult
+
   try {
     const body = await request.json()
-    
+
     // Generate document number if not provided
     if (!body.document_number) {
       body.document_number = await generateDocumentNumber(supabase, body.document_type)
     }
-    
+
+    // Add tenant_id for multi-tenancy
+    body.tenant_id = tenant_id
+
     // If supplier_id provided, fetch supplier details
     if (body.supplier_id && !body.supplier_name) {
       const { data: supplier } = await supabase
@@ -135,7 +147,7 @@ export async function POST(request: NextRequest) {
         .select('name, contact_name, contact_email, contact_phone, address, city, country')
         .eq('id', body.supplier_id)
         .single()
-      
+
       if (supplier) {
         body.supplier_name = supplier.name
         body.supplier_contact_name = body.supplier_contact_name || supplier.contact_name
@@ -144,7 +156,7 @@ export async function POST(request: NextRequest) {
         body.supplier_address = body.supplier_address || [supplier.address, supplier.city, supplier.country].filter(Boolean).join(', ')
       }
     }
-    
+
     // If itinerary_id provided, fetch client details
     if (body.itinerary_id && !body.client_name) {
       const { data: itinerary } = await supabase
@@ -152,30 +164,30 @@ export async function POST(request: NextRequest) {
         .select('client_name, num_adults, num_children')
         .eq('id', body.itinerary_id)
         .single()
-      
+
       if (itinerary) {
         body.client_name = itinerary.client_name
         body.num_adults = body.num_adults || itinerary.num_adults
         body.num_children = body.num_children || itinerary.num_children
       }
     }
-    
+
     const { data, error } = await supabase
       .from('supplier_documents')
       .insert([body])
       .select()
       .single()
-    
+
     if (error) {
       console.error('Error creating supplier document:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    
+
     return NextResponse.json({
       success: true,
       data
     })
-    
+
   } catch (error) {
     console.error('Error in POST supplier-documents:', error)
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })

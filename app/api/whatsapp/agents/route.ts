@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 // GET /api/whatsapp/agents - List all team members (for WhatsApp assignment)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // ✅ SECURITY: Require authentication - protects team member data
+    const supabase = await createAuthenticatedClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const activeOnly = searchParams.get('active_only') !== 'false'
     const availableOnly = searchParams.get('available_only') === 'true'
@@ -26,8 +35,8 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       agents: data || [],
       count: data?.length || 0
     })
@@ -40,7 +49,16 @@ export async function GET(request: NextRequest) {
 // POST /api/whatsapp/agents - Create new team member / agent
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // ✅ SECURITY: Require authentication - prevents unauthorized agent creation
+    const supabase = await createAuthenticatedClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const body = await request.json()
 
     const { name, email, phone, user_id, avatar_url, max_conversations, role } = body
@@ -80,8 +98,8 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       agent: data,
       message: 'Agent created successfully'
     })
@@ -94,7 +112,16 @@ export async function POST(request: NextRequest) {
 // PATCH /api/whatsapp/agents - Update team member / agent
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // ✅ SECURITY: Require authentication - prevents unauthorized agent modification
+    const supabase = await createAuthenticatedClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const body = await request.json()
     const { id, ...updates } = body
 
@@ -114,8 +141,8 @@ export async function PATCH(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       agent: data,
       message: 'Agent updated successfully'
     })
@@ -128,7 +155,16 @@ export async function PATCH(request: NextRequest) {
 // DELETE /api/whatsapp/agents - Deactivate agent (soft delete)
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // ✅ SECURITY: Require authentication - prevents unauthorized agent deactivation
+    const supabase = await createAuthenticatedClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
@@ -158,8 +194,8 @@ export async function DELETE(request: NextRequest) {
       })
       .eq('assigned_team_member_id', id)
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: 'Agent deactivated successfully'
     })
   } catch (error: any) {

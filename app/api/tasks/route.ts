@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
+  // Use authenticated client - RLS automatically filters by tenant_id
+  const supabase = await createAuthenticatedClient()
+
+  // Verify authentication
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) {
+    return NextResponse.json({
+      success: false,
+      error: 'Not authenticated'
+    }, { status: 401 })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -102,8 +109,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Use authenticated client - RLS automatically filters by tenant_id
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const body = await request.json()
-    
+
     const { data, error } = await supabase
       .from('tasks')
       .insert({

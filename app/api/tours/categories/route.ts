@@ -1,22 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// ============================================
-// TOUR CATEGORIES API
-// File: app/api/tours/categories/route.ts
-// 
-// FIXED: Using supabaseAdmin to bypass RLS
-// ============================================
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - List all tour categories
 export async function GET(request: NextRequest) {
   try {
-    const { data, error } = await supabaseAdmin
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
+    const { data, error } = await supabase
       .from('tour_categories')
       .select('*')
       .eq('is_active', true)
@@ -48,6 +39,16 @@ export async function GET(request: NextRequest) {
 // POST - Create new category
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     if (!body.category_name) {
@@ -57,12 +58,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const categoryCode = body.category_code || 
+    const categoryCode = body.category_code ||
       body.category_name.toUpperCase().replace(/\s+/g, '_').substring(0, 20)
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('tour_categories')
       .insert([{
+        tenant_id, // ✅ Explicit tenant_id
         category_name: body.category_name,
         category_code: categoryCode,
         description: body.description || null,

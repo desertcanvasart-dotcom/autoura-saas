@@ -1,23 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// ============================================
-// TOUR VARIATIONS API - FIXED
-// Uses service role key to bypass RLS (same as templates API)
-// ============================================
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - List all variations (optionally filter by template_id)
 export async function GET(request: NextRequest) {
   try {
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
     const { searchParams } = new URL(request.url)
     const templateId = searchParams.get('template_id')
 
-    let query = supabaseAdmin
+    let query = supabase
       .from('tour_variations')
       .select('*')
       .order('tier', { ascending: true })
@@ -54,6 +47,16 @@ export async function GET(request: NextRequest) {
 // POST - Create new variation(s) - SUPPORTS BATCH CREATION
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     // Support both single variation and batch creation
@@ -86,15 +89,37 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         )
       }
+
+      // Verify template belongs to this tenant
+      const { data: template } = await supabase
+        .from('tour_templates')
+        .select('id, tenant_id')
+        .eq('id', v.template_id)
+        .single()
+
+      if (!template) {
+        return NextResponse.json(
+          { success: false, error: 'Template not found or access denied' },
+          { status: 404 }
+        )
+      }
+
+      if (template.tenant_id !== tenant_id) {
+        return NextResponse.json(
+          { success: false, error: 'Cannot create variation for template from another tenant' },
+          { status: 403 }
+        )
+      }
     }
 
     // Prepare variation data with smart defaults
     const variationsToInsert = variations.map(v => {
       // Generate variation code
-      const variationCode = v.variation_code || 
+      const variationCode = v.variation_code ||
         `${v.variation_name.toUpperCase().replace(/\s+/g, '-').substring(0, 20)}-${v.tier.toUpperCase()}`
 
       return {
+        tenant_id, // ✅ Explicit tenant_id
         template_id: v.template_id,
         variation_code: variationCode,
         variation_name: v.variation_name,
@@ -123,7 +148,7 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('tour_variations')
       .insert(variationsToInsert)
       .select()

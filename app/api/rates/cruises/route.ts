@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const searchParams = request.nextUrl.searchParams
     const supplierId = searchParams.get('supplier_id')
     const shipName = searchParams.get('ship_name')
     const route = searchParams.get('route')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = supabaseAdmin
+    let query = supabase
       .from('nile_cruises')
       .select(`
         *,
@@ -41,6 +46,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const body = await request.json()
 
     // Include supplier_id in insert
@@ -49,7 +64,7 @@ export async function POST(request: NextRequest) {
       supplier_id: body.supplier_id || null
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('nile_cruises')
       .insert([newCruise])
       .select(`*, supplier:supplier_id (id, name)`)

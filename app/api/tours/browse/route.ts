@@ -7,18 +7,16 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { getTemplatePriceRange } from '@/lib/auto-pricing-service'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 export async function GET(request: NextRequest) {
   try {
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
     const { searchParams } = new URL(request.url)
-    
+
     // Filters
     const tourType = searchParams.get('tour_type')
     const category = searchParams.get('category')
@@ -33,8 +31,8 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '12')
     const offset = (page - 1) * limit
 
-    // Build query for templates
-    let query = supabaseAdmin
+    // Build query for templates (RLS filters to tenant's templates only)
+    let query = supabase
       .from('tour_templates')
       .select(`
         id,
@@ -130,8 +128,8 @@ export async function GET(request: NextRequest) {
 
         // Fallback: check for manual variation pricing
         if (startingFromPrice === null && variations.length > 0) {
-          // Try to get from variation_pricing table (legacy)
-          const { data: pricing } = await supabaseAdmin
+          // Try to get from variation_pricing table (legacy) - RLS filters automatically
+          const { data: pricing } = await supabase
             .from('variation_pricing')
             .select('selling_price_per_person')
             .in('variation_id', variations.map((v: any) => v.id))

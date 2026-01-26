@@ -1,11 +1,16 @@
 import { createClient } from '@/lib/supabase'
+import { requireAuth } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createClient()
+  // Authenticate and get tenant context
+  const authResult = await requireAuth()
+  if (authResult.error) return authResult.response
+
+  const { supabase } = authResult
   const { id } = await params
 
   try {
@@ -34,15 +39,19 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createClient()
+  // Authenticate and get tenant context
+  const authResult = await requireAuth()
+  if (authResult.error) return authResult.response
+
+  const { supabase } = authResult
   const { id } = await params
 
   try {
     const body = await request.json()
     console.log('Updating document:', id, body)
-    
+
     // Remove fields that shouldn't be updated directly
-    const { itinerary, supplier, created_at, ...updateData } = body
+    const { itinerary, supplier, created_at, tenant_id, ...updateData } = body
     
     // Auto-set timestamps based on status changes
     if (updateData.status === 'sent' && !updateData.sent_at) {
@@ -82,7 +91,11 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createClient()
+  // Authenticate and get tenant context
+  const authResult = await requireAuth()
+  if (authResult.error) return authResult.response
+
+  const { supabase } = authResult
   const { id } = await params
 
   try {

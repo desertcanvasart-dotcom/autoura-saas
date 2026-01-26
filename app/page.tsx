@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/app/supabase'
 import { 
   MessageSquare, 
   FileText, 
@@ -490,6 +492,47 @@ export default function AutouraHomepage() {
   const [activeModule, setActiveModule] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const router = useRouter()
+  const supabase = createClient()
+
+  // Check authentication and redirect if needed
+  useEffect(() => {
+    const checkAuthAndRedirect = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (session?.user) {
+        console.log('✅ User logged in, checking onboarding status...')
+
+        // Get user's tenant membership
+        const { data: memberData } = await supabase
+          .from('tenant_members')
+          .select('tenant_id')
+          .eq('user_id', session.user.id)
+          .single()
+
+        if (memberData?.tenant_id) {
+          // Check onboarding status
+          const { data: featuresData } = await supabase
+            .from('tenant_features')
+            .select('onboarding_completed')
+            .eq('tenant_id', memberData.tenant_id)
+            .single()
+
+          if (featuresData && !featuresData.onboarding_completed) {
+            console.log('→ Redirecting to /onboarding')
+            router.push('/onboarding')
+          } else {
+            console.log('→ Redirecting to /dashboard')
+            router.push('/dashboard')
+          }
+        }
+      } else {
+        console.log('✅ No user session, showing landing page')
+      }
+    }
+
+    checkAuthAndRedirect()
+  }, [router, supabase])
 
   useEffect(() => {
     setIsLoaded(true)

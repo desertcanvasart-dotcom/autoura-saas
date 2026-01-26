@@ -4,23 +4,68 @@
 // POST /api/whatsapp/webhook
 // Receives incoming WhatsApp messages from Twilio
 // Stores in conversation-based structure for chat UI
+// SECURITY: Validates Twilio signature before processing
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/app/supabase'
+import twilio from 'twilio'
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse Twilio webhook data (form-urlencoded)
+    // ============================================
+    // SECURITY: Validate Twilio Signature
+    // ============================================
+    const signature = request.headers.get('x-twilio-signature')
+    const url = request.url
+
+    if (!signature) {
+      console.error('❌ Missing Twilio signature header')
+      return new NextResponse(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { status: 403, headers: { 'Content-Type': 'text/xml' } }
+      )
+    }
+
+    // Parse form data for signature validation
     const formData = await request.formData()
-    
-    const from = formData.get('From') as string // e.g., "whatsapp:+201234567890"
-    const to = formData.get('To') as string // Your WhatsApp number
-    const body = formData.get('Body') as string // Message text
-    const messageSid = formData.get('MessageSid') as string
-    const numMedia = parseInt(formData.get('NumMedia') as string) || 0
-    const mediaUrl = formData.get('MediaUrl0') as string || null
-    const mediaType = formData.get('MediaContentType0') as string || null
+    const params: Record<string, string> = {}
+    formData.forEach((value, key) => {
+      params[key] = value.toString()
+    })
+
+    // Validate signature
+    const authToken = process.env.TWILIO_AUTH_TOKEN
+    if (!authToken) {
+      console.error('❌ TWILIO_AUTH_TOKEN not configured')
+      return new NextResponse(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { status: 500, headers: { 'Content-Type': 'text/xml' } }
+      )
+    }
+
+    const isValid = twilio.validateRequest(authToken, signature, url, params)
+
+    if (!isValid) {
+      console.error('❌ Invalid Twilio signature - possible unauthorized webhook')
+      return new NextResponse(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { status: 403, headers: { 'Content-Type': 'text/xml' } }
+      )
+    }
+
+    console.log('✅ Twilio signature validated')
+
+    // ============================================
+    // Extract webhook data (already parsed above)
+    // ============================================
+    const from = params['From'] // e.g., "whatsapp:+201234567890"
+    const to = params['To'] // Your WhatsApp number
+    const body = params['Body'] // Message text
+    const messageSid = params['MessageSid']
+    const numMedia = parseInt(params['NumMedia'] || '0')
+    const mediaUrl = params['MediaUrl0'] || null
+    const mediaType = params['MediaContentType0'] || null
 
     console.log('📥 Received WhatsApp message:', {
       from,

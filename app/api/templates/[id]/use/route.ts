@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 // POST - Track template usage
 export async function POST(
@@ -14,15 +9,33 @@ export async function POST(
   try {
     const { id } = await params
 
+    // Require authentication - RLS will enforce tenant boundaries
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
+
     // Increment usage count
     const { error } = await supabase.rpc('increment_template_usage', { template_id: id })
 
     // Fallback if RPC doesn't exist
     if (error) {
+      // Fetch current usage count
+      const { data: template } = await supabase
+        .from('message_templates')
+        .select('usage_count')
+        .eq('id', id)
+        .single()
+
       await supabase
         .from('message_templates')
-        .update({ 
-          usage_count: supabase.rpc('increment', { x: 1 }),
+        .update({
+          usage_count: (template?.usage_count || 0) + 1,
           last_used_at: new Date().toISOString()
         })
         .eq('id', id)

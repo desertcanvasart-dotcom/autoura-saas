@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { 
-  Search, 
-  Plus, 
-  Edit2, 
-  Trash2, 
+import {
+  Search,
+  Plus,
+  Edit2,
+  Trash2,
   X,
   Plane,
   ChevronDown,
@@ -16,10 +16,14 @@ import {
   Building2,
   Clock,
   Luggage,
-  ArrowRight
+  ArrowRight,
+  Copy,
+  Download,
+  Upload
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface FlightRate {
   id: string
@@ -166,7 +170,8 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function FlightsContent() {
   const dialog = useConfirmDialog()
-  
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+
   const [rates, setRates] = useState<FlightRate[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -412,10 +417,10 @@ export default function FlightsContent() {
   }
 
   const handleDelete = async (rate: FlightRate) => {
-    const confirmed = await dialog.confirmDelete('Flight Rate', 
+    const confirmed = await dialog.confirmDelete('Flight Rate',
       `Are you sure you want to delete "${rate.service_code}"? This action cannot be undone.`
     )
-    
+
     if (!confirmed) return
 
     try {
@@ -435,15 +440,227 @@ export default function FlightsContent() {
     }
   }
 
+  const handleClone = (rate: FlightRate) => {
+    setEditingRate(null)
+    setError(null)
+    setFormData({
+      service_code: '', // Clear code for new entry
+      route_from: rate.route_from,
+      route_to: rate.route_to,
+      airline: rate.airline,
+      flight_number: '', // Clear flight number for new entry
+      flight_type: rate.flight_type,
+      cabin_class: rate.cabin_class,
+      base_rate_eur: rate.base_rate_eur,
+      base_rate_non_eur: rate.base_rate_non_eur || 0,
+      baggage_kg: rate.baggage_kg || 23,
+      departure_time: rate.departure_time || '',
+      arrival_time: rate.arrival_time || '',
+      duration_minutes: rate.duration_minutes || 0,
+      frequency: rate.frequency || 'daily',
+      season: rate.season || '',
+      rate_valid_from: rate.rate_valid_from,
+      rate_valid_to: rate.rate_valid_to,
+      supplier_id: rate.supplier_id || '',
+      supplier_name: rate.supplier_name || rate.supplier?.name || '',
+      notes: rate.notes || '',
+      is_active: rate.is_active
+    })
+    setIsModalOpen(true)
+  }
+
+  const handleExportCSV = () => {
+    if (filteredRates.length === 0) {
+      dialog.alert('No Data', 'No flight rates to export.', 'warning')
+      return
+    }
+
+    const headers = [
+      'service_code',
+      'route_from',
+      'route_to',
+      'airline',
+      'flight_number',
+      'flight_type',
+      'cabin_class',
+      'base_rate_eur',
+      'base_rate_non_eur',
+      'baggage_kg',
+      'departure_time',
+      'arrival_time',
+      'duration_minutes',
+      'frequency',
+      'season',
+      'rate_valid_from',
+      'rate_valid_to',
+      'supplier_name',
+      'notes',
+      'is_active'
+    ]
+
+    const csvRows = [headers.join(',')]
+
+    filteredRates.forEach(rate => {
+      const row = [
+        `"${rate.service_code || ''}"`,
+        `"${rate.route_from || ''}"`,
+        `"${rate.route_to || ''}"`,
+        `"${rate.airline || ''}"`,
+        `"${rate.flight_number || ''}"`,
+        `"${rate.flight_type || ''}"`,
+        `"${rate.cabin_class || ''}"`,
+        rate.base_rate_eur || 0,
+        rate.base_rate_non_eur || 0,
+        rate.baggage_kg || '',
+        `"${rate.departure_time || ''}"`,
+        `"${rate.arrival_time || ''}"`,
+        rate.duration_minutes || '',
+        `"${rate.frequency || ''}"`,
+        `"${rate.season || ''}"`,
+        `"${rate.rate_valid_from || ''}"`,
+        `"${rate.rate_valid_to || ''}"`,
+        `"${rate.supplier_name || rate.supplier?.name || ''}"`,
+        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        rate.is_active ? 'true' : 'false'
+      ]
+      csvRows.push(row.join(','))
+    })
+
+    const csvContent = csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `flight-rates-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+
+        if (lines.length < 2) {
+          await dialog.alert('Error', 'CSV file is empty or has no data rows.', 'warning')
+          return
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+        const records: Partial<FormData>[] = []
+
+        for (let i = 1; i < lines.length; i++) {
+          const values: string[] = []
+          let current = ''
+          let inQuotes = false
+
+          for (const char of lines[i]) {
+            if (char === '"') {
+              inQuotes = !inQuotes
+            } else if (char === ',' && !inQuotes) {
+              values.push(current.trim())
+              current = ''
+            } else {
+              current += char
+            }
+          }
+          values.push(current.trim())
+
+          const record: Record<string, string | number | boolean> = {}
+          headers.forEach((header, idx) => {
+            let value = values[idx] || ''
+            value = value.replace(/^"|"$/g, '').replace(/""/g, '"')
+            record[header] = value
+          })
+
+          records.push({
+            service_code: String(record.service_code || ''),
+            route_from: String(record.route_from || ''),
+            route_to: String(record.route_to || ''),
+            airline: String(record.airline || 'EgyptAir'),
+            flight_number: String(record.flight_number || ''),
+            flight_type: (record.flight_type === 'international' ? 'international' : 'domestic') as 'domestic' | 'international',
+            cabin_class: (['economy', 'business', 'first'].includes(String(record.cabin_class)) ? record.cabin_class : 'economy') as 'economy' | 'business' | 'first',
+            base_rate_eur: parseFloat(String(record.base_rate_eur)) || 0,
+            base_rate_non_eur: parseFloat(String(record.base_rate_non_eur)) || 0,
+            baggage_kg: parseInt(String(record.baggage_kg)) || 23,
+            departure_time: String(record.departure_time || ''),
+            arrival_time: String(record.arrival_time || ''),
+            duration_minutes: parseInt(String(record.duration_minutes)) || 0,
+            frequency: String(record.frequency || 'daily'),
+            season: String(record.season || ''),
+            rate_valid_from: String(record.rate_valid_from || new Date().toISOString().split('T')[0]),
+            rate_valid_to: String(record.rate_valid_to || '2099-12-31'),
+            supplier_name: String(record.supplier_name || ''),
+            notes: String(record.notes || ''),
+            is_active: record.is_active === 'true' || record.is_active === '1' || record.is_active === true
+          })
+        }
+
+        let successCount = 0
+        let errorCount = 0
+
+        for (const record of records) {
+          try {
+            const response = await fetch('/api/rates/flights', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                ...record,
+                supplier_id: null,
+                flight_number: record.flight_number || null,
+                departure_time: record.departure_time || null,
+                arrival_time: record.arrival_time || null,
+                duration_minutes: record.duration_minutes || null,
+                baggage_kg: record.baggage_kg || null,
+                season: record.season || null,
+                notes: record.notes || null
+              })
+            })
+
+            if (response.ok) {
+              successCount++
+            } else {
+              errorCount++
+            }
+          } catch {
+            errorCount++
+          }
+        }
+
+        fetchRates()
+        await dialog.alert(
+          'Import Complete',
+          `Successfully imported ${successCount} flight rates.${errorCount > 0 ? ` ${errorCount} records failed.` : ''}`,
+          successCount > 0 ? 'success' : 'warning'
+        )
+      } catch (err) {
+        console.error('Error parsing CSV:', err)
+        await dialog.alert('Error', 'Failed to parse CSV file. Please check the format.', 'warning')
+      }
+    }
+
+    reader.readAsText(file)
+    event.target.value = ''
+  }
+
   // Filter rates
   const filteredRates = rates.filter(rate => {
-    const matchesSearch = 
-      rate.service_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rate.route_from.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rate.route_to.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rate.airline.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (rate.flight_number && rate.flight_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (rate.supplier_name && rate.supplier_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    const search = searchTerm.toLowerCase()
+    const matchesSearch =
+      (rate.service_code || '').toLowerCase().includes(search) ||
+      (rate.route_from || '').toLowerCase().includes(search) ||
+      (rate.route_to || '').toLowerCase().includes(search) ||
+      (rate.airline || '').toLowerCase().includes(search) ||
+      (rate.flight_number || '').toLowerCase().includes(search) ||
+      (rate.supplier_name || '').toLowerCase().includes(search)
     return matchesSearch
   })
 
@@ -497,13 +714,33 @@ export default function FlightsContent() {
           <Plane className="h-5 w-5 text-sky-600" />
           <h1 className="text-lg font-semibold text-gray-900">Flight Rates</h1>
         </div>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-sm rounded-md hover:bg-[#4f6238] transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Flight Rate
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-md hover:bg-gray-50 transition-colors"
+            title="Export to CSV"
+          >
+            <Download className="h-4 w-4" />
+            Export
+          </button>
+          <label className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-md hover:bg-gray-50 transition-colors cursor-pointer">
+            <Upload className="h-4 w-4" />
+            Import
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+            />
+          </label>
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-sm rounded-md hover:bg-[#4f6238] transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Flight Rate
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -657,7 +894,7 @@ export default function FlightsContent() {
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Flight</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Class</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Schedule</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">EUR Rate</th>
+              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">{userCurrency} Rate</th>
               <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Type</th>
               <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Status</th>
               <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Actions</th>
@@ -715,7 +952,7 @@ export default function FlightsContent() {
                     </div>
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <span className="text-sm font-medium text-gray-900">€{Number(rate.base_rate_eur).toFixed(2)}</span>
+                    <span className="text-sm font-medium text-gray-900">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
                   </td>
                   <td className="px-4 py-2 text-center">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -743,6 +980,13 @@ export default function FlightsContent() {
                         title="Edit"
                       >
                         <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleClone(rate)}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                        title="Clone"
+                      >
+                        <Copy className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(rate)}
@@ -1113,7 +1357,7 @@ export default function FlightsContent() {
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      EUR Rate <span className="text-red-500">*</span>
+                      Base Rate (EUR) <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">€</span>
@@ -1131,7 +1375,7 @@ export default function FlightsContent() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Non-EUR Rate
+                      Alt Rate (USD)
                     </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>

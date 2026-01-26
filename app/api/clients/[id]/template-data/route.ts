@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 // GET /api/clients/[id]/template-data
 // Returns client info + their latest itinerary for template placeholder replacement
@@ -13,14 +8,21 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id: clientId } = await params
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
     const itineraryId = searchParams.get('itineraryId') // Optional: specific itinerary
 
-    if (!userId) {
-      return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
-    }
+    // RLS will automatically filter by tenant
 
     // Fetch client data - using first_name, last_name instead of name
     const { data: client, error: clientError } = await supabase

@@ -1,25 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '@/lib/supabase-server'
 import { fetchEmails, refreshAccessToken } from '@/lib/gmail'
+import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
+// Admin client only for token updates (not for reading tokens)
+const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams
-  const userId = searchParams.get('userId')
-  const query = searchParams.get('query') || ''
-  const pageToken = searchParams.get('pageToken') || undefined
-  const maxResults = parseInt(searchParams.get('maxResults') || '20')
-
-  if (!userId) {
-    return NextResponse.json({ error: 'User ID required' }, { status: 400 })
-  }
-
   try {
-    // Get user's tokens
+    // ✅ SECURITY: Require authentication - protects email access
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, user } = authResult
+    const searchParams = request.nextUrl.searchParams
+    const query = searchParams.get('query') || ''
+    const pageToken = searchParams.get('pageToken') || undefined
+    const maxResults = parseInt(searchParams.get('maxResults') || '20')
+
+    // ✅ SECURITY: Use authenticated user's ID only - prevents user impersonation
+    // Remove ability to specify userId in query params
+    const userId = user.id
+
+    // Get authenticated user's Gmail tokens (RLS enforces user can only access their own)
     const { data: tokenData, error: tokenError } = await supabase
       .from('gmail_tokens')
       .select('*')
@@ -38,8 +49,8 @@ export async function GET(request: NextRequest) {
       const newTokens = await refreshAccessToken(refresh_token)
       access_token = newTokens.access_token!
 
-      // Update tokens in database
-      await supabase
+      // Update tokens using admin client (token refresh needs admin permissions)
+      await supabaseAdmin
         .from('gmail_tokens')
         .update({
           access_token: newTokens.access_token,

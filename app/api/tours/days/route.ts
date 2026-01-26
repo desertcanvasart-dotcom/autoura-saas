@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - List all days (optionally filter by tour_id)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
 
     const { searchParams } = new URL(request.url)
     const tourId = searchParams.get('tour_id')
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
     // Sort activities by activity_order
     const daysWithSortedActivities = data?.map(day => ({
       ...day,
-      activities: day.activities?.sort((a: any, b: any) => 
+      activities: day.activities?.sort((a: any, b: any) =>
         (a.activity_order || 0) - (b.activity_order || 0)
       ) || []
     }))
@@ -61,7 +62,16 @@ export async function GET(request: NextRequest) {
 // POST - Create new day
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     if (!body.tour_id || !body.day_number || !body.city) {
@@ -71,7 +81,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verify tour template belongs to this tenant
+    const { data: template } = await supabase
+      .from('tour_templates')
+      .select('id, tenant_id')
+      .eq('id', body.tour_id)
+      .single()
+
+    if (!template) {
+      return NextResponse.json(
+        { success: false, error: 'Tour template not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    if (template.tenant_id !== tenant_id) {
+      return NextResponse.json(
+        { success: false, error: 'Cannot create day for tour from another tenant' },
+        { status: 403 }
+      )
+    }
+
     const dayData = {
+      tenant_id, // ✅ Explicit tenant_id
       tour_id: body.tour_id,
       day_number: body.day_number,
       city: body.city,

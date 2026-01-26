@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { showToast } from '@/app/contexts/ToastContext'
 import { 
   Search,
   DollarSign,
@@ -74,6 +78,10 @@ interface Summary {
 const ITEMS_PER_PAGE = 15
 
 export default function AccountsReceivablePage() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
+  const { tenant, loading: tenantLoading, isManager } = useTenant()
+
   const [clients, setClients] = useState<ClientReceivable[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -115,9 +123,16 @@ export default function AccountsReceivablePage() {
     setCurrentPage(1)
   }, [searchTerm, agingFilter, viewMode])
 
+  // Authentication check
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
+
   const handleSendReminder = async (invoice: Invoice) => {
     if (!invoice.client_email) {
-      alert('No email address for this client')
+      showToast('No email address for this client', 'error')
       return
     }
 
@@ -186,6 +201,46 @@ export default function AccountsReceivablePage() {
     currentPage * ITEMS_PER_PAGE
   )
 
+  // Show loading during authentication check
+  if (authLoading || tenantLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2d3b2d]"></div>
+      </div>
+    )
+  }
+
+  // Redirect if not authenticated (will be handled by useEffect)
+  if (!user) {
+    return null
+  }
+
+  // Check authorization
+  if (!isManager) {
+    return (
+      <div className="p-8">
+        <div className="max-w-md mx-auto text-center">
+          <div className="mb-4">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+          <p className="text-gray-600 mb-6">
+            You don't have permission to view accounts receivable. Manager access is required.
+          </p>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[#2d3b2d] text-white rounded-lg hover:bg-[#3d4b3d] transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -203,7 +258,14 @@ export default function AccountsReceivablePage() {
             💳
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Accounts Receivable</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-semibold text-gray-900">Accounts Receivable</h1>
+              {tenant && (
+                <span className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded-full">
+                  {tenant.company_name}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500">Track outstanding client payments</p>
           </div>
         </div>

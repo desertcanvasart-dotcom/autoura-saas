@@ -141,20 +141,23 @@ export interface DayPricingResult {
   templateName: string
   tier: ServiceTier
   totalDays: number
-  
+
   // Accommodation breakdown
   hotelNights: number
   cruiseNights: number
-  
+
   // Single supplement (one number for whole tour)
   singleSupplement: number
-  
+
+  // Triple reduction (one number for whole tour) - PPD model
+  tripleReduction: number
+
   // Services detail (for 2 pax reference)
   services: PricedService[]
-  
+
   // Multi-pax pricing table
   paxPricing: PaxPricingResult[]
-  
+
   // Metadata
   currency: string
   marginPercent: number
@@ -701,6 +704,8 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
 
 /**
  * Get cruise rates for a tier
+ * Uses PPD model: ppd_eur (Per Person Double) + single_supplement_eur
+ * Falls back to legacy calculation if PPD fields not available
  */
 export async function getCruiseRates(
   tier: ServiceTier,
@@ -709,6 +714,7 @@ export async function getCruiseRates(
   shipName: string
   ppdNight: number
   singleSuppNight: number
+  tripleRedNight: number
   durationNights: number
 } | null> {
   try {
@@ -730,23 +736,41 @@ export async function getCruiseRates(
         shipName: 'Default Cruise',
         ppdNight: DEFAULT_RATES[tier].cruisePPDNight,
         singleSuppNight: DEFAULT_RATES[tier].cruiseSingleSuppNight,
+        tripleRedNight: 0,
         durationNights: 4
       }
     }
 
     const cruise = cruises[0]
-    const ppdTrip = cruise.rate_double_eur / 2
-    const ppdNight = ppdTrip / cruise.duration_nights
-    const singleSuppTrip = cruise.rate_single_eur - ppdTrip
-    const singleSuppNight = singleSuppTrip / cruise.duration_nights
+    const durationNights = cruise.duration_nights || 4
 
-    console.log(`✅ Cruise: ${cruise.ship_name} | PPD/night: €${ppdNight.toFixed(2)} | SingleSupp/night: €${singleSuppNight.toFixed(2)}`)
+    // Use new PPD fields if available, otherwise derive from legacy fields
+    let ppdNight: number
+    let singleSuppNight: number
+    let tripleRedNight: number
+
+    if (cruise.ppd_eur !== null && cruise.ppd_eur !== undefined) {
+      // New PPD model - ppd_eur is per night already
+      ppdNight = cruise.ppd_eur
+      singleSuppNight = cruise.single_supplement_eur ?? 0
+      tripleRedNight = cruise.triple_reduction_eur ?? 0
+    } else {
+      // Legacy model - derive from trip rates
+      const ppdTrip = cruise.rate_double_eur / 2
+      ppdNight = ppdTrip / durationNights
+      const singleSuppTrip = (cruise.rate_single_eur || cruise.rate_double_eur) - ppdTrip
+      singleSuppNight = Math.max(0, singleSuppTrip / durationNights)
+      tripleRedNight = 0
+    }
+
+    console.log(`✅ Cruise: ${cruise.ship_name} | PPD/night: €${ppdNight.toFixed(2)} | SingleSupp/night: €${singleSuppNight.toFixed(2)} | TripleRed/night: €${tripleRedNight.toFixed(2)}`)
 
     return {
       shipName: cruise.ship_name,
       ppdNight,
       singleSuppNight,
-      durationNights: cruise.duration_nights
+      tripleRedNight: Math.max(0, tripleRedNight),
+      durationNights
     }
   } catch (err) {
     console.error('Error fetching cruise rates:', err)
@@ -756,6 +780,8 @@ export async function getCruiseRates(
 
 /**
  * Get hotel rates for a city and tier
+ * Uses PPD model: ppd_eur (Per Person Double) + single_supplement_eur
+ * Falls back to legacy calculation if PPD fields not available
  */
 export async function getHotelRates(
   city: string,
@@ -764,24 +790,25 @@ export async function getHotelRates(
   hotelName: string
   ppdNight: number
   singleSuppNight: number
+  tripleRedNight: number
 } | null> {
   try {
+    // Query accommodation_rates table (not hotel_contacts)
     const { data: hotels, error } = await supabaseAdmin
-      .from('hotel_contacts')
+      .from('accommodation_rates')
       .select('*')
       .eq('tier', tier)
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
-      .order('is_preferred', { ascending: false })
       .limit(1)
 
     if (error || !hotels || hotels.length === 0) {
+      // Fallback: try any tier for this city
       const { data: anyHotel } = await supabaseAdmin
-        .from('hotel_contacts')
+        .from('accommodation_rates')
         .select('*')
         .eq('is_active', true)
         .ilike('city', `%${city}%`)
-        .order('is_preferred', { ascending: false })
         .limit(1)
 
       if (!anyHotel || anyHotel.length === 0) {
@@ -789,31 +816,38 @@ export async function getHotelRates(
         return {
           hotelName: `${city} Hotel`,
           ppdNight: DEFAULT_RATES[tier].hotelPPD,
-          singleSuppNight: DEFAULT_RATES[tier].hotelSingleSupp
+          singleSuppNight: DEFAULT_RATES[tier].hotelSingleSupp,
+          tripleRedNight: 0
         }
       }
 
       const hotel = anyHotel[0]
-      const ppd = hotel.rate_double_eur / 2
-      const singleSupp = (hotel.rate_single_eur || hotel.rate_double_eur) - ppd
+      // Use new PPD fields if available, otherwise derive from legacy fields
+      const ppd = hotel.ppd_eur ?? (hotel.double_rate_eur ? hotel.double_rate_eur / 2 : 0)
+      const singleSupp = hotel.single_supplement_eur ?? Math.max(0, (hotel.single_rate_eur || 0) - ppd)
+      const tripleRed = hotel.triple_reduction_eur ?? 0
 
       return {
-        hotelName: hotel.name,
+        hotelName: hotel.property_name || hotel.name,
         ppdNight: ppd,
-        singleSuppNight: Math.max(0, singleSupp)
+        singleSuppNight: Math.max(0, singleSupp),
+        tripleRedNight: Math.max(0, tripleRed)
       }
     }
 
     const hotel = hotels[0]
-    const ppd = hotel.rate_double_eur / 2
-    const singleSupp = (hotel.rate_single_eur || hotel.rate_double_eur) - ppd
+    // Use new PPD fields if available, otherwise derive from legacy fields
+    const ppd = hotel.ppd_eur ?? (hotel.double_rate_eur ? hotel.double_rate_eur / 2 : 0)
+    const singleSupp = hotel.single_supplement_eur ?? Math.max(0, (hotel.single_rate_eur || 0) - ppd)
+    const tripleRed = hotel.triple_reduction_eur ?? 0
 
-    console.log(`✅ Hotel: ${hotel.name} | PPD/night: €${ppd.toFixed(2)} | SingleSupp/night: €${singleSupp.toFixed(2)}`)
+    console.log(`✅ Hotel: ${hotel.property_name || hotel.name} | PPD/night: €${ppd.toFixed(2)} | SingleSupp/night: €${singleSupp.toFixed(2)} | TripleRed/night: €${tripleRed.toFixed(2)}`)
 
     return {
-      hotelName: hotel.name,
+      hotelName: hotel.property_name || hotel.name,
       ppdNight: ppd,
-      singleSuppNight: Math.max(0, singleSupp)
+      singleSuppNight: Math.max(0, singleSupp),
+      tripleRedNight: Math.max(0, tripleRed)
     }
   } catch (err) {
     console.error('Error fetching hotel rates:', err)
@@ -1240,6 +1274,7 @@ export async function calculateDayBasedPricing(
       hotelNights: 0,
       cruiseNights: 0,
       singleSupplement: 0,
+      tripleReduction: 0,
       services: [],
       paxPricing: [],
       currency: 'EUR',
@@ -1301,25 +1336,30 @@ export async function calculateDayBasedPricing(
   const waterCostPerPax = 2
 
   // ============================================
-  // STEP 5: Calculate Single Supplement (whole tour)
+  // STEP 5: Calculate Single Supplement & Triple Reduction (whole tour)
   // ============================================
 
   let singleSupplement = 0
+  let tripleReduction = 0
 
   for (const day of hotelDays) {
     const hotelRate = hotelRatesMap.get(day.city)
     if (hotelRate) {
       singleSupplement += hotelRate.singleSuppNight
+      tripleReduction += hotelRate.tripleRedNight || 0
     } else {
       singleSupplement += DEFAULT_RATES[tier].hotelSingleSupp
+      // No triple reduction for defaults
     }
   }
 
   if (cruiseRates && cruiseNights > 0) {
     singleSupplement += cruiseRates.singleSuppNight * cruiseNights
+    tripleReduction += (cruiseRates.tripleRedNight || 0) * cruiseNights
   }
 
   console.log(`💰 Total Single Supplement: €${singleSupplement.toFixed(2)}`)
+  console.log(`💰 Total Triple Reduction: €${tripleReduction.toFixed(2)}`)
 
   // ============================================
   // STEP 6: Calculate FIXED costs (don't scale with pax)
@@ -1818,6 +1858,7 @@ export async function calculateDayBasedPricing(
   console.log('✅ Day-based pricing complete (v4)')
   console.log(`   Template: ${template.template_name}`)
   console.log(`   Single Supplement: €${singleSupplement.toFixed(2)}`)
+  console.log(`   Triple Reduction: €${tripleReduction.toFixed(2)}`)
   console.log(`   Sample (2 pax +0): €${paxPricing[1]?.withoutLeader.pricePerPerson}/person`)
   console.log(`   Sample (2 pax +1): €${paxPricing[1]?.withLeader.pricePerPerson}/person`)
 
@@ -1830,6 +1871,7 @@ export async function calculateDayBasedPricing(
     hotelNights,
     cruiseNights,
     singleSupplement: Math.round(singleSupplement * 100) / 100,
+    tripleReduction: Math.round(tripleReduction * 100) / 100,
     services,
     paxPricing,
     currency: 'EUR',
@@ -1855,6 +1897,7 @@ export async function calculateSinglePaxPricing(
   sellingPrice: number
   pricePerPerson: number
   singleSupplement: number
+  tripleReduction: number
   services: PricedService[]
   warnings: string[]
 }> {
@@ -1869,6 +1912,7 @@ export async function calculateSinglePaxPricing(
       sellingPrice: 0,
       pricePerPerson: 0,
       singleSupplement: 0,
+      tripleReduction: 0,
       services: [],
       warnings: result.warnings
     }
@@ -1891,6 +1935,7 @@ export async function calculateSinglePaxPricing(
       sellingPrice: pricing.sellingPrice,
       pricePerPerson: pricing.pricePerPerson,
       singleSupplement: result.singleSupplement,
+      tripleReduction: result.tripleReduction,
       services: result.services,
       warnings: [...result.warnings, `Pax count ${params.numPax} not in standard list, using ${closest.numPax}`]
     }
@@ -1906,6 +1951,7 @@ export async function calculateSinglePaxPricing(
     sellingPrice: pricing.sellingPrice,
     pricePerPerson: pricing.pricePerPerson,
     singleSupplement: result.singleSupplement,
+    tripleReduction: result.tripleReduction,
     services: result.services,
     warnings: result.warnings
   }
@@ -1979,6 +2025,7 @@ export interface PricingResult {
   warnings: string[]
   paxPricingTable?: PaxPricingResult[]
   singleSupplement?: number
+  tripleReduction?: number
 }
 
 /**
@@ -2117,7 +2164,8 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     ratesUsed,
     warnings: dayResult.warnings,
     paxPricingTable: dayResult.paxPricing,
-    singleSupplement: dayResult.singleSupplement
+    singleSupplement: dayResult.singleSupplement,
+    tripleReduction: dayResult.tripleReduction
   }
 }
 

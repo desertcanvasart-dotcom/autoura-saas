@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 // GET: Fetch all reminder history across all invoices
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Authenticate user
+    const supabase = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     
     const limit = parseInt(searchParams.get('limit') || '50')

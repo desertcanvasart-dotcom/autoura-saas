@@ -4,12 +4,23 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
-import { createClient } from '@/app/supabase'
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication - sends WhatsApp messages (costs money)
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
+
     const body = await request.json()
-    
+
     const { itineraryId, clientName, clientPhone } = body
 
     if (!itineraryId) {
@@ -25,8 +36,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    const supabase = createClient()
     const { data: itinerary, error: dbError } = await supabase
       .from('itineraries')
       .select('*')

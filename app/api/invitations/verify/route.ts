@@ -21,12 +21,12 @@ export async function GET(request: NextRequest) {
 
     // Find invitation by token
     const { data: invitation, error } = await supabase
-      .from('user_invitations')
+      .from('tenant_invitations')
       .select(`
         *,
         inviter:user_profiles!invited_by(full_name, email)
       `)
-      .eq('token', token)
+      .eq('invitation_token', token)
       .single()
 
     if (error || !invitation) {

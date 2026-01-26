@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') // pending, accepted, expired, all
 
     let query = supabase
-      .from('user_invitations')
+      .from('tenant_invitations')
       .select(`
         *,
         inviter:user_profiles!invited_by(id, full_name, email)
@@ -50,7 +50,15 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, role = 'agent', invited_by } = body
+    const { email, role = 'member', invited_by, tenant_id } = body
+
+    // Validate tenant_id
+    if (!tenant_id) {
+      return NextResponse.json(
+        { success: false, error: 'Tenant ID is required' },
+        { status: 400 }
+      )
+    }
 
     // Validate email
     if (!email || !email.includes('@')) {
@@ -61,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate role
-    const validRoles = ['admin', 'manager', 'agent', 'viewer']
+    const validRoles = ['owner', 'admin', 'manager', 'member', 'viewer']
     if (!validRoles.includes(role)) {
       return NextResponse.json(
         { success: false, error: 'Invalid role' },
@@ -85,7 +93,7 @@ export async function POST(request: NextRequest) {
 
     // Check if there's already a pending invitation
     const { data: existingInvitation } = await supabase
-      .from('user_invitations')
+      .from('tenant_invitations')
       .select('id')
       .eq('email', email.toLowerCase())
       .is('accepted_at', null)
@@ -108,12 +116,13 @@ export async function POST(request: NextRequest) {
 
     // Create invitation
     const { data: invitation, error } = await supabase
-      .from('user_invitations')
+      .from('tenant_invitations')
       .insert({
+        tenant_id,
         email: email.toLowerCase(),
         role,
         invited_by,
-        token,
+        invitation_token: token,
         expires_at: expiresAt.toISOString()
       })
       .select()
@@ -146,6 +155,52 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PUT - Mark invitation as accepted
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { token } = body
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, error: 'Token is required' },
+        { status: 400 }
+      )
+    }
+
+    // Update invitation status
+    const { data, error } = await supabase
+      .from('tenant_invitations')
+      .update({
+        status: 'accepted',
+        accepted_at: new Date().toISOString()
+      })
+      .eq('invitation_token', token)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    if (!data) {
+      return NextResponse.json(
+        { success: false, error: 'Invitation not found' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data
+    })
+  } catch (error) {
+    console.error('Error updating invitation:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to update invitation' },
+      { status: 500 }
+    )
+  }
+}
+
 // DELETE - Cancel/delete invitation
 export async function DELETE(request: NextRequest) {
   try {
@@ -160,7 +215,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { error } = await supabase
-      .from('user_invitations')
+      .from('tenant_invitations')
       .delete()
       .eq('id', id)
 

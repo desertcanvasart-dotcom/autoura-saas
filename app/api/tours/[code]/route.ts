@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 // ============================================
 // TOUR DETAIL API - WITH VARIATION_ID
 // File: app/api/tours/[code]/route.ts
 // ============================================
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
 
 export async function GET(
   request: NextRequest,
@@ -16,6 +12,9 @@ export async function GET(
 ) {
   try {
     const { code } = await params
+
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
 
     // Fetch variation with all related data (removed tour_days - doesn't exist)
     const { data: variation, error: varError } = await supabase

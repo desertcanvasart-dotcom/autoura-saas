@@ -1,15 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 // ============================================
 // B2B PARTNERS INDIVIDUAL API
 // File: app/api/b2b/partners/[id]/route.ts
 // ============================================
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 export async function GET(
   request: NextRequest,
@@ -18,7 +13,19 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    // Use authenticated client - RLS will automatically filter by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
+    const { data, error } = await supabase
       .from('b2b_partners')
       .select(`
         *,
@@ -51,10 +58,14 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const body = await request.json()
-    const { id: _, created_at, ...updateData } = body
 
-    const { data, error } = await supabaseAdmin
+    // Use authenticated client - RLS will automatically filter by tenant
+    const supabase = await createAuthenticatedClient()
+
+    const body = await request.json()
+    const { id: _, created_at, tenant_id, ...updateData } = body
+
+    const { data, error } = await supabase
       .from('b2b_partners')
       .update(updateData)
       .eq('id', id)
@@ -78,7 +89,10 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    const { data: quotes } = await supabaseAdmin
+    // Use authenticated client - RLS will automatically filter by tenant
+    const supabase = await createAuthenticatedClient()
+
+    const { data: quotes } = await supabase
       .from('tour_quotes')
       .select('id')
       .eq('partner_id', id)
@@ -91,9 +105,9 @@ export async function DELETE(
       )
     }
 
-    await supabaseAdmin.from('b2b_partner_pricing').delete().eq('partner_id', id)
+    await supabase.from('b2b_partner_pricing').delete().eq('partner_id', id)
 
-    const { error } = await supabaseAdmin.from('b2b_partners').delete().eq('id', id)
+    const { error } = await supabase.from('b2b_partners').delete().eq('id', id)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

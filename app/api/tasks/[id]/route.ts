@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - Fetch single task
 export async function GET(
@@ -14,7 +9,18 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    // Use authenticated client - RLS automatically filters by tenant_id
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
+    const { data, error } = await supabase
       .from('tasks')
       .select(`
         *,
@@ -42,6 +48,17 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
+
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
 
     const updateData: any = {
@@ -74,7 +91,10 @@ export async function PUT(
       updateData.archived_at = body.archived ? new Date().toISOString() : null
     }
 
-    const { data, error } = await supabaseAdmin
+    // Block tenant_id updates
+    delete (updateData as any).tenant_id
+
+    const { data, error } = await supabase
       .from('tasks')
       .update(updateData)
       .eq('id', id)
@@ -104,7 +124,18 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    const { error } = await supabaseAdmin
+    // Use authenticated client - RLS automatically filters by tenant_id
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
+    const { error } = await supabase
       .from('tasks')
       .delete()
       .eq('id', id)

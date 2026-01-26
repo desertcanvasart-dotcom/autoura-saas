@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id: itineraryId } = await params
 
-    // Get itinerary details
-    const { data: itinerary, error: itinError } = await supabaseAdmin
+    // Get itinerary details - RLS ensures tenant isolation
+    const { data: itinerary, error: itinError } = await supabase
       .from('itineraries')
       .select('*, client:clients(id, first_name, last_name, email)')
       .eq('id', itineraryId)
@@ -25,7 +30,7 @@ export async function POST(
     }
 
     // Get all services with suppliers for this itinerary
-    const { data: days, error: daysError } = await supabaseAdmin
+    const { data: days, error: daysError } = await supabase
       .from('itinerary_days')
       .select('id')
       .eq('itinerary_id', itineraryId)
@@ -36,7 +41,7 @@ export async function POST(
 
     const dayIds = days.map(d => d.id)
 
-    const { data: services, error: servicesError } = await supabaseAdmin
+    const { data: services, error: servicesError } = await supabase
       .from('itinerary_day_services')
       .select(`
         *,
@@ -109,7 +114,7 @@ export async function POST(
     }
 
     // Insert commissions
-    const { data: createdCommissions, error: createError } = await supabaseAdmin
+    const { data: createdCommissions, error: createError } = await supabase
       .from('commissions')
       .insert(commissionsToCreate)
       .select()
@@ -125,7 +130,7 @@ export async function POST(
       .map(s => s.id)
 
     if (serviceIds.length > 0) {
-      await supabaseAdmin
+      await supabase
         .from('itinerary_day_services')
         .update({ commission_status: 'generated' })
         .in('id', serviceIds)

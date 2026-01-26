@@ -8,6 +8,7 @@ import {
   User, Mail, Phone, MapPin, Globe, Building, CreditCard, Tag,
   Star, Bell, Heart, ArrowLeft, Save, X, ChevronRight
 } from 'lucide-react'
+import RequireFeature from '@/components/RequireFeature'
 
 const LEAD_SOURCES = [
   { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
@@ -122,7 +123,8 @@ export default function NewClientPage() {
   const labelClass = "block text-xs font-medium text-gray-600 mb-1"
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <RequireFeature feature="b2c">
+      <div className="min-h-screen bg-gray-50/50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-6 py-4">
@@ -730,5 +732,6 @@ export default function NewClientPage() {
         </div>
       </form>
     </div>
+    </RequireFeature>
   )
 }

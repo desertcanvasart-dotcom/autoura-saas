@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
-const supabase = createClient()
-
-// GET - Used by VIEW page
+/**
+ * GET /api/itineraries/[id]
+ * Get a single itinerary by ID
+ * RLS policies enforce tenant isolation
+ */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Use authenticated client - RLS will enforce tenant isolation
+    const supabase = await createAuthenticatedClient()
     const { id } = await params
-    
+
     const { data, error } = await supabase
       .from('itineraries')
       .select('*')
@@ -33,8 +37,8 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching itinerary:', error)
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to fetch itinerary',
         message: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -43,12 +47,18 @@ export async function GET(
   }
 }
 
-// PUT - Used by EDIT page AND ResourceAssignment
+/**
+ * PUT /api/itineraries/[id]
+ * Update an itinerary
+ * RLS policies enforce tenant isolation
+ */
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Use authenticated client - RLS will enforce tenant isolation
+    const supabase = await createAuthenticatedClient()
     const { id } = await params
     const body = await request.json()
 
@@ -94,8 +104,8 @@ export async function PUT(
   } catch (error) {
     console.error('Error updating itinerary:', error)
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to update itinerary',
         message: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -104,12 +114,19 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete an itinerary and all related data
+/**
+ * DELETE /api/itineraries/[id]
+ * Delete an itinerary and all related data
+ * RLS policies enforce tenant isolation
+ * Note: RLS policy requires 'manager' role or higher
+ */
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Use authenticated client - RLS will enforce tenant isolation and role permission
+    const supabase = await createAuthenticatedClient()
     const { id } = await params
 
     console.log('🗑️ Deleting itinerary:', id)
@@ -135,7 +152,7 @@ export async function DELETE(
 
     if (days && days.length > 0) {
       const dayIds = days.map((d: any) => d.id)
-      
+
       // Delete services for these days
       await supabase
         .from('itinerary_services')
@@ -157,7 +174,7 @@ export async function DELETE(
 
     if (error) {
       console.error('❌ Error deleting itinerary:', error)
-      
+
       // Check for foreign key constraint
       if (error.code === '23503') {
         return NextResponse.json({
@@ -165,7 +182,7 @@ export async function DELETE(
           error: 'Cannot delete itinerary. It has linked records (invoices, payments, etc.). Please remove those first.'
         }, { status: 409 })
       }
-      
+
       throw error
     }
 
@@ -179,8 +196,8 @@ export async function DELETE(
   } catch (error: any) {
     console.error('❌ Error in DELETE:', error)
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to delete itinerary',
         message: error.message
       },

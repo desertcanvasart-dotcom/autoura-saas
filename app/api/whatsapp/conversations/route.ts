@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 // GET /api/whatsapp/conversations - List all conversations
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'active'
     const search = searchParams.get('search') || ''
@@ -76,7 +85,16 @@ export async function GET(request: NextRequest) {
 // POST /api/whatsapp/conversations - Create or get conversation
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const body = await request.json()
     const { phone_number, client_name, client_id, auto_assign } = body
 
@@ -203,7 +221,16 @@ export async function POST(request: NextRequest) {
 // PATCH /api/whatsapp/conversations - Update conversation (archive, mark read, etc.)
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const body = await request.json()
     const { conversation_id, action, agent_id, ...updates } = body
 

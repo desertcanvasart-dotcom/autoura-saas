@@ -5,17 +5,27 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - List all hotel staff with hotel info
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Authenticate user
+    const supabase = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
 
     const { searchParams } = new URL(request.url)
     const hotelId = searchParams.get('hotel_id')
     const isActive = searchParams.get('is_active')
 
+    // Query with RLS - automatically filters by tenant
     let query = supabase
       .from('hotel_staff')
       .select(`
@@ -60,8 +70,21 @@ export async function GET(request: NextRequest) {
 // POST - Create new hotel staff
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Authenticate user and get Supabase client
+    const authResult = await requireAuth()
+
+    if (authResult.error) {
+      return NextResponse.json({
+        success: false,
+        error: authResult.error
+      }, { status: authResult.status })
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
+
+    // Prevent manual tenant_id setting - RLS will handle it
+    delete body.tenant_id
 
     if (!body.name || !body.phone) {
       return NextResponse.json(
@@ -83,6 +106,7 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== undefined ? body.is_active : true
     }
 
+    // Insert with RLS - tenant_id auto-populated by trigger
     const { data, error } = await supabase
       .from('hotel_staff')
       .insert([staffData])

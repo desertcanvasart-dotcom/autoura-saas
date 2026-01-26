@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+// app/api/financial-reports/route.ts
+// ============================================
+// AUTOURA - FINANCIAL REPORTS API
+// ============================================
+// Comprehensive financial analytics and reporting
+// Multi-tenancy: RLS enforces tenant isolation on ALL queries
+// Security: Requires authentication, ALL data filtered by tenant
+// ============================================
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 interface MonthlyData {
   month: string
@@ -46,41 +50,59 @@ interface CommissionData {
   expenses: any[]
 }
 
+/**
+ * GET /api/financial-reports
+ * Comprehensive financial analytics for authenticated user's tenant
+ * Query params: type (overview, revenue, cashflow, tax, commission), year, quarter, month
+ * RLS policies automatically filter ALL data by tenant_id
+ */
 export async function GET(request: NextRequest) {
   try {
+    // Use authenticated client - RLS automatically filters ALL queries by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const reportType = searchParams.get('type') || 'overview' // overview, revenue, cashflow, tax, commission
     const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString())
     const quarter = searchParams.get('quarter') // Q1, Q2, Q3, Q4
     const month = searchParams.get('month') // 1-12
 
-    // Fetch all invoices
-    const { data: invoices, error: invError } = await supabaseAdmin
+    // Fetch all invoices (RLS filters to tenant's invoices only)
+    const { data: invoices, error: invError } = await supabase
       .from('invoices')
       .select('*')
       .order('issue_date', { ascending: true })
 
     if (invError) {
-      console.error('Error fetching invoices:', invError)
+      console.error('❌ Error fetching invoices:', invError)
     }
 
-    // Fetch all expenses
-    const { data: expenses, error: expError } = await supabaseAdmin
+    // Fetch all expenses (RLS filters to tenant's expenses only)
+    const { data: expenses, error: expError } = await supabase
       .from('expenses')
       .select('*')
       .order('expense_date', { ascending: true })
 
     if (expError) {
-      console.error('Error fetching expenses:', expError)
+      console.error('❌ Error fetching expenses:', expError)
     }
 
-    // Fetch itineraries for trip count
-    const { data: itineraries, error: itinError } = await supabaseAdmin
+    // Fetch itineraries for trip count (RLS filters to tenant's itineraries only)
+    const { data: itineraries, error: itinError } = await supabase
       .from('itineraries')
       .select('id, start_date, status, total_cost')
 
     if (itinError) {
-      console.error('Error fetching itineraries:', itinError)
+      console.error('❌ Error fetching itineraries:', itinError)
     }
 
     const allInvoices = invoices || []
@@ -107,7 +129,7 @@ export async function GET(request: NextRequest) {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const monthlyData: MonthlyData[] = monthNames.map((monthName, index) => {
       const monthNum = index + 1
-      
+
       const monthInvoices = yearInvoices.filter(inv => {
         const invMonth = new Date(inv.issue_date).getMonth() + 1
         return invMonth === monthNum
@@ -340,7 +362,7 @@ export async function GET(request: NextRequest) {
       ])].sort((a, b) => b - a)
     })
   } catch (error) {
-    console.error('Error in Financial Reports GET:', error)
+    console.error('❌ Error in Financial Reports GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

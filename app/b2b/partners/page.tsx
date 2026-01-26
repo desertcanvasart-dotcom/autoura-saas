@@ -1,10 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Users, Plus, Search, Edit, Trash2, X, Check, Building2,
-  Mail, Phone, Globe, Percent, AlertCircle, CheckCircle2
+  Mail, Phone, Globe, Percent, AlertCircle, CheckCircle2, XCircle
 } from 'lucide-react'
+import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { useModal } from '@/app/contexts/ModalContext'
+import RequireFeature from '@/components/RequireFeature'
 
 // ============================================
 // B2B PARTNERS PAGE
@@ -46,6 +51,11 @@ const COUNTRIES = [
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'AUD', 'CAD', 'JPY']
 
 export default function B2BPartnersPage() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
+  const { tenant, loading: tenantLoading, isManager, canManagePartners } = useTenant()
+  const modal = useModal()
+
   const [partners, setPartners] = useState<B2BPartner[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -60,7 +70,18 @@ export default function B2BPartnersPage() {
     credit_limit: null as number | null, payment_terms: '', notes: ''
   })
 
-  useEffect(() => { fetchPartners() }, [showInactive])
+  // Authentication check
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
+
+  useEffect(() => {
+    if (user && tenant) {
+      fetchPartners()
+    }
+  }, [showInactive, user, tenant])
 
   const fetchPartners = async () => {
     try {
@@ -128,7 +149,18 @@ export default function B2BPartnersPage() {
   }
 
   const handleDelete = async (partner: B2BPartner) => {
-    if (!confirm(`Delete ${partner.company_name}?`)) return
+    if (!canManagePartners) {
+      showToast('error', 'You don\'t have permission to delete partners')
+      return
+    }
+
+    const confirmed = await modal.confirmDestructive(
+      'Delete Partner',
+      `Are you sure you want to delete ${partner.company_name}? This will remove all associated data.`,
+      { confirmText: 'Delete Partner', cancelText: 'Cancel' }
+    )
+    if (!confirmed) return
+
     try {
       const res = await fetch(`/api/b2b/partners/${partner.id}`, { method: 'DELETE' })
       const data = await res.json()
@@ -148,6 +180,41 @@ export default function B2BPartnersPage() {
     p.partner_code.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // Show loading state while checking auth/tenant
+  if (authLoading || tenantLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-[#647C47] border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  // Prevent flash of content before redirect
+  if (!user || !tenant) {
+    return null
+  }
+
+  // Authorization check
+  if (!isManager) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-4">You don't have permission to manage B2B partners.</p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35]"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -157,7 +224,14 @@ export default function B2BPartnersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <RequireFeature feature="b2b">
+      <div className="min-h-screen bg-gray-50 p-6">
+        {/* Tenant Context */}
+        <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+          <Building2 className="w-4 h-4" />
+          <span>{tenant.company_name}</span>
+        </div>
+
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map(toast => (
@@ -323,6 +397,7 @@ export default function B2BPartnersPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </RequireFeature>
   )
 }

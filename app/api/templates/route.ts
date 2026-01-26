@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - List all templates
 export async function GET(request: NextRequest) {
   try {
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
     const channel = searchParams.get('channel')
@@ -53,8 +51,18 @@ export async function GET(request: NextRequest) {
 // POST - Create new template
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
-    const { name, description, category, subcategory, channel, subject, body: templateBody } = body
+    const { name, description, category, subcategory, channel, subject, body: templateBody, language, parent_template_id } = body
 
     if (!name || !templateBody) {
       return NextResponse.json({ success: false, error: 'Name and body are required' }, { status: 400 })
@@ -67,6 +75,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('message_templates')
       .insert({
+        tenant_id, // ✅ Explicit tenant_id
         name,
         description,
         category: category || 'customer',
@@ -76,6 +85,9 @@ export async function POST(request: NextRequest) {
         body: templateBody,
         placeholders,
         is_active: true,
+        language: language || 'en',
+        parent_template_id: parent_template_id || null,
+        version: 1,
       })
       .select()
       .single()

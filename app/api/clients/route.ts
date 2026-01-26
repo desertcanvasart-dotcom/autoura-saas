@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-// GET /api/clients?userId=xxx&search=xxx&limit=100
+/**
+ * GET /api/clients
+ * List all clients for the authenticated user's tenant
+ * RLS policies automatically filter by tenant_id
+ */
 export async function GET(request: NextRequest) {
   try {
+    // Use authenticated client - RLS will automatically filter by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
     const limit = parseInt(searchParams.get('limit') || '50')
@@ -46,9 +57,23 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/clients - Create new client
+/**
+ * POST /api/clients
+ * Create a new client for the authenticated user's tenant
+ * RLS policies will validate tenant_id
+ */
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     // Validate required fields
@@ -59,8 +84,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create client
+    // Create client with tenant_id
     const clientData = {
+      tenant_id,
       first_name: body.first_name,
       last_name: body.last_name || body.first_name,
       email: body.email || null,

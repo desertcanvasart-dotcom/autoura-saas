@@ -1,11 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-
-// Admin client that bypasses RLS
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET single client
 export async function GET(
@@ -15,7 +9,19 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    // Use authenticated client - RLS will automatically filter by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
+    const { data, error } = await supabase
       .from('clients')
       .select('*')
       .eq('id', id)
@@ -43,13 +49,24 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id } = await params
     const body = await request.json()
 
-    // Remove id from body to prevent update conflicts
-    const { id: _, ...updateData } = body
+    // Remove fields that shouldn't be manually set
+    const { id: _, tenant_id: __, ...updateData } = body
 
-    const { data, error } = await supabaseAdmin
+    // RLS will ensure user can only update their tenant's clients
+    const { data, error } = await supabase
       .from('clients')
       .update(updateData)
       .eq('id', id)
@@ -74,13 +91,24 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { id } = await params
     const body = await request.json()
 
-    // Remove id from body to prevent update conflicts
-    const { id: _, ...updateData } = body
+    // Remove fields that shouldn't be manually set
+    const { id: _, tenant_id: __, ...updateData } = body
 
-    const { data, error } = await supabaseAdmin
+    // RLS will ensure user can only update their tenant's clients
+    const { data, error } = await supabase
       .from('clients')
       .update(updateData)
       .eq('id', id)
@@ -107,9 +135,12 @@ export async function DELETE(
   try {
     const { id } = await params
 
+    // Use authenticated client - RLS will automatically filter by tenant
+    const supabase = await createAuthenticatedClient()
+
     // First, check if client has any related records
     // Check for itineraries
-    const { data: itineraries, error: itinError } = await supabaseAdmin
+    const { data: itineraries, error: itinError } = await supabase
       .from('itineraries')
       .select('id')
       .eq('client_id', id)
@@ -127,7 +158,7 @@ export async function DELETE(
     }
 
     // Check for invoices
-    const { data: invoices, error: invError } = await supabaseAdmin
+    const { data: invoices, error: invError } = await supabase
       .from('invoices')
       .select('id')
       .eq('client_id', id)
@@ -146,7 +177,7 @@ export async function DELETE(
     }
 
     // Check for follow_ups
-    const { data: followUps, error: fuError } = await supabaseAdmin
+    const { data: followUps, error: fuError } = await supabase
       .from('follow_ups')
       .select('id')
       .eq('client_id', id)
@@ -159,7 +190,7 @@ export async function DELETE(
 
     // If there are follow-ups, delete them first (they're not critical)
     if (followUps && followUps.length > 0) {
-      const { error: deleteFollowUpsError } = await supabaseAdmin
+      const { error: deleteFollowUpsError } = await supabase
         .from('follow_ups')
         .delete()
         .eq('client_id', id)
@@ -170,7 +201,7 @@ export async function DELETE(
     }
 
     // Check for WhatsApp conversations
-    const { data: conversations, error: convError } = await supabaseAdmin
+    const { data: conversations, error: convError } = await supabase
       .from('whatsapp_conversations')
       .select('id')
       .eq('client_id', id)
@@ -184,7 +215,7 @@ export async function DELETE(
     // Delete WhatsApp conversations if any
     if (conversations && conversations.length > 0) {
       // First delete messages
-      const { error: deleteMessagesError } = await supabaseAdmin
+      const { error: deleteMessagesError } = await supabase
         .from('whatsapp_messages')
         .delete()
         .in('conversation_id', conversations.map(c => c.id))
@@ -194,7 +225,7 @@ export async function DELETE(
       }
 
       // Then delete conversations
-      const { error: deleteConvError } = await supabaseAdmin
+      const { error: deleteConvError } = await supabase
         .from('whatsapp_conversations')
         .delete()
         .eq('client_id', id)
@@ -205,7 +236,7 @@ export async function DELETE(
     }
 
     // Now delete the client
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('clients')
       .delete()
       .eq('id', id)

@@ -777,10 +777,13 @@ interface ContentItem {
 }
 
 interface WritingRule {
-  rule_type: string
-  rule_text: string
+  id: string
+  name: string
+  description: string
   category: string
+  rule_type: string
   priority: number
+  applies_to: string[]
 }
 
 async function fetchContentLibrary(
@@ -913,17 +916,24 @@ function buildWritingRulesContext(rules: WritingRule[]): string {
 
   let context = '\n\nWRITING STYLE:\n'
 
+  // Filter by rule_type (enforce/prefer/avoid)
   const enforceRules = rules.filter(r => r.rule_type === 'enforce').slice(0, 5)
+  const preferRules = rules.filter(r => r.rule_type === 'prefer').slice(0, 3)
   const avoidRules = rules.filter(r => r.rule_type === 'avoid').slice(0, 5)
 
   if (enforceRules.length > 0) {
     context += 'MUST follow:\n'
-    enforceRules.forEach(r => context += `- ${r.rule_text}\n`)
+    enforceRules.forEach(r => context += `- ${r.name}: ${r.description}\n`)
+  }
+
+  if (preferRules.length > 0) {
+    context += 'PREFER:\n'
+    preferRules.forEach(r => context += `- ${r.name}: ${r.description}\n`)
   }
 
   if (avoidRules.length > 0) {
     context += 'AVOID:\n'
-    avoidRules.forEach(r => context += `- ${r.rule_text}\n`)
+    avoidRules.forEach(r => context += `- ${r.name}: ${r.description}\n`)
   }
 
   return context
@@ -1388,6 +1398,281 @@ function determinePackageType(
 }
 
 // ============================================
+// HELPER: CREATE QUOTES AFTER ITINERARY
+// ============================================
+
+async function createQuotesForItinerary(params: {
+  itinerary_id: string
+  quote_type: 'b2c' | 'b2b' | 'both' | 'none'
+  num_travelers: number
+  tier: ServiceTier
+  margin_percent: number
+  currency: string
+  client_id?: string | null
+  partner_id?: string | null
+}) {
+  const {
+    itinerary_id,
+    quote_type,
+    num_travelers,
+    tier,
+    margin_percent,
+    currency,
+    client_id,
+    partner_id
+  } = params
+
+  if (quote_type === 'none') {
+    return { b2c_quote: null, b2b_quote: null }
+  }
+
+  const { data: tenant } = await supabaseAdmin.from('tenants').select('id').single()
+  const tenant_id = tenant?.id
+
+  if (!tenant_id) {
+    console.error('⚠️ No tenant found - cannot create quotes')
+    return { b2c_quote: null, b2b_quote: null }
+  }
+
+  // Fetch itinerary with services for pricing calculation
+  const { data: itinerary } = await supabaseAdmin
+    .from('itineraries')
+    .select(`
+      *,
+      itinerary_services (*)
+    `)
+    .eq('id', itinerary_id)
+    .single()
+
+  if (!itinerary) {
+    console.error('⚠️ Itinerary not found')
+    return { b2c_quote: null, b2b_quote: null }
+  }
+
+  let b2c_quote = null
+  let b2b_quote = null
+
+  // Create B2C Quote
+  if (quote_type === 'b2c' || quote_type === 'both') {
+    try {
+      // Calculate costs from services
+      const services = itinerary.itinerary_services || []
+      const costBreakdown: Record<string, number> = {
+        accommodation: 0,
+        transportation: 0,
+        entrance_fees: 0,
+        meals: 0,
+        guide: 0,
+        cruise: 0,
+        domestic_flights: 0,
+        tips: 0,
+        other: 0
+      }
+
+      services.forEach((service: any) => {
+        const cost = parseFloat(service.total_cost || 0)
+        switch (service.service_type) {
+          case 'accommodation':
+          case 'hotel':
+            costBreakdown.accommodation += cost
+            break
+          case 'transportation':
+          case 'vehicle':
+          case 'car':
+            costBreakdown.transportation += cost
+            break
+          case 'entrance':
+          case 'entrance_fee':
+          case 'attraction':
+            costBreakdown.entrance_fees += cost
+            break
+          case 'meal':
+          case 'lunch':
+          case 'dinner':
+          case 'breakfast':
+            costBreakdown.meals += cost
+            break
+          case 'guide':
+          case 'tour_guide':
+            costBreakdown.guide += cost
+            break
+          case 'cruise':
+          case 'nile_cruise':
+            costBreakdown.cruise += cost
+            break
+          case 'domestic_flight':
+          case 'flight':
+            costBreakdown.domestic_flights += cost
+            break
+          case 'tips':
+          case 'tipping':
+            costBreakdown.tips += cost
+            break
+          default:
+            costBreakdown.other += cost
+        }
+      })
+
+      const total_cost = Object.values(costBreakdown).reduce((sum, val) => sum + val, 0)
+      const selling_price = total_cost + (total_cost * margin_percent / 100)
+      const price_per_person = selling_price / num_travelers
+
+      // Generate quote number
+      const { data: quoteNumber } = await supabaseAdmin.rpc('generate_b2c_quote_number')
+
+      // Create quote
+      const { data: createdQuote, error } = await supabaseAdmin
+        .from('b2c_quotes')
+        .insert({
+          tenant_id,
+          itinerary_id,
+          client_id,
+          quote_number: quoteNumber,
+          num_travelers,
+          tier,
+          total_cost,
+          margin_percent,
+          selling_price,
+          price_per_person,
+          currency,
+          cost_breakdown: costBreakdown,
+          status: 'draft'
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error creating B2C quote:', error)
+      } else {
+        b2c_quote = createdQuote
+        console.log(`✅ B2C Quote created: ${b2c_quote?.quote_number}`)
+      }
+    } catch (error) {
+      console.error('Error creating B2C quote:', error)
+    }
+  }
+
+  // Create B2B Quote
+  if (quote_type === 'b2b' || quote_type === 'both') {
+    try {
+      const services = itinerary.itinerary_services || []
+      const pax_counts = [2, 4, 6, 8, 10, 12, 15, 20, 25, 30]
+      const tour_leader_included = false
+
+      // Categorize costs
+      const fixedCosts = { transport: 0, guide: 0, other: 0 }
+      const perPersonCosts = { entrance_fees: 0, meals: 0, tips: 0, domestic_flights: 0 }
+      let accommodationCost = 0
+      let cruiseCost = 0
+      let accommodationNights = 0
+
+      services.forEach((service: any) => {
+        const cost = parseFloat(service.total_cost || 0)
+        const type = service.service_type
+
+        if (type === 'accommodation' || type === 'hotel') {
+          accommodationCost += cost
+          accommodationNights++
+        } else if (type === 'cruise' || type === 'nile_cruise') {
+          cruiseCost += cost
+        } else if (type === 'transportation' || type === 'vehicle' || type === 'car') {
+          fixedCosts.transport += cost
+        } else if (type === 'guide' || type === 'tour_guide') {
+          fixedCosts.guide += cost
+        } else if (type === 'entrance' || type === 'entrance_fee' || type === 'attraction') {
+          perPersonCosts.entrance_fees += cost / num_travelers
+        } else if (type === 'meal' || type === 'lunch' || type === 'dinner' || type === 'breakfast') {
+          perPersonCosts.meals += cost / num_travelers
+        } else if (type === 'tips' || type === 'tipping') {
+          perPersonCosts.tips += cost / num_travelers
+        } else if (type === 'domestic_flight' || type === 'flight') {
+          perPersonCosts.domestic_flights += cost / num_travelers
+        } else {
+          fixedCosts.other += cost
+        }
+      })
+
+      // Calculate PPD
+      const totalNights = Math.max(accommodationNights, itinerary.total_days - 1)
+      const ppd_accommodation = accommodationNights > 0 ? accommodationCost / num_travelers / totalNights : 0
+      const ppd_cruise = cruiseCost > 0 ? cruiseCost / num_travelers / totalNights : 0
+      const single_supplement = ppd_accommodation * totalNights * 0.7
+
+      // Tour leader cost
+      const tour_leader_cost = tour_leader_included
+        ? (ppd_accommodation + ppd_cruise) * totalNights + single_supplement +
+          perPersonCosts.entrance_fees + perPersonCosts.meals + perPersonCosts.tips + perPersonCosts.domestic_flights
+        : 0
+
+      // Generate pricing table
+      const pricing_table: Record<string, { pp: number; total: number }> = {}
+      for (const pax of pax_counts) {
+        const effectivePax = tour_leader_included ? pax + 1 : pax
+        const totalAccommodation = (ppd_accommodation + ppd_cruise) * effectivePax * totalNights
+        const fixedPerPerson = (fixedCosts.transport + fixedCosts.guide + fixedCosts.other) / pax
+        const tlCostPerPerson = tour_leader_included ? tour_leader_cost / pax : 0
+
+        const pricePerPerson =
+          (totalAccommodation / pax) +
+          fixedPerPerson +
+          perPersonCosts.entrance_fees +
+          perPersonCosts.meals +
+          perPersonCosts.tips +
+          perPersonCosts.domestic_flights +
+          tlCostPerPerson
+
+        pricing_table[pax.toString()] = {
+          pp: Math.ceil(pricePerPerson * 100) / 100,
+          total: Math.ceil(pricePerPerson * pax * 100) / 100
+        }
+      }
+
+      // Generate quote number
+      const { data: quoteNumber } = await supabaseAdmin.rpc('generate_b2b_quote_number')
+
+      // Create quote
+      const { data: createdQuote, error } = await supabaseAdmin
+        .from('b2b_quotes')
+        .insert({
+          tenant_id,
+          itinerary_id,
+          partner_id,
+          quote_number: quoteNumber,
+          tier,
+          tour_leader_included,
+          currency,
+          ppd_accommodation,
+          ppd_cruise,
+          single_supplement,
+          fixed_transport: fixedCosts.transport,
+          fixed_guide: fixedCosts.guide,
+          fixed_other: fixedCosts.other,
+          pp_entrance_fees: perPersonCosts.entrance_fees,
+          pp_meals: perPersonCosts.meals,
+          pp_tips: perPersonCosts.tips,
+          pp_domestic_flights: perPersonCosts.domestic_flights,
+          pricing_table,
+          tour_leader_cost,
+          status: 'draft'
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error creating B2B quote:', error)
+      } else {
+        b2b_quote = createdQuote
+        console.log(`✅ B2B Quote created: ${b2b_quote?.quote_number}`)
+      }
+    } catch (error) {
+      console.error('Error creating B2B quote:', error)
+    }
+  }
+
+  return { b2c_quote, b2b_quote }
+}
+
+// ============================================
 // MAIN API HANDLER
 // ============================================
 
@@ -1432,7 +1717,10 @@ export async function POST(request: NextRequest) {
       is_structured_input = false,
       extracted_days = null,
       raw_itinerary = null,
-      input_mode_override = null // 'creative' | 'structured' | null
+      input_mode_override = null, // 'creative' | 'structured' | null
+
+      // NEW: Quote type for Phase 1B
+      quote_type = 'none' // 'b2c' | 'b2b' | 'both' | 'none'
     } = body
 
     const finalTourName = tour_requested || tour_name || 'Egypt Tour'
@@ -1714,6 +2002,22 @@ export async function POST(request: NextRequest) {
 
         console.log('🎉 Cruise itinerary complete!')
 
+        // Create quotes if requested and not in draft mode
+        let cruiseQuotesCreated = { b2c_quote: null, b2b_quote: null }
+        if (!skip_pricing && quote_type !== 'none') {
+          console.log(`📝 Creating ${quote_type} quote(s) for cruise...`)
+          cruiseQuotesCreated = await createQuotesForItinerary({
+            itinerary_id: itinerary.id,
+            quote_type: quote_type as 'b2c' | 'b2b' | 'both' | 'none',
+            num_travelers: totalPax,
+            tier,
+            margin_percent,
+            currency,
+            client_id: client_id,
+            partner_id: null
+          })
+        }
+
         return NextResponse.json({
           success: true,
           data: {
@@ -1737,7 +2041,10 @@ export async function POST(request: NextRequest) {
               per_person_cost: Math.round(totalClientPrice / totalPax * 100) / 100,
               content_library_used: true,
               cruise_content: cruiseContent.content.name
-            })
+            }),
+            // Include quote information if created
+            ...(cruiseQuotesCreated.b2c_quote ? { b2c_quote: cruiseQuotesCreated.b2c_quote } : {}),
+            ...(cruiseQuotesCreated.b2b_quote ? { b2b_quote: cruiseQuotesCreated.b2b_quote } : {})
           }
         })
       } else {
@@ -2244,6 +2551,22 @@ export async function POST(request: NextRequest) {
       clientPrice: totalClientPrice
     })
 
+    // Create quotes if requested and not in draft mode
+    let quotesCreated = { b2c_quote: null, b2b_quote: null }
+    if (!skip_pricing && quote_type !== 'none') {
+      console.log(`📝 Creating ${quote_type} quote(s)...`)
+      quotesCreated = await createQuotesForItinerary({
+        itinerary_id: itinerary.id,
+        quote_type: quote_type as 'b2c' | 'b2b' | 'both' | 'none',
+        num_travelers: totalPax,
+        tier,
+        margin_percent,
+        currency,
+        client_id: client_id,
+        partner_id: null
+      })
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -2264,7 +2587,10 @@ export async function POST(request: NextRequest) {
           total_cost: totalClientPrice,
           margin: totalClientPrice - totalSupplierCost,
           per_person_cost: Math.round(totalClientPrice / totalPax * 100) / 100
-        })
+        }),
+        // Include quote information if created
+        ...(quotesCreated.b2c_quote ? { b2c_quote: quotesCreated.b2c_quote } : {}),
+        ...(quotesCreated.b2b_quote ? { b2b_quote: quotesCreated.b2b_quote } : {})
       }
     })
 

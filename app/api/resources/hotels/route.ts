@@ -1,21 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate user
+    const supabase = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const supplierId = searchParams.get('supplier_id')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = supabaseAdmin
+    // Query with RLS - automatically filters by tenant
+    let query = supabase
       .from('accommodation_rates')
       .select('*')
-      .order('property_name')
+      .order('id')
 
     if (supplierId) query = query.eq('supplier_id', supplierId)
     if (activeOnly) query = query.eq('is_active', true)
@@ -36,7 +43,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Authenticate user and get Supabase client
+    const authResult = await requireAuth()
+
+    if (authResult.error) {
+      return NextResponse.json({
+        success: false,
+        error: authResult.error
+      }, { status: authResult.status })
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
+
+    // Prevent manual tenant_id setting - RLS will handle it
+    delete body.tenant_id
+
     console.log('=== HOTELS API POST START ===')
     console.log('Body received:', JSON.stringify(body, null, 2))
 
@@ -60,34 +82,19 @@ export async function POST(request: NextRequest) {
 
     console.log('Inserting:', JSON.stringify(newRate, null, 2))
 
-    // Try insert without select first to see if it works
-    const { data: insertData, error: insertError, count, status, statusText } = await supabaseAdmin
+    // Insert with RLS - tenant_id auto-populated by trigger
+    const { data: insertData, error: insertError } = await supabase
       .from('accommodation_rates')
       .insert(newRate)
       .select('*')
       .single()
 
-    console.log('Insert result - status:', status, 'statusText:', statusText)
-    console.log('Insert data:', insertData)
-    console.log('Insert error:', insertError)
-    console.log('Count:', count)
-
     if (insertError) {
       console.error('Supabase insert error:', insertError)
-      return NextResponse.json({ 
-        success: false, 
+      return NextResponse.json({
+        success: false,
         error: insertError.message,
-        details: insertError,
-        hint: 'Check if RLS is blocking the insert'
-      }, { status: 500 })
-    }
-
-    if (!insertData) {
-      console.error('No data returned from insert - likely RLS issue')
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Insert succeeded but no data returned. This usually means Row Level Security (RLS) is blocking the operation.',
-        hint: 'Run: ALTER TABLE accommodation_rates DISABLE ROW LEVEL SECURITY;'
+        details: insertError
       }, { status: 500 })
     }
 
@@ -98,10 +105,10 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('=== HOTELS API POST ERROR ===')
     console.error('Error:', error)
-    return NextResponse.json({ 
-      success: false, 
+    return NextResponse.json({
+      success: false,
       error: error.message,
-      stack: error.stack 
+      stack: error.stack
     }, { status: 500 })
   }
 }

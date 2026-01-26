@@ -14,6 +14,7 @@ import {
   FileText, Clock, AlertCircle, CheckCircle, Edit, Trash2, Plus, ArrowLeft,
   Building, Globe, CreditCard, Tag, Bell, Heart
 } from 'lucide-react'
+import RequireFeature from '@/components/RequireFeature'
 
 interface Client {
   id: string
@@ -225,9 +226,10 @@ export default function ClientProfilePage() {
   
   const pendingFollowups = followups.filter(f => f.status === 'pending')
   const overdueFollowups = pendingFollowups.filter(f => new Date(f.due_date) < new Date())
-  
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <RequireFeature feature="b2c">
+      <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -903,5 +905,6 @@ export default function ClientProfilePage() {
 />
 
     </div>
+    </RequireFeature>
   )
 }

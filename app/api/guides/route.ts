@@ -23,24 +23,26 @@ export async function GET(request: NextRequest) {
     // Parse query parameters
     const search = searchParams.get('search') || ''
     const is_active = searchParams.get('is_active')
+    const active_only = searchParams.get('active_only')
     const availability_from = searchParams.get('availability_from')
     const availability_to = searchParams.get('availability_to')
     const exclude_itinerary_id = searchParams.get('exclude_itinerary_id')
     const with_stats = searchParams.get('with_stats') === 'true'
-    
-    // Build query - fetch from suppliers table with type='guide'
+
+    // Build query - fetch from suppliers table with supplier_type='guide'
     let query = supabase
       .from('suppliers')
       .select('*')
-      .eq('type', 'guide')
+      .eq('supplier_type', 'guide')
       .order('name', { ascending: true })
-    
+
     // Apply filters
     if (search) {
       query = query.or(`name.ilike.%${search}%,contact_email.ilike.%${search}%`)
     }
-    
-    if (is_active === 'true') {
+
+    // Support both is_active and active_only parameters
+    if (is_active === 'true' || active_only === 'true') {
       query = query.eq('status', 'active')
     }
     
@@ -121,11 +123,11 @@ export async function GET(request: NextRequest) {
         })
       )
       
-      return NextResponse.json(guidesWithStats)
+      return NextResponse.json({ success: true, data: guidesWithStats })
     }
-    
-    // Return as array (ResourceAssignment expects array, not {success, data})
-    return NextResponse.json(guides)
+
+    // Return wrapped format for guide-rates-content
+    return NextResponse.json({ success: true, data: guides })
     
   } catch (error) {
     console.error('Error in guides GET:', error)

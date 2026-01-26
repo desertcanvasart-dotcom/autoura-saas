@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const searchParams = request.nextUrl.searchParams
     const supplierId = searchParams.get('supplier_id')
     const city = searchParams.get('city')
@@ -16,7 +21,7 @@ export async function GET(request: NextRequest) {
     const tier = searchParams.get('tier')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = supabaseAdmin
+    let query = supabase
       .from('meal_rates')
       .select('*')
       .order('restaurant_name')
@@ -44,6 +49,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const body = await request.json()
 
     const newRate = {
@@ -69,7 +84,7 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== false
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('meal_rates')
       .insert(newRate)
       .select('*')

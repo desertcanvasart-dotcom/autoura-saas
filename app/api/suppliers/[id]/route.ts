@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // All valid supplier fields (including new ones from migration)
 const VALID_FIELDS = [
@@ -12,9 +7,11 @@ const VALID_FIELDS = [
   'phone2', 'whatsapp', 'website', 'address', 'city', 'country',
   'default_commission_rate', 'commission_type', 'payment_terms',
   'bank_details', 'status', 'notes',
-  // New type-specific fields
+  // Type-specific fields
   'languages', 'vehicle_types', 'star_rating', 'property_type',
-  'cuisine_types', 'routes', 'ship_name', 'cabin_count', 'capacity'
+  'cuisine_types', 'routes', 'ship_name', 'cabin_count', 'capacity',
+  // Hierarchical fields
+  'is_property', 'parent_supplier_id'
 ]
 
 // Filter object to only include valid fields
@@ -35,7 +32,19 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    // Use authenticated client - RLS automatically filters by tenant_id
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
+    const { data, error } = await supabase
       .from('suppliers')
       .select('*')
       .eq('id', id)
@@ -59,13 +68,25 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
+
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
 
     // Filter to only valid fields to prevent database errors
     const updateData = filterValidFields(body)
 
-    // Remove id if present (shouldn't update primary key)
+    // Remove fields that shouldn't be updated
     delete (updateData as any).id
+    delete (updateData as any).tenant_id
     delete (updateData as any).created_at
     delete (updateData as any).updated_at
 
@@ -73,7 +94,7 @@ export async function PUT(
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('suppliers')
       .update(updateData)
       .eq('id', id)
@@ -103,8 +124,20 @@ export async function DELETE(
   try {
     const { id } = await params
 
+    // Use authenticated client - RLS automatically filters by tenant_id
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     // Check if supplier exists first
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await supabase
       .from('suppliers')
       .select('id, name')
       .eq('id', id)
@@ -114,7 +147,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Supplier not found' }, { status: 404 })
     }
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('suppliers')
       .delete()
       .eq('id', id)

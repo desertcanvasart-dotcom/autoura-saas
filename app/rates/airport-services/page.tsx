@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { 
+import {
   Plane, Plus, Search, Edit, Trash2, X, Check, AlertCircle, CheckCircle2,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy, Download, Upload
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useCurrency } from '@/hooks/useCurrency'
 
 // ============================================
 // CONSTANTS
@@ -184,6 +185,7 @@ function Pagination({
 
 export default function AirportServicesPage() {
   const dialog = useConfirmDialog()
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
   
   const [rates, setRates] = useState<AirportStaffRate[]>([])
   const [loading, setLoading] = useState(true)
@@ -310,26 +312,159 @@ export default function AirportServicesPage() {
   const handleDelete = async (rate: AirportStaffRate) => {
     const serviceName = formatServiceType(rate.service_type)
     const airportName = getAirportName(rate.airport_code)
-    
+
     const confirmed = await dialog.confirmDelete('Airport Service Rate',
       `Are you sure you want to delete the "${serviceName}" service at ${airportName} (${rate.direction})? This action cannot be undone.`
     )
-    
+
     if (!confirmed) return
 
     try {
       const response = await fetch(`/api/rates/airport-services/${rate.id}`, { method: 'DELETE' })
       const data = await response.json()
-      
-      if (data.success) { 
-        showToast('success', 'Airport service rate deleted!') 
-        fetchRates() 
+
+      if (data.success) {
+        showToast('success', 'Airport service rate deleted!')
+        fetchRates()
       } else {
         await dialog.alert('Error', data.error || 'Failed to delete airport service rate', 'warning')
       }
-    } catch { 
+    } catch {
       await dialog.alert('Error', 'Failed to delete airport service rate. Please try again.', 'warning')
     }
+  }
+
+  const handleClone = (rate: AirportStaffRate) => {
+    setEditingRate(null)
+    setFormData({
+      service_code: '',
+      airport_code: rate.airport_code,
+      service_type: rate.service_type,
+      direction: rate.direction,
+      rate_eur: rate.rate_eur,
+      description: rate.description || '',
+      notes: rate.notes || '',
+      is_active: rate.is_active
+    })
+    setShowModal(true)
+    showToast('success', 'Rate cloned - modify and save as new')
+  }
+
+  const handleExportCSV = () => {
+    if (filteredRates.length === 0) {
+      showToast('error', 'No rates to export')
+      return
+    }
+
+    const headers = ['service_code', 'airport_code', 'service_type', 'direction', 'rate_eur', 'description', 'notes', 'is_active']
+    const csvContent = [
+      headers.join(','),
+      ...filteredRates.map(rate => [
+        `"${rate.service_code || ''}"`,
+        `"${rate.airport_code}"`,
+        `"${rate.service_type}"`,
+        `"${rate.direction}"`,
+        rate.rate_eur,
+        `"${(rate.description || '').replace(/"/g, '""')}"`,
+        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        rate.is_active
+      ].join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `airport-services-rates-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
+    showToast('success', `Exported ${filteredRates.length} rates to CSV`)
+  }
+
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+
+        if (lines.length < 2) {
+          showToast('error', 'CSV file is empty or has no data rows')
+          return
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase())
+        const requiredHeaders = ['airport_code', 'service_type', 'direction', 'rate_eur']
+        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
+
+        if (missingHeaders.length > 0) {
+          showToast('error', `Missing required columns: ${missingHeaders.join(', ')}`)
+          return
+        }
+
+        let successCount = 0
+        let errorCount = 0
+
+        for (let i = 1; i < lines.length; i++) {
+          const values: string[] = []
+          let current = ''
+          let inQuotes = false
+
+          for (const char of lines[i]) {
+            if (char === '"') {
+              inQuotes = !inQuotes
+            } else if (char === ',' && !inQuotes) {
+              values.push(current.trim())
+              current = ''
+            } else {
+              current += char
+            }
+          }
+          values.push(current.trim())
+
+          const row: Record<string, string> = {}
+          headers.forEach((header, idx) => {
+            row[header] = (values[idx] || '').replace(/^"|"$/g, '')
+          })
+
+          const rateData = {
+            service_code: row.service_code || '',
+            airport_code: row.airport_code,
+            service_type: row.service_type,
+            direction: row.direction as 'arrival' | 'departure' | 'both',
+            rate_eur: parseFloat(row.rate_eur) || 0,
+            description: row.description || '',
+            notes: row.notes || '',
+            is_active: row.is_active === 'true' || row.is_active === '1' || row.is_active === 'TRUE'
+          }
+
+          try {
+            const response = await fetch('/api/rates/airport-services', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(rateData)
+            })
+            const data = await response.json()
+            if (data.success) {
+              successCount++
+            } else {
+              errorCount++
+            }
+          } catch {
+            errorCount++
+          }
+        }
+
+        fetchRates()
+        showToast('success', `Imported ${successCount} rates${errorCount > 0 ? `, ${errorCount} failed` : ''}`)
+      } catch {
+        showToast('error', 'Failed to parse CSV file')
+      }
+    }
+    reader.readAsText(file)
+    event.target.value = ''
   }
 
   const filteredRates = rates.filter(rate => {
@@ -398,6 +533,13 @@ export default function AirportServicesPage() {
             <div className="w-1.5 h-1.5 rounded-full bg-sky-600" />
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
+              <Download className="w-4 h-4" /> Export
+            </button>
+            <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium cursor-pointer">
+              <Upload className="w-4 h-4" /> Import
+              <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+            </label>
             <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-sky-600 text-white rounded-lg hover:bg-sky-700 font-medium">
               <Plus className="w-4 h-4" /> Add Rate
             </button>
@@ -428,8 +570,8 @@ export default function AirportServicesPage() {
             <p className="text-2xl font-bold text-amber-600">{stats.vipServices}</p>
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Avg. Rate</p>
-            <p className="text-2xl font-bold text-green-600">€{stats.avgRate}</p>
+            <p className="text-xs text-gray-600">Avg. Rate ({userCurrency})</p>
+            <p className="text-2xl font-bold text-green-600">{symbol}{convert(stats.avgRate).toFixed(0)}</p>
           </div>
         </div>
 
@@ -489,7 +631,7 @@ export default function AirportServicesPage() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-sky-800">Airport</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-sky-800">Service</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-sky-800">Direction</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-sky-800">Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-sky-800">{userCurrency} Rate</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-sky-800">Description</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-sky-800">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-sky-800">Actions</th>
@@ -522,7 +664,7 @@ export default function AirportServicesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                      €{rate.rate_eur}
+                      {symbol}{convert(Number(rate.rate_eur)).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 max-w-[200px] truncate">
                       {rate.description || '-'}
@@ -536,15 +678,24 @@ export default function AirportServicesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
-                        <button 
-                          onClick={() => handleEdit(rate)} 
+                        <button
+                          onClick={() => handleEdit(rate)}
                           className="p-1 text-gray-500 hover:text-sky-600 hover:bg-sky-50 rounded"
+                          title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button 
-                          onClick={() => handleDelete(rate)} 
+                        <button
+                          onClick={() => handleClone(rate)}
+                          className="p-1 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded"
+                          title="Clone"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rate)}
                           className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -637,17 +788,23 @@ export default function AirportServicesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Rate (€) *</label>
-                  <input 
-                    type="number" 
-                    name="rate_eur" 
-                    value={formData.rate_eur} 
-                    onChange={handleChange} 
-                    min="0" 
-                    step="0.01" 
-                    required 
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600" 
-                  />
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Rate in EUR (€) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">€</span>
+                    <input
+                      type="number"
+                      name="rate_eur"
+                      value={formData.rate_eur}
+                      onChange={handleChange}
+                      min="0"
+                      step="0.01"
+                      required
+                      placeholder="0.00"
+                      title="Rate in EUR"
+                      className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Stored in EUR, displayed in {userCurrency}</p>
                 </div>
               </div>
               <div>

@@ -9,7 +9,6 @@ interface UserProfile {
   id: string
   email: string
   full_name: string | null
-  role: 'admin' | 'agent' | 'viewer'
   company_name: string | null
   phone: string | null
   is_active: boolean
@@ -20,12 +19,9 @@ interface AuthContextType {
   profile: UserProfile | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, fullName: string) => Promise<void>
+  signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
-  isAdmin: boolean
-  isAgent: boolean
-  isViewer: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -89,18 +85,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
     })
-    
+
     if (error) throw error
+
+    // Check if user needs onboarding
+    try {
+      const { data: memberData } = await supabase
+        .from('tenant_members')
+        .select('tenant_id')
+        .eq('user_id', data.user.id)
+        .single()
+
+      if (memberData?.tenant_id) {
+        const { data: featuresData } = await supabase
+          .from('tenant_features')
+          .select('onboarding_completed')
+          .eq('tenant_id', memberData.tenant_id)
+          .single()
+
+        // Redirect to onboarding if not completed
+        if (featuresData && !featuresData.onboarding_completed) {
+          router.push('/onboarding')
+          return
+        }
+      }
+    } catch (error) {
+      console.error('Error checking onboarding status:', error)
+    }
+
     router.push('/dashboard')
   }
 
-  const signUp = async (email: string, password: string, fullName: string) => {
+  const signUp = async (email: string, password: string, fullName: string, companyName?: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: fullName,
+          company_name: companyName || '',
         },
       },
     })
@@ -128,9 +151,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
     resetPassword,
-    isAdmin: profile?.role === 'admin',
-    isAgent: profile?.role === 'agent',
-    isViewer: profile?.role === 'viewer',
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

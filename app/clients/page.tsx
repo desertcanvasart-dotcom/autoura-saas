@@ -9,25 +9,21 @@ import {
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
+import RequireFeature from '@/components/RequireFeature'
 
 interface ClientSummary {
   id: string
   client_code: string
-  first_name: string
-  last_name: string
+  full_name: string
   email: string
   phone?: string
+  whatsapp?: string
   nationality?: string
   client_type: string
   vip_status: boolean
   status: string
   lead_source?: string
-  total_bookings_count: number
-  total_revenue_generated: number
-  last_contacted_at?: string
   created_at: string
-  pending_followups: number
-  total_communications: number
 }
 
 interface DeleteModalState {
@@ -90,12 +86,12 @@ export default function ClientsPage() {
     try {
       setLoading(true)
       let query = supabase
-        .from('client_summary')
+        .from('clients')
         .select('*')
 
       // Apply search filter
       if (filters.search) {
-        query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,client_code.ilike.%${filters.search}%`)
+        query = query.or(`full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%,client_code.ilike.%${filters.search}%`)
       }
 
       // Apply status filter
@@ -129,19 +125,19 @@ export default function ClientsPage() {
       // Apply sorting
       switch (filters.sortBy) {
         case 'name':
-          query = query.order('first_name', { ascending: true })
+          query = query.order('full_name', { ascending: true })
           break
         case 'name_desc':
-          query = query.order('first_name', { ascending: false })
+          query = query.order('full_name', { ascending: false })
           break
         case 'revenue':
-          query = query.order('total_revenue_generated', { ascending: false })
+          query = query.order('created_at', { ascending: false })
           break
         case 'revenue_asc':
-          query = query.order('total_revenue_generated', { ascending: true })
+          query = query.order('created_at', { ascending: true })
           break
         case 'bookings':
-          query = query.order('total_bookings_count', { ascending: false })
+          query = query.order('created_at', { ascending: false })
           break
         case 'recent':
           query = query.order('created_at', { ascending: false })
@@ -206,7 +202,7 @@ export default function ClientsPage() {
     try {
       const { data: allClients } = await supabase
         .from('clients')
-        .select('status, vip_status, total_revenue_generated, created_at')
+        .select('status, vip_status, created_at')
 
       if (allClients) {
         const now = new Date()
@@ -217,7 +213,7 @@ export default function ClientsPage() {
           active: allClients.filter(c => c.status === 'active').length,
           vip: allClients.filter(c => c.vip_status).length,
           newThisMonth: allClients.filter(c => new Date(c.created_at) >= firstDayOfMonth).length,
-          totalRevenue: allClients.reduce((sum, c) => sum + (c.total_revenue_generated || 0), 0)
+          totalRevenue: 0 // Revenue tracking not yet implemented
         })
       }
     } catch (error) {
@@ -278,7 +274,8 @@ export default function ClientsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <RequireFeature feature="b2c">
+      <div className="min-h-screen bg-gray-50">
       {/* Delete Confirmation Modal */}
       {deleteModal.isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -671,7 +668,7 @@ export default function ClientsPage() {
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-9 w-9 rounded-full bg-primary-100 flex items-center justify-center">
                               <span className="text-primary-600 font-semibold text-xs">
-                                {client.first_name[0]}{client.last_name[0]}
+                                {client.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'CL'}
                               </span>
                             </div>
                             <div className="ml-3">
@@ -680,7 +677,7 @@ export default function ClientsPage() {
                                   href={`/clients/${client.id}`}
                                   className="text-sm font-medium text-gray-900 hover:text-primary-600"
                                 >
-                                  {client.first_name} {client.last_name}
+                                  {client.full_name}
                                 </Link>
                                 {client.vip_status && (
                                   <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
@@ -717,12 +714,12 @@ export default function ClientsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                          <div className="font-semibold">{client.total_bookings_count}</div>
+                          <div className="font-semibold">0</div>
                           <div className="text-xs text-gray-500">bookings</div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm">
                           <div className="font-semibold text-green-600">
-                            €{client.total_revenue_generated.toLocaleString()}
+                            €0
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm">
@@ -742,7 +739,7 @@ export default function ClientsPage() {
                             </Link>
                             <span className="text-gray-300">|</span>
                             <button
-                              onClick={() => openDeleteModal(client.id, `${client.first_name} ${client.last_name}`)}
+                              onClick={() => openDeleteModal(client.id, client.full_name)}
                               className="text-red-600 hover:text-red-800 font-medium"
                             >
                               Delete
@@ -767,5 +764,6 @@ export default function ClientsPage() {
         )}
       </div>
     </div>
+    </RequireFeature>
   )
 }

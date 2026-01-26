@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 import twilio from 'twilio'
 
 const twilioClient = twilio(
@@ -12,7 +12,16 @@ const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+
 // GET /api/whatsapp/messages - Get messages for a conversation
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // ✅ SECURITY: Require authentication - protects conversation data
+    const supabase = await createAuthenticatedClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const conversationId = searchParams.get('conversation_id')
     const limit = parseInt(searchParams.get('limit') || '50')
@@ -50,13 +59,22 @@ export async function GET(request: NextRequest) {
 // POST /api/whatsapp/messages - Send a new message
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // ✅ SECURITY: Require authentication - prevents SMS spam abuse
+    const supabase = await createAuthenticatedClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const body = await request.json()
     const { conversation_id, phone_number, message } = body
 
     if (!message || (!conversation_id && !phone_number)) {
-      return NextResponse.json({ 
-        error: 'Message and either conversation_id or phone_number required' 
+      return NextResponse.json({
+        error: 'Message and either conversation_id or phone_number required'
       }, { status: 400 })
     }
 
@@ -70,7 +88,7 @@ export async function POST(request: NextRequest) {
         .select('phone_number')
         .eq('id', conversation_id)
         .single()
-      
+
       if (!conv) {
         return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
       }
@@ -94,7 +112,7 @@ export async function POST(request: NextRequest) {
           .insert({ phone_number: cleanPhone })
           .select()
           .single()
-        
+
         if (convError) throw convError
         convId = newConv.id
       }
@@ -128,10 +146,10 @@ export async function POST(request: NextRequest) {
 
     if (saveError) throw saveError
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: savedMessage,
-      twilio_sid: twilioMessage.sid 
+      twilio_sid: twilioMessage.sid
     })
   } catch (error: any) {
     console.error('Error sending message:', error)

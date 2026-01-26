@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { requireAuth } from '@/lib/supabase-server'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!
@@ -394,6 +395,15 @@ function extractPhoneFromText(text: string): string {
 
 export async function POST(request: Request) {
   try {
+    // Require authentication - this makes expensive Anthropic API calls
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { conversation } = await request.json()
 
     if (!conversation) {

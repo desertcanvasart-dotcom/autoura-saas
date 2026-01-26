@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '@/lib/supabase-server'
 
 // ============================================
 // TRANSPORTATION RATES API - Single Record
 // File: app/api/rates/transportation/[id]/route.ts
 // ============================================
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 // GET - Single transportation rate by ID
 export async function GET(
@@ -17,9 +12,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('transportation_rates')
       .select(`
         *,
@@ -46,6 +51,16 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const { id } = await params
     const body = await request.json()
 
@@ -68,7 +83,7 @@ export async function PUT(
 
     updates.updated_at = new Date().toISOString()
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('transportation_rates')
       .update(updates)
       .eq('id', id)
@@ -93,9 +108,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const { id } = await params
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('transportation_rates')
       .delete()
       .eq('id', id)

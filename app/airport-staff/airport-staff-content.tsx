@@ -4,8 +4,12 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Crown, Star } from 'lucide-react'
+import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { useModal } from '@/app/contexts/ModalContext'
+import { showToast } from '@/app/contexts/ToastContext'
 
 // ============================================
 // CONSTANTS
@@ -58,7 +62,12 @@ function TierBadge({ tier }: { tier: string | null }) {
 // ============================================
 
 export default function AirportStaffContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, loading: authLoading } = useAuth()
+  const { tenant, loading: tenantLoading, isManager, canManagePartners, hasB2C, hasB2B } = useTenant()
+  const modal = useModal()
+
   const [staff, setStaff] = useState<AirportStaff[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -82,6 +91,13 @@ export default function AirportStaffContent() {
     tier: 'standard',
     is_preferred: false
   })
+
+  // Authentication check
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
 
   // Fetch staff
   const fetchStaff = async () => {
@@ -182,55 +198,70 @@ export default function AirportStaffContent() {
   // Submit form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
+    if (!canManagePartners) {
+      showToast('error', 'You don\'t have permission to manage airport staff')
+      return
+    }
+
     try {
-      const url = editingStaff 
+      const url = editingStaff
         ? `/api/resources/airport-staff/${editingStaff.id}`
         : '/api/resources/airport-staff'
-      
+
       const method = editingStaff ? 'PUT' : 'POST'
-      
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       })
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
-        alert(editingStaff ? 'Staff updated!' : 'Staff created!')
+        showToast('success', editingStaff ? 'Staff member updated successfully' : 'Staff member added successfully')
         setShowModal(false)
         fetchStaff()
       } else {
-        alert('Error: ' + data.error)
+        showToast('error', data.error || 'Failed to save staff member')
       }
     } catch (error) {
       console.error('Error saving staff:', error)
-      alert('Failed to save staff')
+      showToast('error', 'Failed to save staff member')
     }
   }
 
   // Delete staff
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete ${name}?`)) return
-    
+    if (!canManagePartners) {
+      showToast('error', 'You don\'t have permission to delete staff members')
+      return
+    }
+
+    const confirmed = await modal.confirmDestructive(
+      'Delete Staff Member',
+      `Are you sure you want to delete ${name}? This action cannot be undone.`,
+      'Delete'
+    )
+    if (!confirmed) return
+
     try {
       const response = await fetch(`/api/resources/airport-staff/${id}`, {
         method: 'DELETE'
       })
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
-        alert('Staff deleted!')
+        showToast('success', 'Staff member deleted successfully')
         fetchStaff()
       } else {
-        alert('Error: ' + data.error)
+        showToast('error', data.error || 'Failed to delete staff member')
       }
     } catch (error) {
       console.error('Error deleting staff:', error)
-      alert('Failed to delete staff')
+      showToast('error', 'Failed to delete staff member')
     }
   }
   
@@ -257,6 +288,45 @@ export default function AirportStaffContent() {
   const inactiveStaff = staff.filter(s => !s.is_active).length
   const preferredStaff = staff.filter(s => s.is_preferred).length
 
+  // Loading states
+  if (authLoading || tenantLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-sm text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user || !tenant) return null
+
+  // Authorization check
+  if (!isManager) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600 mb-6">
+            You need manager or admin permissions to manage airport staff.
+          </p>
+          <Link
+            href="/dashboard"
+            className="inline-block px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Go to Dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -276,26 +346,42 @@ export default function AirportStaffContent() {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="container mx-auto px-4 lg:px-6 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-gray-900">Airport Staff</h1>
-              <div className="w-1.5 h-1.5 rounded-full bg-teal-600" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-gray-900">Airport Staff</h1>
+                <div className="w-1.5 h-1.5 rounded-full bg-teal-600" />
+              </div>
+              {tenant && (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {tenant.company_name}
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    {hasB2C && !hasB2B && '(B2C Only)'}
+                    {!hasB2C && hasB2B && '(B2B Only)'}
+                    {hasB2C && hasB2B && '(B2C + B2B)'}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleAddNew}
-                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center gap-1.5"
-              >
-                <span>+</span>
-                Add Staff
-              </button>
-              <Link 
+              {canManagePartners && (
+                <button
+                  onClick={handleAddNew}
+                  className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center gap-1.5"
+                >
+                  <span>+</span>
+                  Add Staff
+                </button>
+              )}
+              <Link
                 href="/rates"
                 className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               >
                 ← Resources
               </Link>
-              <Link 
-                href="/" 
+              <Link
+                href="/"
                 className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               >
                 ← Home

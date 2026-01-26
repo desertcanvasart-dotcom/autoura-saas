@@ -1,12 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { 
-  FileText, Search, Download, Trash2, Eye, 
+import {
+  FileText, Search, Download, Trash2, Eye,
   Building2, Loader2, Plus, RefreshCw,
   CheckCircle2, Clock, XCircle, Send
 } from 'lucide-react'
+import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { useModal } from '@/app/contexts/ModalContext'
 
 // ============================================
 // B2B QUOTES LIST PAGE
@@ -37,15 +41,29 @@ interface Quote {
 }
 
 export default function QuotesListPage() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
+  const { tenant, loading: tenantLoading, isManager } = useTenant()
+  const modal = useModal()
+
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [deleting, setDeleting] = useState<string | null>(null)
 
+  // Authentication check
   useEffect(() => {
-    fetchQuotes()
-  }, [statusFilter])
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
+
+  useEffect(() => {
+    if (user && tenant) {
+      fetchQuotes()
+    }
+  }, [statusFilter, user, tenant])
 
   const fetchQuotes = async () => {
     setLoading(true)
@@ -67,17 +85,30 @@ export default function QuotesListPage() {
   }
 
   const handleDelete = async (id: string, quoteNumber: string) => {
-    if (!confirm(`Delete quote ${quoteNumber}?`)) return
-    
+    if (!isManager) {
+      await modal.alert('Permission Denied', 'You don\'t have permission to delete quotes')
+      return
+    }
+
+    const confirmed = await modal.confirmDestructive(
+      'Delete Quote',
+      `Are you sure you want to delete quote ${quoteNumber}?`,
+      { confirmText: 'Delete Quote', cancelText: 'Cancel' }
+    )
+    if (!confirmed) return
+
     setDeleting(id)
     try {
       const res = await fetch(`/api/b2b/quotes/${id}`, { method: 'DELETE' })
       const data = await res.json()
       if (data.success) {
         setQuotes(quotes.filter(q => q.id !== id))
+      } else {
+        await modal.alert('Error', data.error || 'Failed to delete quote')
       }
     } catch (err) {
       console.error('Failed to delete quote:', err)
+      await modal.alert('Error', 'An unexpected error occurred')
     } finally {
       setDeleting(null)
     }
@@ -123,8 +154,49 @@ export default function QuotesListPage() {
     accepted: quotes.filter(q => q.status === 'accepted').length,
   }
 
+  // Show loading state while checking auth/tenant
+  if (authLoading || tenantLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-[#647C47]" />
+      </div>
+    )
+  }
+
+  // Prevent flash of content before redirect
+  if (!user || !tenant) {
+    return null
+  }
+
+  // Authorization check
+  if (!isManager) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-4">You need manager permissions to view B2B quotes.</p>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35]"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+      {/* Tenant Context */}
+      <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+        <Building2 className="w-4 h-4" />
+        <span>{tenant.company_name}</span>
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">

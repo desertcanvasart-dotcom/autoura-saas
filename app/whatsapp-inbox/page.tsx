@@ -10,8 +10,8 @@ import {
   Settings, Filter, UserCheck, UserX
 } from 'lucide-react'
 
-// Supported languages
-const QUICK_LANGUAGES = [
+// Supported languages for translation
+const SUPPORTED_LANGUAGES = [
   { code: 'en', name: 'English', flag: '🇬🇧' },
   { code: 'es', name: 'Spanish', flag: '🇪🇸' },
   { code: 'fr', name: 'French', flag: '🇫🇷' },
@@ -22,7 +22,16 @@ const QUICK_LANGUAGES = [
   { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
   { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
   { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
+  { code: 'nl', name: 'Dutch', flag: '🇳🇱' },
+  { code: 'pl', name: 'Polish', flag: '🇵🇱' },
+  { code: 'tr', name: 'Turkish', flag: '🇹🇷' },
+  { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
+  { code: 'th', name: 'Thai', flag: '🇹🇭' },
+  { code: 'ko', name: 'Korean', flag: '🇰🇷' },
 ]
+
+// Alias for backward compatibility
+const QUICK_LANGUAGES = SUPPORTED_LANGUAGES
 
 interface SalesAgent {
   id: string
@@ -535,8 +544,10 @@ export default function WhatsAppInboxPage() {
   const [translationEnabled, setTranslationEnabled] = useState(false)
   const [translatedMessage, setTranslatedMessage] = useState('')
   const [isTranslating, setIsTranslating] = useState(false)
-  const [customerLanguage, setCustomerLanguage] = useState('es')
+  const [customerLanguage, setCustomerLanguage] = useState('es') // Target language for outgoing messages
+  const [agentLanguage, setAgentLanguage] = useState('en') // Agent's preferred language for reading incoming
   const [showLanguageSelector, setShowLanguageSelector] = useState(false)
+  const [showAgentLanguageSelector, setShowAgentLanguageSelector] = useState(false)
   const [incomingTranslations, setIncomingTranslations] = useState<Record<string, string>>({})
   const [translatingMessageIds, setTranslatingMessageIds] = useState<Set<string>>(new Set())
   const [showOriginalMap, setShowOriginalMap] = useState<Record<string, boolean>>({})
@@ -682,25 +693,27 @@ export default function WhatsAppInboxPage() {
     }
   }
 
-  // Translation functions
+  // Translation functions - support any language to any language
   const translateOutgoing = async (text: string, targetLang: string): Promise<string | null> => {
     try {
       const res = await fetch('/api/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, targetLanguage: targetLang, action: 'fromEnglish' })
+        // Use default action for auto-detect source language -> target language
+        body: JSON.stringify({ text, targetLanguage: targetLang })
       })
       const data = await res.json()
       return data.success && data.data?.translatedText ? data.data.translatedText : null
     } catch { return null }
   }
 
-  const translateIncoming = async (text: string): Promise<string | null> => {
+  const translateIncoming = async (text: string, targetLang: string = 'en'): Promise<string | null> => {
     try {
       const res = await fetch('/api/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, action: 'toEnglish' })
+        // Translate to agent's preferred language (default: English)
+        body: JSON.stringify({ text, targetLanguage: targetLang })
       })
       const data = await res.json()
       return data.success && data.data?.translatedText ? data.data.translatedText : null
@@ -710,7 +723,8 @@ export default function WhatsAppInboxPage() {
   const handleTranslateMessage = async (messageId: string, messageBody: string) => {
     if (incomingTranslations[messageId] || translatingMessageIds.has(messageId)) return
     setTranslatingMessageIds(prev => new Set(prev).add(messageId))
-    const translation = await translateIncoming(messageBody)
+    // Translate to agent's preferred language
+    const translation = await translateIncoming(messageBody, agentLanguage)
     if (translation) setIncomingTranslations(prev => ({ ...prev, [messageId]: translation }))
     setTranslatingMessageIds(prev => { const s = new Set(prev); s.delete(messageId); return s })
   }
@@ -821,7 +835,7 @@ export default function WhatsAppInboxPage() {
     if (translationEnabled && messages.length > 0) {
       messages.forEach(msg => { if (msg.direction === 'inbound' && !incomingTranslations[msg.id]) handleTranslateMessage(msg.id, msg.message_body) })
     }
-  }, [translationEnabled, messages])
+  }, [translationEnabled, messages, agentLanguage])
   useEffect(() => {
     const interval = setInterval(() => {
       fetchConversations(false)
@@ -1024,7 +1038,7 @@ export default function WhatsAppInboxPage() {
                           {isInbound && translationEnabled && (
                             <div className="flex items-center gap-2 mb-1 pb-1 border-b border-gray-200">
                               {isTranslatingThis ? <span className="flex items-center gap-1 text-xs text-blue-500"><Loader2 className="w-3 h-3 animate-spin" />Translating...</span>
-                                : hasTranslation ? <button onClick={() => setShowOriginalMap(p => ({ ...p, [msg.id]: !p[msg.id] }))} className="text-xs text-blue-600 hover:text-blue-700">{showOriginal ? '🇬🇧 Show English' : '🌐 Show Original'}</button>
+                                : hasTranslation ? <button type="button" onClick={() => setShowOriginalMap(p => ({ ...p, [msg.id]: !p[msg.id] }))} className="text-xs text-blue-600 hover:text-blue-700">{showOriginal ? `${getLanguageInfo(agentLanguage).flag} Show ${getLanguageInfo(agentLanguage).name}` : '🌐 Show Original'}</button>
                                 : <button onClick={() => handleTranslateMessage(msg.id, msg.message_body)} className="text-xs text-blue-600 hover:text-blue-700">🌐 Translate</button>}
                             </div>
                           )}
@@ -1045,26 +1059,46 @@ export default function WhatsAppInboxPage() {
 
             {/* Translation Controls */}
             <div className="px-4 py-2 bg-gray-50 border-t border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button onClick={() => { setTranslationEnabled(!translationEnabled); setTranslatedMessage('') }} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${translationEnabled ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'}`}>
                     <Languages className="w-4 h-4" />{translationEnabled ? 'Translation ON' : 'Translate'}
                   </button>
                   {translationEnabled && (
-                    <div className="relative">
-                      <button onClick={() => setShowLanguageSelector(!showLanguageSelector)} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
-                        <span>{getLanguageInfo(customerLanguage).flag}</span><span>{getLanguageInfo(customerLanguage).name}</span><ChevronDown className="w-4 h-4 text-gray-400" />
-                      </button>
-                      {showLanguageSelector && (
-                        <div className="absolute bottom-full left-0 mb-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                          {QUICK_LANGUAGES.filter(l => l.code !== 'en').map(lang => (
-                            <button key={lang.code} onClick={() => { setCustomerLanguage(lang.code); setShowLanguageSelector(false); setTranslatedMessage('') }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${customerLanguage === lang.code ? 'bg-blue-50 text-blue-700' : ''}`}>
-                              <span>{lang.flag}</span><span>{lang.name}</span>{customerLanguage === lang.code && <Check className="w-4 h-4 ml-auto" />}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <>
+                      {/* Outgoing: Send to customer in this language */}
+                      <div className="relative">
+                        <div className="text-[10px] text-gray-400 mb-0.5">Send in:</div>
+                        <button onClick={() => { setShowLanguageSelector(!showLanguageSelector); setShowAgentLanguageSelector(false) }} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+                          <span>{getLanguageInfo(customerLanguage).flag}</span><span>{getLanguageInfo(customerLanguage).name}</span><ChevronDown className="w-4 h-4 text-gray-400" />
+                        </button>
+                        {showLanguageSelector && (
+                          <div className="absolute bottom-full left-0 mb-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                            {SUPPORTED_LANGUAGES.map(lang => (
+                              <button key={lang.code} onClick={() => { setCustomerLanguage(lang.code); setShowLanguageSelector(false); setTranslatedMessage('') }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${customerLanguage === lang.code ? 'bg-blue-50 text-blue-700' : ''}`}>
+                                <span>{lang.flag}</span><span>{lang.name}</span>{customerLanguage === lang.code && <Check className="w-4 h-4 ml-auto" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Incoming: Read messages in this language */}
+                      <div className="relative">
+                        <div className="text-[10px] text-gray-400 mb-0.5">Read in:</div>
+                        <button onClick={() => { setShowAgentLanguageSelector(!showAgentLanguageSelector); setShowLanguageSelector(false) }} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-green-300 rounded-lg text-sm hover:bg-gray-50">
+                          <span>{getLanguageInfo(agentLanguage).flag}</span><span>{getLanguageInfo(agentLanguage).name}</span><ChevronDown className="w-4 h-4 text-gray-400" />
+                        </button>
+                        {showAgentLanguageSelector && (
+                          <div className="absolute bottom-full left-0 mb-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                            {SUPPORTED_LANGUAGES.map(lang => (
+                              <button key={lang.code} onClick={() => { setAgentLanguage(lang.code); setShowAgentLanguageSelector(false); setIncomingTranslations({}) }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${agentLanguage === lang.code ? 'bg-green-50 text-green-700' : ''}`}>
+                                <span>{lang.flag}</span><span>{lang.name}</span>{agentLanguage === lang.code && <Check className="w-4 h-4 ml-auto" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
                 {translationEnabled && newMessage && (
@@ -1086,7 +1120,7 @@ export default function WhatsAppInboxPage() {
             {/* Message Input */}
             <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
               <div className="flex items-center gap-3">
-                <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder={translationEnabled ? `Type in English → sends in ${getLanguageInfo(customerLanguage).name}` : "Type a message..."} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#25D366]" />
+                <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder={translationEnabled ? `Type any language → sends in ${getLanguageInfo(customerLanguage).name}` : "Type a message..."} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-[#25D366]" />
                 <button type="submit" disabled={!newMessage.trim() || sending || (translationEnabled && isTranslating)} className="p-2.5 bg-[#25D366] text-white rounded-full hover:bg-[#20bd5a] disabled:opacity-50">
                   {sending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send className="w-5 h-5" />}
                 </button>

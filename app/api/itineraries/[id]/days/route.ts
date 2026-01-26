@@ -1,18 +1,27 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params  // ← ADD THIS LINE
-    
-    // Fetch all days for this itinerary
+    // Use authenticated client - RLS will filter by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
+    const { id } = await params
+
+    // Fetch all days for this itinerary - RLS ensures tenant isolation
     const { data: days, error: daysError } = await supabase
       .from('itinerary_days')
       .select('*')

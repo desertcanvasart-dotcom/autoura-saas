@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 interface AgingBucket {
   current: number
@@ -28,12 +23,23 @@ interface ClientReceivable {
 
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const searchParams = request.nextUrl.searchParams
     const clientId = searchParams.get('clientId')
     const agingFilter = searchParams.get('aging') // current, 30, 60, 90
 
     // Fetch all unpaid/partially paid invoices
-    let query = supabaseAdmin
+    // RLS automatically filters by tenant_id
+    let query = supabase
       .from('invoices')
       .select('*')
       .gt('balance_due', 0)

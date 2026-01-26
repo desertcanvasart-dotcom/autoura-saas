@@ -2,20 +2,27 @@
 // Location: /app/api/tours/save/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const { tour, pax, is_euro_passport, pricing } = await request.json()
 
     // 1. Save main tour
     const { data: tourData, error: tourError } = await supabase
       .from('tours')
       .insert({
+        tenant_id, // ✅ Explicit tenant_id
         tour_code: tour.tour_code,
         tour_name: tour.tour_name,
         duration_days: tour.duration_days,
@@ -41,6 +48,7 @@ export async function POST(request: NextRequest) {
     // 2. Save tour days
     if (tour.days && tour.days.length > 0) {
       const daysToInsert = tour.days.map((day: any) => ({
+        tenant_id, // ✅ Explicit tenant_id
         tour_id: savedTourId,
         day_number: day.day_number,
         city: day.city,
@@ -75,6 +83,7 @@ export async function POST(request: NextRequest) {
 
         if (day.activities && day.activities.length > 0) {
           const activitiesToInsert = day.activities.map((activity: any) => ({
+            tenant_id, // ✅ Explicit tenant_id
             tour_day_id: savedDay.id,
             activity_order: activity.activity_order,
             entrance_id: activity.entrance?.id || null,
@@ -96,6 +105,7 @@ export async function POST(request: NextRequest) {
     // 4. Save pricing if provided
     if (pricing) {
       await supabase.from('tour_pricing').insert({
+        tenant_id, // ✅ Explicit tenant_id
         tour_id: savedTourId,
         pax: pax,
         is_euro_passport: is_euro_passport,

@@ -3,10 +3,10 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/app/supabase'
-import { 
-  User, 
-  Mail, 
-  Bell, 
+import {
+  User,
+  Mail,
+  Bell,
   CreditCard,
   Settings,
   Save,
@@ -28,7 +28,9 @@ import {
   Send,
   Crown,
   Calculator,
-  Info
+  Info,
+  RefreshCw,
+  Wifi
 } from 'lucide-react'
 
 // ============================================
@@ -71,6 +73,17 @@ interface UserPreferences {
   default_tier: string
   default_margin_percent: number
   default_currency: string
+}
+
+interface ExchangeRate {
+  id?: string
+  base_currency: string
+  target_currency: string
+  rate: number
+  source?: 'api' | 'manual'
+  is_system_rate?: boolean
+  is_override?: boolean
+  api_fetched_at?: string
 }
 
 // ============================================
@@ -150,6 +163,14 @@ function SettingsContent() {
     default_margin_percent: 25,
     default_currency: 'EUR'
   })
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([
+    { base_currency: 'EUR', target_currency: 'USD', rate: 1.08 },
+    { base_currency: 'EUR', target_currency: 'GBP', rate: 0.86 },
+    { base_currency: 'EUR', target_currency: 'EGP', rate: 53.50 }
+  ])
+  const [savingRates, setSavingRates] = useState(false)
+  const [refreshingRates, setRefreshingRates] = useState(false)
+  const [lastApiFetch, setLastApiFetch] = useState<string | null>(null)
 
   // Update URL when tab changes
   const handleTabChange = (tabId: string) => {
@@ -230,9 +251,93 @@ function SettingsContent() {
           default_currency: data.default_currency || 'EUR'
         })
       }
+      // Also fetch exchange rates when loading preferences
+      await fetchExchangeRates()
     } catch (error) {
       console.error('Error fetching preferences:', error)
     }
+  }
+
+  const fetchExchangeRates = async () => {
+    try {
+      const response = await fetch('/api/exchange-rates')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.data && data.data.length > 0) {
+          // Filter to only show EUR-based rates for simplicity
+          const eurRates = data.data.filter((r: ExchangeRate) => r.base_currency === 'EUR')
+          if (eurRates.length > 0) {
+            setExchangeRates(eurRates)
+          }
+          // Set last API fetch time
+          if (data.lastApiFetch) {
+            setLastApiFetch(data.lastApiFetch)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching exchange rates:', error)
+    }
+  }
+
+  const refreshExchangeRates = async () => {
+    setRefreshingRates(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/exchange-rates/refresh', {
+        method: 'POST'
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Fetch the updated rates
+        await fetchExchangeRates()
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 2000)
+      } else {
+        setError(data.error || 'Failed to refresh rates')
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to refresh rates from API')
+    } finally {
+      setRefreshingRates(false)
+    }
+  }
+
+  const saveExchangeRates = async () => {
+    setSavingRates(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/exchange-rates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rates: exchangeRates })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setSaveSuccess(true)
+        setTimeout(() => setSaveSuccess(false), 2000)
+      } else {
+        setError(data.error || 'Failed to save exchange rates')
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to save exchange rates')
+    } finally {
+      setSavingRates(false)
+    }
+  }
+
+  const updateExchangeRate = (targetCurrency: string, newRate: number) => {
+    setExchangeRates(prev =>
+      prev.map(r =>
+        r.target_currency === targetCurrency ? { ...r, rate: newRate } : r
+      )
+    )
   }
 
   const fetchNotificationPrefs = async () => {
@@ -912,7 +1017,7 @@ function SettingsContent() {
           {['EUR', 'USD', 'GBP', 'EGP'].map((currency) => {
             const isSelected = userPreferences.default_currency === currency
             const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-            
+
             return (
               <button
                 key={currency}
@@ -927,6 +1032,94 @@ function SettingsContent() {
               </button>
             )
           })}
+        </div>
+      </div>
+
+      {/* Exchange Rates */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📊</span>
+            <h4 className="text-sm font-bold text-gray-900">Exchange Rates</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            {lastApiFetch && (
+              <span className="text-xs text-gray-400 flex items-center gap-1">
+                <Wifi className="w-3 h-3" />
+                Updated {new Date(lastApiFetch).toLocaleDateString()}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={refreshExchangeRates}
+              disabled={refreshingRates}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-[#647C47] bg-[#647C47]/10 rounded-lg hover:bg-[#647C47]/20 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${refreshingRates ? 'animate-spin' : ''}`} />
+              {refreshingRates ? 'Refreshing...' : 'Refresh from API'}
+            </button>
+          </div>
+        </div>
+
+        <p className="text-xs text-gray-600 mb-4">
+          Rates are fetched automatically from ExchangeRate-API. You can override with custom rates below.
+        </p>
+
+        <div className="space-y-3">
+          {exchangeRates.map((rate) => {
+            const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
+            const names: Record<string, string> = {
+              EUR: 'Euro',
+              USD: 'US Dollar',
+              GBP: 'British Pound',
+              EGP: 'Egyptian Pound'
+            }
+            const isApiRate = rate.is_system_rate && !rate.is_override
+
+            return (
+              <div key={rate.target_currency} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-100">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-medium">{symbols[rate.target_currency]}</span>
+                    <span className="text-sm font-medium text-gray-900">{rate.target_currency}</span>
+                    <span className="text-xs text-gray-400">({names[rate.target_currency]})</span>
+                    {isApiRate ? (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">API</span>
+                    ) : rate.is_override ? (
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded font-medium">Custom</span>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">1 EUR = {rate.rate.toFixed(4)} {rate.target_currency}</p>
+                </div>
+                <div className="w-32">
+                  <input
+                    type="number"
+                    value={rate.rate}
+                    onChange={(e) => updateExchangeRate(rate.target_currency, parseFloat(e.target.value) || 0)}
+                    step="0.0001"
+                    min="0"
+                    aria-label={`Exchange rate for ${rate.target_currency}`}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] text-right"
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-xs text-gray-400">
+            Edit rates above to create custom overrides
+          </p>
+          <button
+            type="button"
+            onClick={saveExchangeRates}
+            disabled={savingRates}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+          >
+            {savingRates ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+            {savingRates ? 'Saving...' : 'Save Custom Rates'}
+          </button>
         </div>
       </div>
 

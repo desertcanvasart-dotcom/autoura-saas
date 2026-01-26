@@ -517,7 +517,7 @@ export default function SuppliersContent() {
       { name: 'Address', key: 'address', type: 'textarea' },
       { name: 'Website', key: 'website', type: 'url' },
       { name: 'Commission %', key: 'default_commission_rate', type: 'number' },
-      { name: 'Payment Terms', key: 'payment_terms', type: 'select', options: ['prepaid', 'net_15', 'net_30', 'net_60'] },
+      { name: 'Payment Terms', key: 'payment_terms', type: 'select', options: ['prepaid', 'cash_only', 'voucher'] },
       { name: 'Status', key: 'status', type: 'select', options: ['active', 'inactive', 'pending'] },
     ]
 
@@ -527,22 +527,15 @@ export default function SuppliersContent() {
         { name: 'Property Type', key: 'property_type', type: 'select', options: ['Hotel', 'Resort', 'Boutique Hotel', 'Guest House', 'Camp'] },
         { name: 'Star Rating', key: 'star_rating', type: 'select', options: ['1', '2', '3', '4', '5'] },
       ],
-      transport_company: [
-        { name: 'Vehicle Types', key: 'vehicle_types', type: 'multiselect', options: VEHICLE_TYPES },
-      ],
+      transport_company: [],
       guide: [
         { name: 'Languages', key: 'languages', type: 'multiselect', options: LANGUAGES },
       ],
       cruise: [
         { name: 'Ship Name', key: 'ship_name', type: 'text' },
-        { name: 'Star Rating', key: 'star_rating', type: 'select', options: ['3', '4', '5', '5-Star Deluxe'] },
-        { name: 'Routes', key: 'routes', type: 'multiselect', options: CRUISE_ROUTES },
-        { name: 'Cabin Count', key: 'cabin_count', type: 'number' },
+        { name: 'Star Rating', key: 'star_rating', type: 'select', options: ['5 Star Standard', '5 Star Superior', '5 Star Deluxe', '5 Star Luxury'] },
       ],
-      restaurant: [
-        { name: 'Cuisine Types', key: 'cuisine_types', type: 'multiselect', options: CUISINE_TYPES },
-        { name: 'Capacity', key: 'capacity', type: 'number' },
-      ],
+      restaurant: [],
     }
 
     const extraFields = typeFields[type] || []

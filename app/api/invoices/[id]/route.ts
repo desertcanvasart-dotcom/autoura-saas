@@ -1,10 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+// app/api/invoices/[id]/route.ts
+// ============================================
+// AUTOURA - SINGLE INVOICE API
+// ============================================
+// Get/Update/Delete individual invoice
+// Multi-tenancy: RLS enforces tenant isolation
+// Security: Requires authentication
+// ============================================
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 export async function GET(
   request: NextRequest,
@@ -12,21 +16,32 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
 
-    const { data, error } = await supabaseAdmin
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
+    const { data, error } = await supabase
       .from('invoices')
       .select('*')
       .eq('id', id)
       .single()
 
     if (error) {
-      console.error('Error fetching invoice:', error)
+      console.error('❌ Error fetching invoice:', error)
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error in invoice GET:', error)
+    console.error('❌ Error in invoice GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -38,6 +53,8 @@ export async function PUT(
   try {
     const { id } = await params
     const body = await request.json()
+    // Use authenticated client - RLS enforces tenant boundaries
+    const supabase = await createAuthenticatedClient()
 
     // Build update object with only provided fields
     const updateData: Record<string, any> = {
@@ -61,18 +78,18 @@ export async function PUT(
 
     // If total_amount is updated, recalculate balance_due
     if (updateData.total_amount !== undefined) {
-      const { data: currentInvoice } = await supabaseAdmin
+      const { data: currentInvoice } = await supabase
         .from('invoices')
         .select('amount_paid')
         .eq('id', id)
         .single()
-      
+
       if (currentInvoice) {
         updateData.balance_due = updateData.total_amount - (currentInvoice.amount_paid || 0)
       }
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('invoices')
       .update(updateData)
       .eq('id', id)
@@ -80,13 +97,13 @@ export async function PUT(
       .single()
 
     if (error) {
-      console.error('Error updating invoice:', error)
+      console.error('❌ Error updating invoice:', error)
       return NextResponse.json({ error: 'Failed to update invoice' }, { status: 500 })
     }
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Error in invoice PUT:', error)
+    console.error('❌ Error in invoice PUT:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -97,27 +114,36 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    // Use authenticated client - RLS policies enforce tenant isolation + manager role
+    const supabase = await createAuthenticatedClient()
 
-    // First delete related payments
-    await supabaseAdmin
+    // First delete related payments (RLS will filter to tenant's payments only)
+    await supabase
       .from('invoice_payments')
       .delete()
       .eq('invoice_id', id)
 
-    // Then delete the invoice
-    const { error } = await supabaseAdmin
+    // Then delete the invoice (RLS will filter to tenant's invoices only)
+    const { error } = await supabase
       .from('invoices')
       .delete()
       .eq('id', id)
 
     if (error) {
-      console.error('Error deleting invoice:', error)
+      console.error('❌ Error deleting invoice:', error)
+      // RLS will return a generic error if permission denied
+      if (error.code === 'PGRST116' || error.message.includes('permission')) {
+        return NextResponse.json(
+          { error: 'Invoice not found or you do not have permission to delete it' },
+          { status: 403 }
+        )
+      }
       return NextResponse.json({ error: 'Failed to delete invoice' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error in invoice DELETE:', error)
+    console.error('❌ Error in invoice DELETE:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

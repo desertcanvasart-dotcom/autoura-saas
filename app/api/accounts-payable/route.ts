@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 interface AgingBucket {
   current: number
@@ -27,6 +22,16 @@ interface SupplierPayable {
 
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const searchParams = request.nextUrl.searchParams
     const supplierName = searchParams.get('supplierName')
     const supplierType = searchParams.get('supplierType')
@@ -34,7 +39,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') // pending, approved, paid
 
     // Fetch all unpaid expenses (pending or approved but not paid)
-    let query = supabaseAdmin
+    // RLS automatically filters by tenant_id
+    let query = supabase
       .from('expenses')
       .select('*')
       .in('status', ['pending', 'approved'])
@@ -149,7 +155,8 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.total_outstanding - a.total_outstanding)
 
     // Fetch paid expenses for payment history
-    const { data: paidExpenses } = await supabaseAdmin
+    // RLS automatically filters by tenant_id
+    const { data: paidExpenses } = await supabase
       .from('expenses')
       .select('*')
       .eq('status', 'paid')

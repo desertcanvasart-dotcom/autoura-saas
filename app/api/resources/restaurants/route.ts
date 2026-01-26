@@ -1,66 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Not authenticated' },
+        { status: 401 }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
-    const supplierId = searchParams.get('supplier_id')
     const city = searchParams.get('city')
     const cuisineType = searchParams.get('cuisine_type')
-    const mealType = searchParams.get('meal_type')
+    const tier = searchParams.get('tier')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = supabaseAdmin
-      .from('meal_rates')
-      .select(`
-        *,
-        supplier:supplier_id (id, name, city, contact_phone, contact_email, cuisine_types)
-      `)
-      .order('restaurant_name')
-      .order('meal_type')
+    // Query restaurant_contacts (correct table) - RLS filters by tenant
+    let query = supabase
+      .from('restaurant_contacts')
+      .select('*')
+      .order('name')
 
-    if (supplierId) query = query.eq('supplier_id', supplierId)
-    if (city) query = query.eq('restaurant_city', city)
+    if (city) query = query.eq('city', city)
     if (cuisineType) query = query.eq('cuisine_type', cuisineType)
-    if (mealType) query = query.eq('meal_type', mealType)
+    if (tier) query = query.eq('tier', tier)
     if (activeOnly) query = query.eq('is_active', true)
 
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      console.error('Error fetching restaurants:', error)
+      throw error
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('Error fetching meal rates:', error)
+    console.error('Error fetching restaurants:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-
-    const newRate = {
-      ...body,
-      supplier_id: body.supplier_id || null
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
     }
 
-    const { data, error } = await supabaseAdmin
-      .from('meal_rates')
-      .insert([newRate])
-      .select(`*, supplier:supplier_id (id, name, city)`)
+    const { supabase } = authResult
+    const body = await request.json()
+
+    // Don't allow tenant_id to be set manually (auto-populate trigger handles it)
+    delete body.tenant_id
+
+    // Insert into restaurant_contacts (correct table) - RLS + trigger handles tenant_id
+    const { data, error } = await supabase
+      .from('restaurant_contacts')
+      .insert([body])
+      .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('Error creating restaurant:', error)
+      throw error
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
-    console.error('Error creating meal rate:', error)
+    console.error('Error creating restaurant:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
 }

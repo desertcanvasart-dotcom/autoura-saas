@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 interface TripPnL {
   itinerary_id: string
@@ -30,14 +25,24 @@ interface TripPnL {
 
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const searchParams = request.nextUrl.searchParams
     const itineraryId = searchParams.get('itineraryId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const status = searchParams.get('status')
 
-    // Fetch itineraries
-    let itineraryQuery = supabaseAdmin
+    // Fetch itineraries (RLS automatically filters by tenant_id)
+    let itineraryQuery = supabase
       .from('itineraries')
       .select('id, itinerary_code, trip_name, client_name, start_date, end_date, status, currency, total_cost')
       .order('start_date', { ascending: false })
@@ -69,8 +74,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([])
     }
 
-    // Fetch all invoices
-    const { data: invoices, error: invError } = await supabaseAdmin
+    // Fetch all invoices (RLS automatically filters by tenant_id)
+    const { data: invoices, error: invError } = await supabase
       .from('invoices')
       .select('itinerary_id, total_amount, amount_paid, status')
 
@@ -78,8 +83,8 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching invoices:', invError)
     }
 
-    // Fetch all expenses
-    const { data: expenses, error: expError } = await supabaseAdmin
+    // Fetch all expenses (RLS automatically filters by tenant_id)
+    const { data: expenses, error: expError } = await supabase
       .from('expenses')
       .select('itinerary_id, amount, category, status')
 

@@ -21,8 +21,7 @@ interface Followup {
   created_at: string
   client: {
     client_code: string
-    first_name: string
-    last_name: string
+    full_name: string
     email: string
     phone: string
   }
@@ -49,8 +48,7 @@ export default function FollowupDashboard() {
           *,
           client:clients!client_id (
             client_code,
-            first_name,
-            last_name,
+            full_name,
             email,
             phone
           )
@@ -424,7 +422,7 @@ export default function FollowupDashboard() {
                           href={`/clients/${followup.client_id}`}
                           className="text-base font-bold text-gray-900 hover:text-primary-600"
                           >
-                            {followup.client?.first_name || 'Unknown'} {followup.client?.last_name || 'Client'}
+                            {followup.client?.full_name || 'Unknown Client'}
                           </Link>
                           <span className="text-xs text-gray-500">
                             {followup.client?.client_code || 'No client linked'}

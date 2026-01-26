@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('guide_rates')
       .select('*')
       .eq('id', id)
@@ -36,6 +41,16 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const { id } = await params
     const body = await request.json()
 
@@ -55,7 +70,7 @@ export async function PUT(
     if (body.notes !== undefined) updateData.notes = body.notes || null
     if (body.is_active !== undefined) updateData.is_active = body.is_active
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('guide_rates')
       .update(updateData)
       .eq('id', id)
@@ -79,9 +94,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ SECURITY: Require authentication - protects pricing data
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase } = authResult
+
     const { id } = await params
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('guide_rates')
       .delete()
       .eq('id', id)

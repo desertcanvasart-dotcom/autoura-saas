@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // Email service - adjust based on your setup (Resend, SendGrid, etc.)
 // This example uses a generic sendEmail function - replace with your actual implementation
@@ -250,13 +250,23 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
 // GET: Fetch invoices due for reminders (preview)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Authenticate user
+    const supabase = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const preview = searchParams.get('preview') === 'true'
 
-    // Get invoices that need reminders
+    // Get invoices that need reminders - RLS automatically filters by tenant
     const today = new Date().toISOString().split('T')[0]
-    
+
     const { data: invoices, error } = await supabase
       .from('invoices')
       .select('*')
@@ -316,11 +326,21 @@ export async function GET(request: NextRequest) {
 // POST: Process and send reminders
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Authenticate user and get Supabase client
+    const authResult = await requireAuth()
+
+    if (authResult.error) {
+      return NextResponse.json({
+        success: false,
+        error: authResult.error
+      }, { status: authResult.status })
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
     const { invoiceIds, sendAll = false } = body
 
-    // Get invoices to process
+    // Get invoices to process - RLS automatically filters by tenant
     let query = supabase
       .from('invoices')
       .select('*')

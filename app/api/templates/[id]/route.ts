@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - Get single template
 export async function GET(
@@ -14,7 +9,10 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabase
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
+    const { data, error} = await supabase
       .from('message_templates')
       .select('*')
       .eq('id', id)
@@ -38,24 +36,51 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
+
+    // Require authentication - RLS will enforce tenant boundaries
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
-    const { name, description, category, subcategory, channel, subject, body: templateBody } = body
+    const { name, description, category, subcategory, channel, subject, body: templateBody, language } = body
 
     // Extract placeholders from body
     const placeholderMatches = templateBody?.match(/\{\{[^}]+\}\}/g) || []
     const placeholders = [...new Set(placeholderMatches)]
 
-    const updateData: any = { updated_at: new Date().toISOString() }
+    // First get current version
+    const { data: currentTemplate } = await supabase
+      .from('message_templates')
+      .select('version')
+      .eq('id', id)
+      .single()
+
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+      version: (currentTemplate?.version || 0) + 1, // Increment version
+      last_modified_by: authResult.user_id
+    }
     if (name !== undefined) updateData.name = name
     if (description !== undefined) updateData.description = description
     if (category !== undefined) updateData.category = category
     if (subcategory !== undefined) updateData.subcategory = subcategory
     if (channel !== undefined) updateData.channel = channel
     if (subject !== undefined) updateData.subject = subject
+    if (language !== undefined) updateData.language = language
     if (templateBody !== undefined) {
       updateData.body = templateBody
       updateData.placeholders = placeholders
     }
+
+    // Do NOT include tenant_id or parent_template_id in update (prevents switching)
+    delete updateData.tenant_id
+    delete updateData.parent_template_id
 
     const { data, error } = await supabase
       .from('message_templates')
@@ -83,6 +108,17 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+
+    // Require authentication - RLS policies enforce manager role
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
 
     const { error } = await supabase
       .from('message_templates')

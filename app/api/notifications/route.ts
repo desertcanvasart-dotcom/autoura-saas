@@ -33,7 +33,18 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await query
 
-    if (error) throw error
+    if (error) {
+      // If table doesn't exist, return empty results
+      if (error.message?.includes('Could not find the table')) {
+        console.log('Notifications table does not exist yet, returning empty results')
+        return NextResponse.json({
+          success: true,
+          data: [],
+          unreadCount: 0
+        })
+      }
+      throw error
+    }
 
     // Also get unread count
     let countQuery = supabase
@@ -52,8 +63,16 @@ export async function GET(request: NextRequest) {
       data,
       unreadCount: unreadCount || 0
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching notifications:', error)
+    // If table doesn't exist, return empty results instead of error
+    if (error.message?.includes('Could not find the table')) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        unreadCount: 0
+      })
+    }
     return NextResponse.json(
       { success: false, error: 'Failed to fetch notifications' },
       { status: 500 }

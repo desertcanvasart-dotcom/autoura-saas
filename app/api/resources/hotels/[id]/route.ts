@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Authenticate user
+    const supabase = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    // Query with RLS - automatically filters by tenant
+    const { data, error } = await supabase
       .from('accommodation_rates')
       .select(`
         *,
@@ -36,8 +43,22 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Authenticate user and get Supabase client
+    const authResult = await requireAuth()
+
+    if (authResult.error) {
+      return NextResponse.json({
+        success: false,
+        error: authResult.error
+      }, { status: authResult.status })
+    }
+
+    const { supabase } = authResult
     const { id } = await params
     const body = await request.json()
+
+    // Prevent manual tenant_id changes
+    delete body.tenant_id
 
     const updateData: any = {
       updated_at: new Date().toISOString()
@@ -99,7 +120,8 @@ export async function PUT(
     if (body.notes !== undefined) updateData.notes = body.notes || null
     if (body.is_active !== undefined) updateData.is_active = body.is_active
 
-    const { data, error } = await supabaseAdmin
+    // Update with RLS - automatically scoped to tenant
+    const { data, error } = await supabase
       .from('accommodation_rates')
       .update(updateData)
       .eq('id', id)
@@ -120,9 +142,21 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Authenticate user and get Supabase client
+    const authResult = await requireAuth()
+
+    if (authResult.error) {
+      return NextResponse.json({
+        success: false,
+        error: authResult.error
+      }, { status: authResult.status })
+    }
+
+    const { supabase } = authResult
     const { id } = await params
 
-    const { error } = await supabaseAdmin
+    // Delete with RLS - automatically scoped to tenant
+    const { error } = await supabase
       .from('accommodation_rates')
       .delete()
       .eq('id', id)

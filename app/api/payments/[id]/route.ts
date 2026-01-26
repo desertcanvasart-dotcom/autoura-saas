@@ -1,5 +1,14 @@
+// app/api/payments/[id]/route.ts
+// ============================================
+// AUTOURA - SINGLE PAYMENT API
+// ============================================
+// Get/Update/Delete individual payment
+// Multi-tenancy: RLS enforces tenant isolation
+// Security: Requires authentication
+// ============================================
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 export async function GET(
   request: NextRequest,
@@ -7,7 +16,17 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const supabase = createClient()
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
 
     const { data: payment, error } = await supabase
       .from('payments')
@@ -36,7 +55,7 @@ export async function GET(
       data: formattedPayment
     })
   } catch (error: any) {
-    console.error('GET payment error:', error)
+    console.error('❌ GET payment error:', error)
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -50,7 +69,8 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const supabase = createClient()
+    // Use authenticated client - RLS enforces tenant boundaries
+    const supabase = await createAuthenticatedClient()
     const body = await request.json()
 
     console.log('Updating payment:', id, body)
@@ -63,7 +83,7 @@ export async function PUT(
       .single()
 
     if (error) {
-      console.error('Supabase update error:', error)
+      console.error('❌ Supabase update error:', error)
       throw error
     }
 
@@ -72,7 +92,7 @@ export async function PUT(
       data
     })
   } catch (error: any) {
-    console.error('PUT payment error:', error)
+    console.error('❌ PUT payment error:', error)
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
@@ -86,20 +106,31 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const supabase = createClient()
+    // Use authenticated client - RLS policies enforce tenant isolation + manager role
+    const supabase = await createAuthenticatedClient()
 
     const { error } = await supabase
       .from('payments')
       .delete()
       .eq('id', id)
 
-    if (error) throw error
+    if (error) {
+      console.error('❌ Delete error:', error)
+      // RLS will return a generic error if permission denied
+      if (error.code === 'PGRST116' || error.message.includes('permission')) {
+        return NextResponse.json(
+          { success: false, error: 'Payment not found or you do not have permission to delete it' },
+          { status: 403 }
+        )
+      }
+      throw error
+    }
 
     return NextResponse.json({
       success: true
     })
   } catch (error: any) {
-    console.error('DELETE payment error:', error)
+    console.error('❌ DELETE payment error:', error)
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }

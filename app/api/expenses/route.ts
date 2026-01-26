@@ -1,13 +1,35 @@
+// app/api/expenses/route.ts
+// ============================================
+// AUTOURA - EXPENSES API
+// ============================================
+// Manages business expenses
+// Multi-tenancy: Enforces tenant isolation via RLS
+// Security: Requires authentication for all operations
+// ============================================
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
+/**
+ * GET /api/expenses
+ * List expenses for authenticated user's tenant
+ * Query params: status, category, supplierType, itineraryId, startDate, endDate
+ * RLS policies automatically filter by tenant_id
+ */
 export async function GET(request: NextRequest) {
   try {
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status')
     const category = searchParams.get('category')
@@ -16,7 +38,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    let query = supabaseAdmin
+    let query = supabase
       .from('expenses')
       .select('*')
       .order('expense_date', { ascending: false })
@@ -48,19 +70,34 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching expenses:', error)
+      console.error('❌ Error fetching expenses:', error)
       return NextResponse.json({ error: 'Failed to fetch expenses' }, { status: 500 })
     }
 
     return NextResponse.json(data || [])
   } catch (error) {
-    console.error('Error in expenses GET:', error)
+    console.error('❌ Error in expenses GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
+/**
+ * POST /api/expenses
+ * Create a new expense record
+ * Requires authentication and validates tenant ownership
+ */
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     // Validate required fields
@@ -71,24 +108,48 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // If itinerary_id provided, verify it belongs to this tenant
+    if (body.itinerary_id) {
+      const { data: itinerary, error: itineraryError } = await supabase
+        .from('itineraries')
+        .select('id, tenant_id')
+        .eq('id', body.itinerary_id)
+        .single()
+
+      if (itineraryError || !itinerary) {
+        return NextResponse.json(
+          { error: 'Itinerary not found or access denied' },
+          { status: 404 }
+        )
+      }
+
+      if (itinerary.tenant_id !== tenant_id) {
+        return NextResponse.json(
+          { error: 'Cannot create expense for itinerary from another tenant' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Generate expense number
-    const { data: seqData, error: seqError } = await supabaseAdmin
+    const { data: seqData, error: seqError } = await supabase
       .rpc('nextval', { seq_name: 'expense_number_seq' })
 
     let expenseNumber = `EXP-${new Date().getFullYear()}-001`
-    
+
     if (!seqError && seqData) {
       expenseNumber = `EXP-${new Date().getFullYear()}-${String(seqData).padStart(3, '0')}`
     } else {
-      // Fallback: get count and increment
-      const { count } = await supabaseAdmin
+      // Fallback: count expenses in THIS TENANT only (RLS filters automatically)
+      const { count } = await supabase
         .from('expenses')
         .select('*', { count: 'exact', head: true })
-      
+
       expenseNumber = `EXP-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(3, '0')}`
     }
 
     const newExpense = {
+      tenant_id, // ✅ Explicit tenant_id
       expense_number: expenseNumber,
       itinerary_id: body.itinerary_id || null,
       supplier_id: body.supplier_id || null,
@@ -110,20 +171,20 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('expenses')
       .insert([newExpense])
       .select()
       .single()
 
     if (error) {
-      console.error('Error creating expense:', error)
+      console.error('❌ Error creating expense:', error)
       return NextResponse.json({ error: 'Failed to create expense' }, { status: 500 })
     }
 
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
-    console.error('Error in expenses POST:', error)
+    console.error('❌ Error in expenses POST:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

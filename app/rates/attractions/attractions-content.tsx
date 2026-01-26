@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   Search, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles,
+  Copy, Download, Upload
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
+import { useCurrency } from '@/hooks/useCurrency'
 
 // ============================================
 // CONSTANTS
@@ -183,7 +185,8 @@ function Pagination({
 export default function AttractionsContent() {
   const searchParams = useSearchParams()
   const dialog = useConfirmDialog()
-  
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+
   const [attractions, setAttractions] = useState<Attraction[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -455,6 +458,175 @@ export default function AttractionsContent() {
     }
   }
 
+  // Clone attraction
+  const handleClone = (rate: Attraction) => {
+    setEditingAttraction(null)
+    setFormData({
+      service_code: generateServiceCode(),
+      attraction_name: rate.attraction_name,
+      city: rate.city,
+      fee_type: rate.fee_type || 'standard',
+      eur_rate: rate.eur_rate,
+      non_eur_rate: rate.non_eur_rate,
+      egyptian_rate: rate.egyptian_rate || 0,
+      student_discount_percentage: rate.student_discount_percentage || 0,
+      child_discount_percent: rate.child_discount_percent || 0,
+      season: rate.season || 'all_year',
+      rate_valid_from: rate.rate_valid_from,
+      rate_valid_to: rate.rate_valid_to,
+      category: rate.category || '',
+      notes: rate.notes || '',
+      is_active: rate.is_active,
+      is_addon: rate.is_addon || false,
+      addon_note: rate.addon_note || '',
+      supplier_id: rate.supplier_id || ''
+    })
+    setShowModal(true)
+    showToast('success', 'Attraction duplicated - modify and save as new')
+  }
+
+  // Export to CSV
+  const handleExportCSV = () => {
+    const headers = [
+      'service_code', 'attraction_name', 'city', 'fee_type', 'eur_rate', 'non_eur_rate',
+      'egyptian_rate', 'student_discount_percentage', 'child_discount_percent', 'season',
+      'rate_valid_from', 'rate_valid_to', 'category', 'notes', 'is_active', 'is_addon', 'addon_note', 'supplier_id'
+    ]
+
+    const csvRows = [headers.join(',')]
+
+    filteredAttractions.forEach(rate => {
+      const row = [
+        rate.service_code || '',
+        `"${(rate.attraction_name || '').replace(/"/g, '""')}"`,
+        rate.city || '',
+        rate.fee_type || '',
+        rate.eur_rate || 0,
+        rate.non_eur_rate || 0,
+        rate.egyptian_rate || 0,
+        rate.student_discount_percentage || 0,
+        rate.child_discount_percent || 0,
+        rate.season || '',
+        rate.rate_valid_from || '',
+        rate.rate_valid_to || '',
+        rate.category || '',
+        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        rate.is_active ? 'true' : 'false',
+        rate.is_addon ? 'true' : 'false',
+        `"${(rate.addon_note || '').replace(/"/g, '""')}"`,
+        rate.supplier_id || ''
+      ]
+      csvRows.push(row.join(','))
+    })
+
+    const csvContent = csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `attractions_export_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    showToast('success', `Exported ${filteredAttractions.length} attractions to CSV`)
+  }
+
+  // Import from CSV
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+
+        if (lines.length < 2) {
+          showToast('error', 'CSV file is empty or has no data rows')
+          return
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+        let successCount = 0
+        let errorCount = 0
+
+        for (let i = 1; i < lines.length; i++) {
+          const values: string[] = []
+          let current = ''
+          let inQuotes = false
+
+          for (const char of lines[i]) {
+            if (char === '"') {
+              inQuotes = !inQuotes
+            } else if (char === ',' && !inQuotes) {
+              values.push(current.trim())
+              current = ''
+            } else {
+              current += char
+            }
+          }
+          values.push(current.trim())
+
+          const record: Record<string, string | number | boolean | null> = {}
+          headers.forEach((header, index) => {
+            let value: string | number | boolean | null = values[index] || ''
+
+            // Handle empty dates as null
+            if ((header === 'rate_valid_from' || header === 'rate_valid_to') && !value) {
+              value = null
+            }
+            // Handle numeric fields
+            else if (['eur_rate', 'non_eur_rate', 'egyptian_rate', 'student_discount_percentage', 'child_discount_percent'].includes(header)) {
+              value = parseFloat(value as string) || 0
+            }
+            // Handle boolean fields
+            else if (['is_active', 'is_addon'].includes(header)) {
+              value = value === 'true' || value === '1' || value === 'yes'
+            }
+
+            record[header] = value
+          })
+
+          // Generate service code if not provided
+          if (!record.service_code) {
+            record.service_code = generateServiceCode()
+          }
+
+          // Set default dates if null
+          if (!record.rate_valid_from) {
+            record.rate_valid_from = today
+          }
+          if (!record.rate_valid_to) {
+            record.rate_valid_to = nextYear
+          }
+
+          try {
+            const response = await fetch('/api/rates/attractions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(record)
+            })
+
+            if (response.ok) {
+              successCount++
+            } else {
+              errorCount++
+            }
+          } catch {
+            errorCount++
+          }
+        }
+
+        fetchAttractions()
+        showToast('success', `Imported ${successCount} attractions${errorCount > 0 ? `, ${errorCount} failed` : ''}`)
+      } catch (error) {
+        console.error('Error importing CSV:', error)
+        showToast('error', 'Failed to parse CSV file')
+      }
+    }
+
+    reader.readAsText(file)
+    event.target.value = ''
+  }
+
   // Get supplier name by ID
   const getSupplierName = (supplierId?: string) => {
     if (!supplierId) return null
@@ -558,7 +730,19 @@ export default function AttractionsContent() {
                 <Plus className="w-4 h-4" />
                 Add Attraction
               </button>
-              <Link 
+              <button
+                onClick={handleExportCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 font-medium"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 font-medium cursor-pointer">
+                <Upload className="w-4 h-4" />
+                Import
+                <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+              </label>
+              <Link
                 href="/rates"
                 className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
               >
@@ -629,8 +813,8 @@ export default function AttractionsContent() {
               <span className="text-gray-400 text-xl">💶</span>
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
-            <p className="text-xs text-gray-600">Avg. EUR Rate</p>
-            <p className="text-2xl font-bold text-gray-900">€{avgRate}</p>
+            <p className="text-xs text-gray-600">Avg. {userCurrency} Rate</p>
+            <p className="text-2xl font-bold text-gray-900">{symbol}{convert(parseFloat(avgRate)).toFixed(2)}</p>
           </div>
         </div>
 
@@ -713,8 +897,8 @@ export default function AttractionsContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Supplier</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Category</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-{userCurrency}</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">
                     <span className="flex items-center justify-center gap-1">
                       <Sparkles className="w-3.5 h-3.5 text-orange-500" />
@@ -762,12 +946,12 @@ export default function AttractionsContent() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm font-bold text-green-600">
-                      {attraction.fee_type === 'free' ? 'FREE' : `€${(attraction.eur_rate || 0).toFixed(2)}`}
+                      {attraction.fee_type === 'free' ? 'FREE' : `${symbol}${convert(attraction.eur_rate || 0).toFixed(2)}`}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm font-semibold text-primary-600">
-                      {attraction.fee_type === 'free' ? 'FREE' : `€${(attraction.non_eur_rate || 0).toFixed(2)}`}
+                      {attraction.fee_type === 'free' ? 'FREE' : `${symbol}${convert(attraction.non_eur_rate || 0).toFixed(2)}`}
                       </span>
                     </td>
                     {/* NEW: Add-on toggle column */}
@@ -801,12 +985,21 @@ export default function AttractionsContent() {
                         <button
                           onClick={() => handleEdit(attraction)}
                           className="p-1 text-gray-500 hover:text-amber-600 hover:bg-amber-50 rounded"
+                          title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => handleClone(attraction)}
+                          className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Clone"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleDelete(attraction.id, attraction.attraction_name)}
                           className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -995,11 +1188,11 @@ export default function AttractionsContent() {
 
               {/* Pricing Information */}
               <div className="mb-4">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Pricing</h3>
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Pricing (stored in EUR)</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      EUR Rate (€) *
+                      EUR Passport Rate (€) *
                     </label>
                     <input
                       type="number"
@@ -1016,7 +1209,7 @@ export default function AttractionsContent() {
 
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Non-EUR Rate (€) *
+                      Non-EUR Passport Rate (€) *
                     </label>
                     <input
                       type="number"

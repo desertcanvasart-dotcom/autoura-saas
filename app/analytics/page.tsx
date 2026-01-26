@@ -41,6 +41,18 @@ interface AnalyticsData {
     total: number
     growth: number
     monthlyData: { month: string; revenue: number }[]
+    forecast?: {
+      month: string
+      revenue: number
+      isForecasted: boolean
+      confidenceLow: number
+      confidenceHigh: number
+    }[]
+    forecastSummary?: {
+      nextPeriod: number
+      confidence: number
+      trend: 'up' | 'down' | 'stable'
+    }
   }
   bookings: {
     total: number
@@ -94,7 +106,13 @@ const emptyData: AnalyticsData = {
       { month: 'Week 2', revenue: 0 },
       { month: 'Week 3', revenue: 0 },
       { month: 'Week 4', revenue: 0 }
-    ]
+    ],
+    forecast: [],
+    forecastSummary: {
+      nextPeriod: 0,
+      confidence: 0,
+      trend: 'stable'
+    }
   },
   bookings: {
     total: 0,
@@ -315,6 +333,50 @@ export default function AnalyticsPage() {
                 Create Itinerary
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revenue Forecast Summary Card */}
+      {displayData.revenue.forecastSummary && displayData.revenue.forecastSummary.nextPeriod > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+                <h3 className="text-sm font-semibold text-gray-900">Revenue Forecast</h3>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs text-gray-600">Next Period Projection</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatCurrency(displayData.revenue.forecastSummary.nextPeriod)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <div>
+                    <span className="text-gray-600">Confidence: </span>
+                    <span className="font-semibold text-gray-900">
+                      {displayData.revenue.forecastSummary.confidence}%
+                    </span>
+                  </div>
+                  <div>
+                    <span className={`px-2 py-0.5 rounded-full font-medium ${
+                      displayData.revenue.forecastSummary.trend === 'up'
+                        ? 'bg-green-100 text-green-700'
+                        : displayData.revenue.forecastSummary.trend === 'down'
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-gray-100 text-gray-700'
+                    }`}>
+                      {displayData.revenue.forecastSummary.trend === 'up' && '↗ Upward'}
+                      {displayData.revenue.forecastSummary.trend === 'down' && '↘ Downward'}
+                      {displayData.revenue.forecastSummary.trend === 'stable' && '→ Stable'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <Target className="w-8 h-8 text-blue-400 opacity-50" />
           </div>
         </div>
       )}
@@ -561,42 +623,120 @@ export default function AnalyticsPage() {
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {/* Revenue Trend Chart with Insight */}
+        {/* Revenue Trend Chart with Forecast */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <h3 className="text-base font-semibold text-gray-900 mb-3">Revenue Trend</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-gray-900">Revenue Trend & Forecast</h3>
+            {displayData.revenue.forecastSummary && displayData.revenue.forecastSummary.confidence > 0 && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className={`px-2 py-0.5 rounded-full ${
+                  displayData.revenue.forecastSummary.trend === 'up'
+                    ? 'bg-green-100 text-green-700'
+                    : displayData.revenue.forecastSummary.trend === 'down'
+                    ? 'bg-red-100 text-red-700'
+                    : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {displayData.revenue.forecastSummary.trend === 'up' && '📈 Trending Up'}
+                  {displayData.revenue.forecastSummary.trend === 'down' && '📉 Trending Down'}
+                  {displayData.revenue.forecastSummary.trend === 'stable' && '➡️ Stable'}
+                </span>
+                <span className="text-gray-500">
+                  {displayData.revenue.forecastSummary.confidence}% confidence
+                </span>
+              </div>
+            )}
+          </div>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={displayData.revenue.monthlyData}>
+            <LineChart data={displayData.revenue.forecast || displayData.revenue.monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="month" 
-                stroke="#666" 
+              <XAxis
+                dataKey="month"
+                stroke="#666"
                 style={{ fontSize: '12px' }}
               />
-              <YAxis 
-                stroke="#666" 
+              <YAxis
+                stroke="#666"
                 style={{ fontSize: '12px' }}
                 tickFormatter={(value) => `€${value.toLocaleString()}`}
               />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#fff',
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
                   fontSize: '12px'
                 }}
-                formatter={(value: any) => [formatCurrency(value), 'Revenue']}
+                formatter={(value: any, name: string) => {
+                  if (name === 'confidenceLow' || name === 'confidenceHigh') {
+                    return [formatCurrency(value), name === 'confidenceLow' ? 'Low Estimate' : 'High Estimate']
+                  }
+                  return [formatCurrency(value), 'Revenue']
+                }}
               />
-              <Line 
-                type="monotone" 
-                dataKey="revenue" 
+              {/* Confidence interval area */}
+              {displayData.revenue.forecast && (
+                <>
+                  <defs>
+                    <linearGradient id="confidenceGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={COLORS.revenue} stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor={COLORS.revenue} stopOpacity={0.05}/>
+                    </linearGradient>
+                  </defs>
+                  <Line
+                    type="monotone"
+                    dataKey="confidenceHigh"
+                    stroke={COLORS.revenue}
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    dot={false}
+                    strokeOpacity={0.3}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="confidenceLow"
+                    stroke={COLORS.revenue}
+                    strokeWidth={1}
+                    strokeDasharray="3 3"
+                    dot={false}
+                    strokeOpacity={0.3}
+                  />
+                </>
+              )}
+              <Line
+                type="monotone"
+                dataKey="revenue"
                 stroke={COLORS.revenue}
                 strokeWidth={3}
-                dot={{ fill: COLORS.revenue, r: 4 }}
+                dot={(props: any) => {
+                  const { cx, cy, payload } = props
+                  if (payload.isForecasted) {
+                    return (
+                      <circle
+                        cx={cx}
+                        cy={cy}
+                        r={4}
+                        fill="white"
+                        stroke={COLORS.revenue}
+                        strokeWidth={2}
+                        strokeDasharray="2 2"
+                      />
+                    )
+                  }
+                  return <circle cx={cx} cy={cy} r={4} fill={COLORS.revenue} />
+                }}
+                strokeDasharray={(props: any) => props?.isForecasted ? '5 5' : undefined}
               />
             </LineChart>
           </ResponsiveContainer>
-          <div className="mt-2 p-2 bg-green-50 rounded text-xs text-gray-700">
-            💡 {insights.revenueInsight}
+          <div className="mt-2 space-y-1">
+            <div className="p-2 bg-green-50 rounded text-xs text-gray-700">
+              💡 {insights.revenueInsight}
+            </div>
+            {displayData.revenue.forecastSummary && displayData.revenue.forecastSummary.nextPeriod > 0 && (
+              <div className="p-2 bg-blue-50 rounded text-xs text-gray-700">
+                🔮 Forecasted next period revenue: <span className="font-semibold">{formatCurrency(displayData.revenue.forecastSummary.nextPeriod)}</span>
+              </div>
+            )}
           </div>
         </div>
 

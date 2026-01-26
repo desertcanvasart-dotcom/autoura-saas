@@ -11,6 +11,8 @@ import {
   X,
   Check,
   Download,
+  Upload,
+  Copy,
   MapPin,
   Clock,
   ChevronLeft,
@@ -24,6 +26,7 @@ import {
   XCircle,
   Info
 } from 'lucide-react'
+import { useCurrency } from '@/hooks/useCurrency'
 
 // Egyptian cities with train stations
 const TRAIN_CITIES = [
@@ -92,6 +95,9 @@ export default function TrainRatesContent() {
   // Delete Confirmation Modal
   const [deleteModal, setDeleteModal] = useState<{ show: boolean; id: string; name: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Currency conversion
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
   // Toast/Notification
   const [notification, setNotification] = useState<{ 
@@ -279,6 +285,170 @@ export default function TrainRatesContent() {
     }
   }
 
+  // Clone a rate - copy all fields, clear ID/code, open modal
+  const handleClone = (rate: TrainRate) => {
+    setEditingRate(null)
+    setFormData({
+      service_code: generateServiceCode(),
+      origin_city: rate.origin_city || '',
+      destination_city: rate.destination_city || '',
+      class_type: rate.class_type || '',
+      rate_eur: rate.rate_eur || 0,
+      duration_hours: rate.duration_hours?.toString() || '',
+      rate_valid_from: rate.rate_valid_from || today,
+      rate_valid_to: rate.rate_valid_to || nextYear,
+      operator_name: rate.operator_name || '',
+      departure_times: rate.departure_times || '',
+      description: rate.description || '',
+      notes: rate.notes || '',
+      is_active: rate.is_active
+    })
+    setShowModal(true)
+  }
+
+  // Export filtered rates to CSV
+  const handleExportCSV = () => {
+    if (filteredRates.length === 0) {
+      showNotification('warning', 'No Data', 'No rates to export. Adjust your filters and try again.')
+      return
+    }
+
+    const headers = [
+      'service_code',
+      'origin_city',
+      'destination_city',
+      'class_type',
+      'rate_eur',
+      'duration_hours',
+      'rate_valid_from',
+      'rate_valid_to',
+      'operator_name',
+      'departure_times',
+      'description',
+      'notes',
+      'is_active'
+    ]
+
+    const csvRows = [
+      headers.join(','),
+      ...filteredRates.map(rate => {
+        return headers.map(header => {
+          const value = rate[header as keyof TrainRate]
+          if (value === null || value === undefined) return ''
+          if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+            return `"${value.replace(/"/g, '""')}"`
+          }
+          return value
+        }).join(',')
+      })
+    ]
+
+    const csvContent = csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `train-rates-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    showNotification('success', 'Export Complete', `Exported ${filteredRates.length} train rates to CSV.`)
+  }
+
+  // Import rates from CSV
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string
+        const lines = text.split('\n').filter(line => line.trim())
+
+        if (lines.length < 2) {
+          showNotification('error', 'Invalid File', 'CSV file must have a header row and at least one data row.')
+          return
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+        const requiredFields = ['origin_city', 'destination_city', 'class_type', 'rate_eur']
+        const missingFields = requiredFields.filter(f => !headers.includes(f))
+
+        if (missingFields.length > 0) {
+          showNotification('error', 'Missing Fields', `CSV is missing required fields: ${missingFields.join(', ')}`)
+          return
+        }
+
+        let successCount = 0
+        let errorCount = 0
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''))
+          const record: Record<string, any> = {}
+
+          headers.forEach((header, index) => {
+            record[header] = values[index] || ''
+          })
+
+          // Prepare the data for API
+          const rateData = {
+            service_code: record.service_code || generateServiceCode(),
+            origin_city: record.origin_city,
+            destination_city: record.destination_city,
+            class_type: record.class_type,
+            rate_eur: parseFloat(record.rate_eur) || 0,
+            duration_hours: record.duration_hours ? parseFloat(record.duration_hours) : null,
+            rate_valid_from: record.rate_valid_from || today,
+            rate_valid_to: record.rate_valid_to || nextYear,
+            operator_name: record.operator_name || '',
+            departure_times: record.departure_times || '',
+            description: record.description || '',
+            notes: record.notes || '',
+            is_active: record.is_active === 'false' ? false : true
+          }
+
+          try {
+            const response = await fetch('/api/rates/trains', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(rateData)
+            })
+
+            if (response.ok) {
+              successCount++
+            } else {
+              errorCount++
+            }
+          } catch {
+            errorCount++
+          }
+        }
+
+        // Reset file input
+        event.target.value = ''
+
+        if (successCount > 0) {
+          fetchRates()
+          showNotification(
+            errorCount > 0 ? 'warning' : 'success',
+            'Import Complete',
+            `Successfully imported ${successCount} rates.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`
+          )
+        } else {
+          showNotification('error', 'Import Failed', 'No rates were imported. Please check your CSV format.')
+        }
+      } catch (error) {
+        console.error('Error importing CSV:', error)
+        showNotification('error', 'Import Error', 'Failed to parse CSV file. Please check the format.')
+      }
+    }
+
+    reader.readAsText(file)
+  }
+
   // Filter rates
   const filteredRates = rates.filter(rate => {
     const matchesSearch = searchTerm === '' ||
@@ -431,12 +601,22 @@ export default function TrainRatesContent() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {/* Export CSV */}}
+            onClick={handleExportCSV}
             className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
           >
             <Download className="w-4 h-4" />
             Export
           </button>
+          <label className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer">
+            <Upload className="w-4 h-4" />
+            Import
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleImportCSV}
+              className="hidden"
+            />
+          </label>
           <button
             onClick={handleAddNew}
             className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
@@ -467,10 +647,10 @@ export default function TrainRatesContent() {
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-gray-400 font-bold">€</span>
+            <span className="text-gray-400 font-bold">{symbol}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">€{avgRate}</p>
+          <p className="text-2xl font-bold text-gray-900">{symbol}{convert(Number(avgRate)).toFixed(0)}</p>
           <p className="text-xs text-gray-600">Avg. Rate</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -617,7 +797,7 @@ export default function TrainRatesContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Class</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Duration</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Operator</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Rate</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
                 </tr>
@@ -655,7 +835,7 @@ export default function TrainRatesContent() {
                       <span className="text-sm text-gray-600">{rate.operator_name || '—'}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-bold text-green-600">€{rate.rate_eur}</span>
+                      <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.rate_eur)).toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -669,12 +849,21 @@ export default function TrainRatesContent() {
                         <button
                           onClick={() => handleEdit(rate)}
                           className="p-1.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
+                          title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => handleClone(rate)}
+                          className="p-1.5 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                          title="Clone"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => confirmDelete(rate.id, `${rate.origin_city} → ${rate.destination_city}`)}
                           className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -717,19 +906,28 @@ export default function TrainRatesContent() {
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
-                    <p className="text-xs text-gray-500">Rate</p>
-                    <p className="text-lg font-bold text-green-600">€{rate.rate_eur}</p>
+                    <p className="text-xs text-gray-500">{userCurrency} Rate</p>
+                    <p className="text-lg font-bold text-green-600">{symbol}{convert(Number(rate.rate_eur)).toFixed(2)}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
                       onClick={() => handleEdit(rate)}
                       className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
+                      title="Edit"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
+                      onClick={() => handleClone(rate)}
+                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                      title="Clone"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => confirmDelete(rate.id, `${rate.origin_city} → ${rate.destination_city}`)}
                       className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="Delete"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -755,17 +953,20 @@ export default function TrainRatesContent() {
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-green-600">€{rate.rate_eur}</span>
+                  <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.rate_eur)).toFixed(2)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}>
                     {rate.is_active ? 'Active' : 'Inactive'}
                   </span>
                   <div className="flex gap-1">
-                    <button onClick={() => handleEdit(rate)} className="p-1 text-gray-400 hover:text-primary-600">
+                    <button onClick={() => handleEdit(rate)} className="p-1 text-gray-400 hover:text-primary-600" title="Edit">
                       <Edit className="w-4 h-4" />
                     </button>
-                    <button onClick={() => confirmDelete(rate.id, `${rate.origin_city} → ${rate.destination_city}`)} className="p-1 text-gray-400 hover:text-red-600">
+                    <button onClick={() => handleClone(rate)} className="p-1 text-gray-400 hover:text-emerald-600" title="Clone">
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => confirmDelete(rate.id, `${rate.origin_city} → ${rate.destination_city}`)} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -979,17 +1180,26 @@ export default function TrainRatesContent() {
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Rate (€) *</label>
-                    <input
-                      type="number"
-                      name="rate_eur"
-                      value={formData.rate_eur}
-                      onChange={handleChange}
-                      required
-                      min="0"
-                      step="0.01"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Rate in EUR (base currency) *</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">€</span>
+                      <input
+                        type="number"
+                        name="rate_eur"
+                        value={formData.rate_eur}
+                        onChange={handleChange}
+                        required
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                    {userCurrency !== 'EUR' && formData.rate_eur > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        ≈ {symbol}{convert(Number(formData.rate_eur)).toFixed(2)} {userCurrency}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

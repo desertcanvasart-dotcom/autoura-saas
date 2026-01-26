@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText } from 'lucide-react'
+import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText, XCircle } from 'lucide-react'
+import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 // ============================================
 // B2B TOUR PRICE CALCULATOR PAGE
@@ -69,6 +71,9 @@ interface SavedQuote {
 export default function TourPriceCalculator() {
   const params = useParams()
   const variationId = params?.id as string
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
+  const { tenant, loading: tenantLoading, isManager } = useTenant()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -98,10 +103,19 @@ export default function TourPriceCalculator() {
     notes: ''
   })
 
+  // Authentication check
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
+
   // Fetch partners on mount
   useEffect(() => {
-    fetchPartners()
-  }, [])
+    if (user && tenant) {
+      fetchPartners()
+    }
+  }, [user, tenant])
 
   const fetchPartners = async () => {
     try {
@@ -276,8 +290,49 @@ export default function TourPriceCalculator() {
     return styles[season] || 'bg-gray-100 text-gray-700'
   }
 
+  // Show loading state while checking auth/tenant
+  if (authLoading || tenantLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#647C47]" />
+      </div>
+    )
+  }
+
+  // Prevent flash of content before redirect
+  if (!user || !tenant) {
+    return null
+  }
+
+  // Authorization check
+  if (!isManager) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-4">You need manager permissions to access the B2B calculator.</p>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35]"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+      {/* Tenant Context */}
+      <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+        <Building2 className="w-4 h-4" />
+        <span>{tenant.company_name}</span>
+      </div>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <Link href="/tours/manager" className="p-2 hover:bg-gray-200 rounded-lg">

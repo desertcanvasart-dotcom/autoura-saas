@@ -5,17 +5,28 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - List all airport staff
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Authenticate user
+    const supabase = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
 
     const { searchParams } = new URL(request.url)
     const location = searchParams.get('location')
     const isActive = searchParams.get('is_active')
 
+    // ✅ MULTI-TENANT: RLS policies automatically filter by tenant_id
+    // Only returns airport staff belonging to authenticated user's tenant
     let query = supabase
       .from('airport_staff')
       .select('*')
@@ -57,8 +68,23 @@ export async function GET(request: NextRequest) {
 // POST - Create new airport staff
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Authenticate user and get Supabase client
+    const authResult = await requireAuth()
+
+    if (authResult.error) {
+      return NextResponse.json({
+        success: false,
+        error: authResult.error
+      }, { status: authResult.status })
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
+
+    // ✅ MULTI-TENANT: Prevent client from manipulating tenant_id
+    // tenant_id will be auto-populated by database trigger from authenticated user's session
+    // This ensures data isolation - users cannot create records in other tenants
+    delete body.tenant_id
 
     if (!body.name || !body.airport_location || !body.phone) {
       return NextResponse.json(
@@ -81,6 +107,9 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== undefined ? body.is_active : true
     }
 
+    // ✅ MULTI-TENANT: tenant_id is auto-populated by database trigger
+    // The trigger automatically sets tenant_id from the authenticated user's session
+    // RLS policies enforce that users can only insert staff for their own tenant
     const { data, error } = await supabase
       .from('airport_staff')
       .insert([staffData])

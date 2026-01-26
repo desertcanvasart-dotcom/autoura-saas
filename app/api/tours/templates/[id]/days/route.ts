@@ -7,12 +7,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // ============================================
 // GET - List all days/activities for a template
@@ -25,8 +20,11 @@ export async function GET(
   try {
     const { id: templateId } = await params
 
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
     // Fetch template info
-    const { data: template, error: templateError } = await supabaseAdmin
+    const { data: template, error: templateError } = await supabase
       .from('tour_templates')
       .select('id, template_name, template_code, duration_days')
       .eq('id', templateId)
@@ -40,7 +38,7 @@ export async function GET(
     }
 
     // Fetch all activities with content library data
-    const { data: activities, error: activitiesError } = await supabaseAdmin
+    const { data: activities, error: activitiesError } = await supabase
       .from('tour_day_activities')
       .select(`
         id,
@@ -136,6 +134,17 @@ export async function POST(
 ) {
   try {
     const { id: templateId } = await params
+
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     const {
@@ -155,9 +164,31 @@ export async function POST(
       activities // Array of activities to add
     } = body
 
+    // Verify template belongs to this tenant
+    const { data: template } = await supabase
+      .from('tour_templates')
+      .select('id, tenant_id')
+      .eq('id', templateId)
+      .single()
+
+    if (!template) {
+      return NextResponse.json(
+        { success: false, error: 'Template not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    if (template.tenant_id !== tenant_id) {
+      return NextResponse.json(
+        { success: false, error: 'Cannot create activity for template from another tenant' },
+        { status: 403 }
+      )
+    }
+
     // Batch insert mode
     if (activities && Array.isArray(activities)) {
       const activitiesToInsert = activities.map((act, index) => ({
+        tenant_id, // ✅ Explicit tenant_id
         template_id: templateId,
         day_number: act.day_number,
         sequence_order: act.sequence_order || index + 1,
@@ -174,7 +205,7 @@ export async function POST(
         internal_notes: act.internal_notes || null
       }))
 
-      const { data: inserted, error } = await supabaseAdmin
+      const { data: inserted, error } = await supabase
         .from('tour_day_activities')
         .insert(activitiesToInsert)
         .select()
@@ -188,7 +219,7 @@ export async function POST(
       }
 
       // Mark template as using day builder
-      await supabaseAdmin
+      await supabase
         .from('tour_templates')
         .update({ uses_day_builder: true })
         .eq('id', templateId)
@@ -209,7 +240,7 @@ export async function POST(
     }
 
     // Get next sequence order for this day
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await supabase
       .from('tour_day_activities')
       .select('sequence_order')
       .eq('template_id', templateId)
@@ -222,7 +253,7 @@ export async function POST(
     // If content_id provided, fetch content info to auto-fill fields
     let contentData = null
     if (content_id) {
-      const { data } = await supabaseAdmin
+      const { data } = await supabase
         .from('content_library')
         .select('name, location, duration')
         .eq('id', content_id)
@@ -230,9 +261,10 @@ export async function POST(
       contentData = data
     }
 
-    const { data: activity, error } = await supabaseAdmin
+    const { data: activity, error } = await supabase
       .from('tour_day_activities')
       .insert({
+        tenant_id, // ✅ Explicit tenant_id
         template_id: templateId,
         day_number,
         sequence_order: nextSequence,
@@ -272,7 +304,7 @@ export async function POST(
     }
 
     // Mark template as using day builder
-    await supabaseAdmin
+    await supabase
       .from('tour_templates')
       .update({ uses_day_builder: true })
       .eq('id', templateId)
@@ -301,14 +333,25 @@ export async function PATCH(
 ) {
   try {
     const { id: templateId } = await params
+
+    // Require authentication - RLS will enforce tenant boundaries
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const body = await request.json()
 
     const { activity_id, ...updates } = body
 
     // Reorder mode: update multiple activities' sequence
     if (body.reorder && Array.isArray(body.reorder)) {
-      const updates = body.reorder.map((item: { id: string; sequence_order: number; day_number?: number }) => 
-        supabaseAdmin
+      const updates = body.reorder.map((item: { id: string; sequence_order: number; day_number?: number }) =>
+        supabase
           .from('tour_day_activities')
           .update({ 
             sequence_order: item.sequence_order,
@@ -338,8 +381,9 @@ export async function PATCH(
     delete updates.id
     delete updates.template_id
     delete updates.created_at
+    delete updates.tenant_id // ✅ Prevents tenant switching
 
-    const { data: activity, error } = await supabaseAdmin
+    const { data: activity, error } = await supabase
       .from('tour_day_activities')
       .update(updates)
       .eq('id', activity_id)
@@ -387,15 +431,26 @@ export async function DELETE(
 ) {
   try {
     const { id: templateId } = await params
+
+    // Require authentication - RLS will enforce tenant boundaries
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { searchParams } = new URL(request.url)
-    
+
     const activityId = searchParams.get('activity_id')
     const dayNumber = searchParams.get('day_number')
     const clearAll = searchParams.get('clear_all') === 'true'
 
     // Clear all activities for template
     if (clearAll) {
-      const { error } = await supabaseAdmin
+      const { error } = await supabase
         .from('tour_day_activities')
         .delete()
         .eq('template_id', templateId)
@@ -408,7 +463,7 @@ export async function DELETE(
       }
 
       // Reset uses_day_builder flag
-      await supabaseAdmin
+      await supabase
         .from('tour_templates')
         .update({ uses_day_builder: false })
         .eq('id', templateId)
@@ -421,7 +476,7 @@ export async function DELETE(
 
     // Clear all activities for a specific day
     if (dayNumber && !activityId) {
-      const { error } = await supabaseAdmin
+      const { error } = await supabase
         .from('tour_day_activities')
         .delete()
         .eq('template_id', templateId)
@@ -448,7 +503,7 @@ export async function DELETE(
       )
     }
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('tour_day_activities')
       .delete()
       .eq('id', activityId)
@@ -463,14 +518,14 @@ export async function DELETE(
     }
 
     // Check if any activities remain
-    const { count } = await supabaseAdmin
+    const { count } = await supabase
       .from('tour_day_activities')
       .select('*', { count: 'exact', head: true })
       .eq('template_id', templateId)
 
     // If no activities, reset flag
     if (count === 0) {
-      await supabaseAdmin
+      await supabase
         .from('tour_templates')
         .update({ uses_day_builder: false })
         .eq('id', templateId)

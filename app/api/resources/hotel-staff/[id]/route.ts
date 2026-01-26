@@ -5,7 +5,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - Get single hotel staff
 export async function GET(
@@ -13,9 +13,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    // Authenticate user
+    const supabase = await createAuthenticatedClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const { id } = await params
 
+    // Query with RLS - automatically filters by tenant
     const { data, error } = await supabase
       .from('hotel_staff')
       .select(`
@@ -52,12 +63,25 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    // Authenticate user and get Supabase client
+    const authResult = await requireAuth()
+
+    if (authResult.error) {
+      return NextResponse.json({
+        success: false,
+        error: authResult.error
+      }, { status: authResult.status })
+    }
+
+    const { supabase } = authResult
     const { id } = await params
     const body = await request.json()
 
+    // Prevent manual tenant_id changes
+    delete body.tenant_id
+
     const updateData: any = {}
-    
+
     if (body.name !== undefined) updateData.name = body.name
     if (body.role !== undefined) updateData.role = body.role
     if (body.hotel_id !== undefined) updateData.hotel_id = body.hotel_id
@@ -69,6 +93,7 @@ export async function PUT(
     if (body.notes !== undefined) updateData.notes = body.notes
     if (body.is_active !== undefined) updateData.is_active = body.is_active
 
+    // Update with RLS - automatically scoped to tenant
     const { data, error } = await supabase
       .from('hotel_staff')
       .update(updateData)
@@ -115,9 +140,20 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    // Authenticate user and get Supabase client
+    const authResult = await requireAuth()
+
+    if (authResult.error) {
+      return NextResponse.json({
+        success: false,
+        error: authResult.error
+      }, { status: authResult.status })
+    }
+
+    const { supabase } = authResult
     const { id } = await params
 
+    // Delete with RLS - automatically scoped to tenant
     const { error } = await supabase
       .from('hotel_staff')
       .delete()

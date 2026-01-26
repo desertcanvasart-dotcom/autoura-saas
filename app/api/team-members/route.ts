@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET - Fetch all team members
 export async function GET(request: NextRequest) {
@@ -13,7 +8,19 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active') === 'true'
     const role = searchParams.get('role')
 
-    let query = supabaseAdmin
+    // Use authenticated client - RLS automatically filters by tenant_id
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
+    let query = supabase
       .from('team_members')
       .select('*')
       .order('name', { ascending: true })
@@ -43,25 +50,34 @@ export async function GET(request: NextRequest) {
 // POST - Create new team member
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
-    
+
     const { name, email, phone, role, notes } = body
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('team_members')
       .insert({
+        tenant_id, // ✅ Explicit tenant_id
         name,
         email: email || null,
         phone: phone || null,
         role: role || 'staff',
         notes: notes || null,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        is_active: true
       })
       .select()
       .single()

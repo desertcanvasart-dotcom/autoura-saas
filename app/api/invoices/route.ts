@@ -1,20 +1,42 @@
+// app/api/invoices/route.ts
+// ============================================
+// AUTOURA - INVOICES API
+// ============================================
+// Manages invoices (standard, deposit, final)
+// Multi-tenancy: Enforces tenant isolation via RLS
+// Security: Requires authentication for all operations
+// ============================================
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
+/**
+ * GET /api/invoices
+ * List invoices for authenticated user's tenant
+ * Query params: status, clientId, itineraryId, type
+ * RLS policies automatically filter by tenant_id
+ */
 export async function GET(request: NextRequest) {
   try {
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
+    // Verify authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not authenticated'
+      }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status')
     const clientId = searchParams.get('clientId')
     const itineraryId = searchParams.get('itineraryId')
     const invoiceType = searchParams.get('type')
 
-    let query = supabaseAdmin
+    let query = supabase
       .from('invoices')
       .select(`
         *,
@@ -43,7 +65,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching invoices:', error)
+      console.error('❌ Error fetching invoices:', error)
       return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })
     }
 
@@ -56,13 +78,28 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(formattedData)
   } catch (error) {
-    console.error('Error in invoices GET:', error)
+    console.error('❌ Error in invoices GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
+/**
+ * POST /api/invoices
+ * Create a new invoice (standard, deposit, or final)
+ * Requires authentication and validates tenant ownership
+ */
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     // Validate required fields
@@ -73,16 +110,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // If itinerary_id provided, verify it belongs to this tenant
+    if (body.itinerary_id) {
+      const { data: itinerary, error: itineraryError } = await supabase
+        .from('itineraries')
+        .select('id, tenant_id')
+        .eq('id', body.itinerary_id)
+        .single()
+
+      if (itineraryError || !itinerary) {
+        return NextResponse.json(
+          { error: 'Itinerary not found or access denied' },
+          { status: 404 }
+        )
+      }
+
+      if (itinerary.tenant_id !== tenant_id) {
+        return NextResponse.json(
+          { error: 'Cannot create invoice for itinerary from another tenant' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Generate invoice number with type suffix
     const year = new Date().getFullYear()
-    const { data: seqData, error: seqError } = await supabaseAdmin
+
+    // Try to use sequence function (works even with authenticated client)
+    const { data: seqData, error: seqError } = await supabase
       .rpc('nextval', { seq_name: 'invoice_number_seq' })
 
     let baseNumber = 1
     if (!seqError && seqData) {
       baseNumber = seqData
     } else {
-      const { count } = await supabaseAdmin
+      // Fallback: count invoices in THIS TENANT only (RLS filters automatically)
+      const { count } = await supabase
         .from('invoices')
         .select('*', { count: 'exact', head: true })
       baseNumber = (count || 0) + 1
@@ -91,7 +154,7 @@ export async function POST(request: NextRequest) {
     // Determine invoice type and number suffix
     const invoiceType = body.invoice_type || 'standard'
     let invoiceNumber = `INV-${year}-${String(baseNumber).padStart(3, '0')}`
-    
+
     if (invoiceType === 'deposit') {
       invoiceNumber = `INV-${year}-${String(baseNumber).padStart(3, '0')}-DEP`
     } else if (invoiceType === 'final') {
@@ -138,6 +201,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newInvoice = {
+      tenant_id, // ✅ Explicit tenant_id
       invoice_number: invoiceNumber,
       invoice_type: invoiceType,
       deposit_percent: depositPercent,
@@ -165,20 +229,20 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('invoices')
       .insert([newInvoice])
       .select()
       .single()
 
     if (error) {
-      console.error('Error creating invoice:', error)
+      console.error('❌ Error creating invoice:', error)
       return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 })
     }
 
     return NextResponse.json(data, { status: 201 })
   } catch (error) {
-    console.error('Error in invoices POST:', error)
+    console.error('❌ Error in invoices POST:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

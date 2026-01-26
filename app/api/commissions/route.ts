@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const searchParams = request.nextUrl.searchParams
     const type = searchParams.get('type') // receivable, payable
     const category = searchParams.get('category')
@@ -17,7 +22,8 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
 
-    let query = supabaseAdmin
+    // RLS automatically filters by tenant_id
+    let query = supabase
       .from('commissions')
       .select(`
         *,
@@ -92,6 +98,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     // Validate required fields
@@ -109,6 +125,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newCommission = {
+      tenant_id, // ✅ Explicitly set tenant_id
       itinerary_id: body.itinerary_id || null,
       supplier_id: body.supplier_id || null,
       client_id: body.client_id || null,
@@ -130,7 +147,8 @@ export async function POST(request: NextRequest) {
       notes: body.notes || null
     }
 
-    const { data, error } = await supabaseAdmin
+    // RLS will enforce tenant isolation
+    const { data, error } = await supabase
       .from('commissions')
       .insert([newCommission])
       .select(`

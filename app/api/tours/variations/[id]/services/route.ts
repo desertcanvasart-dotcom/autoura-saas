@@ -1,22 +1,17 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // ============================================
 // TOUR VARIATION SERVICES API - CRUD + BULK
 // File: app/api/tours/variations/[id]/services/route.ts
 // ============================================
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-async function getRateDetails(rateType: string, rateId: string) {
+async function getRateDetails(rateType: string, rateId: string, supabase: any) {
   let result = null
 
   switch (rateType) {
     case 'transportation':
-      const { data: transport } = await supabaseAdmin
+      const { data: transport } = await supabase
         .from('transportation_rates')
         .select('id, service_type, vehicle_type, origin_city, destination_city, base_rate_eur, base_rate_non_eur, capacity')
         .eq('id', rateId)
@@ -34,7 +29,7 @@ async function getRateDetails(rateType: string, rateId: string) {
       break
 
     case 'guide':
-      const { data: guide } = await supabaseAdmin
+      const { data: guide } = await supabase
         .from('guide_rates')
         .select('id, guide_type, city, half_day_rate, full_day_rate')
         .eq('id', rateId)
@@ -52,7 +47,7 @@ async function getRateDetails(rateType: string, rateId: string) {
       break
 
     case 'activity':
-      const { data: activity } = await supabaseAdmin
+      const { data: activity } = await supabase
         .from('activity_rates')
         .select('id, activity_name, activity_category, city, base_rate_eur, base_rate_non_eur')
         .eq('id', rateId)
@@ -70,7 +65,7 @@ async function getRateDetails(rateType: string, rateId: string) {
       break
 
     case 'meal':
-      const { data: meal } = await supabaseAdmin
+      const { data: meal } = await supabase
         .from('meal_rates')
         .select('id, restaurant_name, meal_type, tier, city, base_rate_eur, base_rate_non_eur')
         .eq('id', rateId)
@@ -88,7 +83,7 @@ async function getRateDetails(rateType: string, rateId: string) {
       break
 
     case 'accommodation':
-      const { data: hotel } = await supabaseAdmin
+      const { data: hotel } = await supabase
         .from('accommodation_rates')
         .select('id, hotel_name, room_type, city, rate_low_season_sgl, rate_high_season_sgl, rate_peak_season_sgl')
         .eq('id', rateId)
@@ -107,7 +102,7 @@ async function getRateDetails(rateType: string, rateId: string) {
       break
 
     case 'cruise':
-      const { data: cruise } = await supabaseAdmin
+      const { data: cruise } = await supabase
         .from('nile_cruises')
         .select('id, ship_name, cabin_type, rate_low_season, rate_high_season, rate_peak_season')
         .eq('id', rateId)
@@ -135,7 +130,10 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    // Use authenticated client - RLS automatically filters by tenant
+    const supabase = await createAuthenticatedClient()
+
+    const { data, error } = await supabase
       .from('tour_variation_services')
       .select('*')
       .eq('variation_id', id)
@@ -147,7 +145,7 @@ export async function GET(
 
     const enrichedServices = await Promise.all((data || []).map(async (service) => {
       if (service.rate_type && service.rate_id) {
-        const rateDetails = await getRateDetails(service.rate_type, service.rate_id)
+        const rateDetails = await getRateDetails(service.rate_type, service.rate_id, supabase)
         return { ...service, rate_details: rateDetails }
       }
       return { ...service, rate_details: null }
@@ -165,9 +163,41 @@ export async function POST(
 ) {
   try {
     const { id } = await params
+
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
-    const { data: maxSeq } = await supabaseAdmin
+    // Verify variation belongs to this tenant
+    const { data: variation } = await supabase
+      .from('tour_variations')
+      .select('id, tenant_id')
+      .eq('id', id)
+      .single()
+
+    if (!variation) {
+      return NextResponse.json(
+        { success: false, error: 'Variation not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    if (variation.tenant_id !== tenant_id) {
+      return NextResponse.json(
+        { success: false, error: 'Cannot create service for variation from another tenant' },
+        { status: 403 }
+      )
+    }
+
+    const { data: maxSeq } = await supabase
       .from('tour_variation_services')
       .select('sequence_order')
       .eq('variation_id', id)
@@ -177,9 +207,10 @@ export async function POST(
 
     const nextOrder = (maxSeq?.sequence_order || 0) + 1
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('tour_variation_services')
       .insert({
+        tenant_id, // ✅ Explicit tenant_id
         variation_id: id,
         service_name: body.service_name,
         service_category: body.service_category,
@@ -213,6 +244,17 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
+
+    // Require authentication - RLS will enforce tenant boundaries
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
     const { services, mode } = body
 
@@ -225,22 +267,27 @@ export async function PUT(
     if (mode === 'update') {
       // Update existing services by ID
       const results = await Promise.all(services.map(async (service: any) => {
-        const { data, error } = await supabaseAdmin
+        const updateData: any = {
+          service_name: service.service_name,
+          service_category: service.service_category,
+          rate_type: service.rate_type,
+          rate_id: service.rate_id,
+          quantity_mode: service.quantity_mode,
+          quantity_value: service.quantity_value,
+          cost_per_unit: service.cost_per_unit,
+          day_number: service.day_number,
+          is_optional: service.is_optional,
+          optional_price_override: service.optional_price_override,
+          notes: service.notes,
+          sequence_order: service.sequence_order
+        }
+
+        // Do NOT include tenant_id in update (prevents tenant switching)
+        delete updateData.tenant_id
+
+        const { data, error } = await supabase
           .from('tour_variation_services')
-          .update({
-            service_name: service.service_name,
-            service_category: service.service_category,
-            rate_type: service.rate_type,
-            rate_id: service.rate_id,
-            quantity_mode: service.quantity_mode,
-            quantity_value: service.quantity_value,
-            cost_per_unit: service.cost_per_unit,
-            day_number: service.day_number,
-            is_optional: service.is_optional,
-            optional_price_override: service.optional_price_override,
-            notes: service.notes,
-            sequence_order: service.sequence_order
-          })
+          .update(updateData)
           .eq('id', service.id)
           .eq('variation_id', id)
           .select()
@@ -258,7 +305,7 @@ export async function PUT(
     } else {
       // Default: Replace all services (delete existing, insert new)
       // Step 1: Delete all existing services for this variation
-      const { error: deleteError } = await supabaseAdmin
+      const { error: deleteError } = await supabase
         .from('tour_variation_services')
         .delete()
         .eq('variation_id', id)
@@ -270,6 +317,7 @@ export async function PUT(
       // Step 2: Insert all new services
       if (services.length > 0) {
         const servicesWithVariation = services.map((service: any, index: number) => ({
+          tenant_id, // ✅ Explicit tenant_id
           variation_id: id,
           service_name: service.service_name,
           service_category: service.service_category,
@@ -285,7 +333,7 @@ export async function PUT(
           sequence_order: service.sequence_order || index + 1
         }))
 
-        const { error: insertError } = await supabaseAdmin
+        const { error: insertError } = await supabase
           .from('tour_variation_services')
           .insert(servicesWithVariation)
 
@@ -295,7 +343,7 @@ export async function PUT(
       }
 
       // Fetch and return updated services
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await supabase
         .from('tour_variation_services')
         .select('*')
         .eq('variation_id', id)
@@ -322,6 +370,17 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+
+    // Require authentication - RLS will enforce tenant boundaries
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase } = authResult
     const { searchParams } = new URL(request.url)
     const serviceId = searchParams.get('serviceId')
 
@@ -329,7 +388,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'serviceId is required' }, { status: 400 })
     }
 
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('tour_variation_services')
       .delete()
       .eq('id', serviceId)

@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { 
+import {
   DollarSign, Plus, Search, Edit, Trash2, X, Check, AlertCircle, CheckCircle2,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy, Download, Upload
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useCurrency } from '@/hooks/useCurrency'
 
 // ============================================
 // CONSTANTS
@@ -162,6 +163,7 @@ function Pagination({
 
 export default function TippingPage() {
   const dialog = useConfirmDialog()
+  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
   
   const [rates, setRates] = useState<TippingRate[]>([])
   const [loading, setLoading] = useState(true)
@@ -286,25 +288,157 @@ export default function TippingPage() {
   const handleDelete = async (rate: TippingRate) => {
     const roleName = rate.role_type.replace('_', ' ')
     const contextName = rate.context ? ` (${rate.context.replace('_', ' ')})` : ''
-    
+
     const confirmed = await dialog.confirmDelete('Tipping Rate',
       `Are you sure you want to delete the tipping rate for "${roleName}"${contextName}? This action cannot be undone.`
     )
-    
+
     if (!confirmed) return
 
     try {
       const response = await fetch(`/api/rates/tipping/${rate.id}`, { method: 'DELETE' })
       const data = await response.json()
-      
-      if (data.success) { 
-        showToast('success', 'Tipping rate deleted!') 
-        fetchRates() 
+
+      if (data.success) {
+        showToast('success', 'Tipping rate deleted!')
+        fetchRates()
       } else {
         await dialog.alert('Error', data.error || 'Failed to delete tipping rate', 'warning')
       }
-    } catch { 
+    } catch {
       await dialog.alert('Error', 'Failed to delete tipping rate. Please try again.', 'warning')
+    }
+  }
+
+  const handleClone = (rate: TippingRate) => {
+    setEditingRate(null)
+    setFormData({
+      service_code: '',
+      role_type: rate.role_type,
+      context: rate.context || '',
+      rate_unit: rate.rate_unit,
+      rate_eur: rate.rate_eur,
+      description: rate.description || '',
+      notes: rate.notes || '',
+      is_active: rate.is_active
+    })
+    setShowModal(true)
+    showToast('success', 'Rate cloned! Modify and save as new.')
+  }
+
+  const handleExportCSV = () => {
+    if (filteredRates.length === 0) {
+      showToast('error', 'No rates to export')
+      return
+    }
+
+    const headers = ['service_code', 'role_type', 'context', 'rate_unit', 'rate_eur', 'description', 'notes', 'is_active']
+    const csvContent = [
+      headers.join(','),
+      ...filteredRates.map(rate => [
+        `"${rate.service_code || ''}"`,
+        `"${rate.role_type || ''}"`,
+        `"${rate.context || ''}"`,
+        `"${rate.rate_unit || ''}"`,
+        rate.rate_eur,
+        `"${(rate.description || '').replace(/"/g, '""')}"`,
+        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        rate.is_active
+      ].join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `tipping-rates-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
+    showToast('success', `Exported ${filteredRates.length} rates to CSV`)
+  }
+
+  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const text = await file.text()
+    const lines = text.split('\n').filter(line => line.trim())
+
+    if (lines.length < 2) {
+      showToast('error', 'CSV file is empty or invalid')
+      event.target.value = ''
+      return
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+    const requiredHeaders = ['role_type', 'rate_unit', 'rate_eur']
+    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
+
+    if (missingHeaders.length > 0) {
+      showToast('error', `Missing required columns: ${missingHeaders.join(', ')}`)
+      event.target.value = ''
+      return
+    }
+
+    let successCount = 0
+    let errorCount = 0
+
+    for (let i = 1; i < lines.length; i++) {
+      const values: string[] = []
+      let current = ''
+      let inQuotes = false
+
+      for (const char of lines[i]) {
+        if (char === '"') {
+          inQuotes = !inQuotes
+        } else if (char === ',' && !inQuotes) {
+          values.push(current.trim())
+          current = ''
+        } else {
+          current += char
+        }
+      }
+      values.push(current.trim())
+
+      const row: Record<string, string> = {}
+      headers.forEach((header, index) => {
+        row[header] = values[index]?.replace(/^"|"$/g, '') || ''
+      })
+
+      const rateData = {
+        service_code: row.service_code || '',
+        role_type: row.role_type || 'guide',
+        context: row.context || null,
+        rate_unit: row.rate_unit || 'per_day',
+        rate_eur: parseFloat(row.rate_eur) || 0,
+        description: row.description || null,
+        notes: row.notes || null,
+        is_active: row.is_active === 'true' || row.is_active === '1' || row.is_active === 'yes'
+      }
+
+      try {
+        const response = await fetch('/api/rates/tipping', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rateData)
+        })
+        const data = await response.json()
+        if (data.success) {
+          successCount++
+        } else {
+          errorCount++
+        }
+      } catch {
+        errorCount++
+      }
+    }
+
+    event.target.value = ''
+    fetchRates()
+
+    if (successCount > 0) {
+      showToast('success', `Imported ${successCount} rates${errorCount > 0 ? `, ${errorCount} failed` : ''}`)
+    } else {
+      showToast('error', `Failed to import rates. ${errorCount} errors.`)
     }
   }
 
@@ -371,6 +505,13 @@ export default function TippingPage() {
             <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
+              <Download className="w-4 h-4" /> Export
+            </button>
+            <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium cursor-pointer">
+              <Upload className="w-4 h-4" /> Import
+              <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+            </label>
             <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
               <Plus className="w-4 h-4" /> Add Rate
             </button>
@@ -402,7 +543,7 @@ export default function TippingPage() {
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
             <p className="text-xs text-gray-600">Avg. Tip</p>
-            <p className="text-2xl font-bold text-green-600">€{stats.avgTip}</p>
+            <p className="text-2xl font-bold text-green-600">{symbol}{convert(stats.avgTip).toFixed(0)}</p>
           </div>
         </div>
 
@@ -452,7 +593,7 @@ export default function TippingPage() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-green-800">Role</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Context</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Unit</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-green-800">Amount</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-green-800">{userCurrency} Rate</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-green-800">Description</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Actions</th>
@@ -483,7 +624,7 @@ export default function TippingPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                      €{rate.rate_eur}
+                      {symbol}{convert(Number(rate.rate_eur)).toFixed(2)}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 max-w-[200px] truncate">
                       {rate.description || '-'}
@@ -497,15 +638,24 @@ export default function TippingPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
-                        <button 
-                          onClick={() => handleEdit(rate)} 
+                        <button
+                          onClick={() => handleEdit(rate)}
                           className="p-1 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded"
+                          title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button 
-                          onClick={() => handleDelete(rate)} 
+                        <button
+                          onClick={() => handleClone(rate)}
+                          className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title="Clone"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rate)}
                           className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                          title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -599,7 +749,7 @@ export default function TippingPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Amount (€) *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Amount in EUR (€) *</label>
                   <input 
                     type="number" 
                     name="rate_eur" 
