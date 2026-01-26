@@ -39,3 +39,34 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Development documentation and audit files
+*-AUDIT.md
+*-SUMMARY.md
+*-COMPLETE.md
+*-FIX.md
+*-FIXES.md
+*-STATUS.md
+*-IMPLEMENTATION.md
+*-TESTING.md
+*-PLAN.md
+*-CRITICAL.md
+*-UPDATE.md
+*-CHECK.md
+*-ISSUES.md
+*-FUNCTIONAL.md
+*-VERIFICATION.md
+*-ARCHITECTURE.md
+*-FIXED.md
+*-ADDED.md
+PHASE*.md
+QUICK*.md
+MASTER-*.md
+EMAIL_SETUP_GUIDE.md
+SETUP_*.md
+
+# Test and verification scripts
+test-*.js
+test-*.sql
+verify-*.sql
+VERIFY-*.sql
