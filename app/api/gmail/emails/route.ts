@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { supabase, user } = authResult
-    if (!supabase) {
+    if (!supabase || !user) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
         { status: 401 }
