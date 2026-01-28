@@ -16,13 +16,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant, user } = authResult
+    const { supabase, tenant_id, user } = authResult
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Check if user has admin access
     const { data: currentMember } = await supabase
       .from('tenant_members')
       .select('role')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', user.id)
       .single()
 
@@ -47,7 +53,7 @@ export async function GET(request: NextRequest) {
           raw_user_meta_data
         )
       `)
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .order('joined_at', { ascending: false })
 
     if (error) throw error

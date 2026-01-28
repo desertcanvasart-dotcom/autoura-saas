@@ -16,13 +16,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant } = authResult
+    const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Get full tenant details
     const { data: tenantData, error } = await supabase
       .from('tenants')
       .select('*')
-      .eq('id', tenant.id)
+      .eq('id', tenant_id)
       .single()
 
     if (error) throw error
@@ -66,13 +72,19 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant, user } = authResult
+    const { supabase, tenant_id, user } = authResult
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Check if user has admin access
     const { data: currentMember } = await supabase
       .from('tenant_members')
       .select('role')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', user.id)
       .single()
 
@@ -133,7 +145,7 @@ export async function PATCH(request: NextRequest) {
     const { data: updatedTenant, error: updateError } = await supabase
       .from('tenants')
       .update(updates)
-      .eq('id', tenant.id)
+      .eq('id', tenant_id)
       .select()
       .single()
 
@@ -141,13 +153,13 @@ export async function PATCH(request: NextRequest) {
 
     // Log activity
     await logActivity(
-      tenant.id,
+      tenant_id,
       user.id,
       'tenant.settings_updated',
       supabase,
       {
         resourceType: 'tenant',
-        resourceId: tenant.id,
+        resourceId: tenant_id,
         details: {
           updated_fields: Object.keys(updates)
         }

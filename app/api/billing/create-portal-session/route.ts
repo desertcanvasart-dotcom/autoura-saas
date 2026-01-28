@@ -16,13 +16,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant, user } = authResult
+    const { supabase, tenant_id, user } = authResult
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Only owners can manage billing
     const { data: member } = await supabase
       .from('tenant_members')
       .select('role')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', user.id)
       .single()
 
@@ -37,7 +43,7 @@ export async function POST(request: NextRequest) {
     const { data: subscription, error: subError } = await supabase
       .from('tenant_subscriptions')
       .select('stripe_customer_id')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .single()
 
     if (subError || !subscription) {

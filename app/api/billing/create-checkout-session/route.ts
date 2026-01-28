@@ -17,13 +17,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant, user } = authResult
+    const { supabase, tenant_id, user } = authResult
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Only owners can manage billing
     const { data: member } = await supabase
       .from('tenant_members')
       .select('role')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', user.id)
       .single()
 
@@ -32,6 +38,20 @@ export async function POST(request: NextRequest) {
         success: false,
         error: 'Only tenant owners can manage billing'
       }, { status: 403 })
+    }
+
+    // Get tenant details for Stripe customer
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('company_name, contact_email')
+      .eq('id', tenant_id)
+      .single()
+
+    if (tenantError || !tenant) {
+      return NextResponse.json({
+        success: false,
+        error: 'Tenant not found'
+      }, { status: 404 })
     }
 
     const body = await request.json()
@@ -82,7 +102,7 @@ export async function POST(request: NextRequest) {
     const { data: existingSub } = await supabase
       .from('tenant_subscriptions')
       .select('id, status')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .in('status', ['active', 'trialing'])
       .single()
 
@@ -95,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     // Get or create Stripe customer
     const customerId = await getOrCreateStripeCustomer(
-      tenant.id,
+      tenant_id,
       tenant.company_name,
       tenant.contact_email,
       supabase
@@ -109,14 +129,14 @@ export async function POST(request: NextRequest) {
     const session = await createCheckoutSession(
       customerId,
       priceId,
-      tenant.id,
+      tenant_id,
       successUrl,
       cancelUrl
     )
 
     // Log activity
     await logActivity(
-      tenant.id,
+      tenant_id,
       user.id,
       'billing.checkout_started',
       supabase,

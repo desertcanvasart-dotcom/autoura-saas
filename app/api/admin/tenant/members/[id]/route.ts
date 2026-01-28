@@ -19,14 +19,20 @@ export async function PATCH(
       )
     }
 
-    const { supabase, tenant, user } = authResult
+    const { supabase, tenant_id, user } = authResult
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const { id } = await params
 
     // Check if user has admin access
     const { data: currentMember } = await supabase
       .from('tenant_members')
       .select('role')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', user.id)
       .single()
 
@@ -52,7 +58,7 @@ export async function PATCH(
       .from('tenant_members')
       .select('*, user:auth.users!inner(email)')
       .eq('id', id)
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .single()
 
     if (fetchError || !targetMember) {
@@ -92,7 +98,7 @@ export async function PATCH(
 
     // Log activity
     await logActivity(
-      tenant.id,
+      tenant_id,
       user.id,
       'team.member_role_changed',
       supabase,
@@ -138,14 +144,20 @@ export async function DELETE(
       )
     }
 
-    const { supabase, tenant, user } = authResult
+    const { supabase, tenant_id, user } = authResult
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const { id } = await params
 
     // Check if user has admin access
     const { data: currentMember } = await supabase
       .from('tenant_members')
       .select('role')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', user.id)
       .single()
 
@@ -161,7 +173,7 @@ export async function DELETE(
       .from('tenant_members')
       .select('*, user:auth.users!inner(email)')
       .eq('id', id)
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .single()
 
     if (fetchError || !targetMember) {
@@ -176,7 +188,7 @@ export async function DELETE(
       const { count } = await supabase
         .from('tenant_members')
         .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenant.id)
+        .eq('tenant_id', tenant_id)
         .eq('role', 'owner')
 
       if (count && count <= 1) {
@@ -205,7 +217,7 @@ export async function DELETE(
 
     // Log activity
     await logActivity(
-      tenant.id,
+      tenant_id,
       user.id,
       'team.member_removed',
       supabase,

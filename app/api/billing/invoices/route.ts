@@ -15,7 +15,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant } = authResult
+    const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const searchParams = request.nextUrl.searchParams
     const limit = parseInt(searchParams.get('limit') || '50')
     const offset = parseInt(searchParams.get('offset') || '0')
@@ -25,7 +31,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('billing_invoices')
       .select('*', { count: 'exact' })
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .order('invoice_date', { ascending: false })
       .range(offset, offset + limit - 1)
 
