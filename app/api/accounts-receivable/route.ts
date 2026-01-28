@@ -33,6 +33,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const searchParams = request.nextUrl.searchParams
     const clientId = searchParams.get('clientId')
     const agingFilter = searchParams.get('aging') // current, 30, 60, 90
