@@ -124,6 +124,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
  * Handle subscription created or updated
  */
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+  // Cast to any for accessing properties that may not be in TypeScript types
+  const sub = subscription as any
   const tenantId = subscription.metadata?.tenant_id
   const customerId = subscription.customer as string
 
@@ -160,11 +162,11 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
       stripe_subscription_id: subscription.id,
       status: subscription.status,
       billing_cycle: billingCycle,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      trial_ends_at: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
-      canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000).toISOString() : null,
-      ends_at: subscription.cancel_at ? new Date(subscription.cancel_at * 1000).toISOString() : null,
+      current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+      trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+      canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
+      ends_at: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
       updated_at: new Date().toISOString()
     }, {
       onConflict: 'tenant_id'
@@ -188,8 +190,8 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
       .upsert({
         tenant_id: tenantId,
         subscription_id: subscriptionRecord.id,
-        period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-        period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        period_start: new Date(sub.current_period_start * 1000).toISOString(),
+        period_end: new Date(sub.current_period_end * 1000).toISOString(),
         quotes_created: 0,
         whatsapp_messages_sent: 0,
         gmail_emails_fetched: 0,
@@ -247,8 +249,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  * Handle successful payment
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
+  const inv = invoice as any
   const customerId = invoice.customer as string
-  const subscriptionId = invoice.subscription as string
+  const subscriptionId = inv.subscription as string
 
   // Get tenant from subscription
   const { data: subscription } = await supabaseAdmin
@@ -271,12 +274,12 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
       tenant_id: subscription.tenant_id,
       subscription_id: subscription.id,
       stripe_invoice_id: invoice.id,
-      stripe_payment_intent_id: invoice.payment_intent as string,
+      stripe_payment_intent_id: inv.payment_intent as string,
       invoice_number: invoice.number || null,
       amount_due: invoice.amount_due / 100,
       amount_paid: invoice.amount_paid / 100,
       currency: invoice.currency,
-      tax: (invoice.tax || 0) / 100,
+      tax: (inv.tax || 0) / 100,
       total: invoice.total / 100,
       status: invoice.status || 'paid',
       invoice_date: new Date(invoice.created * 1000).toISOString(),
@@ -307,7 +310,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
  * Handle failed payment
  */
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  const subscriptionId = invoice.subscription as string
+  const inv = invoice as any
+  const subscriptionId = inv.subscription as string
 
   // Get tenant from subscription
   const { data: subscription } = await supabaseAdmin
@@ -351,6 +355,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
  * Handle trial ending soon
  */
 async function handleTrialWillEnd(subscription: Stripe.Subscription) {
+  const sub = subscription as any
   const tenantId = subscription.metadata?.tenant_id
 
   if (!tenantId) {
@@ -366,7 +371,7 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
     p_user_id: null,
     p_action_type: 'billing.trial_ending_soon',
     p_details: {
-      trial_end: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null
+      trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null
     }
   })
 
