@@ -15,13 +15,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant, user } = authResult
+    const { supabase, tenant_id, user } = authResult
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Check if user has admin access
     const { data: currentMember } = await supabase
       .from('tenant_members')
       .select('role')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', user.id)
       .single()
 
@@ -46,7 +52,7 @@ export async function GET(request: NextRequest) {
         *,
         user:auth.users(email, raw_user_meta_data)
       `, { count: 'exact' })
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -86,7 +92,7 @@ export async function GET(request: NextRequest) {
     const { data: actionTypes } = await supabase
       .from('tenant_activity_logs')
       .select('action_type')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
 
     const uniqueActionTypes = [...new Set((actionTypes || []).map(a => a.action_type))]
 
