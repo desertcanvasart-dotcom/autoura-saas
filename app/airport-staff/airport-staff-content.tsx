@@ -242,7 +242,7 @@ export default function AirportStaffContent() {
     const confirmed = await modal.confirmDestructive(
       'Delete Staff Member',
       `Are you sure you want to delete ${name}? This action cannot be undone.`,
-      'Delete'
+      { confirmText: 'Delete', cancelText: 'Cancel' }
     )
     if (!confirmed) return
 
