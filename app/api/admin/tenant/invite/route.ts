@@ -17,13 +17,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant, user } = authResult
+    const { supabase, tenant_id, user } = authResult
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Check if user has admin access
     const { data: currentMember } = await supabase
       .from('tenant_members')
       .select('role')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', user.id)
       .single()
 
@@ -60,7 +66,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check team members limit
-    const limitCheck = await checkLimit(tenant.id, 'team_members', supabase)
+    const limitCheck = await checkLimit(tenant_id, 'team_members', supabase)
     if (!limitCheck.allowed) {
       return NextResponse.json({
         success: false,
@@ -76,7 +82,7 @@ export async function POST(request: NextRequest) {
     const { data: existingMember } = await supabase
       .from('tenant_members')
       .select('id')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', (
         await supabase
           .from('auth.users')
@@ -97,7 +103,7 @@ export async function POST(request: NextRequest) {
     const { data: existingInvitation } = await supabase
       .from('tenant_invitations')
       .select('id, status')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('email', email)
       .eq('status', 'pending')
       .single()
@@ -119,7 +125,7 @@ export async function POST(request: NextRequest) {
     const { data: invitation, error: inviteError } = await supabase
       .from('tenant_invitations')
       .insert({
-        tenant_id: tenant.id,
+        tenant_id: tenant_id,
         email,
         role,
         invited_by: user.id,
@@ -133,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     // Log activity
     await logActivity(
-      tenant.id,
+      tenant_id,
       user.id,
       'team.member_invited',
       supabase,
@@ -186,13 +192,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant, user } = authResult
+    const { supabase, tenant_id, user } = authResult
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Check if user has admin access
     const { data: currentMember } = await supabase
       .from('tenant_members')
       .select('role')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .eq('user_id', user.id)
       .single()
 
@@ -210,7 +222,7 @@ export async function GET(request: NextRequest) {
         *,
         inviter:auth.users!tenant_invitations_invited_by_fkey(email)
       `)
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', tenant_id)
       .order('created_at', { ascending: false })
 
     if (error) throw error
