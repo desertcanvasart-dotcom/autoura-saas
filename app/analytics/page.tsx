@@ -721,7 +721,6 @@ export default function AnalyticsPage() {
                   }
                   return <circle cx={cx} cy={cy} r={4} fill={COLORS.revenue} />
                 }}
-                strokeDasharray={(props: any) => props?.isForecasted ? '5 5' : undefined}
               />
             </LineChart>
           </ResponsiveContainer>
