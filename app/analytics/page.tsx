@@ -663,7 +663,7 @@ export default function AnalyticsPage() {
                   borderRadius: '8px',
                   fontSize: '12px'
                 }}
-                formatter={(value: any, name: string) => {
+                formatter={(value: any, name?: string) => {
                   if (name === 'confidenceLow' || name === 'confidenceHigh') {
                     return [formatCurrency(value), name === 'confidenceLow' ? 'Low Estimate' : 'High Estimate']
                   }
