@@ -13,10 +13,10 @@ import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { type: string; id: string } }
+  { params }: { params: Promise<{ type: string; id: string }> }
 ) {
   try {
-    const { type, id } = params
+    const { type, id } = await params
 
     if (type !== 'b2c' && type !== 'b2b') {
       return NextResponse.json(
