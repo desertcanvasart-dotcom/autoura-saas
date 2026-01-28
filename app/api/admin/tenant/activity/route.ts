@@ -48,10 +48,7 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabase
       .from('tenant_activity_logs')
-      .select(`
-        *,
-        user:auth.users(email, raw_user_meta_data)
-      `, { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('tenant_id', tenant_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
@@ -73,16 +70,16 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    // Format logs with user information
-    const formattedLogs = (logs || []).map(log => ({
+    // Format logs (user info would need separate lookup if needed)
+    const formattedLogs = (logs || []).map((log: any) => ({
       id: log.id,
       action_type: log.action_type,
       resource_type: log.resource_type,
       resource_id: log.resource_id,
       details: log.details,
       user_id: log.user_id,
-      user_email: log.user?.email || 'System',
-      user_name: log.user?.raw_user_meta_data?.full_name || log.user?.raw_user_meta_data?.name || 'System',
+      user_email: log.user_email || 'System',
+      user_name: log.user_name || 'System',
       ip_address: log.ip_address,
       user_agent: log.user_agent,
       created_at: log.created_at
