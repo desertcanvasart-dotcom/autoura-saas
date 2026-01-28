@@ -49,11 +49,11 @@ export async function POST(
       }
 
       // Send the message via Twilio
-      const result = await sendWhatsAppMessage(
-        conversation.contact_phone,
-        message,
-        attachments?.[0]?.url // Optional media
-      )
+      const result = await sendWhatsAppMessage({
+        to: conversation.contact_phone,
+        body: message,
+        mediaUrl: attachments?.[0]?.url // Optional media
+      })
 
       if (!result.success) {
         return NextResponse.json(
