@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useCurrency } from '@/hooks/useCurrency'
 
 // ============================================
 // INTERFACES
@@ -9,7 +10,7 @@ import Link from 'next/link'
 
 interface BaseRate {
   id?: string
-  service_code: string
+  service_code?: string
   city?: string
   eur_rate?: number
   non_eur_rate?: number
@@ -185,11 +186,26 @@ export default function RatesPage() {
   const [selectedCity, setSelectedCity] = useState('all')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [activeTab, setActiveTab] = useState<TabType>('transportation')
-  
+
   const [selectedTier, setSelectedTier] = useState('all')
   const [selectedPropertyType, setSelectedPropertyType] = useState('all')
   const [showSeasonalPricing, setShowSeasonalPricing] = useState(false)
-  
+
+  // Currency hook for user's preferred currency
+  const { display, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+
+  // Helper to get the correct rate based on user currency (EUR vs non-EUR)
+  const getRate = (eurRate: number | undefined, nonEurRate: number | undefined): number => {
+    const rate = userCurrency === 'EUR' ? (eurRate || 0) : (nonEurRate || eurRate || 0)
+    return rate
+  }
+
+  // Display rate in user's currency
+  const displayRate = (eurRate: number | undefined, nonEurRate?: number | undefined): string => {
+    const rate = getRate(eurRate, nonEurRate)
+    return display(rate, 'EUR')
+  }
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
@@ -561,7 +577,7 @@ export default function RatesPage() {
 
       {/* Search and Filters */}
       <div className="container mx-auto px-4 lg:px-6 print:hidden">
-        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-3 mb-4">
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-4">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1">
               <input
@@ -695,9 +711,9 @@ export default function RatesPage() {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="container mx-auto px-4 lg:px-6 print:hidden">
+      <div className="container mx-auto px-4 lg:px-6 mt-4 print:hidden">
         <div className="bg-white rounded-t-lg shadow-md border border-gray-200">
-          <div className="flex overflow-x-auto border-b border-gray-200">
+          <div className="flex overflow-x-auto py-1 px-2 gap-1">
             {/* Original Tabs */}
             <button
               onClick={() => setActiveTab('transportation')}
@@ -820,7 +836,16 @@ export default function RatesPage() {
 
       {/* Main Content - Tables */}
       <main className="container mx-auto px-4 lg:px-6 pb-6">
-        <div className="bg-white rounded-b-lg shadow-md border border-gray-200 overflow-hidden print:shadow-none print:rounded-none">
+        <div className="bg-white rounded-b-lg shadow-md border border-gray-200 border-t-0 overflow-hidden print:shadow-none print:rounded-none">
+          {/* Currency indicator */}
+          <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+            <span className="text-xs text-gray-500">
+              Showing rates in <span className="font-semibold text-gray-700">{userCurrency}</span>
+            </span>
+            {currencyLoading && (
+              <span className="text-xs text-gray-400">Loading currency...</span>
+            )}
+          </div>
           <div className="overflow-x-auto">
             
             {/* Transportation Table */}
@@ -828,18 +853,19 @@ export default function RatesPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Service</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Vehicle</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
-                    <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Capacity</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Supplier</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Code</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Service</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Vehicle</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">City</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Capacity</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Rate</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Supplier</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {paginatedRates.transportation.map((rate, index) => (
-                    <tr key={rate.service_code} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                    <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                      <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.service_type}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{rate.vehicle_type}</td>
                       <td className="px-4 py-3">
@@ -848,13 +874,14 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center text-xs">
-                        {rate.capacity_min && rate.capacity_max ? 
-                          <span className="px-2 py-0.5 bg-gray-100 rounded text-gray-700">{rate.capacity_min}-{rate.capacity_max}</span> : 
+                        {rate.capacity_min && rate.capacity_max ?
+                          <span className="px-2 py-0.5 bg-gray-100 rounded text-gray-700">{rate.capacity_min}-{rate.capacity_max}</span> :
                           <span className="text-gray-400">-</span>
                         }
                       </td>
-                      <td className="px-4 py-3 text-right text-sm font-bold text-green-600">€{Number(rate.base_rate_eur || rate.eur_rate || 0).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right text-sm font-bold text-primary-600">€{Number(rate.base_rate_non_eur || rate.non_eur_rate || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
+                        {displayRate(rate.base_rate_eur || rate.eur_rate, rate.base_rate_non_eur || rate.non_eur_rate)}
+                      </td>
                       <td className="px-4 py-3 text-xs text-gray-600">{rate.supplier_name || '-'}</td>
                     </tr>
                   ))}
@@ -875,17 +902,18 @@ export default function RatesPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Language</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Type</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Duration</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Code</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Language</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">City</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Duration</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Rate</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {paginatedRates.guides.map((rate, index) => (
-                    <tr key={rate.service_code} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                    <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                      <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.guide_language}</td>
                       <td className="px-4 py-3 text-sm text-gray-700">{rate.guide_type}</td>
                       <td className="px-4 py-3">
@@ -898,8 +926,9 @@ export default function RatesPage() {
                           {rate.tour_duration?.replace('_', ' ')}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-sm font-bold text-green-600">€{Number(rate.base_rate_eur || rate.eur_rate || 0).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right text-sm font-bold text-primary-600">€{Number(rate.base_rate_non_eur || rate.non_eur_rate || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
+                        {displayRate(rate.base_rate_eur || rate.eur_rate, rate.base_rate_non_eur || rate.non_eur_rate)}
+                      </td>
                     </tr>
                   ))}
                   {paginatedRates.guides.length === 0 && (
@@ -919,16 +948,17 @@ export default function RatesPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Attraction</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Category</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Code</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Attraction</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Category</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">City</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Rate</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {paginatedRates.entrances.map((rate, index) => (
-                    <tr key={rate.service_code} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                    <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                      <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.attraction_name}</td>
                       <td className="px-4 py-3">
                         {rate.category && (
@@ -943,10 +973,7 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        €{Number(rate.base_rate_eur || rate.eur_rate || 0).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm font-bold text-primary-600">
-                        €{Number(rate.base_rate_non_eur || rate.non_eur_rate || 0).toFixed(2)}
+                        {displayRate(rate.base_rate_eur || rate.eur_rate, rate.base_rate_non_eur || rate.non_eur_rate)}
                       </td>
                     </tr>
                   ))}
@@ -967,17 +994,18 @@ export default function RatesPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Property</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Tier</th>
-                    <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Stars</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Code</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Property</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Tier</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Stars</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">City</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Rate</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {paginatedRates.accommodation.map((rate, index) => (
-                    <tr key={rate.service_code} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                    <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                      <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.property_name}</td>
                       <td className="px-4 py-3">
                         {rate.tier && (
@@ -995,10 +1023,7 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        €{Number(rate.base_rate_eur).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm font-bold text-primary-600">
-                        €{Number(rate.base_rate_non_eur).toFixed(2)}
+                        {displayRate(rate.base_rate_eur, rate.base_rate_non_eur)}
                       </td>
                     </tr>
                   ))}
@@ -1019,16 +1044,17 @@ export default function RatesPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Restaurant</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Meal Type</th>
-                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">EUR Rate</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-EUR</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Code</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Restaurant</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Meal Type</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">City</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Rate</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {paginatedRates.meals.map((rate, index) => (
-                    <tr key={rate.service_code} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                    <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                      <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.restaurant_name}</td>
                       <td className="px-4 py-3 text-xs text-gray-700">{rate.meal_type}</td>
                       <td className="px-4 py-3">
@@ -1036,8 +1062,9 @@ export default function RatesPage() {
                           {rate.city}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right text-sm font-bold text-green-600">€{Number(rate.base_rate_eur || rate.eur_rate || 0).toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right text-sm font-bold text-primary-600">€{Number(rate.base_rate_non_eur || rate.non_eur_rate || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
+                        {displayRate(rate.base_rate_eur || rate.eur_rate, rate.base_rate_non_eur || rate.non_eur_rate)}
+                      </td>
                     </tr>
                   ))}
                   {paginatedRates.meals.length === 0 && (
@@ -1107,13 +1134,13 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        €{rate.rate_single_eur.toFixed(0)}
+                        {display(rate.rate_single_eur, 'EUR')}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-blue-600">
-                        €{rate.rate_double_eur.toFixed(0)}
+                        {display(rate.rate_double_eur, 'EUR')}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-purple-600">
-                        {rate.rate_triple_eur ? `€${rate.rate_triple_eur.toFixed(0)}` : '-'}
+                        {rate.rate_triple_eur ? display(rate.rate_triple_eur, 'EUR') : '-'}
                       </td>
                     </tr>
                   ))}
@@ -1166,10 +1193,10 @@ export default function RatesPage() {
                         {rate.arrival_time || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        €{rate.rate_oneway_eur.toFixed(0)}
+                        {display(rate.rate_oneway_eur, 'EUR')}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-purple-600">
-                        {rate.rate_roundtrip_eur ? `€${rate.rate_roundtrip_eur.toFixed(0)}` : '-'}
+                        {rate.rate_roundtrip_eur ? display(rate.rate_roundtrip_eur, 'EUR') : '-'}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">
                         {rate.meals_included || 'Dinner & Breakfast'}
@@ -1223,7 +1250,7 @@ export default function RatesPage() {
                         {rate.departure_times || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        €{rate.rate_eur.toFixed(0)}
+                        {display(rate.rate_eur, 'EUR')}
                       </td>
                     </tr>
                   ))}
@@ -1282,7 +1309,7 @@ export default function RatesPage() {
                         {rate.description || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        €{rate.rate_eur.toFixed(0)}
+                        {displayRate(rate.rate_eur, rate.rate_non_eur)}
                       </td>
                     </tr>
                   ))}
@@ -1339,7 +1366,7 @@ export default function RatesPage() {
                         {rate.description || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        €{rate.rate_eur.toFixed(0)}
+                        {displayRate(rate.rate_eur, rate.rate_non_eur)}
                       </td>
                     </tr>
                   ))}
@@ -1397,7 +1424,7 @@ export default function RatesPage() {
                         {rate.description || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        €{rate.rate_eur.toFixed(0)}
+                        {display(rate.rate_eur, 'EUR')}
                       </td>
                     </tr>
                   ))}

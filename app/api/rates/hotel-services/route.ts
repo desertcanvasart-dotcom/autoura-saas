@@ -1,10 +1,21 @@
 // app/api/rates/hotel-services/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 export async function GET() {
   try {
-    const supabase = createClient()
+    // Use authenticated client - RLS automatically filters by tenant
+    let supabase
+    try {
+      supabase = await createAuthenticatedClient()
+    } catch (authError) {
+      console.error('Auth error creating client:', authError)
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
     const { data, error } = await supabase
       .from('hotel_staff_rates')
       .select('*')
@@ -21,12 +32,21 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Require authentication and get tenant info
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { supabase, tenant_id } = authResult
     const body = await request.json()
 
     const { data, error } = await supabase
       .from('hotel_staff_rates')
-      .insert([body])
+      .insert([{ ...body, tenant_id }])
       .select()
       .single()
 

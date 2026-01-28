@@ -5,7 +5,16 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 export async function GET(request: NextRequest) {
   try {
     // Use authenticated client - RLS automatically filters by tenant
-    const supabase = await createAuthenticatedClient()
+    let supabase
+    try {
+      supabase = await createAuthenticatedClient()
+    } catch (authError) {
+      console.error('Auth error creating client:', authError)
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
 
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category_id')
@@ -38,7 +47,7 @@ export async function GET(request: NextRequest) {
     if (templatesError) {
       console.error('Error fetching templates:', templatesError)
       return NextResponse.json(
-        { success: false, error: 'Failed to fetch templates' },
+        { success: false, error: `Failed to fetch templates: ${templatesError.message}`, details: templatesError },
         { status: 500 }
       )
     }

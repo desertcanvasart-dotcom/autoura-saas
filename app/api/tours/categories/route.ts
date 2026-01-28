@@ -5,7 +5,16 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 export async function GET(request: NextRequest) {
   try {
     // Use authenticated client - RLS automatically filters by tenant
-    const supabase = await createAuthenticatedClient()
+    let supabase
+    try {
+      supabase = await createAuthenticatedClient()
+    } catch (authError) {
+      console.error('Auth error creating client:', authError)
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
 
     const { data, error } = await supabase
       .from('tour_categories')
@@ -16,7 +25,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Error fetching categories:', error)
       return NextResponse.json(
-        { success: false, error: 'Failed to fetch categories' },
+        { success: false, error: `Failed to fetch categories: ${error.message}`, details: error },
         { status: 500 }
       )
     }

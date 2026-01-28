@@ -3,11 +3,22 @@
 // Updated to pull from actual resource management tables
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    // Use authenticated client - RLS automatically filters by tenant
+    let supabase
+    try {
+      supabase = await createAuthenticatedClient()
+    } catch (authError) {
+      console.error('Auth error creating client:', authError)
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const city = searchParams.get('city')
