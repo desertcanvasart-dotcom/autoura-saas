@@ -200,7 +200,7 @@ export default function AirportStaffContent() {
     e.preventDefault()
 
     if (!canManagePartners) {
-      showToast('error', 'You don\'t have permission to manage airport staff')
+      showToast('You don\'t have permission to manage airport staff', 'error')
       return
     }
 
@@ -220,22 +220,22 @@ export default function AirportStaffContent() {
       const data = await response.json()
 
       if (data.success) {
-        showToast('success', editingStaff ? 'Staff member updated successfully' : 'Staff member added successfully')
+        showToast(editingStaff ? 'Staff member updated successfully' : 'Staff member added successfully', 'success')
         setShowModal(false)
         fetchStaff()
       } else {
-        showToast('error', data.error || 'Failed to save staff member')
+        showToast(data.error || 'Failed to save staff member', 'error')
       }
     } catch (error) {
       console.error('Error saving staff:', error)
-      showToast('error', 'Failed to save staff member')
+      showToast('Failed to save staff member', 'error')
     }
   }
 
   // Delete staff
   const handleDelete = async (id: string, name: string) => {
     if (!canManagePartners) {
-      showToast('error', 'You don\'t have permission to delete staff members')
+      showToast('You don\'t have permission to delete staff members', 'error')
       return
     }
 
@@ -254,14 +254,14 @@ export default function AirportStaffContent() {
       const data = await response.json()
 
       if (data.success) {
-        showToast('success', 'Staff member deleted successfully')
+        showToast('Staff member deleted successfully', 'success')
         fetchStaff()
       } else {
-        showToast('error', data.error || 'Failed to delete staff member')
+        showToast(data.error || 'Failed to delete staff member', 'error')
       }
     } catch (error) {
       console.error('Error deleting staff:', error)
-      showToast('error', 'Failed to delete staff member')
+      showToast('Failed to delete staff member', 'error')
     }
   }
   
