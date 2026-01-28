@@ -16,10 +16,10 @@ const supabaseAdmin = createClient(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { type: string; id: string } }
+  { params }: { params: Promise<{ type: string; id: string }> }
 ) {
   try {
-    const { type, id } = params
+    const { type, id } = await params
 
     if (type !== 'b2c' && type !== 'b2b') {
       return NextResponse.json(
