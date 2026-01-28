@@ -39,32 +39,22 @@ export async function GET(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // Get all members with their user information
+    // Get all members
     const { data: members, error } = await supabase
       .from('tenant_members')
-      .select(`
-        id,
-        user_id,
-        role,
-        joined_at,
-        user:auth.users!inner(
-          id,
-          email,
-          raw_user_meta_data
-        )
-      `)
+      .select('*')
       .eq('tenant_id', tenant_id)
       .order('joined_at', { ascending: false })
 
     if (error) throw error
 
-    // Format response with user details
-    const formattedMembers = (members || []).map(member => ({
+    // Format response
+    const formattedMembers = (members || []).map((member: any) => ({
       id: member.id,
       user_id: member.user_id,
-      email: member.user?.email || 'N/A',
-      name: member.user?.raw_user_meta_data?.full_name || member.user?.raw_user_meta_data?.name || 'Unknown',
-      avatar_url: member.user?.raw_user_meta_data?.avatar_url || null,
+      email: member.email || 'N/A',
+      name: member.name || 'Unknown',
+      avatar_url: null,
       role: member.role,
       joined_at: member.joined_at
     }))

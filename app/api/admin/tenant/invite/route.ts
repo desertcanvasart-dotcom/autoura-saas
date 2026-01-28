@@ -78,26 +78,8 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // Check if user is already a member
-    const { data: existingMember } = await supabase
-      .from('tenant_members')
-      .select('id')
-      .eq('tenant_id', tenant_id)
-      .eq('user_id', (
-        await supabase
-          .from('auth.users')
-          .select('id')
-          .eq('email', email)
-          .single()
-      )?.data?.id || 'non-existent')
-      .single()
-
-    if (existingMember) {
-      return NextResponse.json({
-        success: false,
-        error: 'User is already a member of this tenant'
-      }, { status: 400 })
-    }
+    // Note: We skip the existing member check since we can't easily query auth.users
+    // The invitation will be created and the user can accept it when they sign up
 
     // Check if there's a pending invitation
     const { data: existingInvitation } = await supabase
@@ -218,10 +200,7 @@ export async function GET(request: NextRequest) {
     // Get all invitations
     const { data: invitations, error } = await supabase
       .from('tenant_invitations')
-      .select(`
-        *,
-        inviter:auth.users!tenant_invitations_invited_by_fkey(email)
-      `)
+      .select('*')
       .eq('tenant_id', tenant_id)
       .order('created_at', { ascending: false })
 

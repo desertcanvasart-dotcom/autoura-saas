@@ -56,7 +56,7 @@ export async function PATCH(
     // Get the member being updated
     const { data: targetMember, error: fetchError } = await supabase
       .from('tenant_members')
-      .select('*, user:auth.users!inner(email)')
+      .select('*')
       .eq('id', id)
       .eq('tenant_id', tenant_id)
       .single()
@@ -77,14 +77,14 @@ export async function PATCH(
     }
 
     // Prevent users from modifying their own role
-    if (targetMember.user_id === user.id) {
+    if ((targetMember as any).user_id === user.id) {
       return NextResponse.json({
         success: false,
         error: 'You cannot change your own role'
       }, { status: 400 })
     }
 
-    const old_role = targetMember.role
+    const old_role = (targetMember as any).role
 
     // Update the role
     const { data: updatedMember, error: updateError } = await supabase
@@ -106,7 +106,7 @@ export async function PATCH(
         resourceType: 'tenant_member',
         resourceId: id,
         details: {
-          member_email: targetMember.user?.email,
+          member_id: (targetMember as any).user_id,
           old_role,
           new_role: role
         }
@@ -171,7 +171,7 @@ export async function DELETE(
     // Get the member being removed
     const { data: targetMember, error: fetchError } = await supabase
       .from('tenant_members')
-      .select('*, user:auth.users!inner(email)')
+      .select('*')
       .eq('id', id)
       .eq('tenant_id', tenant_id)
       .single()
@@ -184,7 +184,7 @@ export async function DELETE(
     }
 
     // Prevent removing the last owner
-    if (targetMember.role === 'owner') {
+    if ((targetMember as any).role === 'owner') {
       const { count } = await supabase
         .from('tenant_members')
         .select('*', { count: 'exact', head: true })
@@ -200,7 +200,7 @@ export async function DELETE(
     }
 
     // Prevent users from removing themselves
-    if (targetMember.user_id === user.id) {
+    if ((targetMember as any).user_id === user.id) {
       return NextResponse.json({
         success: false,
         error: 'You cannot remove yourself. Ask another admin to remove you.'
@@ -225,8 +225,8 @@ export async function DELETE(
         resourceType: 'tenant_member',
         resourceId: id,
         details: {
-          member_email: targetMember.user?.email,
-          member_role: targetMember.role
+          member_id: (targetMember as any).user_id,
+          member_role: (targetMember as any).role
         }
       }
     )
