@@ -16,6 +16,12 @@ export async function POST(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const { id: itineraryId } = await params
 
     // Get itinerary details - RLS ensures tenant isolation

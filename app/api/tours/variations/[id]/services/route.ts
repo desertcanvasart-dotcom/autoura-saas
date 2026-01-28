@@ -174,6 +174,12 @@ export async function POST(
     }
 
     const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
 
     // Verify variation belongs to this tenant
@@ -255,6 +261,12 @@ export async function PUT(
     }
 
     const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
     const { services, mode } = body
 
@@ -381,6 +393,12 @@ export async function DELETE(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const { searchParams } = new URL(request.url)
     const serviceId = searchParams.get('serviceId')
 

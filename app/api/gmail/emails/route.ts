@@ -21,6 +21,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { supabase, user } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const searchParams = request.nextUrl.searchParams
     const query = searchParams.get('query') || ''
     const pageToken = searchParams.get('pageToken') || undefined

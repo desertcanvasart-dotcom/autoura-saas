@@ -16,6 +16,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { supabase, tenant_id, user } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     if (!supabase || !user) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },

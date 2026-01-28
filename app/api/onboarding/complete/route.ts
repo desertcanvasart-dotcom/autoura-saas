@@ -12,6 +12,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Mark onboarding as completed
     const { error } = await supabase

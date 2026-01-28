@@ -63,6 +63,12 @@ export async function PUT(request: NextRequest) {
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const preferences = await request.json()
 
     // Get authenticated user

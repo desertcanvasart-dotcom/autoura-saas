@@ -145,6 +145,12 @@ export async function POST(
     }
 
     const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
 
     const {
@@ -344,6 +350,12 @@ export async function PATCH(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
 
     const { activity_id, ...updates } = body
@@ -442,6 +454,12 @@ export async function DELETE(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const { searchParams } = new URL(request.url)
 
     const activityId = searchParams.get('activity_id')

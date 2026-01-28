@@ -13,6 +13,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { supabase, tenant_id, user } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Verify service role key exists
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {

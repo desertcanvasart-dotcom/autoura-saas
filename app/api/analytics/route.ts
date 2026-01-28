@@ -16,6 +16,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Calculate date range
     const now = new Date()

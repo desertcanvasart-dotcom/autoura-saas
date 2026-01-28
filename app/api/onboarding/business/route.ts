@@ -12,6 +12,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
 
     // Update tenant with business configuration

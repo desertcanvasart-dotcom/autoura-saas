@@ -42,6 +42,12 @@ export async function GET(request: NextRequest) {
       )
     }
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     const searchParams = request.nextUrl.searchParams
     const city = searchParams.get('city')
@@ -116,6 +122,12 @@ export async function POST(request: NextRequest) {
       )
     }
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     const body = await request.json()
 
@@ -200,6 +212,12 @@ export async function PUT(request: NextRequest) {
       )
     }
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     const body = await request.json()
     const { id, ...updates } = body
@@ -270,6 +288,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     const searchParams = request.nextUrl.searchParams
     const id = searchParams.get('id')

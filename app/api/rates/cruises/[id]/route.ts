@@ -16,6 +16,12 @@ export async function GET(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const { id } = await params
 
     const { data, error } = await supabase
@@ -54,6 +60,12 @@ export async function PUT(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const { id } = await params
     const body = await request.json()
 
@@ -161,6 +173,12 @@ export async function DELETE(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const { id } = await params
 
     const { error } = await supabase

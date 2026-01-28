@@ -81,6 +81,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
 
     // Prevent manual tenant_id setting - RLS will handle it

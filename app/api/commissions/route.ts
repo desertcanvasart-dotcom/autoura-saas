@@ -13,6 +13,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const searchParams = request.nextUrl.searchParams
     const type = searchParams.get('type') // receivable, payable
     const category = searchParams.get('category')
@@ -108,6 +114,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
 
     // Validate required fields

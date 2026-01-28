@@ -69,6 +69,12 @@ export async function PUT(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
 
     const updateData: any = {}
@@ -134,6 +140,12 @@ export async function DELETE(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Delete activities first (RLS enforced)
     await supabase

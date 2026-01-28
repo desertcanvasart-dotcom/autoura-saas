@@ -13,6 +13,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

@@ -19,6 +19,12 @@ export async function POST(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Increment usage count
     const { error } = await supabase.rpc('increment_template_usage', { template_id: id })

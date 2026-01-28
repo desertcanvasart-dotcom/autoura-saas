@@ -16,6 +16,12 @@ export async function GET() {
     }
 
     const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Get top templates by usage
     const { data: topTemplates } = await supabase

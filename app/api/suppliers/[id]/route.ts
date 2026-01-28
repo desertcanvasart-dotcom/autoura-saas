@@ -79,6 +79,12 @@ export async function PUT(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const body = await request.json()
 
     // Filter to only valid fields to prevent database errors

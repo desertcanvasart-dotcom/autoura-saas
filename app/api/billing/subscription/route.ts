@@ -16,6 +16,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // For now, return a mock subscription based on tenant_features
     // In production, this would query the actual subscription table

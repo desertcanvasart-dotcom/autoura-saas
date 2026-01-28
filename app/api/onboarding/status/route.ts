@@ -12,6 +12,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { supabase, tenant_id } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Get tenant features to check onboarding status
     const { data: features, error: featuresError } = await supabase

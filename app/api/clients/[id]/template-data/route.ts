@@ -18,6 +18,12 @@ export async function GET(
     }
 
     const { supabase } = authResult
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
     const { id: clientId } = await params
     const { searchParams } = new URL(request.url)
     const itineraryId = searchParams.get('itineraryId') // Optional: specific itinerary
