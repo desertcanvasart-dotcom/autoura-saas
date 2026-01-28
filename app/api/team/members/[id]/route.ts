@@ -4,9 +4,10 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 // Update team member role
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authResult = await requireAuth()
     if (authResult.error) {
       return NextResponse.json(
@@ -63,7 +64,7 @@ export async function PATCH(
     const { error } = await adminClient
       .from('tenant_members')
       .update(updates)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('tenant_id', tenant_id) // Ensure member belongs to same tenant
 
     if (error) {
@@ -90,9 +91,10 @@ export async function PATCH(
 // Remove team member
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authResult = await requireAuth()
     if (authResult.error) {
       return NextResponse.json(
@@ -116,7 +118,7 @@ export async function DELETE(
     const { error } = await adminClient
       .from('tenant_members')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('tenant_id', tenant_id) // Ensure member belongs to same tenant
 
     if (error) {

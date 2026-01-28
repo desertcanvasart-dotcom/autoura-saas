@@ -4,10 +4,11 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 // GET single booking
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('📦 Fetching booking:', params.id)
+    const { id } = await params
+    console.log('📦 Fetching booking:', id)
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -48,7 +49,7 @@ export async function GET(
           phone
         )
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('tenant_id', tenant_id)
       .single()
 
@@ -64,7 +65,7 @@ export async function GET(
     const { data: passengers } = await adminClient
       .from('booking_passengers')
       .select('*')
-      .eq('booking_id', params.id)
+      .eq('booking_id', id)
       .eq('tenant_id', tenant_id)
       .order('is_lead_passenger', { ascending: false })
 
@@ -72,7 +73,7 @@ export async function GET(
     const { data: payments } = await adminClient
       .from('booking_payments')
       .select('*')
-      .eq('booking_id', params.id)
+      .eq('booking_id', id)
       .eq('tenant_id', tenant_id)
       .order('payment_date', { ascending: false })
 
@@ -98,10 +99,11 @@ export async function GET(
 // PATCH booking (update)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('📝 Updating booking:', params.id)
+    const { id } = await params
+    console.log('📝 Updating booking:', id)
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -167,7 +169,7 @@ export async function PATCH(
     const { data: booking, error } = await adminClient
       .from('bookings')
       .update(updates)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('tenant_id', tenant_id)
       .select()
       .single()
@@ -199,10 +201,11 @@ export async function PATCH(
 // DELETE booking
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('🗑️ Deleting booking:', params.id)
+    const { id } = await params
+    console.log('🗑️ Deleting booking:', id)
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -228,7 +231,7 @@ export async function DELETE(
     const { data: booking, error: fetchError } = await adminClient
       .from('bookings')
       .select('booking_number, status')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('tenant_id', tenant_id)
       .single()
 
@@ -251,7 +254,7 @@ export async function DELETE(
     const { error } = await adminClient
       .from('bookings')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('tenant_id', tenant_id)
 
     if (error) {

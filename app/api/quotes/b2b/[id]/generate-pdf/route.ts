@@ -10,10 +10,10 @@ import React from 'react';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const quoteId = params.id;
+    const { id: quoteId } = await params;
 
     // Authenticate and get user
     const { supabase, user } = await requireAuth();
@@ -133,10 +133,10 @@ export async function POST(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const quoteId = params.id;
+    const { id: quoteId } = await params;
 
     // Authenticate and get user
     const { supabase, user } = await requireAuth();

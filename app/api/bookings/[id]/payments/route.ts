@@ -4,9 +4,10 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 // GET all payments for a booking
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authResult = await requireAuth()
     if (authResult.error) {
       return NextResponse.json(
@@ -21,7 +22,7 @@ export async function GET(
     const { data: payments, error } = await adminClient
       .from('booking_payments')
       .select('*')
-      .eq('booking_id', params.id)
+      .eq('booking_id', id)
       .eq('tenant_id', tenant_id)
       .order('payment_date', { ascending: false })
 
@@ -49,9 +50,10 @@ export async function GET(
 // POST record payment
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authResult = await requireAuth()
     if (authResult.error) {
       return NextResponse.json(
@@ -77,7 +79,7 @@ export async function POST(
     const { data: booking, error: bookingError } = await adminClient
       .from('bookings')
       .select('*')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('tenant_id', tenant_id)
       .single()
 
@@ -121,7 +123,7 @@ export async function POST(
     // Create payment record
     const paymentData = {
       tenant_id,
-      booking_id: params.id,
+      booking_id: id,
       payment_number,
       amount,
       currency: booking.currency,
@@ -170,7 +172,7 @@ export async function POST(
         ...(payment_type === 'deposit' && new_status === 'confirmed' ? { confirmation_date: new Date().toISOString().split('T')[0] } : {}),
         ...(new_status === 'paid_full' ? { full_payment_date: new Date().toISOString().split('T')[0] } : {})
       })
-      .eq('id', params.id)
+      .eq('id', id)
 
     if (bookingUpdateError) {
       console.error('Error updating booking:', bookingUpdateError)

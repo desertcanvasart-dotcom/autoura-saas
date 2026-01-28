@@ -4,10 +4,11 @@ import { generateInvoicePDF } from '@/lib/invoice-pdf-generator'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('📧 Sending booking confirmation:', params.id)
+    const { id } = await params
+    console.log('📧 Sending booking confirmation:', id)
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -50,7 +51,7 @@ export async function POST(
           whatsapp
         )
       `)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('tenant_id', tenant_id)
       .single()
 

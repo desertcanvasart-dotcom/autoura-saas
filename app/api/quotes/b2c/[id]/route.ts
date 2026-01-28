@@ -7,9 +7,11 @@ import { createAuthenticatedClient, createAdminClient, requireAuth } from '@/lib
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     // Use authenticated client - RLS will enforce tenant isolation
     const supabase = await createAuthenticatedClient();
 
@@ -21,8 +23,6 @@ export async function GET(
         error: 'Not authenticated'
       }, { status: 401 })
     }
-
-    const { id } = params;
 
     const { data: quote, error } = await supabase
       .from('b2c_quotes')
@@ -246,9 +246,11 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     // Use authenticated client - RLS will enforce tenant isolation and role permission
     const supabase = await createAuthenticatedClient();
 
@@ -260,8 +262,6 @@ export async function DELETE(
         error: 'Not authenticated'
       }, { status: 401 })
     }
-
-    const { id } = params;
 
     const { error } = await supabase
       .from('b2c_quotes')

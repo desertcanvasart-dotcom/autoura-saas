@@ -4,9 +4,10 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 // GET passengers for a booking
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authResult = await requireAuth()
     if (authResult.error) {
       return NextResponse.json(
@@ -21,7 +22,7 @@ export async function GET(
     const { data: passengers, error } = await adminClient
       .from('booking_passengers')
       .select('*')
-      .eq('booking_id', params.id)
+      .eq('booking_id', id)
       .eq('tenant_id', tenant_id)
       .order('is_lead_passenger', { ascending: false })
       .order('created_at', { ascending: true })
@@ -50,9 +51,10 @@ export async function GET(
 // POST create passenger
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authResult = await requireAuth()
     if (authResult.error) {
       return NextResponse.json(
@@ -69,7 +71,7 @@ export async function POST(
     const { data: booking, error: bookingError } = await adminClient
       .from('bookings')
       .select('id')
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('tenant_id', tenant_id)
       .single()
 
@@ -113,7 +115,7 @@ export async function POST(
 
     const passengerData = {
       tenant_id,
-      booking_id: params.id,
+      booking_id: id,
       title,
       first_name,
       last_name,
