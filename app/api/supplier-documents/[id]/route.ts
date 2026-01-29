@@ -8,7 +8,12 @@ export async function GET(
 ) {
   // Authenticate and get tenant context
   const authResult = await requireAuth()
-  if (authResult.error) return authResult.response
+  if (authResult.error) {
+    return NextResponse.json(
+      { success: false, error: authResult.error },
+      { status: authResult.status }
+    )
+  }
 
   const { supabase } = authResult
     if (!supabase) {
@@ -47,7 +52,12 @@ export async function PUT(
 ) {
   // Authenticate and get tenant context
   const authResult = await requireAuth()
-  if (authResult.error) return authResult.response
+  if (authResult.error) {
+    return NextResponse.json(
+      { success: false, error: authResult.error },
+      { status: authResult.status }
+    )
+  }
 
   const { supabase } = authResult
     if (!supabase) {
@@ -105,7 +115,12 @@ export async function DELETE(
 ) {
   // Authenticate and get tenant context
   const authResult = await requireAuth()
-  if (authResult.error) return authResult.response
+  if (authResult.error) {
+    return NextResponse.json(
+      { success: false, error: authResult.error },
+      { status: authResult.status }
+    )
+  }
 
   const { supabase } = authResult
     if (!supabase) {
