@@ -183,13 +183,13 @@ export async function POST(
       }
     }
 
-    await getSupabaseAdmin()
+    await (getSupabaseAdmin() as any)
       .from('tour_quotes')
       .update({
         status: 'converted',
         converted_to_itinerary_id: itin.id,
         converted_at: new Date().toISOString()
-      } as any)
+      })
       .eq('id', id)
 
     return NextResponse.json({
