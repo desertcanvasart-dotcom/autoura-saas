@@ -36,6 +36,7 @@ export async function GET() {
     // Check if API key is configured (don't expose the actual key)
     const apiKeyConfigured = !!process.env.ANTHROPIC_API_KEY
     const globalEnabled = process.env.WHATSAPP_AI_ENABLED === 'true'
+    const toolsEnabled = process.env.WHATSAPP_AI_TOOLS_ENABLED === 'true'
 
     return NextResponse.json({
       success: true,
@@ -43,8 +44,17 @@ export async function GET() {
         enabled: features?.whatsapp_ai_enabled || false,
         apiKeyConfigured,
         globalEnabled,
+        toolsEnabled,
         model: process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514',
-        canEnable: apiKeyConfigured && globalEnabled
+        canEnable: apiKeyConfigured && globalEnabled,
+        availableTools: toolsEnabled ? [
+          'Search customer trips & quotes',
+          'Create trip inquiries',
+          'Request quotes',
+          'Send quote PDFs',
+          'Check availability',
+          'Escalate to human'
+        ] : []
       }
     })
   } catch (error: any) {

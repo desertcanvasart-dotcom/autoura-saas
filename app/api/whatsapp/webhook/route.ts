@@ -203,7 +203,8 @@ export async function POST(request: NextRequest) {
             conversationId,
             clientId,
             phoneNumber,
-            body
+            body,
+            tenantId
           )
 
           if (aiResponse.success && aiResponse.shouldRespond && aiResponse.reply) {
@@ -228,7 +229,9 @@ export async function POST(request: NextRequest) {
                 metadata: {
                   ai_generated: true,
                   ai_confidence: aiResponse.confidence,
-                  ai_model: process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
+                  ai_model: process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514',
+                  tools_used: aiResponse.toolsUsed || [],
+                  actions_performed: aiResponse.actionsPerformed || []
                 }
               })
               console.log('✅ AI response sent and stored:', sendResult.messageId)
@@ -265,6 +268,7 @@ export async function POST(request: NextRequest) {
 // GET endpoint for webhook verification
 export async function GET(request: NextRequest) {
   const aiEnabled = process.env.WHATSAPP_AI_ENABLED === 'true'
+  const aiToolsEnabled = process.env.WHATSAPP_AI_TOOLS_ENABLED === 'true'
   const aiModel = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
 
   return NextResponse.json({
@@ -275,12 +279,26 @@ export async function GET(request: NextRequest) {
       'Conversation-based message storage',
       'Auto client matching',
       'Media support',
-      aiEnabled ? `AI auto-reply enabled (${aiModel})` : 'AI auto-reply disabled'
+      aiEnabled ? `AI auto-reply enabled (${aiModel})` : 'AI auto-reply disabled',
+      aiToolsEnabled ? 'AI tools enabled (can take actions)' : 'AI tools disabled'
     ],
     ai: {
       enabled: aiEnabled,
+      toolsEnabled: aiToolsEnabled,
       model: aiModel,
-      envVar: 'Set WHATSAPP_AI_ENABLED=true to enable AI responses'
+      envVars: {
+        aiEnabled: 'WHATSAPP_AI_ENABLED=true to enable AI responses',
+        toolsEnabled: 'WHATSAPP_AI_TOOLS_ENABLED=true to enable AI actions'
+      },
+      availableTools: aiToolsEnabled ? [
+        'search_customer_trips',
+        'get_quote_details',
+        'create_trip_inquiry',
+        'request_quote_for_trip',
+        'send_quote_to_customer',
+        'check_availability',
+        'escalate_to_human'
+      ] : []
     }
   })
 }
@@ -298,6 +316,7 @@ export async function GET(request: NextRequest) {
 //
 // Required for AI (Optional):
 //   WHATSAPP_AI_ENABLED      - Set to 'true' to enable AI auto-responses
+//   WHATSAPP_AI_TOOLS_ENABLED - Set to 'true' to enable AI tool calling (Phase 2)
 //   ANTHROPIC_API_KEY        - Anthropic API key for Claude
 //   WHATSAPP_AI_MODEL        - Claude model ID (default: claude-sonnet-4-20250514)
 //
@@ -326,5 +345,13 @@ export async function GET(request: NextRequest) {
 // - Automatically skips sensitive topics (complaints, refunds)
 // - Skips when customer requests human agent
 // - Stores AI metadata with each message
+//
+// When WHATSAPP_AI_TOOLS_ENABLED=true (Phase 2):
+// - AI can search customer's trips and quotes
+// - AI can create new trip inquiries
+// - AI can request quotes for trips
+// - AI can send quote PDFs to customers
+// - AI can check availability for dates
+// - AI can escalate conversations to humans
 //
 // ============================================

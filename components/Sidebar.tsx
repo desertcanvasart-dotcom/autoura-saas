@@ -227,6 +227,8 @@ const navigation: NavSection[] = [
       { label: 'Settings', href: '/settings', icon: Settings },
       { label: 'Organization', href: '/settings/tenant', icon: Building },
       { label: 'Team Management', href: '/settings/team', icon: Users },
+      { label: 'WhatsApp', href: '/settings/whatsapp', icon: MessageSquare },
+      { label: 'Capacity', href: '/settings/capacity', icon: Calendar },
       { label: 'Billing and Subscriptions', href: '/settings/billing', icon: CreditCard },
       { label: 'User Management', href: '/users', icon: Shield },
     ]

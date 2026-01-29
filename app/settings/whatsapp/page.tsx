@@ -21,8 +21,10 @@ interface AISettings {
   enabled: boolean
   apiKeyConfigured: boolean
   globalEnabled: boolean
+  toolsEnabled: boolean
   model: string
   canEnable: boolean
+  availableTools: string[]
 }
 
 export default function WhatsAppSettingsPage() {
@@ -432,26 +434,55 @@ export default function WhatsAppSettingsPage() {
 
               {/* Features List */}
               {aiSettings.enabled && (
-                <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                  <p className="text-xs font-medium text-purple-800 mb-2">AI will automatically:</p>
-                  <ul className="text-xs text-purple-700 space-y-1">
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3 h-3" />
-                      Answer customer inquiries about their bookings
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3 h-3" />
-                      Provide tour information and availability
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3 h-3" />
-                      Skip sensitive topics (complaints, refunds) for human handling
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <Check className="w-3 h-3" />
-                      Respond in the customer's language
-                    </li>
-                  </ul>
+                <div className="space-y-3">
+                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <p className="text-xs font-medium text-purple-800 mb-2">AI will automatically:</p>
+                    <ul className="text-xs text-purple-700 space-y-1">
+                      <li className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3" />
+                        Answer customer inquiries about their bookings
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3" />
+                        Provide tour information and availability
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3" />
+                        Skip sensitive topics (complaints, refunds) for human handling
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <Check className="w-3 h-3" />
+                        Respond in the customer's language
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Tool Actions (Phase 2) */}
+                  {aiSettings.toolsEnabled && aiSettings.availableTools.length > 0 && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Sparkles className="w-3.5 h-3.5 text-green-600" />
+                        <p className="text-xs font-medium text-green-800">Advanced Actions Enabled:</p>
+                      </div>
+                      <ul className="text-xs text-green-700 space-y-1">
+                        {aiSettings.availableTools.map((tool, index) => (
+                          <li key={index} className="flex items-center gap-1.5">
+                            <Check className="w-3 h-3" />
+                            {tool}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {!aiSettings.toolsEnabled && (
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                      <p className="text-xs text-gray-600">
+                        <span className="font-medium">Advanced Actions:</span> Not enabled.
+                        Set <code className="bg-gray-100 px-1 rounded">WHATSAPP_AI_TOOLS_ENABLED=true</code> to allow AI to take actions like creating trips, sending quotes, etc.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
