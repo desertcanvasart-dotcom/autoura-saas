@@ -122,6 +122,7 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Suppliers', href: '/suppliers', icon: Building },
       { label: 'Itineraries', href: '/itineraries', icon: Route },
+      { label: 'Tour Departures', href: '/departures', icon: Calendar },
       { label: 'Team Members', href: '/team-members', icon: Users },
       { label: 'Tasks', href: '/tasks', icon: CheckSquare },
     ]

@@ -188,7 +188,7 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'check_availability',
-    description: 'Check general availability for a specific date range. Use this when customer asks if specific dates are available.',
+    description: 'Check availability for a specific date range or tour. Use this when customer asks if specific dates are available or about group tour departures.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -203,9 +203,17 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
         num_travelers: {
           type: 'number',
           description: 'Number of travelers'
+        },
+        tour_name: {
+          type: 'string',
+          description: 'Name of specific tour to check (e.g., "Nile Cruise", "Cairo Pyramids"). Use this when customer asks about a specific tour.'
+        },
+        check_group_tours: {
+          type: 'boolean',
+          description: 'If true, check for scheduled group tour departures'
         }
       },
-      required: ['start_date', 'end_date']
+      required: ['start_date']
     }
   },
   {
@@ -647,13 +655,16 @@ class ToolExecutor {
   // ============================================
   private async checkAvailability(input: {
     start_date: string
-    end_date: string
+    end_date?: string
     num_travelers?: number
+    tour_name?: string
+    check_group_tours?: boolean
   }): Promise<ToolResult> {
     try {
       const startDate = new Date(input.start_date)
       const today = new Date()
       today.setHours(0, 0, 0, 0) // Normalize to start of day
+      const numTravelers = input.num_travelers || 1
 
       // Check if the date is in the past
       if (startDate < today) {
@@ -667,8 +678,126 @@ class ToolExecutor {
         }
       }
 
-      // Check if it's too short notice (less than 3 days)
       const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+      // ============================================
+      // CHECK TOUR DEPARTURES (Group Tours)
+      // ============================================
+      if (this.tenantId && (input.tour_name || input.check_group_tours)) {
+        try {
+          // Build query for tour departures
+          let departureQuery = this.supabase
+            .from('tour_departures')
+            .select('id, tour_name, tour_code, start_date, end_date, duration_days, status, max_pax, booked_pax, price_per_person, currency, cutoff_days')
+            .eq('tenant_id', this.tenantId)
+            .in('status', ['open', 'limited', 'guaranteed'])
+            .gte('start_date', today.toISOString().split('T')[0])
+            .order('start_date', { ascending: true })
+
+          // Filter by tour name if provided
+          if (input.tour_name) {
+            departureQuery = departureQuery.ilike('tour_name', `%${input.tour_name}%`)
+          }
+
+          // Filter by date range - look for departures within 2 weeks of requested date
+          const twoWeeksBefore = new Date(startDate)
+          twoWeeksBefore.setDate(twoWeeksBefore.getDate() - 14)
+          const twoWeeksAfter = new Date(startDate)
+          twoWeeksAfter.setDate(twoWeeksAfter.getDate() + 14)
+
+          departureQuery = departureQuery
+            .gte('start_date', twoWeeksBefore < today ? today.toISOString().split('T')[0] : twoWeeksBefore.toISOString().split('T')[0])
+            .lte('start_date', twoWeeksAfter.toISOString().split('T')[0])
+            .limit(5)
+
+          const { data: departures, error: depError } = await departureQuery
+
+          if (!depError && departures && departures.length > 0) {
+            // Filter departures that have enough spots and are before cutoff
+            const bookableDepartures = departures.filter(dep => {
+              const availableSpots = dep.max_pax - dep.booked_pax
+              const cutoffDate = new Date(dep.start_date)
+              cutoffDate.setDate(cutoffDate.getDate() - (dep.cutoff_days || 3))
+              const isBeforeCutoff = today < cutoffDate
+              return availableSpots >= numTravelers && isBeforeCutoff
+            })
+
+            if (bookableDepartures.length > 0) {
+              // Format departure info
+              const departureInfo = bookableDepartures.map(dep => ({
+                tour_name: dep.tour_name,
+                start_date: dep.start_date,
+                end_date: dep.end_date,
+                duration_days: dep.duration_days,
+                available_spots: dep.max_pax - dep.booked_pax,
+                price_per_person: dep.price_per_person,
+                currency: dep.currency || 'EUR',
+                status: dep.status
+              }))
+
+              const firstDep = bookableDepartures[0]
+              const spotsText = (firstDep.max_pax - firstDep.booked_pax) === 1 ? '1 spot' : `${firstDep.max_pax - firstDep.booked_pax} spots`
+
+              if (bookableDepartures.length === 1) {
+                return {
+                  success: true,
+                  data: {
+                    available: true,
+                    type: 'group_tour',
+                    departures: departureInfo,
+                    message: `Great news! We have a ${firstDep.tour_name} departing on ${this.formatDateShort(firstDep.start_date)} with ${spotsText} available.${firstDep.price_per_person ? ` Price: ${firstDep.currency || 'EUR'} ${firstDep.price_per_person} per person.` : ''} Would you like to join this group?`
+                  }
+                }
+              } else {
+                const datesList = bookableDepartures.slice(0, 3).map(d =>
+                  `${this.formatDateShort(d.start_date)} (${d.max_pax - d.booked_pax} spots)`
+                ).join(', ')
+
+                return {
+                  success: true,
+                  data: {
+                    available: true,
+                    type: 'group_tour',
+                    departures: departureInfo,
+                    message: `We have ${bookableDepartures.length} departures available: ${datesList}. Which date works best for you?`
+                  }
+                }
+              }
+            } else if (departures.length > 0) {
+              // Have departures but none with enough spots
+              return {
+                success: true,
+                data: {
+                  available: false,
+                  type: 'group_tour',
+                  message: `We have ${input.tour_name || 'group tours'} scheduled, but they don't have enough spots for ${numTravelers} traveler${numTravelers > 1 ? 's' : ''}. Would you like a private tour instead, or shall I check if we can add you to a waitlist?`
+                }
+              }
+            }
+          }
+
+          // No group departures found - offer private tour option
+          if (input.tour_name || input.check_group_tours) {
+            return {
+              success: true,
+              data: {
+                available: true,
+                type: 'private_tour',
+                message: input.tour_name
+                  ? `We don't have a scheduled group departure for "${input.tour_name}" around those dates, but we can arrange a private tour for you. Would you like me to create a custom quote?`
+                  : `We don't have group tours scheduled for those dates, but we can arrange a private tour. Would you like me to help you plan one?`
+              }
+            }
+          }
+        } catch (depError) {
+          console.warn('Departure check failed:', depError)
+          // Fall through to capacity check
+        }
+      }
+
+      // ============================================
+      // CHECK OPERATOR CAPACITY (General Availability)
+      // ============================================
       if (daysUntilStart < 3) {
         return {
           success: true,
@@ -681,10 +810,8 @@ class ToolExecutor {
         }
       }
 
-      // Query the operator capacity system
       if (this.tenantId) {
         try {
-          // Call the capacity check API internally
           const { data: capacityData, error } = await this.supabase
             .from('operator_capacity')
             .select('date, status, max_groups, booked_groups, notes, reason')
@@ -693,13 +820,8 @@ class ToolExecutor {
             .lte('date', input.end_date || input.start_date)
             .order('date', { ascending: true })
 
-          if (!error && capacityData) {
-            // Create a map of dates to capacity
-            const capacityMap = new Map<string, {
-              status: string
-              available_slots: number
-              reason?: string
-            }>()
+          if (!error && capacityData && capacityData.length > 0) {
+            const capacityMap = new Map<string, { status: string; available_slots: number; reason?: string }>()
 
             capacityData.forEach(entry => {
               capacityMap.set(entry.date, {
@@ -719,7 +841,6 @@ class ToolExecutor {
               current.setDate(current.getDate() + 1)
             }
 
-            // Check for blackout or busy dates
             const blackoutDates = dates.filter(d => capacityMap.get(d)?.status === 'blackout')
             const busyDates = dates.filter(d => {
               const cap = capacityMap.get(d)
@@ -765,13 +886,12 @@ class ToolExecutor {
           }
         } catch (capacityError) {
           console.warn('Capacity check failed, falling back to basic check:', capacityError)
-          // Fall through to basic check
         }
       }
 
-      // Fallback: Basic availability check (if no capacity data or tenant)
-      const month = startDate.getMonth() + 1 // 1-12
-      const isPeakSeason = [10, 11, 12, 1, 2, 3, 4].includes(month) // Oct-Apr is peak
+      // Fallback: Basic availability check
+      const month = startDate.getMonth() + 1
+      const isPeakSeason = [10, 11, 12, 1, 2, 3, 4].includes(month)
 
       return {
         success: true,
@@ -790,6 +910,12 @@ class ToolExecutor {
     } catch (error: any) {
       return { success: false, error: error.message }
     }
+  }
+
+  // Helper to format dates nicely
+  private formatDateShort(dateStr: string): string {
+    const date = new Date(dateStr + 'T12:00:00')
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }
 
   // ============================================
