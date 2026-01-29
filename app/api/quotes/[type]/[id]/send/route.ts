@@ -176,7 +176,7 @@ export async function POST(
     // Render email HTML
     let emailHtml: string
     if (type === 'b2c') {
-      emailHtml = render(
+      emailHtml = await render(
         createElement(B2CQuoteEmail, {
           clientName: recipientName,
           quoteNumber: quote.quote_number,
@@ -193,7 +193,7 @@ export async function POST(
         })
       )
     } else {
-      emailHtml = render(
+      emailHtml = await render(
         createElement(B2BQuoteEmail, {
           partnerName: quote.b2b_partners?.company_name || 'Partner',
           contactName: quote.b2b_partners?.contact_name,
