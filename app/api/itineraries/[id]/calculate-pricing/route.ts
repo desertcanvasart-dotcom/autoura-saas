@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 // ============================================
