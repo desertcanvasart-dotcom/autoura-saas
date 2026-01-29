@@ -27,10 +27,21 @@
 
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase admin client (avoids build-time errors)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')
+    }
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 // ============================================
 // TYPES
@@ -718,7 +729,7 @@ export async function getCruiseRates(
   durationNights: number
 } | null> {
   try {
-    let query = supabaseAdmin
+    let query = getSupabaseAdmin()
       .from('nile_cruises')
       .select('*')
       .eq('tier', tier)
@@ -794,7 +805,7 @@ export async function getHotelRates(
 } | null> {
   try {
     // Query accommodation_rates table (not hotel_contacts)
-    const { data: hotels, error } = await supabaseAdmin
+    const { data: hotels, error } = await getSupabaseAdmin()
       .from('accommodation_rates')
       .select('*')
       .eq('tier', tier)
@@ -804,7 +815,7 @@ export async function getHotelRates(
 
     if (error || !hotels || hotels.length === 0) {
       // Fallback: try any tier for this city
-      const { data: anyHotel } = await supabaseAdmin
+      const { data: anyHotel } = await getSupabaseAdmin()
         .from('accommodation_rates')
         .select('*')
         .eq('is_active', true)
@@ -863,7 +874,7 @@ export async function getEntranceFee(
   isEurPassport: boolean
 ): Promise<{ id: string; name: string; rate: number } | null> {
   try {
-    let { data: fees, error } = await supabaseAdmin
+    let { data: fees, error } = await getSupabaseAdmin()
       .from('entrance_fees')
       .select('id, attraction_name, eur_rate, non_eur_rate')
       .eq('is_active', true)
@@ -874,7 +885,7 @@ export async function getEntranceFee(
       const keywords = attractionName.toLowerCase().split(/\s+/).filter(k => k.length > 3)
       
       for (const keyword of keywords) {
-        const { data: keywordFees } = await supabaseAdmin
+        const { data: keywordFees } = await getSupabaseAdmin()
           .from('entrance_fees')
           .select('id, attraction_name, eur_rate, non_eur_rate')
           .eq('is_active', true)
@@ -919,7 +930,7 @@ export async function getGuideRate(
   tier: ServiceTier
 ): Promise<{ id: string; name: string; dailyRate: number } | null> {
   try {
-    const { data: guides, error } = await supabaseAdmin
+    const { data: guides, error } = await getSupabaseAdmin()
       .from('guides')
       .select('id, name, daily_rate, languages, tier')
       .eq('is_active', true)
@@ -927,7 +938,7 @@ export async function getGuideRate(
       .order('is_preferred', { ascending: false })
 
     if (error || !guides || guides.length === 0) {
-      const { data: anyGuide } = await supabaseAdmin
+      const { data: anyGuide } = await getSupabaseAdmin()
         .from('guides')
         .select('id, name, daily_rate')
         .eq('is_active', true)
@@ -975,7 +986,7 @@ export async function getMealRates(
   tier: ServiceTier
 ): Promise<{ lunch: number; dinner: number }> {
   try {
-    const { data: mealRate } = await supabaseAdmin
+    const { data: mealRate } = await getSupabaseAdmin()
       .from('meal_rates')
       .select('lunch_rate_eur, dinner_rate_eur')
       .eq('is_active', true)
@@ -1017,7 +1028,7 @@ export async function getAirportServiceRate(
   tier: ServiceTier
 ): Promise<number> {
   try {
-    const { data: rates } = await supabaseAdmin
+    const { data: rates } = await getSupabaseAdmin()
       .from('airport_staff_rates')
       .select('rate_eur')
       .eq('is_active', true)
@@ -1045,7 +1056,7 @@ export async function getHotelServiceRate(
   try {
     const category = getTierCategory(tier)
     
-    const { data: rates } = await supabaseAdmin
+    const { data: rates } = await getSupabaseAdmin()
       .from('hotel_staff_rates')
       .select('rate_eur')
       .eq('is_active', true)
@@ -1068,7 +1079,7 @@ export async function getHotelServiceRate(
  */
 export async function getTippingRate(tier: ServiceTier): Promise<number> {
   try {
-    const { data: rates } = await supabaseAdmin
+    const { data: rates } = await getSupabaseAdmin()
       .from('tipping_rates')
       .select('rate_eur, rate_unit')
       .eq('is_active', true)
@@ -1103,7 +1114,7 @@ export async function getTippingRate(tier: ServiceTier): Promise<number> {
  * Key format: "service_type|city|duration|area|vehicle_type"
  */
 export async function buildTransportCache(): Promise<Map<string, TransportRate>> {
-  const { data: allRates } = await supabaseAdmin
+  const { data: allRates } = await getSupabaseAdmin()
     .from('transportation_rates')
     .select('*')
     .eq('is_active', true)
@@ -1245,7 +1256,7 @@ export async function calculateDayBasedPricing(
   // STEP 1: Fetch template and parse itinerary
   // ============================================
 
-  const { data: template, error: templateError } = await supabaseAdmin
+  const { data: template, error: templateError } = await getSupabaseAdmin()
     .from('tour_templates')
     .select(`
       id,

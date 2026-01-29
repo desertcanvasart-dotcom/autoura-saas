@@ -1,10 +1,27 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
+// Lazy initialization to avoid build-time errors when env vars aren't available
 export const createClient = () => {
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set')
+  }
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 }
 
-export const supabase = createClient()
+// Lazy-initialized singleton (only created when first accessed at runtime)
+let _supabase: SupabaseClient | null = null
+
+export const getSupabase = (): SupabaseClient => {
+  if (!_supabase) {
+    _supabase = createClient()
+  }
+  return _supabase
+}
+
+// For backward compatibility - returns the lazy-initialized client
+// Note: This is now a getter function, not a constant
+// Components using `supabase` directly should migrate to `createClient()` or `getSupabase()`
+export { getSupabase as supabase }
