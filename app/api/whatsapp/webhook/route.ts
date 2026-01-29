@@ -10,6 +10,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/app/supabase'
 import twilio from 'twilio'
+import { processIncomingMessage } from '@/lib/whatsapp-ai-agent'
+import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
 
 export async function POST(request: NextRequest) {
   try {
@@ -168,56 +170,59 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // STEP 4: Auto-respond to common queries
+    // STEP 4: AI-Powered Auto-Response
     // ============================================
-    const lowerBody = body?.toLowerCase() || ''
-    
-    if (lowerBody.includes('booking') || lowerBody.includes('quote') || lowerBody.includes('reservation')) {
-      // Find recent itineraries for this client or phone number
-      let itineraryQuery = supabase
-        .from('itineraries')
-        .select('id, tour_name, start_date, status')
-        .order('created_at', { ascending: false })
-        .limit(1)
+    // Only process if AI is enabled and we have a message body
+    if (process.env.WHATSAPP_AI_ENABLED === 'true' && body && conversationId) {
+      try {
+        console.log('🤖 Processing message with AI agent...')
 
-      // Search by client_id if available, otherwise try phone
-      if (clientId) {
-        itineraryQuery = itineraryQuery.eq('client_id', clientId)
-      } else {
-        itineraryQuery = itineraryQuery.eq('client_phone', phoneNumber)
+        const aiResponse = await processIncomingMessage(
+          supabase,
+          conversationId,
+          clientId,
+          phoneNumber,
+          body
+        )
+
+        if (aiResponse.success && aiResponse.shouldRespond && aiResponse.reply) {
+          console.log('🤖 AI response generated:', aiResponse.reply.substring(0, 100) + '...')
+          console.log('🤖 Confidence:', aiResponse.confidence)
+
+          // Send the AI-generated response
+          const sendResult = await sendWhatsAppMessage({
+            to: phoneNumber,
+            body: aiResponse.reply
+          })
+
+          if (sendResult.success) {
+            // Store the outbound message
+            await supabase.from('whatsapp_messages').insert({
+              conversation_id: conversationId,
+              message_sid: sendResult.messageId,
+              direction: 'outbound',
+              message_body: aiResponse.reply,
+              status: 'sent',
+              sent_at: new Date().toISOString(),
+              metadata: {
+                ai_generated: true,
+                ai_confidence: aiResponse.confidence,
+                ai_model: process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
+              }
+            })
+            console.log('✅ AI response sent and stored:', sendResult.messageId)
+          } else {
+            console.error('❌ Failed to send AI response:', sendResult.error)
+          }
+        } else {
+          console.log('🤖 AI decided not to respond:', aiResponse.reasoning || aiResponse.error)
+        }
+      } catch (aiError) {
+        console.error('❌ AI processing error:', aiError)
+        // Don't fail the webhook - just log the error
       }
-
-      const { data: itineraries } = await itineraryQuery
-
-      if (itineraries && itineraries.length > 0) {
-        const itinerary = itineraries[0]
-        const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-        
-        const autoResponse = `Thank you for your message! 😊\n\n` +
-          `Your most recent booking:\n` +
-          `🎯 ${itinerary.tour_name}\n` +
-          `📅 ${new Date(itinerary.start_date).toLocaleDateString()}\n` +
-          `📋 Status: ${itinerary.status}\n\n` +
-          `Our team will respond to your inquiry shortly. For urgent matters, please call us directly.\n\n` +
-          `Best regards,\n${businessName} Team`
-
-        // TODO: Uncomment to enable auto-responses via Twilio
-        // await sendAutoResponse(phoneNumber, autoResponse, conversationId, supabase)
-        console.log('💬 Auto-response prepared (not sent):', autoResponse.substring(0, 100) + '...')
-      }
-    }
-
-    // Check for greeting keywords
-    if (lowerBody.match(/^(hi|hello|hola|مرحبا|bonjour|hey)[\s!]?$/i)) {
-      const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-      const greetingResponse = `Hello! 👋 Welcome to ${businessName}.\n\n` +
-        `How can we help you today?\n\n` +
-        `• Type "booking" to check your reservation\n` +
-        `• Type "quote" to request a new quote\n` +
-        `• Or just tell us what you need!\n\n` +
-        `Our team typically responds within 30 minutes during business hours.`
-      
-      console.log('💬 Greeting prepared (not sent):', greetingResponse.substring(0, 100) + '...')
+    } else if (!process.env.WHATSAPP_AI_ENABLED) {
+      console.log('ℹ️ AI auto-response disabled. Set WHATSAPP_AI_ENABLED=true to enable.')
     }
 
     // Respond to Twilio with 200 OK
@@ -235,45 +240,11 @@ export async function POST(request: NextRequest) {
     )  }
 }
 
-// ============================================
-// HELPER: Send auto-response (uncomment to enable)
-// ============================================
-// async function sendAutoResponse(
-//   toPhone: string, 
-//   message: string, 
-//   conversationId: string,
-//   supabase: any
-// ) {
-//   try {
-//     const twilio = require('twilio')(
-//       process.env.TWILIO_ACCOUNT_SID,
-//       process.env.TWILIO_AUTH_TOKEN
-//     )
-//     
-//     const twilioMessage = await twilio.messages.create({
-//       body: message,
-//       from: process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886',
-//       to: `whatsapp:${toPhone}`
-//     })
-//     
-//     // Store outbound message
-//     await supabase.from('whatsapp_messages').insert({
-//       conversation_id: conversationId,
-//       message_sid: twilioMessage.sid,
-//       direction: 'outbound',
-//       message_body: message,
-//       status: twilioMessage.status,
-//       sent_at: new Date().toISOString()
-//     })
-//     
-//     console.log('✅ Auto-response sent:', twilioMessage.sid)
-//   } catch (error) {
-//     console.error('❌ Failed to send auto-response:', error)
-//   }
-// }
-
 // GET endpoint for webhook verification
 export async function GET(request: NextRequest) {
+  const aiEnabled = process.env.WHATSAPP_AI_ENABLED === 'true'
+  const aiModel = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
+
   return NextResponse.json({
     success: true,
     message: 'WhatsApp webhook endpoint is active',
@@ -281,65 +252,57 @@ export async function GET(request: NextRequest) {
     features: [
       'Conversation-based message storage',
       'Auto client matching',
-      'Keyword detection (booking, quote, greetings)',
-      'Media support'
-    ]
+      'Media support',
+      aiEnabled ? `AI auto-reply enabled (${aiModel})` : 'AI auto-reply disabled'
+    ],
+    ai: {
+      enabled: aiEnabled,
+      model: aiModel,
+      envVar: 'Set WHATSAPP_AI_ENABLED=true to enable AI responses'
+    }
   })
 }
 
 // ============================================
-// TWILIO WEBHOOK SETUP INSTRUCTIONS
+// ENVIRONMENT VARIABLES
 // ============================================
-// 
+//
+// Required for Twilio:
+//   TWILIO_ACCOUNT_SID       - Twilio Account SID
+//   TWILIO_AUTH_TOKEN        - Twilio Auth Token (for signature validation)
+//   TWILIO_API_KEY           - Twilio API Key (for sending messages)
+//   TWILIO_API_SECRET        - Twilio API Secret
+//   TWILIO_WHATSAPP_FROM     - WhatsApp number (e.g., whatsapp:+14155238886)
+//
+// Required for AI (Optional):
+//   WHATSAPP_AI_ENABLED      - Set to 'true' to enable AI auto-responses
+//   ANTHROPIC_API_KEY        - Anthropic API key for Claude
+//   WHATSAPP_AI_MODEL        - Claude model ID (default: claude-sonnet-4-20250514)
+//
+// Business Info:
+//   BUSINESS_NAME            - Your business name (default: Travel2Egypt)
+//   BUSINESS_EMAIL           - Contact email for customers
+//
+// ============================================
+// TWILIO WEBHOOK SETUP
+// ============================================
+//
 // 1. In Twilio Console, go to:
 //    Messaging → Try it out → WhatsApp sandbox settings
-// 
+//
 // 2. Set "When a message comes in" webhook to:
 //    https://yourdomain.com/api/whatsapp/webhook
-//    (For local testing, use ngrok: https://ngrok.com)
-// 
-// 3. For local development with ngrok:
-//    - Install ngrok: npm install -g ngrok
-//    - Run: ngrok http 3000
-//    - Use the https URL: https://abc123.ngrok.io/api/whatsapp/webhook
-// 
-// ============================================
-// DATABASE SCHEMA (NEW)
-// ============================================
-// 
-// whatsapp_conversations:
-//   - id UUID PRIMARY KEY
-//   - phone_number VARCHAR(50) UNIQUE
-//   - client_id UUID REFERENCES clients(id)
-//   - client_name VARCHAR(255)
-//   - last_message TEXT (auto-updated by trigger)
-//   - last_message_at TIMESTAMP (auto-updated by trigger)
-//   - unread_count INTEGER (auto-updated by trigger)
-//   - status VARCHAR(20): active, archived, blocked
 //
-// whatsapp_messages:
-//   - id UUID PRIMARY KEY
-//   - conversation_id UUID REFERENCES whatsapp_conversations(id)
-//   - message_sid VARCHAR(255) UNIQUE
-//   - direction: inbound, outbound
-//   - message_body TEXT
-//   - media_url TEXT
-//   - media_type VARCHAR(50)
-//   - status: queued, sent, delivered, read, failed
-//   - sent_at TIMESTAMP
-// 
 // ============================================
-// WEBHOOK PAYLOAD EXAMPLE
+// AI AUTO-REPLY FEATURES
 // ============================================
-// {
-//   "MessageSid": "SM1234567890",
-//   "From": "whatsapp:+201234567890",
-//   "To": "whatsapp:+14155238886",
-//   "Body": "Hello, I have a question about my booking",
-//   "NumMedia": "0",
-//   "MediaUrl0": "https://...", (if media attached)
-//   "MediaContentType0": "image/jpeg", (if media attached)
-//   "FromCity": "Cairo",
-//   "FromCountry": "EG"
-// }
+//
+// When WHATSAPP_AI_ENABLED=true:
+// - AI reads conversation history for context
+// - Fetches customer's bookings and quotes
+// - Generates personalized responses
+// - Automatically skips sensitive topics (complaints, refunds)
+// - Skips when customer requests human agent
+// - Stores AI metadata with each message
+//
 // ============================================
