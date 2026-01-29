@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         valid_until: validUntil.toISOString().split('T')[0],
         notes,
         created_by
-      })
+      } as any)
       .select()
       .single()
 
