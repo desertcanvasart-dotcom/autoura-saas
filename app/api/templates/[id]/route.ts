@@ -70,7 +70,7 @@ export async function PUT(
     const updateData: any = {
       updated_at: new Date().toISOString(),
       version: (currentTemplate?.version || 0) + 1, // Increment version
-      last_modified_by: authResult.user_id
+      last_modified_by: authResult.user?.id
     }
     if (name !== undefined) updateData.name = name
     if (description !== undefined) updateData.description = description
