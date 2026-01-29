@@ -259,10 +259,10 @@ export async function withBillingCheck(
     )
   }
 
-  const { supabase, tenant } = authResult
+  const { supabase, tenant_id } = authResult
 
   // Check if tenant has reached limit
-  const limitCheck = await checkLimit(tenant.id, metric, supabase)
+  const limitCheck = await checkLimit(tenant_id, metric, supabase)
 
   if (!limitCheck.allowed) {
     return NextResponse.json(
