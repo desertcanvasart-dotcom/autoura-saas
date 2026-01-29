@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
         margin_percent,
         selling_price,
         price_per_person,
-        cost_breakdown
+        cost_breakdown: costBreakdown
       }
     }, { status: 201 });
 
