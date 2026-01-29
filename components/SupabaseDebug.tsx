@@ -3,8 +3,19 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/app/supabase'
 
+interface DebugInfo {
+  url: string | undefined
+  hasKey: boolean
+  keyLength: number
+  urlPrefix: string | undefined
+  clientStatus: string
+  clientError: string | null
+  queryStatus: string
+  queryError?: string
+}
+
 export default function SupabaseDebug() {
-  const [info, setInfo] = useState<any>(null)
+  const [info, setInfo] = useState<DebugInfo | null>(null)
 
   useEffect(() => {
     // Check environment variables
