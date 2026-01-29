@@ -21,7 +21,7 @@ export default function SupabaseDebug() {
 
       // Test a simple query
       supabase.from('tenants').select('count', { count: 'exact', head: true })
-        .then(({ error }) => {
+        .then(({ error }: { error: { message: string } | null }) => {
           if (error) {
             setInfo(prev => ({ ...prev, queryError: error.message }))
           } else {
