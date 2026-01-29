@@ -101,6 +101,12 @@ export async function PUT(
     }
 
     const { supabase, user } = authResult;
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      );
+    }
     const { id } = await params;
     const body = await request.json();
 
