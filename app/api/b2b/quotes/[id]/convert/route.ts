@@ -83,7 +83,7 @@ export async function POST(
             nationality: q.client_nationality,
             source: 'b2b_quote',
             notes: `Created from B2B quote ${q.quote_number}`
-          })
+          } as any)
           .select()
           .single()
 
@@ -126,7 +126,7 @@ export async function POST(
         payment_status: 'not_paid',
         created_by: user_id,
         notes: `Converted from B2B quote ${q.quote_number}`
-      })
+      } as any)
       .select()
       .single()
 
@@ -154,7 +154,7 @@ export async function POST(
           description: tourDay?.description || '',
           city: tourDay?.city || '',
           overnight_location: tourDay?.overnight_city || ''
-        })
+        } as any)
         .select()
         .single()
 
@@ -179,7 +179,7 @@ export async function POST(
             selling_price: service.line_total * (1 + (q.margin_percent || 25) / 100),
             currency: 'EUR',
             status: 'pending'
-          })
+          } as any)
       }
     }
 
@@ -189,7 +189,7 @@ export async function POST(
         status: 'converted',
         converted_to_itinerary_id: itin.id,
         converted_at: new Date().toISOString()
-      })
+      } as any)
       .eq('id', id)
 
     return NextResponse.json({
