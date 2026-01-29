@@ -752,7 +752,7 @@ export async function getCruiseRates(
       }
     }
 
-    const cruise = cruises[0]
+    const cruise = cruises[0] as any
     const durationNights = cruise.duration_nights || 4
 
     // Use new PPD fields if available, otherwise derive from legacy fields
