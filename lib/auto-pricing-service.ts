@@ -832,7 +832,7 @@ export async function getHotelRates(
         }
       }
 
-      const hotel = anyHotel[0]
+      const hotel = anyHotel[0] as any
       // Use new PPD fields if available, otherwise derive from legacy fields
       const ppd = hotel.ppd_eur ?? (hotel.double_rate_eur ? hotel.double_rate_eur / 2 : 0)
       const singleSupp = hotel.single_supplement_eur ?? Math.max(0, (hotel.single_rate_eur || 0) - ppd)
@@ -846,7 +846,7 @@ export async function getHotelRates(
       }
     }
 
-    const hotel = hotels[0]
+    const hotel = hotels[0] as any
     // Use new PPD fields if available, otherwise derive from legacy fields
     const ppd = hotel.ppd_eur ?? (hotel.double_rate_eur ? hotel.double_rate_eur / 2 : 0)
     const singleSupp = hotel.single_supplement_eur ?? Math.max(0, (hotel.single_rate_eur || 0) - ppd)
