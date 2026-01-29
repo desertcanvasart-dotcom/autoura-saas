@@ -1,18 +1,14 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // B2B PRICING RULES API
 // File: app/api/b2b/pricing-rules/route.ts
 // ============================================
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function GET() {
   try {
+    const supabaseAdmin = createAdminClient()
     const { data, error } = await supabaseAdmin
       .from('b2b_pricing_rules')
       .select('*')
@@ -32,6 +28,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabaseAdmin = createAdminClient()
     const body = await request.json()
 
     const { data, error } = await supabaseAdmin

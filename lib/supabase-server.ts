@@ -9,6 +9,9 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 
+// Check if we're in build mode (no env vars available)
+const isBuildTime = !process.env.NEXT_PUBLIC_SUPABASE_URL;
+
 /**
  * Creates an authenticated Supabase client from request cookies.
  * This client respects Row Level Security (RLS) policies and automatically
@@ -17,6 +20,10 @@ import { cookies } from 'next/headers';
  * Use this for all database operations that should respect tenant isolation.
  */
 export async function createAuthenticatedClient() {
+  if (isBuildTime) {
+    throw new Error('Supabase client cannot be created during build time');
+  }
+
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -54,6 +61,10 @@ export async function createAuthenticatedClient() {
  * DO NOT use for regular CRUD operations as it bypasses tenant isolation!
  */
 export function createAdminClient() {
+  if (isBuildTime) {
+    throw new Error('Supabase admin client cannot be created during build time');
+  }
+
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!

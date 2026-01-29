@@ -1,21 +1,17 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // B2B PRICING RULES API - Single Item
 // File: app/api/b2b/pricing-rules/[id]/route.ts
 // ============================================
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabaseAdmin = createAdminClient()
     const { id } = await params
     const body = await request.json()
 
@@ -67,6 +63,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const supabaseAdmin = createAdminClient()
     const { id } = await params
 
     const { error } = await supabaseAdmin
