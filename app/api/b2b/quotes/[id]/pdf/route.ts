@@ -630,7 +630,7 @@ export async function GET(
     const { id } = await params
 
     // Fetch quote with related data
-    const { data: quote, error } = await supabaseAdmin
+    const { data: quote, error } = await getSupabaseAdmin()
       .from('tour_quotes')
       .select(`
         *,
@@ -651,8 +651,10 @@ export async function GET(
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
 
+    const q = quote as any
+
     // Generate HTML
-    const html = generateQuoteHTML(quote)
+    const html = generateQuoteHTML(q)
 
     // Launch Puppeteer
     const browser = await puppeteer.launch({
@@ -700,7 +702,7 @@ export async function GET(
     return new NextResponse(Buffer.from(pdf), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${quote.quote_number}.pdf"`,
+        'Content-Disposition': `attachment; filename="${q.quote_number}.pdf"`,
       },
     })
 
