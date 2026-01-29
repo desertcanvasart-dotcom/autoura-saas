@@ -228,6 +228,20 @@ function SettingsContent() {
     }
   }
 
+  const fetchEmailSettings = async () => {
+    try {
+      const response = await fetch('/api/settings/email')
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.data) {
+          setEmailSettings(result.data)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching email settings:', error)
+    }
+  }
+
   const fetchPreferences = async () => {
     try {
       const supabase = createClient()
