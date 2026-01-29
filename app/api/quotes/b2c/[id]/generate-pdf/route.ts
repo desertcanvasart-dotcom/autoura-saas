@@ -18,6 +18,13 @@ export async function POST(
     // Authenticate and get user
     const { supabase, user } = await requireAuth();
 
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      );
+    }
+
     // Get user's tenant
     const { data: membership } = await supabase
       .from('tenant_members')
@@ -139,6 +146,13 @@ export async function GET(
 
     // Authenticate and get user
     const { supabase, user } = await requireAuth();
+
+    if (!supabase || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      );
+    }
 
     // Get user's tenant
     const { data: membership } = await supabase
