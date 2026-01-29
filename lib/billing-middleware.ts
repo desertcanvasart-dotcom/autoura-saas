@@ -285,7 +285,7 @@ export async function withBillingCheck(
   // If operation succeeded (2xx status), track usage
   if (response.status >= 200 && response.status < 300) {
     // Track usage asynchronously (don't await to avoid slowing down response)
-    trackUsage(tenant.id, metric, 1, supabase).catch(err => {
+    trackUsage(tenant_id, metric, 1, supabase).catch(err => {
       console.error('Failed to track usage:', err)
     })
   }
