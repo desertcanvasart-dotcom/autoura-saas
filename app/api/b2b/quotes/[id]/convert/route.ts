@@ -28,7 +28,7 @@ export async function POST(
     const body = await request.json()
     const { user_id } = body
 
-    const { data: quote, error: quoteError } = await supabaseAdmin
+    const { data: quote, error: quoteError } = await getSupabaseAdmin()
       .from('tour_quotes')
       .select(`
         *,
@@ -61,7 +61,7 @@ export async function POST(
     // Create or find client
     let clientId = null
     if (quote.client_email) {
-      const { data: existingClient } = await supabaseAdmin
+      const { data: existingClient } = await getSupabaseAdmin()
         .from('clients')
         .select('id')
         .eq('email', quote.client_email)
@@ -71,7 +71,7 @@ export async function POST(
         clientId = existingClient.id
       } else {
         const nameParts = (quote.client_name || '').split(' ')
-        const { data: newClient } = await supabaseAdmin
+        const { data: newClient } = await getSupabaseAdmin()
           .from('clients')
           .insert({
             first_name: nameParts[0] || 'Unknown',
@@ -91,7 +91,7 @@ export async function POST(
 
     // Generate itinerary code
     const year = new Date().getFullYear().toString().slice(-2)
-    const { count } = await supabaseAdmin.from('itineraries').select('*', { count: 'exact', head: true })
+    const { count } = await getSupabaseAdmin().from('itineraries').select('*', { count: 'exact', head: true })
     const itineraryNumber = ((count || 0) + 1).toString().padStart(3, '0')
     const itineraryCode = `ITN-${year}-${itineraryNumber}`
 
@@ -99,7 +99,7 @@ export async function POST(
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + (template?.duration_days || 1) - 1)
 
-    const { data: itinerary, error: itinError } = await supabaseAdmin
+    const { data: itinerary, error: itinError } = await getSupabaseAdmin()
       .from('itineraries')
       .insert({
         itinerary_code: itineraryCode,
@@ -140,7 +140,7 @@ export async function POST(
       const dayDate = new Date(startDate)
       dayDate.setDate(dayDate.getDate() + dayNum - 1)
 
-      const { data: itinDay } = await supabaseAdmin
+      const { data: itinDay } = await getSupabaseAdmin()
         .from('itinerary_days')
         .insert({
           itinerary_id: itinerary.id,
@@ -162,7 +162,7 @@ export async function POST(
         if (service.day_number && service.day_number !== dayNum) continue
         if (!service.day_number && dayNum > 1) continue
 
-        await supabaseAdmin
+        await getSupabaseAdmin()
           .from('itinerary_services')
           .insert({
             itinerary_day_id: itinDay.id,
@@ -179,7 +179,7 @@ export async function POST(
       }
     }
 
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .from('tour_quotes')
       .update({
         status: 'converted',
