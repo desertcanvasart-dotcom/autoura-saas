@@ -150,8 +150,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    console.log('✅ Quote created:', quote.quote_number)
-    return NextResponse.json({ success: true, data: quote }, { status: 201 })
+    const q = quote as any
+    console.log('✅ Quote created:', q.quote_number)
+    return NextResponse.json({ success: true, data: q }, { status: 201 })
 
   } catch (error: any) {
     console.error('Error in POST /api/b2b/quotes:', error)
