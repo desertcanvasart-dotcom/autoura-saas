@@ -230,10 +230,11 @@ async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standar
 
   if (!selectedVehicle) return null
 
+  const v = selectedVehicle as any
   return {
-    rate: selectedVehicle.daily_rate || 0,
-    vehicle: selectedVehicle.vehicle_type || selectedVehicle.name || 'Vehicle',
-    id: selectedVehicle.id
+    rate: v.daily_rate || 0,
+    vehicle: v.vehicle_type || v.name || 'Vehicle',
+    id: v.id
   }
 }
 
@@ -256,16 +257,17 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
       .limit(1)
 
     if (!anyGuide || anyGuide.length === 0) return null
-    
+
+    const g = anyGuide[0] as any
     return {
-      rate: anyGuide[0].daily_rate || 55,
-      name: anyGuide[0].name || 'Guide',
-      id: anyGuide[0].id
+      rate: g.daily_rate || 55,
+      name: g.name || 'Guide',
+      id: g.id
     }
   }
 
   // Find guide matching tier
-  let selectedGuide = guides.find((g: any) => g.tier === tier) || guides[0]
+  const selectedGuide = (guides.find((g: any) => g.tier === tier) || guides[0]) as any
 
   return {
     rate: selectedGuide.daily_rate || 55,
@@ -285,9 +287,9 @@ async function getEntranceFee(attractionName: string, isEurPassport: boolean): P
 
   if (error || !fees || fees.length === 0) return null
 
-  const fee = fees[0]
-  const rate = isEurPassport 
-    ? (fee.eur_rate || 0) 
+  const fee = fees[0] as any
+  const rate = isEurPassport
+    ? (fee.eur_rate || 0)
     : (fee.non_eur_rate || fee.eur_rate || 0)
 
   return {
@@ -320,17 +322,19 @@ async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ 
 
     if (!anyHotel || anyHotel.length === 0) return null
 
+    const h = anyHotel[0] as any
     return {
-      rate: anyHotel[0].rate_double_eur || 80,
-      name: anyHotel[0].name || 'Hotel',
-      id: anyHotel[0].id
+      rate: h.rate_double_eur || 80,
+      name: h.name || 'Hotel',
+      id: h.id
     }
   }
 
+  const hotel = hotels[0] as any
   return {
-    rate: hotels[0].rate_double_eur || 80,
-    name: hotels[0].name || 'Hotel',
-    id: hotels[0].id
+    rate: hotel.rate_double_eur || 80,
+    name: hotel.name || 'Hotel',
+    id: hotel.id
   }
 }
 
@@ -377,8 +381,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Variation not found' }, { status: 404 })
     }
 
-    const effectiveTier = (variation.tier || tier) as ServiceTier
-    const template = variation.tour_templates as any
+    const v = variation as any
+    const effectiveTier = (v.tier || tier) as ServiceTier
+    const template = v.tour_templates as any
     const templateId = template?.id
 
     // Fetch services for this variation
@@ -410,8 +415,8 @@ export async function POST(request: NextRequest) {
           .eq('id', partner_id)
           .single()
         
-        if (partner?.default_margin_percent) {
-          effectiveMargin = partner.default_margin_percent
+        if ((partner as any)?.default_margin_percent) {
+          effectiveMargin = (partner as any).default_margin_percent
         }
       }
 
@@ -470,8 +475,8 @@ export async function POST(request: NextRequest) {
       }))
 
       const result: PriceCalculationResult = {
-        variation_id: variation.id,
-        variation_name: variation.variation_name,
+        variation_id: v.id,
+        variation_name: v.variation_name,
         template_name: template?.template_name || '',
         num_pax,
         travel_date,
@@ -494,7 +499,7 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('🎉 B2B Price calculated via auto-pricing:', {
-        variation: variation.variation_name,
+        variation: v.variation_name,
         numPax: num_pax,
         tourLeader: tour_leader_included,
         cost: result.total_cost,
@@ -524,8 +529,8 @@ export async function POST(request: NextRequest) {
         .eq('id', partner_id)
         .single()
       
-      if (partner?.default_margin_percent) {
-        effectiveMargin = partner.default_margin_percent
+      if ((partner as any)?.default_margin_percent) {
+        effectiveMargin = (partner as any).default_margin_percent
       }
 
       const { data: override } = await getSupabaseAdmin()
@@ -535,9 +540,9 @@ export async function POST(request: NextRequest) {
         .eq('variation_id', variation_id)
         .eq('is_active', true)
         .single()
-      
-      if (override?.margin_percent_override) {
-        effectiveMargin = override.margin_percent_override
+
+      if ((override as any)?.margin_percent_override) {
+        effectiveMargin = (override as any).margin_percent_override
       }
     }
 
@@ -547,7 +552,8 @@ export async function POST(request: NextRequest) {
     let optionalTotal = 0
 
     // Process each service
-    for (const service of (services || [])) {
+    for (const svc of (services || [])) {
+      const service = svc as any
       let unitCost = 0
       let lineTotal = 0
       let rateSource = 'manual'
@@ -675,20 +681,21 @@ export async function POST(request: NextRequest) {
                 .single()
 
               if (cruise) {
-                if (num_pax === 1 && cruise.rate_single_eur) {
-                  unitCost = cruise.rate_single_eur
+                const c = cruise as any
+                if (num_pax === 1 && c.rate_single_eur) {
+                  unitCost = c.rate_single_eur
                   pricingNote = 'Single occupancy'
-                } else if (num_pax >= 3 && cruise.rate_triple_eur) {
-                  unitCost = cruise.rate_triple_eur
+                } else if (num_pax >= 3 && c.rate_triple_eur) {
+                  unitCost = c.rate_triple_eur
                   pricingNote = 'Triple occupancy'
                 } else {
-                  unitCost = cruise.rate_double_eur || 0
+                  unitCost = c.rate_double_eur || 0
                   pricingNote = 'Double occupancy'
                 }
                 lineTotal = unitCost * num_pax
                 effectiveQuantityMode = 'per_pax'
                 rateSource = 'nile_cruises'
-                console.log(`✅ Cruise from B2C: ${cruise.ship_name} -> €${unitCost}/pax`)
+                console.log(`✅ Cruise from B2C: ${c.ship_name} -> €${unitCost}/pax`)
               }
             }
             break
@@ -703,10 +710,11 @@ export async function POST(request: NextRequest) {
               .single()
 
             if (mealRate) {
+              const m = mealRate as any
               if (service.service_name?.toLowerCase().includes('dinner')) {
-                unitCost = mealRate.dinner_rate_eur || 18
+                unitCost = m.dinner_rate_eur || 18
               } else {
-                unitCost = mealRate.lunch_rate_eur || 12
+                unitCost = m.lunch_rate_eur || 12
               }
               lineTotal = unitCost * num_pax
               effectiveQuantityMode = 'per_pax'
@@ -787,8 +795,8 @@ export async function POST(request: NextRequest) {
     const pricePerPerson = sellingPrice / num_pax
 
     const result: PriceCalculationResult = {
-      variation_id: variation.id,
-      variation_name: variation.variation_name,
+      variation_id: v.id,
+      variation_name: v.variation_name,
       template_name: template?.template_name || '',
       num_pax,
       travel_date,
@@ -810,7 +818,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🎉 B2B Price calculated:', {
-      variation: variation.variation_name,
+      variation: v.variation_name,
       numPax: num_pax,
       cost: totalCost,
       margin: effectiveMargin + '%',
