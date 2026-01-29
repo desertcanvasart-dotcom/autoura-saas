@@ -12,6 +12,7 @@ interface UserProfile {
   company_name: string | null
   phone: string | null
   is_active: boolean
+  role?: string | null
 }
 
 interface AuthContextType {
