@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { supabase, tenant_id, user_id } = authResult
+    const { supabase, tenant_id, user } = authResult
     if (!supabase) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
         scheduled_for: scheduledFor,
         timezone: timezone || 'UTC',
         status: 'pending',
-        created_by: user_id,
+        created_by: user?.id,
       })
       .select()
       .single()
