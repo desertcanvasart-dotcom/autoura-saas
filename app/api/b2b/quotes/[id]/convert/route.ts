@@ -70,7 +70,7 @@ export async function POST(
         .single()
 
       if (existingClient) {
-        clientId = existingClient.id
+        clientId = (existingClient as any).id
       } else {
         const nameParts = (q.client_name || '').split(' ')
         const { data: newClient } = await getSupabaseAdmin()
@@ -87,7 +87,7 @@ export async function POST(
           .select()
           .single()
 
-        if (newClient) clientId = newClient.id
+        if (newClient) clientId = (newClient as any).id
       }
     }
 
@@ -134,6 +134,8 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to create itinerary' }, { status: 500 })
     }
 
+    const itin = itinerary as any
+
     // Create itinerary days
     const tourDays = template?.tour_days || []
     
@@ -145,7 +147,7 @@ export async function POST(
       const { data: itinDay } = await getSupabaseAdmin()
         .from('itinerary_days')
         .insert({
-          itinerary_id: itinerary.id,
+          itinerary_id: itin.id,
           day_number: dayNum,
           date: dayDate.toISOString().split('T')[0],
           title: tourDay?.title || `Day ${dayNum}`,
@@ -167,7 +169,7 @@ export async function POST(
         await getSupabaseAdmin()
           .from('itinerary_services')
           .insert({
-            itinerary_day_id: itinDay.id,
+            itinerary_day_id: (itinDay as any).id,
             service_type: service.service_category || 'other',
             service_name: service.service_name,
             supplier_cost: service.line_total / (service.quantity || 1),
@@ -185,7 +187,7 @@ export async function POST(
       .from('tour_quotes')
       .update({
         status: 'converted',
-        converted_to_itinerary_id: itinerary.id,
+        converted_to_itinerary_id: itin.id,
         converted_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -193,7 +195,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       data: {
-        itinerary_id: itinerary.id,
+        itinerary_id: itin.id,
         itinerary_code: itineraryCode,
         quote_number: q.quote_number,
         message: 'Quote successfully converted to itinerary'
