@@ -303,7 +303,7 @@ function calculateRevenueForecast(
   // Calculate R-squared for confidence
   const yMean = sumY / n
   const ssTotal = dataPoints.reduce((sum, p) => sum + Math.pow(p.y - yMean, 2), 0)
-  const ssResidual = dataPoints.reduce((sum, p) => {
+  const ssResidual = dataPoints.reduce((sum: number, p: any) => {
     const predicted = slope * p.x + intercept
     return sum + Math.pow(p.y - predicted, 2)
   }, 0)

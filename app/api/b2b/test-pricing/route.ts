@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
       cruiseNights: parsedItinerary.filter(d => d.accommodation_type === 'cruise').length,
       sightseeingDays: parsedItinerary.filter(d => d.services.guide_required).length,
       totalAttractions: parsedItinerary.reduce((sum, d) => sum + d.attractions.length, 0),
-      externalMeals: parsedItinerary.reduce((sum, d) => {
+      externalMeals: parsedItinerary.reduce((sum: number, d: any) => {
         let count = 0
         if (d.meals.lunch === 'external') count++
         if (d.meals.dinner === 'external') count++

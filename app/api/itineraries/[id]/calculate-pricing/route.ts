@@ -436,7 +436,7 @@ async function getTippingRate(supabase: any, tier: string) {
 
   let dailyTips = 15
   if (rates && rates.length > 0) {
-    dailyTips = rates.reduce((sum, t) => {
+    dailyTips = rates.reduce((sum: number, t: any) => {
       if (t.rate_unit === 'per_day') {
         return sum + (t.rate_eur || 0)
       }
