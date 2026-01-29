@@ -27,7 +27,7 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('tour_quotes')
       .select(`
         *,
@@ -70,7 +70,7 @@ export async function PUT(
     const { id: _, ...updates } = body
     updates.updated_at = new Date().toISOString()
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('tour_quotes')
       .update(updates)
       .eq('id', id)
@@ -98,7 +98,7 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('tour_quotes')
       .delete()
       .eq('id', id)
