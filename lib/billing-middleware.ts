@@ -137,7 +137,7 @@ export async function checkLimit(
           const { count } = await supabase
             .from('gmail_tokens')
             .select('*', { count: 'exact', head: true })
-            .in('user_id', members.map(m => m.user_id))
+            .in('user_id', members.map((m: { user_id: string }) => m.user_id))
 
           current = count || 0
         }
