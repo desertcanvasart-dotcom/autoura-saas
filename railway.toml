@@ -1,0 +1,6 @@
+[build]
+# Ensure environment variables are available during build
+# This allows Supabase clients to be initialized at module level
+
+[deploy]
+startCommand = "npm run start"
