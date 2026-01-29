@@ -88,38 +88,42 @@ export async function POST(request: NextRequest) {
     // ============================================
     let clientId = null
     let clientName = null
-    
+    let clientTenantId = null
+
     const { data: existingClient } = await supabase
       .from('clients')
-      .select('id, full_name')
+      .select('id, full_name, tenant_id')
       .eq('phone', phoneNumber)
       .single()
 
     if (existingClient) {
       clientId = existingClient.id
       clientName = existingClient.full_name
+      clientTenantId = existingClient.tenant_id
     }
 
     // ============================================
     // STEP 2: Find or create conversation
     // ============================================
     let conversationId = null
-    
+    let tenantId = null
+
     const { data: existingConversation } = await supabase
       .from('whatsapp_conversations')
-      .select('id')
+      .select('id, tenant_id')
       .eq('phone_number', phoneNumber)
       .single()
 
     if (existingConversation) {
       conversationId = existingConversation.id
-      
+      tenantId = existingConversation.tenant_id
+
       // Update conversation with client info if we found one and it wasn't linked
       if (clientId) {
         await supabase
           .from('whatsapp_conversations')
-          .update({ 
-            client_id: clientId, 
+          .update({
+            client_id: clientId,
             client_name: clientName,
             updated_at: new Date().toISOString()
           })
@@ -134,15 +138,17 @@ export async function POST(request: NextRequest) {
           phone_number: phoneNumber,
           client_id: clientId,
           client_name: clientName,
+          tenant_id: clientTenantId, // Use client's tenant if available
           status: 'active'
         })
-        .select()
+        .select('id, tenant_id')
         .single()
 
       if (convError) {
         console.error('❌ Error creating conversation:', convError)
       } else {
         conversationId = newConversation.id
+        tenantId = newConversation.tenant_id || clientTenantId
         console.log('✅ Created new conversation:', conversationId)
       }
     }
@@ -172,50 +178,66 @@ export async function POST(request: NextRequest) {
     // ============================================
     // STEP 4: AI-Powered Auto-Response
     // ============================================
-    // Only process if AI is enabled and we have a message body
+    // Only process if AI is globally enabled and we have a message body
     if (process.env.WHATSAPP_AI_ENABLED === 'true' && body && conversationId) {
       try {
-        console.log('🤖 Processing message with AI agent...')
+        // Check tenant-specific AI setting
+        let tenantAiEnabled = false
+        if (tenantId) {
+          const { data: tenantFeatures } = await supabase
+            .from('tenant_features')
+            .select('whatsapp_ai_enabled')
+            .eq('tenant_id', tenantId)
+            .single()
 
-        const aiResponse = await processIncomingMessage(
-          supabase,
-          conversationId,
-          clientId,
-          phoneNumber,
-          body
-        )
+          tenantAiEnabled = tenantFeatures?.whatsapp_ai_enabled || false
+        }
 
-        if (aiResponse.success && aiResponse.shouldRespond && aiResponse.reply) {
-          console.log('🤖 AI response generated:', aiResponse.reply.substring(0, 100) + '...')
-          console.log('🤖 Confidence:', aiResponse.confidence)
-
-          // Send the AI-generated response
-          const sendResult = await sendWhatsAppMessage({
-            to: phoneNumber,
-            body: aiResponse.reply
-          })
-
-          if (sendResult.success) {
-            // Store the outbound message
-            await supabase.from('whatsapp_messages').insert({
-              conversation_id: conversationId,
-              message_sid: sendResult.messageId,
-              direction: 'outbound',
-              message_body: aiResponse.reply,
-              status: 'sent',
-              sent_at: new Date().toISOString(),
-              metadata: {
-                ai_generated: true,
-                ai_confidence: aiResponse.confidence,
-                ai_model: process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
-              }
-            })
-            console.log('✅ AI response sent and stored:', sendResult.messageId)
-          } else {
-            console.error('❌ Failed to send AI response:', sendResult.error)
-          }
+        if (!tenantAiEnabled) {
+          console.log('ℹ️ AI auto-response disabled for this tenant')
         } else {
-          console.log('🤖 AI decided not to respond:', aiResponse.reasoning || aiResponse.error)
+          console.log('🤖 Processing message with AI agent...')
+
+          const aiResponse = await processIncomingMessage(
+            supabase,
+            conversationId,
+            clientId,
+            phoneNumber,
+            body
+          )
+
+          if (aiResponse.success && aiResponse.shouldRespond && aiResponse.reply) {
+            console.log('🤖 AI response generated:', aiResponse.reply.substring(0, 100) + '...')
+            console.log('🤖 Confidence:', aiResponse.confidence)
+
+            // Send the AI-generated response
+            const sendResult = await sendWhatsAppMessage({
+              to: phoneNumber,
+              body: aiResponse.reply
+            })
+
+            if (sendResult.success) {
+              // Store the outbound message
+              await supabase.from('whatsapp_messages').insert({
+                conversation_id: conversationId,
+                message_sid: sendResult.messageId,
+                direction: 'outbound',
+                message_body: aiResponse.reply,
+                status: 'sent',
+                sent_at: new Date().toISOString(),
+                metadata: {
+                  ai_generated: true,
+                  ai_confidence: aiResponse.confidence,
+                  ai_model: process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
+                }
+              })
+              console.log('✅ AI response sent and stored:', sendResult.messageId)
+            } else {
+              console.error('❌ Failed to send AI response:', sendResult.error)
+            }
+          } else {
+            console.log('🤖 AI decided not to respond:', aiResponse.reasoning || aiResponse.error)
+          }
         }
       } catch (aiError) {
         console.error('❌ AI processing error:', aiError)
