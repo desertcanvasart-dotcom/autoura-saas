@@ -474,7 +474,13 @@ export async function POST(
       )
     }
 
-    const { supabase: supabase } = authResult // Use authenticated client
+    const { supabase } = authResult // Use authenticated client
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication failed' },
+        { status: 401 }
+      )
+    }
 
     // Next.js 15: params is now a Promise
     const { id: itineraryId } = await params
