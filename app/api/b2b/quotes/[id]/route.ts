@@ -70,7 +70,7 @@ export async function PUT(
     const { id: _, ...updates } = body
     updates.updated_at = new Date().toISOString()
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('tour_quotes')
       .update(updates)
       .eq('id', id)
