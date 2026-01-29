@@ -48,39 +48,41 @@ export async function POST(
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
 
-    if (quote.converted_to_itinerary_id) {
+    const q = quote as any
+
+    if (q.converted_to_itinerary_id) {
       return NextResponse.json(
-        { error: 'Quote already converted', itinerary_id: quote.converted_to_itinerary_id },
+        { error: 'Quote already converted', itinerary_id: q.converted_to_itinerary_id },
         { status: 400 }
       )
     }
 
-    const template = quote.tour_variations?.tour_templates
-    const variation = quote.tour_variations
+    const template = q.tour_variations?.tour_templates
+    const variation = q.tour_variations
 
     // Create or find client
     let clientId = null
-    if (quote.client_email) {
+    if (q.client_email) {
       const { data: existingClient } = await getSupabaseAdmin()
         .from('clients')
         .select('id')
-        .eq('email', quote.client_email)
+        .eq('email', q.client_email)
         .single()
 
       if (existingClient) {
         clientId = existingClient.id
       } else {
-        const nameParts = (quote.client_name || '').split(' ')
+        const nameParts = (q.client_name || '').split(' ')
         const { data: newClient } = await getSupabaseAdmin()
           .from('clients')
           .insert({
             first_name: nameParts[0] || 'Unknown',
             last_name: nameParts.slice(1).join(' ') || '',
-            email: quote.client_email,
-            phone: quote.client_phone,
-            nationality: quote.client_nationality,
+            email: q.client_email,
+            phone: q.client_phone,
+            nationality: q.client_nationality,
             source: 'b2b_quote',
-            notes: `Created from B2B quote ${quote.quote_number}`
+            notes: `Created from B2B quote ${q.quote_number}`
           })
           .select()
           .single()
@@ -95,7 +97,7 @@ export async function POST(
     const itineraryNumber = ((count || 0) + 1).toString().padStart(3, '0')
     const itineraryCode = `ITN-${year}-${itineraryNumber}`
 
-    const startDate = quote.travel_date ? new Date(quote.travel_date) : new Date()
+    const startDate = q.travel_date ? new Date(q.travel_date) : new Date()
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + (template?.duration_days || 1) - 1)
 
@@ -104,26 +106,26 @@ export async function POST(
       .insert({
         itinerary_code: itineraryCode,
         client_id: clientId,
-        client_name: quote.client_name || 'B2B Client',
+        client_name: q.client_name || 'B2B Client',
         trip_name: template?.template_name || 'Tour Package',
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
         total_days: template?.duration_days || 1,
-        num_adults: quote.num_adults,
-        num_children: quote.num_children || 0,
+        num_adults: q.num_adults,
+        num_children: q.num_children || 0,
         status: 'quoted',
         package_type: 'custom',
         tier: variation?.tier || 'standard',
-        total_cost: quote.selling_price,
-        supplier_cost: quote.total_cost,
-        profit: quote.margin_amount,
-        margin_percent: quote.margin_percent,
-        currency: quote.currency || 'EUR',
-        deposit_amount: Math.round((quote.selling_price || 0) * 0.3),
-        balance_due: Math.round((quote.selling_price || 0) * 0.7),
+        total_cost: q.selling_price,
+        supplier_cost: q.total_cost,
+        profit: q.margin_amount,
+        margin_percent: q.margin_percent,
+        currency: q.currency || 'EUR',
+        deposit_amount: Math.round((q.selling_price || 0) * 0.3),
+        balance_due: Math.round((q.selling_price || 0) * 0.7),
         payment_status: 'not_paid',
         created_by: user_id,
-        notes: `Converted from B2B quote ${quote.quote_number}`
+        notes: `Converted from B2B quote ${q.quote_number}`
       })
       .select()
       .single()
@@ -156,7 +158,7 @@ export async function POST(
 
       if (!itinDay) continue
 
-      const servicesSnapshot = quote.services_snapshot || []
+      const servicesSnapshot = q.services_snapshot || []
       
       for (const service of servicesSnapshot) {
         if (service.day_number && service.day_number !== dayNum) continue
@@ -171,8 +173,8 @@ export async function POST(
             supplier_cost: service.line_total / (service.quantity || 1),
             quantity: service.quantity || 1,
             total_cost: service.line_total,
-            margin_percent: quote.margin_percent,
-            selling_price: service.line_total * (1 + (quote.margin_percent || 25) / 100),
+            margin_percent: q.margin_percent,
+            selling_price: service.line_total * (1 + (q.margin_percent || 25) / 100),
             currency: 'EUR',
             status: 'pending'
           })
@@ -193,7 +195,7 @@ export async function POST(
       data: {
         itinerary_id: itinerary.id,
         itinerary_code: itineraryCode,
-        quote_number: quote.quote_number,
+        quote_number: q.quote_number,
         message: 'Quote successfully converted to itinerary'
       }
     })
