@@ -34,9 +34,9 @@ export default function SupabaseDebug() {
       supabase.from('tenants').select('count', { count: 'exact', head: true })
         .then(({ error }: { error: { message: string } | null }) => {
           if (error) {
-            setInfo(prev => ({ ...prev, queryError: error.message }))
+            setInfo(prev => prev ? { ...prev, queryError: error.message } : null)
           } else {
-            setInfo(prev => ({ ...prev, queryStatus: '✅ Can query' }))
+            setInfo(prev => prev ? { ...prev, queryStatus: '✅ Can query' } : null)
           }
         })
     } catch (err: any) {
