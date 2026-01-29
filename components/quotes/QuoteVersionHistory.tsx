@@ -12,6 +12,7 @@ interface QuoteVersion {
   change_reason: string | null;
   change_summary: string | null;
   changes_diff: any;
+  quote_data?: any;
   users?: { email: string } | null;
 }
 
