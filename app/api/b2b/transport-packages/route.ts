@@ -21,7 +21,7 @@ function getSupabaseAdmin() {
 
 export async function GET() {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('b2b_transport_packages')
       .select('*')
       .order('package_name')
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('b2b_transport_packages')
       .insert({
         package_code: body.package_code || `PKG-${Date.now()}`,
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         includes: body.includes,
         notes: body.notes,
         is_active: body.is_active ?? true
-      })
+      } as any)
       .select()
       .single()
 

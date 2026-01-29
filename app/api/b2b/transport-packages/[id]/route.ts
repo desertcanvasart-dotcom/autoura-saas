@@ -27,7 +27,7 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('b2b_transport_packages')
       .update({
         package_code: body.package_code,
@@ -75,7 +75,7 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('b2b_transport_packages')
       .delete()
       .eq('id', id)

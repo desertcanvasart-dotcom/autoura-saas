@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     // ============================================
     // STEP 1: Fetch template info
     // ============================================
-    const { data: template, error: templateError } = await supabaseAdmin
+    const { data: template, error: templateError } = await getSupabaseAdmin()
       .from('tour_templates')
       .select(`
         id,
@@ -63,17 +63,19 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (templateError || !template) {
-      return NextResponse.json({ 
-        success: false, 
+      return NextResponse.json({
+        success: false,
         error: 'Template not found',
-        templateId 
+        templateId
       }, { status: 404 })
     }
+
+    const t = template as any
 
     // ============================================
     // STEP 2: Parse itinerary for debugging
     // ============================================
-    const parsedItinerary = parseItinerary(template.itinerary)
+    const parsedItinerary = parseItinerary(t.itinerary)
     
     const itineraryAnalysis = {
       totalDays: parsedItinerary.length,
@@ -137,10 +139,10 @@ export async function GET(request: NextRequest) {
       
       // Template info
       template: {
-        id: template.id,
-        name: template.template_name,
-        duration: template.duration_days,
-        theme: (template.tour_categories as any)?.category_name || 'Unknown'
+        id: t.id,
+        name: t.template_name,
+        duration: t.duration_days,
+        theme: t.tour_categories?.category_name || 'Unknown'
       },
       
       // Itinerary analysis
