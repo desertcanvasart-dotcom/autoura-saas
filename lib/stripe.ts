@@ -175,7 +175,7 @@ export async function getUpcomingInvoice(
   customerId: string
 ): Promise<Stripe.Invoice | null> {
   try {
-    return await stripe.invoices.retrieveUpcoming({
+    return await stripe.invoices.createPreview({
       customer: customerId
     })
   } catch (error: any) {
