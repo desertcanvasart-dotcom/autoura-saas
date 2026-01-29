@@ -173,8 +173,6 @@ export default function OnboardingContent() {
           onSkip={handleSkip}
           onComplete={handleComplete}
           currentStep={currentStep}
-          isFirstStep={currentStep === 0}
-          isLastStep={currentStep === STEPS.length - 1}
           tenant={tenant}
         />
       </div>
