@@ -156,10 +156,10 @@ export async function POST(
     let pdfBuffer: Buffer
     if (type === 'b2c') {
       const pdfDoc = createElement(B2CQuotePDF, { quote })
-      pdfBuffer = await renderToBuffer(pdfDoc) as Buffer
+      pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
     } else {
       const pdfDoc = createElement(B2BQuotePDF, { quote })
-      pdfBuffer = await renderToBuffer(pdfDoc) as Buffer
+      pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
     }
 
     // Prepare view quote URL (you can customize this based on your domain)

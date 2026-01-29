@@ -69,7 +69,7 @@ export async function POST(
 
     // Generate PDF using React PDF renderer
     const pdfBuffer = await renderToBuffer(
-      React.createElement(B2CQuotePDF, { quote })
+      React.createElement(B2CQuotePDF, { quote }) as any
     );
 
     // Generate storage path
@@ -191,7 +191,7 @@ export async function GET(
 
     // Generate PDF using React PDF renderer
     const pdfBuffer = await renderToBuffer(
-      React.createElement(B2CQuotePDF, { quote })
+      React.createElement(B2CQuotePDF, { quote }) as any
     );
 
     // Return PDF as downloadable file
