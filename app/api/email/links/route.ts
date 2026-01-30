@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     // If messageId provided, get link for specific email
     if (messageId) {
-      const { data, error } = await getSupabase()
+      const { data, error } = await (getSupabase() as any)
         .from('email_client_links')
         .select(`
           *,
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     // If emailAddress provided, find client by email
     if (emailAddress) {
-      const { data: client, error } = await getSupabase()
+      const { data: client, error } = await (getSupabase() as any)
         .from('clients')
         .select('id, name, email, phone, status')
         .eq('user_id', userId)
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if link already exists
-    const { data: existingData } = await getSupabase()
+    const { data: existingData } = await (getSupabase() as any)
       .from('email_client_links')
       .select('id')
       .eq('user_id', userId)
@@ -191,7 +191,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get all clients for this user
-    const { data: clientsData, error: clientError } = await getSupabase()
+    const { data: clientsData, error: clientError } = await (getSupabase() as any)
       .from('clients')
       .select('id, email')
       .eq('user_id', userId)
@@ -210,7 +210,7 @@ export async function PUT(request: NextRequest) {
 
     // Get existing links to avoid duplicates
     const messageIds = emails.map(e => e.messageId)
-    const { data: linksData } = await getSupabase()
+    const { data: linksData } = await (getSupabase() as any)
       .from('email_client_links')
       .select('message_id')
       .eq('user_id', userId)

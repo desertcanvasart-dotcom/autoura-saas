@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') // pending, accepted, expired, all
 
-    let query = getSupabase()
+    let query = (getSupabase() as any)
       .from('tenant_invitations')
       .select(`
         *,
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const { data: existingUser } = await getSupabase()
+    const { data: existingUser } = await (getSupabase() as any)
       .from('user_profiles')
       .select('id, email')
       .eq('email', email.toLowerCase())
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if there's already a pending invitation
-    const { data: existingInvitation } = await getSupabase()
+    const { data: existingInvitation } = await (getSupabase() as any)
       .from('tenant_invitations')
       .select('id')
       .eq('email', email.toLowerCase())

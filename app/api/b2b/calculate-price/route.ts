@@ -83,7 +83,7 @@ function getSeason(date: Date): 'low' | 'high' | 'peak' {
 
 // Check for B2B pricing rules for an activity (kept for tiered pricing like felucca)
 async function getB2BPricingRule(serviceName: string): Promise<any | null> {
-  const { data, error } = await getSupabaseAdmin()
+  const { data, error } = await (getSupabaseAdmin() as any)
     .from('b2b_pricing_rules')
     .select('*')
     .eq('is_active', true)
@@ -96,7 +96,7 @@ async function getB2BPricingRule(serviceName: string): Promise<any | null> {
 
 // Get transport package for cruise sightseeing (kept for package deals)
 async function getTransportPackage(packageType: string, originCity: string, destCity: string): Promise<any | null> {
-  const { data, error } = await getSupabaseAdmin()
+  const { data, error } = await (getSupabaseAdmin() as any)
     .from('b2b_transport_packages')
     .select('*')
     .eq('package_type', packageType)
@@ -202,7 +202,7 @@ function selectVehicleFromPackage(pkg: any, numPax: number): { rate: number; veh
 
 // Select appropriate vehicle from vehicles table based on pax count and tier
 async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standard'): Promise<{ rate: number; vehicle: string; id: string } | null> {
-  const { data: vehicles, error } = await getSupabaseAdmin()
+  const { data: vehicles, error } = await (getSupabaseAdmin() as any)
     .from('vehicles')
     .select('id, vehicle_type, name, daily_rate, passenger_capacity, tier, is_preferred')
     .eq('is_active', true)
@@ -240,7 +240,7 @@ async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standar
 
 // Select guide from guides table based on language and tier
 async function selectGuideFromB2CTable(language: string = 'English', tier: string = 'standard'): Promise<{ rate: number; name: string; id: string } | null> {
-  const { data: guides, error } = await getSupabaseAdmin()
+  const { data: guides, error } = await (getSupabaseAdmin() as any)
     .from('guides')
     .select('id, name, daily_rate, languages, tier, is_preferred')
     .eq('is_active', true)
@@ -249,7 +249,7 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
 
   if (error || !guides || guides.length === 0) {
     // Fallback: any guide
-    const { data: anyGuide } = await getSupabaseAdmin()
+    const { data: anyGuide } = await (getSupabaseAdmin() as any)
       .from('guides')
       .select('id, name, daily_rate, tier')
       .eq('is_active', true)
@@ -278,7 +278,7 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
 
 // Get entrance fee from entrance_fees table
 async function getEntranceFee(attractionName: string, isEurPassport: boolean): Promise<{ rate: number; name: string; id: string } | null> {
-  const { data: fees, error } = await getSupabaseAdmin()
+  const { data: fees, error } = await (getSupabaseAdmin() as any)
     .from('entrance_fees')
     .select('id, attraction_name, eur_rate, non_eur_rate')
     .eq('is_active', true)
@@ -301,7 +301,7 @@ async function getEntranceFee(attractionName: string, isEurPassport: boolean): P
 
 // Get hotel rate from hotel_contacts table
 async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ rate: number; name: string; id: string } | null> {
-  const { data: hotels, error } = await getSupabaseAdmin()
+  const { data: hotels, error } = await (getSupabaseAdmin() as any)
     .from('hotel_contacts')
     .select('id, name, rate_double_eur, city, tier, is_preferred')
     .eq('is_active', true)
@@ -312,7 +312,7 @@ async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ 
 
   if (error || !hotels || hotels.length === 0) {
     // Fallback: any hotel in city
-    const { data: anyHotel } = await getSupabaseAdmin()
+    const { data: anyHotel } = await (getSupabaseAdmin() as any)
       .from('hotel_contacts')
       .select('id, name, rate_double_eur')
       .eq('is_active', true)
@@ -367,7 +367,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch variation with template info
-    const { data: variation, error: varError } = await getSupabaseAdmin()
+    const { data: variation, error: varError } = await (getSupabaseAdmin() as any)
       .from('tour_variations')
       .select(`
         id, variation_name, variation_code, tier, group_type, min_pax, max_pax,
@@ -387,7 +387,7 @@ export async function POST(request: NextRequest) {
     const templateId = template?.id
 
     // Fetch services for this variation
-    const { data: services, error: servError } = await getSupabaseAdmin()
+    const { data: services, error: servError } = await (getSupabaseAdmin() as any)
       .from('tour_variation_services')
       .select('*')
       .eq('variation_id', variation_id)
@@ -409,12 +409,12 @@ export async function POST(request: NextRequest) {
       // Determine effective margin (partner override)
       let effectiveMargin = margin_percent
       if (partner_id) {
-        const { data: partner } = await getSupabaseAdmin()
+        const { data: partner } = await (getSupabaseAdmin() as any)
           .from('b2b_partners')
           .select('default_margin_percent')
           .eq('id', partner_id)
           .single()
-        
+
         if ((partner as any)?.default_margin_percent) {
           effectiveMargin = (partner as any).default_margin_percent
         }
@@ -523,17 +523,17 @@ export async function POST(request: NextRequest) {
     // Determine effective margin (partner override)
     let effectiveMargin = margin_percent
     if (partner_id) {
-      const { data: partner } = await getSupabaseAdmin()
+      const { data: partner } = await (getSupabaseAdmin() as any)
         .from('b2b_partners')
         .select('default_margin_percent')
         .eq('id', partner_id)
         .single()
-      
+
       if ((partner as any)?.default_margin_percent) {
         effectiveMargin = (partner as any).default_margin_percent
       }
 
-      const { data: override } = await getSupabaseAdmin()
+      const { data: override } = await (getSupabaseAdmin() as any)
         .from('b2b_partner_pricing')
         .select('margin_percent_override')
         .eq('partner_id', partner_id)
@@ -674,7 +674,7 @@ export async function POST(request: NextRequest) {
           case 'cruise': {
             // Cruise rates from nile_cruises table
             if (service.rate_id) {
-              const { data: cruise } = await getSupabaseAdmin()
+              const { data: cruise } = await (getSupabaseAdmin() as any)
                 .from('nile_cruises')
                 .select('*')
                 .eq('id', service.rate_id)
@@ -702,7 +702,7 @@ export async function POST(request: NextRequest) {
           }
 
           case 'meal': {
-            const { data: mealRate } = await getSupabaseAdmin()
+            const { data: mealRate } = await (getSupabaseAdmin() as any)
               .from('meal_rates')
               .select('*')
               .eq('is_active', true)

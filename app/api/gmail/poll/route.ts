@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user's Gmail tokens
-    const { data: tokenData, error: tokenError } = await getSupabase()
+    const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's Gmail tokens
-    const { data: tokenData, error: tokenError } = await getSupabase()
+    const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)

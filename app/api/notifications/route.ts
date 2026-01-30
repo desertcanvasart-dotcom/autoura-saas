@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const unreadOnly = searchParams.get('unreadOnly') === 'true'
     const limit = parseInt(searchParams.get('limit') || '20')
 
-    let query = getSupabase()
+    let query = (getSupabase() as any)
       .from('notifications')
       .select(`
         *,
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Also get unread count
-    let countQuery = getSupabase()
+    let countQuery = (getSupabase() as any)
       .from('notifications')
       .select('id', { count: 'exact', head: true })
       .eq('is_read', false)

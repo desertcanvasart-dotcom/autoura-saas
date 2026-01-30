@@ -27,7 +27,7 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('tour_quotes')
       .select(`
         *,

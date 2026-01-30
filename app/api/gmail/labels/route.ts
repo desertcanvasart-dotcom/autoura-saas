@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
-    const { data: tokenData, error: tokenError } = await getSupabase()
+    const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     if (new Date(token_expiry) <= new Date()) {
       const newTokens = await refreshAccessToken(refresh_token)
       access_token = newTokens.access_token!
-      
+
       await (getSupabase() as any)
         .from('gmail_tokens')
         .update({
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
-    const { data: tokenData, error: tokenError } = await getSupabase()
+    const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -180,7 +180,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
-    const { data: tokenData } = await getSupabase()
+    const { data: tokenData } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)

@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
       switch (partnerType) {
         case 'hotel':
-          const { data: hotels } = await getSupabase()
+          const { data: hotels } = await (getSupabase() as any)
             .from('hotel_contacts')
             .select('id, name, property_type, city, contact_person, phone, email, whatsapp, address, star_rating')
             .eq('is_active', true)
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
           break
 
         case 'guide':
-          const { data: guides } = await getSupabase()
+          const { data: guides } = await (getSupabase() as any)
             .from('guides')
             .select('id, name, phone, email, languages, specialties, daily_rate, hourly_rate')
             .eq('is_active', true)
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
           break
 
         case 'restaurant':
-          const { data: restaurants } = await getSupabase()
+          const { data: restaurants } = await (getSupabase() as any)
             .from('restaurant_contacts')
             .select('id, name, restaurant_type, cuisine_type, city, contact_person, phone, email, whatsapp, address')
             .eq('is_active', true)
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
           break
 
         case 'airport_staff':
-          const { data: airportStaff } = await getSupabase()
+          const { data: airportStaff } = await (getSupabase() as any)
             .from('airport_staff')
             .select('id, name, role, airport_location, phone, email, whatsapp, languages')
             .eq('is_active', true)

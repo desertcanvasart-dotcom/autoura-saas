@@ -40,7 +40,7 @@ export async function GET(
     let quote: any = null
 
     if (type === 'b2c') {
-      const { data, error } = await getSupabaseAdmin()
+      const { data, error } = await (getSupabaseAdmin() as any)
         .from('b2c_quotes')
         .select(`
           *,
@@ -64,7 +64,7 @@ export async function GET(
       if (error) throw error
       quote = data
     } else {
-      const { data, error } = await getSupabaseAdmin()
+      const { data, error } = await (getSupabaseAdmin() as any)
         .from('b2b_quotes')
         .select(`
           *,

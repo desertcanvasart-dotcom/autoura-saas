@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate quote number using admin client (RPC needs admin)
-    const { data: quoteNumber, error: seqError } = await getSupabaseAdmin()
+    const { data: quoteNumber, error: seqError } = await (getSupabaseAdmin() as any)
       .rpc('generate_b2b_quote_number');
 
     if (seqError) {

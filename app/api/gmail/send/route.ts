@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's tokens
-    const { data: tokenData, error: tokenError } = await getSupabase()
+    const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)

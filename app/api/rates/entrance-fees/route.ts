@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit')
     const search = searchParams.get('search')
 
-    let query = getSupabaseAdmin()
+    let query = (getSupabaseAdmin() as any)
       .from('entrance_fees')
       .select('*')
       .order('city', { ascending: true })

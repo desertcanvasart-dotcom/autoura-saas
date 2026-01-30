@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active') === 'true'
     const role = searchParams.get('role')
 
-    let query = getSupabase()
+    let query = (getSupabase() as any)
       .from('user_profiles')
       .select('*')
       .order('created_at', { ascending: false })

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const classType = searchParams.get('class_type')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = getSupabaseAdmin()
+    let query = (getSupabaseAdmin() as any)
       .from('train_rates')
       .select('*')
       .order('origin_city')

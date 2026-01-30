@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     // Fetch rates from each table
     for (const table of rateTables) {
       try {
-        const { data, error } = await getSupabaseAdmin()
+        const { data, error } = await (getSupabaseAdmin() as any)
           .from(table)
           .select('*')
           .eq('supplier_id', supplierId)

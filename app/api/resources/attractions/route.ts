@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const activityType = searchParams.get('activity_type')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = getSupabaseAdmin()
+    let query = (getSupabaseAdmin() as any)
       .from('activity_rates')
       .select(`
         *,

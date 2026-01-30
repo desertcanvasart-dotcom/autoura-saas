@@ -21,7 +21,7 @@ function getSupabaseAdmin() {
 
 export async function GET() {
   try {
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('b2b_transport_packages')
       .select('*')
       .order('package_name')

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Find invitation by token
-    const { data: invitation, error } = await getSupabase()
+    const { data: invitation, error } = await (getSupabase() as any)
       .from('tenant_invitations')
       .select(`
         *,

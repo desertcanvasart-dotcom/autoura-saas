@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'User ID required' }, { status: 400 })
   }
 
-  const { data, error } = await getSupabase()
+  const { data, error } = await (getSupabase() as any)
     .from('email_signatures')
     .select('*')
     .eq('user_id', userId)

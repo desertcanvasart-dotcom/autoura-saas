@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
-    const { data: tokenData, error: tokenError } = await getSupabase()
+    const { data: tokenData, error: tokenError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)

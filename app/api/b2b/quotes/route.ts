@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     // Get single quote by ID
     if (id) {
-      const { data, error } = await getSupabaseAdmin()
+      const { data, error } = await (getSupabaseAdmin() as any)
         .from('tour_quotes')
         .select(`
           *,
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     // List quotes
-    let query = getSupabaseAdmin()
+    let query = (getSupabaseAdmin() as any)
       .from('tour_quotes')
       .select(`
         *,

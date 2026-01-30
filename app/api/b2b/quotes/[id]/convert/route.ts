@@ -28,7 +28,7 @@ export async function POST(
     const body = await request.json()
     const { user_id } = body
 
-    const { data: quote, error: quoteError } = await getSupabaseAdmin()
+    const { data: quote, error: quoteError } = await (getSupabaseAdmin() as any)
       .from('tour_quotes')
       .select(`
         *,
@@ -63,7 +63,7 @@ export async function POST(
     // Create or find client
     let clientId = null
     if (q.client_email) {
-      const { data: existingClient } = await getSupabaseAdmin()
+      const { data: existingClient } = await (getSupabaseAdmin() as any)
         .from('clients')
         .select('id')
         .eq('email', q.client_email)
@@ -93,7 +93,7 @@ export async function POST(
 
     // Generate itinerary code
     const year = new Date().getFullYear().toString().slice(-2)
-    const { count } = await getSupabaseAdmin().from('itineraries').select('*', { count: 'exact', head: true })
+    const { count } = await (getSupabaseAdmin() as any).from('itineraries').select('*', { count: 'exact', head: true })
     const itineraryNumber = ((count || 0) + 1).toString().padStart(3, '0')
     const itineraryCode = `ITN-${year}-${itineraryNumber}`
 

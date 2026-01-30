@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const supplierId = searchParams.get('supplier_id')
     const activeOnly = searchParams.get('activeOnly') === 'true'
 
-    let query = getSupabaseAdmin()
+    let query = (getSupabaseAdmin() as any)
       .from('transportation_rates')
       .select(`
         *,

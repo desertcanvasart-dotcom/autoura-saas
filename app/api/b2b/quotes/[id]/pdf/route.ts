@@ -630,7 +630,7 @@ export async function GET(
     const { id } = await params
 
     // Fetch quote with related data
-    const { data: quote, error } = await getSupabaseAdmin()
+    const { data: quote, error } = await (getSupabaseAdmin() as any)
       .from('tour_quotes')
       .select(`
         *,

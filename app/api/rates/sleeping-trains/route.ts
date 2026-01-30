@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const cabinType = searchParams.get('cabin_type')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = getSupabaseAdmin()
+    let query = (getSupabaseAdmin() as any)
       .from('sleeping_train_rates')
       .select('*')
       .order('origin_city')

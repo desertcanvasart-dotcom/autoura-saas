@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     // ============================================
     // STEP 1: Fetch template info
     // ============================================
-    const { data: template, error: templateError } = await getSupabaseAdmin()
+    const { data: template, error: templateError } = await (getSupabaseAdmin() as any)
       .from('tour_templates')
       .select(`
         id,

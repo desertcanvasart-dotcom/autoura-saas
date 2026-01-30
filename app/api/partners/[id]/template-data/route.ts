@@ -34,7 +34,7 @@ export async function GET(
 
     switch (type) {
       case 'hotel':
-        const { data: hotel, error: hotelError } = await getSupabase()
+        const { data: hotel, error: hotelError } = await (getSupabase() as any)
           .from('hotel_contacts')
           .select('*')
           .eq('id', partnerId)
@@ -61,7 +61,7 @@ export async function GET(
         break
 
       case 'guide':
-        const { data: guide, error: guideError } = await getSupabase()
+        const { data: guide, error: guideError } = await (getSupabase() as any)
           .from('guides')
           .select('*')
           .eq('id', partnerId)
@@ -86,7 +86,7 @@ export async function GET(
         break
 
       case 'restaurant':
-        const { data: restaurant, error: restaurantError } = await getSupabase()
+        const { data: restaurant, error: restaurantError } = await (getSupabase() as any)
           .from('restaurant_contacts')
           .select('*')
           .eq('id', partnerId)
@@ -113,7 +113,7 @@ export async function GET(
         break
 
       case 'airport_staff':
-        const { data: staff, error: staffError } = await getSupabase()
+        const { data: staff, error: staffError } = await (getSupabase() as any)
           .from('airport_staff')
           .select('*')
           .eq('id', partnerId)

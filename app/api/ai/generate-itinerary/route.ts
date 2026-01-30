@@ -1441,7 +1441,7 @@ async function createQuotesForItinerary(params: {
     return { b2c_quote: null, b2b_quote: null }
   }
 
-  const { data: tenant } = await getSupabaseAdmin().from('tenants').select('id').single()
+  const { data: tenant } = await (getSupabaseAdmin() as any).from('tenants').select('id').single()
   const t = tenant as any
   const tenant_id = t?.id
 
@@ -1451,7 +1451,7 @@ async function createQuotesForItinerary(params: {
   }
 
   // Fetch itinerary with services for pricing calculation
-  const { data: itineraryData } = await getSupabaseAdmin()
+  const { data: itineraryData } = await (getSupabaseAdmin() as any)
     .from('itineraries')
     .select(`
       *,
@@ -1536,7 +1536,7 @@ async function createQuotesForItinerary(params: {
       const price_per_person = selling_price / num_travelers
 
       // Generate quote number
-      const { data: quoteNumber } = await getSupabaseAdmin().rpc('generate_b2c_quote_number')
+      const { data: quoteNumber } = await (getSupabaseAdmin() as any).rpc('generate_b2c_quote_number')
 
       // Create quote
       const { data: createdQuote, error } = await (getSupabaseAdmin() as any)
@@ -1646,7 +1646,7 @@ async function createQuotesForItinerary(params: {
       }
 
       // Generate quote number
-      const { data: quoteNumber } = await getSupabaseAdmin().rpc('generate_b2b_quote_number')
+      const { data: quoteNumber } = await (getSupabaseAdmin() as any).rpc('generate_b2b_quote_number')
 
       // Create quote
       const { data: createdQuote, error } = await (getSupabaseAdmin() as any)
