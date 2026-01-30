@@ -1042,7 +1042,7 @@ export async function getAirportServiceRate(
       return DEFAULT_RATES[tier].airportService
     }
 
-    return rates[0].rate_eur || DEFAULT_RATES[tier].airportService
+    return (rates[0] as any).rate_eur || DEFAULT_RATES[tier].airportService
   } catch (err) {
     return DEFAULT_RATES[tier].airportService
   }
@@ -1057,7 +1057,7 @@ export async function getHotelServiceRate(
 ): Promise<number> {
   try {
     const category = getTierCategory(tier)
-    
+
     const { data: rates } = await getSupabaseAdmin()
       .from('hotel_staff_rates')
       .select('rate_eur')
@@ -1070,7 +1070,7 @@ export async function getHotelServiceRate(
       return DEFAULT_RATES[tier].hotelService
     }
 
-    return rates[0].rate_eur || DEFAULT_RATES[tier].hotelService
+    return (rates[0] as any).rate_eur || DEFAULT_RATES[tier].hotelService
   } catch (err) {
     return DEFAULT_RATES[tier].hotelService
   }
