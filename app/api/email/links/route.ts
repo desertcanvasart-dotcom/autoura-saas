@@ -191,12 +191,14 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get all clients for this user
-    const { data: clients, error: clientError } = await getSupabase()
+    const { data: clientsData, error: clientError } = await getSupabase()
       .from('clients')
       .select('id, email')
       .eq('user_id', userId)
 
     if (clientError) throw clientError
+
+    const clients = clientsData as any[]
 
     // Create email -> client lookup
     const emailToClient = new Map<string, string>()
@@ -208,12 +210,13 @@ export async function PUT(request: NextRequest) {
 
     // Get existing links to avoid duplicates
     const messageIds = emails.map(e => e.messageId)
-    const { data: existingLinks } = await getSupabase()
+    const { data: linksData } = await getSupabase()
       .from('email_client_links')
       .select('message_id')
       .eq('user_id', userId)
       .in('message_id', messageIds)
 
+    const existingLinks = linksData as any[]
     const existingMessageIds = new Set(existingLinks?.map(l => l.message_id) || [])
 
     // Find matches and create links
