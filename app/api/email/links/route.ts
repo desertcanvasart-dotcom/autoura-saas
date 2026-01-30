@@ -85,12 +85,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if link already exists
-    const { data: existing } = await getSupabase()
+    const { data: existingData } = await getSupabase()
       .from('email_client_links')
       .select('id')
       .eq('user_id', userId)
       .eq('message_id', messageId)
       .single()
+
+    const existing = existingData as any
 
     if (existing) {
       // Update existing link
