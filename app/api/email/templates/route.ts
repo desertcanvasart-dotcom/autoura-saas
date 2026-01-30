@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform message_templates to match the expected format
-    const transformedMessageTemplates = (messageTemplates || []).map(template => ({
+    const transformedMessageTemplates = (messageTemplates || []).map((template: any) => ({
       id: template.id,
       name: template.name,
       subject: template.subject || '',
