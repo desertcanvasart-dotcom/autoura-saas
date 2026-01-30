@@ -1539,7 +1539,7 @@ async function createQuotesForItinerary(params: {
       const { data: quoteNumber } = await getSupabaseAdmin().rpc('generate_b2c_quote_number')
 
       // Create quote
-      const { data: createdQuote, error } = await getSupabaseAdmin()
+      const { data: createdQuote, error } = await (getSupabaseAdmin() as any)
         .from('b2c_quotes')
         .insert({
           tenant_id,
@@ -1649,7 +1649,7 @@ async function createQuotesForItinerary(params: {
       const { data: quoteNumber } = await getSupabaseAdmin().rpc('generate_b2b_quote_number')
 
       // Create quote
-      const { data: createdQuote, error } = await getSupabaseAdmin()
+      const { data: createdQuote, error } = await (getSupabaseAdmin() as any)
         .from('b2b_quotes')
         .insert({
           tenant_id,
