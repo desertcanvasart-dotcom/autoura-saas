@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category') // 'customer', 'partner', 'internal', or 'all'
 
     // Fetch from message_templates (new templates)
-    let query = getSupabase()
+    let query = (getSupabase() as any)
       .from('message_templates')
       .select('*')
       .eq('is_active', true)
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     // Also fetch from email_templates (legacy templates) if table exists
     let legacyTemplates: any[] = []
     try {
-      const { data: legacy, error: legacyError } = await getSupabase()
+      const { data: legacy, error: legacyError } = await (getSupabase() as any)
         .from('email_templates')
         .select('*')
         .order('name')
