@@ -904,9 +904,9 @@ export async function getEntranceFee(
       return null
     }
 
-    const fee = fees[0]
-    const rate = isEurPassport 
-      ? (fee.eur_rate || 0) 
+    const fee = fees[0] as any
+    const rate = isEurPassport
+      ? (fee.eur_rate || 0)
       : (fee.non_eur_rate || fee.eur_rate || 0)
 
     console.log(`✅ Entrance: ${fee.attraction_name} | €${rate} (${isEurPassport ? 'EUR' : 'non-EUR'})`)
