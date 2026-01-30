@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     // =========================================
     // 1. Find tasks due tomorrow (24h warning)
     // =========================================
-    const { data: dueSoonTasks, error: dueSoonError } = await getSupabase()
+    const { data: dueSoonTasks, error: dueSoonError } = await (getSupabase() as any)
       .from('tasks')
       .select(`
         *,
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         if (!task.assigned_member?.id) continue
 
         // Check if we already sent this notification today
-        const { data: existing } = await getSupabase()
+        const { data: existing } = await (getSupabase() as any)
           .from('notifications')
           .select('id')
           .eq('related_task_id', task.id)
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     // =========================================
     // 2. Find overdue tasks
     // =========================================
-    const { data: overdueTasks, error: overdueError } = await getSupabase()
+    const { data: overdueTasks, error: overdueError } = await (getSupabase() as any)
       .from('tasks')
       .select(`
         *,
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
         const threeDaysAgo = new Date()
         threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
         
-        const { data: existing } = await getSupabase()
+        const { data: existing } = await (getSupabase() as any)
           .from('notifications')
           .select('id')
           .eq('related_task_id', task.id)
