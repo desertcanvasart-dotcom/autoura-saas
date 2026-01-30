@@ -953,14 +953,15 @@ export async function getGuideRate(
         }
       }
 
+      const g = anyGuide[0] as any
       return {
-        id: anyGuide[0].id,
-        name: anyGuide[0].name,
-        dailyRate: anyGuide[0].daily_rate || DEFAULT_RATES[tier].guide
+        id: g.id,
+        name: g.name,
+        dailyRate: g.daily_rate || DEFAULT_RATES[tier].guide
       }
     }
 
-    const selected = guides.find(g => g.tier === tier) || guides[0]
+    const selected = (guides.find((g: any) => g.tier === tier) || guides[0]) as any
 
     console.log(`✅ Guide: ${selected.name} | €${selected.daily_rate}/day`)
 
