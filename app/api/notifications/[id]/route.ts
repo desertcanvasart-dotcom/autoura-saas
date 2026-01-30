@@ -24,7 +24,7 @@ export async function PUT(
     const body = await request.json()
     const { is_read = true } = body
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await (getSupabase() as any)
       .from('notifications')
       .update({ is_read, updated_at: new Date().toISOString() })
       .eq('id', id)

@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     if (new Date(tokenData.token_expiry) < new Date()) {
       const { credentials } = await oauth2Client.refreshAccessToken()
       
-      await getSupabase()
+      await (getSupabase() as any)
         .from('gmail_tokens')
         .update({
           access_token: credentials.access_token,

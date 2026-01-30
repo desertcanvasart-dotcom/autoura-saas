@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== false
     }
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('train_rates')
       .insert(newRate)
       .select('*')

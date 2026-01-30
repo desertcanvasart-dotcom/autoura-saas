@@ -106,7 +106,7 @@ export async function PUT(
 
     console.log('Updating transportation rate:', id, updateData)
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('transportation_rates')
       .update(updateData)
       .eq('id', id)

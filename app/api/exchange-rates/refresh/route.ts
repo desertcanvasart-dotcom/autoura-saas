@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
 
       if (existing) {
         // Update existing
-        return getSupabaseAdmin()
+        return (getSupabaseAdmin() as any)
           .from('exchange_rates')
           .update({
             rate: rate.rate,
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
           .eq('id', existing.id)
       } else {
         // Insert new
-        return getSupabaseAdmin()
+        return (getSupabaseAdmin() as any)
           .from('exchange_rates')
           .insert({
             tenant_id: null,

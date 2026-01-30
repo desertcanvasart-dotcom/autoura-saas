@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       const newTokens = await refreshAccessToken(refresh_token)
       access_token = newTokens.access_token!
 
-      await getSupabase()
+      await (getSupabase() as any)
         .from('gmail_tokens')
         .update({
           access_token: newTokens.access_token,

@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       access_token = newTokens.access_token!
 
       // Update tokens using admin client (token refresh needs admin permissions)
-      await getSupabaseAdmin()
+      await (getSupabaseAdmin() as any)
         .from('gmail_tokens')
         .update({
           access_token: newTokens.access_token,

@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Insert notification
-    const { data: notification, error } = await getSupabase()
+    const { data: notification, error } = await (getSupabase() as any)
       .from('notifications')
       .insert({
         team_member_id,
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
         )
         
         // Mark email as sent
-        await getSupabase()
+        await (getSupabase() as any)
           .from('notifications')
           .update({ email_sent: true })
           .eq('id', notification.id)

@@ -66,7 +66,7 @@ export async function PUT(
     if (body.notes !== undefined) updateData.notes = body.notes || null
     if (body.is_active !== undefined) updateData.is_active = body.is_active
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('sleeping_train_rates')
       .update(updateData)
       .eq('id', id)

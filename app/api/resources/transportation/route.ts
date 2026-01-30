@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       destination_city: body.destination_city || null
     }
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('transportation_rates')
       .insert([newRate])
       .select(`*, supplier:supplier_id (id, name, city)`)

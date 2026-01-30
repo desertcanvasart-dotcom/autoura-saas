@@ -20,7 +20,7 @@ export async function PUT(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const teamMemberId = searchParams.get('teamMemberId')
 
-    let query = getSupabase()
+    let query = (getSupabase() as any)
       .from('notifications')
       .update({ is_read: true, updated_at: new Date().toISOString() })
       .eq('is_read', false)

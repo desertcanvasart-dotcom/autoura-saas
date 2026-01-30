@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update message status in database
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('whatsapp_messages')
       .update({
         status: messageStatus,

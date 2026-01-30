@@ -187,7 +187,7 @@ async function createNotification({
   name?: string
 }) {
   // Insert notification
-  const { data: notification, error } = await getSupabase()
+  const { data: notification, error } = await (getSupabase() as any)
     .from('notifications')
     .insert({
       team_member_id,
@@ -213,7 +213,7 @@ async function createNotification({
       await sendReminderEmail(email, name, title, message, link, type)
       
       // Mark email as sent
-      await getSupabase()
+      await (getSupabase() as any)
         .from('notifications')
         .update({ email_sent: true })
         .eq('id', notification.id)

@@ -160,7 +160,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   const billingCycle = subscription.items.data[0]?.price.recurring?.interval === 'year' ? 'yearly' : 'monthly'
 
   // Upsert subscription
-  const { error } = await getSupabaseAdmin()
+  const { error } = await (getSupabaseAdmin() as any)
     .from('tenant_subscriptions')
     .upsert({
       tenant_id: tenantId,
@@ -192,7 +192,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     .single()
 
   if (subscriptionRecord) {
-    await getSupabaseAdmin()
+    await (getSupabaseAdmin() as any)
       .from('tenant_usage')
       .upsert({
         tenant_id: tenantId,
@@ -227,7 +227,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log(`Subscription deleted for tenant ${tenantId}`)
 
   // Update subscription status
-  const { error } = await getSupabaseAdmin()
+  const { error } = await (getSupabaseAdmin() as any)
     .from('tenant_subscriptions')
     .update({
       status: 'canceled',
@@ -275,7 +275,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   console.log(`Invoice paid for tenant ${subscription.tenant_id}`)
 
   // Store invoice record
-  await getSupabaseAdmin()
+  await (getSupabaseAdmin() as any)
     .from('billing_invoices')
     .upsert({
       tenant_id: subscription.tenant_id,
@@ -335,7 +335,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   console.log(`Payment failed for tenant ${subscription.tenant_id}`)
 
   // Update subscription status to past_due
-  await getSupabaseAdmin()
+  await (getSupabaseAdmin() as any)
     .from('tenant_subscriptions')
     .update({
       status: 'past_due',

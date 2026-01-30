@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       supplier_id: body.supplier_id || null
     }
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('activity_rates')
       .insert([newRate])
       .select(`*, supplier:supplier_id (id, name, city)`)

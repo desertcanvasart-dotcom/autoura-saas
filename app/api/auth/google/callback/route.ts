@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const expiryDate = new Date(Date.now() + (tokens.expiry_date || 3600 * 1000))
 
     // Upsert token record
-    const { error: dbError } = await getSupabase()
+    const { error: dbError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .upsert({
         user_id: state,

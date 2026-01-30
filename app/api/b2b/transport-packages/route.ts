@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('b2b_transport_packages')
       .insert({
         package_code: body.package_code || `PKG-${Date.now()}`,

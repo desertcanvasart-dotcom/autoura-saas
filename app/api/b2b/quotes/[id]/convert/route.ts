@@ -73,7 +73,7 @@ export async function POST(
         clientId = (existingClient as any).id
       } else {
         const nameParts = (q.client_name || '').split(' ')
-        const { data: newClient } = await getSupabaseAdmin()
+        const { data: newClient } = await (getSupabaseAdmin() as any)
           .from('clients')
           .insert({
             first_name: nameParts[0] || 'Unknown',
@@ -101,7 +101,7 @@ export async function POST(
     const endDate = new Date(startDate)
     endDate.setDate(endDate.getDate() + (template?.duration_days || 1) - 1)
 
-    const { data: itinerary, error: itinError } = await getSupabaseAdmin()
+    const { data: itinerary, error: itinError } = await (getSupabaseAdmin() as any)
       .from('itineraries')
       .insert({
         itinerary_code: itineraryCode,
@@ -144,7 +144,7 @@ export async function POST(
       const dayDate = new Date(startDate)
       dayDate.setDate(dayDate.getDate() + dayNum - 1)
 
-      const { data: itinDay } = await getSupabaseAdmin()
+      const { data: itinDay } = await (getSupabaseAdmin() as any)
         .from('itinerary_days')
         .insert({
           itinerary_id: itin.id,
@@ -166,7 +166,7 @@ export async function POST(
         if (service.day_number && service.day_number !== dayNum) continue
         if (!service.day_number && dayNum > 1) continue
 
-        await getSupabaseAdmin()
+        await (getSupabaseAdmin() as any)
           .from('itinerary_services')
           .insert({
             itinerary_day_id: (itinDay as any).id,

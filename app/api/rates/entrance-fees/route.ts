@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       supplier_id: body.supplier_id || null
     }
 
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('entrance_fees')
       .insert(newFee)
       .select('*')

@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     const placeholderMatches = content.match(/\{\{[^}]+\}\}/g) || []
     const placeholders = [...new Set(placeholderMatches)]
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await (getSupabase() as any)
       .from('message_templates')
       .insert({
         name,

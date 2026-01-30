@@ -69,7 +69,7 @@ export async function PUT(
       )
     }
 
-    const { data, error } = await getSupabase()
+    const { data, error } = await (getSupabase() as any)
       .from('user_profiles')
       .update(updateData)
       .eq('id', id)

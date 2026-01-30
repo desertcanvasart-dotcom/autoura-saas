@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     expiresAt.setDate(expiresAt.getDate() + 7)
 
     // Create invitation
-    const { data: invitation, error } = await getSupabase()
+    const { data: invitation, error } = await (getSupabase() as any)
       .from('tenant_invitations')
       .insert({
         tenant_id,
@@ -177,7 +177,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update invitation status
-    const { data, error } = await getSupabase()
+    const { data, error } = await (getSupabase() as any)
       .from('tenant_invitations')
       .update({
         status: 'accepted',

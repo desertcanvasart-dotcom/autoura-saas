@@ -43,13 +43,13 @@ export async function POST(request: NextRequest) {
 
   // If setting as default, unset other defaults
   if (isDefault) {
-    await getSupabase()
+    await (getSupabase() as any)
       .from('email_signatures')
       .update({ is_default: false })
       .eq('user_id', userId)
   }
 
-  const { data, error } = await getSupabase()
+  const { data, error } = await (getSupabase() as any)
     .from('email_signatures')
     .insert({
       user_id: userId,
@@ -76,13 +76,13 @@ export async function PUT(request: NextRequest) {
 
   // If setting as default, unset other defaults
   if (isDefault) {
-    await getSupabase()
+    await (getSupabase() as any)
       .from('email_signatures')
       .update({ is_default: false })
       .eq('user_id', userId)
   }
 
-  const { data, error } = await getSupabase()
+  const { data, error } = await (getSupabase() as any)
     .from('email_signatures')
     .update({
       name,

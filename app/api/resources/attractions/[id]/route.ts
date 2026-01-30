@@ -50,7 +50,7 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
     
-    const { data, error } = await getSupabaseAdmin()
+    const { data, error } = await (getSupabaseAdmin() as any)
       .from('activity_rates')
       .update({
         ...body,
