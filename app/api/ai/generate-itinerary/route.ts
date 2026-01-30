@@ -648,9 +648,9 @@ async function findCruiseContent(
     }
 
     // Find best match based on duration if specified
-    let bestMatch = cruises[0]
+    let bestMatch = cruises[0] as any
     if (requestedDuration) {
-      const durationMatch = cruises.find(c => c.duration_days === requestedDuration)
+      const durationMatch = (cruises as any[]).find((c: any) => c.duration_days === requestedDuration)
       if (durationMatch) {
         bestMatch = durationMatch
       }
