@@ -1001,6 +1001,7 @@ export async function getMealRates(
       }
     }
 
+    const m = mealRate as any
     const multipliers: Record<ServiceTier, number> = {
       budget: 0.8,
       standard: 1.0,
@@ -1009,8 +1010,8 @@ export async function getMealRates(
     }
 
     return {
-      lunch: Math.round((mealRate.lunch_rate_eur || 12) * multipliers[tier]),
-      dinner: Math.round((mealRate.dinner_rate_eur || 18) * multipliers[tier])
+      lunch: Math.round((m.lunch_rate_eur || 12) * multipliers[tier]),
+      dinner: Math.round((m.dinner_rate_eur || 18) * multipliers[tier])
     }
   } catch (err) {
     return {
