@@ -116,7 +116,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   // The actual subscription will be handled by subscription.created event
   // Just log the activity here
-  await getSupabaseAdmin().rpc('log_activity', {
+  await (getSupabaseAdmin() as any).rpc('log_activity', {
     p_tenant_id: tenantId,
     p_user_id: null,
     p_action_type: 'billing.checkout_completed',
@@ -146,7 +146,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   // Get the plan from Stripe price ID
   const priceId = subscription.items.data[0]?.price.id
 
-  const { data: plan } = await getSupabaseAdmin()
+  const { data: plan } = await (getSupabaseAdmin() as any)
     .from('subscription_plans')
     .select('id')
     .or(`stripe_price_id_monthly.eq.${priceId},stripe_price_id_yearly.eq.${priceId}`)
@@ -185,7 +185,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   }
 
   // Create or update usage tracking record for new period
-  const { data: subscriptionRecord } = await getSupabaseAdmin()
+  const { data: subscriptionRecord } = await (getSupabaseAdmin() as any)
     .from('tenant_subscriptions')
     .select('id')
     .eq('tenant_id', tenantId)
@@ -242,7 +242,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   }
 
   // Log activity
-  await getSupabaseAdmin().rpc('log_activity', {
+  await (getSupabaseAdmin() as any).rpc('log_activity', {
     p_tenant_id: tenantId,
     p_user_id: null,
     p_action_type: 'billing.subscription_canceled',
@@ -257,11 +257,10 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const inv = invoice as any
-  const customerId = invoice.customer as string
   const subscriptionId = inv.subscription as string
 
   // Get tenant from subscription
-  const { data: subscription } = await getSupabaseAdmin()
+  const { data: subscription } = await (getSupabaseAdmin() as any)
     .from('tenant_subscriptions')
     .select('id, tenant_id')
     .eq('stripe_subscription_id', subscriptionId)
@@ -301,7 +300,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     })
 
   // Log activity
-  await getSupabaseAdmin().rpc('log_activity', {
+  await (getSupabaseAdmin() as any).rpc('log_activity', {
     p_tenant_id: subscription.tenant_id,
     p_user_id: null,
     p_action_type: 'billing.payment_succeeded',
@@ -321,7 +320,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const subscriptionId = inv.subscription as string
 
   // Get tenant from subscription
-  const { data: subscription } = await getSupabaseAdmin()
+  const { data: subscription } = await (getSupabaseAdmin() as any)
     .from('tenant_subscriptions')
     .select('id, tenant_id')
     .eq('stripe_subscription_id', subscriptionId)
@@ -344,7 +343,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     .eq('id', subscription.id)
 
   // Log activity
-  await getSupabaseAdmin().rpc('log_activity', {
+  await (getSupabaseAdmin() as any).rpc('log_activity', {
     p_tenant_id: subscription.tenant_id,
     p_user_id: null,
     p_action_type: 'billing.payment_failed',
@@ -373,7 +372,7 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
   console.log(`Trial ending soon for tenant ${tenantId}`)
 
   // Log activity
-  await getSupabaseAdmin().rpc('log_activity', {
+  await (getSupabaseAdmin() as any).rpc('log_activity', {
     p_tenant_id: tenantId,
     p_user_id: null,
     p_action_type: 'billing.trial_ending_soon',
