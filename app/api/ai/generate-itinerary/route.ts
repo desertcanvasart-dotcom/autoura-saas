@@ -1451,7 +1451,7 @@ async function createQuotesForItinerary(params: {
   }
 
   // Fetch itinerary with services for pricing calculation
-  const { data: itinerary } = await getSupabaseAdmin()
+  const { data: itineraryData } = await getSupabaseAdmin()
     .from('itineraries')
     .select(`
       *,
@@ -1460,10 +1460,12 @@ async function createQuotesForItinerary(params: {
     .eq('id', itinerary_id)
     .single()
 
-  if (!itinerary) {
+  if (!itineraryData) {
     console.error('⚠️ Itinerary not found')
     return { b2c_quote: null, b2b_quote: null }
   }
+
+  const itinerary = itineraryData as any
 
   let b2c_quote = null
   let b2b_quote = null
