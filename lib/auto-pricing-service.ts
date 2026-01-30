@@ -1090,7 +1090,7 @@ export async function getTippingRate(tier: ServiceTier): Promise<number> {
       return DEFAULT_RATES[tier].tips
     }
 
-    const dailyTotal = rates.reduce((sum, r) => 
+    const dailyTotal = (rates as any[]).reduce((sum: number, r: any) =>
       r.rate_unit === 'per_day' ? sum + (r.rate_eur || 0) : sum, 0
     )
 
@@ -1125,7 +1125,8 @@ export async function buildTransportCache(): Promise<Map<string, TransportRate>>
   
   if (!allRates) return cache
 
-  for (const rate of allRates) {
+  for (const r of allRates) {
+    const rate = r as any
     // Build multiple keys for flexible lookup
     const baseKey = [
       rate.service_type || '',
@@ -1134,9 +1135,9 @@ export async function buildTransportCache(): Promise<Map<string, TransportRate>>
       rate.area || '',
       rate.vehicle_type || ''
     ].join('|')
-    
+
     cache.set(baseKey, rate)
-    
+
     // Also cache without area for fallback
     const keyNoArea = [
       rate.service_type || '',
@@ -1145,11 +1146,11 @@ export async function buildTransportCache(): Promise<Map<string, TransportRate>>
       '',
       rate.vehicle_type || ''
     ].join('|')
-    
+
     if (!cache.has(keyNoArea)) {
       cache.set(keyNoArea, rate)
     }
-    
+
     // For intercity, also cache by origin-destination
     if (rate.service_type === 'intercity_transfer' && rate.origin_city && rate.destination_city) {
       const intercityKey = [
@@ -1296,10 +1297,11 @@ export async function calculateDayBasedPricing(
     }
   }
 
-  console.log('📋 Template found:', template.template_name)
+  const t = template as any
+  console.log('📋 Template found:', t.template_name)
 
-  const itinerary = parseItinerary(template.itinerary)
-  const totalDays = itinerary.length || template.duration_days || 1
+  const itinerary = parseItinerary(t.itinerary)
+  const totalDays = itinerary.length || t.duration_days || 1
 
   if (itinerary.length === 0) {
     warnings.push('No itinerary data found - using defaults')
@@ -1869,7 +1871,7 @@ export async function calculateDayBasedPricing(
   // ============================================
 
   console.log('✅ Day-based pricing complete (v4)')
-  console.log(`   Template: ${template.template_name}`)
+  console.log(`   Template: ${t.template_name}`)
   console.log(`   Single Supplement: €${singleSupplement.toFixed(2)}`)
   console.log(`   Triple Reduction: €${tripleReduction.toFixed(2)}`)
   console.log(`   Sample (2 pax +0): €${paxPricing[1]?.withoutLeader.pricePerPerson}/person`)
@@ -1878,7 +1880,7 @@ export async function calculateDayBasedPricing(
   return {
     success: true,
     templateId,
-    templateName: template.template_name,
+    templateName: t.template_name,
     tier,
     totalDays,
     hotelNights,
