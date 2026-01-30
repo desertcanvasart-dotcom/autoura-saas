@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors)
+let _supabase: ReturnType<typeof createClient> | null = null
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 // GET /api/email/links?userId=xxx&emailAddress=xxx
 // Returns linked client for an email address
@@ -21,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     // If messageId provided, get link for specific email
     if (messageId) {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabase()
         .from('email_client_links')
         .select(`
           *,
@@ -40,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     // If emailAddress provided, find client by email
     if (emailAddress) {
-      const { data: client, error } = await supabase
+      const { data: client, error } = await getSupabase()
         .from('clients')
         .select('id, name, email, phone, status')
         .eq('user_id', userId)
@@ -77,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if link already exists
-    const { data: existing } = await supabase
+    const { data: existing } = await getSupabase()
       .from('email_client_links')
       .select('id')
       .eq('user_id', userId)
@@ -86,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       // Update existing link
-      const { data, error } = await supabase
+      const { data, error } = await getSupabase()
         .from('email_client_links')
         .update({
           client_id: clientId,
@@ -104,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new link
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('email_client_links')
       .insert({
         user_id: userId,
@@ -143,7 +151,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    let query = supabase
+    let query = getSupabase()
       .from('email_client_links')
       .delete()
       .eq('user_id', userId)
@@ -181,7 +189,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get all clients for this user
-    const { data: clients, error: clientError } = await supabase
+    const { data: clients, error: clientError } = await getSupabase()
       .from('clients')
       .select('id, email')
       .eq('user_id', userId)
@@ -198,7 +206,7 @@ export async function PUT(request: NextRequest) {
 
     // Get existing links to avoid duplicates
     const messageIds = emails.map(e => e.messageId)
-    const { data: existingLinks } = await supabase
+    const { data: existingLinks } = await getSupabase()
       .from('email_client_links')
       .select('message_id')
       .eq('user_id', userId)
@@ -236,7 +244,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (linksToCreate.length > 0) {
-      const { data, error } = await supabase
+      const { data, error } = await getSupabase()
         .from('email_client_links')
         .insert(linksToCreate)
         .select()

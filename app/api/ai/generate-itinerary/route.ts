@@ -3,15 +3,30 @@ import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
+// Lazy-initialized Anthropic client (avoids build-time errors)
+let _anthropic: Anthropic | null = null
 
-// Admin client for bypassing RLS on content library
-const supabaseAdmin = createAdminClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getAnthropic() {
+  if (!_anthropic) {
+    _anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+    })
+  }
+  return _anthropic
+}
+
+// Lazy-initialized Supabase admin client (avoids build-time errors)
+let _supabaseAdmin: ReturnType<typeof createAdminClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 // Default margin percentage (used if no user preference)
 const DEFAULT_MARGIN_PERCENT = 25
@@ -554,7 +569,7 @@ async function findCruiseContent(
 
   try {
     // Build query based on detected cruise parameters
-    let query = supabaseAdmin
+    let query = getSupabaseAdmin()
       .from('content_library')
       .select(`
         *,
@@ -591,7 +606,7 @@ async function findCruiseContent(
       console.log('⚠️ No cruise content found in Content Library for route:', cruiseDetection.route)
       
       // Try without route filter as fallback
-      const { data: fallbackCruises } = await supabaseAdmin
+      const { data: fallbackCruises } = await getSupabaseAdmin()
         .from('content_library')
         .select(`
           *,
@@ -797,7 +812,7 @@ async function fetchContentLibrary(
       ...interests.map(i => i.toLowerCase())
     ]
 
-    const { data: variations, error } = await supabaseAdmin
+    const { data: variations, error } = await getSupabaseAdmin()
       .from('content_variations')
       .select(`
         id,
@@ -871,7 +886,7 @@ async function fetchContentLibrary(
 
 async function fetchWritingRules(): Promise<WritingRule[]> {
   try {
-    const { data: rules, error } = await supabaseAdmin
+    const { data: rules, error } = await getSupabaseAdmin()
       .from('writing_rules')
       .select('*')
       .eq('is_active', true)
@@ -1208,7 +1223,7 @@ NOW CONVERT THE ITINERARY TO JSON:`
 
   console.log('🤖 Sending STRICT structured prompt to AI...')
 
-  const message = await anthropic.messages.create({
+  const message = await getAnthropic().messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 16384,
     messages: [
@@ -1344,7 +1359,7 @@ Return ONLY valid JSON:
 
 Use EXACT attraction names from the provided list. Set includes_hotel to false on the last day.`
 
-  const message = await anthropic.messages.create({
+  const message = await getAnthropic().messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 8192,
     messages: [
@@ -1426,7 +1441,7 @@ async function createQuotesForItinerary(params: {
     return { b2c_quote: null, b2b_quote: null }
   }
 
-  const { data: tenant } = await supabaseAdmin.from('tenants').select('id').single()
+  const { data: tenant } = await getSupabaseAdmin().from('tenants').select('id').single()
   const tenant_id = tenant?.id
 
   if (!tenant_id) {
@@ -1435,7 +1450,7 @@ async function createQuotesForItinerary(params: {
   }
 
   // Fetch itinerary with services for pricing calculation
-  const { data: itinerary } = await supabaseAdmin
+  const { data: itinerary } = await getSupabaseAdmin()
     .from('itineraries')
     .select(`
       *,
@@ -1518,10 +1533,10 @@ async function createQuotesForItinerary(params: {
       const price_per_person = selling_price / num_travelers
 
       // Generate quote number
-      const { data: quoteNumber } = await supabaseAdmin.rpc('generate_b2c_quote_number')
+      const { data: quoteNumber } = await getSupabaseAdmin().rpc('generate_b2c_quote_number')
 
       // Create quote
-      const { data: createdQuote, error } = await supabaseAdmin
+      const { data: createdQuote, error } = await getSupabaseAdmin()
         .from('b2c_quotes')
         .insert({
           tenant_id,
@@ -1628,10 +1643,10 @@ async function createQuotesForItinerary(params: {
       }
 
       // Generate quote number
-      const { data: quoteNumber } = await supabaseAdmin.rpc('generate_b2b_quote_number')
+      const { data: quoteNumber } = await getSupabaseAdmin().rpc('generate_b2b_quote_number')
 
       // Create quote
-      const { data: createdQuote, error } = await supabaseAdmin
+      const { data: createdQuote, error } = await getSupabaseAdmin()
         .from('b2b_quotes')
         .insert({
           tenant_id,
