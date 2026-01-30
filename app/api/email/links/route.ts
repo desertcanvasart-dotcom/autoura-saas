@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-// Lazy-initialized Supabase client (avoids build-time errors)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
 let _supabase: ReturnType<typeof createClient> | null = null
 
 function getSupabase() {
