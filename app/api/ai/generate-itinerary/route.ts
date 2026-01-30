@@ -1442,7 +1442,8 @@ async function createQuotesForItinerary(params: {
   }
 
   const { data: tenant } = await getSupabaseAdmin().from('tenants').select('id').single()
-  const tenant_id = tenant?.id
+  const t = tenant as any
+  const tenant_id = t?.id
 
   if (!tenant_id) {
     console.error('⚠️ No tenant found - cannot create quotes')
@@ -2089,10 +2090,10 @@ export async function POST(request: NextRequest) {
 
     // Fetch rates
     const { data: vehicles } = await supabase.from('vehicles').select('*').eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false })
-    let selectedVehicle = vehicles?.find((v: any) => totalPax >= toNumber(v.capacity_min, 1) && totalPax <= toNumber(v.capacity_max, 99)) || vehicles?.[vehicles.length - 1]
-    
+    let selectedVehicle = (vehicles?.find((v: any) => totalPax >= toNumber(v.capacity_min, 1) && totalPax <= toNumber(v.capacity_max, 99)) || vehicles?.[vehicles.length - 1]) as any
+
     const { data: guides } = await supabase.from('guides').select('*').eq('is_active', true).eq('tier', tier).contains('languages', [finalLanguage]).limit(5)
-    let selectedGuide = guides?.[0]
+    let selectedGuide = guides?.[0] as any
 
     const { data: allEntranceFees } = await supabase.from('entrance_fees').select('*').eq('is_active', true)
     
@@ -2116,7 +2117,7 @@ export async function POST(request: NextRequest) {
     if (includeAccommodationFinal) {
       const { data: hotels } = await supabase.from('hotel_contacts').select('*').ilike('city', effectiveCity).eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false }).limit(5)
       if (hotels?.length) {
-        selectedHotel = hotels[0]
+        selectedHotel = hotels[0] as any
         hotelRate = toNumber(selectedHotel.rate_double_eur, 80)
         hotelName_final = selectedHotel.name
       } else {
