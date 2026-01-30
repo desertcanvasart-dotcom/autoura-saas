@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Check if we need to refresh (unless forced)
     if (!force) {
-      const { data: existingRates } = await getSupabaseAdmin()
+      const { data: existingRates } = await (getSupabaseAdmin() as any)
         .from('exchange_rates')
         .select('api_fetched_at')
         .is('tenant_id', null)
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     // Upsert system-level rates
     const upsertPromises = fetchedRates.map(async (rate) => {
       // First try to update existing
-      const { data: existing } = await getSupabaseAdmin()
+      const { data: existing } = await (getSupabaseAdmin() as any)
         .from('exchange_rates')
         .select('id')
         .is('tenant_id', null)
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     await Promise.all(upsertPromises)
 
     // Fetch updated rates to return
-    const { data: updatedRates, error } = await getSupabaseAdmin()
+    const { data: updatedRates, error } = await (getSupabaseAdmin() as any)
       .from('exchange_rates')
       .select('*')
       .is('tenant_id', null)
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET() {
   try {
-    const { data: rates, error } = await getSupabaseAdmin()
+    const { data: rates, error } = await (getSupabaseAdmin() as any)
       .from('exchange_rates')
       .select('*')
       .is('tenant_id', null)
