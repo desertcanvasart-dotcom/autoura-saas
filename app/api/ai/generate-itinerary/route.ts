@@ -633,7 +633,7 @@ async function findCruiseContent(
         return noMatch
       }
 
-      const content = fallbackCruises[0]
+      const content = fallbackCruises[0] as any
       const variation = content.content_variations[0]
 
       console.log(`📚 Found fallback cruise: ${content.name} (${variation.tier} tier)`)
