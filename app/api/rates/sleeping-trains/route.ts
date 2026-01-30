@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +23,7 @@ export async function GET(request: NextRequest) {
     const cabinType = searchParams.get('cabin_type')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = supabaseAdmin
+    let query = getSupabaseAdmin()
       .from('sleeping_train_rates')
       .select('*')
       .order('origin_city')
@@ -63,7 +71,7 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== false
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('sleeping_train_rates')
       .insert(newRate)
       .select('*')

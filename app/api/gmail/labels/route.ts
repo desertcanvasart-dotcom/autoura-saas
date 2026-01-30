@@ -4,16 +4,32 @@ import { google } from 'googleapis'
 import { refreshAccessToken } from '@/lib/gmail'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabase: ReturnType<typeof createClient> | null = null
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-)
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
+
+// Lazy-initialized OAuth2 client
+let _oauth2Client: InstanceType<typeof google.auth.OAuth2> | null = null
+
+function getOAuth2Client() {
+  if (!_oauth2Client) {
+    _oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    )
+  }
+  return _oauth2Client
+}
 
 // GET - Fetch all labels
 export async function GET(request: NextRequest) {
@@ -37,7 +53,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
-    const { data: tokenData, error: tokenError } = await supabase
+    const { data: tokenData, error: tokenError } = await getSupabase()
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -53,7 +69,7 @@ export async function GET(request: NextRequest) {
       const newTokens = await refreshAccessToken(refresh_token)
       access_token = newTokens.access_token!
       
-      await supabase
+      await getSupabase()
         .from('gmail_tokens')
         .update({
           access_token: newTokens.access_token,
@@ -62,8 +78,8 @@ export async function GET(request: NextRequest) {
         .eq('user_id', userId)
     }
 
-    oauth2Client.setCredentials({ access_token, refresh_token })
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+    getOAuth2Client().setCredentials({ access_token, refresh_token })
+    const gmail = google.gmail({ version: 'v1', auth: getOAuth2Client() })
 
     const response = await gmail.users.labels.list({ userId: 'me' })
     
@@ -102,7 +118,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
-    const { data: tokenData, error: tokenError } = await supabase
+    const { data: tokenData, error: tokenError } = await getSupabase()
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -119,8 +135,8 @@ export async function POST(request: NextRequest) {
       access_token = newTokens.access_token!
     }
 
-    oauth2Client.setCredentials({ access_token, refresh_token })
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+    getOAuth2Client().setCredentials({ access_token, refresh_token })
+    const gmail = google.gmail({ version: 'v1', auth: getOAuth2Client() })
 
     const response = await gmail.users.labels.create({
       userId: 'me',
@@ -164,7 +180,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
-    const { data: tokenData } = await supabase
+    const { data: tokenData } = await getSupabase()
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -181,8 +197,8 @@ export async function DELETE(request: NextRequest) {
       access_token = newTokens.access_token!
     }
 
-    oauth2Client.setCredentials({ access_token, refresh_token })
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+    getOAuth2Client().setCredentials({ access_token, refresh_token })
+    const gmail = google.gmail({ version: 'v1', auth: getOAuth2Client() })
 
     await gmail.users.labels.delete({
       userId: 'me',

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +23,7 @@ export async function GET(request: NextRequest) {
     const supplierId = searchParams.get('supplier_id')
     const activeOnly = searchParams.get('activeOnly') === 'true'
 
-    let query = supabaseAdmin
+    let query = getSupabaseAdmin()
       .from('transportation_rates')
       .select(`
         *,
@@ -92,7 +100,7 @@ export async function POST(request: NextRequest) {
       destination_city: body.destination_city || null
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('transportation_rates')
       .insert([newRate])
       .select(`*, supplier:supplier_id (id, name, city)`)

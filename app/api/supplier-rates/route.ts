@@ -5,10 +5,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 // Map supplier type to rate table(s)
 const SUPPLIER_RATE_TABLES: Record<string, string[]> = {
@@ -51,7 +59,7 @@ export async function GET(request: NextRequest) {
     // Fetch rates from each table
     for (const table of rateTables) {
       try {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await getSupabaseAdmin()
           .from(table)
           .select('*')
           .eq('supplier_id', supplierId)

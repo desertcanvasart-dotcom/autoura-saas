@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabase: ReturnType<typeof createClient> | null = null
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 // GET /api/partners/[id]/template-data?type=hotel|guide|restaurant|airport_staff
 export async function GET(
@@ -26,7 +34,7 @@ export async function GET(
 
     switch (type) {
       case 'hotel':
-        const { data: hotel, error: hotelError } = await supabase
+        const { data: hotel, error: hotelError } = await getSupabase()
           .from('hotel_contacts')
           .select('*')
           .eq('id', partnerId)
@@ -53,7 +61,7 @@ export async function GET(
         break
 
       case 'guide':
-        const { data: guide, error: guideError } = await supabase
+        const { data: guide, error: guideError } = await getSupabase()
           .from('guides')
           .select('*')
           .eq('id', partnerId)
@@ -78,7 +86,7 @@ export async function GET(
         break
 
       case 'restaurant':
-        const { data: restaurant, error: restaurantError } = await supabase
+        const { data: restaurant, error: restaurantError } = await getSupabase()
           .from('restaurant_contacts')
           .select('*')
           .eq('id', partnerId)
@@ -105,7 +113,7 @@ export async function GET(
         break
 
       case 'airport_staff':
-        const { data: staff, error: staffError } = await supabase
+        const { data: staff, error: staffError } = await getSupabase()
           .from('airport_staff')
           .select('*')
           .eq('id', partnerId)

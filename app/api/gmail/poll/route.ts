@@ -3,10 +3,18 @@ import { google } from 'googleapis'
 import { createClient } from '@supabase/supabase-js'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabase: ReturnType<typeof createClient> | null = null
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 // GET /api/gmail/poll?userId=xxx&historyId=xxx
 // Poll for new emails since last history ID
@@ -34,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user's Gmail tokens
-    const { data: tokenData, error: tokenError } = await supabase
+    const { data: tokenData, error: tokenError } = await getSupabase()
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -60,7 +68,7 @@ export async function GET(request: NextRequest) {
     if (new Date(tokenData.token_expiry) < new Date()) {
       const { credentials } = await oauth2Client.refreshAccessToken()
       
-      await supabase
+      await getSupabase()
         .from('gmail_tokens')
         .update({
           access_token: credentials.access_token,
@@ -235,7 +243,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's Gmail tokens
-    const { data: tokenData, error: tokenError } = await supabase
+    const { data: tokenData, error: tokenError } = await getSupabase()
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)

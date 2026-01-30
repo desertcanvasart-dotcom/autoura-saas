@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 // Helper function to get min capacity based on vehicle type
 function getMinCapacityForVehicle(vehicleType: string): number {
@@ -27,7 +35,7 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('transportation_rates')
       .select('*')
       .eq('id', id)
@@ -98,7 +106,7 @@ export async function PUT(
 
     console.log('Updating transportation rate:', id, updateData)
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('transportation_rates')
       .update(updateData)
       .eq('id', id)
@@ -134,7 +142,7 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('transportation_rates')
       .delete()
       .eq('id', id)

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabase: ReturnType<typeof createClient> | null = null
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 // This endpoint should be called by a cron job (Railway cron, Vercel cron, or external service)
 // Recommended: Run daily at 8:00 AM local time
@@ -44,7 +52,7 @@ export async function GET(request: NextRequest) {
     // =========================================
     // 1. Find tasks due tomorrow (24h warning)
     // =========================================
-    const { data: dueSoonTasks, error: dueSoonError } = await supabase
+    const { data: dueSoonTasks, error: dueSoonError } = await getSupabase()
       .from('tasks')
       .select(`
         *,
@@ -61,7 +69,7 @@ export async function GET(request: NextRequest) {
         if (!task.assigned_member?.id) continue
 
         // Check if we already sent this notification today
-        const { data: existing } = await supabase
+        const { data: existing } = await getSupabase()
           .from('notifications')
           .select('id')
           .eq('related_task_id', task.id)
@@ -90,7 +98,7 @@ export async function GET(request: NextRequest) {
     // =========================================
     // 2. Find overdue tasks
     // =========================================
-    const { data: overdueTasks, error: overdueError } = await supabase
+    const { data: overdueTasks, error: overdueError } = await getSupabase()
       .from('tasks')
       .select(`
         *,
@@ -110,7 +118,7 @@ export async function GET(request: NextRequest) {
         const threeDaysAgo = new Date()
         threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
         
-        const { data: existing } = await supabase
+        const { data: existing } = await getSupabase()
           .from('notifications')
           .select('id')
           .eq('related_task_id', task.id)
@@ -179,7 +187,7 @@ async function createNotification({
   name?: string
 }) {
   // Insert notification
-  const { data: notification, error } = await supabase
+  const { data: notification, error } = await getSupabase()
     .from('notifications')
     .insert({
       team_member_id,
@@ -205,7 +213,7 @@ async function createNotification({
       await sendReminderEmail(email, name, title, message, link, type)
       
       // Mark email as sent
-      await supabase
+      await getSupabase()
         .from('notifications')
         .update({ email_sent: true })
         .eq('id', notification.id)

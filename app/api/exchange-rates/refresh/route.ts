@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { fetchAllExchangeRates } from '@/lib/exchange-rate-api'
 
-// Use service role for system-level operations
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 /**
  * POST /api/exchange-rates/refresh
@@ -27,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     // Check if we need to refresh (unless forced)
     if (!force) {
-      const { data: existingRates } = await supabaseAdmin
+      const { data: existingRates } = await getSupabaseAdmin()
         .from('exchange_rates')
         .select('api_fetched_at')
         .is('tenant_id', null)
@@ -68,7 +75,7 @@ export async function POST(request: NextRequest) {
     // Upsert system-level rates
     const upsertPromises = fetchedRates.map(async (rate) => {
       // First try to update existing
-      const { data: existing } = await supabaseAdmin
+      const { data: existing } = await getSupabaseAdmin()
         .from('exchange_rates')
         .select('id')
         .is('tenant_id', null)
@@ -78,7 +85,7 @@ export async function POST(request: NextRequest) {
 
       if (existing) {
         // Update existing
-        return supabaseAdmin
+        return getSupabaseAdmin()
           .from('exchange_rates')
           .update({
             rate: rate.rate,
@@ -89,7 +96,7 @@ export async function POST(request: NextRequest) {
           .eq('id', existing.id)
       } else {
         // Insert new
-        return supabaseAdmin
+        return getSupabaseAdmin()
           .from('exchange_rates')
           .insert({
             tenant_id: null,
@@ -106,7 +113,7 @@ export async function POST(request: NextRequest) {
     await Promise.all(upsertPromises)
 
     // Fetch updated rates to return
-    const { data: updatedRates, error } = await supabaseAdmin
+    const { data: updatedRates, error } = await getSupabaseAdmin()
       .from('exchange_rates')
       .select('*')
       .is('tenant_id', null)
@@ -140,7 +147,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET() {
   try {
-    const { data: rates, error } = await supabaseAdmin
+    const { data: rates, error } = await getSupabaseAdmin()
       .from('exchange_rates')
       .select('*')
       .is('tenant_id', null)

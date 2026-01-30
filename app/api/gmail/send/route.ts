@@ -4,16 +4,32 @@ import { refreshAccessToken } from '@/lib/gmail'
 import { google } from 'googleapis'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabase: ReturnType<typeof createClient> | null = null
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-)
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
+
+// Lazy-initialized OAuth2 client
+let _oauth2Client: InstanceType<typeof google.auth.OAuth2> | null = null
+
+function getOAuth2Client() {
+  if (!_oauth2Client) {
+    _oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    )
+  }
+  return _oauth2Client
+}
 
 interface Attachment {
   filename: string
@@ -43,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's tokens
-    const { data: tokenData, error: tokenError } = await supabase
+    const { data: tokenData, error: tokenError } = await getSupabase()
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -60,7 +76,7 @@ export async function POST(request: NextRequest) {
       const newTokens = await refreshAccessToken(refresh_token)
       access_token = newTokens.access_token!
 
-      await supabase
+      await getSupabase()
         .from('gmail_tokens')
         .update({
           access_token: newTokens.access_token,
@@ -71,12 +87,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Set credentials
-    oauth2Client.setCredentials({
+    getOAuth2Client().setCredentials({
       access_token,
       refresh_token,
     })
 
-    const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+    const gmail = google.gmail({ version: 'v1', auth: getOAuth2Client() })
 
     // Build email with or without attachments
     let rawEmail: string

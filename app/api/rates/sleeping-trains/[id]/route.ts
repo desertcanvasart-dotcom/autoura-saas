@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 export async function GET(
   request: NextRequest,
@@ -13,7 +21,7 @@ export async function GET(
   try {
     const { id } = await params
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('sleeping_train_rates')
       .select('*')
       .eq('id', id)
@@ -58,7 +66,7 @@ export async function PUT(
     if (body.notes !== undefined) updateData.notes = body.notes || null
     if (body.is_active !== undefined) updateData.is_active = body.is_active
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('sleeping_train_rates')
       .update(updateData)
       .eq('id', id)
@@ -84,7 +92,7 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('sleeping_train_rates')
       .delete()
       .eq('id', id)

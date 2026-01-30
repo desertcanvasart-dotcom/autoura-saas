@@ -5,10 +5,18 @@ import { createElement } from 'react'
 import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 /**
  * GET /api/quotes/[type]/[id]/pdf
@@ -32,7 +40,7 @@ export async function GET(
     let quote: any = null
 
     if (type === 'b2c') {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await getSupabaseAdmin()
         .from('b2c_quotes')
         .select(`
           *,
@@ -56,7 +64,7 @@ export async function GET(
       if (error) throw error
       quote = data
     } else {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await getSupabaseAdmin()
         .from('b2b_quotes')
         .select(`
           *,

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabase: ReturnType<typeof createClient> | null = null
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 // PUT - Mark notification as read
 export async function PUT(
@@ -16,7 +24,7 @@ export async function PUT(
     const body = await request.json()
     const { is_read = true } = body
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('notifications')
       .update({ is_read, updated_at: new Date().toISOString() })
       .eq('id', id)
@@ -46,7 +54,7 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('notifications')
       .delete()
       .eq('id', id)

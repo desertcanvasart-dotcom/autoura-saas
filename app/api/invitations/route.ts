@@ -2,10 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabase: ReturnType<typeof createClient> | null = null
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 // GET - List all invitations (admin/manager only)
 export async function GET(request: NextRequest) {
@@ -13,7 +21,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') // pending, accepted, expired, all
 
-    let query = supabase
+    let query = getSupabase()
       .from('tenant_invitations')
       .select(`
         *,
@@ -78,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const { data: existingUser } = await supabase
+    const { data: existingUser } = await getSupabase()
       .from('user_profiles')
       .select('id, email')
       .eq('email', email.toLowerCase())
@@ -92,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if there's already a pending invitation
-    const { data: existingInvitation } = await supabase
+    const { data: existingInvitation } = await getSupabase()
       .from('tenant_invitations')
       .select('id')
       .eq('email', email.toLowerCase())
@@ -115,7 +123,7 @@ export async function POST(request: NextRequest) {
     expiresAt.setDate(expiresAt.getDate() + 7)
 
     // Create invitation
-    const { data: invitation, error } = await supabase
+    const { data: invitation, error } = await getSupabase()
       .from('tenant_invitations')
       .insert({
         tenant_id,
@@ -169,7 +177,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Update invitation status
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('tenant_invitations')
       .update({
         status: 'accepted',
@@ -214,7 +222,7 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from('tenant_invitations')
       .delete()
       .eq('id', id)

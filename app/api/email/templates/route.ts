@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabase: ReturnType<typeof createClient> | null = null
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +21,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category') // 'customer', 'partner', 'internal', or 'all'
 
     // Fetch from message_templates (new templates)
-    let query = supabase
+    let query = getSupabase()
       .from('message_templates')
       .select('*')
       .eq('is_active', true)
@@ -35,7 +43,7 @@ export async function GET(request: NextRequest) {
     // Also fetch from email_templates (legacy templates) if table exists
     let legacyTemplates: any[] = []
     try {
-      const { data: legacy, error: legacyError } = await supabase
+      const { data: legacy, error: legacyError } = await getSupabase()
         .from('email_templates')
         .select('*')
         .order('name')
@@ -104,7 +112,7 @@ export async function POST(request: NextRequest) {
     const placeholderMatches = content.match(/\{\{[^}]+\}\}/g) || []
     const placeholders = [...new Set(placeholderMatches)]
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('message_templates')
       .insert({
         name,

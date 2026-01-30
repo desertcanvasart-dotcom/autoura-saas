@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabase: ReturnType<typeof createClient> | null = null
+
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 export async function GET(request: NextRequest) {
   const userId = request.nextUrl.searchParams.get('userId')
@@ -13,7 +21,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'User ID required' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('email_signatures')
     .select('*')
     .eq('user_id', userId)
@@ -35,13 +43,13 @@ export async function POST(request: NextRequest) {
 
   // If setting as default, unset other defaults
   if (isDefault) {
-    await supabase
+    await getSupabase()
       .from('email_signatures')
       .update({ is_default: false })
       .eq('user_id', userId)
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('email_signatures')
     .insert({
       user_id: userId,
@@ -68,13 +76,13 @@ export async function PUT(request: NextRequest) {
 
   // If setting as default, unset other defaults
   if (isDefault) {
-    await supabase
+    await getSupabase()
       .from('email_signatures')
       .update({ is_default: false })
       .eq('user_id', userId)
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('email_signatures')
     .update({
       name,
@@ -101,7 +109,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from('email_signatures')
     .delete()
     .eq('id', id)

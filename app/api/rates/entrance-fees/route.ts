@@ -2,17 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 // ============================================
-// ENTRANCE FEES API  
+// ENTRANCE FEES API
 // File: app/api/rates/entrance-fees/route.ts
-// 
+//
 // This endpoint powers the attractions dropdown
 // in TourManagerContent.tsx
 // ============================================
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +32,7 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit')
     const search = searchParams.get('search')
 
-    let query = supabaseAdmin
+    let query = getSupabaseAdmin()
       .from('entrance_fees')
       .select('*')
       .order('city', { ascending: true })
@@ -82,7 +90,7 @@ export async function POST(request: NextRequest) {
       supplier_id: body.supplier_id || null
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await getSupabaseAdmin()
       .from('entrance_fees')
       .insert(newFee)
       .select('*')

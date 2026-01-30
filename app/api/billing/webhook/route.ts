@@ -4,11 +4,18 @@ import { verifyWebhookSignature } from '@/lib/stripe'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
-// Admin client for webhook operations (bypasses RLS intentionally for system operations)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 /**
  * POST /api/billing/webhook
@@ -109,7 +116,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   // The actual subscription will be handled by subscription.created event
   // Just log the activity here
-  await supabaseAdmin.rpc('log_activity', {
+  await getSupabaseAdmin().rpc('log_activity', {
     p_tenant_id: tenantId,
     p_user_id: null,
     p_action_type: 'billing.checkout_completed',
@@ -139,7 +146,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   // Get the plan from Stripe price ID
   const priceId = subscription.items.data[0]?.price.id
 
-  const { data: plan } = await supabaseAdmin
+  const { data: plan } = await getSupabaseAdmin()
     .from('subscription_plans')
     .select('id')
     .or(`stripe_price_id_monthly.eq.${priceId},stripe_price_id_yearly.eq.${priceId}`)
@@ -153,7 +160,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   const billingCycle = subscription.items.data[0]?.price.recurring?.interval === 'year' ? 'yearly' : 'monthly'
 
   // Upsert subscription
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('tenant_subscriptions')
     .upsert({
       tenant_id: tenantId,
@@ -178,14 +185,14 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   }
 
   // Create or update usage tracking record for new period
-  const { data: subscriptionRecord } = await supabaseAdmin
+  const { data: subscriptionRecord } = await getSupabaseAdmin()
     .from('tenant_subscriptions')
     .select('id')
     .eq('tenant_id', tenantId)
     .single()
 
   if (subscriptionRecord) {
-    await supabaseAdmin
+    await getSupabaseAdmin()
       .from('tenant_usage')
       .upsert({
         tenant_id: tenantId,
@@ -220,7 +227,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log(`Subscription deleted for tenant ${tenantId}`)
 
   // Update subscription status
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('tenant_subscriptions')
     .update({
       status: 'canceled',
@@ -235,7 +242,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   }
 
   // Log activity
-  await supabaseAdmin.rpc('log_activity', {
+  await getSupabaseAdmin().rpc('log_activity', {
     p_tenant_id: tenantId,
     p_user_id: null,
     p_action_type: 'billing.subscription_canceled',
@@ -254,7 +261,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const subscriptionId = inv.subscription as string
 
   // Get tenant from subscription
-  const { data: subscription } = await supabaseAdmin
+  const { data: subscription } = await getSupabaseAdmin()
     .from('tenant_subscriptions')
     .select('id, tenant_id')
     .eq('stripe_subscription_id', subscriptionId)
@@ -268,7 +275,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   console.log(`Invoice paid for tenant ${subscription.tenant_id}`)
 
   // Store invoice record
-  await supabaseAdmin
+  await getSupabaseAdmin()
     .from('billing_invoices')
     .upsert({
       tenant_id: subscription.tenant_id,
@@ -294,7 +301,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     })
 
   // Log activity
-  await supabaseAdmin.rpc('log_activity', {
+  await getSupabaseAdmin().rpc('log_activity', {
     p_tenant_id: subscription.tenant_id,
     p_user_id: null,
     p_action_type: 'billing.payment_succeeded',
@@ -314,7 +321,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const subscriptionId = inv.subscription as string
 
   // Get tenant from subscription
-  const { data: subscription } = await supabaseAdmin
+  const { data: subscription } = await getSupabaseAdmin()
     .from('tenant_subscriptions')
     .select('id, tenant_id')
     .eq('stripe_subscription_id', subscriptionId)
@@ -328,7 +335,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   console.log(`Payment failed for tenant ${subscription.tenant_id}`)
 
   // Update subscription status to past_due
-  await supabaseAdmin
+  await getSupabaseAdmin()
     .from('tenant_subscriptions')
     .update({
       status: 'past_due',
@@ -337,7 +344,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     .eq('id', subscription.id)
 
   // Log activity
-  await supabaseAdmin.rpc('log_activity', {
+  await getSupabaseAdmin().rpc('log_activity', {
     p_tenant_id: subscription.tenant_id,
     p_user_id: null,
     p_action_type: 'billing.payment_failed',
@@ -366,7 +373,7 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
   console.log(`Trial ending soon for tenant ${tenantId}`)
 
   // Log activity
-  await supabaseAdmin.rpc('log_activity', {
+  await getSupabaseAdmin().rpc('log_activity', {
     p_tenant_id: tenantId,
     p_user_id: null,
     p_action_type: 'billing.trial_ending_soon',

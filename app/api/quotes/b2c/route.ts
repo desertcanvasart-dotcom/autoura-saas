@@ -21,11 +21,18 @@ async function createAuthenticatedClient() {
   );
 }
 
-// Admin client for operations that need to bypass RLS (like RPC calls)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    _supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabaseAdmin
+}
 
 /**
  * GET /api/quotes/b2c
@@ -178,7 +185,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate quote number using admin client (RPC needs admin)
-    const { data: quoteNumber, error: seqError } = await supabaseAdmin
+    const { data: quoteNumber, error: seqError } = await getSupabaseAdmin()
       .rpc('generate_b2c_quote_number');
 
     if (seqError) {
