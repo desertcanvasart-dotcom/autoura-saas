@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       // Update existing link
-      const { data, error } = await getSupabase()
+      const { data, error } = await (getSupabase() as any)
         .from('email_client_links')
         .update({
           client_id: clientId,
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new link
-    const { data, error } = await getSupabase()
+    const { data, error } = await (getSupabase() as any)
       .from('email_client_links')
       .insert({
         user_id: userId,
@@ -244,7 +244,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (linksToCreate.length > 0) {
-      const { data, error } = await getSupabase()
+      const { data, error } = await (getSupabase() as any)
         .from('email_client_links')
         .insert(linksToCreate)
         .select()
