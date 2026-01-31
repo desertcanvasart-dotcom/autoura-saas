@@ -2,9 +2,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Lazy-initialized OpenAI client (avoids build-time errors when env vars unavailable)
+let _openai: OpenAI | null = null
+
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY is not defined in environment variables')
+    }
+    _openai = new OpenAI({ apiKey })
+  }
+  return _openai
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,7 +66,7 @@ export async function POST(request: NextRequest) {
       prompt = `Translate the following text to ${targetLanguage}. Only respond with the translation, no explanations:\n\n${text}`
     }
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: systemPrompt },

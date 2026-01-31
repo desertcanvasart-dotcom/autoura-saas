@@ -3,9 +3,19 @@
 
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Lazy-initialized OpenAI client (avoids build-time errors when env vars unavailable)
+let _openai: OpenAI | null = null
+
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY is not defined in environment variables')
+    }
+    _openai = new OpenAI({ apiKey })
+  }
+  return _openai
+}
 
 // Supported languages with their codes and names
 export const SUPPORTED_LANGUAGES = [
@@ -61,7 +71,7 @@ export interface DetectionResult {
  */
 export async function detectLanguage(text: string): Promise<DetectionResult> {
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
@@ -149,7 +159,7 @@ ${context ? `- Context: This is a ${context}` : ''}
 
 Respond with ONLY the translated text, no explanations or additional commentary.`
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         {
