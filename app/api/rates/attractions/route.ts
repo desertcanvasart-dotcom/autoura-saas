@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Transform field names for frontend compatibility
-    const transformedData = data?.map(item => ({
+    const transformedData = data?.map((item: any) => ({
       id: item.id,
       service_code: item.service_code || `ENT-${item.id?.substring(0, 6).toUpperCase()}`,
       attraction_name: item.attraction_name,

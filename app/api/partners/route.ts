@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
             .order('name', { ascending: true })
             .limit(limit)
           
-          data = (hotels || []).map(h => ({
+          data = (hotels || []).map((h: any) => ({
             id: h.id,
             type: 'hotel',
             name: h.name,
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
             .order('name', { ascending: true })
             .limit(limit)
           
-          data = (guides || []).map(g => ({
+          data = (guides || []).map((g: any) => ({
             id: g.id,
             type: 'guide',
             name: g.name,
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
             .order('name', { ascending: true })
             .limit(limit)
           
-          data = (restaurants || []).map(r => ({
+          data = (restaurants || []).map((r: any) => ({
             id: r.id,
             type: 'restaurant',
             name: r.name,
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
             .order('name', { ascending: true })
             .limit(limit)
           
-          data = (airportStaff || []).map(a => ({
+          data = (airportStaff || []).map((a: any) => ({
             id: a.id,
             type: 'airport_staff',
             name: a.name,

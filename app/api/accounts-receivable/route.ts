@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     today.setHours(0, 0, 0, 0)
 
     // Calculate aging for each invoice
-    const invoicesWithAging = (invoices || []).map(inv => {
+    const invoicesWithAging = (invoices || []).map((inv: any) => {
       const dueDate = new Date(inv.due_date)
       dueDate.setHours(0, 0, 0, 0)
       const daysPastDue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))

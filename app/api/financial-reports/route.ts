@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
 
     // Generate monthly data
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    const monthlyData: MonthlyData[] = monthNames.map((monthName, index) => {
+    const monthlyData: MonthlyData[] = monthNames.map((monthName: string, index: number) => {
       const monthNum = index + 1
 
       const monthInvoices = yearInvoices.filter(inv => {
@@ -192,7 +192,7 @@ export async function GET(request: NextRequest) {
       { quarter: 'Q2', months: [4, 5, 6] },
       { quarter: 'Q3', months: [7, 8, 9] },
       { quarter: 'Q4', months: [10, 11, 12] }
-    ].map(q => {
+    ].map((q: any) => {
       const qMonths = monthlyData.filter(m => q.months.includes(m.month_num))
       const revenue = qMonths.reduce((sum, m) => sum + m.revenue, 0)
       const expenses = qMonths.reduce((sum, m) => sum + m.expenses, 0)
@@ -316,7 +316,7 @@ export async function GET(request: NextRequest) {
       total_pending: commissionExpenses
         .filter(exp => exp.status !== 'paid')
         .reduce((sum, exp) => sum + Number(exp.amount || 0), 0),
-      by_type: commissionCategories.map(cat => ({
+      by_type: commissionCategories.map((cat: string) => ({
         type: cat,
         amount: commissionExpenses
           .filter(exp => exp.category === cat)
@@ -365,7 +365,7 @@ export async function GET(request: NextRequest) {
       commissionSummary,
       yearOverYear,
       availableYears: [...new Set([
-        ...(availableYearsResult.data || []).map(inv => new Date(inv.issue_date).getFullYear()),
+        ...(availableYearsResult.data || []).map((inv: any) => new Date(inv.issue_date).getFullYear()),
         year, // Always include current year
         prevYear // Always include previous year
       ])].filter(y => y > 2020).sort((a, b) => b - a)

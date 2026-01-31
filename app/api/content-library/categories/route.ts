@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
           return acc
         }, {})
 
-        const categoriesWithCounts = categories.map(cat => ({
+        const categoriesWithCounts = categories.map((cat: any) => ({
           ...cat,
           content_count: countMap[cat.id] || 0
         }))

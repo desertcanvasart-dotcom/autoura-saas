@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     // Format invoices for frontend
-    const formattedInvoices = (invoices || []).map(invoice => ({
+    const formattedInvoices = (invoices || []).map((invoice: any) => ({
       id: invoice.id,
       invoice_number: invoice.invoice_number,
       invoice_date: invoice.invoice_date,

@@ -45,7 +45,7 @@ export async function GET() {
     }
 
     // Transform data to match UI expectations
-    const transformed = (data || []).map(rule => ({
+    const transformed = (data || []).map((rule: any) => ({
       ...rule,
       // Use examples_json if available, otherwise convert examples array
       examples: rule.examples_json || {

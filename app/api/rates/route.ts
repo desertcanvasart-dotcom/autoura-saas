@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         const accommodationResult = await accommodationQuery
         
         // Transform hotel data to match rates format
-        data = (accommodationResult.data || []).map(hotel => ({
+        data = (accommodationResult.data || []).map((hotel: any) => ({
           service_code: hotel.id,
           property_name: hotel.name,
           property_type: hotel.property_type,
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
         const mealResult = await mealQuery
         
         // Transform restaurant data to match rates format
-        data = (mealResult.data || []).map(restaurant => ({
+        data = (mealResult.data || []).map((restaurant: any) => ({
           service_code: restaurant.id,
           restaurant_name: restaurant.name,
           meal_type: restaurant.meal_types?.[0] || 'lunch',
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
         
         const transportResult = await transportQuery.order('city').order('service_type')
         
-        data = (transportResult.data || []).map(rate => ({
+        data = (transportResult.data || []).map((rate: any) => ({
           service_code: rate.service_code || rate.id,
           service_type: rate.service_type,
           vehicle_type: rate.vehicle_type,
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
         const guideResult = await guideQuery
         
         // Transform guide data to match rates format
-        data = (guideResult.data || []).map(guide => ({
+        data = (guideResult.data || []).map((guide: any) => ({
           service_code: guide.id,
           guide_language: guide.languages?.[0] || 'English',
           guide_type: guide.specialties?.[0] || 'General',

@@ -444,7 +444,7 @@ export async function POST(request: NextRequest) {
       const travelDate = new Date(travel_date)
       const season = getSeason(travelDate)
 
-      const convertedServices: CalculatedService[] = autoPriceResult.services.map(s => ({
+      const convertedServices: CalculatedService[] = autoPriceResult.services.map((s: any) => ({
         service_id: s.id,
         service_name: s.serviceName,
         service_category: s.serviceType,
@@ -459,7 +459,7 @@ export async function POST(request: NextRequest) {
         pricing_note: s.notes
       }))
 
-      const convertedOptional: CalculatedService[] = autoPriceResult.optionalServices.map(s => ({
+      const convertedOptional: CalculatedService[] = autoPriceResult.optionalServices.map((s: any) => ({
         service_id: s.id,
         service_name: s.serviceName,
         service_category: s.serviceType,

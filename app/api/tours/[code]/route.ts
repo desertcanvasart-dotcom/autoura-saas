@@ -72,7 +72,7 @@ export async function GET(
       .eq('variation_id', variation.id)
       .order('day_number', { ascending: true })
 
-    const dailyItinerary = (varItinerary || []).map(day => ({
+    const dailyItinerary = (varItinerary || []).map((day: any) => ({
       day_number: day.day_number,
       day_title: day.day_title || day.title,
       day_description: day.day_description || day.description,
@@ -85,7 +85,7 @@ export async function GET(
 
     // Combine services - prefer new system, fall back to legacy
     const services = variationServices && variationServices.length > 0
-      ? variationServices.map(s => ({
+      ? variationServices.map((s: any) => ({
           service_category: s.service_category,
           service_name: s.service_name,
           quantity_type: s.quantity_mode,

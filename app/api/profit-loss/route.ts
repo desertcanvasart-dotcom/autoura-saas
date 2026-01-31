@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build P&L for each itinerary
-    const pnlData: TripPnL[] = itineraries.map(itinerary => {
+    const pnlData: TripPnL[] = itineraries.map((itinerary: any) => {
       // Get invoices for this itinerary
       const itinInvoices = (invoices || []).filter(inv => inv.itinerary_id === itinerary.id)
       const totalRevenue = itinInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0)

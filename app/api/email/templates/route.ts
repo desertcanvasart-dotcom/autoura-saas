@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     }))
 
     // Transform legacy templates
-    const transformedLegacyTemplates = legacyTemplates.map(template => ({
+    const transformedLegacyTemplates = legacyTemplates.map((template: any) => ({
       ...template,
       source: 'email_templates'
     }))

@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to include combined name field
-    const transformedClients = (clients || []).map(client => ({
+    const transformedClients = (clients || []).map((client: any) => ({
       id: client.id,
       name: `${client.first_name || ''} ${client.last_name || ''}`.trim(),
       email: client.email,

@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Map supplier fields to guide format - use contact_phone for phone
-    let guides = (suppliers || []).map(g => ({
+    let guides = (suppliers || []).map((g: any) => ({
       id: g.id,
       name: g.name,
       phone: g.contact_phone || g.whatsapp || g.phone2,

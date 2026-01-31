@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     today.setHours(0, 0, 0, 0)
 
     // Calculate aging for each expense (based on expense_date, not due_date since expenses don't have due dates)
-    const expensesWithAging = (expenses || []).map(exp => {
+    const expensesWithAging = (expenses || []).map((exp: any) => {
       const expenseDate = new Date(exp.expense_date)
       expenseDate.setHours(0, 0, 0, 0)
       const daysOutstanding = Math.floor((today.getTime() - expenseDate.getTime()) / (1000 * 60 * 60 * 24))

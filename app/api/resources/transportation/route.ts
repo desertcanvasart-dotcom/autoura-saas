@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch transportation rates' }, { status: 500 })
     }
 
-    const transformedData = (data || []).map(rate => ({
+    const transformedData = (data || []).map((rate: any) => ({
       ...rate,
       capacity_min: getMinCapacityForVehicle(rate.vehicle_type),
       base_rate_non: rate.base_rate_non_eur

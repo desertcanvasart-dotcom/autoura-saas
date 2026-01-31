@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Flatten the response to include client_phone at the top level
-    const formattedData = (data || []).map(invoice => ({
+    const formattedData = (data || []).map((invoice: any) => ({
       ...invoice,
       client_phone: invoice.itineraries?.client_phone || null,
       itineraries: undefined // Remove nested object
