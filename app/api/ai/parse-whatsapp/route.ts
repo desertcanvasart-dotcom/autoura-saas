@@ -2,9 +2,19 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/supabase-server'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!
-})
+// Lazy-initialized Anthropic client (avoids build-time errors when env vars unavailable)
+let _anthropic: Anthropic | null = null
+
+function getAnthropic(): Anthropic {
+  if (!_anthropic) {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      throw new Error('ANTHROPIC_API_KEY is not defined in environment variables')
+    }
+    _anthropic = new Anthropic({ apiKey })
+  }
+  return _anthropic
+}
 
 // ============================================
 // EGYPTIAN TRAVEL ABBREVIATIONS
@@ -434,7 +444,7 @@ export async function POST(request: Request) {
       : buildGeneralExtractionPrompt()
 
     // Call Claude to analyze the conversation
-    const message = await anthropic.messages.create({
+    const message = await getAnthropic().messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 8192,
       messages: [

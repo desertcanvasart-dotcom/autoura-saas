@@ -9,7 +9,19 @@ import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
 import B2CQuoteEmail from '@/components/emails/B2CQuoteEmail'
 import B2BQuoteEmail from '@/components/emails/B2BQuoteEmail'
 
-const resend = new Resend(process.env.RESEND_API_KEY!)
+// Lazy-initialized Resend client (avoids build-time errors when env vars unavailable)
+let _resend: Resend | null = null
+
+function getResend(): Resend {
+  if (!_resend) {
+    const apiKey = process.env.RESEND_API_KEY
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY is not defined in environment variables')
+    }
+    _resend = new Resend(apiKey)
+  }
+  return _resend
+}
 
 /**
  * POST /api/quotes/[type]/[id]/send
@@ -218,7 +230,7 @@ export async function POST(
       ? `Your Egypt Travel Quote - ${quote.quote_number}`
       : `B2B Rate Sheet - ${quote.quote_number} - ${quote.itineraries?.trip_name || 'Egypt Tour'}`
 
-    const { data: emailData, error: emailError } = await resend.emails.send({
+    const { data: emailData, error: emailError } = await getResend().emails.send({
       from: process.env.RESEND_FROM_EMAIL || 'Autoura <quotes@autoura.com>',
       to: toEmail,
       subject: emailSubject,
