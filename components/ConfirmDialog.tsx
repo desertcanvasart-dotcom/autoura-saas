@@ -38,11 +38,26 @@ interface ConfirmDialogContextType {
 
 const ConfirmDialogContext = createContext<ConfirmDialogContextType | null>(null)
 
+// No-op fallback for SSR/prerendering when ConfirmDialogProvider isn't available
+const noopConfirmDialogContext: ConfirmDialogContextType = {
+  confirm: async () => false,
+  alert: async () => true,
+  prompt: async () => null,
+  confirmDelete: async () => false,
+}
+
 export function useConfirmDialog() {
   const context = useContext(ConfirmDialogContext)
+
+  // During SSR/prerendering, context won't be available
+  // Return a no-op fallback to allow initial render to complete
   if (!context) {
-    throw new Error('useConfirmDialog must be used within ConfirmDialogProvider')
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      console.warn('useConfirmDialog: ConfirmDialogProvider not found, using no-op fallback')
+    }
+    return noopConfirmDialogContext
   }
+
   return context
 }
 

@@ -208,10 +208,42 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>
 }
 
+// No-op fallback for SSR/prerendering when TenantProvider isn't available
+const noopTenantContext: TenantContextType = {
+  tenant: null,
+  tenantMember: null,
+  features: null,
+  loading: true, // Treat as loading during SSR to prevent content flash
+  refetchTenant: async () => {},
+
+  // Permissions (default to false during SSR)
+  isOwner: false,
+  isAdmin: false,
+  isManager: false,
+  canManageMembers: false,
+  canDeleteQuotes: false,
+  canManagePartners: false,
+
+  // Features (default to false during SSR)
+  hasB2C: false,
+  hasB2B: false,
+  hasWhatsApp: false,
+  hasEmail: false,
+  hasPDF: false,
+  hasAnalytics: false,
+}
+
 export function useTenant() {
   const context = useContext(TenantContext)
+
+  // During SSR/prerendering, context won't be available
+  // Return a no-op fallback to allow initial render to complete
   if (context === undefined) {
-    throw new Error('useTenant must be used within a TenantProvider')
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      console.warn('useTenant: TenantProvider not found, using no-op fallback')
+    }
+    return noopTenantContext
   }
+
   return context
 }

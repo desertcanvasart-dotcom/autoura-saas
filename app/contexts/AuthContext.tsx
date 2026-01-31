@@ -157,10 +157,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// No-op fallback for SSR/prerendering when AuthProvider isn't available
+const noopAuthContext: AuthContextType = {
+  user: null,
+  profile: null,
+  loading: true, // Treat as loading during SSR to prevent content flash
+  signIn: async () => {},
+  signUp: async () => {},
+  signOut: async () => {},
+  resetPassword: async () => {},
+}
+
 export function useAuth() {
   const context = useContext(AuthContext)
+
+  // During SSR/prerendering, context won't be available
+  // Return a no-op fallback to allow initial render to complete
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      console.warn('useAuth: AuthProvider not found, using no-op fallback')
+    }
+    return noopAuthContext
   }
+
   return context
 }

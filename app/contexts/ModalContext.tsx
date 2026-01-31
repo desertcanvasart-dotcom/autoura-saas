@@ -44,11 +44,28 @@ const ModalContext = createContext<ModalContextType | null>(null)
 // HOOK
 // ============================================
 
+// No-op fallback for SSR/prerendering when ModalProvider isn't available
+const noopModalContext: ModalContextType = {
+  alert: async () => true,
+  confirm: async () => false,
+  prompt: async () => null,
+  confirmDelete: async () => false,
+  confirmDestructive: async () => false,
+}
+
 export function useModal() {
   const context = useContext(ModalContext)
+
+  // During SSR/prerendering, context won't be available
+  // Return a no-op fallback to allow initial render to complete
   if (!context) {
-    throw new Error('useModal must be used within a ModalProvider')
+    // Only warn in development if we're in a browser (actual bug)
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      console.warn('useModal: ModalProvider not found, using no-op fallback')
+    }
+    return noopModalContext
   }
+
   return context
 }
 
