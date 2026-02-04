@@ -559,6 +559,8 @@ export async function POST(
     console.log(`[Pricing] Starting for itinerary ${itineraryId}`)
     console.log(`[Pricing] ${days.length} days, ${totalPax} pax, tier: ${tier}, package: ${package_type}`)
     console.log(`[Pricing] Include add-ons: ${include_addons}`)
+    const cruisePackageTypes = ['cruise-package', 'cruise-land', 'nile-cruise', 'cruise']
+    console.log(`[Pricing] Is cruise package: ${cruisePackageTypes.includes(package_type)} (type: "${package_type}")`)
 
     // ============================================
     // GET USER PREFERENCES
@@ -810,7 +812,7 @@ export async function POST(
 
       // ACCOMMODATION (Hotel or Cruise)
       const isLastDay = day.day_number === days.length
-      const isCruisePackage = package_type === 'cruise-package' || package_type === 'cruise-land'
+      const isCruisePackage = ['cruise-package', 'cruise-land', 'nile-cruise', 'cruise'].includes(package_type)
 
       if (services.hotel && overnight_city && includeAccommodation && !isLastDay) {
         if (isCruisePackage) {

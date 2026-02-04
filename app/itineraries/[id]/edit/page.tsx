@@ -141,6 +141,7 @@ const PACKAGE_TYPES = [
   { id: 'day-trips', name: 'Day Trips', icon: '🗓️', desc: 'No accommodation', advanced: false },
   { id: 'tours-only', name: 'Tours Only', icon: '🚐', desc: 'Client has own hotel', advanced: false },
   { id: 'land-package', name: 'Land Package', icon: '🏨', desc: 'Tours + Hotels', advanced: false },
+  { id: 'cruise-package', name: 'Nile Cruise', icon: '🛳️', desc: 'Cruise only', advanced: false },
   { id: 'full-package', name: 'Full Package', icon: '✈️', desc: 'All inclusive + Airport', advanced: true },
   { id: 'cruise-land', name: 'Cruise + Land', icon: '🚢', desc: 'Nile cruise combo', advanced: true },
   { id: 'shore-excursions', name: 'Shore Excursions', icon: '⚓', desc: 'Port pickup, time-limited', advanced: true }
