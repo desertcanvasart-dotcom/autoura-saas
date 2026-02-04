@@ -456,6 +456,63 @@ async function getTippingRate(supabase: any, tier: string) {
   }
 }
 
+async function getCruiseRate(supabase: any, tier: string, totalPax: number) {
+  // Try nile_cruises table first
+  const { data: cruise } = await supabase
+    .from('nile_cruises')
+    .select('*')
+    .eq('is_active', true)
+    .eq('tier', tier)
+    .order('is_preferred', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (cruise) {
+    // Cruise rates are typically per person per night, full board
+    const perPersonPerNight = cruise.rate_per_person_per_night || cruise.standard_rate || 150
+    return {
+      rate: perPersonPerNight,
+      supplier_id: cruise.id,
+      supplier_name: cruise.ship_name || cruise.name,
+      name: `${cruise.ship_name || cruise.name} - Full Board`,
+      code: cruise.id || `CRZ-${tier.substring(0,3).toUpperCase()}`
+    }
+  }
+
+  // Fallback without tier filter
+  const { data: anyCruise } = await supabase
+    .from('nile_cruises')
+    .select('*')
+    .eq('is_active', true)
+    .order('is_preferred', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (anyCruise) {
+    const perPersonPerNight = anyCruise.rate_per_person_per_night || anyCruise.standard_rate || 150
+    return {
+      rate: perPersonPerNight,
+      supplier_id: anyCruise.id,
+      supplier_name: anyCruise.ship_name || anyCruise.name,
+      name: `${anyCruise.ship_name || anyCruise.name} - Full Board`,
+      code: anyCruise.id || `CRZ-${tier.substring(0,3).toUpperCase()}`
+    }
+  }
+
+  // Fallback rates by tier (per person per night, full board included)
+  const fallbackRates: Record<string, number> = {
+    'budget': 80, 'standard': 150, 'deluxe': 220, 'luxury': 350
+  }
+
+  return {
+    rate: fallbackRates[tier] || 150,
+    supplier_id: null,
+    supplier_name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Nile Cruise`,
+    name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Nile Cruise - Full Board`,
+    code: `CRZ-${tier.substring(0,3).toUpperCase()}`
+  }
+}
+
 // ============================================
 // MAIN HANDLER
 // ============================================
@@ -751,29 +808,57 @@ export async function POST(
       totalSupplierCost += tipping.rate
       totalClientPrice += tipsClient
 
-      // HOTEL
+      // ACCOMMODATION (Hotel or Cruise)
       const isLastDay = day.day_number === days.length
+      const isCruisePackage = package_type === 'cruise-package' || package_type === 'cruise-land'
+
       if (services.hotel && overnight_city && includeAccommodation && !isLastDay) {
-        const hotel = await getHotelRate(supabase, overnight_city, tier)
-        const hotelTotal = hotel.rate * roomsNeeded
-        const hotelClient = applyMarkup(hotelTotal, marginPercent)
-        allServices.push({
-          tenant_id,
-          itinerary_id: itineraryId,
-          itinerary_day_id: dayId,
-          service_type: 'accommodation',
-          service_code: hotel.code,
-          service_name: `${hotel.supplier_name} (${roomsNeeded} room${roomsNeeded > 1 ? 's' : ''})`,
-          supplier_name: hotel.supplier_name,
-          quantity: roomsNeeded,
-          rate_eur: hotel.rate,
-          rate_non_eur: hotel.rate,
-          total_cost: hotelTotal,
-          client_price: hotelClient,
-          notes: `Overnight at ${overnight_city}`
-        })
-        totalSupplierCost += hotelTotal
-        totalClientPrice += hotelClient
+        if (isCruisePackage) {
+          // CRUISE ACCOMMODATION
+          const cruise = await getCruiseRate(supabase, tier, totalPax)
+          // Cruise rate is per person per night
+          const cruiseTotal = cruise.rate * totalPax
+          const cruiseClient = applyMarkup(cruiseTotal, marginPercent)
+          allServices.push({
+            tenant_id,
+            itinerary_id: itineraryId,
+            itinerary_day_id: dayId,
+            service_type: 'cruise',
+            service_code: cruise.code,
+            service_name: cruise.name,
+            supplier_name: cruise.supplier_name,
+            quantity: totalPax,
+            rate_eur: cruise.rate,
+            rate_non_eur: cruise.rate,
+            total_cost: cruiseTotal,
+            client_price: cruiseClient,
+            notes: `Nile Cruise - Full Board`
+          })
+          totalSupplierCost += cruiseTotal
+          totalClientPrice += cruiseClient
+        } else {
+          // HOTEL ACCOMMODATION
+          const hotel = await getHotelRate(supabase, overnight_city, tier)
+          const hotelTotal = hotel.rate * roomsNeeded
+          const hotelClient = applyMarkup(hotelTotal, marginPercent)
+          allServices.push({
+            tenant_id,
+            itinerary_id: itineraryId,
+            itinerary_day_id: dayId,
+            service_type: 'accommodation',
+            service_code: hotel.code,
+            service_name: `${hotel.supplier_name} (${roomsNeeded} room${roomsNeeded > 1 ? 's' : ''})`,
+            supplier_name: hotel.supplier_name,
+            quantity: roomsNeeded,
+            rate_eur: hotel.rate,
+            rate_non_eur: hotel.rate,
+            total_cost: hotelTotal,
+            client_price: hotelClient,
+            notes: `Overnight at ${overnight_city}`
+          })
+          totalSupplierCost += hotelTotal
+          totalClientPrice += hotelClient
+        }
       }
     }
 
