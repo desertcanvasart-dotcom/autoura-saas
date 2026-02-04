@@ -593,6 +593,7 @@ export async function POST(
       const transportClient = applyMarkup(transport.rate, marginPercent)
       allServices.push({
         tenant_id,
+        itinerary_id: itineraryId,
         itinerary_day_id: dayId,
         service_type: 'transportation',
         service_code: transport.code,
@@ -614,6 +615,7 @@ export async function POST(
         const guideClient = applyMarkup(guide.rate, marginPercent)
         allServices.push({
           tenant_id,
+          itinerary_id: itineraryId,
           itinerary_day_id: dayId,
           service_type: 'guide',
           service_code: guide.code,
@@ -645,6 +647,7 @@ export async function POST(
         // No markup on entrance fees typically
         allServices.push({
           tenant_id,
+          itinerary_id: itineraryId,
           itinerary_day_id: dayId,
           service_type: 'entrance',
           service_code: entrance.code,
@@ -669,6 +672,7 @@ export async function POST(
         const mealClient = applyMarkup(mealTotal, marginPercent)
         allServices.push({
           tenant_id,
+          itinerary_id: itineraryId,
           itinerary_day_id: dayId,
           service_type: 'meal',
           service_code: meal.code,
@@ -692,6 +696,7 @@ export async function POST(
         const mealClient = applyMarkup(mealTotal, marginPercent)
         allServices.push({
           tenant_id,
+          itinerary_id: itineraryId,
           itinerary_day_id: dayId,
           service_type: 'meal',
           service_code: `${meal.code}-DINNER`,
@@ -712,6 +717,7 @@ export async function POST(
       const waterTotal = waterRate * totalPax
       allServices.push({
         tenant_id,
+        itinerary_id: itineraryId,
         itinerary_day_id: dayId,
         service_type: 'supplies',
         service_code: 'WATER',
@@ -730,6 +736,7 @@ export async function POST(
       const tipsClient = applyMarkup(tipping.rate, marginPercent)
       allServices.push({
         tenant_id,
+        itinerary_id: itineraryId,
         itinerary_day_id: dayId,
         service_type: 'tips',
         service_code: tipping.code,
@@ -752,6 +759,7 @@ export async function POST(
         const hotelClient = applyMarkup(hotelTotal, marginPercent)
         allServices.push({
           tenant_id,
+          itinerary_id: itineraryId,
           itinerary_day_id: dayId,
           service_type: 'accommodation',
           service_code: hotel.code,
