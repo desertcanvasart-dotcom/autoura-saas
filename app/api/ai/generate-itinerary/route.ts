@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@/lib/supabase'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { requireAuth } from '@/lib/supabase-server'
 
 // Lazy-initialized Anthropic client (avoids build-time errors)
 let _anthropic: Anthropic | null = null
@@ -1696,8 +1696,23 @@ async function createQuotesForItinerary(params: {
 
 export async function POST(request: NextRequest) {
   try {
+    // Get authenticated user and tenant
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const { supabase, tenant_id } = authResult
+    if (!supabase || !tenant_id) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
-    const supabase = createClient()
     const userPrefs = await getUserPreferences(supabase)
     
     const {
@@ -1882,6 +1897,7 @@ export async function POST(request: NextRequest) {
         const { data: itinerary, error: itineraryError } = await supabase
           .from('itineraries')
           .insert({
+            tenant_id,
             itinerary_code,
             client_name,
             client_email: client_email || null,
@@ -2197,6 +2213,7 @@ export async function POST(request: NextRequest) {
     const { data: itinerary, error: itineraryError } = await supabase
       .from('itineraries')
       .insert({
+        tenant_id,
         itinerary_code,
         client_name,
         client_email: client_email || null,

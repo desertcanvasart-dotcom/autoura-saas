@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/app/supabase'
 import {
   GripVertical,
   ChevronDown,
@@ -241,14 +241,38 @@ export default function ItineraryEditorPage() {
     if (!itineraryId) return
 
     try {
-      // Load itinerary
+      // Load itinerary - use maybeSingle to handle RLS blocking
       const { data: itin, error: itinError } = await supabase
         .from('itineraries')
         .select('*')
         .eq('id', itineraryId)
-        .single()
+        .maybeSingle()
 
-      if (itinError) throw itinError
+      if (itinError) {
+        console.error('Itinerary load error:', itinError)
+        throw itinError
+      }
+
+      if (!itin) {
+        // Debug: Check user auth and tenant
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        console.error('Auth debug - user:', user?.id, user?.email, 'error:', authError?.message)
+
+        if (user) {
+          // Check tenant membership
+          const { data: membership, error: membershipError } = await supabase
+            .from('tenant_members')
+            .select('tenant_id, role, status')
+            .eq('user_id', user.id)
+            .maybeSingle()
+          console.error('Tenant membership:', membership, 'error:', membershipError?.message)
+        } else {
+          console.error('User not authenticated!')
+        }
+
+        throw new Error('Itinerary not found or you do not have access')
+      }
+
       setItinerary(itin)
 
       // Load days
@@ -302,8 +326,8 @@ export default function ItineraryEditorPage() {
         }
       }
 
-    } catch (error) {
-      console.error('Error loading itinerary:', error)
+    } catch (error: any) {
+      console.error('Error loading itinerary:', error?.message || error?.code || JSON.stringify(error))
     } finally {
       setLoading(false)
     }

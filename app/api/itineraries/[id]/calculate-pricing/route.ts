@@ -474,8 +474,8 @@ export async function POST(
       )
     }
 
-    const { supabase } = authResult // Use authenticated client
-    if (!supabase) {
+    const { supabase, tenant_id } = authResult // Use authenticated client
+    if (!supabase || !tenant_id) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
         { status: 401 }
@@ -592,6 +592,7 @@ export async function POST(
       const transport = await getTransportationRate(supabase, city, tier, totalPax)
       const transportClient = applyMarkup(transport.rate, marginPercent)
       allServices.push({
+        tenant_id,
         itinerary_day_id: dayId,
         service_type: 'transportation',
         service_code: transport.code,
@@ -612,6 +613,7 @@ export async function POST(
         const guide = await getGuideRate(supabase, city, tier)
         const guideClient = applyMarkup(guide.rate, marginPercent)
         allServices.push({
+          tenant_id,
           itinerary_day_id: dayId,
           service_type: 'guide',
           service_code: guide.code,
@@ -642,6 +644,7 @@ export async function POST(
         const entranceTotal = entrance.rate * totalPax
         // No markup on entrance fees typically
         allServices.push({
+          tenant_id,
           itinerary_day_id: dayId,
           service_type: 'entrance',
           service_code: entrance.code,
@@ -651,8 +654,8 @@ export async function POST(
           rate_non_eur: entrance.rateNonEur,
           total_cost: entranceTotal,
           client_price: entranceTotal,
-          notes: entrance.isAddon 
-            ? `${isEuroPassport ? 'EUR' : 'non-EUR'} rate (Optional Add-on)` 
+          notes: entrance.isAddon
+            ? `${isEuroPassport ? 'EUR' : 'non-EUR'} rate (Optional Add-on)`
             : `${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
         })
         totalSupplierCost += entranceTotal
@@ -665,6 +668,7 @@ export async function POST(
         const mealTotal = meal.rate * totalPax
         const mealClient = applyMarkup(mealTotal, marginPercent)
         allServices.push({
+          tenant_id,
           itinerary_day_id: dayId,
           service_type: 'meal',
           service_code: meal.code,
@@ -687,6 +691,7 @@ export async function POST(
         const mealTotal = meal.rate * totalPax
         const mealClient = applyMarkup(mealTotal, marginPercent)
         allServices.push({
+          tenant_id,
           itinerary_day_id: dayId,
           service_type: 'meal',
           service_code: `${meal.code}-DINNER`,
@@ -706,6 +711,7 @@ export async function POST(
       // WATER (standard inclusion)
       const waterTotal = waterRate * totalPax
       allServices.push({
+        tenant_id,
         itinerary_day_id: dayId,
         service_type: 'supplies',
         service_code: 'WATER',
@@ -723,6 +729,7 @@ export async function POST(
       // TIPS (standard inclusion)
       const tipsClient = applyMarkup(tipping.rate, marginPercent)
       allServices.push({
+        tenant_id,
         itinerary_day_id: dayId,
         service_type: 'tips',
         service_code: tipping.code,
@@ -744,6 +751,7 @@ export async function POST(
         const hotelTotal = hotel.rate * roomsNeeded
         const hotelClient = applyMarkup(hotelTotal, marginPercent)
         allServices.push({
+          tenant_id,
           itinerary_day_id: dayId,
           service_type: 'accommodation',
           service_code: hotel.code,

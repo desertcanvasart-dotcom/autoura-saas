@@ -91,10 +91,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Create client with tenant_id
+    const firstName = body.first_name
+    const lastName = body.last_name || body.first_name
+
     const clientData = {
       tenant_id,
-      first_name: body.first_name,
-      last_name: body.last_name || body.first_name,
+      first_name: firstName,
+      last_name: lastName,
+      full_name: `${firstName} ${lastName}`.trim(), // Required by DB constraint
       email: body.email || null,
       phone: body.phone || null,
       nationality: body.nationality || 'Unknown',
