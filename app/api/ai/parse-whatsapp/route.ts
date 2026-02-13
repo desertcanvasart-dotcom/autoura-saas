@@ -741,5 +741,35 @@ EXTRACTION RULES:
 5. Use 0 for missing numbers
 6. Use [] for missing arrays
 7. Default num_adults to 2 if not specified
-8. Default duration_days to 1 if not clear`
+8. Default duration_days to 1 if not clear
+
+CRITICAL DURATION RULES:
+9. Number of DAYS = Number of NIGHTS + 1. ALWAYS.
+   - "4-night cruise" = 5 days (duration_days: 5)
+   - "3-night cruise" = 4 days (duration_days: 4)
+   - "7-night cruise" = 8 days (duration_days: 8)
+   - "four nights" = 5 days (duration_days: 5)
+   When the request mentions NIGHTS, add 1 to get days.
+
+CRUISE BUSINESS RULES:
+10. Nile cruise from Luxor: ALWAYS 4 nights / 5 days (Luxor to Aswan). There is NO 3-night or 4-day cruise from Luxor.
+11. Nile cruise from Aswan: ALWAYS 3 nights / 4 days (Aswan to Luxor).
+12. Round-trip Luxor cruise: ALWAYS 7 nights / 8 days.
+13. Lake Nasser cruise: typically 3 or 4 nights.
+
+NATIONALITY & LANGUAGE RULES:
+14. ALWAYS extract nationality when mentioned (e.g., "Japanese customer", "French group", "5 Japanese" = nationality: "Japanese")
+15. Infer guide language from nationality when no language is explicitly stated:
+    - Japanese → language: "Japanese"
+    - French → language: "French"
+    - Spanish → language: "Spanish"
+    - German → language: "German"
+    - Italian → language: "Italian"
+    - Chinese → language: "Chinese"
+    - Korean → language: "Korean"
+    - Portuguese → language: "Portuguese"
+    - Russian → language: "Russian"
+    - Arabic → language: "Arabic"
+    - If nationality is English-speaking (American, British, Australian, etc.) or not listed → language: "English"
+16. If both nationality and language are explicitly mentioned, use the explicitly stated language.`
 }

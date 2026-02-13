@@ -63,6 +63,33 @@ const TIER_DESCRIPTIONS: Record<ServiceTier, string> = {
 }
 
 // ============================================
+// HELPER: Create itinerary with graceful column fallback
+// ============================================
+async function createItineraryRecord(supabase: any, data: Record<string, any>): Promise<{ data: any; error: any }> {
+  // Try with all columns first (includes nationality, language, is_euro_passport from migration 152)
+  const { data: result, error } = await supabase
+    .from('itineraries')
+    .insert(data)
+    .select()
+    .single()
+
+  if (error && error.message?.includes('Could not find the')) {
+    // Column doesn't exist yet — remove the new columns and retry
+    console.log('⚠️ Falling back: removing new columns from itinerary insert (run migration 152)')
+    const { nationality, language, is_euro_passport, ...fallbackData } = data
+    // Append nationality info to notes so it's not lost
+    if (nationality) {
+      fallbackData.notes = fallbackData.notes
+        ? `${fallbackData.notes} | Nationality: ${nationality}, Language: ${language || 'English'}`
+        : `Nationality: ${nationality}, Language: ${language || 'English'}`
+    }
+    return await supabase.from('itineraries').insert(fallbackData).select().single()
+  }
+
+  return { data: result, error }
+}
+
+// ============================================
 // COMPREHENSIVE EGYPT TRAVEL ABBREVIATIONS
 // ============================================
 
@@ -1757,7 +1784,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     const finalTourName = tour_requested || tour_name || 'Egypt Tour'
-    const finalLanguage = language !== 'English' ? language : (conversation_language || 'English')
+    let finalLanguage = language !== 'English' ? language : (conversation_language || 'English')
     const tier: ServiceTier = raw_tier ? normalizeTier(raw_tier) : budget_level !== 'standard' ? normalizeTier(budget_level) : userPrefs.default_tier
 
     if (!isValidDate(start_date)) {
@@ -1823,9 +1850,37 @@ export async function POST(request: NextRequest) {
     )
 
     // Adjust duration for cruise if needed
-    if (cruiseDetection.isCruise && duration_days === 1) {
-      duration_days = cruiseDetection.detectedDuration || (cruiseDetection.cruiseType === 'lake-nasser' ? 4 : 5)
-      console.log(`🚢 Adjusted cruise duration to ${duration_days} days`)
+    if (cruiseDetection.isCruise) {
+      // CRUISE BUSINESS RULES: Enforce valid cruise durations
+      // Luxor→Aswan: always 5 days (4 nights)
+      // Aswan→Luxor: always 4 days (3 nights)
+      // Round trip Luxor: always 8 days (7 nights)
+      // Lake Nasser: 4 or 5 days (3-4 nights)
+      const validCruiseDurations: Record<string, number> = {
+        'luxor-aswan': 5,
+        'aswan-luxor': 4,
+        'round-trip': 8,
+        'aswan-abu-simbel': 4
+      }
+
+      const expectedDuration = cruiseDetection.route ? validCruiseDurations[cruiseDetection.route] : null
+
+      if (duration_days === 1) {
+        // Parser couldn't determine duration — use detected or business rules
+        duration_days = cruiseDetection.detectedDuration || expectedDuration || 5
+        console.log(`🚢 Set cruise duration to ${duration_days} days (was unset)`)
+      } else if (cruiseDetection.detectedDuration && cruiseDetection.detectedDuration !== duration_days) {
+        // Parser got a different duration than what cruise detection found (nights+1 mismatch)
+        console.log(`🚢 Duration mismatch: parser=${duration_days}, detected=${cruiseDetection.detectedDuration}`)
+        duration_days = cruiseDetection.detectedDuration
+        console.log(`🚢 Corrected cruise duration to ${duration_days} days`)
+      } else if (expectedDuration && !cruiseDetection.includesLand && duration_days !== expectedDuration) {
+        // Pure cruise with wrong duration for the route — apply business rule
+        console.log(`🚢 Business rule correction: ${cruiseDetection.route} cruise must be ${expectedDuration} days, was ${duration_days}`)
+        duration_days = expectedDuration
+      }
+
+      console.log(`🚢 Final cruise duration: ${duration_days} days`)
     }
 
     // UPDATED: Determine effective package type
@@ -1858,6 +1913,33 @@ export async function POST(request: NextRequest) {
       isEuroPassport = euCountries.some(c => nationality.toLowerCase().includes(c))
     }
     isEuroPassport = isEuroPassport ?? false
+
+    // Infer guide language from nationality if language is still default English
+    if (nationality && finalLanguage === 'English') {
+      const nationalityLanguageMap: Record<string, string> = {
+        'japanese': 'Japanese', 'japan': 'Japanese',
+        'french': 'French', 'france': 'French',
+        'spanish': 'Spanish', 'spain': 'Spanish',
+        'german': 'German', 'germany': 'German',
+        'italian': 'Italian', 'italy': 'Italian',
+        'chinese': 'Chinese', 'china': 'Chinese',
+        'korean': 'Korean', 'korea': 'Korean',
+        'portuguese': 'Portuguese', 'portugal': 'Portuguese', 'brazil': 'Portuguese',
+        'russian': 'Russian', 'russia': 'Russian',
+        'arabic': 'Arabic', 'saudi': 'Arabic', 'uae': 'Arabic', 'emirati': 'Arabic',
+        'turkish': 'Turkish', 'turkey': 'Turkish',
+        'dutch': 'Dutch', 'netherlands': 'Dutch', 'holland': 'Dutch',
+        'polish': 'Polish', 'poland': 'Polish'
+      }
+      const natLower = nationality.toLowerCase()
+      for (const [key, lang] of Object.entries(nationalityLanguageMap)) {
+        if (natLower.includes(key)) {
+          console.log(`🌍 Inferred guide language "${lang}" from nationality "${nationality}"`)
+          finalLanguage = lang
+          break
+        }
+      }
+    }
 
     // Calculate dates
     const startDateObj = new Date(start_date)
@@ -1893,10 +1975,8 @@ export async function POST(request: NextRequest) {
 
         const nights = duration_days - 1
         
-        // Create itinerary - UPDATED: Use effectivePackageType
-        const { data: itinerary, error: itineraryError } = await supabase
-          .from('itineraries')
-          .insert({
+        // Create itinerary - UPDATED: Use effectivePackageType + nationality/language
+        const { data: itinerary, error: itineraryError } = await createItineraryRecord(supabase, {
             tenant_id,
             itinerary_code,
             client_name,
@@ -1916,11 +1996,12 @@ export async function POST(request: NextRequest) {
             tier,
             package_type: effectivePackageType,
             cost_mode,
+            nationality: nationality || null,
+            language: finalLanguage,
+            is_euro_passport: isEuroPassport,
             notes: special_requests.length > 0 ? special_requests.join('; ') : null,
             client_id
           })
-          .select()
-          .single()
 
         if (itineraryError) throw new Error(`Failed to create itinerary: ${itineraryError.message}`)
 
@@ -1934,6 +2015,8 @@ export async function POST(request: NextRequest) {
           const dayDate = new Date(startDateObj)
           dayDate.setDate(startDateObj.getDate() + dayData.day_number - 1)
 
+          const isLastCruiseDay = dayData.day_number === duration_days
+
           const { data: day, error: dayError } = await supabase
             .from('itinerary_days')
             .insert({
@@ -1943,7 +2026,10 @@ export async function POST(request: NextRequest) {
               title: dayData.title,
               description: dayData.description,
               city: dayData.city || effectiveCity,
-              overnight_city: dayData.overnight || `On board - ${dayData.city}`,
+              overnight_city: isLastCruiseDay ? (dayData.city || effectiveCity) : (dayData.overnight || `On board ${cruiseRate.shipName}`),
+              accommodation_type: isLastCruiseDay ? 'none' : 'cruise',
+              is_cruise_day: true,
+              is_sailing_day: dayData.is_sailing_day || false,
               attractions: dayData.attractions || [],
               guide_required: true,
               lunch_included: dayData.meals?.includes('lunch') ?? true,
@@ -2035,6 +2121,37 @@ export async function POST(request: NextRequest) {
         }
 
         console.log('🎉 Cruise itinerary complete!')
+
+        // Auto-assign cruise as a resource for the itinerary
+        if (cruiseRate.found && cruiseRate.supplierId) {
+          try {
+            const cruiseRouteLabelMap: Record<string, string> = {
+              'luxor-aswan': 'Luxor → Aswan',
+              'aswan-luxor': 'Aswan → Luxor',
+              'round-trip': 'Round Trip',
+              'aswan-abu-simbel': 'Aswan → Abu Simbel'
+            }
+            const routeLabel = cruiseDetection.route ? cruiseRouteLabelMap[cruiseDetection.route] || cruiseDetection.route : ''
+            const cruiseEndDate = new Date(startDateObj)
+            cruiseEndDate.setDate(startDateObj.getDate() + duration_days - 1)
+
+            await supabase.from('itinerary_resources').insert({
+              itinerary_id: itinerary.id,
+              resource_type: 'cruise',
+              resource_id: cruiseRate.supplierId,
+              resource_name: `${cruiseRate.shipName}${routeLabel ? ` (${routeLabel})` : ''}`,
+              start_date: start_date,
+              end_date: cruiseEndDate.toISOString().split('T')[0],
+              cost_eur: totalSupplierCost,
+              quantity: totalPax,
+              status: 'pending',
+              notes: `${nights} nights, ${totalPax} pax, ${cruiseRate.cabinType}`
+            })
+            console.log(`🚢 Auto-assigned cruise resource: ${cruiseRate.shipName}`)
+          } catch (resourceError) {
+            console.error('⚠️ Failed to auto-assign cruise resource:', resourceError)
+          }
+        }
 
         // Create quotes if requested and not in draft mode
         let cruiseQuotesCreated = { b2c_quote: null, b2b_quote: null }
@@ -2210,9 +2327,7 @@ export async function POST(request: NextRequest) {
     finalEndDate.setDate(startDateObj.getDate() + duration_days - 1)
 
     // Create itinerary record - UPDATED: Use effectivePackageType
-    const { data: itinerary, error: itineraryError } = await supabase
-      .from('itineraries')
-      .insert({
+    const { data: itinerary, error: itineraryError } = await createItineraryRecord(supabase, {
         tenant_id,
         itinerary_code,
         client_name,
@@ -2232,11 +2347,12 @@ export async function POST(request: NextRequest) {
         tier,
         package_type: effectivePackageType,
         cost_mode,
+        nationality: nationality || null,
+        language: finalLanguage,
+        is_euro_passport: isEuroPassport,
         notes: special_requests.length > 0 ? special_requests.join('; ') : null,
         client_id
       })
-      .select()
-      .single()
 
     if (itineraryError) {
       console.error('❌ Failed to create itinerary:', itineraryError)
@@ -2272,6 +2388,15 @@ export async function POST(request: NextRequest) {
         dayTitle = `Day ${dayNumber}: Day at Leisure`
       }
 
+      // Determine accommodation type for this day
+      const dayAccommodationType = isCruiseDay ? (isLastDay ? 'none' : 'cruise') : (includesHotelForDay ? 'hotel' : 'none')
+
+      // Determine overnight display — show cruise name for cruise days
+      let overnightCity = dayData.overnight_city || dayData.city || effectiveCity
+      if (isCruiseDay && !isLastDay) {
+        overnightCity = `On board - ${dayData.city || effectiveCity}`
+      }
+
       // Create day record
       const { data: day, error: dayError } = await supabase
         .from('itinerary_days')
@@ -2282,7 +2407,11 @@ export async function POST(request: NextRequest) {
           title: dayTitle,
           description: dayData.description || '',
           city: dayData.city || effectiveCity,
-          overnight_city: dayData.overnight_city || dayData.city || effectiveCity,
+          overnight_city: overnightCity,
+          accommodation_type: dayAccommodationType,
+          is_cruise_day: isCruiseDay,
+          is_sailing_day: isSailingDay,
+          is_transfer_only: isTransferOnly,
           attractions: dayData.attractions || [],
           guide_required: dayNeedsGuide,
           lunch_included: dayIncludesLunch,
@@ -2585,6 +2714,39 @@ export async function POST(request: NextRequest) {
       supplierCost: totalSupplierCost,
       clientPrice: totalClientPrice
     })
+
+    // Auto-assign cruise resource if this itinerary includes cruise days
+    if (cruiseDetection.isCruise) {
+      try {
+        const cruiseRate = await getCruiseRate(tier, [], supabase)
+        if (cruiseRate.found && cruiseRate.supplierId) {
+          const cruiseRouteLabelMap: Record<string, string> = {
+            'luxor-aswan': 'Luxor → Aswan',
+            'aswan-luxor': 'Aswan → Luxor',
+            'round-trip': 'Round Trip',
+            'aswan-abu-simbel': 'Aswan → Abu Simbel'
+          }
+          const routeLabel = cruiseDetection.route ? cruiseRouteLabelMap[cruiseDetection.route] || cruiseDetection.route : ''
+          const cruiseNights = cruiseDetection.cruiseNights || (duration_days - 1)
+
+          await supabase.from('itinerary_resources').insert({
+            itinerary_id: itinerary.id,
+            resource_type: 'cruise',
+            resource_id: cruiseRate.supplierId,
+            resource_name: `${cruiseRate.shipName}${routeLabel ? ` (${routeLabel})` : ''}`,
+            start_date: start_date,
+            end_date: endDate.toISOString().split('T')[0],
+            cost_eur: cruiseRate.perPersonPerNight * totalPax * cruiseNights,
+            quantity: totalPax,
+            status: 'pending',
+            notes: `${cruiseNights} nights, ${totalPax} pax, ${cruiseRate.cabinType}`
+          })
+          console.log(`🚢 Auto-assigned cruise resource: ${cruiseRate.shipName}`)
+        }
+      } catch (resourceError) {
+        console.error('⚠️ Failed to auto-assign cruise resource:', resourceError)
+      }
+    }
 
     // Create quotes if requested and not in draft mode
     let quotesCreated = { b2c_quote: null, b2b_quote: null }
