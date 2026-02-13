@@ -12,7 +12,7 @@ export async function GET(
     const supabase = createClient()
     
     const { data, error } = await supabase
-      .from('cruise_contacts')
+      .from('nile_cruises')
       .select('*')
       .eq('id', id)
       .single()
@@ -39,7 +39,7 @@ export async function PUT(
     const body = await request.json()
     
     const { data, error } = await supabase
-      .from('cruise_contacts')
+      .from('nile_cruises')
       .update({
         ...body,
         updated_at: new Date().toISOString()
@@ -69,7 +69,7 @@ export async function DELETE(
     const supabase = createClient()
     
     const { error } = await supabase
-      .from('cruise_contacts')
+      .from('nile_cruises')
       .delete()
       .eq('id', id)
     

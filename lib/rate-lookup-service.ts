@@ -996,31 +996,15 @@ export async function lookupRates(
     // ============================================
     if (params.include_cruise && params.cruise_embark_city && params.cruise_disembark_city) {
       console.log(`🚢 Looking up cruises: ${params.cruise_embark_city} → ${params.cruise_disembark_city}, tier=${tier}`)
-      
-      let { data: cruises } = await supabase
-        .from('cruise_contacts')
-        .select('*')
-        .eq('is_active', true)
-        .eq('tier', tier)
-        .order('is_preferred', { ascending: false })
-        .limit(5)
 
-      if (!cruises || cruises.length === 0) {
-        const { data: fallbackCruises } = await supabase
-          .from('cruise_contacts')
-          .select('*')
-          .eq('is_active', true)
-          .order('is_preferred', { ascending: false })
-          .limit(5)
-        cruises = fallbackCruises
-      }
-
+      // Query nile_cruises directly — it has tier, is_preferred, rates, and route info all in one table
       let cruiseQuery = supabase
         .from('nile_cruises')
         .select('*')
         .eq('is_active', true)
         .eq('embark_city', params.cruise_embark_city)
         .eq('disembark_city', params.cruise_disembark_city)
+        .eq('tier', tier)
 
       if (params.cruise_cabin_type) {
         cruiseQuery = cruiseQuery.eq('cabin_type', params.cruise_cabin_type)
@@ -1029,14 +1013,39 @@ export async function lookupRates(
         cruiseQuery = cruiseQuery.eq('duration_nights', params.cruise_nights)
       }
 
-      const { data: cruiseRates } = await cruiseQuery
+      let { data: cruiseRates } = await cruiseQuery
+        .order('is_preferred', { ascending: false })
         .order('rate_double_eur', { ascending: tier === 'budget' })
-        .limit(1)
+        .limit(5)
+
+      // Fallback: if no cruises match tier, get any active cruise on this route
+      if (!cruiseRates || cruiseRates.length === 0) {
+        console.log(`⚠️ No cruises found for tier ${tier}, falling back to all active cruises`)
+        let fallbackQuery = supabase
+          .from('nile_cruises')
+          .select('*')
+          .eq('is_active', true)
+          .eq('embark_city', params.cruise_embark_city)
+          .eq('disembark_city', params.cruise_disembark_city)
+
+        if (params.cruise_cabin_type) {
+          fallbackQuery = fallbackQuery.eq('cabin_type', params.cruise_cabin_type)
+        }
+        if (params.cruise_nights) {
+          fallbackQuery = fallbackQuery.eq('duration_nights', params.cruise_nights)
+        }
+
+        const { data: fallbackCruises } = await fallbackQuery
+          .order('is_preferred', { ascending: false })
+          .order('rate_double_eur', { ascending: tier === 'budget' })
+          .limit(5)
+        cruiseRates = fallbackCruises
+      }
 
       if (cruiseRates && cruiseRates.length > 0) {
         const cruise = cruiseRates[0]
-        const selectedCruiseContact = cruises && cruises.length > 0 ? cruises[0] : null
-        
+        console.log(`✅ Selected cruise: ${cruise.ship_name} (tier: ${cruise.tier}, preferred: ${cruise.is_preferred})`)
+
         result.cruise = {
           id: cruise.id,
           cruise_code: cruise.cruise_code,
@@ -1050,8 +1059,8 @@ export async function lookupRates(
           rate_single_eur: toNumber(cruise.rate_single_eur, 0),
           rate_double_eur: toNumber(cruise.rate_double_eur, 0),
           rate_triple_eur: toNumber(cruise.rate_triple_eur, 0),
-          tier: selectedCruiseContact?.tier || tier,
-          is_preferred: selectedCruiseContact?.is_preferred || false
+          tier: cruise.tier || tier,
+          is_preferred: cruise.is_preferred || false
         }
       }
     }

@@ -13,22 +13,22 @@ export async function GET(request: NextRequest) {
     const route = searchParams.get('route')
     
     let query = supabase
-      .from('cruise_contacts')
+      .from('nile_cruises')
       .select('*')
-      .order('name', { ascending: true })
-    
+      .order('ship_name', { ascending: true })
+
     if (isActive === 'true') {
       query = query.eq('is_active', true)
     } else if (isActive === 'false') {
       query = query.eq('is_active', false)
     }
-    
+
     if (cruiseType) {
-      query = query.eq('cruise_type', cruiseType)
+      query = query.eq('ship_category', cruiseType)
     }
-    
+
     if (route) {
-      query = query.eq('route', route)
+      query = query.eq('route_name', route)
     }
     
     const { data, error } = await query
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     
     const { data, error } = await supabase
-      .from('cruise_contacts')
+      .from('nile_cruises')
       .insert(body)
       .select()
       .single()
