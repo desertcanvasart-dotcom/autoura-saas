@@ -1,4 +1,6 @@
 'use client'
+// @bulk-import
+import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -1206,6 +1208,7 @@ export default function CruisesPage() {
               <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
             </div>
             <div className="flex items-center gap-2">
+              <BulkRateImportExport tableName="nile_cruises" onImportComplete={fetchCruises} />
               <button
                 onClick={handleAddNew}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"

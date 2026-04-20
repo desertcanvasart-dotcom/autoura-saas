@@ -20,10 +20,32 @@ export default function ResetPasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    // Check if user has a valid session from the reset link
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setHasSession(!!session)
+      // Extract recovery token from URL hash (Supabase sends #access_token=...&type=recovery)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      const type = hashParams.get('type')
+
+      if (accessToken && type === 'recovery') {
+        // Set the session using the recovery token
+        const { data, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || '',
+        })
+
+        if (sessionError) {
+          setError('Invalid or expired reset link. Please request a new one.')
+          setHasSession(false)
+        } else if (data.session) {
+          setHasSession(true)
+        }
+      } else {
+        // Fallback: check if there's already a valid session
+        const { data: { session } } = await supabase.auth.getSession()
+        setHasSession(!!session)
+      }
+
       setSessionChecked(true)
     }
     checkSession()

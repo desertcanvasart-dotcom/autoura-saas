@@ -22,6 +22,7 @@ interface SupplierDocument {
   supplier_contact_name?: string
   supplier_contact_email?: string
   supplier_contact_phone?: string
+  supplier_whatsapp?: string
   supplier_address?: string
   client_name: string
   client_nationality?: string
@@ -34,6 +35,8 @@ interface SupplierDocument {
   pickup_time?: string
   pickup_location?: string
   dropoff_location?: string
+  vehicle_type?: string
+  driver_name?: string
   services: ServiceItem[]
   currency: string
   total_cost: number
@@ -50,19 +53,55 @@ interface SupplierDocument {
     non_eur_rate: number
     quantity: number
   }[]
+  // Transport routes specific
+  selected_routes?: {
+    rate_id: string
+    service_code: string
+    route_name: string
+    service_type: string
+    city: string
+    quantity: number
+    unit_rate: number
+    total_cost: number
+  }[]
+  // Meal specific
+  selected_meals?: {
+    rate_id: string
+    service_code: string
+    restaurant_name: string
+    meal_type: string
+    city: string
+    quantity: number
+    unit_rate: number
+    total_cost: number
+  }[]
+  // Guide specific
+  selected_guides?: {
+    rate_id: string
+    service_code: string
+    guide_language: string
+    guide_type: string
+    tour_duration: string
+    city: string
+    quantity: number
+    unit_rate: number
+    total_cost: number
+  }[]
 }
 
-// Brand colors
+// Brand colors - lighter, more professional palette
 const BRAND = {
   primary: { r: 100, g: 124, b: 71 },      // Olive green #647C47
   primaryDark: { r: 80, g: 100, b: 57 },   // Darker olive
-  primaryLight: { r: 240, g: 244, b: 236 }, // Light olive bg
+  primaryLight: { r: 245, g: 248, b: 241 }, // Very light olive bg (lighter)
+  primaryMedium: { r: 220, g: 230, b: 210 }, // Medium light olive for accents
   text: { r: 30, g: 30, b: 30 },
   textMuted: { r: 100, g: 100, b: 100 },
   textLight: { r: 150, g: 150, b: 150 },
-  border: { r: 220, g: 220, b: 220 },
+  border: { r: 200, g: 210, b: 190 },       // Light olive border
+  borderLight: { r: 230, g: 230, b: 230 },  // Very light border
   white: { r: 255, g: 255, b: 255 },
-  background: { r: 250, g: 250, b: 250 }
+  background: { r: 252, g: 252, b: 250 }
 }
 
 const DOCUMENT_TITLES: Record<string, string> = {
@@ -102,10 +141,10 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   const title = DOCUMENT_TITLES[doc.document_type] || 'SERVICE DOCUMENT'
 
   // ==================== HEADER SECTION ====================
-  
-  // Top accent bar
+
+  // Top accent bar (thin)
   pdf.setFillColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
-  pdf.rect(0, 0, pageWidth, 8, 'F')
+  pdf.rect(0, 0, pageWidth, 4, 'F')
   
   y = 15
   
@@ -185,11 +224,15 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     supplierY += addressLines.slice(0, 2).length * 4
   }
   if (doc.supplier_contact_phone) {
-    pdf.text(`📞 ${doc.supplier_contact_phone}`, margin + 4, supplierY)
+    pdf.text(`Tel: ${doc.supplier_contact_phone}`, margin + 4, supplierY)
+    supplierY += 4
+  }
+  if (doc.supplier_whatsapp) {
+    pdf.text(`WhatsApp: ${doc.supplier_whatsapp}`, margin + 4, supplierY)
     supplierY += 4
   }
   if (doc.supplier_contact_email) {
-    pdf.text(`✉️ ${doc.supplier_contact_email}`, margin + 4, supplierY)
+    pdf.text(`Email: ${doc.supplier_contact_email}`, margin + 4, supplierY)
   }
   
   // Guest Box (Right)
@@ -235,7 +278,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   pdf.text(paxDetail, guestBoxX + 4, y + 33)
   
   if (doc.city) {
-    pdf.text(`📍 ${doc.city}`, guestBoxX + 4, y + 28)
+    pdf.text(doc.city, guestBoxX + 4, y + 28)
   }
   
   y += 45
@@ -281,20 +324,22 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     pdf.text(checkOutDate, margin + dateBoxWidth + 10, y + 14)
     
     // Nights
-    pdf.setFillColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
-    pdf.roundedRect(margin + (dateBoxWidth + 6) * 2, y, dateBoxWidth, 22, 3, 3, 'F')
-    
+    pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
+    pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.roundedRect(margin + (dateBoxWidth + 6) * 2, y, dateBoxWidth, 22, 3, 3, 'FD')
+
     let nights = 0
     if (doc.check_in && doc.check_out) {
       nights = Math.ceil((new Date(doc.check_out).getTime() - new Date(doc.check_in).getTime()) / (1000 * 60 * 60 * 24))
     }
-    
+
     pdf.setFontSize(7)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.white.r, BRAND.white.g, BRAND.white.b)
+    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
     pdf.text('DURATION', margin + (dateBoxWidth + 6) * 2 + 4, y + 5)
-    
+
     pdf.setFontSize(14)
+    pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
     pdf.text(`${nights} NIGHT${nights !== 1 ? 'S' : ''}`, margin + (dateBoxWidth + 6) * 2 + dateBoxWidth / 2, y + 15, { align: 'center' })
     
     y += 28
@@ -322,29 +367,31 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     pdf.text(serviceDate, margin + 4, y + 14)
     
     // Pickup Time
-    pdf.setFillColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
-    pdf.roundedRect(margin + dateBoxWidth + 6, y, dateBoxWidth, 22, 3, 3, 'F')
-    
+    pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
+    pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.roundedRect(margin + dateBoxWidth + 6, y, dateBoxWidth, 22, 3, 3, 'FD')
+
     pdf.setFontSize(7)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.white.r, BRAND.white.g, BRAND.white.b)
+    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
     pdf.text('PICKUP TIME', margin + dateBoxWidth + 10, y + 5)
-    
+
     pdf.setFontSize(14)
     pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
     pdf.text(doc.pickup_time || '—', margin + dateBoxWidth + 10, y + 15)
     
     y += 28
     
-    // Pickup/Dropoff for transport
-    if (doc.document_type === 'transport_voucher' && (doc.pickup_location || doc.dropoff_location)) {
+    // Pickup/Dropoff for transport (only show single-route box when no selected_routes)
+    if (doc.document_type === 'transport_voucher' && !doc.selected_routes?.length && (doc.pickup_location || doc.dropoff_location)) {
       pdf.setFillColor(BRAND.background.r, BRAND.background.g, BRAND.background.b)
       pdf.roundedRect(margin, y, contentWidth, 18, 3, 3, 'F')
-      
+
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'normal')
       pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
-      
+
       if (doc.pickup_location) {
         pdf.setFont('helvetica', 'bold')
         pdf.text('FROM:', margin + 4, y + 7)
@@ -352,7 +399,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
         pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
         pdf.text(doc.pickup_location, margin + 20, y + 7)
       }
-      
+
       if (doc.dropoff_location) {
         pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
         pdf.setFont('helvetica', 'bold')
@@ -361,14 +408,63 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
         pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
         pdf.text(doc.dropoff_location, margin + 20, y + 13)
       }
-      
+
+      y += 24
+    }
+
+    // Vehicle Type & Driver for transport
+    if (doc.document_type === 'transport_voucher' && (doc.vehicle_type || doc.driver_name)) {
+      const vehicleTypeLabels: Record<string, string> = {
+        'sedan': 'Sedan (1-3 pax)',
+        'suv': 'SUV / 4x4 (1-4 pax)',
+        'minivan': 'Minivan (4-6 pax)',
+        'van': 'Van (7-10 pax)',
+        'minibus': 'Minibus (11-20 pax)',
+        'bus': 'Bus (21+ pax)',
+        'luxury_sedan': 'Luxury Sedan',
+        'luxury_van': 'Luxury Van / Sprinter'
+      }
+
+      const halfWidth = (contentWidth - 6) / 2
+
+      // Vehicle Type Box
+      pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
+      pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+      pdf.roundedRect(margin, y, halfWidth, 18, 3, 3, 'FD')
+
+      pdf.setFontSize(7)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+      pdf.text('VEHICLE TYPE', margin + 4, y + 5)
+
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+      const vehicleLabel = doc.vehicle_type ? (vehicleTypeLabels[doc.vehicle_type] || doc.vehicle_type) : '—'
+      pdf.text(vehicleLabel, margin + 4, y + 13)
+
+      // Driver Name Box
+      pdf.setFillColor(BRAND.background.r, BRAND.background.g, BRAND.background.b)
+      pdf.setDrawColor(BRAND.border.r, BRAND.border.g, BRAND.border.b)
+      pdf.roundedRect(margin + halfWidth + 6, y, halfWidth, 18, 3, 3, 'FD')
+
+      pdf.setFontSize(7)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+      pdf.text('DRIVER', margin + halfWidth + 10, y + 5)
+
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+      pdf.text(doc.driver_name || 'To be assigned', margin + halfWidth + 10, y + 13)
+
       y += 24
     }
   }
 
   // ==================== SERVICES TABLE ====================
   
-  const hasServices = (doc.services && doc.services.length > 0) || (doc.selected_attractions && doc.selected_attractions.length > 0)
+  const hasServices = (doc.services && doc.services.length > 0) || (doc.selected_attractions && doc.selected_attractions.length > 0) || (doc.selected_routes && doc.selected_routes.length > 0) || (doc.selected_meals && doc.selected_meals.length > 0) || (doc.selected_guides && doc.selected_guides.length > 0)
   
   if (hasServices) {
     pdf.setFontSize(9)
@@ -378,20 +474,22 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     y += 10
     
     // Table header
-    pdf.setFillColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
-    pdf.roundedRect(margin, y, contentWidth, 10, 2, 2, 'F')
-    
+    pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
+    pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setLineWidth(0.5)
+    pdf.roundedRect(margin, y, contentWidth, 10, 2, 2, 'FD')
+
     pdf.setFontSize(8)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.white.r, BRAND.white.g, BRAND.white.b)
+    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
     pdf.text('Description', margin + 4, y + 6.5)
     pdf.text('Qty', pageWidth - margin - 40, y + 6.5, { align: 'center' })
     pdf.text('Amount', pageWidth - margin - 4, y + 6.5, { align: 'right' })
     
     y += 12
     
-    // Use selected_attractions if available (entrance fees), otherwise use services
-    const items = doc.selected_attractions || doc.services || []
+    // Use selected_routes for transport, selected_meals for meals, selected_attractions for entrance fees, otherwise use services
+    const items = doc.selected_routes || doc.selected_meals || doc.selected_guides || doc.selected_attractions || doc.services || []
     
     items.forEach((item: any, idx: number) => {
       const isOdd = idx % 2 === 0
@@ -405,18 +503,18 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
       
       // Get item name
-      const itemName = item.attraction_name || item.service_name || item.service_type || 'Service'
+      const itemName = item.route_name || item.restaurant_name || (item.guide_language ? `${item.guide_language} ${(item.guide_type || '').replace(/_/g, ' ')} - ${(item.tour_duration || '').replace(/_/g, ' ')}` : null) || item.attraction_name || item.service_name || item.service_type || 'Service'
       const itemCity = item.city ? ` (${item.city})` : ''
       pdf.text((itemName + itemCity).substring(0, 60), margin + 4, y + 6.5)
-      
+
       // Quantity
       const qty = item.quantity || 1
       pdf.text(qty.toString(), pageWidth - margin - 40, y + 6.5, { align: 'center' })
-      
+
       // Amount
-      const amount = item.total_price || item.eur_rate || item.unit_price || 0
+      const amount = item.total_cost || item.total_price || item.eur_rate || item.unit_price || 0
       if (amount > 0) {
-        pdf.text(`${doc.currency} ${(amount * qty).toFixed(2)}`, pageWidth - margin - 4, y + 6.5, { align: 'right' })
+        pdf.text(`${doc.currency} ${amount.toFixed(2)}`, pageWidth - margin - 4, y + 6.5, { align: 'right' })
       } else {
         pdf.text('—', pageWidth - margin - 4, y + 6.5, { align: 'right' })
       }
@@ -427,10 +525,10 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       if (y > pageHeight - 70) {
         pdf.addPage()
         y = margin
-        
-        // Re-add header bar on new page
+
+        // Re-add header bar on new page (thin)
         pdf.setFillColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
-        pdf.rect(0, 0, pageWidth, 5, 'F')
+        pdf.rect(0, 0, pageWidth, 4, 'F')
         y = 15
       }
     })
@@ -449,7 +547,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     pdf.setFontSize(7)
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
-    pdf.text('⚠️ SPECIAL REQUESTS', margin + 4, y + 5)
+    pdf.text('SPECIAL REQUESTS', margin + 4, y + 5)
     
     pdf.setFontSize(9)
     pdf.setFont('helvetica', 'normal')
@@ -475,22 +573,31 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   pdf.setFontSize(10)
   pdf.setFont('helvetica', 'normal')
   pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
-  const paymentTermsText = (doc.payment_terms || 'as_agreed').replace(/_/g, ' ').toUpperCase()
+  const paymentTermsDisplay: Record<string, string> = {
+    'prepaid': 'PREPAID',
+    'credit': 'CREDIT TERMS',
+    'on_service': 'PAY ON SERVICE DATE',
+    'commission': 'COMMISSION BASED'
+  }
+  const paymentTermsText = doc.payment_terms ? (paymentTermsDisplay[doc.payment_terms] || doc.payment_terms.replace(/_/g, ' ').toUpperCase()) : 'TO BE CONFIRMED'
   pdf.text(paymentTermsText, margin + 4, y + 13)
   
   // Total (right)
   const totalBoxWidth = contentWidth * 0.4
   const totalBoxX = pageWidth - margin - totalBoxWidth
-  pdf.setFillColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
-  pdf.roundedRect(totalBoxX, y, totalBoxWidth, 18, 3, 3, 'F')
-  
+  pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
+  pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setLineWidth(0.8)
+  pdf.roundedRect(totalBoxX, y, totalBoxWidth, 18, 3, 3, 'FD')
+
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.white.r, BRAND.white.g, BRAND.white.b)
+  pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
   pdf.text('TOTAL AMOUNT', totalBoxX + 4, y + 5)
-  
+
   pdf.setFontSize(14)
   pdf.setFont('helvetica', 'bold')
+  pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
   pdf.text(`${doc.currency} ${doc.total_cost.toFixed(2)}`, totalBoxX + totalBoxWidth - 4, y + 14, { align: 'right' })
   
   y += 28

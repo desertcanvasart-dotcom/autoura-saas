@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/supabase-server'
+import { getMemoriesForPrompt, logAgentRun } from '@/lib/agent-memory'
+import { checkLimit, trackUsage } from '@/lib/billing-middleware'
 
 // Lazy-initialized Anthropic client (avoids build-time errors)
 let _anthropic: Anthropic | null = null
@@ -1083,9 +1085,10 @@ async function generateFromStructuredInput(
     attractionNames: string[]
     writingRules: WritingRule[]
     packageType?: PackageType
+    memoryPromptBlock?: string
   }
 ): Promise<any> {
-  const { tier, totalPax, language, attractionNames, writingRules, packageType } = params
+  const { tier, totalPax, language, attractionNames, writingRules, packageType, memoryPromptBlock } = params
   const writingContext = buildWritingRulesContext(writingRules)
 
   // Calculate expected number of days
@@ -1248,6 +1251,23 @@ PACKAGE: ${packageType || 'cruise-land'}
 
 NOW CONVERT THE ITINERARY TO JSON:`
 
+  // In structured mode, only inject pricing + supplier memories (not client preferences)
+  const structuredMemoryBlock = memoryPromptBlock
+    ? memoryPromptBlock
+        .split('\n')
+        .filter(line =>
+          line.includes('PRICING PATTERNS') ||
+          line.includes('SUPPLIER PREFERENCES') ||
+          line.startsWith('•') ||
+          line.startsWith('═')
+        )
+        .join('\n')
+    : ''
+
+  const fullPrompt = structuredMemoryBlock
+    ? prompt + '\n\n' + structuredMemoryBlock
+    : prompt
+
   console.log('🤖 Sending STRICT structured prompt to AI...')
 
   const message = await getAnthropic().messages.create({
@@ -1256,7 +1276,7 @@ NOW CONVERT THE ITINERARY TO JSON:`
     messages: [
       {
         role: 'user',
-        content: prompt
+        content: fullPrompt
       }
     ]
   })
@@ -1319,12 +1339,14 @@ async function generateCreativeItinerary(
     includeLunch: boolean
     includeDinner: boolean
     includeAccommodation: boolean
+    memoryPromptBlock?: string
   }
 ): Promise<any> {
   const {
     clientName, tourName, durationDays, tier, totalPax, numAdults, numChildren,
     language, cities, interests, specialRequests, startDate, effectiveCity,
-    attractionNames, contentContext, writingContext, includeLunch, includeDinner, includeAccommodation
+    attractionNames, contentContext, writingContext, includeLunch, includeDinner, includeAccommodation,
+    memoryPromptBlock
   } = params
 
   const prompt = `Create a ${durationDays}-day Egypt itinerary.
@@ -1386,13 +1408,18 @@ Return ONLY valid JSON:
 
 Use EXACT attraction names from the provided list. Set includes_hotel to false on the last day.`
 
+  // Append memory context if available
+  const fullPrompt = memoryPromptBlock
+    ? prompt + '\n\n' + memoryPromptBlock
+    : prompt
+
   const message = await getAnthropic().messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 8192,
     messages: [
       {
         role: 'user',
-        content: prompt
+        content: fullPrompt
       }
     ]
   })
@@ -1739,6 +1766,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Capture user ID once (reused for quota logging + run logging)
+    const { data: { user } } = await supabase.auth.getUser()
+    const userId = user?.id ?? null
+
+    // ── Quota check ──────────────────────────────────────────
+    const quotaCheck = await checkLimit(tenant_id, 'itinerary_runs', supabase)
+
+    if (!quotaCheck.allowed) {
+      // Log the rejected run for audit
+      await supabase.from('agent_runs').insert({
+        tenant_id,
+        agent_type: 'itinerary',
+        triggered_by: userId,
+        status: 'quota_exceeded',
+        input_summary: 'Blocked: monthly itinerary run limit reached',
+      })
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Monthly itinerary generation limit reached',
+          limit_reached: true,
+          limit: quotaCheck.limit,
+          current: quotaCheck.current,
+          plan_name: quotaCheck.plan_name,
+          upgrade_url: '/settings/billing/plans',
+        },
+        { status: 402 }
+      )
+    }
+    // ─────────────────────────────────────────────────────────
+
+    const runStartTime = Date.now()
+
     const body = await request.json()
     const userPrefs = await getUserPreferences(supabase)
     
@@ -1905,6 +1966,15 @@ export async function POST(request: NextRequest) {
     })
 
     const totalPax = num_adults + num_children
+
+    // ── Fetch + inject agent memory ──────────────────────────
+    const memoryResult = await getMemoriesForPrompt({
+      supabase,
+      tenant_id,
+      client_id: client_id || null,
+    })
+    console.log(`🧠 Injecting ${memoryResult.count} memories into prompt`)
+    // ─────────────────────────────────────────────────────────
 
     // Passport type
     let isEuroPassport = is_euro_passport
@@ -2169,6 +2239,27 @@ export async function POST(request: NextRequest) {
           })
         }
 
+        // ── Post-run logging + usage tracking (cruise path) ──
+        const cruiseRunDuration = Date.now() - runStartTime
+        const cruiseInputSummary = `${duration_days}d ${tier} ${effectivePackageType} · ${totalPax} pax · ${effectiveCity} · cruise`
+        const cruiseOutputSummary = `${itinerary.id} · ${duration_days} days · cost €${Math.round(totalClientPrice)}`
+
+        logAgentRun({
+          supabase,
+          tenant_id,
+          agent_type: 'itinerary',
+          triggered_by: userId,
+          itinerary_id: itinerary.id,
+          input_summary: cruiseInputSummary,
+          output_summary: cruiseOutputSummary,
+          duration_ms: cruiseRunDuration,
+          memories_injected: memoryResult.count,
+          status: 'success',
+        }).catch(console.error)
+
+        trackUsage(tenant_id, 'itinerary_runs', 1, supabase).catch(console.error)
+        // ─────────────────────────────────────────────────────
+
         return NextResponse.json({
           success: true,
           data: {
@@ -2288,7 +2379,8 @@ export async function POST(request: NextRequest) {
           language: finalLanguage,
           attractionNames,
           writingRules,
-          packageType: effectivePackageType
+          packageType: effectivePackageType,
+          memoryPromptBlock: memoryResult.prompt_block
         }
       )
     } else {
@@ -2313,7 +2405,8 @@ export async function POST(request: NextRequest) {
         writingContext,
         includeLunch: include_lunch,
         includeDinner: include_dinner,
-        includeAccommodation: includeAccommodationFinal
+        includeAccommodation: includeAccommodationFinal,
+        memoryPromptBlock: memoryResult.prompt_block
       })
     }
 
@@ -2763,6 +2856,27 @@ export async function POST(request: NextRequest) {
         partner_id: null
       })
     }
+
+    // ── Post-run logging + usage tracking (land path) ────
+    const landRunDuration = Date.now() - runStartTime
+    const landInputSummary = `${duration_days}d ${tier} ${effectivePackageType} · ${totalPax} pax · ${effectiveCity}${cruiseDetection.isCruise ? ' · cruise' : ''}`
+    const landOutputSummary = `${itinerary.id} · ${duration_days} days · cost €${Math.round(totalClientPrice)}`
+
+    logAgentRun({
+      supabase,
+      tenant_id,
+      agent_type: 'itinerary',
+      triggered_by: userId,
+      itinerary_id: itinerary.id,
+      input_summary: landInputSummary,
+      output_summary: landOutputSummary,
+      duration_ms: landRunDuration,
+      memories_injected: memoryResult.count,
+      status: 'success',
+    }).catch(console.error)
+
+    trackUsage(tenant_id, 'itinerary_runs', 1, supabase).catch(console.error)
+    // ─────────────────────────────────────────────────────
 
     return NextResponse.json({
       success: true,

@@ -6,7 +6,16 @@ import { requireAuth } from '@/lib/supabase-server'
  * Handles usage tracking and limit enforcement for metered features
  */
 
-export type MetricType = 'quotes' | 'whatsapp_messages' | 'gmail_emails' | 'pdfs' | 'api_calls' | 'team_members' | 'gmail_accounts'
+export type MetricType =
+  | 'quotes'
+  | 'whatsapp_messages'
+  | 'gmail_emails'
+  | 'pdfs'
+  | 'api_calls'
+  | 'team_members'
+  | 'gmail_accounts'
+  | 'itinerary_runs'   // AI Itinerary Agent invocations
+  | 'pricing_runs'     // AI Pricing Agent invocations
 
 export interface LimitCheckResult {
   allowed: boolean
@@ -61,7 +70,9 @@ export async function checkLimit(
           max_quotes_per_month,
           max_whatsapp_messages,
           max_team_members,
-          max_gmail_accounts
+          max_gmail_accounts,
+          max_itinerary_runs_per_month,
+          max_pricing_runs_per_month
         )
       `)
       .eq('tenant_id', tenantId)
@@ -88,10 +99,16 @@ export async function checkLimit(
         case 'gmail_accounts':
           limit = plan.max_gmail_accounts
           break
+        case 'itinerary_runs':
+          limit = plan.max_itinerary_runs_per_month
+          break
+        case 'pricing_runs':
+          limit = plan.max_pricing_runs_per_month
+          break
       }
 
       // Get current usage for display
-      if (['quotes', 'whatsapp_messages', 'gmail_emails', 'pdfs', 'api_calls'].includes(metric)) {
+      if (['quotes', 'whatsapp_messages', 'gmail_emails', 'pdfs', 'api_calls', 'itinerary_runs', 'pricing_runs'].includes(metric)) {
         const { data: usage } = await supabase
           .from('tenant_usage')
           .select('*')
@@ -117,6 +134,12 @@ export async function checkLimit(
               break
             case 'api_calls':
               current = usage.api_calls || 0
+              break
+            case 'itinerary_runs':
+              current = usage.itinerary_runs || 0
+              break
+            case 'pricing_runs':
+              current = usage.pricing_runs || 0
               break
           }
         }

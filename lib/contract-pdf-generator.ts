@@ -16,11 +16,13 @@ interface ContractData {
   destinations: string
   totalCost: number
   currency: string
+  inclusions?: string[]
+  exclusions?: string[]
 }
 
 export async function generateContractPDF(data: ContractData): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
-  const page = pdfDoc.addPage([595, 842]) // A4 size
+  let page = pdfDoc.addPage([595, 842]) // A4 size
   
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
@@ -81,32 +83,52 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   y -= 35
 
   // Inclusions
+  if (y < 80) {
+    page = pdfDoc.addPage([595, 842])
+    y = 842 - 50
+  }
   page.drawText('INCLUSIONS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
   y -= 18
-  const inclusions = [
-    '• Private transportation throughout',
-    '• Licensed Egyptologist guide',
-    '• Entrance fees to all sites',
-    '• Accommodation as specified',
-    '• Meals as mentioned',
-    '• All taxes and service charges'
-  ]
+  const inclusions = data.inclusions && data.inclusions.length > 0
+    ? data.inclusions.map(i => `• ${i}`)
+    : [
+      '• Private transportation throughout',
+      '• Licensed Egyptologist guide',
+      '• Entrance fees to all sites',
+      '• Accommodation as specified',
+      '• Meals as mentioned',
+      '• All taxes and service charges'
+    ]
   for (const item of inclusions) {
+    if (y < 60) {
+      page = pdfDoc.addPage([595, 842])
+      y = 842 - 50
+    }
     page.drawText(item, { x: 55, y, size: 10, font: helvetica })
     y -= 14
   }
   y -= 20
 
   // Exclusions
+  if (y < 80) {
+    page = pdfDoc.addPage([595, 842])
+    y = 842 - 50
+  }
   page.drawText('EXCLUSIONS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
   y -= 18
-  const exclusions = [
-    '• International flights',
-    '• Travel insurance',
-    '• Personal expenses',
-    '• Guide gratuities (optional)'
-  ]
+  const exclusions = data.exclusions && data.exclusions.length > 0
+    ? data.exclusions.map(e => `• ${e}`)
+    : [
+      '• International flights',
+      '• Travel insurance',
+      '• Personal expenses',
+      '• Guide gratuities (optional)'
+    ]
   for (const item of exclusions) {
+    if (y < 60) {
+      page = pdfDoc.addPage([595, 842])
+      y = 842 - 50
+    }
     page.drawText(item, { x: 55, y, size: 10, font: helvetica })
     y -= 14
   }

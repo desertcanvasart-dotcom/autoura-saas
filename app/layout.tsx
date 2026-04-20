@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { Inter } from "next/font/google"
 import "./globals.css"
 import Sidebar from "@/components/Sidebar"
+import ImpersonationBanner from "@/components/ImpersonationBanner"
 import { AuthProvider } from './contexts/AuthContext'
 import { TenantProvider } from './contexts/TenantContext'
 import { ConfirmDialogProvider } from '@/components/ConfirmDialog'
@@ -20,7 +21,8 @@ export default function RootLayout({
   
   // Pages that should NOT show the sidebar (public pages)
   const publicPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/terms', '/privacy', '/contact', '/integrations', '/about']
-  const isPublicPage = publicPages.includes(pathname)
+  const isPublicPage = publicPages.includes(pathname) || pathname.startsWith('/docs')
+  const isSuperAdminPage = pathname.startsWith('/super-admin')
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -28,11 +30,15 @@ export default function RootLayout({
         <AuthProvider>
           <TenantProvider>
             <ConfirmDialogProvider>
+              <ImpersonationBanner />
               {isPublicPage ? (
                 // Public pages - no sidebar
                 <main className="min-h-screen">
                   {children}
                 </main>
+              ) : isSuperAdminPage ? (
+                // Super admin pages - own layout handles sidebar
+                <>{children}</>
               ) : (
                 // App pages - with sidebar
                 <div className="flex h-screen overflow-hidden bg-gray-50">

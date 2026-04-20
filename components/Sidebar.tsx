@@ -51,7 +51,8 @@ import {
   Route,
   Package,
   Briefcase,
-  Tags
+  Tags,
+  Grid3x3
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -108,10 +109,11 @@ const navigation: NavSection[] = [
     key: 'communication',
     roles: ['admin', 'manager', 'agent'],
     items: [
+      { label: 'Communications', href: '/communications', icon: Mail },
       { label: 'Conversations', href: '/conversations', icon: MessageSquare },
       { label: 'Inbox', href: '/inbox', icon: Mail },
       { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageSquare },
-      { label: 'WhatsApp Parser', href: '/whatsapp-parser', icon: Send },
+      { label: 'Parser', href: '/whatsapp-parser', icon: Send },
       { label: 'Message Templates', href: '/templates', icon: FileText },
     ]
   },
@@ -173,6 +175,8 @@ const navigation: NavSection[] = [
       { label: 'Airport Services', href: '/rates/airport-services', icon: Plane },
       { label: 'Hotel Services', href: '/rates/hotel-services', icon: ConciergeBell },
       { label: 'Tipping', href: '/rates/tipping', icon: DollarSign },
+      { label: 'Fixed Costs', href: '/rates/fixed-costs', icon: DollarSign },
+      { label: 'Pricing Grid', href: '/pricing-grid', icon: Grid3x3 },
     ]
   },
   {
@@ -196,6 +200,7 @@ const navigation: NavSection[] = [
     roles: ['admin', 'manager'],
     items: [
       { label: 'Content Library', href: '/content-library', icon: Library },
+      { label: 'AI Prompts', href: '/content-library/prompts', icon: Library },
       { label: 'Writing Rules', href: '/content-library/rules', icon: BookOpen },
       { label: 'Documents', href: '/documents', icon: FileText },
     ]

@@ -14,6 +14,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/accounts-receivable': ['admin', 'manager'],
   '/accounts-payable': ['admin', 'manager'],
   '/rates': ['admin', 'manager'],
+  '/pricing-grid': ['admin', 'manager', 'agent'],
   '/hotels': ['admin', 'manager'],
   '/restaurants': ['admin', 'manager'],
   '/guides': ['admin', 'manager'],
@@ -30,6 +31,7 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/whatsapp-inbox': ['admin', 'manager', 'agent'],
   '/whatsapp-parser': ['admin', 'manager', 'agent'],
   '/contacts': ['admin', 'manager', 'agent'],
+  '/communications': ['admin', 'manager', 'agent'],
   '/followups': ['admin', 'manager', 'agent'],
   '/tours': ['admin', 'manager', 'agent'],
   '/expenses': ['admin', 'manager', 'agent'],
@@ -100,7 +102,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept', '/terms', '/privacy', '/contact']
+  const publicRoutes = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept', '/terms', '/privacy', '/contact', '/docs']
   const isPublicRoute = publicRoutes.some(route => 
     request.nextUrl.pathname === route || 
     (route !== '/' && request.nextUrl.pathname.startsWith(route))
@@ -125,7 +127,12 @@ export async function middleware(request: NextRequest) {
   
   if (user && !isPublicRoute && !isApiRoute) {
     const pathname = request.nextUrl.pathname
-    
+
+    // Super admin routes: only require authentication (super admin check at page/API level)
+    if (pathname.startsWith('/super-admin')) {
+      return response
+    }
+
     // Check if this route has permission restrictions
     const matchedRoute = Object.keys(ROUTE_PERMISSIONS).find(route => {
       return pathname === route || pathname.startsWith(route + '/')

@@ -1,4 +1,6 @@
 'use client'
+// @bulk-import
+import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -514,6 +516,7 @@ export default function HotelServicesPage() {
             <div className="w-1.5 h-1.5 rounded-full bg-rose-600" />
           </div>
           <div className="flex items-center gap-2">
+            <BulkRateImportExport tableName="hotel_staff_rates" onImportComplete={fetchRates} />
             <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
               <Download className="w-4 h-4" /> Export
             </button>

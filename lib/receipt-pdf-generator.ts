@@ -20,7 +20,7 @@ interface Invoice {
   currency: string
 }
 
-export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice) {
+export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice): jsPDF {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -149,6 +149,10 @@ export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice) {
   doc.setFont('helvetica', 'normal')
   doc.text('Travel2Egypt | www.travel2egypt.org | info@travel2egypt.org', pageWidth / 2, footerY, { align: 'center' })
 
-  // Save
+  return doc
+}
+
+export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice) {
+  const doc = generateReceiptPDF(receipt, invoice)
   doc.save(`Receipt-${receipt.receiptNumber}.pdf`)
 }

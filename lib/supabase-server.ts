@@ -8,6 +8,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { isSuperAdmin, IMPERSONATE_COOKIE } from '@/lib/super-admin';
 
 // Check if we're in build mode (no env vars available)
 const isBuildTime = !process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -87,6 +88,21 @@ export async function getUserTenantId() {
       status: 401,
       user: null,
       tenant_id: null,
+    };
+  }
+
+  // Check for super admin impersonation
+  const cookieStore = await cookies();
+  const impersonateTenantId = cookieStore.get(IMPERSONATE_COOKIE)?.value;
+
+  if (impersonateTenantId && user.email && isSuperAdmin(user.email)) {
+    // Super admin is impersonating a tenant — use that tenant_id
+    return {
+      error: null,
+      status: 200,
+      user,
+      tenant_id: impersonateTenantId,
+      role: 'admin', // Super admin gets admin role when impersonating
     };
   }
 

@@ -53,6 +53,16 @@ import {
   closestCenter
 } from '@dnd-kit/core'
 
+interface BookingResource {
+  id: string
+  resource_type: string
+  resource_id: string
+  resource_name: string
+  start_date: string
+  end_date: string
+  status: string
+}
+
 interface Booking {
   id: string
   itinerary_code: string
@@ -67,6 +77,7 @@ interface Booking {
   assigned_vehicle_id?: string | null
   guide_name?: string
   vehicle_name?: string
+  resources: BookingResource[]
 }
 
 interface Guide {
@@ -160,24 +171,57 @@ export default function CalendarPage() {
 
   const fetchData = async () => {
     try {
-      const bookingsResponse = await fetch('/api/itineraries')
-      const bookingsData = await bookingsResponse.json()
-      
+      const [bookingsResponse, resourcesResponse, guidesResponse, vehiclesResponse] = await Promise.all([
+        fetch('/api/itineraries'),
+        fetch('/api/itinerary-resources'),
+        fetch('/api/guides?is_active=true'),
+        fetch('/api/vehicles?is_active=true'),
+      ])
+
+      const [bookingsData, resourcesData, guidesData, vehiclesData] = await Promise.all([
+        bookingsResponse.json(),
+        resourcesResponse.json(),
+        guidesResponse.json(),
+        vehiclesResponse.json(),
+      ])
+
+      if (guidesData.success) setGuides(guidesData.data)
+      if (vehiclesData.success) setVehicles(vehiclesData.data)
+
       if (bookingsData.success) {
-        const validBookings = bookingsData.data.filter((b: Booking) => b.start_date && b.end_date)
+        // Build resource map: itinerary_id -> resources[]
+        const resourceMap = new Map<string, BookingResource[]>()
+        if (resourcesData.success && resourcesData.data) {
+          for (const r of resourcesData.data) {
+            const list = resourceMap.get(r.itinerary_id) || []
+            list.push({
+              id: r.id,
+              resource_type: r.resource_type,
+              resource_id: r.resource_id,
+              resource_name: r.resource_name || '',
+              start_date: r.start_date,
+              end_date: r.end_date,
+              status: r.status || 'confirmed',
+            })
+            resourceMap.set(r.itinerary_id, list)
+          }
+        }
+
+        // Enrich bookings with resource data
+        const validBookings = bookingsData.data
+          .filter((b: any) => b.start_date && b.end_date)
+          .map((b: any) => {
+            const resources = resourceMap.get(b.id) || []
+            const guide = resources.find(r => r.resource_type === 'guide')
+            const vehicle = resources.find(r => r.resource_type === 'vehicle')
+            return {
+              ...b,
+              resources,
+              guide_name: guide?.resource_name || null,
+              vehicle_name: vehicle?.resource_name || null,
+            }
+          })
         setBookings(validBookings)
-      }
-
-      const guidesResponse = await fetch('/api/guides?is_active=true')
-      const guidesData = await guidesResponse.json()
-      if (guidesData.success) {
-        setGuides(guidesData.data)
-      }
-
-      const vehiclesResponse = await fetch('/api/vehicles?is_active=true')
-      const vehiclesData = await vehiclesResponse.json()
-      if (vehiclesData.success) {
-        setVehicles(vehiclesData.data)
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -188,29 +232,38 @@ export default function CalendarPage() {
 
   const detectConflicts = () => {
     const conflictIds: string[] = []
-    
+
     for (let i = 0; i < bookings.length; i++) {
       for (let j = i + 1; j < bookings.length; j++) {
-        const booking1 = bookings[i]
-        const booking2 = bookings[j]
-        
-        const start1 = parseISO(booking1.start_date)
-        const end1 = parseISO(booking1.end_date)
-        const start2 = parseISO(booking2.start_date)
-        const end2 = parseISO(booking2.end_date)
-        
-        const overlaps = (
-          (start1 <= end2 && end1 >= start2) ||
-          (start2 <= end1 && end2 >= start1)
+        const b1 = bookings[i]
+        const b2 = bookings[j]
+
+        const start1 = parseISO(b1.start_date)
+        const end1 = parseISO(b1.end_date)
+        const start2 = parseISO(b2.start_date)
+        const end2 = parseISO(b2.end_date)
+
+        const datesOverlap = start1 <= end2 && end1 >= start2
+        if (!datesOverlap) continue
+
+        // Check if any resource is shared between the two bookings
+        const hasSharedResource = b1.resources.some(r1 =>
+          r1.resource_id && b2.resources.some(r2 =>
+            r2.resource_type === r1.resource_type && r2.resource_id === r1.resource_id
+          )
         )
-        
-        if (overlaps) {
-          if (!conflictIds.includes(booking1.id)) conflictIds.push(booking1.id)
-          if (!conflictIds.includes(booking2.id)) conflictIds.push(booking2.id)
+
+        // Also check legacy fields
+        const sharedGuide = b1.assigned_guide_id && b2.assigned_guide_id && b1.assigned_guide_id === b2.assigned_guide_id
+        const sharedVehicle = b1.assigned_vehicle_id && b2.assigned_vehicle_id && b1.assigned_vehicle_id === b2.assigned_vehicle_id
+
+        if (hasSharedResource || sharedGuide || sharedVehicle) {
+          if (!conflictIds.includes(b1.id)) conflictIds.push(b1.id)
+          if (!conflictIds.includes(b2.id)) conflictIds.push(b2.id)
         }
       }
     }
-    
+
     setConflicts(conflictIds)
   }
 
@@ -222,11 +275,19 @@ export default function CalendarPage() {
     }
 
     if (filters.guideId) {
-      filtered = filtered.filter(b => b.assigned_guide_id === filters.guideId)
+      if (filters.guideId === 'unassigned') {
+        filtered = filtered.filter(b => !b.assigned_guide_id && !b.resources.some(r => r.resource_type === 'guide'))
+      } else {
+        filtered = filtered.filter(b => b.assigned_guide_id === filters.guideId || b.resources.some(r => r.resource_type === 'guide' && r.resource_id === filters.guideId))
+      }
     }
 
     if (filters.vehicleId) {
-      filtered = filtered.filter(b => b.assigned_vehicle_id === filters.vehicleId)
+      if (filters.vehicleId === 'unassigned') {
+        filtered = filtered.filter(b => !b.assigned_vehicle_id && !b.resources.some(r => r.resource_type === 'vehicle'))
+      } else {
+        filtered = filtered.filter(b => b.assigned_vehicle_id === filters.vehicleId || b.resources.some(r => r.resource_type === 'vehicle' && r.resource_id === filters.vehicleId))
+      }
     }
 
     if (filters.searchQuery) {
@@ -1032,8 +1093,8 @@ function DraggableBooking({ booking, getStatusColor, conflicts }: any) {
       <div className="font-medium truncate flex items-center justify-between gap-1">
         <span className="truncate">{booking.client_name}</span>
         <div className="flex items-center gap-0.5 flex-shrink-0">
-          {booking.assigned_guide_id && <User className="w-3 h-3" />}
-          {booking.assigned_vehicle_id && <Car className="w-3 h-3" />}
+          {booking.guide_name && <span className="flex items-center gap-0.5" title={booking.guide_name}><User className="w-3 h-3" /></span>}
+          {booking.vehicle_name && <span className="flex items-center gap-0.5" title={booking.vehicle_name}><Car className="w-3 h-3" /></span>}
         </div>
       </div>
       <div className="text-xs opacity-90 truncate">{booking.itinerary_code}</div>
@@ -1093,16 +1154,16 @@ function WeekView({ currentDate, bookings, conflicts, getBookingsForDate, getSta
                       </div>
                       <div className="flex items-center gap-1.5 text-xs opacity-75">
                         <span>{booking.num_travelers} pax</span>
-                        {booking.assigned_guide_id && (
-                          <span className="flex items-center gap-0.5">
+                        {booking.guide_name && (
+                          <span className="flex items-center gap-0.5" title={booking.guide_name}>
                             <User className="w-3 h-3" />
-                            Guide
+                            {booking.guide_name.split(' ')[0]}
                           </span>
                         )}
-                        {booking.assigned_vehicle_id && (
-                          <span className="flex items-center gap-0.5">
+                        {booking.vehicle_name && (
+                          <span className="flex items-center gap-0.5" title={booking.vehicle_name}>
                             <Car className="w-3 h-3" />
-                            Vehicle
+                            {booking.vehicle_name.split(' ')[0]}
                           </span>
                         )}
                       </div>
@@ -1188,8 +1249,8 @@ function TimelineView({ bookings, conflicts, getStatusColor }: any) {
                     </Link>
                     <div className="text-xs text-gray-500 flex items-center gap-1.5">
                       <span>{booking.itinerary_code}</span>
-                      {booking.assigned_guide_id && <User className="w-3 h-3" />}
-                      {booking.assigned_vehicle_id && <Car className="w-3 h-3" />}
+                      {booking.guide_name && <span className="flex items-center gap-0.5" title={booking.guide_name}><User className="w-3 h-3" /></span>}
+                      {booking.vehicle_name && <span className="flex items-center gap-0.5" title={booking.vehicle_name}><Car className="w-3 h-3" /></span>}
                     </div>
                   </div>
                 </div>

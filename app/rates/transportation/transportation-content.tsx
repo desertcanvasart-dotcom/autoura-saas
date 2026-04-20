@@ -1,4 +1,6 @@
 'use client'
+// @bulk-import
+import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useState, useEffect, useCallback } from 'react'
 import {
@@ -614,6 +616,7 @@ export default function TransportationContent() {
           <h1 className="text-lg font-semibold text-gray-900">Transportation Rates</h1>
         </div>
         <div className="flex items-center gap-2">
+          <BulkRateImportExport tableName="transportation_rates" onImportComplete={fetchRates} />
           <button
             type="button"
             onClick={handleExportCSV}

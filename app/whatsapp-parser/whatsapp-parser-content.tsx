@@ -12,7 +12,7 @@ import {
   Crown, Star, Settings, Check, X, Hotel, Plane, Car, Ship,
   Sun, Map, Building2, Package, Anchor, Clock, BadgeCheck,
   Percent, Languages, ChevronDown, ChevronUp, Info, Edit3, Save,
-  Zap, Pencil, FileText, Wand2, ListChecks, AlertTriangle
+  Zap, Pencil, FileText, Wand2, ListChecks, AlertTriangle, Grid3X3
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -1420,6 +1420,25 @@ function WhatsAppParserContent() {
     await generateItineraryWithData(clientIdToUse, extractedData)
   }
 
+  // Redirect to Pricing Grid with extracted data
+  const sendToPricingGrid = () => {
+    if (!extractedData) return
+
+    const text = extractedData.raw_itinerary || conversation
+    const params = new URLSearchParams()
+    params.set('conversation', btoa(unescape(encodeURIComponent(text))))
+    if (extractedData.client_name) params.set('clientName', extractedData.client_name)
+    if (extractedData.client_email) params.set('email', extractedData.client_email)
+    if (extractedData.client_phone || phoneNumber) params.set('phone', extractedData.client_phone || phoneNumber)
+    if (extractedData.num_adults) params.set('pax', String(extractedData.num_adults + (extractedData.num_children || 0)))
+    if (selectedTier) params.set('tier', selectedTier)
+    if (extractedData.tour_name) params.set('tourName', extractedData.tour_name)
+    if (extractedData.nationality) params.set('nationality', extractedData.nationality)
+    if (selectedClientId) params.set('clientId', selectedClientId)
+
+    router.push(`/pricing-grid?${params.toString()}`)
+  }
+
   // ============================================
   // RENDER
   // ============================================
@@ -1637,8 +1656,21 @@ function WhatsAppParserContent() {
                   </div>
                 </div>
 
+                {/* Send to Pricing Grid */}
+                <div className="rounded-xl p-4 shadow-lg bg-gradient-to-r from-[#647C47] to-[#4f6339]">
+                  <p className="text-sm text-white/90 mb-3">
+                    Review the itinerary structure, edit services, then price it step by step.
+                  </p>
+                  <button
+                    onClick={sendToPricingGrid}
+                    className="w-full px-6 py-3 bg-white rounded-lg font-bold text-base text-[#647C47] hover:bg-green-50 flex items-center justify-center gap-2 transition-all shadow-md"
+                  >
+                    <Grid3X3 className="w-5 h-5" /> Send to Pricing Grid
+                  </button>
+                </div>
+
                 {/* NEW: Input Mode Selector */}
-                <InputModeSelector 
+                <InputModeSelector
                   mode={inputMode}
                   onChange={setInputMode}
                   autoDetected={autoDetectedMode}
