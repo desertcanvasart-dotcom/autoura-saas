@@ -6,7 +6,7 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "unset ANTHROPIC_API_KEY ANTHROPIC_BASE_URL && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
