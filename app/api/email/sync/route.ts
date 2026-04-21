@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
+import { generateDraftReplies } from '@/lib/copilot-suggest'
 
 function extractEmailAddress(from: string | null | undefined): string {
   if (!from) return ''
@@ -72,6 +74,10 @@ export async function POST(request: NextRequest) {
     const messageIds = response.data.messages || []
 
     const result = { success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0, history_id: null as string | null }
+
+    // Track conversation ids that received at least one new inbound message
+    // during this sync — used to fire opt-in pre-generation after the loop.
+    const conversationsWithNewInbound = new Set<string>()
 
     // Group by thread
     const threadMessages = new Map<string, any[]>()
@@ -147,9 +153,51 @@ export async function POST(request: NextRequest) {
               is_starred: message.labelIds?.includes('STARRED') || false, labels: message.labelIds, sent_at: msgDate,
             })
             result.messages_created++
+            // Track conversations that received new inbound messages for pre-generation
+            if (msgDir === 'inbound') {
+              conversationsWithNewInbound.add(conversationId)
+            }
           }
         }
       } catch {}
+    }
+
+    // ============================================
+    // Draft-only pre-generation for new inbound emails (opt-in per tenant)
+    // ============================================
+    if (conversationsWithNewInbound.size > 0) {
+      try {
+        const { data: features } = await supabase
+          .from('tenant_features')
+          .select('copilot_pregenerate_enabled')
+          .eq('tenant_id', tenant_id)
+          .single()
+
+        if (features?.copilot_pregenerate_enabled) {
+          const convIds = Array.from(conversationsWithNewInbound)
+          after(async () => {
+            // Serialize to avoid hammering Claude; cap at 10 per sync to stay sensible.
+            const capped = convIds.slice(0, 10)
+            for (const cid of capped) {
+              try {
+                await generateDraftReplies({
+                  supabase: supabase as any,
+                  tenantId: tenant_id,
+                  channel: 'email',
+                  emailConversationId: cid,
+                  reviewerUserId: null,
+                  count: 2,
+                  skipIfPendingExists: true,
+                })
+              } catch (err: any) {
+                console.error('Pre-generation (email) failed for conv', cid, err?.message)
+              }
+            }
+          })
+        }
+      } catch (flagErr) {
+        console.error('Pregenerate flag check failed:', flagErr)
+      }
     }
 
     // Update sync state

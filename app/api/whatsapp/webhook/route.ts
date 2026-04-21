@@ -8,10 +8,12 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { createClient } from '@/app/supabase'
 import twilio from 'twilio'
 import { processIncomingMessage } from '@/lib/whatsapp-ai-agent'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { generateDraftReplies } from '@/lib/copilot-suggest'
 
 export async function POST(request: NextRequest) {
   try {
@@ -328,6 +330,42 @@ export async function POST(request: NextRequest) {
       }
     } else if (!process.env.WHATSAPP_AI_ENABLED) {
       console.log('ℹ️ AI auto-response disabled. Set WHATSAPP_AI_ENABLED=true to enable.')
+    }
+
+    // ============================================
+    // STEP 5: Draft-only pre-generation (opt-in per tenant)
+    // ============================================
+    // Respond to Twilio first, then run suggest-reply post-response so the
+    // webhook doesn't block. Drafts go into communication_drafts with
+    // status='pending' — NOT auto-sent. Gated by copilot_pregenerate_enabled.
+    if (tenantId && conversationId && body) {
+      try {
+        const { data: features } = await supabase
+          .from('tenant_features')
+          .select('copilot_pregenerate_enabled')
+          .eq('tenant_id', tenantId)
+          .single()
+
+        if (features?.copilot_pregenerate_enabled) {
+          after(async () => {
+            try {
+              await generateDraftReplies({
+                supabase: supabase as any,
+                tenantId: tenantId!,
+                channel: 'whatsapp',
+                whatsappConversationId: conversationId!,
+                reviewerUserId: null,
+                count: 2,
+                skipIfPendingExists: true,
+              })
+            } catch (err: any) {
+              console.error('Pre-generation (whatsapp) failed:', err?.message || err)
+            }
+          })
+        }
+      } catch (flagErr) {
+        console.error('Pregenerate flag check failed:', flagErr)
+      }
     }
 
     // Respond to Twilio with 200 OK

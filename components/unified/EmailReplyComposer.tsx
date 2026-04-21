@@ -56,6 +56,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
   const [panelError, setPanelError] = useState<string | null>(null)
   const [lastParentId, setLastParentId] = useState<string | null>(null)
   const [acceptedDraftId, setAcceptedDraftId] = useState<string | null>(null)
+  const [fromPregenerate, setFromPregenerate] = useState(false)
 
   const [signatures, setSignatures] = useState<Signature[]>([])
   const [signatureId, setSignatureId] = useState<string | null>(null)
@@ -91,6 +92,18 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
     setRetrievedCount(0)
     setLastParentId(null)
     setAcceptedDraftId(null)
+    setFromPregenerate(false)
+    // Fetch any pre-generated drafts for this conversation
+    fetch(`/api/ai/suggest-email-reply?email_conversation_id=${conversation.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.success && data.drafts?.length > 0) {
+          setDrafts(data.drafts)
+          setLastParentId(data.drafts[0]?.id || null)
+          setFromPregenerate(data.drafts.some((d: any) => d.ai_flags?.pregenerated))
+        }
+      })
+      .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id, signatures.length])
 
@@ -130,6 +143,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
         setTone(data.tone || null)
         setRetrievedCount(data.retrieved_count || 0)
         setLastParentId(data.drafts?.[0]?.id || null)
+        setFromPregenerate(false)
       }
     } catch (e: any) {
       setPanelError(e?.message || 'Network error')
@@ -267,6 +281,11 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
             {retrievedCount > 0 && (
               <span className="text-purple-600 bg-purple-50 border border-purple-100 rounded-full px-1.5 py-0.5 text-[10px]">
                 {retrievedCount} memory match{retrievedCount === 1 ? '' : 'es'}
+              </span>
+            )}
+            {fromPregenerate && drafts.length > 0 && (
+              <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-[10px]">
+                ready
               </span>
             )}
           </div>

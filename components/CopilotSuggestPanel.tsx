@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Sparkles, Loader2, RefreshCw, X, Check } from 'lucide-react'
 
 interface Draft {
@@ -23,6 +23,26 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
   const [tone, setTone] = useState<'professional' | 'friendly' | 'formal' | null>(null)
   const [lastParentId, setLastParentId] = useState<string | null>(null)
   const [retrievedCount, setRetrievedCount] = useState<number>(0)
+  const [fromPregenerate, setFromPregenerate] = useState(false)
+
+  // On conversation change, check for any pre-generated drafts waiting
+  useEffect(() => {
+    if (!whatsappConversationId) { setDrafts([]); setFromPregenerate(false); return }
+    fetch(`/api/ai/suggest-reply?whatsapp_conversation_id=${whatsappConversationId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.success && data.drafts?.length > 0) {
+          setDrafts(data.drafts)
+          setLastParentId(data.drafts[0]?.id || null)
+          // Detect pre-generated drafts via ai_flags.pregenerated
+          setFromPregenerate(data.drafts.some((d: any) => d.ai_flags?.pregenerated))
+        } else {
+          setDrafts([])
+          setFromPregenerate(false)
+        }
+      })
+      .catch(() => {})
+  }, [whatsappConversationId])
 
   const generate = async (regenerate = false) => {
     if (!whatsappConversationId || loading) return
@@ -47,6 +67,7 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
         setTone(data.tone || null)
         setLastParentId(data.drafts?.[0]?.id || null)
         setRetrievedCount(data.retrieved_count || 0)
+        setFromPregenerate(false)
       }
     } catch (e: any) {
       setError(e?.message || 'Network error')
@@ -107,6 +128,11 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
           {retrievedCount > 0 && (
             <span className="text-purple-600 bg-purple-50 border border-purple-100 rounded-full px-1.5 py-0.5 text-[10px]">
               {retrievedCount} memory match{retrievedCount === 1 ? '' : 'es'}
+            </span>
+          )}
+          {fromPregenerate && drafts.length > 0 && (
+            <span className="text-green-700 bg-green-50 border border-green-100 rounded-full px-1.5 py-0.5 text-[10px]">
+              ready
             </span>
           )}
         </div>
