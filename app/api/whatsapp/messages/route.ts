@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { indexWhatsAppReply } from '@/lib/copilot-indexer'
 import twilio from 'twilio'
 
 const twilioClient = twilio(
@@ -145,6 +146,20 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (saveError) throw saveError
+
+    // Auto-index this agent reply into the copilot knowledge base so future
+    // suggestions can learn from it. Non-fatal on failure.
+    if (savedMessage?.tenant_id && savedMessage?.id) {
+      await indexWhatsAppReply({
+        supabase,
+        tenantId: savedMessage.tenant_id,
+        conversationId: convId,
+        outboundMessageId: savedMessage.id,
+        outboundText: message,
+        outboundSentAt: savedMessage.sent_at,
+        isAiGenerated: false,
+      }).catch(() => {})
+    }
 
     return NextResponse.json({
       success: true,

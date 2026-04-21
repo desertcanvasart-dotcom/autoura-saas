@@ -22,6 +22,7 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
   const [error, setError] = useState<string | null>(null)
   const [tone, setTone] = useState<'professional' | 'friendly' | 'formal' | null>(null)
   const [lastParentId, setLastParentId] = useState<string | null>(null)
+  const [retrievedCount, setRetrievedCount] = useState<number>(0)
 
   const generate = async (regenerate = false) => {
     if (!whatsappConversationId || loading) return
@@ -45,6 +46,7 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
         setDrafts(data.drafts || [])
         setTone(data.tone || null)
         setLastParentId(data.drafts?.[0]?.id || null)
+        setRetrievedCount(data.retrieved_count || 0)
       }
     } catch (e: any) {
       setError(e?.message || 'Network error')
@@ -102,6 +104,11 @@ export default function CopilotSuggestPanel({ whatsappConversationId, onAccept, 
           <Sparkles className="w-3.5 h-3.5 text-purple-600" />
           <span className="font-medium text-gray-700">AI Copilot</span>
           {tone && <span className="text-gray-400">· {tone}</span>}
+          {retrievedCount > 0 && (
+            <span className="text-purple-600 bg-purple-50 border border-purple-100 rounded-full px-1.5 py-0.5 text-[10px]">
+              {retrievedCount} memory match{retrievedCount === 1 ? '' : 'es'}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {drafts.length > 0 && (

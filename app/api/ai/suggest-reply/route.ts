@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/supabase-server'
+import { retrieveKnowledge, formatRetrievalContext, type RetrievedItem } from '@/lib/copilot-retrieval'
 
 const MODEL = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
 const BUSINESS_NAME = process.env.BUSINESS_NAME || 'Travel2Egypt'
@@ -183,6 +184,16 @@ export async function POST(request: NextRequest) {
       .map((m) => `${m.direction === 'inbound' ? 'Customer' : 'Agent'}: ${m.text}`)
       .join('\n')
 
+    // ---------- Semantic retrieval (tenant-scoped RAG) ----------
+    let retrieved: RetrievedItem[] = []
+    let retrievalContext = ''
+    try {
+      retrieved = await retrieveKnowledge(supabase, tenant_id, latestInbound.text, { limit: 6 })
+      retrievalContext = formatRetrievalContext(retrieved)
+    } catch (ragErr: any) {
+      console.error('RAG retrieval failed (continuing without context):', ragErr?.message)
+    }
+
     const systemPrompt = `You are an AI reply assistant for a travel agency named "${BUSINESS_NAME}". You help a human agent draft WhatsApp replies to customers.
 
 TONE: ${tone}
@@ -213,6 +224,9 @@ Generate exactly ${count} distinct draft reply option${count === 1 ? '' : 's'}. 
       `Conversation so far (most recent last):\n${transcript}`,
       `\nLatest customer message to reply to:\n"${latestInbound.text}"`,
     ]
+    if (retrievalContext) {
+      userPromptParts.push(`\n---\n${retrievalContext}\n---\nUse the knowledge above where it directly answers the customer. Do NOT copy past replies verbatim — use them as style and factual reference.`)
+    }
     if (user_instruction) userPromptParts.push(`\nAgent guidance for this round: ${user_instruction}`)
     if (parent_draft_id) userPromptParts.push(`\nThe previous drafts were dismissed. Offer different angles this time.`)
 
@@ -280,7 +294,11 @@ Generate exactly ${count} distinct draft reply option${count === 1 ? '' : 's'}. 
       ai_model: MODEL,
       ai_confidence: d.confidence === 'high' || d.confidence === 'medium' || d.confidence === 'low' ? d.confidence : 'medium',
       ai_flags: { tone, rationale: d.rationale || null, instruction: user_instruction || null },
-      context_used: { message_count: messages.length, latest_sid: latestInbound.sid || null },
+      context_used: {
+        message_count: messages.length,
+        latest_sid: latestInbound.sid || null,
+        retrieved: retrieved.map((r) => ({ id: r.id, type: r.source_type, similarity: Number(r.similarity.toFixed(3)) })),
+      },
       generation_time_ms: generationTimeMs,
       status: 'pending',
       send_channel: 'whatsapp',
@@ -312,6 +330,11 @@ Generate exactly ${count} distinct draft reply option${count === 1 ? '' : 's'}. 
       tone,
       drafts: inserted,
       generation_time_ms: generationTimeMs,
+      retrieved_count: retrieved.length,
+      retrieved_types: retrieved.reduce((acc: Record<string, number>, r) => {
+        acc[r.source_type] = (acc[r.source_type] || 0) + 1
+        return acc
+      }, {}),
     })
   } catch (err: any) {
     console.error('suggest-reply error:', err)
