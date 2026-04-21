@@ -63,12 +63,13 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [attachErr, setAttachErr] = useState<string | null>(null)
 
-  // Fetch signatures once per user
+  // Fetch signatures once per user (API scopes by auth session)
   useEffect(() => {
-    fetch(`/api/email/signatures?userId=${userId}`)
+    fetch('/api/email/signatures')
       .then((r) => r.json())
       .then((data) => {
-        const sigs: Signature[] = data?.signatures || []
+        if (!data?.success) return
+        const sigs: Signature[] = data.signatures || []
         setSignatures(sigs)
         const def = sigs.find((s) => s.is_default) || sigs[0] || null
         setSignatureId(def?.id || null)
