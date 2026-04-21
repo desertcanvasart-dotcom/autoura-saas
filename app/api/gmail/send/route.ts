@@ -126,29 +126,30 @@ export async function POST(request: NextRequest) {
     // ============================================
     // Persist outbound into email_messages + index + mark draft sent
     // Best-effort: never fail the send if post-processing errors.
+    // conversationId is the unified_conversations.id (canonical).
     // ============================================
     if (conversationId && response.data.id) {
       try {
-        // Look up tenant + thread from the conversation
+        // Look up tenant + conversation from unified_conversations
         const { data: conv } = await (authClient as any)
-          .from('email_conversations')
-          .select('id, thread_id, tenant_id, client_id')
+          .from('unified_conversations')
+          .select('id, tenant_id, client_id, contact_email')
           .eq('id', conversationId)
           .single()
 
         const sentAt = new Date().toISOString()
-        let insertedMessageId: string | null = null
 
         if (conv) {
           const { data: inserted, error: insertErr } = await (authClient as any)
             .from('email_messages')
             .insert({
-              conversation_id: conv.id,
-              message_id: response.data.id,
-              thread_id: threadId || conv.thread_id,
+              tenant_id: conv.tenant_id,
+              unified_conversation_id: conv.id,
+              gmail_message_id: response.data.id,
+              gmail_thread_id: threadId || null,
               direction: 'outbound',
-              from_address: user.email || '',
-              to_addresses: Array.isArray(to) ? to : [to],
+              from_email: user.email || '',
+              to_email: Array.isArray(to) ? to[0] : to,
               subject,
               body_text: bodyTextClean,
               body_html: body,
@@ -162,8 +163,6 @@ export async function POST(request: NextRequest) {
           if (insertErr && insertErr.code !== '23505') {
             console.error('Email outbound persist failed:', insertErr.message)
           } else if (inserted?.id) {
-            insertedMessageId = inserted.id
-
             // Fire-and-await: index the reply pair for RAG (use plain text so
             // the embedding reflects prose, not HTML tags)
             await indexEmailReply({
@@ -178,12 +177,13 @@ export async function POST(request: NextRequest) {
               clientId: conv.client_id || null,
             }).catch(() => {})
 
-            // Bump conversation summary fields
+            // Bump conversation summary fields on unified_conversations
             await (authClient as any)
-              .from('email_conversations')
+              .from('unified_conversations')
               .update({
-                last_message_snippet: bodyTextClean.slice(0, 160),
                 last_message_at: sentAt,
+                last_message_preview: bodyTextClean.slice(0, 160),
+                last_message_channel: 'email',
               })
               .eq('id', conv.id)
           }

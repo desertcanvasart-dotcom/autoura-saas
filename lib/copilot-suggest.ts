@@ -82,6 +82,9 @@ interface SuggestArgs {
   tenantId: string
   channel: Channel
   whatsappConversationId?: string
+  // The canonical customer-scoped conversation id (unified_conversations.id).
+  // For backwards compat, callers may still pass emailConversationId (deprecated alias).
+  unifiedConversationId?: string
   emailConversationId?: string
   reviewerUserId?: string | null    // null on pre-generation (no user context)
   count?: number
@@ -96,24 +99,25 @@ interface SuggestArgs {
 export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestResult> {
   const {
     supabase, tenantId, channel,
-    whatsappConversationId, emailConversationId,
+    whatsappConversationId,
     reviewerUserId = null,
     count = 2,
     parentDraftId = null,
     instruction = null,
     skipIfPendingExists = false,
   } = args
+  const unifiedConversationId = args.unifiedConversationId ?? args.emailConversationId
 
   if (channel === 'whatsapp' && !whatsappConversationId) {
     return { success: false, error: 'whatsappConversationId required for WhatsApp channel' }
   }
-  if (channel === 'email' && !emailConversationId) {
-    return { success: false, error: 'emailConversationId required for email channel' }
+  if (channel === 'email' && !unifiedConversationId) {
+    return { success: false, error: 'unifiedConversationId required for email channel' }
   }
 
   const ctx = channel === 'whatsapp'
     ? await loadWhatsAppContext(supabase, tenantId, whatsappConversationId!)
-    : await loadEmailContext(supabase, tenantId, emailConversationId!)
+    : await loadEmailContext(supabase, tenantId, unifiedConversationId!)
 
   if (!ctx.ok) return { success: false, error: ctx.error }
 
@@ -395,27 +399,27 @@ async function loadWhatsAppContext(
 }
 
 async function loadEmailContext(
-  supabase: SupabaseClient, tenantId: string, emailConversationId: string
+  supabase: SupabaseClient, tenantId: string, unifiedConversationId: string
 ): Promise<LoadedContext> {
   const { data: conv } = await supabase
-    .from('email_conversations')
-    .select('id, thread_id, tenant_id, client_id, client_email, client_name, subject')
-    .eq('id', emailConversationId)
+    .from('unified_conversations')
+    .select('id, tenant_id, client_id, contact_name, contact_email')
+    .eq('id', unifiedConversationId)
     .single()
   if (!conv || conv.tenant_id !== tenantId) return { ok: false, error: 'Conversation not found' }
 
   const { data: rawMessages } = await supabase
     .from('email_messages')
-    .select('message_id, direction, from_address, subject, body_text, snippet, sent_at')
-    .eq('conversation_id', emailConversationId)
+    .select('gmail_message_id, gmail_thread_id, direction, from_email, subject, body_text, snippet, sent_at')
+    .eq('unified_conversation_id', unifiedConversationId)
     .order('sent_at', { ascending: false })
     .limit(10)
 
   const messages = (rawMessages || [])
     .map((m: any) => ({
-      message_id: m.message_id,
+      message_id: m.gmail_message_id,
       direction: m.direction,
-      from: m.from_address,
+      from: m.from_email,
       subject: m.subject || '',
       text: (m.body_text || m.snippet || '').trim(),
       sent_at: m.sent_at,
@@ -427,14 +431,18 @@ async function loadEmailContext(
   const latestInbound = [...messages].reverse().find((m) => m.direction === 'inbound')
   if (!latestInbound) return { ok: false, error: 'No inbound message to reply to' }
 
-  // Thread
+  // Most recent thread subject comes from the latest message; unified_conversations
+  // doesn't store one.
+  const threadSubject = [...messages].reverse().find((m) => m.subject)?.subject || null
+
+  // Thread (communication_threads)
   let threadId: string
   const { data: existingThread } = await supabase
     .from('communication_threads')
     .select('id')
     .eq('tenant_id', tenantId)
     .eq('channel', 'email')
-    .eq('email_conversation_id', emailConversationId)
+    .eq('unified_conversation_id', unifiedConversationId)
     .maybeSingle()
 
   if (existingThread?.id) {
@@ -443,11 +451,17 @@ async function loadEmailContext(
     const { data: newThread } = await supabase
       .from('communication_threads')
       .insert({
-        tenant_id: tenantId, channel: 'email', email_conversation_id: emailConversationId,
-        client_id: conv.client_id, client_name: conv.client_name,
-        contact_info: conv.client_email || 'unknown', subject: conv.subject,
-        status: 'open', urgency: 'normal',
-        last_message_at: new Date().toISOString(), message_count: 0,
+        tenant_id: tenantId,
+        channel: 'email',
+        unified_conversation_id: unifiedConversationId,
+        client_id: conv.client_id,
+        client_name: conv.contact_name,
+        contact_info: conv.contact_email || 'unknown',
+        subject: threadSubject,
+        status: 'open',
+        urgency: 'normal',
+        last_message_at: new Date().toISOString(),
+        message_count: 0,
       })
       .select('id').single()
     if (!newThread) return { ok: false, error: 'Failed to create thread' }
@@ -474,7 +488,8 @@ async function loadEmailContext(
       .insert({
         tenant_id: tenantId, thread_id: threadId, channel: 'email',
         source_message_id: latestInbound.message_id,
-        sender_name: conv.client_name, sender_contact: latestInbound.from || conv.client_email,
+        sender_name: conv.contact_name,
+        sender_contact: latestInbound.from || conv.contact_email,
         message_body: latestInbound.text, message_snippet: snippet,
         subject: latestInbound.subject, status: 'draft_pending',
         received_at: latestInbound.sent_at || new Date().toISOString(),
@@ -500,7 +515,7 @@ async function loadEmailContext(
     transcript,
     latestInboundText: latestInbound.text,
     latestInboundSubject: latestInbound.subject,
-    threadSubject: conv.subject,
+    threadSubject,
   }
 }
 

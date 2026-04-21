@@ -94,7 +94,7 @@ export async function indexWhatsAppReply(args: IndexWhatsAppReplyArgs): Promise<
 interface IndexEmailReplyArgs {
   supabase: SupabaseClient
   tenantId: string
-  conversationId: string              // email_conversations.id
+  conversationId: string              // unified_conversations.id (canonical)
   outboundMessageId: string           // email_messages.id for the reply row
   outboundSourceMessageId?: string | null // Gmail message_id (for audit)
   outboundSubject?: string | null
@@ -122,8 +122,8 @@ export async function indexEmailReply(args: IndexEmailReplyArgs): Promise<string
     const before = outboundSentAt || new Date().toISOString()
     const { data: inbound } = await supabase
       .from('email_messages')
-      .select('subject, body_text, snippet, from_address, sent_at')
-      .eq('conversation_id', conversationId)
+      .select('subject, body_text, snippet, from_email, sent_at')
+      .eq('unified_conversation_id', conversationId)
       .eq('direction', 'inbound')
       .lt('sent_at', before)
       .order('sent_at', { ascending: false })
@@ -155,7 +155,7 @@ export async function indexEmailReply(args: IndexEmailReplyArgs): Promise<string
         answer_text: answerText,
         metadata: {
           channel: 'email',
-          email_conversation_id: conversationId,
+          unified_conversation_id: conversationId,
           email_message_id: outboundMessageId,
           gmail_message_id: outboundSourceMessageId,
           client_id: clientId,

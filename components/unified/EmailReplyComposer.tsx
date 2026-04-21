@@ -94,7 +94,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
     setAcceptedDraftId(null)
     setFromPregenerate(false)
     // Fetch any pre-generated drafts for this conversation
-    fetch(`/api/ai/suggest-email-reply?email_conversation_id=${conversation.id}`)
+    fetch(`/api/ai/suggest-email-reply?unified_conversation_id=${conversation.id}`)
       .then((r) => r.json())
       .then((data) => {
         if (data?.success && data.drafts?.length > 0) {
@@ -129,7 +129,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email_conversation_id: conversation.id,
+          unified_conversation_id: conversation.id,
           count: 2,
           parent_draft_id: regenerate ? lastParentId : null,
         }),

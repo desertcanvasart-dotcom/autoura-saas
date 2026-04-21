@@ -17,18 +17,20 @@ export async function POST(request: NextRequest) {
     const { supabase, tenant_id, user } = auth
 
     const body = await request.json().catch(() => ({}))
-    const email_conversation_id: string | undefined = body.email_conversation_id
+    // Canonical param is unified_conversation_id; keep email_conversation_id as a deprecated alias.
+    const unified_conversation_id: string | undefined =
+      body.unified_conversation_id || body.email_conversation_id
     const count: number = Math.min(3, Math.max(1, Number(body.count) || 2))
     const parent_draft_id: string | null = body.parent_draft_id || null
     const instruction: string | null = body.instruction || null
 
-    if (!email_conversation_id) {
-      return NextResponse.json({ success: false, error: 'email_conversation_id required' }, { status: 400 })
+    if (!unified_conversation_id) {
+      return NextResponse.json({ success: false, error: 'unified_conversation_id required' }, { status: 400 })
     }
 
     const result = await generateDraftReplies({
       supabase, tenantId: tenant_id, channel: 'email',
-      emailConversationId: email_conversation_id,
+      unifiedConversationId: unified_conversation_id,
       reviewerUserId: user.id,
       count, parentDraftId: parent_draft_id, instruction,
       skipIfPendingExists: false,
@@ -60,9 +62,11 @@ export async function GET(request: NextRequest) {
   }
   const { supabase, tenant_id } = auth
 
-  const emailConvId = request.nextUrl.searchParams.get('email_conversation_id')
-  if (!emailConvId) {
-    return NextResponse.json({ success: false, error: 'email_conversation_id required' }, { status: 400 })
+  const unifiedConvId =
+    request.nextUrl.searchParams.get('unified_conversation_id') ||
+    request.nextUrl.searchParams.get('email_conversation_id')
+  if (!unifiedConvId) {
+    return NextResponse.json({ success: false, error: 'unified_conversation_id required' }, { status: 400 })
   }
 
   const { data: thread } = await supabase
@@ -70,7 +74,7 @@ export async function GET(request: NextRequest) {
     .select('id')
     .eq('tenant_id', tenant_id)
     .eq('channel', 'email')
-    .eq('email_conversation_id', emailConvId)
+    .eq('unified_conversation_id', unifiedConvId)
     .maybeSingle()
 
   if (!thread?.id) {

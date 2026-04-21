@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
                   supabase: supabase as any,
                   tenantId: tenant_id,
                   channel: 'email',
-                  emailConversationId: cid,
+                  unifiedConversationId: cid,
                   reviewerUserId: null,
                   count: 2,
                   skipIfPendingExists: true,
