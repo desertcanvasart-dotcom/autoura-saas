@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      userId, to, subject, body, threadId, attachments,
+      userId, to, subject, body, body_text: bodyTextParam, threadId, attachments,
       conversation_id: conversationId,
       draft_id: draftId,
     } = await request.json()
@@ -57,6 +57,12 @@ export async function POST(request: NextRequest) {
     if (!userId || !to || !subject || !body) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+
+    // Plain-text version for body_text column + RAG indexing. Client may send
+    // one; fall back to a server-side strip if not.
+    const bodyTextClean = (bodyTextParam && typeof bodyTextParam === 'string' && bodyTextParam.trim())
+      ? bodyTextParam.trim()
+      : stripHtmlServer(body).trim()
 
     // Verify authenticated user matches requested userId
     if (user.id !== userId) {
@@ -144,8 +150,9 @@ export async function POST(request: NextRequest) {
               from_address: user.email || '',
               to_addresses: Array.isArray(to) ? to : [to],
               subject,
-              body_text: body,
-              snippet: (body || '').slice(0, 200),
+              body_text: bodyTextClean,
+              body_html: body,
+              snippet: bodyTextClean.slice(0, 200),
               sent_at: sentAt,
               is_read: true,
             })
@@ -157,7 +164,8 @@ export async function POST(request: NextRequest) {
           } else if (inserted?.id) {
             insertedMessageId = inserted.id
 
-            // Fire-and-await: index the reply pair for RAG
+            // Fire-and-await: index the reply pair for RAG (use plain text so
+            // the embedding reflects prose, not HTML tags)
             await indexEmailReply({
               supabase: authClient as any,
               tenantId: conv.tenant_id,
@@ -165,7 +173,7 @@ export async function POST(request: NextRequest) {
               outboundMessageId: inserted.id,
               outboundSourceMessageId: response.data.id,
               outboundSubject: subject,
-              outboundBody: body,
+              outboundBody: bodyTextClean,
               outboundSentAt: sentAt,
               clientId: conv.client_id || null,
             }).catch(() => {})
@@ -174,9 +182,8 @@ export async function POST(request: NextRequest) {
             await (authClient as any)
               .from('email_conversations')
               .update({
-                last_message_snippet: (body || '').slice(0, 160),
+                last_message_snippet: bodyTextClean.slice(0, 160),
                 last_message_at: sentAt,
-                message_count: undefined, // let downstream sync recompute if desired
               })
               .eq('id', conv.id)
           }
@@ -194,7 +201,7 @@ export async function POST(request: NextRequest) {
             body: JSON.stringify({
               action: 'mark_sent',
               send_message_id: response.data.id,
-              edited_body: body,
+              edited_body: bodyTextClean,
             }),
           }).catch(() => {})
         }
@@ -208,6 +215,28 @@ export async function POST(request: NextRequest) {
     console.error('Send email error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
+}
+
+/**
+ * Minimal server-side HTML stripper. Only used as a fallback when the client
+ * didn't send an explicit plain-text version — keeps Gmail, DB, and RAG
+ * bodies consistent regardless of who constructed the request.
+ */
+function stripHtmlServer(html: string): string {
+  if (!html) return ''
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+    .replace(/<li[^>]*>/gi, '\n• ')
+    .replace(/<\/li>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function buildSimpleEmail(to: string, subject: string, body: string): string {
