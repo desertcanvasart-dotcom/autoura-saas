@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Loader2, Mail, Star, Archive, User, Send } from 'lucide-react'
+import EmailReplyComposer from './EmailReplyComposer'
+import { useAuth } from '@/app/contexts/AuthContext'
 
 interface Message {
   id: string
@@ -35,9 +37,18 @@ interface Props {
 }
 
 export default function UnifiedMessageThread({ conversation, onConversationUpdate }: Props) {
+  const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const refreshMessages = () => {
+    if (!conversation) return
+    fetch(`/api/email/messages?conversation_id=${conversation.id}`)
+      .then(res => res.json())
+      .then(data => { if (data.success) setMessages(data.messages || []) })
+      .catch(() => {})
+  }
 
   useEffect(() => {
     if (!conversation) { setMessages([]); return }
@@ -144,6 +155,15 @@ export default function UnifiedMessageThread({ conversation, onConversationUpdat
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Inline reply composer with AI copilot */}
+      {user?.id && (
+        <EmailReplyComposer
+          conversation={conversation}
+          userId={user.id}
+          onSent={refreshMessages}
+        />
+      )}
     </div>
   )
 }

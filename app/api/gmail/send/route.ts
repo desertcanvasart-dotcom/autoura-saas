@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { refreshAccessToken } from '@/lib/gmail'
 import { google } from 'googleapis'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { indexEmailReply } from '@/lib/copilot-indexer'
 
 // Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
 let _supabase: ReturnType<typeof createClient> | null = null
@@ -47,7 +48,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { userId, to, subject, body, threadId, attachments } = await request.json()
+    const {
+      userId, to, subject, body, threadId, attachments,
+      conversation_id: conversationId,
+      draft_id: draftId,
+    } = await request.json()
 
     if (!userId || !to || !subject || !body) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -111,6 +116,92 @@ export async function POST(request: NextRequest) {
         threadId,
       },
     })
+
+    // ============================================
+    // Persist outbound into email_messages + index + mark draft sent
+    // Best-effort: never fail the send if post-processing errors.
+    // ============================================
+    if (conversationId && response.data.id) {
+      try {
+        // Look up tenant + thread from the conversation
+        const { data: conv } = await (authClient as any)
+          .from('email_conversations')
+          .select('id, thread_id, tenant_id, client_id')
+          .eq('id', conversationId)
+          .single()
+
+        const sentAt = new Date().toISOString()
+        let insertedMessageId: string | null = null
+
+        if (conv) {
+          const { data: inserted, error: insertErr } = await (authClient as any)
+            .from('email_messages')
+            .insert({
+              conversation_id: conv.id,
+              message_id: response.data.id,
+              thread_id: threadId || conv.thread_id,
+              direction: 'outbound',
+              from_address: user.email || '',
+              to_addresses: Array.isArray(to) ? to : [to],
+              subject,
+              body_text: body,
+              snippet: (body || '').slice(0, 200),
+              sent_at: sentAt,
+              is_read: true,
+            })
+            .select('id')
+            .single()
+
+          if (insertErr && insertErr.code !== '23505') {
+            console.error('Email outbound persist failed:', insertErr.message)
+          } else if (inserted?.id) {
+            insertedMessageId = inserted.id
+
+            // Fire-and-await: index the reply pair for RAG
+            await indexEmailReply({
+              supabase: authClient as any,
+              tenantId: conv.tenant_id,
+              conversationId: conv.id,
+              outboundMessageId: inserted.id,
+              outboundSourceMessageId: response.data.id,
+              outboundSubject: subject,
+              outboundBody: body,
+              outboundSentAt: sentAt,
+              clientId: conv.client_id || null,
+            }).catch(() => {})
+
+            // Bump conversation summary fields
+            await (authClient as any)
+              .from('email_conversations')
+              .update({
+                last_message_snippet: (body || '').slice(0, 160),
+                last_message_at: sentAt,
+                message_count: undefined, // let downstream sync recompute if desired
+              })
+              .eq('id', conv.id)
+          }
+        }
+
+        // Mark the copilot draft as sent
+        if (draftId) {
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || 3000}`}/api/ai/suggest-reply/${draftId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              // Pass along the user's cookie for auth on the internal call
+              cookie: request.headers.get('cookie') || '',
+            },
+            body: JSON.stringify({
+              action: 'mark_sent',
+              send_message_id: response.data.id,
+              edited_body: body,
+            }),
+          }).catch(() => {})
+        }
+      } catch (postErr: any) {
+        console.error('Post-send processing error:', postErr?.message || postErr)
+      }
+    }
 
     return NextResponse.json({ success: true, messageId: response.data.id })
   } catch (err: any) {

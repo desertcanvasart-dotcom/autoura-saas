@@ -87,3 +87,96 @@ export async function indexWhatsAppReply(args: IndexWhatsAppReplyArgs): Promise<
     return null
   }
 }
+
+// ============================================
+// Email reply indexer
+// ============================================
+interface IndexEmailReplyArgs {
+  supabase: SupabaseClient
+  tenantId: string
+  conversationId: string              // email_conversations.id
+  outboundMessageId: string           // email_messages.id for the reply row
+  outboundSourceMessageId?: string | null // Gmail message_id (for audit)
+  outboundSubject?: string | null
+  outboundBody: string                // plain-text body of the reply
+  outboundSentAt: string | null
+  clientId?: string | null
+}
+
+/**
+ * Find the most recent inbound email in the conversation before `outboundSentAt`,
+ * pair it with the reply, embed the pair, and store in copilot_knowledge.
+ */
+export async function indexEmailReply(args: IndexEmailReplyArgs): Promise<string | null> {
+  const {
+    supabase, tenantId, conversationId,
+    outboundMessageId, outboundSourceMessageId = null,
+    outboundSubject = null, outboundBody, outboundSentAt,
+    clientId = null,
+  } = args
+
+  try {
+    const outboundText = (outboundBody || '').trim()
+    if (outboundText.length < 20) return null // too short to be useful
+
+    const before = outboundSentAt || new Date().toISOString()
+    const { data: inbound } = await supabase
+      .from('email_messages')
+      .select('subject, body_text, snippet, from_address, sent_at')
+      .eq('conversation_id', conversationId)
+      .eq('direction', 'inbound')
+      .lt('sent_at', before)
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const inboundBody = (inbound?.body_text || inbound?.snippet || '').trim()
+    if (!inboundBody) return null
+
+    // Embed the INBOUND email (question) as the retrieval key. Prepend subject
+    // so tonal/contextual cues are captured.
+    const queryText = inbound?.subject
+      ? `${inbound.subject}\n\n${inboundBody}`
+      : inboundBody
+
+    const embedding = await embedText(queryText)
+
+    const answerText = outboundSubject
+      ? `Subject: ${outboundSubject}\n\n${outboundText}`
+      : outboundText
+
+    const { data, error } = await supabase
+      .from('copilot_knowledge')
+      .insert({
+        tenant_id: tenantId,
+        source_type: 'whatsapp_pair', // reused turn-pair semantics for consistency
+        title: null,
+        query_text: queryText,
+        answer_text: answerText,
+        metadata: {
+          channel: 'email',
+          email_conversation_id: conversationId,
+          email_message_id: outboundMessageId,
+          gmail_message_id: outboundSourceMessageId,
+          client_id: clientId,
+          paired_at: outboundSentAt,
+          subject: outboundSubject,
+        },
+        embedding: toPgVector(embedding) as any,
+        embedding_model: EMBEDDING_MODEL,
+      })
+      .select('id')
+      .single()
+
+    if (error) {
+      if (error.code !== '23505') {
+        console.error('indexEmailReply insert error:', error.message)
+      }
+      return null
+    }
+    return data?.id ?? null
+  } catch (err: any) {
+    console.error('indexEmailReply failed:', err?.message || err)
+    return null
+  }
+}
