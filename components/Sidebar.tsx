@@ -52,7 +52,8 @@ import {
   Package,
   Briefcase,
   Tags,
-  Grid3x3
+  Grid3x3,
+  Sparkles
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -113,6 +114,7 @@ const navigation: NavSection[] = [
       { label: 'Conversations', href: '/conversations', icon: MessageSquare },
       { label: 'Inbox', href: '/inbox', icon: Mail },
       { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageSquare },
+      { label: 'Copilot Knowledge', href: '/copilot-knowledge', icon: Sparkles },
       { label: 'Parser', href: '/whatsapp-parser', icon: Send },
       { label: 'Message Templates', href: '/templates', icon: FileText },
     ]
