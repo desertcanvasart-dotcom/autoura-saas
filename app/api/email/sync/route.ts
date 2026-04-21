@@ -7,7 +7,18 @@ import { generateDraftReplies } from '@/lib/copilot-suggest'
 function extractEmailAddress(from: string | null | undefined): string {
   if (!from) return ''
   const match = from.match(/<([^>]+)>/)
-  return match ? match[1].toLowerCase() : from.toLowerCase()
+  return match ? match[1].toLowerCase() : from.toLowerCase().trim()
+}
+
+function extractDisplayName(from: string | null | undefined): string | null {
+  if (!from) return null
+  // "John Smith <john@example.com>" → "John Smith"
+  const match = from.match(/^(.*?)\s*<[^>]+>\s*$/)
+  if (match) {
+    const name = match[1].trim().replace(/^"(.*)"$/, '$1').trim()
+    return name || null
+  }
+  return null
 }
 
 function getDirection(from: string | null | undefined, userEmail: string): 'inbound' | 'outbound' {
@@ -90,47 +101,90 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
 
-    // Process threads
+    // Process threads — write to unified_conversations (customer-scoped) and
+    // email_messages (125 schema).
     for (const [threadId, messages] of threadMessages) {
       try {
-        const firstMsg = messages[0]
-        const headers = firstMsg.payload?.headers || []
-        const getHeader = (n: string) => headers.find((h: any) => h.name.toLowerCase() === n.toLowerCase())?.value || ''
-
-        const from = getHeader('From'), to = getHeader('To'), subject = getHeader('Subject')
-        const direction = getDirection(from, userEmail)
-        const clientEmail = direction === 'inbound' ? extractEmailAddress(from) : extractEmailAddress(to)
-
-        const lastMsg = messages.reduce((latest: any, msg: any) => {
-          return parseInt(msg.internalDate || '0') > parseInt(latest.internalDate || '0') ? msg : latest
-        }, messages[0])
+        // Determine who the "customer" is for this thread. Use the latest
+        // inbound's From if present, else the first message's To.
+        const sorted = [...messages].sort((a: any, b: any) =>
+          parseInt(a.internalDate || '0') - parseInt(b.internalDate || '0')
+        )
+        const lastMsg = sorted[sorted.length - 1]
         const lastDate = new Date(parseInt(lastMsg.internalDate || '0')).toISOString()
 
-        // Upsert conversation
-        const { data: existing } = await supabase.from('email_conversations').select('id').eq('thread_id', threadId).single()
-        let conversationId: string
+        const firstHeaders = sorted[0].payload?.headers || []
+        const getH = (headers: any[], n: string) =>
+          headers.find((h: any) => h.name.toLowerCase() === n.toLowerCase())?.value || ''
 
-        if (existing) {
-          await supabase.from('email_conversations').update({ subject, last_message_snippet: lastMsg.snippet, last_message_at: lastDate, message_count: messages.length, last_sync_at: new Date().toISOString() }).eq('id', existing.id)
-          conversationId = existing.id
+        const firstFrom = getH(firstHeaders, 'From')
+        const firstTo = getH(firstHeaders, 'To')
+        const firstDir = getDirection(firstFrom, userEmail)
+        const customerHeader = firstDir === 'inbound' ? firstFrom : firstTo
+        const contactEmail = extractEmailAddress(customerHeader)
+        const contactName = extractDisplayName(customerHeader)
+
+        if (!contactEmail) continue // can't route without a customer address
+
+        // Upsert unified_conversations keyed by (tenant_id, contact_email)
+        let unifiedId: string
+        const { data: existingUnified } = await supabase
+          .from('unified_conversations')
+          .select('id, total_messages')
+          .eq('tenant_id', tenant_id)
+          .eq('contact_email', contactEmail)
+          .maybeSingle()
+
+        if (existingUnified) {
+          await supabase
+            .from('unified_conversations')
+            .update({
+              contact_name: contactName || undefined,
+              last_message_at: lastDate,
+              last_message_preview: lastMsg.snippet || null,
+              last_message_channel: 'email',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingUnified.id)
+          unifiedId = existingUnified.id
           result.conversations_updated++
         } else {
-          const { data: newConv, error } = await supabase.from('email_conversations').insert({ tenant_id, thread_id: threadId, user_id: userId, client_email: clientEmail, subject, last_message_snippet: lastMsg.snippet, last_message_at: lastDate, message_count: messages.length, status: 'active', is_hidden: false, last_sync_at: new Date().toISOString() }).select().single()
-          if (error) continue
-          conversationId = newConv.id
+          const { data: newUnified, error: unifiedErr } = await supabase
+            .from('unified_conversations')
+            .insert({
+              tenant_id,
+              contact_email: contactEmail,
+              contact_name: contactName,
+              last_message_at: lastDate,
+              last_message_preview: lastMsg.snippet || null,
+              last_message_channel: 'email',
+              total_messages: 0,
+              unread_messages: 0,
+              status: 'active',
+            })
+            .select('id')
+            .single()
+          if (unifiedErr || !newUnified) continue
+          unifiedId = newUnified.id
           result.conversations_created++
         }
 
-        // Store messages
+        // Store each message in email_messages (skip duplicates by gmail_message_id)
         for (const message of messages) {
           const mHeaders = message.payload?.headers || []
-          const getMH = (n: string) => mHeaders.find((h: any) => h.name.toLowerCase() === n.toLowerCase())?.value || ''
+          const getMH = (n: string) => getH(mHeaders, n)
           const msgDate = new Date(parseInt(message.internalDate || '0')).toISOString()
-          const msgDir = getDirection(getMH('From'), userEmail)
+          const fromRaw = getMH('From')
+          const toRaw = getMH('To')
+          const msgDir = getDirection(fromRaw, userEmail)
 
           let bodyHtml = '', bodyText = ''
           const extractBody = (p: any) => {
-            if (p.body?.data) { const c = Buffer.from(p.body.data, 'base64').toString('utf-8'); if (p.mimeType === 'text/html') bodyHtml = c; else if (p.mimeType === 'text/plain') bodyText = c }
+            if (p.body?.data) {
+              const c = Buffer.from(p.body.data, 'base64').toString('utf-8')
+              if (p.mimeType === 'text/html') bodyHtml = c
+              else if (p.mimeType === 'text/plain') bodyText = c
+            }
             if (p.parts) for (const part of p.parts) extractBody(part)
           }
           if (message.payload) extractBody(message.payload)
@@ -142,24 +196,80 @@ export async function POST(request: NextRequest) {
           }
           if (message.payload) extractAtt(message.payload)
 
-          const { data: existingMsg } = await supabase.from('email_messages').select('id').eq('message_id', message.id).single()
-          if (!existingMsg) {
-            await supabase.from('email_messages').insert({
-              conversation_id: conversationId, message_id: message.id, thread_id: threadId, direction: msgDir,
-              from_address: getMH('From'), to_addresses: getMH('To') ? getMH('To').split(',').map((e: string) => e.trim()) : [],
-              cc_addresses: getMH('Cc') ? getMH('Cc').split(',').map((e: string) => e.trim()) : null,
-              subject: getMH('Subject'), body_text: bodyText || null, body_html: bodyHtml || null,
-              snippet: message.snippet, attachments, is_read: !message.labelIds?.includes('UNREAD'),
-              is_starred: message.labelIds?.includes('STARRED') || false, labels: message.labelIds, sent_at: msgDate,
-            })
-            result.messages_created++
-            // Track conversations that received new inbound messages for pre-generation
-            if (msgDir === 'inbound') {
-              conversationsWithNewInbound.add(conversationId)
-            }
+          const { data: existingMsg } = await supabase
+            .from('email_messages')
+            .select('id')
+            .eq('tenant_id', tenant_id)
+            .eq('gmail_message_id', message.id)
+            .maybeSingle()
+
+          if (existingMsg) continue
+
+          const fromEmail = extractEmailAddress(fromRaw)
+          const fromName = extractDisplayName(fromRaw)
+          const toEmail = extractEmailAddress(toRaw)
+          const toName = extractDisplayName(toRaw)
+          const cc = getMH('Cc')
+          const ccEmails = cc ? cc.split(',').map((e: string) => extractEmailAddress(e)).filter(Boolean) : null
+
+          const { error: insErr } = await supabase.from('email_messages').insert({
+            tenant_id,
+            unified_conversation_id: unifiedId,
+            gmail_message_id: message.id,
+            gmail_thread_id: threadId,
+            from_email: fromEmail,
+            from_name: fromName,
+            to_email: toEmail,
+            to_name: toName,
+            cc_emails: ccEmails,
+            subject: getMH('Subject') || null,
+            body_text: bodyText || null,
+            body_html: bodyHtml || null,
+            snippet: message.snippet || null,
+            direction: msgDir,
+            attachments,
+            labels: message.labelIds || null,
+            is_read: !(message.labelIds || []).includes('UNREAD'),
+            is_starred: (message.labelIds || []).includes('STARRED'),
+            is_important: (message.labelIds || []).includes('IMPORTANT'),
+            sent_at: msgDate,
+            received_at: msgDir === 'inbound' ? msgDate : null,
+          })
+
+          if (insErr && insErr.code !== '23505') {
+            console.error('email_messages insert failed:', insErr.message)
+            continue
+          }
+
+          result.messages_created++
+          if (msgDir === 'inbound') {
+            conversationsWithNewInbound.add(unifiedId)
           }
         }
-      } catch {}
+
+        // Recalculate total/unread counts for the unified conversation from source of truth
+        const { count: totalCount } = await supabase
+          .from('email_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('unified_conversation_id', unifiedId)
+
+        const { count: unreadCount } = await supabase
+          .from('email_messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('unified_conversation_id', unifiedId)
+          .eq('direction', 'inbound')
+          .eq('is_read', false)
+
+        await supabase
+          .from('unified_conversations')
+          .update({
+            total_messages: totalCount || 0,
+            unread_messages: unreadCount || 0,
+          })
+          .eq('id', unifiedId)
+      } catch (threadErr: any) {
+        console.error('[Email Sync] Thread error:', threadErr?.message || threadErr)
+      }
     }
 
     // ============================================
