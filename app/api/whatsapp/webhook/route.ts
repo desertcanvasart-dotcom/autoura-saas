@@ -176,6 +176,86 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
+    // STEP 3b: Mirror into communication_threads + communication_inbox
+    // (powers the AI copilot — feature-flagged via COPILOT_ENABLED)
+    // ============================================
+    if (tenantId && conversationId && body) {
+      try {
+        const receivedAt = new Date().toISOString()
+        const snippet = body.length > 140 ? body.slice(0, 137) + '...' : body
+
+        const { data: existingThread } = await supabase
+          .from('communication_threads')
+          .select('id, message_count')
+          .eq('tenant_id', tenantId)
+          .eq('channel', 'whatsapp')
+          .eq('whatsapp_conversation_id', conversationId)
+          .maybeSingle()
+
+        let threadId: string | null = existingThread?.id ?? null
+
+        if (threadId) {
+          await supabase
+            .from('communication_threads')
+            .update({
+              last_message_at: receivedAt,
+              message_count: (existingThread?.message_count ?? 0) + 1,
+              status: 'open',
+              client_id: clientId,
+              client_name: clientName,
+            })
+            .eq('id', threadId)
+        } else {
+          const { data: newThread, error: threadErr } = await supabase
+            .from('communication_threads')
+            .insert({
+              tenant_id: tenantId,
+              channel: 'whatsapp',
+              whatsapp_conversation_id: conversationId,
+              client_id: clientId,
+              client_name: clientName,
+              contact_info: phoneNumber,
+              status: 'open',
+              urgency: 'normal',
+              last_message_at: receivedAt,
+              message_count: 1,
+            })
+            .select('id')
+            .single()
+          if (threadErr) {
+            console.error('❌ Error creating communication_thread:', threadErr)
+          } else {
+            threadId = newThread.id
+          }
+        }
+
+        if (threadId) {
+          const { error: inboxErr } = await supabase
+            .from('communication_inbox')
+            .insert({
+              tenant_id: tenantId,
+              thread_id: threadId,
+              channel: 'whatsapp',
+              source_message_id: messageSid,
+              sender_name: clientName,
+              sender_contact: phoneNumber,
+              message_body: body,
+              message_snippet: snippet,
+              status: 'new',
+              received_at: receivedAt,
+            })
+          if (inboxErr && inboxErr.code !== '23505') {
+            // 23505 = unique violation (duplicate webhook retry) — safe to ignore
+            console.error('❌ Error creating communication_inbox row:', inboxErr)
+          }
+        }
+      } catch (copilotErr) {
+        // Never fail the webhook on copilot mirror errors
+        console.error('❌ Copilot mirror error:', copilotErr)
+      }
+    }
+
+    // ============================================
     // STEP 4: AI-Powered Auto-Response
     // ============================================
     // Only process if AI is globally enabled and we have a message body

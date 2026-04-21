@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   MessageSquare, Send, Search, Phone, User, Clock,
-  Sparkles, RefreshCw, Plus, CheckCheck, Check, 
+  Sparkles, RefreshCw, Plus, CheckCheck, Check,
   AlertCircle, X, Languages, ChevronDown, Loader2,
   Trash2, UserPlus, Users, History, ArrowRight,
   Settings, Filter, UserCheck, UserX
 } from 'lucide-react'
+import CopilotSuggestPanel from '@/components/CopilotSuggestPanel'
 
 // Supported languages for translation
 const SUPPORTED_LANGUAGES = [
@@ -513,6 +514,7 @@ export default function WhatsAppInboxPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
+  const [acceptedDraftId, setAcceptedDraftId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -747,9 +749,22 @@ export default function WhatsAppInboxPage() {
         setMessages(prev => [...prev, data.message])
         setNewMessage('')
         setTranslatedMessage('')
-        setConversations(prev => prev.map(c => 
+        setConversations(prev => prev.map(c =>
           c.id === selectedConversation.id ? { ...c, last_message: messageToSend, last_message_at: new Date().toISOString() } : c
         ))
+        // Mark the copilot draft as sent (if one was used)
+        if (acceptedDraftId) {
+          fetch(`/api/ai/suggest-reply/${acceptedDraftId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'mark_sent',
+              send_message_id: data.twilio_sid,
+              edited_body: messageToSend,
+            }),
+          }).catch(() => {})
+          setAcceptedDraftId(null)
+        }
         // Log reply activity
         if (currentAgentId) {
           fetch('/api/whatsapp/activity', {
@@ -813,6 +828,7 @@ export default function WhatsAppInboxPage() {
     if (conv.unread_count > 0) markAsRead(conv.id)
     setNewMessage('')
     setTranslatedMessage('')
+    setAcceptedDraftId(null)
     setIncomingTranslations({})
     setShowOriginalMap({})
   }
@@ -1116,6 +1132,15 @@ export default function WhatsAppInboxPage() {
                 </div>
               )}
             </div>
+
+            {/* AI Copilot Suggestions */}
+            <CopilotSuggestPanel
+              whatsappConversationId={selectedConversation?.id || null}
+              onAccept={(text, draftId) => {
+                setNewMessage(text)
+                setAcceptedDraftId(draftId)
+              }}
+            />
 
             {/* Message Input */}
             <form onSubmit={sendMessage} className="p-4 bg-white border-t border-gray-200">
