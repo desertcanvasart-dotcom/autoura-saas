@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Loader2, Trash2, Edit3, X, Save, BookOpen, FileText, MapPin, HelpCircle, Sparkles, Power } from 'lucide-react'
+import { Plus, Loader2, Trash2, Edit3, X, Save, BookOpen, FileText, MapPin, HelpCircle, Sparkles, Power, Upload, Check } from 'lucide-react'
 
 type SourceType = 'kb_faq' | 'kb_policy' | 'kb_tour' | 'kb_custom'
 
@@ -23,12 +23,17 @@ const TYPE_META: Record<SourceType, { label: string; icon: React.ComponentType<{
   kb_custom: { label: 'Other',        icon: BookOpen,   color: 'text-purple-600 bg-purple-50 border-purple-200',  hint: 'Anything else the copilot should draw on.' },
 }
 
+type Tone = 'professional' | 'friendly' | 'formal'
+
 export default function CopilotKnowledgePage() {
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<SourceType | 'all'>('all')
   const [editing, setEditing] = useState<Entry | null>(null)
   const [showNew, setShowNew] = useState(false)
+  const [showBulk, setShowBulk] = useState(false)
+  const [tone, setTone] = useState<Tone>('professional')
+  const [toneSaving, setToneSaving] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -38,7 +43,24 @@ export default function CopilotKnowledgePage() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  const loadSettings = async () => {
+    const res = await fetch('/api/copilot/settings')
+    const data = await res.json()
+    if (data.success && data.settings?.tone) setTone(data.settings.tone)
+  }
+
+  const saveTone = async (next: Tone) => {
+    setTone(next)
+    setToneSaving(true)
+    await fetch('/api/copilot/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tone: next }),
+    }).catch(() => {})
+    setToneSaving(false)
+  }
+
+  useEffect(() => { load(); loadSettings() }, [])
 
   const visible = filter === 'all' ? entries : entries.filter((e) => e.source_type === filter)
 
@@ -59,8 +81,8 @@ export default function CopilotKnowledgePage() {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="flex items-start justify-between mb-6 gap-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-5 h-5 text-purple-600" />
             <h1 className="text-2xl font-semibold text-gray-900">Copilot Knowledge Base</h1>
@@ -69,13 +91,52 @@ export default function CopilotKnowledgePage() {
             Everything your AI copilot draws on when drafting replies. Scoped to your workspace.
           </p>
         </div>
-        <button
-          onClick={() => setShowNew(true)}
-          className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
-        >
-          <Plus className="w-4 h-4" />
-          Add entry
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setShowBulk(true)}
+            className="flex items-center gap-2 border border-purple-200 text-purple-700 px-3 py-2 rounded-lg hover:bg-purple-50 text-sm"
+          >
+            <Upload className="w-4 h-4" />
+            Bulk import
+          </button>
+          <button
+            onClick={() => setShowNew(true)}
+            className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Add entry
+          </button>
+        </div>
+      </div>
+
+      {/* Tone preference card */}
+      <div className="mb-6 border border-purple-100 bg-purple-50/40 rounded-lg p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium text-gray-800 mb-1">Your copilot tone</h3>
+            <p className="text-xs text-gray-500">
+              Controls how drafts sound when <em>you</em> ask for suggestions. Each teammate can pick their own.
+            </p>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {(['professional', 'friendly', 'formal'] as Tone[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => saveTone(t)}
+                disabled={toneSaving}
+                className={`flex items-center gap-1 px-3 py-1.5 text-xs rounded-full border ${
+                  tone === t
+                    ? 'bg-purple-600 text-white border-purple-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'
+                }`}
+              >
+                {tone === t && <Check className="w-3 h-3" />}
+                {t[0].toUpperCase() + t.slice(1)}
+              </button>
+            ))}
+            {toneSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400 ml-1" />}
+          </div>
+        </div>
       </div>
 
       {/* Filter pills */}
@@ -123,6 +184,13 @@ export default function CopilotKnowledgePage() {
           entry={editing}
           onClose={() => { setShowNew(false); setEditing(null) }}
           onSaved={() => { setShowNew(false); setEditing(null); load() }}
+        />
+      )}
+
+      {showBulk && (
+        <BulkImportModal
+          onClose={() => setShowBulk(false)}
+          onDone={() => { setShowBulk(false); load() }}
         />
       )}
     </div>
@@ -173,6 +241,198 @@ function EntryCard({ entry, onEdit, onDelete, onToggle }: { entry: Entry; onEdit
           <button onClick={onDelete} className="p-1.5 text-gray-400 hover:text-red-600 rounded" title="Delete">
             <Trash2 className="w-4 h-4" />
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BulkImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [mode, setMode] = useState<'ai_extract' | 'as_is'>('ai_extract')
+  const [sourceType, setSourceType] = useState<SourceType>('kb_custom')
+  const [title, setTitle] = useState('')
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<{ created: number; total: number; preview: any[]; failures: string[] } | null>(null)
+
+  const submit = async () => {
+    if (text.trim().length < 20) { setError('Paste at least 20 characters'); return }
+    setBusy(true)
+    setError(null)
+    setResult(null)
+    try {
+      const res = await fetch('/api/copilot/knowledge/bulk-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          mode,
+          source_type: mode === 'as_is' ? sourceType : undefined,
+          title: mode === 'as_is' && title.trim() ? title.trim() : undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) { setError(data.error || 'Import failed'); return }
+      setResult({ created: data.created, total: data.total, preview: data.preview || [], failures: data.failures || [] })
+    } catch (e: any) {
+      setError(e?.message || 'Network error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const done = () => { onDone() }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Upload className="w-4 h-4 text-purple-600" />
+            Bulk import knowledge
+          </h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5 overflow-y-auto space-y-4">
+          {!result && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Mode</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setMode('ai_extract')}
+                    className={`text-left p-3 rounded-lg border text-sm ${mode === 'ai_extract' ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-200' : 'border-gray-200 hover:bg-gray-50'}`}
+                  >
+                    <div className="font-medium text-gray-900 mb-0.5 flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                      AI-structured
+                    </div>
+                    <p className="text-[11px] text-gray-500 leading-tight">
+                      Claude splits the text into typed entries (FAQ / policy / tour / other).
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => setMode('as_is')}
+                    className={`text-left p-3 rounded-lg border text-sm ${mode === 'as_is' ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-200' : 'border-gray-200 hover:bg-gray-50'}`}
+                  >
+                    <div className="font-medium text-gray-900 mb-0.5">As a single entry</div>
+                    <p className="text-[11px] text-gray-500 leading-tight">
+                      Stores the whole paste as one entry of the type you choose. Still auto-chunked.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {mode === 'as_is' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1.5">Type</label>
+                    <select
+                      value={sourceType}
+                      onChange={(e) => setSourceType(e.target.value as SourceType)}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                    >
+                      <option value="kb_custom">Other</option>
+                      <option value="kb_faq">FAQ</option>
+                      <option value="kb_policy">Policy</option>
+                      <option value="kb_tour">Tour</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1.5">Title (optional)</label>
+                    <input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Short label"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">Content</label>
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  rows={14}
+                  placeholder="Paste FAQs, policies, tour descriptions, or any business knowledge here…"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg font-mono resize-y"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {mode === 'ai_extract'
+                    ? 'Claude will detect FAQs, policies, and tour blocks automatically.'
+                    : 'Long content will be split into retrieval chunks automatically.'}
+                </p>
+              </div>
+
+              {error && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">{error}</div>}
+            </>
+          )}
+
+          {result && (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm">
+                <p className="text-green-800 font-medium mb-0.5">
+                  Imported {result.created} of {result.total} entries.
+                </p>
+                {result.failures.length > 0 && (
+                  <p className="text-[11px] text-amber-700">
+                    {result.failures.length} chunks failed — you can review and re-import those manually.
+                  </p>
+                )}
+              </div>
+              {result.preview.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-700 mb-2">Preview</p>
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    {result.preview.map((p: any, idx: number) => (
+                      <div key={idx} className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] uppercase tracking-wide text-purple-700 bg-purple-50 border border-purple-100 rounded-full px-1.5 py-0.5">
+                            {p.source_type.replace('kb_', '')}
+                          </span>
+                          {p.title && <span className="text-sm font-medium text-gray-900 truncate">{p.title}</span>}
+                        </div>
+                        {p.question && <p className="text-xs text-gray-600"><span className="font-medium">Q:</span> {p.question}</p>}
+                        <p className="text-xs text-gray-500 mt-1">{p.preview}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+          {result ? (
+            <button
+              onClick={done}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
+            >
+              <Check className="w-3.5 h-3.5" />
+              Done
+            </button>
+          ) : (
+            <>
+              <button onClick={onClose} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">
+                Cancel
+              </button>
+              <button
+                onClick={submit}
+                disabled={busy || text.trim().length < 20}
+                className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                {busy ? (mode === 'ai_extract' ? 'Extracting…' : 'Importing…') : 'Import'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
