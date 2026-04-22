@@ -101,8 +101,13 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Public routes that don't require authentication
-  const publicRoutes = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept', '/terms', '/privacy', '/contact', '/docs']
+  // Public routes that don't require authentication.
+  // Keep in sync with app/(public)/* — the route-group folder name does NOT
+  // grant public access automatically; the middleware has to know.
+  const publicRoutes = [
+    '/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept',
+    '/about', '/contact', '/docs', '/integrations', '/privacy', '/terms',
+  ]
   const isPublicRoute = publicRoutes.some(route => 
     request.nextUrl.pathname === route || 
     (route !== '/' && request.nextUrl.pathname.startsWith(route))
