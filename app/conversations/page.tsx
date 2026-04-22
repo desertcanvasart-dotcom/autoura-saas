@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useAuth } from '@/app/contexts/AuthContext'
+import UnifiedConversationComposer from '@/components/unified/UnifiedConversationComposer'
 
 interface Message {
   id: string
@@ -22,6 +23,7 @@ interface Conversation {
   contact_name: string
   contact_email: string | null
   contact_phone: string | null
+  whatsapp_conversation_id: string | null
   last_message_at: string | null
   last_message_preview: string | null
   last_message_channel: string | null
@@ -56,12 +58,6 @@ export default function ConversationsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [channelFilter, setChannelFilter] = useState('all')
-
-  // Message composer
-  const [newMessage, setNewMessage] = useState('')
-  const [newSubject, setNewSubject] = useState('')
-  const [sendChannel, setSendChannel] = useState<'whatsapp' | 'email'>('whatsapp')
-  const [sending, setSending] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -99,13 +95,6 @@ export default function ConversationsPage() {
       if (data.success) {
         setSelectedConversation(data.data)
 
-        // Auto-select send channel based on available contact info
-        if (data.data.contact_phone) {
-          setSendChannel('whatsapp')
-        } else if (data.data.contact_email) {
-          setSendChannel('email')
-        }
-
         // Mark as read
         if (data.data.unread_messages > 0) {
           await fetch(`/api/conversations/${id}`, {
@@ -123,40 +112,6 @@ export default function ConversationsPage() {
       console.error('Error fetching conversation:', err)
     } finally {
       setLoadingMessages(false)
-    }
-  }
-
-  // Send message
-  const handleSendMessage = async () => {
-    if (!selectedConversation || !newMessage.trim()) return
-
-    setSending(true)
-    try {
-      const res = await fetch(`/api/conversations/${selectedConversation.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel: sendChannel,
-          message: newMessage,
-          subject: sendChannel === 'email' ? newSubject : undefined
-        })
-      })
-
-      const data = await res.json()
-
-      if (data.success) {
-        setNewMessage('')
-        setNewSubject('')
-        // Refresh conversation
-        fetchConversation(selectedConversation.id)
-        fetchConversations()
-      } else {
-        alert(data.error || 'Failed to send message')
-      }
-    } catch (err: any) {
-      alert(err.message)
-    } finally {
-      setSending(false)
     }
   }
 
@@ -484,73 +439,23 @@ export default function ConversationsPage() {
                 )}
               </div>
 
-              {/* Message Composer */}
-              <div className="bg-white border-t border-gray-200 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm text-gray-500">Send via:</span>
-                  <button
-                    onClick={() => setSendChannel('whatsapp')}
-                    disabled={!selectedConversation.contact_phone}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      sendChannel === 'whatsapp'
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    } ${!selectedConversation.contact_phone ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    📱 WhatsApp
-                  </button>
-                  <button
-                    onClick={() => setSendChannel('email')}
-                    disabled={!selectedConversation.contact_email}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      sendChannel === 'email'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    } ${!selectedConversation.contact_email ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    ✉️ Email
-                  </button>
-                </div>
-
-                {sendChannel === 'email' && (
-                  <input
-                    type="text"
-                    placeholder="Subject..."
-                    value={newSubject}
-                    onChange={(e) => setNewSubject(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm mb-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                )}
-
-                <div className="flex items-end gap-2">
-                  <textarea
-                    placeholder={`Type your ${sendChannel === 'email' ? 'email' : 'message'}...`}
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault()
-                        handleSendMessage()
-                      }
-                    }}
-                    rows={3}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                  <button
-                    onClick={handleSendMessage}
-                    disabled={sending || !newMessage.trim()}
-                    className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                      sending || !newMessage.trim()
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : sendChannel === 'whatsapp'
-                          ? 'bg-green-500 text-white hover:bg-green-600'
-                          : 'bg-blue-500 text-white hover:bg-blue-600'
-                    }`}
-                  >
-                    {sending ? 'Sending...' : 'Send'}
-                  </button>
-                </div>
-              </div>
+              {/* Channel-aware composer: rich email + copilot, or WhatsApp + copilot */}
+              {user?.id && (
+                <UnifiedConversationComposer
+                  conversation={{
+                    id: selectedConversation.id,
+                    contact_name: selectedConversation.contact_name,
+                    contact_email: selectedConversation.contact_email,
+                    contact_phone: selectedConversation.contact_phone,
+                    whatsapp_conversation_id: selectedConversation.whatsapp_conversation_id,
+                  }}
+                  userId={user.id}
+                  onSent={() => {
+                    fetchConversation(selectedConversation.id)
+                    fetchConversations()
+                  }}
+                />
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-500">
