@@ -194,14 +194,15 @@ export default function ConversationsPage() {
           </div>
           <button
             onClick={async () => {
-              const res = await fetch('/api/conversations/sync-emails', {
+              if (!user?.id) return
+              const res = await fetch('/api/email/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ limit: 50 })
+                body: JSON.stringify({ user_id: user.id, max_results: 50, days_back: 30 })
               })
               const data = await res.json()
-              if (data.success) {
-                alert(`Synced ${data.data.synced} emails`)
+              if (res.ok && data.success !== false) {
+                alert(`Synced ${data.messages_created || 0} messages (${data.conversations_created || 0} new, ${data.conversations_updated || 0} updated)`)
                 fetchConversations()
               } else {
                 alert(data.error || 'Sync failed')
