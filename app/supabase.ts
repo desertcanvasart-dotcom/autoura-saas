@@ -1,8 +1,9 @@
 import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-let client: ReturnType<typeof createBrowserClient> | null = null
+let client: SupabaseClient | null = null
 
-export function createClient() {
+export function createClient(): SupabaseClient {
   // Return existing client if already created (singleton pattern)
   if (client) {
     return client
@@ -13,8 +14,11 @@ export function createClient() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    // Return a mock client during build time to prevent errors
-    // This won't be used at runtime since env vars will be available
+    // Return a mock client during build time to prevent errors.
+    // This won't be used at runtime since env vars will be available.
+    // Cast through `unknown` so the mock satisfies the typed return without
+    // widening the public return type to `any` (which would poison every
+    // caller's query result typing).
     return {
       auth: {
         getSession: async () => ({ data: { session: null }, error: null }),
@@ -28,7 +32,7 @@ export function createClient() {
         update: async () => ({ data: null, error: null }),
         delete: async () => ({ data: null, error: null })
       })
-    } as any
+    } as unknown as SupabaseClient
   }
 
   // Create new client only if it doesn't exist

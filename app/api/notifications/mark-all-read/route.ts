@@ -1,35 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient, requireAuth } from '@/lib/supabase-server'
+import { resolveTeamMemberIdForUser } from '@/lib/notifications'
 
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
-}
-
-// PUT - Mark all notifications as read
-export async function PUT(request: NextRequest) {
+// PUT - Mark all of the authenticated user's notifications as read
+export async function PUT(_request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const teamMemberId = searchParams.get('teamMemberId')
-
-    let query = (getSupabase() as any)
-      .from('notifications')
-      .update({ is_read: true, updated_at: new Date().toISOString() })
-      .eq('is_read', false)
-
-    if (teamMemberId) {
-      query = query.eq('team_member_id', teamMemberId)
+    const auth = await requireAuth()
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 
-    const { data, error } = await query.select()
+    const teamMemberId = await resolveTeamMemberIdForUser(
+      auth.supabase!,
+      auth.tenant_id!,
+      auth.user!.email
+    )
+    if (!teamMemberId) {
+      return NextResponse.json({ success: true, message: '0 notifications marked as read', count: 0 })
+    }
+
+    const { data, error } = await (createAdminClient() as any)
+      .from('notifications')
+      .update({ is_read: true, updated_at: new Date().toISOString() })
+      .eq('team_member_id', teamMemberId)
+      .eq('is_read', false)
+      .select()
 
     if (error) throw error
 

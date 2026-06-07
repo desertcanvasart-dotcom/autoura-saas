@@ -101,9 +101,10 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
 }
 
 export async function GET(request: NextRequest) {
-  // Verify authorization
+  // Verify authorization. Fail closed: if no secret is configured, or the
+  // header doesn't match, reject. Never run unauthenticated.
   const authHeader = request.headers.get('authorization')
-  if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
+  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

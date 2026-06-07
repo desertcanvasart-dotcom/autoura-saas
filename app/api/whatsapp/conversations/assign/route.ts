@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { createNotification } from '@/lib/notifications'
 
 // POST /api/whatsapp/conversations/assign - Assign or claim a conversation
 export async function POST(request: NextRequest) {
@@ -96,42 +97,19 @@ export async function POST(request: NextRequest) {
       if (teamMember) {
         const clientName = conversation.client_name || conversation.contact_name || conversation.phone_number
 
-        const { error: notifError } = await supabase
-          .from('notifications')
-          .insert({
+        // teamMember was fetched via the tenant-scoped (RLS) client above, so it
+        // is guaranteed to belong to the caller's tenant.
+        try {
+          await createNotification({
             team_member_id: teamMember.id,
             type: 'whatsapp_assigned',
             title: 'New WhatsApp Chat Assigned',
-            message: `You've been assigned a WhatsApp conversation with ${clientName}`,
+            message: `You've been assigned a WhatsApp conversation with ${clientName}. Last message: "${conversation.last_message?.substring(0, 100) || 'No messages yet'}"`,
             link: `/whatsapp-inbox?conversation=${conversation_id}`,
-            is_read: false,
-            email_sent: false
+            send_email: Boolean(teamMember.email),
           })
-
-        if (notifError) {
-          console.error('Notification insert error:', notifError)
-        } else {
-          console.log('Notification created for team member:', teamMember.id, teamMember.name)
-        }
-
-        if (teamMember.email) {
-          try {
-            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
-            await fetch(`${baseUrl}/api/notifications`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                team_member_id: teamMember.id,
-                type: 'whatsapp_assigned',
-                title: 'New WhatsApp Chat Assigned',
-                message: `You've been assigned a WhatsApp conversation with ${clientName}. Last message: "${conversation.last_message?.substring(0, 100) || 'No messages yet'}"`,
-                link: `/whatsapp-inbox?conversation=${conversation_id}`,
-                send_email: true
-              })
-            })
-          } catch (emailError) {
-            console.error('Failed to send assignment email:', emailError)
-          }
+        } catch (notifError) {
+          console.error('Notification create error:', notifError)
         }
       } else {
         console.log('Team member not found for notification, id:', newAssigneeId)

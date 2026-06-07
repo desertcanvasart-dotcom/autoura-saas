@@ -1,15 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { requireAuth } from '@/lib/supabase-server'
+
+// Verify a conversation belongs to the caller's tenant (RLS-scoped lookup).
+async function assertConversationInTenant(
+  supabase: NonNullable<Awaited<ReturnType<typeof requireAuth>>['supabase']>,
+  conversationId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('whatsapp_conversations')
+    .select('id')
+    .eq('id', conversationId)
+    .maybeSingle()
+  return Boolean(data)
+}
 
 // GET /api/whatsapp/activity - Get activity history for a conversation
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const auth = await requireAuth()
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    const supabase = auth.supabase!
+
     const { searchParams } = new URL(request.url)
     const conversationId = searchParams.get('conversation_id')
     const agentId = searchParams.get('agent_id')
     const limit = parseInt(searchParams.get('limit') || '50')
     const actionTypes = searchParams.get('action_types')?.split(',')
+
+    // Activity is always scoped to a conversation the caller's tenant owns.
+    if (!conversationId) {
+      return NextResponse.json({ error: 'conversation_id is required' }, { status: 400 })
+    }
+    if (!(await assertConversationInTenant(supabase, conversationId))) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
 
     let query = supabase
       .from('conversation_activity')
@@ -50,14 +76,23 @@ export async function GET(request: NextRequest) {
 // POST /api/whatsapp/activity - Log a new activity
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const auth = await requireAuth()
+    if (auth.error) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status })
+    }
+    const supabase = auth.supabase!
+
     const body = await request.json()
     const { conversation_id, agent_id, action_type, action_details } = body
 
     if (!conversation_id || !action_type) {
-      return NextResponse.json({ 
-        error: 'Conversation ID and action type are required' 
+      return NextResponse.json({
+        error: 'Conversation ID and action type are required'
       }, { status: 400 })
+    }
+
+    if (!(await assertConversationInTenant(supabase, conversation_id))) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
     const validActionTypes = [

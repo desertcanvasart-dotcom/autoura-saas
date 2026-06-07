@@ -22,11 +22,12 @@ function getSupabase() {
 // External: Use cron-job.org or similar service
 
 export async function GET(request: NextRequest) {
-  // Optional: Verify cron secret to prevent unauthorized calls
+  // Verify cron secret. Fail closed: if no secret is configured, or the
+  // header doesn't match, reject. Never run unauthenticated.
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }

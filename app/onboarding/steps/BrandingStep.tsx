@@ -103,7 +103,7 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
       if (error) {
         console.error('❌ Upload error details:', {
           message: error.message,
-          statusCode: error.statusCode,
+          statusCode: (error as any).statusCode,
           error: error
         })
         throw error

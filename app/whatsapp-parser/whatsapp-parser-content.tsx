@@ -1429,7 +1429,7 @@ function WhatsAppParserContent() {
     params.set('conversation', btoa(unescape(encodeURIComponent(text))))
     if (extractedData.client_name) params.set('clientName', extractedData.client_name)
     if (extractedData.client_email) params.set('email', extractedData.client_email)
-    if (extractedData.client_phone || phoneNumber) params.set('phone', extractedData.client_phone || phoneNumber)
+    if (extractedData.client_phone || phoneNumber) params.set('phone', extractedData.client_phone || phoneNumber || '')
     if (extractedData.num_adults) params.set('pax', String(extractedData.num_adults + (extractedData.num_children || 0)))
     if (selectedTier) params.set('tier', selectedTier)
     if (extractedData.tour_name) params.set('tourName', extractedData.tour_name)

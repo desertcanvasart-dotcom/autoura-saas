@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { createNotification } from '@/lib/notifications'
 import { createMessageWithRetry, getUserFriendlyError } from '@/lib/ai/anthropic-client'
 import {
   buildTaskGenerationPrompt,
@@ -142,17 +143,15 @@ export async function POST(
     const uniqueAssignees = [...new Set((createdTasks || []).map(t => t.assigned_to).filter(Boolean))]
     for (const assigneeId of uniqueAssignees) {
       const assigneeTasks = (createdTasks || []).filter(t => t.assigned_to === assigneeId)
+      // assigneeId comes from tasks just inserted via the tenant-scoped client,
+      // so it belongs to the caller's tenant.
       try {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            team_member_id: assigneeId,
-            type: 'task_assigned',
-            title: `${assigneeTasks.length} new task${assigneeTasks.length !== 1 ? 's' : ''} for ${itinerary.itinerary_code}`,
-            message: `Operations tasks generated for ${itinerary.client_name} (${itinerary.start_date} to ${itinerary.end_date}).`,
-            link: '/tasks',
-          }),
+        await createNotification({
+          team_member_id: assigneeId as string,
+          type: 'task_assigned',
+          title: `${assigneeTasks.length} new task${assigneeTasks.length !== 1 ? 's' : ''} for ${itinerary.itinerary_code}`,
+          message: `Operations tasks generated for ${itinerary.client_name} (${itinerary.start_date} to ${itinerary.end_date}).`,
+          link: '/tasks',
         })
       } catch {}
     }

@@ -75,7 +75,15 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  console.log(`🧠 Memory cron: found ${runsToProcess?.length || 0} runs to process`)
+  type AgentRun = {
+    id: string
+    tenant_id: string
+    itinerary_id: string
+    agent_type: string
+  }
+  const runs = (runsToProcess || []) as unknown as AgentRun[]
+
+  console.log(`🧠 Memory cron: found ${runs.length} runs to process`)
 
   // --------------------------------------------------------
   // STEP 2: Process each run for memory extraction
@@ -85,7 +93,7 @@ export async function POST(request: NextRequest) {
   let runsProcessed = 0
   let runsFailed = 0
 
-  for (const run of runsToProcess || []) {
+  for (const run of runs) {
     try {
       const result = await processRunForMemory({
         supabaseAdmin,
