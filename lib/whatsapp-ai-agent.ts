@@ -233,7 +233,11 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
         }
       },
       required: ['reason']
-    }
+    },
+    // Cache breakpoint on the last tool caches the entire tools block.
+    // AGENT_TOOLS is globally stable, so this prefix is reused across every
+    // conversation within the cache TTL (reads cost ~0.1x).
+    cache_control: { type: 'ephemeral' }
   }
 ]
 
@@ -1298,7 +1302,13 @@ Email: ${this.businessEmail}
         const response = await this.anthropic.messages.create({
           model: this.modelId,
           max_tokens: 1024,
-          system: systemPrompt,
+          // Cache the system block (in array form) so the tools+system prefix
+          // is reused across the iterations of this tool loop (same systemPrompt
+          // each pass). The tools breakpoint on AGENT_TOOLS additionally lets
+          // other conversations reuse the tools portion.
+          system: [
+            { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }
+          ],
           messages: currentMessages,
           tools: AGENT_TOOLS
         })
