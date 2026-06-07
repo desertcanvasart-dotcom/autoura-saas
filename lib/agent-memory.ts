@@ -129,21 +129,21 @@ function buildMemoryPromptBlock(memories: AgentMemory[]): string {
 
   if (grouped.pricing_pattern.length > 0) {
     sections.push(
-      '=== PRICING PATTERNS (this operator's typical approach) ===\n' +
+      "=== PRICING PATTERNS (this operator's typical approach) ===\n" +
         grouped.pricing_pattern.map((m) => `• ${m.content}`).join('\n')
     )
   }
 
   if (grouped.inquiry_pattern.length > 0) {
     sections.push(
-      '=== INQUIRY PATTERNS (what this operator's clients typically want) ===\n' +
+      "=== INQUIRY PATTERNS (what this operator's clients typically want) ===\n" +
         grouped.inquiry_pattern.map((m) => `• ${m.content}`).join('\n')
     )
   }
 
   if (grouped.supplier_note.length > 0) {
     sections.push(
-      '=== SUPPLIER PREFERENCES (this operator's preferred suppliers) ===\n' +
+      "=== SUPPLIER PREFERENCES (this operator's preferred suppliers) ===\n" +
         grouped.supplier_note.map((m) => `• ${m.content}`).join('\n')
     )
   }
