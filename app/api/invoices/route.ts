@@ -36,6 +36,17 @@ export async function GET(request: NextRequest) {
     const itineraryId = searchParams.get('itineraryId')
     const invoiceType = searchParams.get('type')
 
+    // Pagination. Callers may opt in with ?limit / ?offset. When neither is
+    // supplied we still apply a safety cap so a tenant with a very large
+    // invoice history can't load the entire table into memory in one request.
+    const SAFETY_CAP = 1000
+    const limitParam = parseInt(searchParams.get('limit') || '')
+    const offsetParam = parseInt(searchParams.get('offset') || '')
+    const limit = Number.isFinite(limitParam) && limitParam > 0
+      ? Math.min(limitParam, SAFETY_CAP)
+      : SAFETY_CAP
+    const offset = Number.isFinite(offsetParam) && offsetParam > 0 ? offsetParam : 0
+
     let query = supabase
       .from('invoices')
       .select(`
@@ -45,6 +56,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
 
     if (status) {
       query = query.eq('status', status)
