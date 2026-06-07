@@ -62,10 +62,10 @@ export default function OnboardingContent() {
   // Authentication check
   useEffect(() => {
     if (!authLoading && !user) {
-      console.log('❌ Onboarding: No user found, redirecting to login')
+
       router.push('/login')
     } else if (user) {
-      console.log('✅ Onboarding: User authenticated:', user.email)
+
     }
   }, [user, authLoading, router])
 

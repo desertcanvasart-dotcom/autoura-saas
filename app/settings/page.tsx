@@ -138,7 +138,7 @@ function SettingsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab')
-  
+
   const [activeTab, setActiveTab] = useState(tabParam || 'profile')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -183,7 +183,7 @@ function SettingsContent() {
     const loadData = async () => {
       setLoading(true)
       setError(null)
-      
+
       try {
         switch (activeTab) {
           case 'profile':
@@ -220,7 +220,7 @@ function SettingsContent() {
       if (response.ok) {
         const result = await response.json()
         const profileData = result.data || result.profile || result
-        console.log('Profile loaded:', profileData)
+
         setProfile(profileData)
       }
     } catch (error) {
@@ -246,15 +246,15 @@ function SettingsContent() {
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) return
-  
+
       const { data, error } = await supabase
         .from('user_preferences')
         .select('*')
         .eq('user_id', user.id)
         .single()
-  
+
       if (data) {
         setUserPreferences({
           id: data.id,
@@ -369,16 +369,16 @@ function SettingsContent() {
   const savePreferences = async () => {
     setSaving(true)
     setError(null)
-  
+
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         setError('Please sign in to save preferences')
         return
       }
-  
+
       const prefData = {
         user_id: user.id,
         default_cost_mode: userPreferences.default_cost_mode,
@@ -387,16 +387,16 @@ function SettingsContent() {
         default_currency: userPreferences.default_currency,
         updated_at: new Date().toISOString()
       }
-  
+
       const { error } = await supabase
         .from('user_preferences')
         .upsert(prefData, { 
           onConflict: 'user_id',
           ignoreDuplicates: false 
         })
-  
+
       if (error) throw error
-  
+
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
     } catch (err: any) {
@@ -488,15 +488,15 @@ function SettingsContent() {
   // Handle avatar upload
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    console.log('Upload triggered, file:', file, 'profile:', profile)
-    
+
+
     if (!file) {
-      console.log('No file selected')
+
       return
     }
-    
+
     if (!profile?.id) {
-      console.log('No profile ID available')
+
       setError('Profile not loaded. Please refresh the page.')
       return
     }
@@ -509,14 +509,14 @@ function SettingsContent() {
       formData.append('file', file)
       formData.append('userId', profile.id)
 
-      console.log('Uploading to /api/avatar/upload...')
+
       const response = await fetch('/api/avatar/upload', {
         method: 'POST',
         body: formData
       })
 
       const data = await response.json()
-      console.log('Upload response:', data)
+
 
       if (data.success) {
         setProfile(prev => prev ? { ...prev, avatar_url: data.url } : null)
@@ -696,7 +696,7 @@ function SettingsContent() {
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
             {emailSettings?.gmail_connected ? (
               <>
@@ -783,7 +783,7 @@ function SettingsContent() {
       {/* Delivery Methods */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
         <h4 className="text-sm font-medium text-gray-900">Delivery Methods</h4>
-        
+
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Mail className="w-5 h-5 text-gray-500" />
@@ -826,7 +826,7 @@ function SettingsContent() {
       {/* Notification Types */}
       <div className="space-y-3">
         <h4 className="text-sm font-medium text-gray-900">Task Notifications</h4>
-        
+
         {[
           { key: 'task_assigned', label: 'Task Assigned', desc: 'When a task is assigned to you', icon: '📋' },
           { key: 'task_due_soon', label: 'Task Due Soon', desc: 'Reminder 24 hours before due date', icon: '⏰' },
@@ -881,7 +881,7 @@ function SettingsContent() {
           <Calculator className="w-5 h-5 text-blue-600" />
           <h4 className="text-sm font-bold text-gray-900">Cost Calculation Mode</h4>
         </div>
-        
+
         <p className="text-xs text-gray-600 mb-4">
           Choose how costs are calculated for new itineraries. You can override this per itinerary.
         </p>
@@ -890,7 +890,7 @@ function SettingsContent() {
           {COST_MODE_OPTIONS.map((option) => {
             const Icon = option.icon
             const isSelected = userPreferences.default_cost_mode === option.value
-            
+
             return (
               <button
                 key={option.value}
@@ -943,7 +943,7 @@ function SettingsContent() {
           <Crown className="w-5 h-5 text-amber-600" />
           <h4 className="text-sm font-bold text-gray-900">Default Service Tier</h4>
         </div>
-        
+
         <p className="text-xs text-gray-600 mb-4">
           Set the default tier for new itineraries. AI will select suppliers matching this tier.
         </p>
@@ -951,7 +951,7 @@ function SettingsContent() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {TIER_OPTIONS.map((tier) => {
             const isSelected = userPreferences.default_tier === tier.value
-            
+
             return (
               <button
                 key={tier.value}
@@ -989,7 +989,7 @@ function SettingsContent() {
           <span className="text-lg">💰</span>
           <h4 className="text-sm font-bold text-gray-900">Default Profit Margin</h4>
         </div>
-        
+
         <p className="text-xs text-gray-600 mb-4">
           Set the default margin percentage applied to supplier costs.
         </p>
@@ -1022,7 +1022,7 @@ function SettingsContent() {
           <span className="text-lg">💱</span>
           <h4 className="text-sm font-bold text-gray-900">Default Currency</h4>
         </div>
-        
+
         <p className="text-xs text-gray-600 mb-4">
           Set the default currency for new itineraries and pricing.
         </p>

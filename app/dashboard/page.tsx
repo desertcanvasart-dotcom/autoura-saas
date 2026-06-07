@@ -72,7 +72,7 @@ export default function DashboardPage() {
           .select('full_name, first_name')
           .eq('id', user.id)
           .single()
-        
+
         if (profile?.full_name) {
           // Get first name from full name
           setUserName(profile.full_name.split(' ')[0])
@@ -163,7 +163,7 @@ export default function DashboardPage() {
         const quotesData = await quotesRes.json()
         quotes = quotesData.data || quotesData.quotes || []
       } catch (e) {
-        console.log('Could not fetch quotes, falling back to itineraries')
+
         // Fallback to itineraries if quotes API doesn't exist yet
         const fallbackRes = await fetch('/api/itineraries?limit=50')
         const fallbackData = await fallbackRes.json()
@@ -184,7 +184,7 @@ export default function DashboardPage() {
                  (b.status === 'confirmed' || b.status === 'active')
         }).length
       } catch (e) {
-        console.log('Bookings API not available yet')
+
       }
 
       // Get recent clients (already sorted by created_at)
@@ -559,7 +559,7 @@ function StatCard({
   color = 'primary',
   subtitle
 }: StatCardProps) {
-  
+
   const dotColors = {
     primary: 'bg-primary-600',
     warning: 'bg-warning',

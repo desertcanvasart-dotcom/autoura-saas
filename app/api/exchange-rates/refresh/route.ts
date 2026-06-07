@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch rates from API
-    console.log('Fetching exchange rates from API...')
+
     const apiKey = process.env.EXCHANGE_RATE_API_KEY // Optional
     const fetchedRates = await fetchAllExchangeRates(apiKey)
 

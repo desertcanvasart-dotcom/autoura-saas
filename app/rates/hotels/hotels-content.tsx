@@ -245,11 +245,11 @@ function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => vo
   const bgColor = toast.type === 'success' ? 'bg-green-50 border-green-200' :
                   toast.type === 'error' ? 'bg-red-50 border-red-200' :
                   'bg-blue-50 border-blue-200'
-  
+
   const iconColor = toast.type === 'success' ? 'text-green-600' :
                     toast.type === 'error' ? 'text-red-600' :
                     'text-blue-600'
-  
+
   const textColor = toast.type === 'success' ? 'text-green-800' :
                     toast.type === 'error' ? 'text-red-800' :
                     'text-blue-800'
@@ -355,7 +355,7 @@ function Pagination({
             } else {
               pageNum = currentPage - 2 + i
             }
-            
+
             return (
               <button
                 key={pageNum}
@@ -423,7 +423,7 @@ export default function HotelsContent() {
 
   const today = new Date().toISOString().split('T')[0]
   const nextYear = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
-  
+
   const [formData, setFormData] = useState({
     service_code: '',
     property_name: '',
@@ -823,7 +823,7 @@ export default function HotelsContent() {
 
       const method = editingRate ? 'PUT' : 'POST'
 
-      console.log('Submitting form data:', dataToSubmit)
+
 
       const response = await fetch(url, {
         method,
@@ -832,7 +832,7 @@ export default function HotelsContent() {
       })
 
       const data = await response.json()
-      console.log('API response:', data)
+
 
       if (!response.ok || !data.success) {
         const errorMsg = data.error || data.hint || `HTTP error ${response.status}`
@@ -860,16 +860,16 @@ export default function HotelsContent() {
     const confirmed = await dialog.confirmDelete('Hotel', 
       `Are you sure you want to delete "${name}"? This action cannot be undone.`
     )
-    
+
     if (!confirmed) return
-    
+
     try {
       const response = await fetch(`/api/rates/hotels/${id}`, {
       method: 'DELETE'
       })
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
         showToast('success', `${name} deleted!`)
         fetchRates()
@@ -1204,12 +1204,12 @@ export default function HotelsContent() {
       rate.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rate.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rate.contact_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesCity = selectedCity === 'all' || rate.city === selectedCity
     const matchesSupplier = selectedSupplier === 'all' || rate.supplier_id === selectedSupplier
     const matchesActive = showInactive || rate.is_active
     const matchesTier = filterTier === null || rate.tier === filterTier
-  
+
     return matchesSearch && matchesCity && matchesSupplier && matchesActive && matchesTier
   })
 
@@ -1371,7 +1371,7 @@ export default function HotelsContent() {
                 className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
               />
             </div>
-            
+
             {/* City Filter */}
             <div className="md:w-40 relative">
               <select
@@ -1427,7 +1427,7 @@ export default function HotelsContent() {
             >
               {showInactive ? 'Show All' : 'Active Only'}
             </button>
-            
+
             {/* View Toggle */}
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               <button
@@ -1453,7 +1453,7 @@ export default function HotelsContent() {
               </button>
             </div>
           </div>
-          
+
           <div className="mt-3 pt-3 border-t border-gray-200">
             <p className="text-xs text-gray-600">
               Showing <span className="font-bold text-gray-900">{filteredRates.length}</span> of {rates.length} hotels
@@ -1579,7 +1579,7 @@ export default function HotelsContent() {
                 </tbody>
               </table>
             </div>
-            
+
             {totalItems > 0 && (
               <Pagination
                 currentPage={currentPage}
@@ -1613,7 +1613,7 @@ export default function HotelsContent() {
                         {rate.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center gap-2 mb-3">
                       <TierBadge tier={rate.tier} />
                       <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">

@@ -77,14 +77,14 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   const egyptDayPattern = /\bD(\d+)\b/gi
   const egyptDayMatches = text.match(egyptDayPattern)
   let maxDayNumber = 0
-  
+
   if (egyptDayMatches && egyptDayMatches.length >= 1) {
     // Extract the highest day number
     egyptDayMatches.forEach(match => {
       const num = parseInt(match.replace(/\D/g, ''))
       if (num > maxDayNumber) maxDayNumber = num
     })
-    
+
     signals.push(`Found ${egyptDayMatches.length} Egyptian day markers (D1, D2... up to D${maxDayNumber})`)
     confidence += Math.min(egyptDayMatches.length * 15, 40)
   }
@@ -94,11 +94,11 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   const ntsPattern = /(\d+)\s*NTS?\s*([A-Z]{2,4})/gi
   const ntsMatches = text.match(ntsPattern)
-  
+
   if (ntsMatches && ntsMatches.length >= 1) {
     signals.push(`Found ${ntsMatches.length} night allocation patterns (e.g., "2NTS CAI")`)
     confidence += ntsMatches.length * 15
-    
+
     // Calculate total nights from NTS pattern
     let totalNights = 0
     let match
@@ -116,7 +116,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   const cityCodePattern = new RegExp(`\\b(${EGYPT_CITY_CODES.join('|')})\\b`, 'gi')
   const cityMatches = text.match(cityCodePattern)
-  
+
   if (cityMatches && cityMatches.length >= 2) {
     const uniqueCities = [...new Set(cityMatches.map(c => c.toUpperCase()))]
     signals.push(`Found ${uniqueCities.length} Egyptian city codes: ${uniqueCities.join(', ')}`)
@@ -128,7 +128,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   const cruisePattern = /\b(CRZ|C\/IN|C\/OUT|check\s*in\s*crz|check\s*out\s*crz)\b/gi
   const cruiseMatches = text.match(cruisePattern)
-  
+
   if (cruiseMatches && cruiseMatches.length >= 1) {
     signals.push(`Found cruise indicators (CRZ, C/IN, C/OUT)`)
     confidence += 15
@@ -139,7 +139,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   const flightPattern = new RegExp(`\\b(${AIRLINE_CODES.join('|')})(\\d{2,4})\\b`, 'gi')
   const flightMatches = text.match(flightPattern)
-  
+
   if (flightMatches && flightMatches.length >= 1) {
     signals.push(`Found ${flightMatches.length} flight codes: ${flightMatches.join(', ')}`)
     confidence += 15
@@ -150,7 +150,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   const timePattern = /@\s*\d{1,2}[:\.]?\d{2}/gi
   const timeMatches = text.match(timePattern)
-  
+
   if (timeMatches && timeMatches.length >= 1) {
     signals.push(`Found ${timeMatches.length} time markers`)
     confidence += 10
@@ -161,7 +161,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   const insideOutsidePattern = /\(\s*(INSIDE|OUTSIDE)\s*\)/gi
   const insideOutsideMatches = text.match(insideOutsidePattern)
-  
+
   if (insideOutsideMatches && insideOutsideMatches.length >= 1) {
     signals.push(`Found ${insideOutsideMatches.length} entrance markers (INSIDE/OUTSIDE)`)
     confidence += 15
@@ -184,7 +184,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   if (dayMarkers && dayMarkers.length >= 2) {
     signals.push(`Found ${dayMarkers.length} standard day markers (Day 1:, Day 2:)`)
     confidence += Math.min(dayMarkers.length * 12, 30)
-    
+
     // Extract highest day number
     dayMarkers.forEach(match => {
       const num = parseInt(match.replace(/\D/g, ''))
@@ -200,13 +200,13 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
     /\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\b/gi,
     /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g,
   ]
-  
+
   let dateMatches = 0
   for (const pattern of datePatterns) {
     const matches = text.match(pattern)
     if (matches) dateMatches += matches.length
   }
-  
+
   if (dateMatches >= 2) {
     signals.push(`Found ${dateMatches} date references`)
     confidence += Math.min(dateMatches * 8, 20)
@@ -217,7 +217,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   const mealPattern = /\b(LUNCH|DINNER|BREAKFAST)\b|\b,\s*[LD]\s*,|\b,\s*[LD]\s*$/gi
   const mealMatches = text.match(mealPattern)
-  
+
   if (mealMatches && mealMatches.length >= 2) {
     signals.push(`Found ${mealMatches.length} meal indicators`)
     confidence += 10
@@ -228,7 +228,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   const overnightPattern = /\bOVERNIGHT\s+(AT|IN)\b/gi
   const overnightMatches = text.match(overnightPattern)
-  
+
   if (overnightMatches && overnightMatches.length >= 1) {
     signals.push(`Found ${overnightMatches.length} overnight indicators`)
     confidence += 10
@@ -240,13 +240,13 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   const attractionPatterns = [
     /\b(pyramids?|sphinx|giza|karnak|luxor\s*temple|valley\s*of\s*(the\s*)?kings|hatshepsut|abu\s*simbel|philae|phaila|edfu|kom\s*ombo|egyptian\s*museum|grand\s*(egyptian\s*)?museum|GEM|khan\s*el[- ]?khalili|citadel|high\s*dam|unfinished\s*obelisk|memnon|pompey|qaitbay|montazah|alexandria\s*library)\b/gi
   ]
-  
+
   let attractionCount = 0
   for (const pattern of attractionPatterns) {
     const matches = text.match(pattern)
     if (matches) attractionCount += matches.length
   }
-  
+
   if (attractionCount >= 3) {
     signals.push(`Found ${attractionCount} Egyptian attractions`)
     confidence += Math.min(attractionCount * 3, 15)
@@ -257,7 +257,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   const transitionPattern = /[A-Z]{2,4}\s*\/\s*[A-Z]{2,4}/gi
   const transitionMatches = text.match(transitionPattern)
-  
+
   if (transitionMatches && transitionMatches.length >= 1) {
     signals.push(`Found ${transitionMatches.length} city transitions (e.g., CAI/ALX)`)
     confidence += transitionMatches.length * 10
@@ -266,13 +266,13 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   // EXTRACT DAY SEGMENTS for passing to AI
   // ============================================
-  
+
   // Method 1: Split by D1, D2, D3... pattern
   const daySegmentPattern = /\bD(\d+)\b/gi
   let lastIndex = 0
   let match
   const segments: { dayNum: number; content: string; startIndex: number }[] = []
-  
+
   while ((match = daySegmentPattern.exec(text)) !== null) {
     if (segments.length > 0) {
       // Complete the previous segment
@@ -284,12 +284,12 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
       startIndex: match.index
     })
   }
-  
+
   // Complete the last segment
   if (segments.length > 0) {
     segments[segments.length - 1].content = text.substring(segments[segments.length - 1].startIndex).trim()
   }
-  
+
   // Sort by day number and extract content
   segments.sort((a, b) => a.dayNum - b.dayNum)
   segments.forEach(seg => {
@@ -324,15 +324,15 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
   // ============================================
   // DETERMINE IF STRUCTURED
   // ============================================
-  
+
   // Lower threshold if we have strong Egyptian patterns
   const hasEgyptianPatterns = egyptDayMatches && egyptDayMatches.length >= 2
   const hasNtsPattern = ntsMatches && ntsMatches.length >= 1
   const hasCityCodes = cityMatches && cityMatches.length >= 2
-  
+
   // If we have D1, D2 patterns OR NTS patterns, it's definitely structured
   const definitelyStructured = hasEgyptianPatterns || (hasNtsPattern && hasCityCodes)
-  
+
   const isStructured = definitelyStructured || (confidence >= 35 && detectedDays >= 2)
 
   // Boost confidence if definitely structured
@@ -340,17 +340,7 @@ function detectStructuredItinerary(text: string): StructureDetectionResult {
     confidence = Math.max(confidence, 70)
   }
 
-  console.log('🔍 Structure Detection Debug:', {
-    egyptDayMatches: egyptDayMatches?.length || 0,
-    ntsMatches: ntsMatches?.length || 0,
-    cityMatches: cityMatches?.length || 0,
-    maxDayNumber,
-    detectedDays,
-    confidence,
-    definitelyStructured,
-    isStructured,
-    signals
-  })
+
 
   return {
     isStructured,
@@ -379,27 +369,27 @@ function extractPhoneFromText(text: string): string {
     /携帯[：:]\s*([0-9\-\+\(\)\s]{8,20})/,
     /電話[：:]\s*([0-9\-\+\(\)\s]{8,20})/,
   ]
-  
+
   for (const pattern of telPatterns) {
     const match = text.match(pattern)
     if (match && match[1]) {
       return match[1].trim()
     }
   }
-  
+
   const phonePatterns = [
     /\+\d{1,3}[\s\-]?\d{2,4}[\s\-]?\d{3,4}[\s\-]?\d{3,4}/,
     /\d{2,4}-\d{3,4}-\d{3,4}/,
     /\(\d{2,4}\)\s?\d{3,4}[\s\-]?\d{3,4}/,
   ]
-  
+
   for (const pattern of phonePatterns) {
     const match = text.match(pattern)
     if (match) {
       return match[0].trim()
     }
   }
-  
+
   return ''
 }
 
@@ -425,14 +415,8 @@ export async function POST(request: Request) {
 
     // Pre-detect if this is a structured itinerary
     const structureDetection = detectStructuredItinerary(conversation)
-    
-    console.log('📊 Structure Detection Result:', {
-      isStructured: structureDetection.isStructured,
-      confidence: structureDetection.confidence,
-      detectedDays: structureDetection.detectedDays,
-      signals: structureDetection.signals,
-      rawDaySegments: structureDetection.rawDaySegments.length
-    })
+
+
 
     // Pre-extract email and phone using regex as fallback
     const regexEmail = extractEmailFromText(conversation)
@@ -471,7 +455,7 @@ export async function POST(request: Request) {
       }
     } catch (e) {
       console.error('Failed to parse Claude response:', e)
-      console.log('Raw response:', responseText.substring(0, 500))
+
     }
 
     // Helper to validate date
@@ -489,7 +473,7 @@ export async function POST(request: Request) {
       client_phone: extracted.client_phone || regexPhone || '',
       company_name: extracted.company_name || '',
       nationality: extracted.nationality || '',
-      
+
       // Trip info
       trip_name: extracted.trip_name || extracted.tour_requested || 'Egypt Tour',
       tour_requested: extracted.tour_requested || '',
@@ -499,44 +483,37 @@ export async function POST(request: Request) {
       duration_days: parseInt(extracted.duration_days) || structureDetection.detectedDays || 1,
       num_adults: parseInt(extracted.num_adults) || 2,
       num_children: parseInt(extracted.num_children) || 0,
-      
+
       // Preferences
       language: extracted.language || 'English',
       interests: Array.isArray(extracted.interests) ? extracted.interests : [],
       cities: Array.isArray(extracted.cities) ? extracted.cities : [],
       special_requests: Array.isArray(extracted.special_requests) ? extracted.special_requests : [],
       budget_level: extracted.budget_level || 'standard',
-      
+
       // Accommodation
       hotel_name: extracted.hotel_name || '',
       hotel_location: extracted.hotel_location || '',
-      
+
       // Metadata
       conversation_language: extracted.conversation_language || 'English',
       confidence_score: parseFloat(extracted.confidence_score) || 0.8,
-      
+
       // STRUCTURE DETECTION RESULTS
       is_structured_input: structureDetection.isStructured,
       structure_confidence: structureDetection.confidence,
       structure_signals: structureDetection.signals,
-      
+
       // EXTRACTED DAY-BY-DAY (only if structured)
       extracted_days: structureDetection.isStructured && extracted.days 
         ? extracted.days 
         : null,
-      
+
       // Raw itinerary text for generator (only if structured)
       raw_itinerary: structureDetection.isStructured ? conversation : null
     }
 
-    console.log('✅ Parsed result:', {
-      client: data.client_name,
-      isStructured: data.is_structured_input,
-      structureConfidence: data.structure_confidence,
-      days: data.extracted_days?.length || 0,
-      durationDays: data.duration_days,
-      signals: data.structure_signals
-    })
+
 
     return NextResponse.json({
       success: true,
@@ -630,7 +607,7 @@ Return ONLY valid JSON:
   "client_phone": "extracted phone or empty string",
   "company_name": "company if B2B or empty string",
   "nationality": "nationality if mentioned or empty string",
-  
+
   "trip_name": "Descriptive trip name based on itinerary",
   "tour_requested": "original request summary",
   "tour_name": "Descriptive tour name",
@@ -639,19 +616,19 @@ Return ONLY valid JSON:
   "duration_days": number (calculate from NTS if not explicit),
   "num_adults": number (default 2),
   "num_children": number (default 0),
-  
+
   "language": "guide language preference",
   "interests": ["decoded interests/attractions"],
   "cities": ["Cairo", "Alexandria", "Aswan", "Luxor", "Hurghada"],
   "special_requests": ["any special requests"],
   "budget_level": "budget|standard|deluxe|luxury",
-  
+
   "hotel_name": "hotel if mentioned",
   "hotel_location": "location if mentioned",
-  
+
   "conversation_language": "English",
   "confidence_score": 0.95,
-  
+
   "days": [
     {
       "day_number": 1,
@@ -710,7 +687,7 @@ Extract the following and return as JSON:
   "client_phone": "Phone number",
   "company_name": "Company name if B2B",
   "nationality": "Client nationality if mentioned",
-  
+
   "trip_name": "Descriptive trip name",
   "tour_requested": "What they're asking for",
   "tour_name": "Tour name",
@@ -719,16 +696,16 @@ Extract the following and return as JSON:
   "duration_days": number,
   "num_adults": number,
   "num_children": number,
-  
+
   "language": "Preferred guide language",
   "interests": ["places they want to visit", "activities"],
   "cities": ["cities mentioned"],
   "special_requests": ["any special requests"],
   "budget_level": "budget|standard|deluxe|luxury",
-  
+
   "hotel_name": "Hotel if mentioned",
   "hotel_location": "Location if mentioned",
-  
+
   "conversation_language": "Language of the conversation",
   "confidence_score": 0.0 to 1.0
 }

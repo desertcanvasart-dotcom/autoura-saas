@@ -72,15 +72,11 @@ async function getUserPreferences(supabase: any, userId: string): Promise<UserPr
       .single()
 
     if (error || !data) {
-      console.log('[Pricing] No user preferences found, using defaults')
+
       return null
     }
 
-    console.log('[Pricing] User preferences loaded:', {
-      margin: data.default_margin_percent,
-      tier: data.default_tier,
-      cost_mode: data.default_cost_mode
-    })
+
 
     return {
       default_cost_mode: data.default_cost_mode || 'auto',
@@ -101,7 +97,7 @@ async function getUserPreferences(supabase: any, userId: string): Promise<UserPr
 async function getCurrentUserId(): Promise<string | null> {
   try {
     const cookieStore = await cookies()
-    
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -191,7 +187,7 @@ async function getTransportationRate(supabase: any, city: string, tier: string, 
     'Cairo': 52, 'Giza': 52, 'Luxor': 45, 'Aswan': 45,
     'Alexandria': 60, 'Hurghada': 55
   }
-  
+
   return {
     rate: fallback[city] || 50,
     supplier_id: null,
@@ -268,7 +264,7 @@ async function getEntranceFee(supabase: any, attractionName: string, isEuroPassp
   // Try entrance_fees table first (PRIMARY TABLE)
   // Use exact match first, then fall back to fuzzy match
   let fee = null
-  
+
   // First try exact match
   const { data: exactFee } = await supabase
     .from('entrance_fees')
@@ -277,7 +273,7 @@ async function getEntranceFee(supabase: any, attractionName: string, isEuroPassp
     .eq('attraction_name', attractionName)
     .limit(1)
     .single()
-  
+
   if (exactFee) {
     fee = exactFee
   } else {
@@ -330,7 +326,7 @@ async function getEntranceFee(supabase: any, attractionName: string, isEuroPassp
   }
 
   // Fallback - unknown attractions are NOT add-ons
-  console.log(`[Pricing] ⚠️ No rate found for "${attractionName}", using fallback €15`)
+
   return {
     rate: 15,
     rateEur: 15,
@@ -542,7 +538,7 @@ export async function POST(
     // Next.js 15: params is now a Promise
     const { id: itineraryId } = await params
     const body: PricingRequest = await request.json()
-    
+
     const { 
       tier, 
       package_type, 
@@ -552,22 +548,22 @@ export async function POST(
       nationality_type,
       include_addons = false  // NEW: Default to NOT including add-ons
     } = body
-    
+
     const totalPax = num_adults + num_children
     const isEuroPassport = nationality_type === 'eur'
 
-    console.log(`[Pricing] Starting for itinerary ${itineraryId}`)
-    console.log(`[Pricing] ${days.length} days, ${totalPax} pax, tier: ${tier}, package: ${package_type}`)
-    console.log(`[Pricing] Include add-ons: ${include_addons}`)
+
+
+
     const cruisePackageTypes = ['cruise-package', 'cruise-land', 'nile-cruise', 'cruise']
-    console.log(`[Pricing] Is cruise package: ${cruisePackageTypes.includes(package_type)} (type: "${package_type}")`)
+
 
     // ============================================
     // GET USER PREFERENCES
     // ============================================
     const userId = await getCurrentUserId()
     let userPrefs: UserPreferences | null = null
-    
+
     if (userId) {
       userPrefs = await getUserPreferences(supabase, userId)
     }
@@ -585,11 +581,11 @@ export async function POST(
     let marginPercent: number
     if (itinerary?.margin_percent !== null && itinerary?.margin_percent !== undefined) {
       marginPercent = itinerary.margin_percent
-      console.log(`[Pricing] Using itinerary margin: ${marginPercent}%`)
+
     } else if (userPrefs?.default_margin_percent !== null && userPrefs?.default_margin_percent !== undefined) {
       marginPercent = userPrefs.default_margin_percent
-      console.log(`[Pricing] Using user preference margin: ${marginPercent}%`)
-      
+
+
       // Also save this margin to the itinerary for future reference
       await supabase
         .from('itineraries')
@@ -597,7 +593,7 @@ export async function POST(
         .eq('id', itineraryId)
     } else {
       marginPercent = DEFAULT_MARGIN_PERCENT
-      console.log(`[Pricing] Using default margin: ${marginPercent}%`)
+
     }
 
     const currency = itinerary?.currency || userPrefs?.default_currency || DEFAULT_CURRENCY
@@ -627,7 +623,7 @@ export async function POST(
     const allServices: any[] = []
     let totalSupplierCost = 0
     let totalClientPrice = 0
-    
+
     // NEW: Track skipped add-ons for reporting
     const skippedAddons: string[] = []
 
@@ -709,14 +705,14 @@ export async function POST(
       // ENTRANCE FEES - NOW WITH ADD-ON CHECK
       for (const attraction of attractions) {
         const entrance = await memoRate(`entrance|${attraction}|${isEuroPassport}`, () => getEntranceFee(supabase, attraction, isEuroPassport))
-        
+
         // NEW: Skip add-ons if not explicitly included
         if (entrance.isAddon && !include_addons) {
-          console.log(`[Pricing] ⏭️ Skipping add-on: ${entrance.name} (${entrance.addonNote || 'optional extra'})`)
+
           skippedAddons.push(entrance.name)
           continue
         }
-        
+
         const entranceTotal = entrance.rate * totalPax
         // No markup on entrance fees typically
         allServices.push({
@@ -914,10 +910,10 @@ export async function POST(
       })
       .eq('id', itineraryId)
 
-    console.log(`[Pricing] Complete: Cost €${totalSupplierCost.toFixed(2)} → Client €${totalClientPrice.toFixed(2)} (${marginPercent}% margin = €${profit.toFixed(2)} profit)`)
-    
+
+
     if (skippedAddons.length > 0) {
-      console.log(`[Pricing] Skipped ${skippedAddons.length} add-ons: ${skippedAddons.join(', ')}`)
+
     }
 
     return NextResponse.json({

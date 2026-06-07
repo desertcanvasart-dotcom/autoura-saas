@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabase()
     const searchParams = request.nextUrl.searchParams
-    
+
     // Parse query parameters
     const search = searchParams.get('search') || ''
     const is_active = searchParams.get('is_active')
@@ -45,9 +45,9 @@ export async function GET(request: NextRequest) {
     if (is_active === 'true' || active_only === 'true') {
       query = query.eq('status', 'active')
     }
-    
+
     const { data: suppliers, error } = await query
-    
+
     if (error) {
       console.error('Error fetching guides:', error)
       return NextResponse.json(
@@ -74,8 +74,8 @@ export async function GET(request: NextRequest) {
       ...g
     }))
 
-    console.log(`✅ Found ${guides.length} guides from suppliers table`)
-    
+
+
     // If checking availability, filter out guides with conflicting bookings
     if (availability_from && availability_to) {
       let bookingsQuery = supabase
@@ -83,17 +83,17 @@ export async function GET(request: NextRequest) {
         .select('assigned_guide_id')
         .not('assigned_guide_id', 'is', null)
         .or(`and(start_date.lte.${availability_to},end_date.gte.${availability_from})`)
-      
+
       if (exclude_itinerary_id) {
         bookingsQuery = bookingsQuery.neq('id', exclude_itinerary_id)
       }
-      
+
       const { data: bookings } = await bookingsQuery
-      
+
       const bookedGuideIds = bookings?.map(b => b.assigned_guide_id) || []
       guides = guides.filter(g => !bookedGuideIds.includes(g.id))
     }
-    
+
     // Add statistics if requested
     if (with_stats && guides.length > 0) {
       const guidesWithStats = await Promise.all(
@@ -102,18 +102,18 @@ export async function GET(request: NextRequest) {
             .from('itineraries')
             .select('id, start_date, end_date, total_cost')
             .eq('assigned_guide_id', guide.id)
-          
+
           const now = new Date()
           const activeBookings = bookings?.filter(b => 
             new Date(b.start_date) <= now && new Date(b.end_date) >= now
           ).length || 0
-          
+
           const upcomingBookings = bookings?.filter(b => 
             new Date(b.start_date) > now
           ).length || 0
-          
+
           const totalRevenue = bookings?.reduce((sum, b) => sum + (b.total_cost || 0), 0) || 0
-          
+
           return {
             ...guide,
             active_bookings: activeBookings,
@@ -122,13 +122,13 @@ export async function GET(request: NextRequest) {
           }
         })
       )
-      
+
       return NextResponse.json({ success: true, data: guidesWithStats })
     }
 
     // Return wrapped format for guide-rates-content
     return NextResponse.json({ success: true, data: guides })
-    
+
   } catch (error) {
     console.error('Error in guides GET:', error)
     return NextResponse.json(
@@ -142,14 +142,14 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = getSupabase()
     const body = await request.json()
-    
+
     if (!body.name) {
       return NextResponse.json(
         { success: false, error: 'Guide name is required' },
         { status: 400 }
       )
     }
-    
+
     // Create guide as a supplier with type='guide'
     const guideData = {
       type: 'guide',
@@ -165,35 +165,35 @@ export async function POST(request: NextRequest) {
       hourly_rate: body.hourly_rate || null,
       notes: body.notes || null,
     }
-    
+
     const { data, error } = await supabase
       .from('suppliers')
       .insert([guideData])
       .select()
       .single()
-    
+
     if (error) {
       console.error('Error creating guide:', error)
-      
+
       if (error.code === '23505') {
         return NextResponse.json(
           { success: false, error: 'A guide with this email already exists' },
           { status: 409 }
         )
       }
-      
+
       return NextResponse.json(
         { success: false, error: 'Failed to create guide' },
         { status: 500 }
       )
     }
-    
+
     return NextResponse.json({
       success: true,
       data: data,
       message: 'Guide created successfully',
     }, { status: 201 })
-    
+
   } catch (error) {
     console.error('Error in guides POST:', error)
     return NextResponse.json(

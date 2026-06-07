@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
   const supabaseAdmin = getSupabaseAdmin()
 
-  console.log('🧠 Agent memory cron: starting...')
+
 
   // --------------------------------------------------------
   // STEP 1: Find unprocessed successful runs from last 24h
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
   }
   const runs = (runsToProcess || []) as unknown as AgentRun[]
 
-  console.log(`🧠 Memory cron: found ${runs.length} runs to process`)
+
 
   // --------------------------------------------------------
   // STEP 2: Process each run for memory extraction
@@ -104,9 +104,7 @@ export async function POST(request: NextRequest) {
       totalMemoriesWritten += result.memories_written
       runsProcessed++
 
-      console.log(
-        `🧠 Processed run ${run.id}: ${result.memories_written} memories written`
-      )
+
     } catch (err) {
       console.error(`🧠 Failed to process run ${run.id}:`, err)
       runsFailed++
@@ -123,7 +121,7 @@ export async function POST(request: NextRequest) {
       'purge_expired_agent_memories'
     )
     memoriesPurged = purgeResult || 0
-    console.log(`🧠 Purged ${memoriesPurged} expired memories`)
+
   } catch (err) {
     console.error('🧠 Memory purge failed:', err)
   }
@@ -140,7 +138,7 @@ export async function POST(request: NextRequest) {
     duration_ms: duration,
   }
 
-  console.log('🧠 Agent memory cron complete:', summary)
+
 
   return NextResponse.json(summary)
 }

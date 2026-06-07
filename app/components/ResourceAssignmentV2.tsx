@@ -218,21 +218,21 @@ export default function ResourceAssignmentV2({
   const [activeTab, setActiveTab] = useState('guide')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  
+
   // Filter states for modal
   const [modalCityFilter, setModalCityFilter] = useState('all')
   const [modalRouteFilter, setModalRouteFilter] = useState('all')
   const [modalAirportFilter, setModalAirportFilter] = useState('all')
-  
+
   // Available resources from each table
   const [availableResources, setAvailableResources] = useState<Record<string, Resource[]>>({})
-  
+
   // Assigned resources for this itinerary
   const [assignedResources, setAssignedResources] = useState<AssignedResource[]>([])
-  
+
   // Conflicts
   const [conflicts, setConflicts] = useState<Conflict[]>([])
-  
+
   // Add resource modal
   const [showAddModal, setShowAddModal] = useState(false)
   const [addFormData, setAddFormData] = useState({
@@ -275,26 +275,26 @@ export default function ResourceAssignmentV2({
   }
   const fetchAvailableResources = async () => {
     const resources: Record<string, Resource[]> = {}
-    
+
     for (const type of RESOURCE_TYPES) {
       try {
         const response = await fetch(`${type.apiEndpoint}?is_active=true`)
-        
+
         // Handle 404 or other errors gracefully
         if (!response.ok) {
-          console.log(`Resource API not available: ${type.apiEndpoint}`)
+
           resources[type.key] = []
           continue
         }
-        
+
         const data = await response.json()
         resources[type.key] = Array.isArray(data) ? data : (data.data || [])
       } catch (error) {
-        console.log(`Error fetching ${type.key}:`, error)
+
         resources[type.key] = []
       }
     }
-    
+
     setAvailableResources(resources)
   }
 
@@ -302,7 +302,7 @@ export default function ResourceAssignmentV2({
     try {
       const response = await fetch(`/api/itinerary-resources?itinerary_id=${itineraryId}`)
       const data = await response.json()
-      
+
       if (data.success) {
         setAssignedResources(data.data || [])
       }
@@ -315,7 +315,7 @@ export default function ResourceAssignmentV2({
     try {
       const response = await fetch(`/api/itinerary-resources/conflicts?itinerary_id=${itineraryId}`)
       const data = await response.json()
-      
+
       if (data.success) {
         setConflicts(data.data || [])
       }
@@ -328,9 +328,9 @@ export default function ResourceAssignmentV2({
   const getFilteredResourcesForModal = (): Resource[] => {
     const resources = availableResources[activeTab] || []
     const typeConfig = RESOURCE_TYPES.find(t => t.key === activeTab)
-    
+
     if (!typeConfig) return resources
-    
+
     // Filter based on resource type
     switch (typeConfig.filterType) {
       case 'city':
@@ -343,7 +343,7 @@ export default function ResourceAssignmentV2({
           const city = r[typeConfig.cityField || 'city']
           return city?.toLowerCase().includes(modalCityFilter.toLowerCase())
         })
-      
+
       case 'airport':
         // For airport staff - filter by airport_location
         if (modalAirportFilter === 'all') return resources
@@ -351,7 +351,7 @@ export default function ResourceAssignmentV2({
           const location = r.airport_location?.toLowerCase() || ''
           return location.includes(modalAirportFilter.toLowerCase())
         })
-      
+
       case 'hotelCity':
         // For hotel staff - filter by hotel.city
         if (modalCityFilter === 'all') return resources
@@ -359,12 +359,12 @@ export default function ResourceAssignmentV2({
           const hotelCity = r.hotel?.city?.toLowerCase() || ''
           return hotelCity.includes(modalCityFilter.toLowerCase())
         })
-      
+
       case 'route':
         // For cruises - filter by route
         if (modalRouteFilter === 'all') return resources
         return resources.filter(r => r.route === modalRouteFilter)
-      
+
       default:
         return resources
     }
@@ -402,7 +402,7 @@ export default function ResourceAssignmentV2({
     const resources = availableResources[type] || []
     const typeConfig = RESOURCE_TYPES.find(t => t.key === type)
     const cityField = typeConfig?.cityField || 'city'
-    
+
     const cities = new Set<string>()
     resources.forEach(r => {
       const city = r[cityField]
@@ -422,10 +422,10 @@ export default function ResourceAssignmentV2({
       const activeType = RESOURCE_TYPES.find(t => t.key === activeTab)
       const filteredResources = getFilteredResourcesForModal()
       const selectedResource = filteredResources.find(r => r.id === addFormData.resource_id)
-      
+
       // Build resource name with location info
       let resourceName = selectedResource?.[activeType?.nameField || 'name'] || 'Unknown'
-      
+
       // Add location context to the name
       if (activeTab === 'airport_staff' && selectedResource?.airport_location) {
         resourceName += ` (${selectedResource.airport_location})`
@@ -441,7 +441,7 @@ export default function ResourceAssignmentV2({
       } else if (selectedResource?.city && ['guide', 'vehicle', 'hotel', 'restaurant'].includes(activeTab)) {
         resourceName += ` (${selectedResource.city})`
       }
-      
+
       const response = await fetch('/api/itinerary-resources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -506,7 +506,7 @@ export default function ResourceAssignmentV2({
     if (!typeConfig?.canNotify) return
 
     setSendingWhatsApp(resource.id)
-    
+
     try {
       let endpoint = ''
       let body: any = {}
@@ -529,7 +529,7 @@ export default function ResourceAssignmentV2({
           notes: resource.notes
         }
       } else {
-        console.log('No WhatsApp endpoint for resource type:', resource.resource_type)
+
         return
       }
 
@@ -631,7 +631,7 @@ export default function ResourceAssignmentV2({
             const hasConflict = getConflictsForType(type.key).length > 0
             const isActive = activeTab === type.key
             const colorClass = COLOR_CLASSES[type.color]
-            
+
             return (
               <button
                 key={type.key}
@@ -689,7 +689,7 @@ export default function ResourceAssignmentV2({
               const canNotify = typeConfig?.canNotify || false
               const isSending = sendingWhatsApp === resource.id
               const wasSent = whatsAppSent.has(resource.id)
-              
+
               return (
                 <div 
                   key={resource.id}
@@ -725,7 +725,7 @@ export default function ResourceAssignmentV2({
                         )}
                       </div>
                     </div>
-                    
+
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2">
                       {/* WhatsApp Button */}
@@ -752,7 +752,7 @@ export default function ResourceAssignmentV2({
                           </span>
                         </button>
                       )}
-                      
+
                       {/* Remove Button */}
                       <button
                         onClick={() => handleRemoveResource(resource.id)}
@@ -809,9 +809,9 @@ export default function ResourceAssignmentV2({
             </div>
 
             <div className="p-6 space-y-4">
-              
+
               {/* ===== FILTER SECTION ===== */}
-              
+
               {/* City Filter - for guides, vehicles, hotels, restaurants */}
               {activeTypeConfig.filterType === 'city' && (
                 <div>

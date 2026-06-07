@@ -60,7 +60,7 @@ function formatEmailBody(html: string): string {
   lines.forEach((line) => {
     const trimmed = line.trim()
     const bulletMatch = trimmed.match(/^[■●•◦▪▸►‣⁃\-–—\*]\s*(.+)/)
-    
+
     if (bulletMatch) {
       if (!inList) {
         inList = true
@@ -80,7 +80,7 @@ function formatEmailBody(html: string): string {
         inList = false
         listItems = []
       }
-      
+
       if (trimmed) {
         const headerMatch = trimmed.match(/^\[([^\]]+)\]$/)
         if (headerMatch) {
@@ -180,7 +180,7 @@ export default function InboxPage() {
   const [folder, setFolder] = useState<FolderType>('inbox')
   const [starredEmails, setStarredEmails] = useState<Set<string>>(new Set())
   const [isFolderCollapsed, setIsFolderCollapsed] = useState(false)
-  
+
   const [customLabels, setCustomLabels] = useState<GmailLabel[]>([])
   const [showLabelModal, setShowLabelModal] = useState(false)
   const [showMoveMenu, setShowMoveMenu] = useState<string | null>(null)
@@ -198,7 +198,7 @@ export default function InboxPage() {
   const [nextPageToken, setNextPageToken] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  
+
   const supabase = createClient()
 
   // NEW: Email polling hook for real-time updates
@@ -214,10 +214,10 @@ export default function InboxPage() {
     enabled: isConnected && !!user,
     interval: 120000, // Poll every 2 minutes
     onNewEmails: (newEmails) => {
-      console.log('New emails received:', newEmails.length)
+
       setNewEmailCount(prev => prev + newEmails.length)
       setShowNewEmailBanner(true)
-      
+
       // Add new emails to the list if we're in inbox
       if (folder === 'inbox') {
         setEmails(prev => {
@@ -307,7 +307,7 @@ export default function InboxPage() {
   // UPDATED: fetchEmails with caching and attachment parsing - RESET pagination
   const fetchEmails = async (query?: string, targetFolder?: FolderType) => {
     if (!user) return
-    
+
     setRefreshing(true)
     // Reset pagination when fetching fresh
     setNextPageToken(null)
@@ -319,7 +319,7 @@ export default function InboxPage() {
       if (!query && isCacheReady) {
         const cached = await getCached(currentFolder, { limit: 25 })
         if (cached.fromCache && !cached.isStale) {
-          console.log('Using cached emails for', currentFolder)
+
           setEmails(cached.emails as Email[])
           setRefreshing(false)
           // Still fetch fresh in background
@@ -327,7 +327,7 @@ export default function InboxPage() {
           return
         }
       }
-      
+
       await fetchFreshEmails(query, currentFolder, false)
     } catch (err: any) {
       setError(err.message)
@@ -338,18 +338,18 @@ export default function InboxPage() {
   // UPDATED: Helper function to fetch fresh emails from API with pagination support
   const fetchFreshEmails = async (query?: string, currentFolder?: FolderType, isBackground = false, pageToken?: string) => {
     if (!user) return
-    
+
     try {
       const params = new URLSearchParams({
         userId: user.id,
         maxResults: '25', // Reduced from 50 for faster initial load
       })
-      
+
       // Add page token for pagination
       if (pageToken) {
         params.append('pageToken', pageToken)
       }
-      
+
       const folderToUse = currentFolder || folder
       let folderQuery = query || ''
 
@@ -360,7 +360,7 @@ export default function InboxPage() {
       } else {
         folderQuery = 'in:inbox -from:me ' + folderQuery
       }
-      
+
       if (folderQuery) params.append('query', folderQuery.trim())
 
       const response = await fetch(`/api/gmail/emails?${params}`)
@@ -376,7 +376,7 @@ export default function InboxPage() {
 
       // PARSE ATTACHMENTS from each email
       setEmails(data.messages || [])
-      
+
       // Update starred set
       const starred = new Set<string>()
       data.messages.forEach((email: Email) => {
@@ -385,7 +385,7 @@ export default function InboxPage() {
         }
       })
       setStarredEmails(starred)
-      
+
       // CACHE THE RESULTS
       if (isCacheReady && !query && !pageToken) {
         await cache(folderToUse, data.messages, historyId || undefined)
@@ -406,16 +406,16 @@ export default function InboxPage() {
   // NEW: Load more emails function for pagination
   const loadMoreEmails = async () => {
     if (!user || !nextPageToken || loadingMore) return
-    
+
     setLoadingMore(true)
-    
+
     try {
       const params = new URLSearchParams({
         userId: user.id,
         maxResults: '25',
         pageToken: nextPageToken,
       })
-      
+
       let folderQuery = searchQuery || ''
 
       if (folder === 'sent') {
@@ -425,7 +425,7 @@ export default function InboxPage() {
       } else {
         folderQuery = 'in:inbox -from:me ' + folderQuery
       }
-      
+
       if (folderQuery) params.append('query', folderQuery.trim())
 
       const response = await fetch(`/api/gmail/emails?${params}`)
@@ -445,7 +445,7 @@ export default function InboxPage() {
         const newEmails = (data.messages || []).filter((e: Email) => !existingIds.has(e.id))
         return [...prev, ...newEmails]
       })
-      
+
       // Update starred set
       data.messages.forEach((email: Email) => {
         if (email.labelIds?.includes('STARRED')) {
@@ -464,7 +464,7 @@ export default function InboxPage() {
   // NEW: Helper to parse attachments from Gmail API response
   const parseAttachments = (email: any): Email['attachments'] => {
     const attachments: Email['attachments'] = []
-    
+
     const processPart = (part: any) => {
       if (part.filename && part.body?.attachmentId) {
         attachments.push({
@@ -478,14 +478,14 @@ export default function InboxPage() {
         part.parts.forEach(processPart)
       }
     }
-    
+
     // Check different possible locations for parts
     if (email.payload?.parts) {
       email.payload.parts.forEach(processPart)
     } else if (email.parts) {
       email.parts.forEach(processPart)
     }
-    
+
     return attachments
   }
 
@@ -496,7 +496,7 @@ export default function InboxPage() {
   }
   const handleParseEmail = () => {
     if (!selectedEmail) return
-    
+
     const senderName = extractName(selectedEmail.from)
     const bodyText = selectedEmail.body
       .replace(/<br\s*\/?>/gi, '\n')
@@ -509,28 +509,28 @@ export default function InboxPage() {
       .replace(/&#39;/g, "'")
       .replace(/\s+/g, ' ')
       .trim()
-    
+
     const conversationText = `From: ${senderName}
 Subject: ${selectedEmail.subject}
 Date: ${new Date(selectedEmail.date).toLocaleString()}
 
 ${bodyText}`
-    
+
     const senderEmail = extractEmailAddress(selectedEmail.from)
     const matchedClient = clients.find(c => c.email?.toLowerCase() === senderEmail.toLowerCase())
-    
+
     // Use base64 encoding to avoid URL issues with special characters
     const encodedConversation = btoa(unescape(encodeURIComponent(conversationText)))
-    
+
     const params = new URLSearchParams({ 
       conversation: encodedConversation, 
       source: 'email',
       encoded: 'base64'
     })
-    
+
     if (matchedClient) params.set('clientId', matchedClient.id)
     if (senderEmail) params.set('email', senderEmail)
-    
+
     window.location.href = `/whatsapp-parser?${params.toString()}`
   }
   useEffect(() => {
@@ -570,10 +570,10 @@ ${bodyText}`
     labelId?: string
   ) => {
     if (!user) return
-    
+
     const ids = messageIds || (selectedEmail ? [selectedEmail.id] : Array.from(selectedEmails))
     if (ids.length === 0) return
-  
+
     setActionLoading(true)
     try {
       const response = await fetch('/api/gmail/actions', {
@@ -581,7 +581,7 @@ ${bodyText}`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, messageIds: ids, action, labelId }),
       })
-  
+
       const data = await response.json()
       if (data.error) throw new Error(data.error)
 
@@ -599,7 +599,7 @@ ${bodyText}`
           }
         }
       }
-  
+
       await fetchEmails()
       setSelectedEmail(null)
       setSelectedEmails(new Set())
@@ -610,7 +610,7 @@ ${bodyText}`
       setActionLoading(false)
     }
   }
-  
+
   const handleDelete = () => handleEmailAction('delete')
   const handleArchive = () => handleEmailAction('archive')
   const handleMarkRead = () => handleEmailAction('markRead')
@@ -620,7 +620,7 @@ ${bodyText}`
   const handleMoveToLabel = (labelId: string) => {
     handleEmailAction('move', undefined, labelId)
   }
-  
+
   const toggleEmailSelection = (emailId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setSelectedEmails(prev => {
@@ -633,7 +633,7 @@ ${bodyText}`
       return next
     })
   }
-  
+
   const selectAllEmails = () => {
     if (selectedEmails.size === filteredEmails.length) {
       setSelectedEmails(new Set())
@@ -641,7 +641,7 @@ ${bodyText}`
       setSelectedEmails(new Set(filteredEmails.map(e => e.id)))
     }
   }
-  
+
   const decodeHtmlEntities = (text: string) => {
     return text
       .replace(/&#39;/g, "'")
@@ -670,7 +670,7 @@ ${bodyText}`
     emails.forEach(email => {
       const emailDate = new Date(email.date)
       emailDate.setHours(0, 0, 0, 0)
-      
+
       let group: string
       if (emailDate.getTime() === today.getTime()) {
         group = 'Today'
@@ -697,7 +697,7 @@ ${bodyText}`
     const now = new Date()
     const diff = now.getTime() - date.getTime()
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    
+
     if (days === 0) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     } else if (days === 1) {
@@ -966,7 +966,7 @@ ${bodyText}`
 
         {/* Email List */}
         <div className={`${selectedEmail ? 'w-2/5' : 'flex-1'} bg-white border-r border-gray-200 overflow-y-auto`}>
-          
+
           {/* Bulk Actions Bar */}
           {filteredEmails.length > 0 && (
             <div className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2 bg-white border-b border-gray-200">
@@ -981,7 +981,7 @@ ${bodyText}`
                   <Square className="w-4 h-4 text-gray-400" />
                 )}
               </button>
-              
+
               {selectedEmails.size > 0 && (
                 <>
                   <span className="text-xs text-gray-500">
@@ -1012,7 +1012,7 @@ ${bodyText}`
                     >
                       <MailOpen className="w-4 h-4 text-gray-500" />
                     </button>
-                    
+
                     <div className="relative">
                       <button
                         onClick={() => setShowMoveMenu(showMoveMenu ? null : 'bulk')}
@@ -1040,7 +1040,7 @@ ${bodyText}`
                   </div>
                 </>
               )}
-              
+
               {/* Email count indicator */}
               {selectedEmails.size === 0 && (
                 <span className="text-xs text-gray-400 ml-auto">
@@ -1080,7 +1080,7 @@ ${bodyText}`
                     const isSentByMe = folder === 'sent' || isFromMe(email)
                     const isStarred = starredEmails.has(email.id)
                     const isSelected = selectedEmails.has(email.id)
-                    
+
                     return (
                       <div
                         key={email.id}
@@ -1110,7 +1110,7 @@ ${bodyText}`
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-medium ${getAvatarColor(displayEmail)}`}>
                             {getInitials(displayName)}
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2 mb-0.5">
                               <div className="flex items-center gap-1.5 min-w-0">
@@ -1159,7 +1159,7 @@ ${bodyText}`
                   })}
                 </div>
               ))}
-              
+
               {/* LOAD MORE BUTTON */}
               {hasMore && (
                 <div className="p-4 border-t border-gray-100">
@@ -1182,7 +1182,7 @@ ${bodyText}`
                   </button>
                 </div>
               )}
-              
+
               {/* End of list indicator */}
               {!hasMore && filteredEmails.length > 0 && (
                 <div className="p-4 text-center text-xs text-gray-400">
@@ -1227,7 +1227,7 @@ ${bodyText}`
                       <Mail className="w-4 h-4 text-gray-500" />
                     )}
                   </button>
-                  
+
                   {customLabels.length > 0 && (
                     <div className="relative">
                       <button 
@@ -1254,7 +1254,7 @@ ${bodyText}`
                       )}
                     </div>
                   )}
-                  
+
                   {/* Parse Email Button */}
                   <button
                     onClick={handleParseEmail}
@@ -1288,7 +1288,7 @@ ${bodyText}`
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
                 {decodeHtmlEntities(selectedEmail.subject || '(No subject)')}
               </h2>
-              
+
               <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-200">
                 {folder === 'sent' || isFromMe(selectedEmail) ? (
                   <>
@@ -1429,7 +1429,7 @@ ${bodyText}`
           <h2 className="text-xl font-semibold text-gray-900 mb-6">
             {decodeHtmlEntities(selectedEmail.subject || '(No subject)')}
           </h2>
-          
+
           <div 
             className="prose prose-sm max-w-none text-gray-700"
             dangerouslySetInnerHTML={{ __html: selectedEmail.body }}
@@ -1479,7 +1479,7 @@ ${bodyText}`
             )}
           </button>
         </div>
-        
+
         <button
           onClick={() => {
             setShowExpandedEmail(false)
@@ -1564,7 +1564,7 @@ function ComposeModal({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
-  
+
   const extractEmailAddr = (from: string) => {
     const match = from.match(/<(.+)>/)
     return match ? match[1] : from
@@ -1581,19 +1581,19 @@ function ComposeModal({
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [showSignatureDropdown, setShowSignatureDropdown] = useState(false)
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
-  
+
   // State for template placeholder modal
   const [showPlaceholderModal, setShowPlaceholderModal] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null)
   const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({})
-  
+
   // CLIENT state
   const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [loadingCRMData, setLoadingCRMData] = useState(false)
   const [clientItineraries, setClientItineraries] = useState<any[]>([])
   const [selectedItineraryId, setSelectedItineraryId] = useState<string>('')
   const [crmPlaceholderData, setCrmPlaceholderData] = useState<Record<string, string>>({})
-  
+
   // PARTNER state
   const [activeTab, setActiveTab] = useState<'client' | 'partner'>('client')
   const [partners, setPartners] = useState<any[]>([])
@@ -1609,13 +1609,13 @@ function ComposeModal({
           fetch(`/api/email/signatures?userId=${userId}`),
           fetch(`/api/email/templates?userId=${userId}`)
         ])
-        
+
         const sigData = await sigRes.json()
         const tempData = await tempRes.json()
-        
+
         if (sigData.signatures) setSignatures(sigData.signatures)
         if (tempData.templates) setTemplates(tempData.templates)
-        
+
         const defaultSig = sigData.signatures?.find((s: EmailSignature) => s.is_default)
         if (defaultSig) {
           setBody(`<p></p><br/>${defaultSig.content}`)
@@ -1624,7 +1624,7 @@ function ComposeModal({
         console.error('Error fetching signatures/templates:', err)
       }
     }
-    
+
     if (userId) fetchData()
   }, [userId])
 
@@ -1655,10 +1655,10 @@ function ComposeModal({
     try {
       const response = await fetch(`/api/partners/${partnerId}/template-data?type=${type}`)
       const data = await response.json()
-      
+
       if (data.placeholderData) {
         setPartnerPlaceholderData(data.placeholderData)
-        
+
         // Auto-fill "To" field with partner email
         if (data.placeholderData.partner_email) {
           setTo(data.placeholderData.partner_email)
@@ -1700,20 +1700,20 @@ function ComposeModal({
     try {
       const response = await fetch(`/api/clients/${clientId}/template-data?userId=${userId}`)
       const data = await response.json()
-      
+
       if (data.error) {
         console.error('Error fetching CRM data:', data.error)
         return
       }
 
       setClientItineraries(data.allItineraries || [])
-      
+
       if (data.latestItinerary) {
         setSelectedItineraryId(data.latestItinerary.id)
       }
-      
+
       setCrmPlaceholderData(data.placeholderData || {})
-      
+
       const client = clients.find(c => c.id === clientId)
       if (client?.email) {
         setTo(client.email)
@@ -1735,7 +1735,7 @@ function ComposeModal({
         `/api/clients/${clientId}/template-data?userId=${userId}&itineraryId=${itineraryId}`
       )
       const data = await response.json()
-      
+
       if (data.placeholderData) {
         setCrmPlaceholderData(data.placeholderData)
       }
@@ -1767,7 +1767,7 @@ function ComposeModal({
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      
+
       if (file.size > maxSize) {
         setError(`File "${file.name}" is too large. Maximum size is 25MB.`)
         continue
@@ -1800,7 +1800,7 @@ function ComposeModal({
 
   const useTemplate = (template: EmailTemplate) => {
     const placeholders = getPlaceholders(template.content + ' ' + template.subject)
-    
+
     if (placeholders.length > 0) {
       setSelectedTemplate(template)
       setPlaceholderValues({})
@@ -1879,7 +1879,7 @@ function ComposeModal({
       <div className={`bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full transition-all duration-300 ${
         isExpanded ? 'sm:max-w-4xl sm:h-[85vh]' : 'sm:max-w-2xl'
       } max-h-[95vh] flex flex-col`}>
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
           <h3 className="text-sm font-semibold text-gray-900">
@@ -1953,7 +1953,7 @@ function ComposeModal({
         {['customer', 'partner', 'internal'].map(category => {
           const categoryTemplates = templates.filter(t => t.category === category)
           if (categoryTemplates.length === 0) return null
-          
+
           return (
             <div key={category}>
               <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 sticky top-0">
@@ -1999,7 +1999,7 @@ function ComposeModal({
     )}
   </div>
 )}
-     
+
         {signatures.length > 0 && (
               <div className="relative">
                 <button 
@@ -2163,7 +2163,7 @@ function ComposeModal({
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
-            
+
             <div className="p-5 overflow-y-auto flex-1 space-y-4">
               {/* Tab selector */}
               <div className="flex border border-gray-200 rounded-lg p-1 bg-gray-50">
@@ -2198,7 +2198,7 @@ function ComposeModal({
                     <Users className="w-4 h-4" />
                     Load Client from CRM
                   </p>
-                  
+
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -2283,7 +2283,7 @@ function ComposeModal({
                     <Building2 className="w-4 h-4" />
                     Load Partner from Resources
                   </p>
-                  
+
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -2396,7 +2396,7 @@ function ComposeModal({
                 ))}
               </div>
             </div>
-            
+
             <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setShowPlaceholderModal(false)}
@@ -2434,20 +2434,20 @@ function CreateLabelModal({
 
   const handleCreate = async () => {
     if (!name.trim()) return
-    
+
     setCreating(true)
     setError(null)
-    
+
     try {
       const response = await fetch('/api/gmail/labels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, name: name.trim() }),
       })
-      
+
       const data = await response.json()
       if (data.error) throw new Error(data.error)
-      
+
       onCreated()
     } catch (err: any) {
       setError(err.message)
@@ -2465,14 +2465,14 @@ function CreateLabelModal({
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
-        
+
         <div className="p-5">
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs">
               {error}
             </div>
           )}
-          
+
           <label className="block text-xs font-medium text-gray-600 mb-1">
             Folder Name
           </label>
@@ -2486,7 +2486,7 @@ function CreateLabelModal({
             autoFocus
           />
         </div>
-        
+
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50">
           <button
             onClick={onClose}

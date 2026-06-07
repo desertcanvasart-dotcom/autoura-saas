@@ -8,7 +8,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    console.log('📧 Sending booking confirmation:', id)
+
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -117,8 +117,8 @@ Your Travel Team
     if (send_via === 'email') {
       // TODO: Integrate with existing email system
       // For now, return the message that would be sent
-      console.log('📧 Would send email to:', client?.email)
-      console.log('Message:', confirmationMessage)
+
+
 
       return NextResponse.json({
         success: true,
@@ -131,8 +131,8 @@ Your Travel Team
       })
     } else if (send_via === 'whatsapp') {
       // TODO: Integrate with WhatsApp API
-      console.log('📱 Would send WhatsApp to:', client?.whatsapp_number)
-      console.log('Message:', confirmationMessage)
+
+
 
       return NextResponse.json({
         success: true,

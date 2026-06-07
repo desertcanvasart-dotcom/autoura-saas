@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (e) {
       // email_templates table might not exist, that's okay
-      console.log('Legacy email_templates table not found, using message_templates only')
+
     }
 
     // Transform message_templates to match the expected format

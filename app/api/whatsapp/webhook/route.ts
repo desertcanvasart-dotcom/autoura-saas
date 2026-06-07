@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('✅ Twilio signature validated')
+
 
     // ============================================
     // Extract webhook data (already parsed above)
@@ -71,20 +71,14 @@ export async function POST(request: NextRequest) {
     const mediaUrl = params['MediaUrl0'] || null
     const mediaType = params['MediaContentType0'] || null
 
-    console.log('📥 Received WhatsApp message:', {
-      from,
-      to,
-      messageSid,
-      body: body?.substring(0, 50) + '...',
-      hasMedia: numMedia > 0
-    })
+
 
     // Extract phone number (remove "whatsapp:" prefix)
     const phoneNumber = from.replace('whatsapp:', '')
     const toNumber = to.replace('whatsapp:', '')
 
     const supabase = createClient()
-    
+
     // ============================================
     // STEP 1: Find or create client
     // ============================================
@@ -151,7 +145,7 @@ export async function POST(request: NextRequest) {
       } else {
         conversationId = newConversation.id
         tenantId = newConversation.tenant_id || clientTenantId
-        console.log('✅ Created new conversation:', conversationId)
+
       }
     }
 
@@ -174,7 +168,7 @@ export async function POST(request: NextRequest) {
     if (msgError) {
       console.error('❌ Error storing message:', msgError)
     } else {
-      console.log('✅ Message stored successfully')
+
     }
 
     // ============================================
@@ -276,9 +270,9 @@ export async function POST(request: NextRequest) {
         }
 
         if (!tenantAiEnabled) {
-          console.log('ℹ️ AI auto-response disabled for this tenant')
+
         } else {
-          console.log('🤖 Processing message with AI agent...')
+
 
           const aiResponse = await processIncomingMessage(
             supabase,
@@ -290,8 +284,8 @@ export async function POST(request: NextRequest) {
           )
 
           if (aiResponse.success && aiResponse.shouldRespond && aiResponse.reply) {
-            console.log('🤖 AI response generated:', aiResponse.reply.substring(0, 100) + '...')
-            console.log('🤖 Confidence:', aiResponse.confidence)
+
+
 
             // Send the AI-generated response
             const sendResult = await sendWhatsAppMessage({
@@ -316,12 +310,12 @@ export async function POST(request: NextRequest) {
                   actions_performed: aiResponse.actionsPerformed || []
                 }
               })
-              console.log('✅ AI response sent and stored:', sendResult.messageId)
+
             } else {
               console.error('❌ Failed to send AI response:', sendResult.error)
             }
           } else {
-            console.log('🤖 AI decided not to respond:', aiResponse.reasoning || aiResponse.error)
+
           }
         }
       } catch (aiError) {
@@ -329,7 +323,7 @@ export async function POST(request: NextRequest) {
         // Don't fail the webhook - just log the error
       }
     } else if (!process.env.WHATSAPP_AI_ENABLED) {
-      console.log('ℹ️ AI auto-response disabled. Set WHATSAPP_AI_ENABLED=true to enable.')
+
     }
 
     // ============================================

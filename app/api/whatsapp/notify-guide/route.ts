@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { itineraryId, guideId } = body
 
-    console.log('📤 Notify guide request:', { itineraryId, guideId })
+
 
     if (!itineraryId || !guideId) {
       return NextResponse.json(
@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
 
     // Use contact_phone or whatsapp field
     const guidePhone = guide.contact_phone || guide.whatsapp || guide.phone2
-    
-    console.log('📱 Guide:', { name: guide.name, contact_phone: guide.contact_phone, whatsapp: guide.whatsapp })
+
+
 
     if (!guidePhone) {
       return NextResponse.json(
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    
+
     const message = `🎯 *${businessName} - New Assignment* 🎯\n\n` +
       `Hi ${guide.name},\n\n` +
       `You've been assigned to a new tour!\n\n` +
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       `Good luck! 🌟\n\n` +
       `${businessName} Operations Team`
 
-    console.log('📤 Sending to:', guidePhone)
+
 
     const result = await sendWhatsAppMessage({
       to: guidePhone,
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('✅ Guide notified:', result.messageId)
+
 
     return NextResponse.json({
       success: true,

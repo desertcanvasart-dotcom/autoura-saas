@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { itineraryId } = body
 
-    console.log('📤 Send tour reminder request:', { itineraryId })
+
 
     if (!itineraryId) {
       return NextResponse.json(
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       `See you soon! 🐪✨\n\n` +
       `${businessName} Team`
 
-    console.log('📤 Sending reminder to:', itinerary.client_phone)
+
 
     const result = await sendWhatsAppMessage({
       to: itinerary.client_phone,
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('✅ Tour reminder sent:', result.messageId)
+
 
     return NextResponse.json({
       success: true,

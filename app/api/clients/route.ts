@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       vip_status: body.vip_status || false
     }
 
-    console.log('📝 Creating client:', clientData)
+
 
     const { data: newClient, error: clientError } = await supabase
       .from('clients')
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('✅ Client created:', newClient.id)
+
 
     // Save preferences if provided
     if (body.preferences) {
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
             special_needs: body.preferences.special_needs || null,
             preferred_tier: body.preferences.tier || 'standard'
           })
-        console.log('✅ Client preferences saved')
+
       } catch (e) {
         console.warn('⚠️ Could not save preferences:', e)
       }
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
             note_type: 'general',
             is_internal: true
           })
-        console.log('✅ Client note saved')
+
       } catch (e) {
         console.warn('⚠️ Could not save note:', e)
       }
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
             client_name: `${clientData.first_name} ${clientData.last_name}`.trim()
           })
           .eq('phone_number', body.link_whatsapp_phone)
-        console.log('✅ WhatsApp conversation linked')
+
       } catch (e) {
         console.warn('⚠️ Could not link WhatsApp:', e)
       }

@@ -155,7 +155,7 @@ export async function PUT(
     // Do NOT include tenant_id in update (prevents tenant switching)
     delete updateData.tenant_id
 
-    console.log('Updating template:', id, 'with fields:', Object.keys(updateData))
+
 
     // Update template (RLS enforces tenant boundaries)
     const { data, error } = await supabase

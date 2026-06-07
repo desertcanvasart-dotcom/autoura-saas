@@ -8,10 +8,10 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
   const page = pdfDoc.addPage([595, 842]) // A4
-  
+
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  
+
   const { width, height } = page.getSize()
   const margin = 50
   let y = height - 50
@@ -22,7 +22,7 @@ async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
   page.drawText('Travel2Egypt', {
     x: margin, y, size: 24, font: helveticaBold, color: rgb(0.39, 0.49, 0.28)
   })
-  
+
   page.drawText('INVOICE', {
     x: width - margin - 80, y, size: 20, font: helveticaBold, color: rgb(0.2, 0.2, 0.2)
   })
@@ -32,7 +32,7 @@ async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
   page.drawText(`Invoice: ${invoice.invoice_number}`, {
     x: margin, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4)
   })
-  
+
   const typeLabel = invoice.invoice_type === 'deposit' 
     ? `Deposit (${invoice.deposit_percent}%)`
     : invoice.invoice_type === 'final' ? 'Final Balance' : 'Standard'
@@ -74,7 +74,7 @@ async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
     x: margin, y: y - 5, width: width - 2 * margin, height: 25,
     color: rgb(0.95, 0.95, 0.95)
   })
-  
+
   page.drawText('Description', { x: margin + 10, y: y + 5, size: 9, font: helveticaBold, color: rgb(0.3, 0.3, 0.3) })
   page.drawText('Qty', { x: 350, y: y + 5, size: 9, font: helveticaBold, color: rgb(0.3, 0.3, 0.3) })
   page.drawText('Price', { x: 400, y: y + 5, size: 9, font: helveticaBold, color: rgb(0.3, 0.3, 0.3) })
@@ -87,7 +87,7 @@ async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
     const description = item.description.length > 45 
       ? item.description.substring(0, 45) + '...' 
       : item.description
-    
+
     page.drawText(description, { x: margin + 10, y, size: 10, font: helvetica, color: rgb(0.2, 0.2, 0.2) })
     page.drawText(String(item.quantity), { x: 350, y, size: 10, font: helvetica, color: rgb(0.3, 0.3, 0.3) })
     page.drawText(`${currencySymbol}${Number(item.unit_price).toFixed(2)}`, { x: 400, y, size: 10, font: helvetica, color: rgb(0.3, 0.3, 0.3) })
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { invoiceId } = body
 
-    console.log('📤 Send invoice request:', { invoiceId })
+
 
     if (!invoiceId) {
       return NextResponse.json(
@@ -248,11 +248,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate PDF
-    console.log('📄 Generating invoice PDF...')
+
     const pdfBytes = await generateInvoicePDF(invoice)
 
     // Upload to Supabase Storage (use admin client for storage)
-    console.log('📤 Uploading PDF to storage...')
+
     const fileName = `invoices/invoice-${invoice.invoice_number}-${Date.now()}.pdf`
 
     const { error: uploadError } = await supabaseAdmin.storage
@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(fileName)
 
     const pdfUrl = urlData.publicUrl
-    console.log('✅ PDF uploaded:', pdfUrl)
+
 
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
     const businessEmail = process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'
@@ -307,7 +307,7 @@ export async function POST(request: NextRequest) {
       `📧 ${businessEmail}\n\n` +
       `Thank you! 🙏\n${businessName} Team`
 
-    console.log('📤 Sending to:', clientPhone)
+
 
     const result = await sendWhatsAppMessage({
       to: clientPhone,
@@ -333,7 +333,7 @@ export async function POST(request: NextRequest) {
         .eq('id', invoiceId)
     }
 
-    console.log('✅ Invoice sent with PDF:', result.messageId)
+
 
     return NextResponse.json({
       success: true,

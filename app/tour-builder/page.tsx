@@ -55,12 +55,12 @@ export default function TourBuilderPage() {
       })
 
       const data = await response.json()
-      
+
       if (data.success) {
         setPricing(data.data)
       } else {
         // Silently fail if validation error - tour is still being built
-        console.log('Calculation skipped:', data.error)
+
         setPricing(null)
       }
     } catch (error) {
@@ -286,7 +286,7 @@ export default function TourBuilderPage() {
                   <p className="text-sm text-gray-600 mb-4">
                     Review your tour details and save the template.
                   </p>
-                  
+
                   <div className="space-y-3 mb-6">
                     {/* Tour Details Card */}
                     <div className="bg-white border border-gray-200 rounded-lg p-3">
@@ -360,7 +360,7 @@ export default function TourBuilderPage() {
                               pricing
                             })
                           })
-                          
+
                           const html = await response.text()
                           const blob = new Blob([html], { type: 'text/html' })
                           const url = window.URL.createObjectURL(blob)

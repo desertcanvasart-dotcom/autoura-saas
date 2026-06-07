@@ -70,17 +70,17 @@ function getTwilioClient() {
 export function formatWhatsAppNumber(phone: string): string {
   // Remove all non-digit characters
   let cleaned = phone.replace(/\D/g, '')
-  
+
   // Add + if not present
   if (!cleaned.startsWith('+')) {
     cleaned = '+' + cleaned
   }
-  
+
   // Ensure it starts with country code
   if (cleaned.length < 10) {
     throw new Error('Invalid phone number: too short')
   }
-  
+
   return `whatsapp:${cleaned}`
 }
 
@@ -132,7 +132,7 @@ export async function sendWhatsAppMessage({
       ...(mediaUrl && { mediaUrl: [mediaUrl] })
     })
 
-    console.log('✅ WhatsApp message sent:', message.sid, 'Status:', message.status)
+
 
     // Check if message might be blocked by 24-hour window
     const warning = message.status === 'queued' 
@@ -146,7 +146,7 @@ export async function sendWhatsAppMessage({
     }
   } catch (error: any) {
     console.error('❌ Failed to send WhatsApp message:', error)
-    
+
     // Handle specific Twilio errors
     if (error.code === 63016) {
       return {
@@ -154,7 +154,7 @@ export async function sendWhatsAppMessage({
         error: 'Customer must message first (24-hour window). Use a template message to initiate.'
       }
     }
-    
+
     return {
       success: false,
       error: error.message
@@ -184,7 +184,7 @@ export async function sendQuoteViaWhatsApp({
   try {
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    
+
     // Build message body
     let message = `🌟 *${businessName}* 🌟\n\n`
     message += `Dear ${clientName},\n\n`
@@ -194,27 +194,27 @@ export async function sendQuoteViaWhatsApp({
     message += `🎯 *Tour:* ${tourName}\n`
     message += `📅 *Dates:* ${formatDate(startDate)} - ${formatDate(endDate)}\n`
     message += `👥 *Travelers:* ${adults} adult${adults > 1 ? 's' : ''}`
-    
+
     if (children > 0) {
       message += `, ${children} child${children > 1 ? 'ren' : ''}`
     }
-    
+
     message += `\n💰 *Total Cost:* ${formatCurrency(totalCost)}\n\n`
-    
+
     message += `✨ What's Included:\n`
     message += `✅ Professional tour guide\n`
     message += `✅ All entrance fees\n`
     message += `✅ Private transportation\n`
     message += `✅ Meals as specified\n`
     message += `✅ Hotel pickups\n\n`
-    
+
     message += `📄 Your detailed itinerary is attached as a PDF.\n\n`
-    
+
     message += `💳 *Ready to Book?*\n`
     message += `Reply to this message or contact us:\n`
     message += `📧 ${process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'}\n`
     message += `🌐 ${process.env.BUSINESS_WEBSITE || 'travel2egypt.org'}\n\n`
-    
+
     message += `We look forward to creating unforgettable memories with you! 🐪✨\n\n`
     message += `Best regards,\n`
     message += `${businessName} Team`
@@ -321,9 +321,9 @@ export async function sendStatusUpdate({
   try {
     // Check if auto-updates are enabled
     const autoUpdatesEnabled = process.env.ENABLE_WHATSAPP_STATUS_UPDATES === 'true'
-    
+
     if (!autoUpdatesEnabled) {
-      console.log('ℹ️ WhatsApp status updates are disabled. Set ENABLE_WHATSAPP_STATUS_UPDATES=true to enable.')
+
       return {
         success: false,
         error: 'WhatsApp status updates are disabled'
@@ -361,7 +361,7 @@ export async function sendTourReminder(
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    
+
     const message = `⏰ *${businessName}* ⏰\n\n` +
       `Dear ${clientName},\n\n` +
       `This is a friendly reminder about your tour tomorrow! 🎯\n\n` +
@@ -406,7 +406,7 @@ export async function sendPaymentReminder(
 ): Promise<{ success: boolean; messageId?: string; error?: string }> {
   try {
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    
+
     const message = `💳 *${businessName}* 💳\n\n` +
       `Dear ${clientName},\n\n` +
       `This is a friendly reminder about your pending payment.\n\n` +

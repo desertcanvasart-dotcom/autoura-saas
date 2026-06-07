@@ -69,9 +69,9 @@ export default function WhatsAppButton({
         throw new Error(data.error || 'Failed to send message')
       }
 
-      console.log('✅ WhatsApp sent:', data.messageId)
+
       setSent(true)
-      
+
       setTimeout(() => setSent(false), 3000)
 
       if (onSuccess) {
@@ -96,13 +96,13 @@ export default function WhatsAppButton({
       if (status === 'paid') return 'Sending Confirmation...'
       return 'Sending...'
     }
-    
+
     if (sent) return 'Sent!'
-    
+
     if (type === 'quote') return 'Send Quote via WhatsApp'
     if (type === 'guide') return 'Notify Guide via WhatsApp'
     if (type === 'contract') return 'Send Contract via WhatsApp'
-    
+
     if (type === 'status') {
       switch (status) {
         case 'confirmed':
@@ -119,7 +119,7 @@ export default function WhatsAppButton({
           return 'Send Update via WhatsApp'
       }
     }
-    
+
     return 'Send via WhatsApp'
   }
 

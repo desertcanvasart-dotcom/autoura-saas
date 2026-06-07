@@ -32,16 +32,10 @@ export default function DayPlanner({
 
   const currentDay = tour.days[selectedDay]
 
-  console.log('📅 Current Day:', {
-    dayNumber: currentDay.day_number,
-    city: currentDay.city,
-    hasAccommodation: !!currentDay.accommodation,
-    hasLunchMeal: !!currentDay.lunch_meal,
-    hasDinnerMeal: !!currentDay.dinner_meal
-  })
+
 
   const handleFieldChange = (field: keyof TourDay, value: any) => {
-    console.log('🔄 Field changed:', field, 'Value:', value)
+
     const updatedDay = {
       ...currentDay,
       [field]: value

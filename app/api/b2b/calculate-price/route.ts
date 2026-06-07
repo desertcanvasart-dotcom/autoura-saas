@@ -354,13 +354,7 @@ export async function POST(request: NextRequest) {
       tour_leader_included = false  // NEW: Added tour leader parameter
     } = body
 
-    console.log('📥 B2B Calculate Price Request:', {
-      variation_id,
-      num_pax,
-      tour_leader_included,  // Log this
-      is_eur_passport,
-      margin_percent
-    })
+
 
     if (!variation_id) {
       return NextResponse.json({ error: 'variation_id is required' }, { status: 400 })
@@ -403,9 +397,9 @@ export async function POST(request: NextRequest) {
     // If no services AND template uses day builder, use auto-pricing
     // ============================================
     if ((!services || services.length === 0) && templateId) {
-      console.log('📊 No variation services found, using auto-pricing fallback')
-      console.log(`   tourLeaderIncluded: ${tour_leader_included}`)
-      
+
+
+
       // Determine effective margin (partner override)
       let effectiveMargin = margin_percent
       if (partner_id) {
@@ -498,17 +492,7 @@ export async function POST(request: NextRequest) {
         pax_pricing_table: autoPriceResult.paxPricingTable  // NEW - for rate sheet
       }
 
-      console.log('🎉 B2B Price calculated via auto-pricing:', {
-        variation: v.variation_name,
-        numPax: num_pax,
-        tourLeader: tour_leader_included,
-        cost: result.total_cost,
-        tourLeaderCost: result.tour_leader_cost,
-        margin: effectiveMargin + '%',
-        selling: result.selling_price,
-        perPerson: result.price_per_person,
-        singleSupplement: result.single_supplement
-      })
+
 
       return NextResponse.json({ success: true, data: result })
     }
@@ -565,7 +549,7 @@ export async function POST(request: NextRequest) {
       // ============================================
       if (service.rate_type === 'activity' && service.service_name) {
         const b2bRule = await getB2BPricingRule(service.service_name)
-        
+
         if (b2bRule) {
           const priceResult = applyB2BPricingRule(b2bRule, num_pax)
           unitCost = priceResult.unitCost
@@ -573,8 +557,8 @@ export async function POST(request: NextRequest) {
           pricingNote = priceResult.pricingNote
           effectiveQuantityMode = priceResult.quantityMode
           rateSource = 'b2b_rule'
-          
-          console.log(`✅ B2B Rule applied: ${service.service_name} -> ${pricingNote}`)
+
+
         }
       }
 
@@ -591,7 +575,7 @@ export async function POST(request: NextRequest) {
             effectiveQuantityMode = 'fixed'
             pricingNote = `${vehicle.vehicle}: €${vehicle.rate} (${num_pax} pax)`
             rateSource = 'b2b_package'
-            console.log(`✅ B2B Package applied: ${service.service_name} -> ${pricingNote}`)
+
           }
         }
         else if (service.service_name?.toLowerCase().includes('transfer') || 
@@ -623,7 +607,7 @@ export async function POST(request: NextRequest) {
               effectiveQuantityMode = 'fixed'
               pricingNote = `${vehicle.vehicle}: €${vehicle.rate}/day`
               rateSource = 'vehicles'
-              console.log(`✅ Vehicle from B2C: ${vehicle.vehicle} -> €${vehicle.rate}`)
+
             }
             break
           }
@@ -636,7 +620,7 @@ export async function POST(request: NextRequest) {
               effectiveQuantityMode = 'fixed'
               pricingNote = `${guide.name}: €${guide.rate}/day`
               rateSource = 'guides'
-              console.log(`✅ Guide from B2C: ${guide.name} -> €${guide.rate}`)
+
             }
             break
           }
@@ -651,7 +635,7 @@ export async function POST(request: NextRequest) {
                 effectiveQuantityMode = 'per_pax'
                 pricingNote = `${fee.name}: €${fee.rate}/pax (${is_eur_passport ? 'EUR' : 'non-EUR'})`
                 rateSource = 'entrance_fees'
-                console.log(`✅ Entrance from B2C: ${fee.name} -> €${fee.rate}/pax`)
+
               }
             }
             break
@@ -666,7 +650,7 @@ export async function POST(request: NextRequest) {
               effectiveQuantityMode = 'per_room'
               pricingNote = `${hotel.name}: €${hotel.rate}/room × ${roomsNeeded}`
               rateSource = 'hotel_contacts'
-              console.log(`✅ Hotel from B2C: ${hotel.name} -> €${hotel.rate}/room`)
+
             }
             break
           }
@@ -695,7 +679,7 @@ export async function POST(request: NextRequest) {
                 lineTotal = unitCost * num_pax
                 effectiveQuantityMode = 'per_pax'
                 rateSource = 'nile_cruises'
-                console.log(`✅ Cruise from B2C: ${c.ship_name} -> €${unitCost}/pax`)
+
               }
             }
             break
@@ -720,7 +704,7 @@ export async function POST(request: NextRequest) {
               effectiveQuantityMode = 'per_pax'
               pricingNote = `€${unitCost}/pax`
               rateSource = 'meal_rates'
-              console.log(`✅ Meal from B2C: ${service.service_name} -> €${unitCost}/pax`)
+
             }
             break
           }
@@ -733,7 +717,7 @@ export async function POST(request: NextRequest) {
       if (rateSource === 'manual' && service.cost_per_unit) {
         unitCost = service.cost_per_unit
         rateSource = 'stored'
-        console.log(`⚠️ Fallback to stored: ${service.service_name} -> €${unitCost}`)
+
       }
 
       // ============================================
@@ -817,13 +801,7 @@ export async function POST(request: NextRequest) {
       currency: 'EUR'
     }
 
-    console.log('🎉 B2B Price calculated:', {
-      variation: v.variation_name,
-      numPax: num_pax,
-      cost: totalCost,
-      margin: effectiveMargin + '%',
-      selling: sellingPrice
-    })
+
 
     return NextResponse.json({ success: true, data: result })
   } catch (error: any) {
