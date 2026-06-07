@@ -3,7 +3,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('📋 Fetching team members...')
+
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { tenant_id, user } = authResult
-    console.log('✅ Auth successful:', { tenant_id, user_id: user?.id })
+
 
     const adminClient = createAdminClient()
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       }
     }))
 
-    console.log(`✅ Found ${membersWithEmails?.length || 0} team members`)
+
 
     return NextResponse.json({
       success: true,

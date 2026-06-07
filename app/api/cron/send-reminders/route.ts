@@ -40,7 +40,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
     day: 'numeric', month: 'long', year: 'numeric' 
   })
   const daysOverdue = Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
-  
+
   let subject: string
   let urgencyMessage: string
   let urgencyColor: string
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     const supabase = createClient()
     const today = new Date().toISOString().split('T')[0]
 
-    console.log('🔔 Starting automated reminder processing...')
+
 
     // Get invoices due for reminders today
     const { data: invoices, error } = await supabase
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     if (!invoices || invoices.length === 0) {
-      console.log('✅ No reminders to send today')
+
       return NextResponse.json({
         success: true,
         message: 'No reminders to send',
@@ -136,14 +136,14 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    console.log(`📧 Processing ${invoices.length} reminders...`)
+
 
     let sent = 0
     let failed = 0
 
     for (const invoice of invoices) {
       const daysOverdue = Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
-      
+
       let reminderType = 'reminder'
       if (daysOverdue <= -7) reminderType = 'before_due_7'
       else if (daysOverdue <= 0) reminderType = 'on_due'
@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
           })
 
         sent++
-        console.log(`✅ Sent reminder for ${invoice.invoice_number}`)
+
       } else {
         await supabase
           .from('invoice_reminders')
@@ -196,11 +196,11 @@ export async function GET(request: NextRequest) {
           })
 
         failed++
-        console.log(`❌ Failed to send reminder for ${invoice.invoice_number}: ${result.error}`)
+
       }
     }
 
-    console.log(`🔔 Reminder processing complete: ${sent} sent, ${failed} failed`)
+
 
     return NextResponse.json({
       success: true,

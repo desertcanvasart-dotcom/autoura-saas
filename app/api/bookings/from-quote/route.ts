@@ -3,7 +3,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('📦 Creating booking from quote...')
+
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
       .update({ status: 'confirmed' })
       .eq('id', quote.itinerary_id)
 
-    console.log('✅ Booking created:', booking_number)
+
 
     return NextResponse.json({
       success: true,

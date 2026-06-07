@@ -9,29 +9,29 @@ const SERVICE_TO_DOC_TYPE: Record<string, { docType: string | null, category?: s
   transportation: { docType: 'transport_voucher' },
   transport: { docType: 'transport_voucher' },
   transfer: { docType: 'transport_voucher' },
-  
+
   // Creates Guide Assignment
   guide: { docType: 'guide_assignment' },
-  
+
   // Creates Service Order for MEALS
   meal: { docType: 'service_order', category: 'meals' },
   lunch: { docType: 'service_order', category: 'meals' },
   dinner: { docType: 'service_order', category: 'meals' },
   breakfast: { docType: 'service_order', category: 'meals' },
-  
+
   // Creates Service Order for ENTRANCE FEES
   entrance: { docType: 'service_order', category: 'entrance' },
   activity: { docType: 'service_order', category: 'entrance' },
   tour: { docType: 'service_order', category: 'entrance' },
   excursion: { docType: 'service_order', category: 'entrance' },
-  
+
   // Creates Hotel Voucher
   accommodation: { docType: 'hotel_voucher' },
   hotel: { docType: 'hotel_voucher' },
-  
+
   // Creates Cruise Voucher
   cruise: { docType: 'cruise_voucher' },
-  
+
   // NO document needed - skip these
   tips: { docType: null },
   supplies: { docType: null },
@@ -83,14 +83,14 @@ async function generateDocumentNumber(supabase: any, docType: string): Promise<s
   const prefix = DOC_PREFIXES[docType] || 'SD'
   const year = new Date().getFullYear()
   const pattern = `${prefix}-${year}-%`
-  
+
   const { data } = await supabase
     .from('supplier_documents')
     .select('document_number')
     .like('document_number', pattern)
     .order('document_number', { ascending: false })
     .limit(1)
-  
+
   let nextNum = 1
   if (data && data.length > 0) {
     const lastNum = data[0].document_number
@@ -99,14 +99,14 @@ async function generateDocumentNumber(supabase: any, docType: string): Promise<s
       nextNum = parseInt(match[1], 10) + 1
     }
   }
-  
+
   // Add offset for batch generation (multiple docs of same type)
   const offset = typeOffsets[docType] || 0
   nextNum += offset
-  
+
   // Increment offset for next call of same type
   typeOffsets[docType] = offset + 1
-  
+
   return `${prefix}-${year}-${String(nextNum).padStart(4, '0')}`
 }
 
@@ -116,35 +116,35 @@ export async function POST(
 ) {
   const supabase = createClient()
   const { id: itineraryId } = await params
-  
+
   // Reset offsets for each request
   Object.keys(typeOffsets).forEach(key => delete typeOffsets[key])
-  
+
   try {
     const body = await request.json().catch(() => ({}))
     const { document_types } = body
-    
-    console.log('📄 Generating documents for itinerary:', itineraryId)
-    console.log('📋 Requested types:', document_types || 'ALL')
-    
+
+
+
+
     // Fetch itinerary with client details
     const { data: itinerary, error: itinError } = await supabase
       .from('itineraries')
       .select('*')
       .eq('id', itineraryId)
       .single()
-    
+
     if (itinError) {
       console.error('❌ Itinerary fetch error:', itinError)
       return NextResponse.json({ error: 'Itinerary not found', details: itinError.message }, { status: 404 })
     }
-    
+
     if (!itinerary) {
       return NextResponse.json({ error: 'Itinerary not found' }, { status: 404 })
     }
-    
-    console.log('✅ Found itinerary:', itinerary.itinerary_code)
-    
+
+
+
     // Fetch all days with services
     const { data: days, error: daysError } = await supabase
       .from('itinerary_days')
@@ -154,14 +154,14 @@ export async function POST(
       `)
       .eq('itinerary_id', itineraryId)
       .order('day_number', { ascending: true })
-    
+
     if (daysError) {
       console.error('❌ Days fetch error:', daysError)
       return NextResponse.json({ error: daysError.message }, { status: 500 })
     }
-    
-    console.log(`✅ Found ${days?.length || 0} days`)
-    
+
+
+
     // Collect all supplier IDs from services
     const supplierIds = new Set<string>()
     let totalServices = 0
@@ -173,9 +173,9 @@ export async function POST(
         }
       }
     }
-    
-    console.log(`✅ Found ${totalServices} services, ${supplierIds.size} with suppliers`)
-    
+
+
+
     // Fetch all suppliers at once
     let suppliersMap: Record<string, any> = {}
     if (supplierIds.size > 0) {
@@ -183,12 +183,12 @@ export async function POST(
         .from('suppliers')
         .select('*')
         .in('id', Array.from(supplierIds))
-      
+
       if (suppliers) {
         suppliersMap = Object.fromEntries(suppliers.map(s => [s.id, s]))
       }
     }
-    
+
     // Group services by supplier (when supplier is assigned)
     const supplierGroups: Record<string, {
       supplier: any,
@@ -198,7 +198,7 @@ export async function POST(
       docType: string,
       category?: string
     }> = {}
-    
+
     // Group services WITHOUT suppliers by docType + category + city
     const unassignedGroups: Record<string, {
       docType: string,
@@ -207,32 +207,32 @@ export async function POST(
       services: any[],
       dates: { min: string, max: string }
     }> = {}
-    
+
     for (const day of days || []) {
       for (const service of day.services || []) {
         const serviceDate = day.date
         const serviceCity = day.city || service.city || 'Cairo'
-        
+
         // Check if this service type should generate a document
         const serviceMapping = SERVICE_TO_DOC_TYPE[service.service_type]
         if (!serviceMapping || serviceMapping.docType === null) {
           // Skip services that don't need documents (tips, water, supplies, service_fee)
-          console.log(`⏭️ Skipping ${service.service_type} - no document needed`)
+
           continue
         }
-        
+
         const { docType: serviceDocType, category: serviceCategory } = serviceMapping
-        
+
         if (service.supplier_id && suppliersMap[service.supplier_id]) {
           // HAS SUPPLIER - group by supplier
           const supplierId = service.supplier_id
           const supplier = suppliersMap[supplierId]
-          
+
           if (!supplierGroups[supplierId]) {
             let docType = SUPPLIER_TO_DOC_TYPE[supplier.type] || 
                           serviceDocType || 
                           'service_order'
-            
+
             supplierGroups[supplierId] = {
               supplier,
               services: [],
@@ -242,16 +242,16 @@ export async function POST(
               category: serviceCategory
             }
           }
-          
+
           supplierGroups[supplierId].services.push({
             ...service,
             day_number: day.day_number,
             date: serviceDate,
             city: serviceCity
           })
-          
+
           supplierGroups[supplierId].cities.add(serviceCity)
-          
+
           if (serviceDate && (!supplierGroups[supplierId].dates.min || serviceDate < supplierGroups[supplierId].dates.min)) {
             supplierGroups[supplierId].dates.min = serviceDate
           }
@@ -262,7 +262,7 @@ export async function POST(
           // NO SUPPLIER - group by docType + category + city
           // This ensures meals and entrance fees create SEPARATE service orders
           const groupKey = `${serviceDocType}-${serviceCategory || 'default'}-${serviceCity}`
-          
+
           if (!unassignedGroups[groupKey]) {
             unassignedGroups[groupKey] = {
               docType: serviceDocType,
@@ -272,14 +272,14 @@ export async function POST(
               dates: { min: serviceDate || '', max: serviceDate || '' }
             }
           }
-          
+
           unassignedGroups[groupKey].services.push({
             ...service,
             day_number: day.day_number,
             date: serviceDate,
             city: serviceCity
           })
-          
+
           if (serviceDate && (!unassignedGroups[groupKey].dates.min || serviceDate < unassignedGroups[groupKey].dates.min)) {
             unassignedGroups[groupKey].dates.min = serviceDate
           }
@@ -289,49 +289,49 @@ export async function POST(
         }
       }
     }
-    
-    console.log(`📁 Supplier groups: ${Object.keys(supplierGroups).length}`)
-    console.log(`📁 Unassigned groups (by type+city): ${Object.keys(unassignedGroups).length}`)
+
+
+
     for (const [key, group] of Object.entries(unassignedGroups)) {
-      console.log(`   - ${key}: ${group.services.length} services`)
+
     }
-    
+
     // Check for existing documents
     const { data: existingDocs } = await supabase
       .from('supplier_documents')
       .select('supplier_id, document_type, city')
       .eq('itinerary_id', itineraryId)
       .neq('status', 'cancelled')
-    
+
     const existingSupplierDocKeys = new Set(
       (existingDocs || [])
         .filter(d => d.supplier_id)
         .map(d => `${d.supplier_id}-${d.document_type}`)
     )
-    
+
     const existingUnassignedDocKeys = new Set(
       (existingDocs || [])
         .filter(d => !d.supplier_id)
         .map(d => `${d.document_type}-${d.city || 'General'}`)
     )
-    
+
     // Generate documents
     const documentsToCreate: any[] = []
-    
+
     // 1. Documents for services WITH suppliers
     for (const [supplierId, group] of Object.entries(supplierGroups)) {
       const docKey = `${supplierId}-${group.docType}`
       if (existingSupplierDocKeys.has(docKey)) {
-        console.log(`⏭️ Skipping existing: ${docKey}`)
+
         continue
       }
-      
+
       if (document_types && !document_types.includes(group.docType)) {
         continue
       }
-      
+
       const docNumber = await generateDocumentNumber(supabase, group.docType)
-      
+
       const formattedServices = group.services.map(s => ({
         service_type: s.service_type,
         service_name: s.service_name,
@@ -342,11 +342,11 @@ export async function POST(
         notes: s.notes,
         total_cost: s.total_cost
       }))
-      
+
       const totalCost = group.services.reduce((sum, s) => sum + (parseFloat(s.total_cost) || 0), 0)
       const isHotel = group.docType === 'hotel_voucher'
       const isCruise = group.docType === 'cruise_voucher'
-      
+
       documentsToCreate.push({
         itinerary_id: itineraryId,
         supplier_id: supplierId,
@@ -371,24 +371,24 @@ export async function POST(
         payment_terms: group.supplier.payment_terms || 'commission',
         status: 'draft'
       })
-      
-      console.log(`📝 Will create (supplier): ${docNumber} - ${group.supplier.name}`)
+
+
     }
-    
+
     // 2. Documents for services WITHOUT suppliers (grouped by docType + category + city)
     for (const [groupKey, group] of Object.entries(unassignedGroups)) {
       // Check if we should skip
       if (existingUnassignedDocKeys.has(groupKey)) {
-        console.log(`⏭️ Skipping existing unassigned: ${groupKey}`)
+
         continue
       }
-      
+
       if (document_types && !document_types.includes(group.docType)) {
         continue
       }
-      
+
       const docNumber = await generateDocumentNumber(supabase, group.docType)
-      
+
       const formattedServices = group.services.map(s => ({
         service_type: s.service_type,
         service_name: s.service_name,
@@ -399,18 +399,18 @@ export async function POST(
         notes: s.notes,
         total_cost: s.total_cost
       }))
-      
+
       const totalCost = group.services.reduce((sum, s) => sum + (parseFloat(s.total_cost) || 0), 0)
       const isHotel = group.docType === 'hotel_voucher'
       const isCruise = group.docType === 'cruise_voucher'
-      
+
       // Generate a meaningful supplier name based on document type, category, and city
       const docTypeNames = DEFAULT_SUPPLIER_NAMES[group.docType] || { default: 'Services' }
       const defaultName = (typeof docTypeNames === 'object' 
         ? (docTypeNames[group.category || 'default'] || docTypeNames.default)
         : docTypeNames) || 'Services'
       const supplierName = `${group.city} ${defaultName}`
-      
+
       documentsToCreate.push({
         itinerary_id: itineraryId,
         supplier_id: null, // No supplier assigned
@@ -435,26 +435,26 @@ export async function POST(
         payment_terms: 'pay_direct',
         status: 'draft'
       })
-      
-      console.log(`📝 Will create (unassigned): ${docNumber} - ${supplierName}`)
+
+
     }
-    
+
     // Insert all documents
     if (documentsToCreate.length > 0) {
-      console.log(`💾 Inserting ${documentsToCreate.length} documents...`)
-      
+
+
       const { data: createdDocs, error: createError } = await supabase
         .from('supplier_documents')
         .insert(documentsToCreate)
         .select()
-      
+
       if (createError) {
         console.error('❌ Error creating documents:', createError)
         return NextResponse.json({ error: createError.message }, { status: 500 })
       }
-      
-      console.log(`🎉 Successfully created ${createdDocs.length} documents`)
-      
+
+
+
       return NextResponse.json({
         success: true,
         message: `Generated ${createdDocs.length} document(s)`,
@@ -462,16 +462,16 @@ export async function POST(
         documents: createdDocs
       })
     }
-    
-    console.log('⚠️ No documents to create')
-    
+
+
+
     return NextResponse.json({
       success: true,
       message: 'No new documents to generate. Documents may already exist or no services found.',
       count: 0,
       documents: []
     })
-    
+
   } catch (error) {
     console.error('❌ Error generating documents:', error)
     return NextResponse.json({ error: 'Failed to generate documents' }, { status: 500 })

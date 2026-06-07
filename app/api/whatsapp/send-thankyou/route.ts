@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { itineraryId } = body
 
-    console.log('📤 Send thank you request:', { itineraryId })
+
 
     if (!itineraryId) {
       return NextResponse.json(
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       `We hope to see you again soon! 🌟\n\n` +
       `Best regards,\n${businessName} Team`
 
-    console.log('📤 Sending thank you to:', itinerary.client_phone)
+
 
     const result = await sendWhatsAppMessage({
       to: itinerary.client_phone,
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', itineraryId)
 
-    console.log('✅ Thank you message sent:', result.messageId)
+
 
     return NextResponse.json({
       success: true,

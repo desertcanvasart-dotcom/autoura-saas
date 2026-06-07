@@ -196,7 +196,7 @@ export default function ItineraryEditorPage() {
   // ============================================
   // STATE
   // ============================================
-  
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [calculating, setCalculating] = useState(false)
@@ -205,18 +205,18 @@ export default function ItineraryEditorPage() {
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
   const [showAdvancedPackages, setShowAdvancedPackages] = useState(false)
   const [draggedDay, setDraggedDay] = useState<string | null>(null)
-  
+
   // Services & Pricing State
   const [services, setServices] = useState<ItineraryService[]>([])
   const [showServicesSection, setShowServicesSection] = useState(true)
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null)
   const [servicesChanged, setServicesChanged] = useState(false)
-  
+
   // Status & Invoice State
   const [existingInvoice, setExistingInvoice] = useState<{id: string, invoice_number: string} | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
-  
+
   // Attraction picker modal
   const [showAttractionModal, setShowAttractionModal] = useState(false)
   const [attractionModalDayId, setAttractionModalDayId] = useState<string | null>(null)
@@ -352,7 +352,7 @@ export default function ItineraryEditorPage() {
 
   const loadSuppliers = async () => {
     try {
-      console.log('Loading suppliers...')
+
       const { data, error } = await supabase
         .from('suppliers')
         .select('id, name, type, city, contact_phone')
@@ -363,8 +363,8 @@ export default function ItineraryEditorPage() {
         console.error('Error loading suppliers:', error)
         return
       }
-      
-      console.log('Loaded suppliers:', data?.length || 0)
+
+
       setSuppliers(data || [])
     } catch (error) {
       console.error('Error loading suppliers:', error)
@@ -385,10 +385,10 @@ export default function ItineraryEditorPage() {
       supplies: ['dmc', 'ground_handler'],
       service_fee: ['dmc', 'ground_handler', 'tour_operator']
     }
-    
+
     const relevantTypes = typeMapping[serviceType] || []
     if (relevantTypes.length === 0) return suppliers
-    
+
     return suppliers.filter(s => relevantTypes.includes(s.type))
   }
 
@@ -409,7 +409,7 @@ export default function ItineraryEditorPage() {
   const updateStatus = async (newStatus: string) => {
     if (!itinerary) return
     setUpdatingStatus(true)
-    
+
     try {
       const { error } = await supabase
         .from('itineraries')
@@ -586,7 +586,7 @@ export default function ItineraryEditorPage() {
     setSaving(true)
 
     try {
-      console.log('💾 Saving draft...')
+
 
       // 1. Update itinerary metadata
       const totalCost = services
@@ -607,7 +607,7 @@ export default function ItineraryEditorPage() {
         .eq('id', itineraryId)
 
       if (itinError) throw itinError
-      console.log('✅ Itinerary updated')
+
 
       // 2. Update each day
       for (const day of days) {
@@ -635,7 +635,7 @@ export default function ItineraryEditorPage() {
 
           if (insertError) throw insertError
           if (newDay) day.id = newDay.id
-          console.log(`✅ Day ${day.day_number} inserted`)
+
         } else {
           const { error: updateError } = await supabase
             .from('itinerary_days')
@@ -643,19 +643,19 @@ export default function ItineraryEditorPage() {
             .eq('id', day.id)
 
           if (updateError) throw updateError
-          console.log(`✅ Day ${day.day_number} updated`)
+
         }
       }
 
       // 3. Save services if changed
       if (servicesChanged) {
-        console.log('💾 Saving services...')
-        
+
+
         // Delete services marked for deletion
         const toDelete = services.filter(s => s.isDeleted && !s.isNew)
         for (const service of toDelete) {
           await supabase.from('itinerary_services').delete().eq('id', service.id)
-          console.log(`🗑️ Deleted service ${service.id}`)
+
         }
 
         // Insert new services
@@ -670,13 +670,13 @@ export default function ItineraryEditorPage() {
               .insert({ ...serviceData, itinerary_day_id: day.id })
               .select()
               .single()
-            
+
             if (error) {
               console.error('Error inserting service:', error)
             } else if (newService) {
               service.id = newService.id
               service.isNew = false
-              console.log(`✅ Service inserted: ${service.service_name}`)
+
             }
           }
         }
@@ -689,11 +689,11 @@ export default function ItineraryEditorPage() {
             .from('itinerary_services')
             .update(serviceData)
             .eq('id', service.id)
-          
+
           if (error) {
             console.error('Error updating service:', error)
           } else {
-            console.log(`✅ Service updated: ${service.service_name}`)
+
           }
         }
 
@@ -702,7 +702,7 @@ export default function ItineraryEditorPage() {
         setServicesChanged(false)
       }
 
-      console.log('🎉 Draft saved successfully!')
+
       return true
 
     } catch (error: any) {
@@ -719,16 +719,16 @@ export default function ItineraryEditorPage() {
     setCalculating(true)
 
     try {
-      console.log('💾 Saving before calculating...')
+
       const saveSuccess = await saveDraft()
-      
+
       if (!saveSuccess) {
         alert('Failed to save draft. Please try again.')
         setCalculating(false)
         return
       }
 
-      console.log('📊 Calling calculate-pricing API...')
+
 
       const response = await fetch(`/api/itineraries/${itineraryId}/calculate-pricing`, {
         method: 'POST',
@@ -756,7 +756,7 @@ export default function ItineraryEditorPage() {
         throw new Error(result.error || 'Pricing calculation failed')
       }
 
-      console.log('✅ Pricing calculated:', result)
+
       router.push(`/itineraries/${itineraryId}`)
 
     } catch (error: any) {
@@ -830,7 +830,7 @@ export default function ItineraryEditorPage() {
             >
               <ArrowLeft size={18} className="text-gray-600" />
             </button>
-            
+
             {/* Status Dropdown */}
             <select
               value={itinerary.status || 'draft'}
@@ -844,13 +844,13 @@ export default function ItineraryEditorPage() {
                 <option key={status.value} value={status.value}>{status.label}</option>
               ))}
             </select>
-            
+
             {/* Itinerary Code */}
             <h1 className="text-lg font-bold text-gray-900 whitespace-nowrap">{itinerary.itinerary_code}</h1>
-            
+
             {/* Separator */}
             <span className="text-gray-300">|</span>
-            
+
             {/* Client Info */}
             <span className="text-gray-600 text-sm whitespace-nowrap">
               {itinerary.client_name} • {days.length} days • {itinerary.num_adults} adults
@@ -985,7 +985,7 @@ export default function ItineraryEditorPage() {
             {showAdvancedPackages ? 'Hide' : 'Show'} advanced options
           </button>
         </div>
-        
+
         <div className="grid grid-cols-3 gap-3 mb-3">
           {PACKAGE_TYPES.filter(p => !p.advanced).map(pkg => (
             <button
@@ -1005,7 +1005,7 @@ export default function ItineraryEditorPage() {
             </button>
           ))}
         </div>
-        
+
         {showAdvancedPackages && (
           <div className="grid grid-cols-3 gap-3 pt-3 border-t border-gray-200">
             {PACKAGE_TYPES.filter(p => p.advanced).map(pkg => (
@@ -1310,7 +1310,7 @@ export default function ItineraryEditorPage() {
                                         placeholder="Service name"
                                       />
                                     </div>
-                                    
+
                                     {/* Row 2: Supplier Selection - Full Width */}
                                     <div className="flex items-center gap-2 pl-10">
                                       <label className="text-xs font-medium text-gray-600 whitespace-nowrap">
@@ -1577,7 +1577,7 @@ export default function ItineraryEditorPage() {
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#647C47]"
                 />
               </div>
-              
+
               <div className="flex flex-wrap gap-2 mb-4">
                 <button
                   onClick={() => setAttractionCityFilter(null)}
@@ -1604,7 +1604,7 @@ export default function ItineraryEditorPage() {
                 {filteredAttractions.map(attr => {
                   const currentDay = days.find(d => d.id === attractionModalDayId)
                   const isAdded = currentDay?.attractions.includes(attr.activity_name)
-                  
+
                   return (
                     <div
                       key={attr.id}

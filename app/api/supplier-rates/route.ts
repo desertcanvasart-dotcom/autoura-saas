@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     let rateTables = supplierType 
       ? SUPPLIER_RATE_TABLES[supplierType] || []
       : Object.values(SUPPLIER_RATE_TABLES).flat()
-    
+
     // Remove duplicates
     rateTables = [...new Set(rateTables)]
 
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
         }
       } catch (e) {
         // Table might not have supplier_id yet, skip
-        console.log(`Skipping ${table}: ${e}`)
+
       }
     }
 

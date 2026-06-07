@@ -31,12 +31,7 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient()
 
-    console.log('🔑 Creating team invitations for:', {
-      tenant_id,
-      user_id: user?.id,
-      user_email: user?.email,
-      has_service_key: !!process.env.SUPABASE_SERVICE_ROLE_KEY
-    })
+
 
     const body = await request.json()
 
@@ -77,10 +72,7 @@ export async function POST(request: NextRequest) {
       expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
     }))
 
-    console.log('📧 Attempting to insert invitations:', {
-      count: invitations.length,
-      invitations: invitations.map(i => ({ email: i.email, role: i.role }))
-    })
+
 
     // Insert invitations using admin client to bypass RLS
     // (permissions already validated by requireAuth)
@@ -107,19 +99,19 @@ export async function POST(request: NextRequest) {
     // For now, we'll just log the invitation links for manual testing
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
-    console.log('\n' + '='.repeat(80))
-    console.log('📧 TEAM INVITATIONS CREATED (Email sending not configured)')
-    console.log('='.repeat(80))
+
+
+
 
     insertedInvitations?.forEach(inv => {
       const inviteUrl = `${baseUrl}/accept-invite?token=${inv.invitation_token}`
-      console.log(`\n👤 ${inv.email} (${inv.role})`)
-      console.log(`🔗 ${inviteUrl}`)
+
+
     })
 
-    console.log('\n' + '='.repeat(80))
-    console.log('To enable email sending, set up an email service in the TODO section above')
-    console.log('='.repeat(80) + '\n')
+
+
+
 
     // Update onboarding step
     const { error: stepError } = await supabase

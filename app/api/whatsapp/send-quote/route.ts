@@ -92,11 +92,7 @@ export async function POST(request: NextRequest) {
       `We look forward to creating unforgettable memories with you! 🐪✨\n\n` +
       `Best regards,\n${businessName} Team`
 
-    console.log('📤 Sending quote via WhatsApp:', {
-      to: clientPhone,
-      itineraryId,
-      tourName: itinerary.trip_name
-    })
+
 
     // Send message (text only - no PDF attachment)
     const result = await sendWhatsAppMessage({
@@ -120,7 +116,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', itineraryId)
 
-    console.log('✅ Quote sent successfully via WhatsApp:', result.messageId)
+
 
     return NextResponse.json({
       success: true,

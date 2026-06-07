@@ -267,7 +267,7 @@ class ToolExecutor {
   }
 
   async execute(toolName: string, toolInput: any): Promise<ToolResult> {
-    console.log(`🔧 Executing tool: ${toolName}`, toolInput)
+
 
     switch (toolName) {
       case 'search_customer_trips':
@@ -1313,10 +1313,7 @@ Email: ${this.businessEmail}
           tools: AGENT_TOOLS
         })
 
-        console.log(`🤖 AI Response (iteration ${iterations}):`, {
-          stopReason: response.stop_reason,
-          contentTypes: response.content.map(c => c.type)
-        })
+
 
         // Check if the model wants to use a tool
         if (response.stop_reason === 'tool_use') {
@@ -1335,7 +1332,7 @@ Email: ${this.businessEmail}
           const toolResults: Anthropic.Messages.ToolResultBlockParam[] = []
 
           for (const toolUse of toolUseBlocks) {
-            console.log(`🔧 Tool called: ${toolUse.name}`, toolUse.input)
+
             toolsUsed.push(toolUse.name)
 
             // Execute the tool

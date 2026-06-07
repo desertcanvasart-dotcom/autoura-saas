@@ -423,9 +423,7 @@ export async function processRunForMemory(params: {
       const result = await writeMemory(supabaseAdmin, memoryInput)
       if (result.success) {
         memories_written++
-        console.log(
-          `🧠 Memory ${result.action}: [${memoryInput.memory_type}] ${memoryInput.content.substring(0, 60)}...`
-        )
+
       }
     }
 

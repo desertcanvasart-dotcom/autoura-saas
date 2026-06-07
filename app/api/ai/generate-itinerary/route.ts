@@ -77,7 +77,7 @@ async function createItineraryRecord(supabase: any, data: Record<string, any>): 
 
   if (error && error.message?.includes('Could not find the')) {
     // Column doesn't exist yet — remove the new columns and retry
-    console.log('⚠️ Falling back: removing new columns from itinerary insert (run migration 152)')
+
     const { nationality, language, is_euro_passport, ...fallbackData } = data
     // Append nationality info to notes so it's not lost
     if (nationality) {
@@ -366,13 +366,7 @@ function calculateExpectedDays(rawItinerary: string, extractedDays: ExtractedDay
   // Take the maximum of all methods
   const expectedDays = Math.max(maxDayNumber, daysFromNights, extractedCount)
 
-  console.log(`📊 Day calculation:`, {
-    maxDayFromMarkers: maxDayNumber,
-    totalNights,
-    daysFromNightsFormula: daysFromNights,
-    extractedDaysCount: extractedCount,
-    finalExpectedDays: expectedDays
-  })
+
 
   return expectedDays || 1 // Default to 1 if nothing found
 }
@@ -437,7 +431,7 @@ function detectCruiseRequest(
     /(\d+)\s*nts?\s*alx/gi,  // Alexandria nights
     /(\d+)\s*nts?\s*htl/gi   // Generic hotel nights
   ]
-  
+
   for (const pattern of landPatterns) {
     let match
     while ((match = pattern.exec(allText)) !== null) {
@@ -532,26 +526,15 @@ function detectCruiseRequest(
   // Detect if trip includes land (hotels)
   const landCities = ['cairo', 'alexandria', 'hurghada', 'sharm', 'giza', 'dahab', 'marsa alam', 
                       'cai', 'alx', 'hrg', 'ssh', 'gza', 'rmf']
-  
+
   const citiesLower = (cities || []).map(c => c.toLowerCase())
   const hasLandCities = citiesLower.some(city => 
     landCities.some(lc => city.includes(lc))
   ) || landCities.some(lc => allText.includes(lc + ' hotel') || allText.includes('nts ' + lc))
-  
+
   const includesLand = hasLandCities || landNights > 0 || (durationDays > (cruiseNights + 1))
 
-  console.log(`🚢 CRUISE DETECTION:`, {
-    isCruise: true,
-    type: cruiseType,
-    route,
-    startCity,
-    endCity,
-    cruiseNights,
-    landNights,
-    includesLand,
-    detectedDuration,
-    keywords: matchedKeywords
-  })
+
 
   return {
     isCruise: true,
@@ -632,8 +615,8 @@ async function findCruiseContent(
     const { data: cruises, error } = await query
 
     if (error || !cruises || cruises.length === 0) {
-      console.log('⚠️ No cruise content found in Content Library for route:', cruiseDetection.route)
-      
+
+
       // Try without route filter as fallback
       const { data: fallbackCruises } = await getSupabaseAdmin()
         .from('content_library')
@@ -658,14 +641,14 @@ async function findCruiseContent(
         .limit(1)
 
       if (!fallbackCruises || fallbackCruises.length === 0) {
-        console.log('⚠️ No cruise content found at all in Content Library')
+
         return noMatch
       }
 
       const content = fallbackCruises[0] as any
       const variation = content.content_variations[0]
 
-      console.log(`📚 Found fallback cruise: ${content.name} (${variation.tier} tier)`)
+
 
       return {
         found: true,
@@ -687,7 +670,7 @@ async function findCruiseContent(
 
     const variation = bestMatch.content_variations[0]
 
-    console.log(`📚 Found cruise content: ${bestMatch.name} (${variation.tier} tier, ${bestMatch.duration_days} days)`)
+
 
     return {
       found: true,
@@ -869,7 +852,7 @@ async function fetchContentLibrary(
       .eq('is_active', true)
 
     if (error || !variations) {
-      console.log('⚠️ No content library items found:', error?.message)
+
       return []
     }
 
@@ -879,18 +862,18 @@ async function fetchContentLibrary(
         const item = v.content_library
         if (!item) return false
         if (item.is_cruise) return false // Exclude cruise content
-        
+
         const itemTags = (item.tags || []).map((t: string) => t.toLowerCase())
         const itemLocation = (item.location || '').toLowerCase()
         const itemName = (item.name || '').toLowerCase()
-        
+
         const matchesSearch = searchTags.length === 0 || searchTags.some(tag => 
           itemTags.includes(tag) ||
           itemLocation.includes(tag) ||
           itemName.includes(tag) ||
           tag.includes(itemLocation)
         )
-        
+
         return matchesSearch
       })
       .map((v: any) => ({
@@ -905,7 +888,7 @@ async function fetchContentLibrary(
         inclusions: v.inclusions || []
       }))
 
-    console.log(`📚 Found ${content.length} content items for tier ${tier}`)
+
     return content
   } catch (err) {
     console.error('⚠️ Error fetching content library:', err)
@@ -1001,7 +984,7 @@ async function getUserPreferences(supabase: any): Promise<{
 
   try {
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (!user) return defaults
 
     const { data: prefs } = await supabase
@@ -1033,7 +1016,7 @@ async function fetchAttractionsList(supabase: any): Promise<string[]> {
       .select('attraction_name')
       .eq('is_active', true)
       .eq('is_addon', false) // Exclude add-ons
-    
+
     return data?.map((a: any) => a.attraction_name) || []
   } catch {
     return []
@@ -1049,29 +1032,29 @@ async function fetchAttractionsList(supabase: any): Promise<string[]> {
 // ============================================
 function preParseRawItinerary(rawItinerary: string): { dayNumber: number; rawContent: string }[] {
   const segments: { dayNumber: number; rawContent: string }[] = []
-  
+
   // Split by D1, D2, D3... or Day 1, Day 2... patterns
   const dayPattern = /(?:^|\n)\s*(D(\d+)|Day\s*(\d+))\b/gi
   const matches = [...rawItinerary.matchAll(dayPattern)]
-  
+
   if (matches.length === 0) {
     // No day markers found, return entire content as day 1
     return [{ dayNumber: 1, rawContent: rawItinerary.trim() }]
   }
-  
+
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i]
     const dayNum = parseInt(match[2] || match[3])
     const startIdx = match.index!
     const endIdx = i < matches.length - 1 ? matches[i + 1].index! : rawItinerary.length
-    
+
     const content = rawItinerary.substring(startIdx, endIdx).trim()
     segments.push({ dayNumber: dayNum, rawContent: content })
   }
-  
+
   // Sort by day number
   segments.sort((a, b) => a.dayNumber - b.dayNumber)
-  
+
   return segments
 }
 
@@ -1096,10 +1079,10 @@ async function generateFromStructuredInput(
 
   // PRE-PARSE the raw itinerary into day segments
   const daySegments = preParseRawItinerary(rawItinerary)
-  
-  console.log(`📋 STRUCTURED MODE: Pre-parsed ${daySegments.length} day segments, expecting ${expectedDays} days`)
+
+
   daySegments.forEach(seg => {
-    console.log(`  Day ${seg.dayNumber}: ${seg.rawContent.substring(0, 80)}...`)
+
   })
 
   // Build the day-by-day mapping section
@@ -1126,16 +1109,16 @@ ${EGYPT_TRAVEL_GLOSSARY}
    - If Abu Simbel is not mentioned → DO NOT ADD IT
    - If Unfinished Obelisk is not mentioned → DO NOT ADD IT
    - If Grand Museum is not mentioned → DO NOT ADD IT
-   
+
 2. FORBIDDEN: Removing or skipping activities from input
    - If D1 says "Alexandria tour" → Day 1 MUST include Alexandria
    - If D2 says "Pyramids & Museum" → Day 2 MUST include BOTH
-   
+
 3. FORBIDDEN: Reordering days or activities
    - D1 content goes in day_number: 1
    - D2 content goes in day_number: 2
    - NEVER put D1 content in day_number: 2
-   
+
 4. FORBIDDEN: "Improving" the itinerary
    - Do NOT add sites you think they "should" visit
    - Do NOT rearrange for "better flow"
@@ -1206,28 +1189,28 @@ PACKAGE: ${packageType || 'cruise-land'}
       "cities_visited": ["Cairo", "Alexandria"],
       "overnight_city": "Cairo",
       "accommodation_type": "hotel",
-      
+
       "is_arrival": true,
       "is_departure": false,
       "is_transfer_only": false,
       "is_free_day": false,
       "is_cruise_day": false,
       "is_sailing_day": false,
-      
+
       "attractions": ["Pompey's Pillar", "Qaitbay Citadel", "Alexandria Library", "Montazah Park"],
       "entrance_included": ["Pompey's Pillar", "Qaitbay Citadel", "Montazah Park"],
       "photo_stops": ["Alexandria Library"],
-      
+
       "activities": ["Airport arrival", "Transfer to Alexandria", "Visit Pompey's Pillar", "Visit Qaitbay Citadel", "Photo stop at Alexandria Library", "Visit Montazah Park", "Lunch", "Return to Cairo", "Dinner"],
       "guide_required": true,
-      
+
       "includes_lunch": true,
       "includes_dinner": true,
       "meal_notes": null,
-      
+
       "flight_info": "MS956 arriving 05:10",
       "transport_type": "flight",
-      
+
       "needs_airport_service": true,
       "needs_hotel_service": true
     }
@@ -1268,7 +1251,7 @@ NOW CONVERT THE ITINERARY TO JSON:`
     ? prompt + '\n\n' + structuredMemoryBlock
     : prompt
 
-  console.log('🤖 Sending STRICT structured prompt to AI...')
+
 
   const message = await getAnthropic().messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -1294,21 +1277,17 @@ NOW CONVERT THE ITINERARY TO JSON:`
   }
 
   const result = JSON.parse(jsonMatch[0])
-  
+
   // Validate day count
   if (result.days && result.days.length < expectedDays) {
     console.warn(`⚠️ AI returned ${result.days.length} days but expected ${expectedDays}`)
   } else {
-    console.log(`✅ AI successfully generated ${result.days?.length || 0} days`)
+
   }
-  
+
   // Log first day for debugging
   if (result.days && result.days[0]) {
-    console.log('📍 Day 1 generated:', {
-      title: result.days[0].title,
-      attractions: result.days[0].attractions,
-      cities_visited: result.days[0].cities_visited
-    })
+
   }
 
   return result
@@ -1462,7 +1441,7 @@ function determinePackageType(
   if (cruiseDetection.includesLand) {
     return 'cruise-land'
   }
-  
+
   return 'cruise-package'
 }
 
@@ -1617,7 +1596,7 @@ async function createQuotesForItinerary(params: {
         console.error('Error creating B2C quote:', error)
       } else {
         b2c_quote = createdQuote
-        console.log(`✅ B2C Quote created: ${b2c_quote?.quote_number}`)
+
       }
     } catch (error) {
       console.error('Error creating B2C quote:', error)
@@ -1734,7 +1713,7 @@ async function createQuotesForItinerary(params: {
         console.error('Error creating B2B quote:', error)
       } else {
         b2b_quote = createdQuote
-        console.log(`✅ B2B Quote created: ${b2b_quote?.quote_number}`)
+
       }
     } catch (error) {
       console.error('Error creating B2B quote:', error)
@@ -1802,7 +1781,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const userPrefs = await getUserPreferences(supabase)
-    
+
     const {
       client_name,
       client_email,
@@ -1833,7 +1812,7 @@ export async function POST(request: NextRequest) {
       cost_mode = userPrefs.default_cost_mode,
       package_type: requested_package_type = 'land-package',
       skip_pricing = false,
-      
+
       // NEW: Structured input parameters from parser
       is_structured_input = false,
       extracted_days = null,
@@ -1859,7 +1838,7 @@ export async function POST(request: NextRequest) {
     // DETERMINE INPUT MODE
     // ============================================
     let inputMode: InputMode = 'creative'
-    
+
     if (input_mode_override === 'structured') {
       inputMode = 'structured'
     } else if (input_mode_override === 'creative') {
@@ -1876,23 +1855,23 @@ export async function POST(request: NextRequest) {
         /PROGRAM\s*:/i,                  // PROGRAM: header
         /\b[A-Z]{3}\/[A-Z]{3}\b/        // CAI/ALX, LXR/HRG city transitions
       ]
-      
+
       if (structuredPatterns.some(pattern => pattern.test(raw_itinerary))) {
         inputMode = 'structured'
-        console.log('🔍 Auto-detected structured input from patterns in raw_itinerary')
+
       }
     }
 
-    console.log('🤖 Input Mode:', inputMode, '| Override:', input_mode_override, '| is_structured_input:', is_structured_input)
+
 
     let duration_days = parseInt(raw_duration_days) || 1
-    
+
     // For structured mode, calculate days from raw itinerary
     if (inputMode === 'structured' && raw_itinerary) {
       const calculatedDays = calculateExpectedDays(raw_itinerary, extracted_days)
       if (calculatedDays > duration_days) {
         duration_days = calculatedDays
-        console.log(`📊 Adjusted duration to ${duration_days} days based on itinerary analysis`)
+
       }
     } else if (inputMode === 'structured' && extracted_days?.length) {
       duration_days = extracted_days.length
@@ -1929,24 +1908,24 @@ export async function POST(request: NextRequest) {
       if (duration_days === 1) {
         // Parser couldn't determine duration — use detected or business rules
         duration_days = cruiseDetection.detectedDuration || expectedDuration || 5
-        console.log(`🚢 Set cruise duration to ${duration_days} days (was unset)`)
+
       } else if (cruiseDetection.detectedDuration && cruiseDetection.detectedDuration !== duration_days) {
         // Parser got a different duration than what cruise detection found (nights+1 mismatch)
-        console.log(`🚢 Duration mismatch: parser=${duration_days}, detected=${cruiseDetection.detectedDuration}`)
+
         duration_days = cruiseDetection.detectedDuration
-        console.log(`🚢 Corrected cruise duration to ${duration_days} days`)
+
       } else if (expectedDuration && !cruiseDetection.includesLand && duration_days !== expectedDuration) {
         // Pure cruise with wrong duration for the route — apply business rule
-        console.log(`🚢 Business rule correction: ${cruiseDetection.route} cruise must be ${expectedDuration} days, was ${duration_days}`)
+
         duration_days = expectedDuration
       }
 
-      console.log(`🚢 Final cruise duration: ${duration_days} days`)
+
     }
 
     // UPDATED: Determine effective package type
     const effectivePackageType = determinePackageType(requested_package_type, cruiseDetection)
-    console.log(`📦 Package type: ${effectivePackageType}`)
+
 
     let effectiveCity = city
     if (cruiseDetection.isCruise && cruiseDetection.startCity) {
@@ -1955,15 +1934,7 @@ export async function POST(request: NextRequest) {
       effectiveCity = cities[0]
     }
 
-    console.log('🤖 Starting itinerary generation:', {
-      client: client_name,
-      inputMode,
-      isCruise: cruiseDetection.isCruise,
-      packageType: effectivePackageType,
-      tier,
-      duration: duration_days,
-      startCity: effectiveCity
-    })
+
 
     const totalPax = num_adults + num_children
 
@@ -1973,7 +1944,7 @@ export async function POST(request: NextRequest) {
       tenant_id,
       client_id: client_id || null,
     })
-    console.log(`🧠 Injecting ${memoryResult.count} memories into prompt`)
+
     // ─────────────────────────────────────────────────────────
 
     // Passport type
@@ -2004,7 +1975,7 @@ export async function POST(request: NextRequest) {
       const natLower = nationality.toLowerCase()
       for (const [key, lang] of Object.entries(nationalityLanguageMap)) {
         if (natLower.includes(key)) {
-          console.log(`🌍 Inferred guide language "${lang}" from nationality "${nationality}"`)
+
           finalLanguage = lang
           break
         }
@@ -2028,23 +1999,23 @@ export async function POST(request: NextRequest) {
     // CRUISE-ONLY PATH (creative mode, pure cruise)
     // ============================================
     if (cruiseDetection.isCruise && inputMode === 'creative' && effectivePackageType === 'cruise-package') {
-      console.log('🚢 Processing as PURE CRUISE itinerary (creative mode)...')
-      
+
+
       const cruiseContent = await findCruiseContent(cruiseDetection, tier, duration_days)
-      
+
       if (cruiseContent.found && cruiseContent.dayByDay.length > 0) {
-        console.log(`📚 Using Content Library cruise: ${cruiseContent.content.name}`)
-        
+
+
         // Use Content Library duration if available
         if (cruiseContent.content.duration_days) {
           duration_days = cruiseContent.content.duration_days
         }
-        
+
         const cruiseRate = await getCruiseRate(tier, cruiseContent.recommendedSuppliers, supabase)
-        console.log(`💰 Cruise rate: €${cruiseRate.perPersonPerNight}/person/night on ${cruiseRate.shipName}`)
+
 
         const nights = duration_days - 1
-        
+
         // Create itinerary - UPDATED: Use effectivePackageType + nationality/language
         const { data: itinerary, error: itineraryError } = await createItineraryRecord(supabase, {
             tenant_id,
@@ -2075,7 +2046,7 @@ export async function POST(request: NextRequest) {
 
         if (itineraryError) throw new Error(`Failed to create itinerary: ${itineraryError.message}`)
 
-        console.log('✅ Created cruise itinerary:', itinerary.id)
+
 
         let totalSupplierCost = 0
         let totalClientPrice = 0
@@ -2143,7 +2114,7 @@ export async function POST(request: NextRequest) {
           // Add entrance fees
           if (dayData.attractions?.length > 0) {
             const { data: entranceFees } = await supabase.from('entrance_fees').select('*').eq('is_active', true)
-            
+
             let dayEntranceTotal = 0
             const matchedAttractions: string[] = []
 
@@ -2190,7 +2161,7 @@ export async function POST(request: NextRequest) {
           }).eq('id', itinerary.id)
         }
 
-        console.log('🎉 Cruise itinerary complete!')
+
 
         // Auto-assign cruise as a resource for the itinerary
         if (cruiseRate.found && cruiseRate.supplierId) {
@@ -2217,7 +2188,7 @@ export async function POST(request: NextRequest) {
               status: 'pending',
               notes: `${nights} nights, ${totalPax} pax, ${cruiseRate.cabinType}`
             })
-            console.log(`🚢 Auto-assigned cruise resource: ${cruiseRate.shipName}`)
+
           } catch (resourceError) {
             console.error('⚠️ Failed to auto-assign cruise resource:', resourceError)
           }
@@ -2226,7 +2197,7 @@ export async function POST(request: NextRequest) {
         // Create quotes if requested and not in draft mode
         let cruiseQuotesCreated = { b2c_quote: null, b2b_quote: null }
         if (!skip_pricing && quote_type !== 'none') {
-          console.log(`📝 Creating ${quote_type} quote(s) for cruise...`)
+
           cruiseQuotesCreated = await createQuotesForItinerary({
             itinerary_id: itinerary.id,
             quote_type: quote_type as 'b2c' | 'b2b' | 'both' | 'none',
@@ -2290,7 +2261,7 @@ export async function POST(request: NextRequest) {
           }
         })
       } else {
-        console.log('⚠️ No cruise content in Content Library, falling back to AI generation')
+
         // Fall through to standard AI generation
       }
     }
@@ -2298,7 +2269,7 @@ export async function POST(request: NextRequest) {
     // ============================================
     // LAND TOUR / CRUISE+LAND PATH (STRUCTURED OR CREATIVE)
     // ============================================
-    console.log(`🏛️ Processing as ${effectivePackageType} itinerary (${inputMode} mode)...`)
+
 
     // Fetch rates and content
     const searchCities = cities.length > 0 ? cities : [effectiveCity]
@@ -2322,7 +2293,7 @@ export async function POST(request: NextRequest) {
     let selectedGuide = guides?.[0] as any
 
     const { data: allEntranceFees } = await supabase.from('entrance_fees').select('*').eq('is_active', true)
-    
+
     const { data: mealRates } = await supabase.from('meal_rates').select('*').eq('is_active', true).limit(1)
     const tierMealMultiplier: Record<ServiceTier, number> = { 'budget': 0.8, 'standard': 1.0, 'deluxe': 1.3, 'luxury': 1.6 }
     let lunchRate = Math.round(toNumber(mealRates?.[0]?.lunch_rate_eur, 12) * tierMealMultiplier[tier])
@@ -2368,8 +2339,8 @@ export async function POST(request: NextRequest) {
     let itineraryData: any
 
     if (inputMode === 'structured' && raw_itinerary) {
-      console.log('📋 Using STRUCTURED mode - following provided itinerary')
-      
+
+
       itineraryData = await generateFromStructuredInput(
         extracted_days || [],
         raw_itinerary,
@@ -2384,8 +2355,8 @@ export async function POST(request: NextRequest) {
         }
       )
     } else {
-      console.log('🎨 Using CREATIVE mode - AI generating itinerary')
-      
+
+
       itineraryData = await generateCreativeItinerary({
         clientName: client_name,
         tourName: finalTourName,
@@ -2452,7 +2423,7 @@ export async function POST(request: NextRequest) {
       throw new Error(`Failed to create itinerary: ${itineraryError.message}`)
     }
 
-    console.log(`✅ Created itinerary ${itinerary.id} with ${duration_days} days`)
+
 
     // Create days and services
     let totalSupplierCost = 0
@@ -2548,7 +2519,7 @@ export async function POST(request: NextRequest) {
       if (dayData.needs_airport_service || dayData.is_arrival || dayData.is_departure || dayData.flight_info) {
         const isInternational = dayData.is_arrival || dayData.is_departure
         const serviceDesc = isInternational ? 'Airport Meet & Assist (International)' : 'Airport Meet & Assist (Domestic)'
-        
+
         services.push({
           service_type: 'airport_service',
           service_code: 'AIRPORT',
@@ -2637,26 +2608,26 @@ export async function POST(request: NextRequest) {
       // Entrance fees (ONLY for INSIDE attractions, not OUTSIDE photo stops)
       const entranceAttractions = dayData.entrance_included || dayData.attractions || []
       const photoStops = dayData.photo_stops || []
-      
+
       if (entranceAttractions.length > 0 && !isTransferOnly && !isFreeDay) {
         let dayEntranceTotal = 0
         const matchedAttractions: string[] = []
-        
+
         for (const attr of entranceAttractions) {
           // Skip if this attraction is in photo_stops (OUTSIDE)
           if (photoStops.some((ps: string) => ps.toLowerCase() === attr.toLowerCase())) {
             continue
           }
-          
+
           const fee = allEntranceFees?.find((ef: any) =>
             ef.attraction_name.toLowerCase().includes(attr.toLowerCase()) ||
             attr.toLowerCase().includes(ef.attraction_name.toLowerCase())
           )
-          
+
           if (fee) {
             // Check if it's an add-on (should be excluded from automatic pricing)
             if (fee.is_addon) continue
-            
+
             const feePerPerson = isEuroPassport 
               ? toNumber(fee.eur_rate, 0) 
               : toNumber(fee.non_eur_rate, fee.eur_rate || 0)
@@ -2664,12 +2635,12 @@ export async function POST(request: NextRequest) {
             matchedAttractions.push(fee.attraction_name)
           }
         }
-        
+
         if (dayEntranceTotal > 0) {
           const notesText = photoStops.length > 0 
             ? `Inside: ${matchedAttractions.join(', ')} | Photo stops: ${photoStops.join(', ')}`
             : `Sites: ${matchedAttractions.join(', ')}`
-          
+
           services.push({
             service_type: 'entrance',
             service_code: 'ENTRANCE',
@@ -2799,14 +2770,7 @@ export async function POST(request: NextRequest) {
       }).eq('id', itinerary.id)
     }
 
-    console.log('🎉 Land tour itinerary complete!', {
-      id: itinerary.id,
-      mode: inputMode,
-      packageType: effectivePackageType,
-      days: duration_days,
-      supplierCost: totalSupplierCost,
-      clientPrice: totalClientPrice
-    })
+
 
     // Auto-assign cruise resource if this itinerary includes cruise days
     if (cruiseDetection.isCruise) {
@@ -2834,7 +2798,7 @@ export async function POST(request: NextRequest) {
             status: 'pending',
             notes: `${cruiseNights} nights, ${totalPax} pax, ${cruiseRate.cabinType}`
           })
-          console.log(`🚢 Auto-assigned cruise resource: ${cruiseRate.shipName}`)
+
         }
       } catch (resourceError) {
         console.error('⚠️ Failed to auto-assign cruise resource:', resourceError)
@@ -2844,7 +2808,7 @@ export async function POST(request: NextRequest) {
     // Create quotes if requested and not in draft mode
     let quotesCreated = { b2c_quote: null, b2b_quote: null }
     if (!skip_pricing && quote_type !== 'none') {
-      console.log(`📝 Creating ${quote_type} quote(s)...`)
+
       quotesCreated = await createQuotesForItinerary({
         itinerary_id: itinerary.id,
         quote_type: quote_type as 'b2c' | 'b2b' | 'both' | 'none',

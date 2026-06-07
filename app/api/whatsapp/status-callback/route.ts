@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return new NextResponse('Forbidden', { status: 403 })
     }
 
-    console.log('✅ Twilio signature validated for status callback')
+
 
     // Extract status callback data from already-parsed params
     const messageSid = params['MessageSid']
@@ -62,13 +62,7 @@ export async function POST(request: NextRequest) {
     const to = params['To']
     const from = params['From']
 
-    console.log('📊 Status Callback:', {
-      messageSid,
-      messageStatus,
-      errorCode,
-      to,
-      from
-    })
+
 
     if (!messageSid) {
       return NextResponse.json({ error: 'Missing MessageSid' }, { status: 400 })
@@ -91,7 +85,7 @@ export async function POST(request: NextRequest) {
       console.error('Error updating message status:', error)
       // Don't return error - Twilio expects 200 OK
     } else {
-      console.log('✅ Message status updated:', messageSid, '→', messageStatus)
+
     }
 
     // Log failed messages for debugging

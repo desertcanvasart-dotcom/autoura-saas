@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    console.log('📦 Fetching booking:', id)
+
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -77,7 +77,7 @@ export async function GET(
       .eq('tenant_id', tenant_id)
       .order('payment_date', { ascending: false })
 
-    console.log('✅ Booking fetched:', booking.booking_number)
+
 
     return NextResponse.json({
       success: true,
@@ -103,7 +103,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    console.log('📝 Updating booking:', id)
+
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -182,7 +182,7 @@ export async function PATCH(
       )
     }
 
-    console.log('✅ Booking updated:', booking.booking_number)
+
 
     return NextResponse.json({
       success: true,
@@ -205,7 +205,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    console.log('🗑️ Deleting booking:', id)
+
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -265,7 +265,7 @@ export async function DELETE(
       )
     }
 
-    console.log('✅ Booking deleted:', booking.booking_number)
+
 
     return NextResponse.json({
       success: true,

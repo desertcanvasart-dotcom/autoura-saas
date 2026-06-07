@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
 // Create authenticated client to get user preferences
 async function createAuthClient() {
   const cookieStore = await cookies()
-  
+
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -68,22 +68,17 @@ export async function POST(request: NextRequest) {
 
     const total_travelers = num_adults + num_children
 
-    console.log('🚗 Vehicle Selection:', { 
-      city, 
-      service: transportation_service, 
-      travelers: total_travelers,
-      override: override_transportation 
-    })
+
 
     // ============================================
     // STEP 1: GET VEHICLE (HYBRID SELECTION)
     // ============================================
     let vehicle
-    
+
     if (override_transportation) {
       // Manual override - use specific service code
-      console.log('🔧 Using override:', override_transportation)
-      
+
+
       const { data: overrideVehicle } = await supabase
         .from('transportation_rates')
         .select('*')
@@ -103,8 +98,8 @@ export async function POST(request: NextRequest) {
       vehicle = overrideVehicle
     } else {
       // Auto-select based on city, service type, and group size
-      console.log('🤖 Auto-selecting vehicle...')
-      
+
+
       const { data: vehicles } = await supabase
         .from('transportation_rates')
         .select('*')
@@ -122,7 +117,7 @@ export async function POST(request: NextRequest) {
       vehicle = vehicles[0] // Pick cheapest option that fits
     }
 
-    console.log('✅ Selected vehicle:', vehicle.vehicle_type, '€', vehicle.base_rate_eur)
+
 
     const vehicle_cost_per_day = vehicle.base_rate_eur
 
@@ -241,7 +236,7 @@ export async function POST(request: NextRequest) {
       // 1. Explicit parameter passed - use it directly
       profit_margin = margin_percent
       margin_source = 'explicit_parameter'
-      console.log('💰 Using explicit margin:', profit_margin + '%')
+
     } else if (userId) {
       // 2. Try to get user preferences
       const { data: userPrefs } = await supabase
@@ -253,7 +248,7 @@ export async function POST(request: NextRequest) {
       if (userPrefs?.default_margin_percent !== null && userPrefs?.default_margin_percent !== undefined) {
         profit_margin = userPrefs.default_margin_percent
         margin_source = 'user_preferences'
-        console.log('💰 Using user preference margin:', profit_margin + '%')
+
       } else {
         // Fall back to profit_margins table
         const { data: margins } = await supabase
@@ -265,14 +260,14 @@ export async function POST(request: NextRequest) {
 
         profit_margin = margins?.[0]?.margin_percentage || 25
         margin_source = margins?.[0] ? 'profit_margins_table' : 'default'
-        console.log('💰 Using table/default margin:', profit_margin + '%')
+
       }
     } else {
       // 3. No userId - try to get from authenticated session
       try {
         const authClient = await createAuthClient()
         const { data: { user } } = await authClient.auth.getUser()
-        
+
         if (user) {
           const { data: userPrefs } = await supabase
             .from('user_preferences')
@@ -283,7 +278,7 @@ export async function POST(request: NextRequest) {
           if (userPrefs?.default_margin_percent !== null && userPrefs?.default_margin_percent !== undefined) {
             profit_margin = userPrefs.default_margin_percent
             margin_source = 'user_preferences_session'
-            console.log('💰 Using session user preference margin:', profit_margin + '%')
+
           } else {
             // Fall back to profit_margins table
             const { data: margins } = await supabase

@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
     const body = await request.json()
 
-    console.log('Recording payment:', body)
+
 
     // Validate required fields
     if (!body.amount || !body.payment_method || !body.payment_date) {

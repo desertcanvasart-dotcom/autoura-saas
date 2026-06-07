@@ -35,40 +35,40 @@ export interface RateLookupParams {
   duration_days: number
   language: string
   is_euro_passport: boolean
-  
+
   // Service Tier
   tier?: ServiceTier
-  
+
   // NEW: Pricing Mode & Rules
   mode?: PricingMode           // 'b2b' or 'b2c' - defaults to 'b2c'
   checkPricingRules?: boolean  // Whether to apply pricing rules - defaults to false
   marginPercent?: number       // For B2C retail markup - defaults to 25
-  
+
   // Transportation
   city?: string
   service_type?: 'day_tour' | 'half_day_tour' | 'airport_transfer' | 'intercity_transfer' | 'dinner_transfer' | 'sound_light_transfer'
   origin_city?: string
   destination_city?: string
-  
+
   // Attractions
   attractions?: string[]
-  
+
   // Meals
   include_lunch?: boolean
   include_dinner?: boolean
-  
+
   // Accommodation
   include_accommodation?: boolean
   hotel_standard?: 'budget' | 'standard' | 'luxury'
   num_hotel_stays?: number
-  
+
   // Airport
   include_airport_service?: boolean
   airport_code?: string
   airport_service_type?: 'meet_greet' | 'customs_assist' | 'full_service'
   num_arrivals?: number
   num_departures?: number
-  
+
   // Nile Cruise
   include_cruise?: boolean
   cruise_ship?: string
@@ -76,24 +76,24 @@ export interface RateLookupParams {
   cruise_embark_city?: string
   cruise_disembark_city?: string
   cruise_nights?: number
-  
+
   // Sleeping Train
   include_sleeping_train?: boolean
   sleeping_train_origin?: string
   sleeping_train_destination?: string
   sleeping_train_cabin?: 'single' | 'double'
   sleeping_train_roundtrip?: boolean
-  
+
   // Regular Train
   include_train?: boolean
   train_origin?: string
   train_destination?: string
   train_class?: 'first_class' | 'second_class'
-  
+
   // Tipping
   include_tips?: boolean
   tip_context?: 'day_tour' | 'half_day_tour' | 'cruise' | 'transfer'
-  
+
   // Other
   include_water?: boolean
 }
@@ -448,14 +448,14 @@ function findMatchingRule(
   rules: PricingRule[]
 ): PricingRule | null {
   if (!serviceName || rules.length === 0) return null
-  
+
   const serviceNameLower = serviceName.toLowerCase()
-  
+
   // Try exact match first
   let match = rules.find(r => 
     r.service_name.toLowerCase() === serviceNameLower
   )
-  
+
   // Try partial match (first word)
   if (!match) {
     const firstWord = serviceNameLower.split(' ')[0]
@@ -464,7 +464,7 @@ function findMatchingRule(
       firstWord.includes(r.service_name.toLowerCase().split(' ')[0])
     )
   }
-  
+
   return match || null
 }
 
@@ -556,10 +556,10 @@ export async function lookupRates(
   supabase: SupabaseClient,
   params: RateLookupParams
 ): Promise<RatesUsed> {
-  
+
   // Normalize the tier
   const tier = normalizeTier(params.tier)
-  
+
   const result: RatesUsed = {
     success: false,
     tier_used: tier,
@@ -577,15 +577,15 @@ export async function lookupRates(
   }
 
   try {
-    console.log(`🎯 Looking up rates for tier: ${tier.toUpperCase()}`)
-    
+
+
     // ============================================
     // 1. VEHICLE RATES (from vehicles table with tier)
     // ============================================
     const serviceType = params.service_type || 'day_tour'
-    
-    console.log(`🚗 Looking up vehicles: city=${params.city}, tier=${tier}, pax=${params.pax}`)
-    
+
+
+
     // First try: Get vehicles matching tier, ordered by preferred
     let { data: vehicles, error: vehicleError } = await supabase
       .from('vehicles')
@@ -597,7 +597,7 @@ export async function lookupRates(
 
     // Fallback: If no vehicles match tier, get any active vehicles
     if (!vehicles || vehicles.length === 0) {
-      console.log(`⚠️ No vehicles found for tier ${tier}, falling back to all active vehicles`)
+
       const { data: fallbackVehicles } = await supabase
         .from('vehicles')
         .select('*')
@@ -615,8 +615,8 @@ export async function lookupRates(
       ) || vehicles[vehicles.length - 1]
 
       if (suitableVehicle) {
-        console.log(`✅ Selected vehicle: ${suitableVehicle.vehicle_type} (tier: ${suitableVehicle.tier}, preferred: ${suitableVehicle.is_preferred})`)
-        
+
+
         // Now get the rate from transportation_rates
         const { data: vehicleRates } = await supabase
           .from('transportation_rates')
@@ -652,8 +652,8 @@ export async function lookupRates(
     // ============================================
     // 2. GUIDE RATES (from guides table with tier)
     // ============================================
-    console.log(`🎯 Looking up guides: language=${params.language}, tier=${tier}`)
-    
+
+
     let { data: guides } = await supabase
       .from('guides')
       .select('*')
@@ -664,7 +664,7 @@ export async function lookupRates(
       .limit(5)
 
     if (!guides || guides.length === 0) {
-      console.log(`⚠️ No guides found for tier ${tier} with ${params.language}, trying without tier filter`)
+
       const { data: fallbackGuides } = await supabase
         .from('guides')
         .select('*')
@@ -677,8 +677,8 @@ export async function lookupRates(
 
     if (guides && guides.length > 0) {
       const selectedGuide = guides[0]
-      console.log(`✅ Selected guide: ${selectedGuide.name} (tier: ${selectedGuide.tier}, preferred: ${selectedGuide.is_preferred})`)
-      
+
+
       const { data: guideRates } = await supabase
         .from('guide_rates')
         .select('*')
@@ -723,8 +723,8 @@ export async function lookupRates(
     // ============================================
     // 3. ATTRACTION RATES (Entrance Fees - no tier)
     // ============================================
-    console.log(`🏛️ Looking up entrance fees: city=${params.city}, attractions=${params.attractions?.join(', ') || 'default'}`)
-    
+
+
     if (params.attractions && params.attractions.length > 0) {
       const { data: attractions, error: attractionError } = await supabase
         .from('entrance_fees')
@@ -734,7 +734,7 @@ export async function lookupRates(
         .limit(20)
 
       if (!attractionError && attractions && attractions.length > 0) {
-        console.log(`✅ Found ${attractions.length} attractions by name`)
+
         result.attractions = attractions.map(a => ({
           id: a.id,
           name: a.attraction_name,
@@ -754,7 +754,7 @@ export async function lookupRates(
         .limit(10)
 
       if (attractions && attractions.length > 0) {
-        console.log(`✅ Found ${attractions.length} attractions for ${params.city}`)
+
         result.attractions = attractions.map(a => ({
           id: a.id,
           name: a.attraction_name,
@@ -771,8 +771,8 @@ export async function lookupRates(
     // 4. RESTAURANT RATES (with tier)
     // ============================================
     if (params.include_lunch || params.include_dinner) {
-      console.log(`🍽️ Looking up restaurants: city=${params.city}, tier=${tier}`)
-      
+
+
       let { data: restaurants } = await supabase
         .from('restaurant_contacts')
         .select('*')
@@ -795,10 +795,10 @@ export async function lookupRates(
 
       if (restaurants && restaurants.length > 0) {
         const restaurant = restaurants[0]
-        console.log(`✅ Selected restaurant: ${restaurant.name} (tier: ${restaurant.tier}, preferred: ${restaurant.is_preferred})`)
-        
+
+
         const tierMultiplier = TIER_MULTIPLIERS[tier]
-        
+
         result.restaurant = {
           id: restaurant.id,
           name: restaurant.name,
@@ -835,8 +835,8 @@ export async function lookupRates(
     // 5. HOTEL RATES (with tier)
     // ============================================
     if (params.include_accommodation) {
-      console.log(`🏨 Looking up hotels: city=${params.city}, tier=${tier}`)
-      
+
+
       let { data: hotels } = await supabase
         .from('hotel_contacts')
         .select('*')
@@ -848,7 +848,7 @@ export async function lookupRates(
         .limit(5)
 
       if (!hotels || hotels.length === 0) {
-        console.log(`⚠️ No hotels found for tier ${tier}, falling back`)
+
         const { data: fallbackHotels } = await supabase
           .from('hotel_contacts')
           .select('*')
@@ -862,8 +862,8 @@ export async function lookupRates(
 
       if (hotels && hotels.length > 0) {
         const hotel = hotels[0]
-        console.log(`✅ Selected hotel: ${hotel.name} (tier: ${hotel.tier}, preferred: ${hotel.is_preferred}, ${hotel.star_rating}⭐)`)
-        
+
+
         result.hotel = {
           id: hotel.id,
           name: hotel.name,
@@ -900,8 +900,8 @@ export async function lookupRates(
     // 6. AIRPORT STAFF RATES (with tier)
     // ============================================
     if (params.include_airport_service && params.airport_code) {
-      console.log(`✈️ Looking up airport staff: airport=${params.airport_code}, tier=${tier}`)
-      
+
+
       let { data: airportStaff } = await supabase
         .from('airport_staff')
         .select('*')
@@ -930,7 +930,7 @@ export async function lookupRates(
       if (airportStaff && airportStaff.length > 0) {
         const staff = airportStaff[0]
         const rate = staffRates && staffRates.length > 0 ? staffRates[0] : null
-        
+
         result.airport_staff = {
           id: staff.id,
           service_code: staff.id,
@@ -949,8 +949,8 @@ export async function lookupRates(
     // 7. HOTEL STAFF RATES (with tier)
     // ============================================
     if (params.include_accommodation && params.num_hotel_stays && params.num_hotel_stays > 0) {
-      console.log(`🛎️ Looking up hotel staff: tier=${tier}`)
-      
+
+
       let { data: hotelStaff } = await supabase
         .from('hotel_staff')
         .select('*')
@@ -978,7 +978,7 @@ export async function lookupRates(
       if (hotelStaff && hotelStaff.length > 0) {
         const staff = hotelStaff[0]
         const rate = staffRates && staffRates.length > 0 ? staffRates[0] : null
-        
+
         result.hotel_staff = {
           id: staff.id,
           service_code: staff.id,
@@ -995,7 +995,7 @@ export async function lookupRates(
     // 8. NILE CRUISE RATES (with tier)
     // ============================================
     if (params.include_cruise && params.cruise_embark_city && params.cruise_disembark_city) {
-      console.log(`🚢 Looking up cruises: ${params.cruise_embark_city} → ${params.cruise_disembark_city}, tier=${tier}`)
+
 
       // Query nile_cruises directly — it has tier, is_preferred, rates, and route info all in one table
       let cruiseQuery = supabase
@@ -1020,7 +1020,7 @@ export async function lookupRates(
 
       // Fallback: if no cruises match tier, get any active cruise on this route
       if (!cruiseRates || cruiseRates.length === 0) {
-        console.log(`⚠️ No cruises found for tier ${tier}, falling back to all active cruises`)
+
         let fallbackQuery = supabase
           .from('nile_cruises')
           .select('*')
@@ -1044,7 +1044,7 @@ export async function lookupRates(
 
       if (cruiseRates && cruiseRates.length > 0) {
         const cruise = cruiseRates[0]
-        console.log(`✅ Selected cruise: ${cruise.ship_name} (tier: ${cruise.tier}, preferred: ${cruise.is_preferred})`)
+
 
         result.cruise = {
           id: cruise.id,
@@ -1121,8 +1121,8 @@ export async function lookupRates(
     // 11. TIPPING RATES (adjusted by tier)
     // ============================================
     if (params.include_tips !== false) {
-      console.log(`💰 Looking up tipping rates (tier multiplier: ${TIER_MULTIPLIERS[tier]}x)`)
-      
+
+
       const { data: tips } = await supabase
         .from('tipping_rates')
         .select('*')
@@ -1138,12 +1138,12 @@ export async function lookupRates(
           rate_eur: Math.round(toNumber(t.rate_eur, 0) * tierMultiplier),
           context: t.context
         }))
-        console.log(`✅ Found ${tips.length} tipping rates (adjusted for ${tier} tier)`)
+
       }
     }
 
     result.success = true
-    
+
     const preferredCount = [
       result.vehicle?.is_preferred,
       result.guide?.is_preferred,
@@ -1153,9 +1153,9 @@ export async function lookupRates(
       result.hotel_staff?.is_preferred,
       result.cruise?.is_preferred
     ].filter(Boolean).length
-    
-    console.log(`⭐ Preferred suppliers selected: ${preferredCount}`)
-    
+
+
+
     return result
 
   } catch (error: any) {
@@ -1172,7 +1172,7 @@ export async function calculatePricingFromRates(
   supabase: SupabaseClient,
   params: RateLookupParams
 ): Promise<PricingCalculation> {
-  
+
   const { pax, num_adults, num_children, duration_days } = params
   const tier = normalizeTier(params.tier)
   const mode = params.mode || 'b2c'
@@ -1185,7 +1185,7 @@ export async function calculatePricingFromRates(
   let pricingRules: PricingRule[] = []
   if (params.checkPricingRules) {
     pricingRules = await getPricingRules(supabase, mode)
-    console.log(`📋 Loaded ${pricingRules.length} pricing rules for ${mode.toUpperCase()} mode`)
+
   }
 
   const result: PricingCalculation = {
@@ -1223,7 +1223,7 @@ export async function calculatePricingFromRates(
     const transportPerDay = toNumber(rates.vehicle.rate_per_day, 0)
     const isTransfer = ['intercity_transfer', 'airport_transfer', 'dinner_transfer', 'sound_light_transfer'].includes(rates.vehicle.service_type)
     const transportTotal = isTransfer ? transportPerDay : transportPerDay * duration_days
-    
+
     result.breakdown.transportation = {
       total: transportTotal,
       per_day: transportPerDay,
@@ -1240,7 +1240,7 @@ export async function calculatePricingFromRates(
   if (rates.guide) {
     const guidePerDay = toNumber(rates.guide.daily_rate_eur, 0)
     const guideTotal = guidePerDay * duration_days
-    
+
     result.breakdown.guide = {
       total: guideTotal,
       per_day: guidePerDay,
@@ -1255,19 +1255,19 @@ export async function calculatePricingFromRates(
   // ============================================
   if (rates.attractions.length > 0) {
     let totalEntrancePerPerson = 0
-    
+
     for (const attraction of rates.attractions) {
       const adultFee = params.is_euro_passport 
         ? toNumber(attraction.entrance_fee_eur, 0) 
         : toNumber(attraction.entrance_fee_non_eur, attraction.entrance_fee_eur || 0)
-      
+
       // Check for pricing rule override
       if (params.checkPricingRules && pricingRules.length > 0) {
         const rule = findMatchingRule(attraction.name, pricingRules)
         if (rule) {
           const originalCost = adultFee * pax
           const { adjustedCost, note } = applyPricingRule(rule, pax, originalCost)
-          
+
           rulesApplied.push({
             rule_id: rule.id,
             rule_name: rule.service_name,
@@ -1278,18 +1278,18 @@ export async function calculatePricingFromRates(
             savings: originalCost - adjustedCost,
             note
           })
-          
+
           // Add adjusted cost instead of standard calculation
           totalEntrancePerPerson += adjustedCost / pax
           continue
         }
       }
-      
+
       totalEntrancePerPerson += adultFee
     }
-    
+
     const entranceTotal = totalEntrancePerPerson * pax * duration_days
-    
+
     result.breakdown.entrances = {
       total: entranceTotal,
       per_person: totalEntrancePerPerson * duration_days,
@@ -1304,7 +1304,7 @@ export async function calculatePricingFromRates(
   if (rates.restaurant) {
     const lunchPerPerson = params.include_lunch ? toNumber(rates.restaurant.lunch_rate_eur, 0) : 0
     const dinnerPerPerson = params.include_dinner ? toNumber(rates.restaurant.dinner_rate_eur, 0) : 0
-    
+
     result.breakdown.meals = {
       lunch_total: lunchPerPerson * pax * duration_days,
       dinner_total: dinnerPerPerson * pax * duration_days,
@@ -1322,7 +1322,7 @@ export async function calculatePricingFromRates(
     const nights = duration_days > 1 ? duration_days - 1 : 0
     const roomsNeeded = Math.ceil(pax / 2)
     const ratePerNight = toNumber(rates.hotel.rate_double_eur, 0)
-    
+
     result.breakdown.accommodation = {
       total: ratePerNight * roomsNeeded * nights,
       per_night: ratePerNight,
@@ -1340,7 +1340,7 @@ export async function calculatePricingFromRates(
     const arrivals = params.num_arrivals || 0
     const departures = params.num_departures || 0
     const ratePerService = toNumber(rates.airport_staff.rate_eur, 0)
-    
+
     result.breakdown.airport_staff = {
       total: ratePerService * (arrivals + departures),
       arrivals: arrivals,
@@ -1356,7 +1356,7 @@ export async function calculatePricingFromRates(
   // ============================================
   if (rates.hotel_staff && params.num_hotel_stays) {
     const perStay = toNumber(rates.hotel_staff.rate_eur, 0)
-    
+
     result.breakdown.hotel_staff = {
       total: perStay * params.num_hotel_stays,
       per_stay: perStay,
@@ -1371,13 +1371,13 @@ export async function calculatePricingFromRates(
   // ============================================
   if (rates.cruise && params.include_cruise) {
     let perPerson = toNumber(rates.cruise.rate_double_eur, 0)
-    
+
     if (pax === 1) {
       perPerson = toNumber(rates.cruise.rate_single_eur, 0)
     } else if (pax >= 3 && rates.cruise.rate_triple_eur) {
       perPerson = toNumber(rates.cruise.rate_triple_eur, 0)
     }
-    
+
     result.breakdown.cruise = {
       total: perPerson * pax,
       per_person: perPerson,
@@ -1397,7 +1397,7 @@ export async function calculatePricingFromRates(
     const perPerson = isRoundtrip && rates.sleeping_train.rate_roundtrip_eur
       ? toNumber(rates.sleeping_train.rate_roundtrip_eur, 0)
       : toNumber(rates.sleeping_train.rate_oneway_eur, 0)
-    
+
     result.breakdown.sleeping_train = {
       total: perPerson * pax,
       per_person: perPerson,
@@ -1411,7 +1411,7 @@ export async function calculatePricingFromRates(
   // ============================================
   if (rates.train && params.include_train) {
     const perPerson = toNumber(rates.train.rate_eur, 0)
-    
+
     result.breakdown.train = {
       total: perPerson * pax,
       per_person: perPerson,
@@ -1424,12 +1424,12 @@ export async function calculatePricingFromRates(
   // ============================================
   let tipsTotal = 0
   const tipsBreakdown: { role: string; amount: number }[] = []
-  
+
   if (rates.tipping.length > 0 && params.include_tips !== false) {
     for (const tip of rates.tipping) {
       let tipAmount = 0
       const tipRate = toNumber(tip.rate_eur, 0)
-      
+
       if (tip.rate_unit === 'per_day') {
         tipAmount = tipRate * duration_days
       } else if (tip.rate_unit === 'per_service') {
@@ -1441,14 +1441,14 @@ export async function calculatePricingFromRates(
       } else {
         tipAmount = tipRate * duration_days
       }
-      
+
       if (tipAmount > 0) {
         tipsTotal += tipAmount
         tipsBreakdown.push({ role: tip.role_type, amount: tipAmount })
       }
     }
   }
-  
+
   result.breakdown.tips = {
     total: tipsTotal,
     per_day: duration_days > 0 ? tipsTotal / duration_days : 0,
@@ -1461,7 +1461,7 @@ export async function calculatePricingFromRates(
   if (params.include_water !== false) {
     const waterPerPersonPerDay = 2
     const waterTotal = waterPerPersonPerDay * pax * duration_days
-    
+
     result.breakdown.water = {
       total: waterTotal,
       per_person: waterPerPersonPerDay * duration_days
@@ -1489,7 +1489,7 @@ export async function calculatePricingFromRates(
   // Apply margin for B2C mode
   let totalCost = supplierCost
   let marginAmount = 0
-  
+
   if (mode === 'b2c' && marginPercent > 0) {
     marginAmount = supplierCost * (marginPercent / 100)
     totalCost = supplierCost + marginAmount
@@ -1504,23 +1504,23 @@ export async function calculatePricingFromRates(
   result.rules_applied = rulesApplied
 
   result.success = true
-  
-  console.log(`💰 PRICING SUMMARY (Tier: ${tier.toUpperCase()}, Mode: ${mode.toUpperCase()}):`)
-  console.log(`   Transportation: €${result.breakdown.transportation.total}`)
-  console.log(`   Guide: €${result.breakdown.guide.total}`)
-  console.log(`   Entrances: €${result.breakdown.entrances.total} (${result.breakdown.entrances.count} sites)`)
-  console.log(`   Meals: €${result.breakdown.meals.lunch_total + result.breakdown.meals.dinner_total}`)
-  console.log(`   Accommodation: €${result.breakdown.accommodation.total}`)
-  console.log(`   Tips: €${result.breakdown.tips.total}`)
-  console.log(`   Water: €${result.breakdown.water.total}`)
-  console.log(`   ⭐ Preferred Suppliers: ${preferredCount}`)
-  console.log(`   📋 Pricing Rules Applied: ${rulesApplied.length}`)
+
+
+
+
+
+
+
+
+
+
+
   if (mode === 'b2c') {
-    console.log(`   💵 Supplier Cost: €${result.supplier_cost}`)
-    console.log(`   📈 Margin (${marginPercent}%): €${result.margin_amount}`)
+
+
   }
-  console.log(`   TOTAL: €${result.total_cost}`)
-  
+
+
   return result
 }
 
@@ -1559,7 +1559,7 @@ export function getFallbackRates(params: {
   const waterTotal = waterPerPerson * pax * duration_days
 
   const supplierCost = transportTotal + guideTotal + entranceTotal + lunchTotal + tipsTotal + waterTotal
-  
+
   // Apply margin for B2C
   let totalCost = supplierCost
   let marginAmount = 0

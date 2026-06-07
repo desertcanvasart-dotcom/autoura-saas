@@ -3,7 +3,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('📋 Fetching bookings...')
+
 
     const authResult = await requireAuth()
     if (authResult.error) {
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log(`✅ Found ${bookings?.length || 0} bookings`)
+
 
     return NextResponse.json({
       success: true,

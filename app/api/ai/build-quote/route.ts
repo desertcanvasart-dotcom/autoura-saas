@@ -75,12 +75,7 @@ export async function POST(request: NextRequest) {
     }
     isEuroPassport = isEuroPassport ?? false
 
-    console.log('📊 Building quote for:', {
-      tour_requested,
-      pax: totalPax,
-      duration: duration_days,
-      passport: isEuroPassport ? 'EUR' : 'non-EUR'
-    })
+
 
     // ============================================
     // STEP 1: MATCH TOUR TEMPLATE (if enabled)
@@ -97,7 +92,7 @@ export async function POST(request: NextRequest) {
           totalPax, 
           isEuroPassport
         )
-        
+
         if (templateData) {
           matchResult = {
             success: true,
@@ -262,12 +257,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log('✅ Quote built:', {
-      total: quote.pricing.total_cost,
-      per_person: quote.pricing.per_person_cost,
-      template: quote.template_match?.template_name || 'custom',
-      source: quote.pricing.source
-    })
+
 
     return NextResponse.json({
       success: true,

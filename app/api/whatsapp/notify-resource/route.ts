@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { itineraryId, resourceId, resourceType, resourceName, startDate, endDate, notes } = body
 
-    console.log('📤 Notify resource request:', { itineraryId, resourceId, resourceType })
+
 
     if (!itineraryId || !resourceId || !resourceType) {
       return NextResponse.json(
@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
 
     // Use contact_phone or whatsapp field
     const resourcePhone = resource.contact_phone || resource.whatsapp || resource.phone2
-    
-    console.log('📱 Resource:', { name: resource.name, contact_phone: resource.contact_phone, whatsapp: resource.whatsapp })
+
+
 
     if (!resourcePhone) {
       return NextResponse.json(
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    
+
     // Format dates
     const formatDate = (dateStr: string) => {
       return new Date(dateStr).toLocaleDateString('en-US', { 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     // Generate message based on resource type
     let message = ''
-    
+
     if (resourceType === 'restaurant') {
       message = `🍽️ *${businessName} - Reservation Request*\n\n` +
         `Hello ${resource.name},\n\n` +
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
         `Please confirm availability.\n\n` +
         `Thank you!\n` +
         `${businessName} Team`
-        
+
     } else if (resourceType === 'airport_staff') {
       message = `✈️ *${businessName} - Airport Assignment*\n\n` +
         `Hello ${resource.name},\n\n` +
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
         `${notes ? `📝 *Notes:* ${notes}\n` : ''}\n` +
         `Please confirm receipt of this assignment.\n\n` +
         `${businessName} Operations`
-        
+
     } else if (resourceType === 'hotel_staff') {
       message = `🏨 *${businessName} - Hotel Assignment*\n\n` +
         `Hello ${resource.name},\n\n` +
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         `${businessName} Operations`
     }
 
-    console.log('📤 Sending to:', resourcePhone)
+
 
     const result = await sendWhatsAppMessage({
       to: resourcePhone,
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`✅ WhatsApp sent to ${resourceType}:`, result.messageId)
+
 
     return NextResponse.json({
       success: true,

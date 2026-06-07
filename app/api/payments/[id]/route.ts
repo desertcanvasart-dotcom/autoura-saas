@@ -73,7 +73,7 @@ export async function PUT(
     const supabase = await createAuthenticatedClient()
     const body = await request.json()
 
-    console.log('Updating payment:', id, body)
+
 
     const { data, error } = await supabase
       .from('payments')

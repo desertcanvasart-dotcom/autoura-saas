@@ -53,7 +53,7 @@ export function useEmailPolling({
   const [unreadCount, setUnreadCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [newEmailCount, setNewEmailCount] = useState(0)
-  
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const isPollingRef = useRef(false)
   const consecutiveErrorsRef = useRef(0)
@@ -65,7 +65,7 @@ export function useEmailPolling({
 
     // Skip polling if we've had too many consecutive errors
     if (consecutiveErrorsRef.current >= maxConsecutiveErrors) {
-      console.log('Polling paused due to consecutive errors. Click Refresh to retry.')
+
       return
     }
 
@@ -80,7 +80,7 @@ export function useEmailPolling({
       }
 
       const response = await fetch(`/api/gmail/poll?${params}`)
-      
+
       if (!response.ok) {
         // Don't throw - just log and handle gracefully
         const errorData = await response.json().catch(() => ({}))

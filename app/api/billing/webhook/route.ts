@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`Received Stripe webhook event: ${event.type}`)
+
 
     // Handle different event types
     switch (event.type) {
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         break
 
       default:
-        console.log(`Unhandled event type: ${event.type}`)
+
     }
 
     return NextResponse.json({ received: true })
@@ -112,7 +112,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return
   }
 
-  console.log(`Checkout completed for tenant ${tenantId}, subscription ${subscriptionId}`)
+
 
   // The actual subscription will be handled by subscription.created event
   // Just log the activity here
@@ -141,7 +141,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     return
   }
 
-  console.log(`Updating subscription ${subscription.id} for tenant ${tenantId}`)
+
 
   // Get the plan from Stripe price ID
   const priceId = subscription.items.data[0]?.price.id
@@ -210,7 +210,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
       })
   }
 
-  console.log(`Successfully updated subscription for tenant ${tenantId}`)
+
 }
 
 /**
@@ -224,7 +224,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     return
   }
 
-  console.log(`Subscription deleted for tenant ${tenantId}`)
+
 
   // Update subscription status
   const { error } = await (getSupabaseAdmin() as any)
@@ -271,7 +271,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     return
   }
 
-  console.log(`Invoice paid for tenant ${subscription.tenant_id}`)
+
 
   // Store invoice record
   await (getSupabaseAdmin() as any)
@@ -331,7 +331,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     return
   }
 
-  console.log(`Payment failed for tenant ${subscription.tenant_id}`)
+
 
   // Update subscription status to past_due
   await (getSupabaseAdmin() as any)
@@ -369,7 +369,7 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
     return
   }
 
-  console.log(`Trial ending soon for tenant ${tenantId}`)
+
 
   // Log activity
   await (getSupabaseAdmin() as any).rpc('log_activity', {

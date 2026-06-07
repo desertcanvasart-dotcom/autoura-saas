@@ -32,14 +32,14 @@ function getSupabaseAdmin() {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  
+
   // Default to Nile Cruise tour
   const templateId = searchParams.get('template_id') || '04e22e6d-e8f0-4bd9-99f5-6dcb2b1c707a'
   const tier = (searchParams.get('tier') || 'standard') as ServiceTier
   const isEurPassport = searchParams.get('eur') !== 'false'
   const marginPercent = parseFloat(searchParams.get('margin') || '25')
-  
-  console.log('🧪 Testing day-based pricing:', { templateId, tier, isEurPassport, marginPercent })
+
+
 
   try {
     // ============================================
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     // STEP 2: Parse itinerary for debugging
     // ============================================
     const parsedItinerary = parseItinerary(t.itinerary)
-    
+
     const itineraryAnalysis = {
       totalDays: parsedItinerary.length,
       hotelNights: parsedItinerary.filter(d => d.accommodation_type === 'hotel').length,
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
       success: true,
       test: 'Day-Based Pricing Service v3',
       timestamp: new Date().toISOString(),
-      
+
       // Template info
       template: {
         id: t.id,
@@ -144,17 +144,17 @@ export async function GET(request: NextRequest) {
         duration: t.duration_days,
         theme: t.tour_categories?.category_name || 'Unknown'
       },
-      
+
       // Itinerary analysis
       itineraryAnalysis,
-      
+
       // Pricing parameters
       params: {
         tier,
         isEurPassport,
         marginPercent
       },
-      
+
       // NEW: Full pricing table
       pricingTable: {
         singleSupplement: dayPricingResult.singleSupplement,
@@ -165,10 +165,10 @@ export async function GET(request: NextRequest) {
           plusOne: p.withLeader.pricePerPerson
         }))
       },
-      
+
       // Formatted for display
       formattedTable: pricingTableRows,
-      
+
       // Service breakdown (for 2 pax)
       serviceBreakdown: dayPricingResult.services.map(s => ({
         day: s.dayNumber,
@@ -178,10 +178,10 @@ export async function GET(request: NextRequest) {
         isPerPax: s.isPerPax,
         source: s.rateSource
       })),
-      
+
       // Warnings
       warnings: dayPricingResult.warnings,
-      
+
       // Legacy compatibility check
       legacyCompatibility: {
         success: legacyResult.success,

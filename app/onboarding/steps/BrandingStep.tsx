@@ -85,12 +85,7 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
       const fileExt = logoFile.name.split('.').pop()
       const fileName = `${tenant?.id || 'tenant'}-${Date.now()}.${fileExt}`
 
-      console.log('📤 Uploading logo:', {
-        fileName,
-        fileSize: logoFile.size,
-        fileType: logoFile.type,
-        tenantId: tenant?.id
-      })
+
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
@@ -109,14 +104,14 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
         throw error
       }
 
-      console.log('✅ Upload successful:', data)
+
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('tenant-logos')
         .getPublicUrl(fileName)
 
-      console.log('🔗 Public URL:', publicUrl)
+
 
       return publicUrl
     } catch (error: any) {

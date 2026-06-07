@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     const q = quote as any
-    console.log('✅ Quote created:', q.quote_number)
+
     return NextResponse.json({ success: true, data: q }, { status: 201 })
 
   } catch (error: any) {

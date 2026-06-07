@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     const adminClient = createAdminClient()
     const selectedTier = PRICING_TIERS[tier]
 
-    console.log(`[Pricing Tier] Updating tenant ${tenant_id} to tier: ${tier}`)
+
 
     // Check if tenant_features record exists
     const { data: existingFeatures, error: fetchError } = await adminClient
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
     if (!existingFeatures) {
       // Insert new record
-      console.log(`[Pricing Tier] No existing features found, creating new record`)
+
       result = await adminClient
         .from('tenant_features')
         .insert({
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
         .single()
     } else {
       // Update existing record
-      console.log(`[Pricing Tier] Updating existing features record`)
+
       result = await adminClient
         .from('tenant_features')
         .update(updateData)
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log(`[Pricing Tier] Successfully updated to ${tier}:`, result.data)
+
 
     // Also update the tenant's business_type to match
     const { error: tenantUpdateError } = await adminClient

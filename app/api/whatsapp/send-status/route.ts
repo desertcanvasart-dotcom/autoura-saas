@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { itineraryId, status, notes } = body
 
-    console.log('📤 Status update request:', { itineraryId, status })
+
 
     if (!itineraryId) {
       return NextResponse.json(
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
       notes
     )
 
-    console.log('📤 Sending to:', itinerary.client_phone)
+
 
     // Send via WhatsApp
     const result = await sendWhatsAppMessage({
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', itineraryId)
 
-    console.log('✅ Status update sent:', result.messageId)
+
 
     return NextResponse.json({
       success: true,

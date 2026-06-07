@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
-    console.log('✅ Found itineraries:', data?.length || 0)
+
 
     return NextResponse.json({
       success: true,

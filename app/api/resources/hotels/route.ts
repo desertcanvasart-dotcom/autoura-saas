@@ -65,8 +65,8 @@ export async function POST(request: NextRequest) {
     // Prevent manual tenant_id setting - RLS will handle it
     delete body.tenant_id
 
-    console.log('=== HOTELS API POST START ===')
-    console.log('Body received:', JSON.stringify(body, null, 2))
+
+
 
     // Minimal insert with only required fields
     const newRate: Record<string, any> = {
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (body.supplier_name) newRate.supplier_name = body.supplier_name
     if (body.notes) newRate.notes = body.notes
 
-    console.log('Inserting:', JSON.stringify(newRate, null, 2))
+
 
     // Insert with RLS - tenant_id auto-populated by trigger
     const { data: insertData, error: insertError } = await supabase
@@ -104,8 +104,8 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    console.log('=== INSERT SUCCESSFUL ===')
-    console.log('Inserted data:', insertData)
+
+
 
     return NextResponse.json({ success: true, data: insertData })
   } catch (error: any) {

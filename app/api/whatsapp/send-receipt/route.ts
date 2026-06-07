@@ -81,11 +81,7 @@ export async function POST(request: NextRequest) {
       `🌐 ${businessWebsite}\n\n` +
       `Best regards,\n*${businessName} Team*`
 
-    console.log('📤 Sending receipt via WhatsApp:', {
-      to: clientPhone,
-      paymentId,
-      receiptNumber
-    })
+
 
     // Send via WhatsApp
     const result = await sendWhatsAppMessage({
@@ -97,7 +93,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: result.error }, { status: 500 })
     }
 
-    console.log('✅ Receipt sent successfully via WhatsApp:', result.messageId)
+
 
     return NextResponse.json({
       success: true,

@@ -129,7 +129,7 @@ export async function DELETE(
     const supabase = await createAuthenticatedClient()
     const { id } = await params
 
-    console.log('🗑️ Deleting itinerary:', id)
+
 
     // Check if itinerary has invoices
     const { data: invoices } = await supabase
@@ -186,7 +186,7 @@ export async function DELETE(
       throw error
     }
 
-    console.log('✅ Itinerary deleted successfully')
+
 
     return NextResponse.json({
       success: true,

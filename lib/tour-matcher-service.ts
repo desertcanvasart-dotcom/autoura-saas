@@ -91,7 +91,7 @@ export async function matchTourTemplate(
   supabase: SupabaseClient,
   input: MatchInput
 ): Promise<MatchResult> {
-  
+
   const result: MatchResult = {
     success: false,
     matches: [],
@@ -105,7 +105,7 @@ export async function matchTourTemplate(
     // 1. EXTRACT CITIES FROM INPUT
     // ============================================
     const extractedCities = new Set<string>()
-    
+
     // From explicit cities
     if (input.cities) {
       input.cities.forEach((c: string) => extractedCities.add(c))
@@ -114,7 +114,7 @@ export async function matchTourTemplate(
     // From tour_requested text
     if (input.tour_requested) {
       const requestLower = input.tour_requested.toLowerCase()
-      
+
       for (const [keyword, cities] of Object.entries(ATTRACTION_KEYWORDS)) {
         if (requestLower.includes(keyword)) {
           cities.forEach((c: string) => extractedCities.add(c))
@@ -135,16 +135,16 @@ export async function matchTourTemplate(
     }
 
     const targetCities = Array.from(extractedCities)
-    console.log('🗺️ Extracted cities:', targetCities)
+
 
     // ============================================
     // 2. DETERMINE TOUR TYPE
     // ============================================
     let targetTourType: string | null = null
-    
+
     if (input.tour_requested) {
       const requestLower = input.tour_requested.toLowerCase()
-      
+
       for (const [type, keywords] of Object.entries(TOUR_TYPE_KEYWORDS)) {
         if (keywords.some((k: string) => requestLower.includes(k))) {
           targetTourType = type
@@ -158,7 +158,7 @@ export async function matchTourTemplate(
       targetTourType = input.duration_days <= 1 ? 'day_tour' : 'multi_day'
     }
 
-    console.log('🎯 Target tour type:', targetTourType)
+
 
     // ============================================
     // 3. FETCH MATCHING TEMPLATES
@@ -212,7 +212,7 @@ export async function matchTourTemplate(
         const matchingCities = targetCities.filter((c: string) => 
           templateCities.some((tc: string) => tc.includes(c.toLowerCase()) || c.toLowerCase().includes(tc))
         )
-        
+
         if (matchingCities.length > 0) {
           const cityScore = Math.min(50, (matchingCities.length / targetCities.length) * 50)
           score += cityScore
@@ -224,11 +224,11 @@ export async function matchTourTemplate(
       if (input.tour_requested && template.template_name) {
         const requestWords = input.tour_requested.toLowerCase().split(/\s+/)
         const templateWords = template.template_name.toLowerCase().split(/\s+/)
-        
+
         const matchingWords = requestWords.filter((w: string) => 
           templateWords.some((tw: string) => tw.includes(w) || w.includes(tw))
         )
-        
+
         if (matchingWords.length > 0) {
           const nameScore = Math.min(20, matchingWords.length * 5)
           score += nameScore
@@ -301,7 +301,7 @@ export async function matchTourTemplate(
 
     if (scoredMatches.length > 0) {
       result.best_match = scoredMatches[0]
-      
+
       if (scoredMatches[0].match_score >= 70) {
         result.recommendation = `Strong match: "${scoredMatches[0].template_name}" (${scoredMatches[0].match_score}% confidence)`
       } else if (scoredMatches[0].match_score >= 50) {
@@ -342,7 +342,7 @@ export async function getTemplateWithPricing(
   pax: number,
   isEuroPassport: boolean
 ): Promise<TemplateWithPricing | null> {
-  
+
   try {
     // Get template with all related data
     const { data: template, error: templateError } = await supabase

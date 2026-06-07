@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    console.log('Updating conversation with:', updateData)
+
 
     const { error: updateError } = await supabase
       .from('whatsapp_conversations')
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
           console.error('Notification create error:', notifError)
         }
       } else {
-        console.log('Team member not found for notification, id:', newAssigneeId)
+
       }
     }
 
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
           }
         })
     } catch (activityError) {
-      console.log('Activity log skipped:', activityError)
+
     }
 
     // Fetch updated conversation
@@ -217,7 +217,7 @@ export async function GET(request: NextRequest) {
         .in('action_type', ['assigned', 'claimed', 'transferred', 'unassigned', 'auto_assigned'])
         .order('created_at', { ascending: false })
         .limit(10)
-      
+
       history = historyData || []
     } catch {
       // Activity table might not exist

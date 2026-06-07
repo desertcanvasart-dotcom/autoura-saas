@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate contract PDF
-    console.log('📄 Generating contract PDF...')
+
     const contractData = {
       contractNumber: `TC-2025-${itineraryId.slice(0, 8).toUpperCase()}`,
       contractDate: new Date().toISOString(),
@@ -70,11 +70,11 @@ export async function POST(request: NextRequest) {
     }
 
     const pdfBytes = await generateContractPDF(contractData)
-    
+
     // Upload to Supabase Storage
-    console.log('📤 Uploading PDF to storage...')
+
     const fileName = `contracts/contract-${itineraryId}-${Date.now()}.pdf`
-    
+
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('documents')
       .upload(fileName, pdfBytes, {
@@ -93,11 +93,11 @@ export async function POST(request: NextRequest) {
       .getPublicUrl(fileName)
 
     const pdfUrl = urlData.publicUrl
-    console.log('✅ PDF uploaded:', pdfUrl)
+
 
     // Build message
     const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    
+
     const message = `📄 *${businessName}* 📄\n\n` +
       `Dear ${itinerary.client_name || 'Valued Guest'},\n\n` +
       `Your tour contract is ready! 🎉\n\n` +
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('✅ Contract sent with PDF:', result.messageId)
+
 
     return NextResponse.json({
       success: true,

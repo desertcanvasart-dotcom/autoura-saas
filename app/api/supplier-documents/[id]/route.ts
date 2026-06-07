@@ -70,11 +70,11 @@ export async function PUT(
 
   try {
     const body = await request.json()
-    console.log('Updating document:', id, body)
+
 
     // Remove fields that shouldn't be updated directly
     const { itinerary, supplier, created_at, tenant_id, ...updateData } = body
-    
+
     // Auto-set timestamps based on status changes
     if (updateData.status === 'sent' && !updateData.sent_at) {
       updateData.sent_at = new Date().toISOString()
@@ -85,7 +85,7 @@ export async function PUT(
     if (updateData.status === 'completed' && !updateData.completed_at) {
       updateData.completed_at = new Date().toISOString()
     }
-    
+
     // Set updated_at
     updateData.updated_at = new Date().toISOString()
 
@@ -101,7 +101,7 @@ export async function PUT(
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    console.log('Document updated successfully:', data)
+
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('Error in PUT:', error)
