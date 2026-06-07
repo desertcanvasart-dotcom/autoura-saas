@@ -631,7 +631,22 @@ export async function POST(
     // NEW: Track skipped add-ons for reporting
     const skippedAddons: string[] = []
 
-    const tipping = await getTippingRate(supabase, tier)
+    // Request-scoped memoization for rate lookups. The same city/tier/attraction
+    // recurs across days, so caching each lookup by its inputs avoids repeated
+    // sequential DB round-trips within a single pricing run. We cache the promise
+    // itself so duplicate/concurrent lookups dedupe. Results are only read by
+    // callers (never mutated), so sharing a reference across hits is safe.
+    const rateCache = new Map<string, Promise<any>>()
+    function memoRate<T>(key: string, fn: () => Promise<T>): Promise<T> {
+      let hit = rateCache.get(key) as Promise<T> | undefined
+      if (!hit) {
+        hit = fn()
+        rateCache.set(key, hit)
+      }
+      return hit
+    }
+
+    const tipping = await memoRate(`tip|${tier}`, () => getTippingRate(supabase, tier))
     const waterRate = 2
     const roomsNeeded = Math.ceil(totalPax / 2)
 
@@ -648,7 +663,7 @@ export async function POST(
       const { city, attractions, services, overnight_city } = day
 
       // TRANSPORTATION
-      const transport = await getTransportationRate(supabase, city, tier, totalPax)
+      const transport = await memoRate(`transport|${city}|${tier}|${totalPax}`, () => getTransportationRate(supabase, city, tier, totalPax))
       const transportClient = applyMarkup(transport.rate, marginPercent)
       allServices.push({
         tenant_id,
@@ -670,7 +685,7 @@ export async function POST(
 
       // GUIDE
       if (services.guide) {
-        const guide = await getGuideRate(supabase, city, tier)
+        const guide = await memoRate(`guide|${city}|${tier}`, () => getGuideRate(supabase, city, tier))
         const guideClient = applyMarkup(guide.rate, marginPercent)
         allServices.push({
           tenant_id,
@@ -693,7 +708,7 @@ export async function POST(
 
       // ENTRANCE FEES - NOW WITH ADD-ON CHECK
       for (const attraction of attractions) {
-        const entrance = await getEntranceFee(supabase, attraction, isEuroPassport)
+        const entrance = await memoRate(`entrance|${attraction}|${isEuroPassport}`, () => getEntranceFee(supabase, attraction, isEuroPassport))
         
         // NEW: Skip add-ons if not explicitly included
         if (entrance.isAddon && !include_addons) {
@@ -726,7 +741,7 @@ export async function POST(
 
       // LUNCH
       if (services.lunch) {
-        const meal = await getMealRate(supabase, city, 'lunch', tier)
+        const meal = await memoRate(`meal|${city}|lunch|${tier}`, () => getMealRate(supabase, city, 'lunch', tier))
         const mealTotal = meal.rate * totalPax
         const mealClient = applyMarkup(mealTotal, marginPercent)
         allServices.push({
@@ -750,7 +765,7 @@ export async function POST(
 
       // DINNER
       if (services.dinner) {
-        const meal = await getMealRate(supabase, city, 'dinner', tier)
+        const meal = await memoRate(`meal|${city}|dinner|${tier}`, () => getMealRate(supabase, city, 'dinner', tier))
         const mealTotal = meal.rate * totalPax
         const mealClient = applyMarkup(mealTotal, marginPercent)
         allServices.push({
@@ -817,7 +832,7 @@ export async function POST(
       if (services.hotel && overnight_city && includeAccommodation && !isLastDay) {
         if (isCruisePackage) {
           // CRUISE ACCOMMODATION
-          const cruise = await getCruiseRate(supabase, tier, totalPax)
+          const cruise = await memoRate(`cruise|${tier}|${totalPax}`, () => getCruiseRate(supabase, tier, totalPax))
           // Cruise rate is per person per night
           const cruiseTotal = cruise.rate * totalPax
           const cruiseClient = applyMarkup(cruiseTotal, marginPercent)
@@ -840,7 +855,7 @@ export async function POST(
           totalClientPrice += cruiseClient
         } else {
           // HOTEL ACCOMMODATION
-          const hotel = await getHotelRate(supabase, overnight_city, tier)
+          const hotel = await memoRate(`hotel|${overnight_city}|${tier}`, () => getHotelRate(supabase, overnight_city, tier))
           const hotelTotal = hotel.rate * roomsNeeded
           const hotelClient = applyMarkup(hotelTotal, marginPercent)
           allServices.push({
