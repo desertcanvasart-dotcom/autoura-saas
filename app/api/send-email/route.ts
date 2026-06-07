@@ -1,18 +1,26 @@
 import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { generateEmailTemplate } from '@/lib/communication-utils'
+import { requireAuth } from '@/lib/supabase-server'
 
 export async function POST(request: Request) {
   try {
-    const { 
+    // Authenticated users only — this route sends mail through the company
+    // mailbox, so it must never be callable anonymously.
+    const auth = await requireAuth()
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+
+    const {
       itineraryId,
-      clientName, 
+      clientName,
       clientEmail,
       itineraryCode,
       tripName,
       totalCost,
       currency,
-      pdfBase64 
+      pdfBase64
     } = await request.json()
 
     if (!clientEmail) {

@@ -1,42 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient, requireAuth } from '@/lib/supabase-server'
+import { resolveTeamMemberIdForUser } from '@/lib/notifications'
 
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
-}
-
-// PUT - Mark notification as read
+// PUT - Mark a notification as read (only the caller's own notifications)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth()
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+
+    const teamMemberId = await resolveTeamMemberIdForUser(
+      auth.supabase!,
+      auth.tenant_id!,
+      auth.user!.email
+    )
+    if (!teamMemberId) {
+      return NextResponse.json({ success: false, error: 'Notification not found' }, { status: 404 })
+    }
+
     const { id } = await params
     const body = await request.json()
     const { is_read = true } = body
 
-    const { data, error } = await (getSupabase() as any)
+    const { data, error } = await (createAdminClient() as any)
       .from('notifications')
       .update({ is_read, updated_at: new Date().toISOString() })
       .eq('id', id)
+      .eq('team_member_id', teamMemberId)
       .select()
       .single()
 
     if (error) throw error
 
-    return NextResponse.json({
-      success: true,
-      data
-    })
+    return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('Error updating notification:', error)
     return NextResponse.json(
@@ -46,25 +46,37 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete a notification
+// DELETE - Delete a notification (only the caller's own notifications)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth()
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+
+    const teamMemberId = await resolveTeamMemberIdForUser(
+      auth.supabase!,
+      auth.tenant_id!,
+      auth.user!.email
+    )
+    if (!teamMemberId) {
+      return NextResponse.json({ success: false, error: 'Notification not found' }, { status: 404 })
+    }
+
     const { id } = await params
 
-    const { error } = await getSupabase()
+    const { error } = await (createAdminClient() as any)
       .from('notifications')
       .delete()
       .eq('id', id)
+      .eq('team_member_id', teamMemberId)
 
     if (error) throw error
 
-    return NextResponse.json({
-      success: true,
-      message: 'Notification deleted'
-    })
+    return NextResponse.json({ success: true, message: 'Notification deleted' })
   } catch (error) {
     console.error('Error deleting notification:', error)
     return NextResponse.json(
