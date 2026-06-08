@@ -3,6 +3,7 @@ import { createAdminClient, requireAuth } from '@/lib/supabase-server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createElement } from 'react'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
 import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
 
@@ -151,6 +152,19 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: 'No recipient phone number found' },
         { status: 400 }
+      )
+    }
+
+    // Output gate (harness Layer 2): never WhatsApp a non-deliverable price.
+    const priceCheck = checkQuoteRowDeliverable(quote, type)
+    if (!priceCheck.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'This quote cannot be sent — its price is not deliverable. Resolve the issues and re-price before sending.',
+          violations: priceCheck.violations,
+        },
+        { status: 422 }
       )
     }
 
