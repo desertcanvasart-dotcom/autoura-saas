@@ -1,0 +1,39 @@
+name: CI
+
+# Enforces the pricing harness (and the rest of the codebase) on every PR:
+# the test suite + a strict type-check must pass before merge.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests + type-check
+    runs-on: ubuntu-latest
+    env:
+      # Tests/tsc don't use Puppeteer's bundled browser — skip the slow download.
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests (Vitest)
+        run: npm test
+
+      - name: Type-check (tsc --noEmit)
+        # The project needs a larger heap or tsc OOMs (and can silently report 0).
+        run: NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit -p tsconfig.json
