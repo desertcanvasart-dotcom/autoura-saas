@@ -133,6 +133,40 @@ export function missingHotelTables(): MockTables {
 }
 
 /**
+ * Full dataset with hotel + guide rates for EVERY tier, so all four tiers
+ * price out completely. Used by the cross-tier "golden basket" drift guard.
+ */
+export function multiTierRateTables(): MockTables {
+  const tables = fullRateTables()
+  const tiers = [
+    { tier: 'budget', ppd: 35, ss: 20, guide: 45 },
+    { tier: 'standard', ppd: 55, ss: 30, guide: 60 },
+    { tier: 'deluxe', ppd: 90, ss: 50, guide: 75 },
+    { tier: 'luxury', ppd: 140, ss: 80, guide: 100 },
+  ]
+  tables.accommodation_rates = tiers.map((t) => ({
+    id: `h-cai-${t.tier}`,
+    property_name: `Cairo ${t.tier} Hotel`,
+    city: 'Cairo',
+    tier: t.tier,
+    ppd_eur: t.ppd,
+    single_supplement_eur: t.ss,
+    triple_reduction_eur: 0,
+    is_active: true,
+  }))
+  tables.guides = tiers.map((t) => ({
+    id: `g-${t.tier}`,
+    name: `Guide ${t.tier}`,
+    daily_rate: t.guide,
+    languages: ['English'],
+    tier: t.tier,
+    is_preferred: true,
+    is_active: true,
+  }))
+  return tables
+}
+
+/**
  * Only a BUDGET hotel exists; a STANDARD request fuzzy-matches it (wrong tier).
  * Per policy, a fuzzy match blocks exactly like a missing rate.
  */
