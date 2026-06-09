@@ -16,7 +16,8 @@
     "lib/pricing/rate-resolution.ts",
     "lib/auto-pricing-service.ts",
     "lib/tourCalculator.ts",
-    "app/pricing-grid/lib/grid-completeness.ts"
+    "app/pricing-grid/lib/grid-completeness.ts",
+    "app/pricing-grid/lib/calculator.ts"
   ],
   "exclude": ["node_modules", "**/__tests__/**", "**/*.test.ts"]
 }

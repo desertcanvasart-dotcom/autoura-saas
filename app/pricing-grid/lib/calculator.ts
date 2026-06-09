@@ -4,8 +4,8 @@
 // All amounts in EUR. No side effects, no DOM access.
 // Currency conversion applied at display time only.
 
-import type { GridDay, GridConfig, DayCalc, GridTotals, EMPTY_TOTALS } from '../types'
-import { GROUP_SLOTS, PER_PERSON_SLOTS, getSlotDef } from './slot-mapping'
+import type { GridDay, GridConfig, DayCalc, GridTotals } from '../types'
+import { getSlotDef } from './slot-mapping'
 
 // --- Per-Day Calculation ---
 
