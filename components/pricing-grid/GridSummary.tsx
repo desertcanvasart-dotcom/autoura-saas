@@ -1,7 +1,8 @@
 'use client'
 
-import { Save, ExternalLink, Loader2 } from 'lucide-react'
+import { Save, ExternalLink, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import type { GridConfig, GridTotals } from '@/app/pricing-grid/types'
+import type { GridCompleteness } from '@/app/pricing-grid/lib/grid-completeness'
 import { convertAmount, formatCurrency } from '@/app/pricing-grid/lib/calculator'
 
 interface GridSummaryProps {
@@ -11,9 +12,10 @@ interface GridSummaryProps {
   isSaving: boolean
   savedUrl: string | null
   onSave: () => void
+  completeness?: GridCompleteness
 }
 
-export default function GridSummary({ config, totals, dayCount, isSaving, savedUrl, onSave }: GridSummaryProps) {
+export default function GridSummary({ config, totals, dayCount, isSaving, savedUrl, onSave, completeness }: GridSummaryProps) {
   const displayRate = config.exchangeRate
   const cur = config.currency
 
@@ -61,6 +63,33 @@ export default function GridSummary({ config, totals, dayCount, isSaving, savedU
           {dayCount} days | {config.pax} pax | {config.tier} tier | {config.clientType.toUpperCase()} | {cur}
         </div>
       </div>
+
+      {/* Needs attention (B-full completeness) */}
+      {completeness && completeness.issues.length > 0 && (
+        <div className="px-4 py-3 border-t border-gray-100">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider mb-2">
+            {completeness.blocking > 0 ? (
+              <span className="flex items-center gap-1.5 text-red-600">
+                <AlertTriangle className="w-4 h-4" /> Needs attention — {completeness.blocking} blocking
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-green-600">
+                <CheckCircle2 className="w-4 h-4" /> Ready
+              </span>
+            )}
+            {completeness.warnings > 0 && (
+              <span className="text-amber-600 normal-case font-normal">· {completeness.warnings} warning(s)</span>
+            )}
+          </div>
+          <ul className="space-y-1 text-xs max-h-40 overflow-y-auto">
+            {completeness.issues.map((issue, idx) => (
+              <li key={idx} className={issue.severity === 'block' ? 'text-red-600' : 'text-amber-600'}>
+                • {issue.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">

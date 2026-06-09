@@ -1,11 +1,25 @@
 'use client'
 
 import { ChevronDown, ChevronRight, Trash2, Copy, MapPin } from 'lucide-react'
-import type { GridDay, GridConfig, AllRates, DayCalc } from '@/app/pricing-grid/types'
+import type { GridDay, GridConfig, AllRates, DayCalc, DayType, IntercityMode } from '@/app/pricing-grid/types'
 import type { SlotValue, SlotDefinition } from '@/app/pricing-grid/types'
+import { DAY_TYPES, DAY_TYPE_LABELS, DAY_TYPE_DEFAULTS } from '@/app/pricing-grid/types'
 import { GROUP_SLOTS, PER_PERSON_SLOTS } from '@/app/pricing-grid/lib/slot-mapping'
 import { calculateDay, convertAmount, formatCurrency } from '@/app/pricing-grid/lib/calculator'
+import { resolveComponents } from '@/app/pricing-grid/lib/grid-completeness'
 import SlotRow from './SlotRow'
+
+function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${active ? 'bg-[#647C47] text-white border-[#647C47]' : 'bg-white text-gray-500 border-gray-200 hover:border-[#647C47]/40'}`}
+    >
+      {label}
+    </button>
+  )
+}
 
 interface DayRowProps {
   day: GridDay
@@ -23,6 +37,7 @@ export default function DayRow({
 }: DayRowProps) {
   const dayCalc = calculateDay(day, config)
   const displayRate = config.exchangeRate
+  const comp = resolveComponents(day)
 
   const getOptionsForSlot = (slotDef: SlotDefinition): any[] => {
     if (!slotDef.rateTable) return []
@@ -113,6 +128,39 @@ export default function DayRow({
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Day setup — drives completeness (B-full) */}
+      <div className="px-4 py-2 border-b border-gray-50 flex flex-wrap items-center gap-1.5">
+        <select
+          value={day.dayType ?? 'tour'}
+          onChange={(e) => {
+            const dt = e.target.value as DayType
+            onUpdateDay({ dayType: dt, ...DAY_TYPE_DEFAULTS[dt] })
+          }}
+          className="text-xs px-2 py-1 border border-gray-200 rounded-md bg-white focus:border-[#647C47] outline-none"
+          title="Day type preset"
+        >
+          {DAY_TYPES.map((dt) => (
+            <option key={dt} value={dt}>{DAY_TYPE_LABELS[dt]}</option>
+          ))}
+        </select>
+        <Chip label="Overnight" active={comp.overnight} onClick={() => onUpdateDay({ overnight: !comp.overnight })} />
+        <Chip label="Sightseeing" active={comp.hasSightseeing} onClick={() => onUpdateDay({ hasSightseeing: !comp.hasSightseeing })} />
+        <Chip label="Airport in" active={comp.airportArrival} onClick={() => onUpdateDay({ airportArrival: !comp.airportArrival })} />
+        <Chip label="Airport out" active={comp.airportDeparture} onClick={() => onUpdateDay({ airportDeparture: !comp.airportDeparture })} />
+        <Chip label="Check-in" active={comp.hotelCheckIn} onClick={() => onUpdateDay({ hotelCheckIn: !comp.hotelCheckIn })} />
+        <Chip label="Check-out" active={comp.hotelCheckOut} onClick={() => onUpdateDay({ hotelCheckOut: !comp.hotelCheckOut })} />
+        <select
+          value={comp.intercity}
+          onChange={(e) => onUpdateDay({ intercity: e.target.value as IntercityMode })}
+          className="text-xs px-2 py-1 border border-gray-200 rounded-md bg-white focus:border-[#647C47] outline-none"
+          title="Intercity move"
+        >
+          <option value="none">No transfer</option>
+          <option value="road">Intercity: road</option>
+          <option value="flight">Intercity: flight</option>
+        </select>
       </div>
 
       {/* Description */}

@@ -719,7 +719,9 @@ export default function ItineraryEditorPage() {
     setCalculating(true)
 
     try {
-
+      // Save the latest structure, then price in the PRICING GRID — the single
+      // pricing engine. (The old per-itinerary calculate-pricing route, which
+      // substituted hardcoded default rates, has been removed.)
       const saveSuccess = await saveDraft()
 
       if (!saveSuccess) {
@@ -728,40 +730,10 @@ export default function ItineraryEditorPage() {
         return
       }
 
-
-
-      const response = await fetch(`/api/itineraries/${itineraryId}/calculate-pricing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tier: itinerary.tier,
-          package_type: itinerary.package_type,
-          days: days.map(d => ({
-            day_number: d.day_number,
-            city: d.city,
-            attractions: d.attractions,
-            services: d.services,
-            overnight_city: d.overnight_city
-          })),
-          num_adults: itinerary.num_adults,
-          num_children: itinerary.num_children,
-          nationality_type: 'non-eur'
-        })
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        console.error('❌ Pricing API error:', result)
-        throw new Error(result.error || 'Pricing calculation failed')
-      }
-
-
-      router.push(`/itineraries/${itineraryId}`)
-
+      router.push(`/pricing-grid?itinerary=${itineraryId}`)
     } catch (error: any) {
-      console.error('❌ Error calculating pricing:', error)
-      alert(`Failed to calculate pricing: ${error.message || 'Unknown error'}`)
+      console.error('❌ Error opening pricing grid:', error)
+      alert(`Failed to open pricing grid: ${error.message || 'Unknown error'}`)
     } finally {
       setCalculating(false)
     }
@@ -942,7 +914,7 @@ export default function ItineraryEditorPage() {
               className="px-3 py-1.5 bg-[#647C47] text-white rounded-lg text-sm font-semibold hover:bg-[#4a5c35] flex items-center gap-1.5 disabled:opacity-50"
             >
               <Calculator size={14} />
-              {calculating ? 'Calculating...' : 'Calculate'}
+              {calculating ? 'Opening…' : 'Price in Grid'}
             </button>
           </div>
         </div>
@@ -1520,7 +1492,7 @@ export default function ItineraryEditorPage() {
           {/* Action Box */}
           <div className="bg-[#f4f7f1] rounded-xl p-5 border border-[#b8c9a8]">
             <p className="text-sm text-[#4a5c35] mb-4">
-              ✨ Edit content and pricing, then save or recalculate from rate tables.
+              ✨ Edit content, then save or price it in the pricing grid.
             </p>
             <button
               onClick={saveDraft}
@@ -1536,7 +1508,7 @@ export default function ItineraryEditorPage() {
               className="w-full py-3 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Calculator size={16} />
-              {calculating ? 'Calculating...' : 'Recalculate from Rates'}
+              {calculating ? 'Opening…' : 'Price in Grid'}
             </button>
             <p className="text-xs text-gray-500 mt-3 text-center">
               Recalculating will regenerate services from your rate tables
