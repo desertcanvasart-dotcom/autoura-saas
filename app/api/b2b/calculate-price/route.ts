@@ -72,6 +72,9 @@ interface PriceCalculationResult {
   single_supplement: number  // NEW
   currency: string
   pax_pricing_table?: any[]  // NEW - for rate sheet
+  // Harness: deliverable only when complete; holes list services with no real rate.
+  complete: boolean
+  holes: { kind?: string; message: string }[]
 }
 
 function getSeason(date: Date): 'low' | 'high' | 'peak' {
@@ -260,7 +263,7 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
 
     const g = anyGuide[0] as any
     return {
-      rate: g.daily_rate || 55,
+      rate: g.daily_rate || 0,
       name: g.name || 'Guide',
       id: g.id
     }
@@ -270,7 +273,7 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
   const selectedGuide = (guides.find((g: any) => g.tier === tier) || guides[0]) as any
 
   return {
-    rate: selectedGuide.daily_rate || 55,
+    rate: selectedGuide.daily_rate || 0,
     name: selectedGuide.name || 'Guide',
     id: selectedGuide.id
   }
@@ -324,7 +327,7 @@ async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ 
 
     const h = anyHotel[0] as any
     return {
-      rate: h.rate_double_eur || 80,
+      rate: h.rate_double_eur || 0,
       name: h.name || 'Hotel',
       id: h.id
     }
@@ -332,7 +335,7 @@ async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ 
 
   const hotel = hotels[0] as any
   return {
-    rate: hotel.rate_double_eur || 80,
+    rate: hotel.rate_double_eur || 0,
     name: hotel.name || 'Hotel',
     id: hotel.id
   }
@@ -489,7 +492,10 @@ export async function POST(request: NextRequest) {
         price_per_person: autoPriceResult.pricePerPerson,
         single_supplement: autoPriceResult.singleSupplement || 0,  // NEW
         currency: autoPriceResult.currency,
-        pax_pricing_table: autoPriceResult.paxPricingTable  // NEW - for rate sheet
+        pax_pricing_table: autoPriceResult.paxPricingTable,  // NEW - for rate sheet
+        // Harness: propagate completeness from the hardened engine.
+        complete: autoPriceResult.complete,
+        holes: (autoPriceResult.holes || []).map((h) => ({ kind: h.kind, message: h.message })),
       }
 
 
@@ -532,6 +538,7 @@ export async function POST(request: NextRequest) {
 
     const calculatedServices: CalculatedService[] = []
     const optionalServices: CalculatedService[] = []
+    const holes: { kind?: string; message: string }[] = []
     let subtotalCost = 0
     let optionalTotal = 0
 
@@ -696,9 +703,9 @@ export async function POST(request: NextRequest) {
             if (mealRate) {
               const m = mealRate as any
               if (service.service_name?.toLowerCase().includes('dinner')) {
-                unitCost = m.dinner_rate_eur || 18
+                unitCost = m.dinner_rate_eur || 0
               } else {
-                unitCost = m.lunch_rate_eur || 12
+                unitCost = m.lunch_rate_eur || 0
               }
               lineTotal = unitCost * num_pax
               effectiveQuantityMode = 'per_pax'
@@ -746,6 +753,14 @@ export async function POST(request: NextRequest) {
         }
 
         lineTotal = unitCost * quantity
+      }
+
+      // Harness: a non-optional service with no real rate is a HOLE, not a guess.
+      if (!service.is_optional && unitCost === 0) {
+        holes.push({
+          kind: service.service_category,
+          message: `No rate found for "${service.service_name}" (${service.service_category || 'service'}).`,
+        })
       }
 
       const calculatedService: CalculatedService = {
@@ -798,7 +813,9 @@ export async function POST(request: NextRequest) {
       selling_price: Math.round(sellingPrice * 100) / 100,
       price_per_person: Math.round(pricePerPerson * 100) / 100,
       single_supplement: 0,  // Not calculated in legacy mode
-      currency: 'EUR'
+      currency: 'EUR',
+      complete: holes.length === 0,
+      holes,
     }
 
 
