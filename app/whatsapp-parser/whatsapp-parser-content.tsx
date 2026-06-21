@@ -662,7 +662,7 @@ function GenerationModeSelector({
         Generation Mode
       </h3>
       
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3">
         <button
           onClick={() => onChange('edit')}
           className={`p-4 rounded-xl border-2 text-left transition-all ${
@@ -689,30 +689,8 @@ function GenerationModeSelector({
             </div>
           </div>
           <p className="text-xs text-gray-500 leading-relaxed">
-            Review & edit content before calculating pricing.
-          </p>
-        </button>
-
-        <button
-          onClick={() => onChange('quick')}
-          className={`p-4 rounded-xl border-2 text-left transition-all ${
-            mode === 'quick'
-              ? 'border-amber-500 bg-amber-50 ring-2 ring-amber-500 ring-offset-1'
-              : 'border-gray-200 hover:border-gray-300'
-          }`}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              mode === 'quick' ? 'bg-amber-100' : 'bg-gray-100'
-            }`}>
-              <Zap className={`w-4 h-4 ${mode === 'quick' ? 'text-amber-600' : 'text-gray-500'}`} />
-            </div>
-            <span className={`text-sm font-semibold ${mode === 'quick' ? 'text-amber-700' : 'text-gray-700'}`}>
-              Quick Generate
-            </span>
-          </div>
-          <p className="text-xs text-gray-500 leading-relaxed">
-            Auto-calculate pricing immediately.
+            Conversations become an <strong>unpriced draft</strong>. Review &amp; edit the
+            itinerary, then price it in the grid — the system never auto-prices a conversation.
           </p>
         </button>
       </div>

@@ -703,16 +703,11 @@ async function getCruiseRate(
   recommendedSuppliers: string[],
   supabase: any
 ): Promise<CruiseRate> {
-  const defaultRates: Record<ServiceTier, number> = {
-    'budget': 150,
-    'standard': 200,
-    'deluxe': 300,
-    'luxury': 500
-  }
-
+  // Harness: no fabricated default cruise rate. A miss yields found:false +
+  // perPersonPerNight 0 so the caller can flag it, never a guessed price.
   const noRate: CruiseRate = {
     found: false,
-    perPersonPerNight: defaultRates[tier],
+    perPersonPerNight: 0,
     shipName: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Nile Cruise`,
     supplierId: null,
     cabinType: 'Standard Cabin'
@@ -732,7 +727,7 @@ async function getCruiseRate(
         const ship = matchedShips[0]
         return {
           found: true,
-          perPersonPerNight: ship.rate_per_person_eur || ship.double_cabin_rate_eur || defaultRates[tier],
+          perPersonPerNight: ship.rate_per_person_eur || ship.double_cabin_rate_eur || 0,
           shipName: ship.ship_name,
           supplierId: ship.supplier_id || ship.id,
           cabinType: ship.cabin_type || 'Standard Cabin'
@@ -753,7 +748,7 @@ async function getCruiseRate(
       const ship = tierCruises[0]
       return {
         found: true,
-        perPersonPerNight: ship.rate_per_person_eur || ship.double_cabin_rate_eur || defaultRates[tier],
+        perPersonPerNight: ship.rate_per_person_eur || ship.double_cabin_rate_eur || 0,
         shipName: ship.ship_name,
         supplierId: ship.supplier_id || ship.id,
         cabinType: ship.cabin_type || 'Standard Cabin'
@@ -772,7 +767,7 @@ async function getCruiseRate(
       const ship = anyCruise[0]
       return {
         found: true,
-        perPersonPerNight: ship.rate_per_person_eur || ship.double_cabin_rate_eur || defaultRates[tier],
+        perPersonPerNight: ship.rate_per_person_eur || ship.double_cabin_rate_eur || 0,
         shipName: ship.ship_name,
         supplierId: ship.supplier_id || ship.id,
         cabinType: ship.cabin_type || 'Standard Cabin'
@@ -1811,7 +1806,10 @@ export async function POST(request: NextRequest) {
       currency = userPrefs.default_currency,
       cost_mode = userPrefs.default_cost_mode,
       package_type: requested_package_type = 'land-package',
-      skip_pricing = false,
+      // Harness: pricing is OPT-IN and safe-by-default. Conversations from
+      // WhatsApp/email generate an UNPRICED draft for the user to revise, then
+      // price in the grid. The route only prices if a caller explicitly asks.
+      skip_pricing = true,
 
       // NEW: Structured input parameters from parser
       is_structured_input = false,
@@ -2315,21 +2313,20 @@ export async function POST(request: NextRequest) {
       const { data: hotels } = await supabase.from('hotel_contacts').select('*').ilike('city', effectiveCity).eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false }).limit(5)
       if (hotels?.length) {
         selectedHotel = hotels[0] as any
-        hotelRate = toNumber(selectedHotel.rate_double_eur, 80)
+        hotelRate = toNumber(selectedHotel.rate_double_eur, 0)
         hotelName_final = selectedHotel.name
-      } else {
-        const defaultRates: Record<ServiceTier, number> = { 'budget': 45, 'standard': 80, 'deluxe': 120, 'luxury': 180 }
-        hotelRate = defaultRates[tier]
       }
+      // Harness: no fabricated default hotel rate. A miss leaves hotelRate 0
+      // (unpriced) — pricing is done against real rates later in the grid.
     }
 
     const { data: tippingRates } = await supabase.from('tipping_rates').select('*').eq('is_active', true)
-    let dailyTips = tippingRates?.reduce((sum: number, t: any) => t.rate_unit === 'per_day' ? sum + toNumber(t.rate_eur, 0) : sum, 0) || 15
+    let dailyTips = tippingRates?.reduce((sum: number, t: any) => t.rate_unit === 'per_day' ? sum + toNumber(t.rate_eur, 0) : sum, 0) || 0
     const tierTipsMultiplier: Record<ServiceTier, number> = { 'budget': 0.8, 'standard': 1.0, 'deluxe': 1.2, 'luxury': 1.5 }
     dailyTips = Math.round(dailyTips * tierTipsMultiplier[tier])
 
-    const vehiclePerDay = selectedVehicle ? toNumber(selectedVehicle.daily_rate_eur, 50) : 50
-    const guidePerDay = selectedGuide ? toNumber(selectedGuide.daily_rate_eur, 55) : 55
+    const vehiclePerDay = selectedVehicle ? toNumber(selectedVehicle.daily_rate_eur, 0) : 0
+    const guidePerDay = selectedGuide ? toNumber(selectedGuide.daily_rate_eur, 0) : 0
     const roomsNeeded = Math.ceil(totalPax / 2)
 
     // ============================================
