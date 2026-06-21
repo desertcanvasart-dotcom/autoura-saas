@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
+import { checkQuoteRowDeliverable } from '@/lib/pricing-guards'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { render } from '@react-email/render'
 import { createElement } from 'react'
@@ -168,6 +169,19 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: 'No recipient email address found' },
         { status: 400 }
+      )
+    }
+
+    // Output gate (harness Layer 2): never email a non-deliverable price.
+    const priceCheck = checkQuoteRowDeliverable(quote, type)
+    if (!priceCheck.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'This quote cannot be sent — its price is not deliverable. Resolve the issues and re-price before sending.',
+          violations: priceCheck.violations,
+        },
+        { status: 422 }
       )
     }
 

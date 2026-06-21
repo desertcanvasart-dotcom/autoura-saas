@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { validateRatePayload } from '@/lib/rate-validation'
 
 // ============================================
 // ENTRANCE FEES API
@@ -68,6 +69,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+
+    const rateCheck = validateRatePayload(body)
+    if (!rateCheck.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid rate values', violations: rateCheck.errors },
+        { status: 400 }
+      )
+    }
 
     const newFee = {
       service_code: body.service_code || `ENT-${Date.now().toString(36).toUpperCase()}`,

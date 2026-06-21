@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect, useRef, useCallback } from 'react'
+import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Plus, RotateCcw, ArrowRight, ArrowLeft, Loader2, DollarSign } from 'lucide-react'
 
@@ -9,8 +9,9 @@ import type {
   GridPhase, ReviewDay,
 } from './types'
 import { DEFAULT_CONFIG, EMPTY_TOTALS, DEFAULT_MARGINS } from './types'
-import { createEmptySlots } from './lib/slot-mapping'
+import { createEmptySlots, mapServiceToSlot } from './lib/slot-mapping'
 import { calculateGrandTotals } from './lib/calculator'
+import { gridCompleteness } from './lib/grid-completeness'
 
 import GridHeader from '@/components/pricing-grid/GridHeader'
 import InputPanel from '@/components/pricing-grid/InputPanel'
@@ -159,6 +160,13 @@ function PricingGridContent() {
 
   // --- Handle URL params (from inbox integration) ---
   useEffect(() => {
+    // ?itinerary=<id> → load an existing itinerary straight into the grid
+    // (e.g. redirected from the itinerary editor's "Re-price in grid").
+    const itineraryParam = searchParams.get('itinerary')
+    if (itineraryParam) {
+      handleLoadItinerary(itineraryParam).catch(() => setParseError('Failed to load itinerary'))
+      return
+    }
     const conversation = searchParams.get('conversation')
     const clientName = searchParams.get('clientName')
     const email = searchParams.get('email')
@@ -230,6 +238,9 @@ function PricingGridContent() {
       }),
     })))
   }, [])
+
+  // Completeness (B-full): which days are missing required components.
+  const completeness = useMemo(() => gridCompleteness(days, config), [days, config])
 
   // --- Handlers ---
 
@@ -316,7 +327,7 @@ function PricingGridContent() {
   const handleLoadItinerary = useCallback(async (id: string) => {
     setIsParsing(true)
     try {
-      const res = await fetch(`/api/itineraries/${id}`)
+      const res = await fetch(`/api/itineraries/${id}?include=days`)
       const data = await res.json()
       if (!data.success || !data.data) {
         throw new Error('Itinerary not found')
@@ -336,15 +347,30 @@ function PricingGridContent() {
       }))
 
       if (itn.itinerary_days) {
-        const loadedDays: GridDay[] = itn.itinerary_days.map((d: any, i: number) => ({
-          id: d.id || crypto.randomUUID(),
-          dayNumber: d.day_number || i + 1,
-          title: d.title || `Day ${i + 1}`,
-          city: d.city || '',
-          description: d.description || '',
-          isExpanded: i === 0,
-          slots: createEmptySlots(),
-        }))
+        const loadedDays: GridDay[] = itn.itinerary_days.map((d: any, i: number) => {
+          // Restore priced slots from grid-tagged services ([pricing-grid:slotId]).
+          const slots = createEmptySlots()
+          for (const svc of (d.itinerary_services || [])) {
+            const mapped = mapServiceToSlot(svc)
+            if (!mapped) continue
+            const slot = slots.find(s => s.slotId === mapped.slotId)
+            if (!slot) continue
+            slot.resolvedRate += mapped.rate
+            slot.label = slot.label ? `${slot.label}, ${mapped.label}` : mapped.label
+            slot.selectedId = svc.id
+            slot.selectedIds = [...slot.selectedIds, svc.id]
+            slot.selections = [...(slot.selections || []), { id: svc.id, rate: mapped.rate, label: mapped.label }]
+          }
+          return {
+            id: d.id || crypto.randomUUID(),
+            dayNumber: d.day_number || i + 1,
+            title: d.title || `Day ${i + 1}`,
+            city: d.city || '',
+            description: d.description || '',
+            isExpanded: i === 0,
+            slots,
+          }
+        })
         setDays(loadedDays)
         setPhase('pricing')
       }
@@ -357,6 +383,22 @@ function PricingGridContent() {
 
   const handleSave = useCallback(async () => {
     if (days.length === 0) return
+
+    // Completeness gate (B-full): don't silently save an under-priced grid.
+    const check = gridCompleteness(days, config)
+    if (check.blocking > 0) {
+      const proceed = window.confirm(
+        `This itinerary has ${check.blocking} blocking issue(s) that make the price incomplete:\n\n` +
+        check.issues
+          .filter((i) => i.severity === 'block')
+          .slice(0, 12)
+          .map((i) => `• ${i.message}`)
+          .join('\n') +
+        `\n\nSave anyway as a draft? It won't be deliverable until these are resolved.`
+      )
+      if (!proceed) return
+    }
+
     setIsSaving(true)
     setSavedUrl(null)
 
@@ -700,6 +742,7 @@ function PricingGridContent() {
               isSaving={isSaving}
               savedUrl={savedUrl}
               onSave={handleSave}
+              completeness={completeness}
             />
           </>
         )}

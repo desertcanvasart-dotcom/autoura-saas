@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { validateRatePayload } from '@/lib/rate-validation'
 
 // ============================================
 // TRANSPORTATION RATES API - Full CRUD
@@ -131,6 +132,14 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
+    const rateCheck = validateRatePayload(body)
+    if (!rateCheck.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid rate values', violations: rateCheck.errors },
+        { status: 400 }
+      )
+    }
+
     // Generate service code if not provided
     const serviceCode = body.service_code || generateServiceCode(body)
 
@@ -220,6 +229,14 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    const rateCheck = validateRatePayload(body)
+    if (!rateCheck.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid rate values', violations: rateCheck.errors },
+        { status: 400 }
+      )
+    }
     const { id, ...updates } = body
 
     if (!id) {

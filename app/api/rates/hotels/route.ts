@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { validateRatePayload } from '@/lib/rate-validation'
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,6 +75,15 @@ export async function POST(request: NextRequest) {
       )
     }
     const body = await request.json()
+
+    // Harness Layer 4: reject negative / absurd rate values at entry.
+    const rateCheck = validateRatePayload(body)
+    if (!rateCheck.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid rate values', violations: rateCheck.errors },
+        { status: 400 }
+      )
+    }
 
     // ✅ MULTI-TENANT: tenant_id is auto-populated by database trigger
     // See migrations:

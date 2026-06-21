@@ -445,11 +445,28 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
       }
     }
 
+    // AI FENCE: flag drafts that must be human-reviewed before they can become
+    // a deliverable quote — either the whole itinerary was AI-generated, or some
+    // custom items carry an AI hint that needs a real, manually-entered price.
+    const needsHumanInputCount = days.reduce(
+      (n: number, d: any) => n + d.slots.filter((s: any) => s.needsHumanInput).length,
+      0
+    )
+    const needsReview = generationMode === 'generated' || needsHumanInputCount > 0
+
     return NextResponse.json({
       success: true,
       days,
       metadata: aiResult.metadata || {},
       generationMode,
+      needsReview,
+      needsHumanInputCount,
+      reviewReason:
+        generationMode === 'generated'
+          ? 'AI generated a suggested itinerary — review every line and confirm prices before sending.'
+          : needsHumanInputCount > 0
+            ? 'Some custom items need a manually-entered price before sending.'
+            : undefined,
     })
 
   } catch (error: any) {
@@ -464,7 +481,7 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
 // ============================================
 // Build slot values from AI response
 // ============================================
-function buildSlotsFromAI(
+export function buildSlotsFromAI(
   aiSlots: Record<string, any>,
   rateMap: Map<string, { rate: number; rateNonEur: number; label: string; table: string }>
 ) {
@@ -481,14 +498,22 @@ function buildSlotsFromAI(
     const raw = aiSlots[slotId]
 
     if (CUSTOM_SLOTS.has(slotId)) {
-      const amount = typeof raw === 'number' ? raw : null
+      // AI FENCE (harness Layer 3): never let the model's free-text number
+      // become a price. For the catch-all slots (other_group, other_pp) we keep
+      // the AI's figure ONLY as a non-binding hint and require a human to enter
+      // the real amount. 'water' is left at 0 here and auto-filled downstream
+      // with the code constant (€1 pp/day), not the AI's number.
+      const aiSuggested = typeof raw === 'number' ? raw : null
+      const needsHumanInput = slotId !== 'water' && aiSuggested !== null
       return {
         slotId,
         selectedId: null,
         selectedIds: [],
-        customAmount: amount,
-        resolvedRate: amount || 0,
-        label: amount ? `Custom €${amount}` : '',
+        customAmount: null,
+        resolvedRate: 0,
+        aiSuggested,
+        needsHumanInput,
+        label: needsHumanInput ? `Needs manual price (AI hint: €${aiSuggested})` : '',
       }
     }
 

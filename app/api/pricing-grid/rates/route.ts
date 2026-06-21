@@ -15,6 +15,10 @@ interface RateOption {
   tier?: string
   category?: string
   details?: Record<string, any>
+  // Completeness metadata (B-full) — carried into the grid slot on selection so
+  // the gate can be transport-type-aware and entrance-class-aware.
+  serviceType?: string // transport: airport_transfer | intercity_transfer | day_tour | ...
+  pricingClass?: 'mandatory' | 'optional' | 'free' // entrance fees
 }
 
 export async function GET(request: NextRequest) {
@@ -81,6 +85,7 @@ export async function GET(request: NextRequest) {
         rateNonEur: Number(r.base_rate_non_eur) || Number(r.base_rate_eur) || 0,
         city: r.origin_city || r.city,
         category: r.service_type,
+        serviceType: r.service_type, // → carried into the slot for type-aware completeness
         details: {
           service_type: r.service_type,
           vehicle_type: r.vehicle_type,
@@ -197,7 +202,10 @@ export async function GET(request: NextRequest) {
       rateNonEur: Number(r.non_eur_rate) || Number(r.eur_rate) || 0,
       city: r.city,
       category: r.category,
-      details: { is_addon: r.is_addon, fee_type: r.fee_type },
+      // Derive class until pricing_class is populated: is_addon ⇒ optional, else mandatory.
+      // (A genuinely free site should be tagged pricing_class: 'free' explicitly.)
+      pricingClass: (r.pricing_class as 'mandatory' | 'optional' | 'free') || (r.is_addon ? 'optional' : 'mandatory'),
+      details: { is_addon: r.is_addon, fee_type: r.fee_type, pricing_class: r.pricing_class },
     }))
 
     // Flights

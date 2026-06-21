@@ -30,6 +30,18 @@ export async function GET(
       )
     }
 
+    // ?include=days → nest the itinerary's days (each with its services), e.g.
+    // so the pricing grid can load an existing itinerary. Off by default.
+    const url = new URL(request.url)
+    if (url.searchParams.get('include') === 'days') {
+      const { data: days } = await supabase
+        .from('itinerary_days')
+        .select('*, itinerary_services(*)')
+        .eq('itinerary_id', id)
+        .order('day_number', { ascending: true })
+      ;(data as any).itinerary_days = days || []
+    }
+
     return NextResponse.json({
       success: true,
       data

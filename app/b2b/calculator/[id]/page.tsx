@@ -46,6 +46,9 @@ interface PricingResult {
   price_per_person: number
   single_supplement?: number
   currency: string
+  // Harness: completeness surfaced from the de-fabricated b2b pricing route.
+  complete?: boolean
+  holes?: { kind?: string; message: string }[]
 }
 
 interface RateSheetRow {
@@ -526,6 +529,21 @@ export default function TourPriceCalculator() {
           {/* Pricing Result */}
           {result && (
             <>
+              {result.complete === false && result.holes && result.holes.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-red-700 mb-1">
+                    ⚠ Incomplete pricing — {result.holes.length} item(s) have no rate
+                  </p>
+                  <ul className="text-xs text-red-600 space-y-0.5">
+                    {result.holes.map((h, i) => (
+                      <li key={i}>• {h.message}</li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-red-500 mt-1.5">
+                    Add the missing rates before sending this rate sheet to a partner.
+                  </p>
+                </div>
+              )}
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>

@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { validateRatePayload } from '@/lib/rate-validation'
 
 // GET - Fetch all attractions
 export async function GET(request: NextRequest) {
@@ -119,6 +120,14 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+
+    const rateCheck = validateRatePayload(body)
+    if (!rateCheck.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid rate values', violations: rateCheck.errors },
+        { status: 400 }
+      )
+    }
     
     const {
       service_code,

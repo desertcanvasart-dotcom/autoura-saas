@@ -112,7 +112,7 @@ export default function SlotRow({ slotDef, value, options, passport, currency, e
               <div className="max-h-48 overflow-y-auto">
                 <button
                   onClick={() => {
-                    onChange({ ...value, selectedId: null, resolvedRate: 0, label: '' })
+                    onChange({ ...value, selectedId: null, resolvedRate: 0, label: '', selections: [] })
                     setIsOpen(false)
                     setSearchTerm('')
                   }}
@@ -130,6 +130,13 @@ export default function SlotRow({ slotDef, value, options, passport, currency, e
                         selectedId: opt.id,
                         resolvedRate: rate,
                         label: opt.label,
+                        selections: [{
+                          id: opt.id,
+                          rate,
+                          label: opt.label,
+                          serviceType: opt.serviceType,
+                          pricingClass: opt.pricingClass,
+                        }],
                       })
                       setIsOpen(false)
                       setSearchTerm('')
@@ -214,11 +221,22 @@ export default function SlotRow({ slotDef, value, options, passport, currency, e
                           return sum + (o ? getRateForOption(o) : 0)
                         }, 0)
                         const labels = newIds.map(id => options.find(x => x.id === id)?.label || '').filter(Boolean)
+                        const newSelections = newIds.map(id => {
+                          const o = options.find(x => x.id === id)
+                          return {
+                            id,
+                            rate: o ? getRateForOption(o) : 0,
+                            label: o?.label,
+                            serviceType: o?.serviceType,
+                            pricingClass: o?.pricingClass,
+                          }
+                        })
                         onChange({
                           ...value,
                           selectedIds: newIds,
                           resolvedRate: newTotal,
                           label: labels.join(', '),
+                          selections: newSelections,
                         })
                       }}
                       className="rounded border-gray-300 text-[#647C47] focus:ring-[#647C47]"

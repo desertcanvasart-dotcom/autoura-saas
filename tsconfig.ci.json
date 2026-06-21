@@ -1,0 +1,23 @@
+{
+  // Scoped type-check for CI. The full Next app only type-checks after `next
+  // build` generates `.next/types` (styled-jsx + route shims), which a fresh CI
+  // checkout lacks — so CI type-checks the pricing harness's own TypeScript
+  // (pure logic, no JSX, no Next-type dependency) instead. Full type-checking
+  // runs in the deploy/build pipeline. See PRICING-HARNESS-PLAN.md.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false
+  },
+  "include": [
+    "lib/pricing-types.ts",
+    "lib/pricing-guards.ts",
+    "lib/pricing-coverage.ts",
+    "lib/rate-validation.ts",
+    "lib/pricing/rate-resolution.ts",
+    "lib/auto-pricing-service.ts",
+    "lib/tourCalculator.ts",
+    "app/pricing-grid/lib/grid-completeness.ts",
+    "app/pricing-grid/lib/calculator.ts"
+  ],
+  "exclude": ["node_modules", "**/__tests__/**", "**/*.test.ts"]
+}

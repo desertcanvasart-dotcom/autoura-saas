@@ -11,6 +11,61 @@ export type ClientType = 'b2b' | 'b2c'
 export type SlotCategory = 'group' | 'per_person'
 export type SlotInputMode = 'single' | 'multi' | 'custom' | 'auto'
 
+// Per-day type (B-full completeness): drives which slots a day is REQUIRED to
+// have priced before the grid is deliverable. See lib grid-completeness.
+export type DayType = 'arrival' | 'tour' | 'transfer' | 'cruise' | 'free' | 'departure'
+
+export const DAY_TYPES: DayType[] = ['arrival', 'tour', 'transfer', 'cruise', 'free', 'departure']
+
+export const DAY_TYPE_LABELS: Record<DayType, string> = {
+  arrival: 'Arrival',
+  tour: 'Day Tour',
+  transfer: 'Transfer',
+  cruise: 'Cruise Night',
+  free: 'Free / Leisure',
+  departure: 'Departure',
+}
+
+/** Default day type when none is set (most days are guided sightseeing days). */
+export const DEFAULT_DAY_TYPE: DayType = 'tour'
+
+// Per-day transition EVENTS — these (not the day type) drive airport & hotel
+// service requirements, because the same event can occur on different day types
+// (e.g. a domestic-flight Transfer day has BOTH airport events). A day with a
+// check-in OR check-out requires hotel services; a day with an airport arrival
+// OR departure requires airport services.
+// How a city-to-city move happens on a transfer day (drives the transport
+// segment kind required): none, by road, or by domestic flight.
+export type IntercityMode = 'none' | 'road' | 'flight'
+
+// The full set of components that can occur on a day. Requirements derive from
+// THESE (not the day type directly), so combined days work — e.g. a domestic
+// flight Transfer day that also sightsees has hasSightseeing + intercity:'flight'
+// + airport events all at once.
+export interface DayComponents {
+  overnight: boolean           // sleeps somewhere tonight  → requires a sleep slot
+  hasSightseeing: boolean       // day tour                  → day-tour transport + guide(if on) + mandatory entrances
+  airportArrival: boolean       // met at arrival airport    → airport services + airport transfer
+  airportDeparture: boolean     // assisted at dep. airport  → airport services + airport transfer
+  hotelCheckIn: boolean         // into hotel / embark cruise → hotel services
+  hotelCheckOut: boolean        // out of hotel / disembark   → hotel services
+  intercity: IntercityMode      // road → intercity transfer; flight → flights slot
+}
+
+/** Default components per day type — a preset the operator can override per day. */
+export const DAY_TYPE_DEFAULTS: Record<DayType, DayComponents> = {
+  arrival:   { overnight: true,  hasSightseeing: false, airportArrival: true,  airportDeparture: false, hotelCheckIn: true,  hotelCheckOut: false, intercity: 'none' },
+  tour:      { overnight: true,  hasSightseeing: true,  airportArrival: false, airportDeparture: false, hotelCheckIn: false, hotelCheckOut: false, intercity: 'none' },
+  transfer:  { overnight: true,  hasSightseeing: false, airportArrival: false, airportDeparture: false, hotelCheckIn: true,  hotelCheckOut: true,  intercity: 'road' },
+  cruise:    { overnight: true,  hasSightseeing: false, airportArrival: false, airportDeparture: false, hotelCheckIn: false, hotelCheckOut: false, intercity: 'none' },
+  free:      { overnight: true,  hasSightseeing: false, airportArrival: false, airportDeparture: false, hotelCheckIn: false, hotelCheckOut: false, intercity: 'none' },
+  departure: { overnight: false, hasSightseeing: false, airportArrival: false, airportDeparture: true,  hotelCheckIn: false, hotelCheckOut: true,  intercity: 'none' },
+}
+
+// Entrance-fee class: mandatory (always charged), optional (paid on request),
+// free (no charge — €0 is expected, not "missing").
+export type PricingClass = 'mandatory' | 'optional' | 'free'
+
 export const TIERS: Tier[] = ['budget', 'standard', 'deluxe', 'luxury']
 export const CURRENCIES: Currency[] = ['EUR', 'USD', 'GBP', 'EGP']
 export const DEFAULT_MARGINS: Record<ClientType, number> = { b2b: 10, b2c: 25 }
@@ -79,13 +134,27 @@ export interface SlotDefinition {
 
 // --- Slot Values ---
 
+// A single resolved selection within a slot. Carries the metadata the
+// completeness gate needs to reason precisely: a transport line's segment kind
+// (service_type) and an entrance fee's pricing class. Populated from the chosen
+// rate option at selection time (manual or AI). Optional for back-compat.
+export interface SlotSelection {
+  id: string
+  rate: number
+  label?: string
+  serviceType?: string        // transport: 'airport_transfer' | 'intercity_transfer' | 'day_tour' | ...
+  pricingClass?: PricingClass // entrance fees: mandatory | optional | free
+}
+
 export interface SlotValue {
   slotId: string
   selectedId: string | null        // for single-select
   selectedIds: string[]            // for multi-select
   customAmount: number | null      // for custom entry
-  resolvedRate: number             // computed EUR amount for this slot
+  resolvedRate: number             // computed EUR amount for this slot (sum of selections)
   label: string                    // display label for selections
+  /** Per-selection detail (segment type / pricing class). Enables type/class-aware completeness. */
+  selections?: SlotSelection[]
 }
 
 export function emptySlotValue(slotId: string): SlotValue {
@@ -110,6 +179,9 @@ export interface RateOption {
   tier?: string
   category?: string
   details?: Record<string, any>
+  // Completeness metadata (B-full), carried into the slot on selection.
+  serviceType?: string
+  pricingClass?: PricingClass
 }
 
 export type AllRates = Record<string, RateOption[]>
@@ -124,6 +196,17 @@ export interface GridDay {
   description: string
   isExpanded: boolean
   slots: SlotValue[]
+  /** B-full: a one-click preset that fills the component flags below. Defaults to DEFAULT_DAY_TYPE. */
+  dayType?: DayType
+  // B-full day components — when set, these OVERRIDE the dayType preset defaults.
+  // Requirements are computed from these (see grid-completeness).
+  overnight?: boolean
+  hasSightseeing?: boolean
+  airportArrival?: boolean
+  airportDeparture?: boolean
+  hotelCheckIn?: boolean
+  hotelCheckOut?: boolean
+  intercity?: IntercityMode
 }
 
 // --- Calculation Results ---
