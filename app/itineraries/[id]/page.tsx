@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake } from 'lucide-react'
@@ -79,6 +79,30 @@ export default function ViewItineraryPage() {
   
   const [itinerary, setItinerary] = useState<Itinerary | null>(null)
   const [days, setDays] = useState<DayWithServices[]>([])
+
+  // The stored itinerary.total_cost is a denormalized cache that can be 0/stale
+  // (an itinerary priced via its services without the header being re-synced —
+  // which is why the header read EUR 0.00 while Profit & Loss showed a price).
+  // The services are the source of truth, so derive the client total from them,
+  // mirroring the Profit & Loss card, and use that whenever services exist.
+  const computedClientTotal = useMemo(() => {
+    const margin = 25 // matches the Profit & Loss card below
+    let total = 0
+    for (const day of days) {
+      for (const s of (day.services || [])) {
+        const supplier = Number(s.total_cost) || 0
+        const clientPrice = (s as any).client_price != null
+          ? Number((s as any).client_price)
+          : supplier * (1 + margin / 100)
+        total += clientPrice
+      }
+    }
+    return Math.round(total * 100) / 100
+  }, [days])
+
+  const effectiveTotalCost = computedClientTotal > 0
+    ? computedClientTotal
+    : (Number(itinerary?.total_cost) || 0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1]))
@@ -336,8 +360,8 @@ export default function ViewItineraryPage() {
       const lineItems = [{
         description: `${itinerary.trip_name} - ${itinerary.itinerary_code}`,
         quantity: 1,
-        unit_price: itinerary.total_cost,
-        amount: itinerary.total_cost
+        unit_price: effectiveTotalCost,
+        amount: effectiveTotalCost
       }]
   
       const response = await fetch('/api/invoices', {
@@ -349,11 +373,11 @@ export default function ViewItineraryPage() {
           client_name: itinerary.client_name,
           client_email: itinerary.client_email,
           line_items: lineItems,
-          subtotal: itinerary.total_cost,
+          subtotal: effectiveTotalCost,
           tax_rate: 0,
           tax_amount: 0,
           discount_amount: 0,
-          total_amount: itinerary.total_cost,
+          total_amount: effectiveTotalCost,
           currency: itinerary.currency || 'EUR',
           issue_date: new Date().toISOString().split('T')[0],
           due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -457,7 +481,7 @@ export default function ViewItineraryPage() {
           clientEmail: itinerary.client_email,
           itineraryCode: itinerary.itinerary_code,
           tripName: itinerary.trip_name,
-          totalCost: itinerary.total_cost.toFixed(2),
+          totalCost: effectiveTotalCost.toFixed(2),
           currency: itinerary.currency,
           pdfBase64: pdfBase64.split(',')[1]
         })
@@ -834,7 +858,7 @@ export default function ViewItineraryPage() {
             </div>
             <div>
               <p className="text-xs text-gray-500 mb-1">Total Cost</p>
-              <p className="text-xl font-bold text-gray-900">{itinerary.currency} {itinerary.total_cost.toFixed(2)}</p>
+              <p className="text-xl font-bold text-gray-900">{itinerary.currency} {effectiveTotalCost.toFixed(2)}</p>
               <div className="flex items-center gap-2 mt-1">
                 <span className={`inline-block px-2 py-0.5 rounded border text-xs font-medium ${getStatusBadge(itinerary.status)}`}>
                   {itinerary.status.charAt(0).toUpperCase() + itinerary.status.slice(1)}
@@ -883,7 +907,7 @@ export default function ViewItineraryPage() {
         </div>
 
         {/* PROFIT & LOSS */}
-        {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={itinerary.total_cost} currency={itinerary.currency} marginPercent={25} days={days} />}
+        {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={effectiveTotalCost} currency={itinerary.currency} marginPercent={25} days={days} />}
 
         {/* WHATSAPP ACTIONS */}
         <div className="bg-white rounded-lg border border-green-200 shadow-sm p-4">
