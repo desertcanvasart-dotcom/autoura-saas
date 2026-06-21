@@ -38,6 +38,29 @@ export async function POST(request: NextRequest) {
     const totalDays = days.length
     const endDate = new Date(new Date(startDate).getTime() + (totalDays - 1) * 86400000).toISOString().split('T')[0]
 
+    // Server-authoritative pricing total. Sum the exact services we're about to
+    // write (the source of truth) instead of trusting the client `totals` to be
+    // present/non-zero — that's why itinerary.total_cost previously persisted 0
+    // while the services held real prices. total_cost stores the CLIENT/selling
+    // price (how the header, invoice and PDF consume it).
+    const GRID_GROUP_SLOTS = ['route', 'guide', 'airport_services', 'hotel_services', 'tipping', 'boat_rides', 'other_group']
+    const supplierTotal = (days || []).reduce((sum: number, day: any) => {
+      return sum + (day.slots || []).reduce((dsum: number, slot: any) => {
+        if (!slot || (slot.resolvedRate === 0 && !slot.customAmount)) return dsum
+        const isGroup = GRID_GROUP_SLOTS.includes(slot.slotId)
+        const rate = Number(slot.resolvedRate) || 0
+        return dsum + (isGroup ? rate : rate * pax)
+      }, 0)
+    }, 0)
+    const marginPct = config.marginPercent || 25
+    const round2 = (n: number) => Math.round(n * 100) / 100
+    const computedSupplierTotal = round2(supplierTotal)
+    const computedSellingTotal = round2(supplierTotal * (1 + marginPct / 100))
+    // Prefer the grid's exact client totals when present; else use the
+    // server-computed figures so we never persist 0 when services exist.
+    const finalSupplierTotal = (totals?.totalCost && totals.totalCost > 0) ? totals.totalCost : computedSupplierTotal
+    const finalSellingTotal = (totals?.sellingPriceTotal && totals.sellingPriceTotal > 0) ? totals.sellingPriceTotal : computedSellingTotal
+
     // 1. Create/update itinerary record
     const itineraryData: Record<string, any> = {
       tenant_id,
@@ -54,10 +77,10 @@ export async function POST(request: NextRequest) {
       num_children: 0,
       tier: config.tier || 'standard',
       package_type: 'land-package',
-      total_cost: totals.totalCost || 0,
-      selling_price: totals.sellingPriceTotal || 0,
+      total_cost: finalSellingTotal,
+      selling_price: finalSellingTotal,
       margin_percent: config.marginPercent || 25,
-      profit: totals.marginAmount || 0,
+      profit: round2(finalSellingTotal - finalSupplierTotal),
       currency: config.currency || 'EUR',
       status: 'draft',
       notes: `Created via Pricing Grid | ${config.clientType?.toUpperCase()} | ${pax} pax`,

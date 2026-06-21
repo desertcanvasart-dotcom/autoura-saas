@@ -239,16 +239,17 @@ export default function ViewItineraryPage() {
         return day
       }))
 
-      let newTotalCost = 0
+      // Sum the (supplier) service costs, then store the CLIENT/selling total in
+      // total_cost — consistent with the grid save and how the header/invoice/PDF
+      // consume the field (previously this persisted the raw supplier sum).
+      let supplierSum = 0
       days.forEach(day => {
         day.services.forEach(s => {
-          if (s.id === serviceId) {
-            newTotalCost += newCost
-          } else {
-            newTotalCost += s.total_cost
-          }
+          supplierSum += s.id === serviceId ? newCost : s.total_cost
         })
       })
+      const margin = Number((itinerary as any)?.margin_percent) || 25
+      const newTotalCost = Math.round(supplierSum * (1 + margin / 100) * 100) / 100
 
       await supabase
         .from('itineraries')
