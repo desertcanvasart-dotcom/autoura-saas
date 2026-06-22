@@ -13,6 +13,8 @@ import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import ItineraryPL from '@/app/components/ItineraryPL'
 import { createClient } from '@/lib/supabase'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
+import PDFPreviewModal from '@/app/components/PDFPreviewModal'
+import ItineraryExpenses from '@/app/components/ItineraryExpenses'
 
 interface Itinerary {
   id: string
@@ -107,6 +109,10 @@ export default function ViewItineraryPage() {
   const [error, setError] = useState<string | null>(null)
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1]))
   const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [showPdfPreview, setShowPdfPreview] = useState(false)
+  const [pdfPreviewBlob, setPdfPreviewBlob] = useState<Blob | null>(null)
+  const [pdfShowBreakdown, setPdfShowBreakdown] = useState(true)
+  const [expenseRefreshTrigger, setExpenseRefreshTrigger] = useState(0)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendSuccess, setSendSuccess] = useState<string | null>(null)
@@ -407,14 +413,28 @@ export default function ViewItineraryPage() {
 
     setGeneratingPDF(true)
     try {
-      const pdf = await generateItineraryPDF(itinerary, days)
-      const filename = `${itinerary.itinerary_code}_${itinerary.client_name.replace(/\s+/g, '_')}.pdf`
-      pdf.save(filename)
+      // Open a preview first; the modal exposes Download / Print / Email and a
+      // breakdown toggle. The current breakdown choice is preserved.
+      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown })
+      setPdfPreviewBlob(pdf.output('blob'))
+      setShowPdfPreview(true)
     } catch (error) {
       console.error('Error generating PDF:', error)
       alert('Failed to generate PDF. Please try again.')
     } finally {
       setGeneratingPDF(false)
+    }
+  }
+
+  // Regenerate the preview blob when the user toggles the pricing breakdown
+  const handleToggleBreakdown = async (show: boolean) => {
+    setPdfShowBreakdown(show)
+    if (!itinerary || days.length === 0) return
+    try {
+      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: show })
+      setPdfPreviewBlob(pdf.output('blob'))
+    } catch (error) {
+      console.error('Error regenerating PDF preview:', error)
     }
   }
 
@@ -724,10 +744,11 @@ export default function ViewItineraryPage() {
                   </>
                 )}
               </button>
-              <AddExpenseFromItinerary 
+              <AddExpenseFromItinerary
                 itineraryId={itinerary.id}
                 itineraryCode={itinerary.itinerary_code}
                 clientName={itinerary.client_name}
+                onExpenseAdded={() => setExpenseRefreshTrigger(t => t + 1)}
               />
               <Link 
                 href={`/itineraries/${itinerary.id}/edit`}
@@ -824,6 +845,18 @@ export default function ViewItineraryPage() {
         </div>
       )}
 
+      {/* PDF Preview Modal */}
+      <PDFPreviewModal
+        pdfBlob={pdfPreviewBlob}
+        filename={`${itinerary.itinerary_code}_${itinerary.client_name.replace(/\s+/g, '_')}.pdf`}
+        isOpen={showPdfPreview}
+        onClose={() => { setShowPdfPreview(false); setPdfPreviewBlob(null) }}
+        onSendEmail={() => { setShowPdfPreview(false); setShowSendModal(true) }}
+        title="Itinerary PDF Preview"
+        showBreakdown={pdfShowBreakdown}
+        onToggleBreakdown={handleToggleBreakdown}
+      />
+
       <div className="container mx-auto px-4 py-4 space-y-4">
         {/* INFO CARD */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
@@ -909,6 +942,13 @@ export default function ViewItineraryPage() {
 
         {/* PROFIT & LOSS */}
         {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={effectiveTotalCost} currency={itinerary.currency} marginPercent={25} days={days} />}
+
+        {/* EXTRA EXPENSES */}
+        <ItineraryExpenses
+          itineraryId={itinerary.id}
+          currency={itinerary.currency || 'EUR'}
+          refreshTrigger={expenseRefreshTrigger}
+        />
 
         {/* WHATSAPP ACTIONS */}
         <div className="bg-white rounded-lg border border-green-200 shadow-sm p-4">
