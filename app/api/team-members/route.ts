@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const activeOnly = searchParams.get('active') === 'true'
     const role = searchParams.get('role')
+    const departmentId = searchParams.get('departmentId')
 
     // Use authenticated client - RLS automatically filters by tenant_id
     const supabase = await createAuthenticatedClient()
@@ -31,6 +32,10 @@ export async function GET(request: NextRequest) {
 
     if (role) {
       query = query.eq('role', role)
+    }
+
+    if (departmentId) {
+      query = query.eq('department_id', departmentId)
     }
 
     const { data, error } = await query
@@ -68,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
     const body = await request.json()
 
-    const { name, email, phone, role, notes } = body
+    const { name, email, phone, role, notes, department_id } = body
 
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -83,6 +88,7 @@ export async function POST(request: NextRequest) {
         phone: phone || null,
         role: role || 'staff',
         notes: notes || null,
+        department_id: department_id || null,
         is_active: true
       })
       .select()

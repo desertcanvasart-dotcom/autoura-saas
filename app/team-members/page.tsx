@@ -22,10 +22,18 @@ interface TeamMember {
   email: string
   phone: string
   role: string
+  department_id: string | null
   notes: string
   is_active: boolean
   created_at: string
   updated_at: string
+}
+
+interface Department {
+  id: string
+  name: string
+  description?: string
+  service_types?: string[]
 }
 
 const ROLES = [
@@ -40,9 +48,11 @@ const ROLES = [
 
 export default function TeamMembersPage() {
   const [members, setMembers] = useState<TeamMember[]>([])
+  const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [departmentFilter, setDepartmentFilter] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
@@ -51,6 +61,7 @@ export default function TeamMembersPage() {
     email: '',
     phone: '',
     role: 'staff',
+    department_id: '',
     notes: ''
   })
   const [saving, setSaving] = useState(false)
@@ -58,6 +69,25 @@ export default function TeamMembersPage() {
   useEffect(() => {
     fetchMembers()
   }, [showInactive])
+
+  useEffect(() => {
+    fetchDepartments()
+  }, [])
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await fetch('/api/departments')
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) setDepartments(result.data)
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error)
+    }
+  }
+
+  const departmentName = (id: string | null) =>
+    id ? departments.find(d => d.id === id)?.name : undefined
 
   const fetchMembers = async () => {
     try {
@@ -90,7 +120,8 @@ export default function TeamMembersPage() {
       const response = await fetch(url, {
         method: editingMember ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        // coerce empty department to null (avoids inserting '' into a uuid column)
+        body: JSON.stringify({ ...formData, department_id: formData.department_id || null })
       })
 
       if (response.ok) {
@@ -113,6 +144,7 @@ export default function TeamMembersPage() {
       email: member.email || '',
       phone: member.phone || '',
       role: member.role || 'staff',
+      department_id: member.department_id || '',
       notes: member.notes || ''
     })
     setShowModal(true)
@@ -154,6 +186,7 @@ export default function TeamMembersPage() {
       email: '',
       phone: '',
       role: 'staff',
+      department_id: '',
       notes: ''
     })
   }
@@ -173,7 +206,8 @@ export default function TeamMembersPage() {
       member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesRole = !roleFilter || member.role === roleFilter
-    return matchesSearch && matchesRole
+    const matchesDepartment = !departmentFilter || member.department_id === departmentFilter
+    return matchesSearch && matchesRole && matchesDepartment
   })
 
   if (loading) {
@@ -254,6 +288,19 @@ export default function TeamMembersPage() {
           ))}
         </select>
 
+        {departments.length > 0 && (
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+          >
+            <option value="">All Departments</option>
+            {departments.map(d => (
+              <option key={d.id} value={d.id}>🏢 {d.name}</option>
+            ))}
+          </select>
+        )}
+
         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
           <input
             type="checkbox"
@@ -296,6 +343,11 @@ export default function TeamMembersPage() {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${roleConfig.color}`}>
                         {roleConfig.label}
                       </span>
+                      {departmentName(member.department_id) && (
+                        <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
+                          🏢 {departmentName(member.department_id)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
@@ -420,6 +472,20 @@ export default function TeamMembersPage() {
                 >
                   {ROLES.map(role => (
                     <option key={role.value} value={role.value}>{role.icon} {role.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                <select
+                  value={formData.department_id}
+                  onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
+                >
+                  <option value="">— No department —</option>
+                  {departments.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
               </div>

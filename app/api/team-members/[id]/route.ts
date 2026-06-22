@@ -74,6 +74,7 @@ export async function PUT(
     if (body.phone !== undefined) updateData.phone = body.phone
     if (body.role !== undefined) updateData.role = body.role
     if (body.notes !== undefined) updateData.notes = body.notes
+    if (body.department_id !== undefined) updateData.department_id = body.department_id
     if (body.is_active !== undefined) updateData.is_active = body.is_active
 
     // Block tenant_id updates
