@@ -116,6 +116,7 @@ const navigation: NavSection[] = [
       { label: 'Conversations', href: '/conversations', icon: MessageSquare },
       { label: 'Inbox', href: '/inbox', icon: Mail },
       { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageSquare },
+      { label: 'Copilot', href: '/copilot', icon: Sparkles },
       { label: 'Copilot Knowledge', href: '/copilot-knowledge', icon: Sparkles },
       { label: 'Copilot Settings', href: '/settings/copilot', icon: Sparkles },
       { label: 'Copilot Analytics', href: '/settings/copilot-analytics', icon: BarChart3 },
