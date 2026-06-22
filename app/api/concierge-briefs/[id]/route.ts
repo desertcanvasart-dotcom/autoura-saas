@@ -1,7 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/supabase-server'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 const ALLOWED_STATUSES = ['needs_review', 'in_progress', 'responded', 'archived'] as const
+
+// GET /api/concierge-briefs/[id]
+// Full brief including full_transcript (RLS-scoped to the tenant).
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const supabase = await createAuthenticatedClient()
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const { data, error } = await supabase
+      .from('concierge_briefs')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      return NextResponse.json({ success: false, error: 'Brief not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, data })
+  } catch (error) {
+    console.error('Error in concierge-brief GET:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
+  }
+}
 
 // PATCH /api/concierge-briefs/[id]
 // Triage action: update a brief's review_status (tenant-scoped via RLS).
