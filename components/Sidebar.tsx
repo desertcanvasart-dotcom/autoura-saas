@@ -101,6 +101,7 @@ const navigation: NavSection[] = [
     roles: ['admin', 'manager', 'agent'],
     items: [
       { label: 'Clients', href: '/clients', icon: Users, businessTypes: ['b2c_only', 'b2c_and_b2b'] },
+      { label: 'Concierge Leads', href: '/concierge-briefs', icon: ConciergeBell },
       { label: 'Staff', href: '/contacts?type=staff', icon: UserCog },
       { label: 'Follow-ups', href: '/followups', icon: CheckSquare },
       { label: 'Calendar', href: '/calendar', icon: Calendar },
