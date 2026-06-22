@@ -197,6 +197,7 @@ const navigation: NavSection[] = [
       { label: 'Receipts', href: '/receipts', icon: Receipt },
       { label: 'Receivables', href: '/accounts-receivable', icon: Wallet },
       { label: 'Payables', href: '/accounts-payable', icon: CreditCard },
+      { label: 'Supplier Invoices', href: '/supplier-invoices', icon: Receipt },
       { label: 'Expenses', href: '/expenses', icon: Receipt },
       { label: 'Commissions', href: '/commissions', icon: Handshake },
       { label: 'Profit & Loss', href: '/profit-loss', icon: TrendingUp },
