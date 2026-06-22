@@ -27,6 +27,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import type { RateSource, PricingHole } from './pricing-types'
+import { getFixedDailyCosts } from '@/lib/fixed-costs'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -1303,7 +1304,10 @@ export async function calculateDayBasedPricing(
   const guideRate = await getGuideRate(language, tier)
   const mealRates = await getMealRates(tier)
   const tippingRate = await getTippingRate(tier)
-  const waterCostPerPax = 2
+  // Water cost is admin-configurable via Rates → Fixed Costs (fixed_daily_costs);
+  // falls back to €2 (the previous hardcoded value) if the table is empty.
+  const fixedDailyCosts = await getFixedDailyCosts()
+  const waterCostPerPax = fixedDailyCosts.waterPerPersonPerDay
 
   // ============================================
   // STEP 5: Calculate Single Supplement & Triple Reduction (whole tour)

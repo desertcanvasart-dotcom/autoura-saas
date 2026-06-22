@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { clearFixedCostsCache } from '@/lib/fixed-costs'
 
 // GET - List fixed daily costs
 export async function GET() {
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    clearFixedCostsCache()
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
@@ -80,6 +82,7 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    clearFixedCostsCache()
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
