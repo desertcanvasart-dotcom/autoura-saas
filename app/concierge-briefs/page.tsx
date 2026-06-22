@@ -14,7 +14,10 @@ import {
   ExternalLink,
   Clock,
   Inbox,
+  Eye,
 } from 'lucide-react'
+import BriefDetailDrawer from './BriefDetailDrawer'
+import { conciergeSla, type SlaLevel } from '@/lib/concierge-sla'
 
 interface Brief {
   id: string
@@ -66,6 +69,14 @@ const ACTIONS: Record<StatusKey, { to: StatusKey; label: string; primary?: boole
   archived: [{ to: 'needs_review', label: 'Reopen', primary: true }],
 }
 
+const SLA_BADGE: Record<SlaLevel, string> = {
+  overdue: 'bg-red-100 text-red-700',
+  soon: 'bg-amber-100 text-amber-700',
+  ok: 'bg-emerald-100 text-emerald-700',
+  met: 'bg-green-100 text-green-700',
+  none: 'bg-gray-100 text-gray-500',
+}
+
 const TABS: { key: 'all' | StatusKey; label: string }[] = [
   { key: 'needs_review', label: 'Needs Review' },
   { key: 'in_progress', label: 'In Progress' },
@@ -91,6 +102,7 @@ export default function ConciergeBriefsPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'all' | StatusKey>('needs_review')
   const [updating, setUpdating] = useState<string | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   const fetchBriefs = useCallback(async () => {
     try {
@@ -227,6 +239,12 @@ export default function ConciergeBriefsPage() {
                       {b.brief_revision > 1 && (
                         <span className="text-xs text-gray-400">rev {b.brief_revision}</span>
                       )}
+                      {(() => {
+                        const sla = conciergeSla(b.committed_response_by, b.review_status)
+                        return sla.level === 'overdue' || sla.level === 'soon' || sla.level === 'ok' ? (
+                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${SLA_BADGE[sla.level]}`}>{sla.label}</span>
+                        ) : null
+                      })()}
                     </div>
 
                     {/* Contact */}
@@ -276,6 +294,12 @@ export default function ConciergeBriefsPage() {
 
                   {/* Right: actions */}
                   <div className="flex flex-col items-end gap-2 shrink-0">
+                    <button
+                      onClick={() => setDetailId(b.id)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> Details
+                    </button>
                     {b.client_id && (
                       <Link
                         href={`/clients/${b.client_id}`}
@@ -306,6 +330,14 @@ export default function ConciergeBriefsPage() {
             )
           })}
         </div>
+      )}
+
+      {detailId && (
+        <BriefDetailDrawer
+          briefId={detailId}
+          onClose={() => setDetailId(null)}
+          onStatusChange={updateStatus}
+        />
       )}
     </div>
   )
