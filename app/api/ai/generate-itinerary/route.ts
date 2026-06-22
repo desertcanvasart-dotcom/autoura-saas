@@ -4,6 +4,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/supabase-server'
 import { getMemoriesForPrompt, logAgentRun } from '@/lib/agent-memory'
 import { checkLimit, trackUsage } from '@/lib/billing-middleware'
+import { applyDayRules } from '@/lib/ai/day-rules-engine'
 
 // Lazy-initialized Anthropic client (avoids build-time errors)
 let _anthropic: Anthropic | null = null
@@ -2376,6 +2377,15 @@ export async function POST(request: NextRequest) {
         includeAccommodation: includeAccommodationFinal,
         memoryPromptBlock: memoryResult.prompt_block
       })
+    }
+
+    // Day-rules engine: deterministic post-AI cleanup. Sets arrival/departure/
+    // transfer-only flags and strips non-attractions (meal venues, geographic
+    // terms like "Red Sea", cruise-bundled activities) from attractions[] so
+    // pricing only charges entrance fees for real, bookable sites.
+    // NOTE: this MUTATES AI day output → changes which attractions get priced.
+    if (itineraryData?.days) {
+      itineraryData.days = applyDayRules(itineraryData.days, effectivePackageType)
     }
 
     // Update duration from AI result
