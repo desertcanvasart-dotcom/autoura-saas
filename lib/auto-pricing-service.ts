@@ -661,19 +661,48 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
 // ============================================
 
 /**
- * Get cruise rates for a tier
- * Uses PPD model: ppd_eur (Per Person Double) + single_supplement_eur
- * Falls back to legacy calculation if PPD fields not available
+ * Detect the cruise season (peak | high | low) for a travel date from the
+ * ship's season-boundary columns. Seasons recur annually, so dates are compared
+ * by month/day (the stored year is ignored). Defaults to 'low'.
+ */
+export function detectCruiseSeason(cruise: any, startDate: string): 'low' | 'high' | 'peak' {
+  const d = new Date(startDate)
+  if (isNaN(d.getTime())) return 'low'
+  const mmdd = (d.getMonth() + 1) * 100 + d.getDate()
+  const toMmdd = (s: string | null | undefined): number | null => {
+    if (!s) return null
+    const x = new Date(s)
+    if (isNaN(x.getTime())) return null
+    return (x.getMonth() + 1) * 100 + x.getDate()
+  }
+  const inRange = (start: number | null, end: number | null): boolean => {
+    if (start == null || end == null) return false
+    return start <= end ? (mmdd >= start && mmdd <= end) : (mmdd >= start || mmdd <= end)
+  }
+  if (inRange(toMmdd(cruise.peak_season_1_start), toMmdd(cruise.peak_season_1_end))) return 'peak'
+  if (inRange(toMmdd(cruise.peak_season_2_start), toMmdd(cruise.peak_season_2_end))) return 'peak'
+  if (inRange(toMmdd(cruise.high_season_start), toMmdd(cruise.high_season_end))) return 'high'
+  return 'low'
+}
+
+/**
+ * Get cruise rates for a tier (season-aware PPD model).
+ * Picks the seasonal PPD for the travel date's season (low = ppd_eur,
+ * high = high_season_ppd_eur, peak = peak_season_ppd_eur) + single supplement +
+ * triple reduction. Falls back to the base (low) PPD when a seasonal column is
+ * unset, then to legacy rates. No travelDate => low season (prior behaviour).
  */
 export async function getCruiseRates(
   tier: ServiceTier,
-  embarkCity?: string
+  embarkCity?: string,
+  travelDate?: string
 ): Promise<{
   shipName: string
   ppdNight: number
   singleSuppNight: number
   tripleRedNight: number
   durationNights: number
+  season: 'low' | 'high' | 'peak'
   source: RateSource
 } | null> {
   try {
@@ -701,12 +730,25 @@ export async function getCruiseRates(
     let ppdNight: number
     let singleSuppNight: number
     let tripleRedNight: number
+    let season: 'low' | 'high' | 'peak' = 'low'
 
     if (cruise.ppd_eur !== null && cruise.ppd_eur !== undefined) {
-      // New PPD model - ppd_eur is per night already
-      ppdNight = cruise.ppd_eur
-      singleSuppNight = cruise.single_supplement_eur ?? 0
-      tripleRedNight = cruise.triple_reduction_eur ?? 0
+      // PPD model — pick the seasonal PPD for the travel date, falling back to
+      // the base (low) PPD when a seasonal rate isn't set. No travelDate => low.
+      season = travelDate ? detectCruiseSeason(cruise, travelDate) : 'low'
+      if (season === 'peak') {
+        ppdNight = cruise.peak_season_ppd_eur ?? cruise.ppd_eur
+        singleSuppNight = cruise.peak_season_single_supplement_eur ?? cruise.single_supplement_eur ?? 0
+        tripleRedNight = cruise.peak_season_triple_reduction_eur ?? cruise.triple_reduction_eur ?? 0
+      } else if (season === 'high') {
+        ppdNight = cruise.high_season_ppd_eur ?? cruise.ppd_eur
+        singleSuppNight = cruise.high_season_single_supplement_eur ?? cruise.single_supplement_eur ?? 0
+        tripleRedNight = cruise.high_season_triple_reduction_eur ?? cruise.triple_reduction_eur ?? 0
+      } else {
+        ppdNight = cruise.ppd_eur
+        singleSuppNight = cruise.single_supplement_eur ?? 0
+        tripleRedNight = cruise.triple_reduction_eur ?? 0
+      }
     } else {
       // Legacy model - derive from trip rates
       const ppdTrip = cruise.rate_double_eur / 2
@@ -724,6 +766,7 @@ export async function getCruiseRates(
       singleSuppNight,
       tripleRedNight: Math.max(0, tripleRedNight),
       durationNights,
+      season,
       source: 'db'
     }
   } catch (err) {
@@ -1170,6 +1213,7 @@ export async function calculateDayBasedPricing(
     tier,
     isEurPassport,
     language = 'English',
+    travelDate,
     marginPercent = 25
   } = params
 
@@ -1268,7 +1312,7 @@ export async function calculateDayBasedPricing(
   let cruiseRates: NonNullable<Awaited<ReturnType<typeof getCruiseRates>>> | null = null
   if (cruiseNights > 0) {
     const firstCruiseDay = cruiseDays[0]
-    const cr = await getCruiseRates(tier, firstCruiseDay?.city)
+    const cr = await getCruiseRates(tier, firstCruiseDay?.city, travelDate)
     if (cr && cr.source === 'db') {
       cruiseRates = cr
     } else {
@@ -2137,6 +2181,7 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     tier,
     isEurPassport,
     language,
+    travelDate: params.travelDate,
     marginPercent
   })
 
