@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUrl } from '@/lib/gmail'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { signState } from '@/lib/oauth-state'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,8 +24,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
-    // Generate OAuth URL with user ID as state
-    const authUrl = getAuthUrl(userId)
+    // Sign the user id into the OAuth state so the callback can verify the
+    // embedded id wasn't tampered with. Prior code passed `userId` as
+    // plaintext state — an attacker could initiate their own Google OAuth
+    // flow with `state=<victim_user_id>` and have the callback bind their
+    // Google tokens to the victim's gmail_tokens row.
+    const authUrl = getAuthUrl(signState(userId))
 
     return NextResponse.json({ authUrl })
   } catch (err: any) {
