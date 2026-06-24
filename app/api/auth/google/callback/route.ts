@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getTokensFromCode, getUserEmail } from '@/lib/gmail'
+import { verifyState } from '@/lib/oauth-state'
 
 // Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
 let _supabase: ReturnType<typeof createClient> | null = null
@@ -33,6 +34,17 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  // Verify the signed state before trusting the embedded user id — without
+  // this, an attacker could initiate their own Google OAuth flow with
+  // state=<victim_user_id> and have THEIR tokens written to the victim's
+  // gmail_tokens row, hijacking the victim's email-sync identity.
+  const userId = verifyState(state)
+  if (!userId) {
+    return NextResponse.redirect(
+      new URL('/settings/email?error=invalid_state', request.url)
+    )
+  }
+
   try {
     // Exchange code for tokens
     const tokens = await getTokensFromCode(code)
@@ -51,7 +63,7 @@ export async function GET(request: NextRequest) {
     const { error: dbError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .upsert({
-        user_id: state,
+        user_id: userId,
         email,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
