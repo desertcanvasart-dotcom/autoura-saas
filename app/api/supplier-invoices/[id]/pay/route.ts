@@ -12,12 +12,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params
     const body = await request.json().catch(() => ({}))
 
-    const { data: invoice, error } = await supabase.from('supplier_invoices').select('status').eq('id', id).single()
-    if (error || !invoice) return NextResponse.json({ success: false, error: 'Supplier invoice not found' }, { status: 404 })
-    if (invoice.status !== 'approved') {
-      return NextResponse.json({ success: false, error: 'Invoice must be approved before it can be paid.' }, { status: 400 })
-    }
-
+    // Conditional UPDATE: the .eq('status', 'approved') runs at the DB level
+    // alongside the WHERE on id, so two concurrent pay calls can't both
+    // succeed. The prior code did SELECT-then-UPDATE which let two requests
+    // both pass the read-side check and both write paid_at, with the second
+    // overwriting the first.
     const { data, error: uErr } = await supabase
       .from('supplier_invoices')
       .update({
@@ -27,8 +26,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         payment_reference: body.payment_reference || null,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', id).select().single()
+      .eq('id', id)
+      .eq('status', 'approved')
+      .select()
+      .maybeSingle()
     if (uErr) return NextResponse.json({ success: false, error: 'Failed to mark paid' }, { status: 500 })
+
+    if (!data) {
+      // Distinguish "not found" from "wrong state" so the caller knows
+      // whether to retry, refresh, or surface an error.
+      const { data: probe } = await supabase
+        .from('supplier_invoices')
+        .select('status')
+        .eq('id', id)
+        .maybeSingle()
+      if (!probe) {
+        return NextResponse.json({ success: false, error: 'Supplier invoice not found' }, { status: 404 })
+      }
+      return NextResponse.json(
+        { success: false, error: `Invoice must be approved before it can be paid. Current status: ${probe.status}` },
+        { status: 409 }
+      )
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (e: any) {

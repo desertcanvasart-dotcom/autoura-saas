@@ -72,15 +72,36 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    // If marking as received/paid, set the paid_date
-    if ((body.status === 'received' || body.status === 'paid') && !body.paid_date) {
-      body.paid_date = new Date().toISOString().split('T')[0]
+    // Allowlist of writable fields. Prior code passed `body` straight to
+    // .update() — a caller could PUT { tenant_id: '<other>', id: '<other>',
+    // amount: 9999 } and rewrite the row entirely. RLS gates the parent
+    // tenant but the update still rewrites the row in place if the existing
+    // tenant_id matches the session's.
+    const allowedFields = [
+      'supplier_id',
+      'itinerary_id',
+      'client_id',
+      'commission_amount',
+      'commission_percent',
+      'currency',
+      'status',
+      'paid_date',
+      'notes',
+    ]
+    const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) updateData[field] = body[field]
+    }
+
+    // If marking as received/paid, set the paid_date if caller didn't.
+    if ((updateData.status === 'received' || updateData.status === 'paid') && !updateData.paid_date) {
+      updateData.paid_date = new Date().toISOString().split('T')[0]
     }
 
     // RLS ensures only tenant's commissions can be updated
     const { data, error } = await supabase
       .from('commissions')
-      .update(body)
+      .update(updateData)
       .eq('id', id)
       .select(`
         *,

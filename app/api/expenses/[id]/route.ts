@@ -65,16 +65,29 @@ export async function PUT(
       }, { status: 401 })
     }
 
-    const updateData = {
-      ...body,
-      updated_at: new Date().toISOString()
+    // Allowlist of writable fields. The prior denylist pattern (spread body,
+    // delete a few keys) let clients write fields like `paid_at`, `status`,
+    // `approved_at`, `approved_by`, etc. — derived/state-machine fields that
+    // must only move through the dedicated routes.
+    const allowedFields = [
+      'description',
+      'category',
+      'amount',
+      'currency',
+      'expense_date',
+      'supplier_id',
+      'supplier_name',
+      'itinerary_id',
+      'booking_id',
+      'notes',
+      'receipt_url',
+      'payment_method',
+      'payment_reference',
+    ]
+    const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) updateData[field] = body[field]
     }
-
-    // Remove fields that shouldn't be updated
-    delete updateData.id
-    delete updateData.tenant_id
-    delete updateData.expense_number
-    delete updateData.created_at
 
     const { data, error } = await supabase
       .from('expenses')

@@ -34,11 +34,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params
     const body = await request.json()
 
-    // Strip immutable / derived fields
-    const { id: _i, tenant_id: _t, created_at, internal_reference, matched_expenses, ...updateData } = body
+    // Allowlist of writable fields. The prior denylist (spread body, destructure
+    // a few keys out) let clients PATCH state-machine fields like `status`,
+    // `approved_at`, `approved_by`, `paid_at`, `payment_method`, `payment_reference`,
+    // `match_status`, `matched_amount` — bypassing the pay/approve/match routes
+    // and their state guards. Allowlist enforces that only descriptive metadata
+    // can move through this endpoint; status transitions go through the
+    // dedicated routes that own them.
+    const allowedFields = [
+      'supplier_id',
+      'invoice_number',
+      'invoice_date',
+      'due_date',
+      'currency',
+      'subtotal',
+      'tax_amount',
+      'total_amount',
+      'notes',
+      'document_url',
+    ]
+    const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
+    for (const field of allowedFields) {
+      if (body[field] !== undefined) updateData[field] = body[field]
+    }
+
     const { data, error } = await supabase
       .from('supplier_invoices')
-      .update({ ...updateData, updated_at: new Date().toISOString() })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()
