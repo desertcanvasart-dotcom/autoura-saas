@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-numbering'
 
 /**
  * GET /api/expenses
@@ -137,26 +138,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate expense number
-    const { data: seqData, error: seqError } = await supabase
-      .rpc('nextval', { seq_name: 'expense_number_seq' })
-
-    let expenseNumber = `EXP-${new Date().getFullYear()}-001`
-
-    if (!seqError && seqData) {
-      expenseNumber = `EXP-${new Date().getFullYear()}-${String(seqData).padStart(3, '0')}`
-    } else {
-      // Fallback: count expenses in THIS TENANT only (RLS filters automatically)
-      const { count } = await supabase
-        .from('expenses')
-        .select('*', { count: 'exact', head: true })
-
-      expenseNumber = `EXP-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(3, '0')}`
-    }
-
-    const newExpense = {
+    // Expense number generation goes through nextDocumentNumber + the INSERT
+    // is wrapped in insertWithUniqueRetry so a 23505 violation from the new
+    // UNIQUE constraint regenerates the number rather than crashing.
+    const baseExpense = {
       tenant_id, // ✅ Explicit tenant_id
-      expense_number: expenseNumber,
       itinerary_id: body.itinerary_id || null,
       supplier_id: body.supplier_id || null,
       category: body.category,
@@ -177,11 +163,19 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    const { data, error } = await supabase
-      .from('expenses')
-      .insert([newExpense])
-      .select()
-      .single()
+    const { data, error } = await insertWithUniqueRetry({
+      generateRow: async () => ({
+        ...baseExpense,
+        expense_number: await nextDocumentNumber({
+          supabase,
+          prefix: 'EXP',
+          sequenceName: 'expense_number_seq',
+          table: 'expenses',
+          column: 'expense_number',
+        }),
+      }),
+      insert: async (row) => await supabase.from('expenses').insert([row]).select().single(),
+    })
 
     if (error) {
       console.error('❌ Error creating expense:', error)
