@@ -75,21 +75,6 @@ export async function POST(
     const adminClient = createAdminClient()
     const body = await request.json()
 
-    // Fetch booking
-    const { data: booking, error: bookingError } = await adminClient
-      .from('bookings')
-      .select('*')
-      .eq('id', id)
-      .eq('tenant_id', tenant_id)
-      .single()
-
-    if (bookingError || !booking) {
-      return NextResponse.json(
-        { success: false, error: 'Booking not found' },
-        { status: 404 }
-      )
-    }
-
     const {
       amount,
       payment_type = 'deposit',
@@ -106,7 +91,10 @@ export async function POST(
       )
     }
 
-    // Generate payment number
+    // Generate payment number. The prior code generated it before the INSERT
+    // happened anyway; keeping that call here lets the existing generate_payment_number
+    // RPC stay the source of payment numbering, while record_booking_payment
+    // (below) handles the booking-row recomputation atomically.
     const { data: paymentNumberData, error: paymentNumberError } = await adminClient
       .rpc('generate_payment_number')
 
@@ -120,69 +108,61 @@ export async function POST(
 
     const payment_number = paymentNumberData
 
-    // Create payment record
-    const paymentData = {
-      tenant_id,
-      booking_id: id,
-      payment_number,
-      amount,
-      currency: booking.currency,
-      payment_type,
-      payment_method,
-      payment_date,
-      status: 'received',
-      transaction_reference,
-      notes,
-      created_by: user?.id
+    // Atomic payment recording via record_booking_payment (PL/pgSQL RPC).
+    // Replaces what used to be: fetch booking → insert payment → recompute
+    // and update booking — three separate non-transactional round-trips
+    // where two concurrent callers could both read a stale total_paid and
+    // both update the booking with last-write-wins. The RPC takes
+    // SELECT ... FOR UPDATE on the booking row, inserts the payment,
+    // recomputes total_paid from the ledger (currency-safe), updates the
+    // booking (including conditional status transitions and first-time
+    // confirmation_date / full_payment_date capture). balance_due is left
+    // to the existing BEFORE INSERT/UPDATE trigger on bookings.
+    const { data: rpcRows, error: rpcError } = await adminClient
+      .rpc('record_booking_payment', {
+        p_booking_id: id,
+        p_tenant_id: tenant_id,
+        p_payment_number: payment_number,
+        p_amount: amount,
+        p_payment_type: payment_type,
+        p_payment_method: payment_method || null,
+        p_payment_date: payment_date,
+        p_transaction_reference: transaction_reference || null,
+        p_notes: notes || null,
+        p_created_by: user?.id || null,
+      })
+
+    if (rpcError) {
+      // The RPC raises if the booking is not found for this tenant.
+      const msg = rpcError.message || ''
+      const status = msg.includes('not found') ? 404 : 500
+      console.error('Error recording payment:', rpcError)
+      return NextResponse.json(
+        { success: false, error: 'Failed to record payment', details: msg },
+        { status }
+      )
     }
 
-    const { data: payment, error: paymentError } = await adminClient
-      .from('booking_payments')
-      .insert(paymentData)
-      .select()
-      .single()
-
-    if (paymentError) {
-      console.error('Error creating payment:', paymentError)
+    const result = (rpcRows && rpcRows[0]) || null
+    if (!result) {
       return NextResponse.json(
-        { success: false, error: 'Failed to record payment', details: paymentError.message },
+        { success: false, error: 'Payment RPC returned no rows' },
         { status: 500 }
       )
     }
 
-    // Update booking total_paid
-    const new_total_paid = parseFloat(booking.total_paid || 0) + parseFloat(amount)
-    const new_balance_due = parseFloat(booking.total_amount) - new_total_paid
-
-    let new_status = booking.status
-
-    // Auto-update booking status based on payment
-    if (payment_type === 'deposit' && booking.status === 'pending_deposit') {
-      new_status = 'confirmed'
-    } else if (new_balance_due <= 0) {
-      new_status = 'paid_full'
-    }
-
-    const { error: bookingUpdateError } = await adminClient
-      .from('bookings')
-      .update({
-        total_paid: new_total_paid,
-        balance_due: new_balance_due,
-        status: new_status,
-        ...(payment_type === 'deposit' && new_status === 'confirmed' ? { confirmation_date: new Date().toISOString().split('T')[0] } : {}),
-        ...(new_status === 'paid_full' ? { full_payment_date: new Date().toISOString().split('T')[0] } : {})
-      })
-      .eq('id', id)
-
-    if (bookingUpdateError) {
-      console.error('Error updating booking:', bookingUpdateError)
-    }
+    // Read back the payment row for the response shape callers expect.
+    const { data: payment } = await adminClient
+      .from('booking_payments')
+      .select('*')
+      .eq('id', result.payment_id)
+      .single()
 
     return NextResponse.json({
       success: true,
       message: 'Payment recorded successfully',
       data: payment,
-      booking_status: new_status
+      booking_status: result.new_status
     })
   } catch (error: any) {
     console.error('Error in payment POST:', error)
