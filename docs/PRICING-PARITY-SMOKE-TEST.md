@@ -23,7 +23,7 @@ SUPABASE_SERVICE_ROLE_KEY=...        # used by the B2B-quote RPC path in save
 ANTHROPIC_API_KEY=...                # only needed to test the AI parse route
 ```
 
-No new migrations are required — this PR keeps the existing `tenant_id` persistence schema (no `org_id`, no new RPC).
+No new migrations are required — this PR keeps the existing `tenant_id` persistence schema (no `org_id`, no new RPC). Transport is handled in code: the grid `rates` route groups this app's **one-row-per-vehicle** `transportation_rates` into the tier set the grid expects (`groupVehicleRowsToTiers`, unit-tested), so the existing transport schema is used as-is — no column changes.
 
 ## 2. Run target
 

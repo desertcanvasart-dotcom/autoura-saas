@@ -52,67 +52,16 @@ export async function GET(request: NextRequest) {
       supabase.from('flight_rates').select('*').eq('is_active', true),
     ])
 
-    // Map to RateOption format per slot
-    // Vehicle tiers: each transport row expands into up to 5 options (one per vehicle type)
-    const VEHICLE_TIERS = [
-      { key: 'sedan',   label: 'Sedan',   capMin: 1,  capMax: 2  },
-      { key: 'minivan', label: 'Minivan', capMin: 3,  capMax: 7  },
-      { key: 'van',     label: 'Van',     capMin: 8,  capMax: 12 },
-      { key: 'minibus', label: 'Minibus', capMin: 13, capMax: 20 },
-      { key: 'bus',     label: 'Bus',     capMin: 21, capMax: 45 },
-    ]
-
-    const expandTiers = (r: any, namePrefix: string) => {
-      const tiered = VEHICLE_TIERS
-        .filter(t => toNum(r[`${t.key}_rate_eur`]) > 0)
-        .map(t => ({
-          id: `${r.id}__${t.key}`,
-          name: `${t.label} (${r[`${t.key}_capacity_min`] || t.capMin}-${r[`${t.key}_capacity_max`] || t.capMax} pax) — ${namePrefix}`,
-          rateEur: toNum(r[`${t.key}_rate_eur`]),
-          rateNonEur: toNum(r[`${t.key}_rate_non_eur`] || r[`${t.key}_rate_eur`]),
-          city: r.origin_city || r.city,
-          details: `${t.label} | ${r.service_type}`,
-          capacity_min: r[`${t.key}_capacity_min`] || t.capMin,
-          capacity_max: r[`${t.key}_capacity_max`] || t.capMax,
-          service_type: r.service_type,
-          origin_city: r.origin_city || r.city,
-          destination_city: r.destination_city,
-        }))
-      // Fallback: if no tiered columns, use legacy base_rate_eur for all tiers
-      if (tiered.length === 0 && toNum(r.base_rate_eur) > 0) {
-        return VEHICLE_TIERS.map(t => ({
-          id: `${r.id}__${t.key}`,
-          name: `${t.label} (${t.capMin}-${t.capMax} pax) — ${namePrefix}`,
-          rateEur: toNum(r.base_rate_eur),
-          rateNonEur: toNum(r.base_rate_non_eur || r.base_rate_eur),
-          city: r.origin_city || r.city,
-          details: `${t.label} | ${r.service_type} (legacy rate)`,
-          capacity_min: t.capMin,
-          capacity_max: t.capMax,
-          service_type: r.service_type,
-          origin_city: r.origin_city || r.city,
-          destination_city: r.destination_city,
-        }))
-      }
-      return tiered
-    }
-
+    // Map to RateOption format per slot. Transport tiering is built by
+    // groupVehicleRowsToTiers() at module scope (see below).
     const rates = {
       route: [
-        // Day tour vehicles (merged into route — all transport in one slot)
-        ...(transportRates || [])
-          .filter((r: any) => r.service_type === 'day_tour')
-          .flatMap((r: any) => {
-            const label = r.route_name || r.service_code || `${r.origin_city || r.city || ''} Day Tour`
-            return expandTiers(r, label)
-          }),
-        // All other transport types (airport transfers, intercity, city transfers, dinner transfers, etc.)
-        ...(transportRates || [])
-          .filter((r: any) => r.service_type !== 'day_tour')
-          .flatMap((r: any) => {
-            const label = r.route_name || `${r.origin_city || ''} → ${r.destination_city || ''}`.trim() || r.service_code
-            return expandTiers(r, label)
-          }),
+        // All transport in one slot. This app stores transportation_rates as ONE
+        // ROW PER VEHICLE; group them into per-route tier sets so the grid's
+        // buildTransportTierIndex can re-select the vehicle as group size grows.
+        // Read-only — no schema change; uses the same grouping key as
+        // travel-ops-pro migration 20260205_transportation_rates_restructure.
+        ...groupVehicleRowsToTiers(transportRates || []),
         // Cruise transport packages (bundled sightseeing vehicle for cruise days)
         ...(cruiseTransportPkgs || []).map((r: any) => ({
           id: r.id,
@@ -264,4 +213,105 @@ export async function GET(request: NextRequest) {
 function toNum(v: any): number {
   const n = parseFloat(v)
   return isNaN(n) ? 0 : n
+}
+
+// ============================================================================
+// Transport tiering (Option B) — read the one-row-per-vehicle
+// transportation_rates model and synthesize the tier set the grid expects.
+// ============================================================================
+// The grid calculator (buildTransportTierIndex / resolveTransportRate) expects
+// each transport SERVICE to expose its vehicle tiers as options whose id is
+// `${rowId}__${tier}` carrying a capacity band, so the right vehicle is
+// re-selected as group size grows. travel-ops-pro stores those tiers as columns
+// on ONE row; this app stores ONE ROW PER VEHICLE. We group the rows here — by
+// the same key travel-ops-pro migration 20260205 used — and emit the same option
+// shape. Pure and read-only: the table is never modified.
+
+interface VehicleTierDef { key: string; capMin: number; capMax: number; aliases: string[] }
+const VEHICLE_TIER_DEFS: VehicleTierDef[] = [
+  { key: 'sedan',   capMin: 1,  capMax: 2,  aliases: ['sedan', 'car', 'saloon'] },
+  { key: 'minivan', capMin: 3,  capMax: 7,  aliases: ['minivan', 'mini van', 'mpv'] },
+  { key: 'van',     capMin: 8,  capMax: 12, aliases: ['van', 'h1', 'hiace'] },
+  { key: 'minibus', capMin: 13, capMax: 20, aliases: ['minibus', 'mini bus', 'coaster'] },
+  { key: 'bus',     capMin: 21, capMax: 45, aliases: ['bus', 'coach'] },
+]
+const TIER_BY_ALIAS = new Map<string, VehicleTierDef>()
+for (const t of VEHICLE_TIER_DEFS) for (const a of t.aliases) TIER_BY_ALIAS.set(a, t)
+
+function normLower(v: any): string {
+  return String(v ?? '').toLowerCase().trim()
+}
+
+function vehicleSlug(v: any): string {
+  return normLower(v).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'vehicle'
+}
+
+/**
+ * Group per-vehicle transportation_rates rows into the grid's tiered option
+ * shape. Rows are grouped by (service_type, city, origin_city, destination_city,
+ * route_name); each group's stable keeper id (earliest created_at, then lowest
+ * id) becomes the option rowId, so all of a route's vehicles share one
+ * `${keeperId}__${tier}` family and buildTransportTierIndex re-selects by pax.
+ * Each vehicle row keeps its own rate + capacity band (falling back to the
+ * canonical tier band when the row's capacity columns are null).
+ */
+export function groupVehicleRowsToTiers(rows: any[]): any[] {
+  const groupKey = (r: any) =>
+    [normLower(r.service_type), normLower(r.city), normLower(r.origin_city),
+     normLower(r.destination_city), normLower(r.route_name)].join('|')
+
+  const groups = new Map<string, any[]>()
+  for (const r of rows) {
+    const k = groupKey(r)
+    const arr = groups.get(k)
+    if (arr) arr.push(r)
+    else groups.set(k, [r])
+  }
+
+  const options: any[] = []
+  for (const groupRows of groups.values()) {
+    const sorted = [...groupRows].sort((a, b) => {
+      const ca = String(a.created_at ?? ''), cb = String(b.created_at ?? '')
+      if (ca !== cb) return ca < cb ? -1 : 1
+      return String(a.id) < String(b.id) ? -1 : 1
+    })
+    const keeper = sorted[0]
+    const label =
+      keeper.route_name ||
+      `${keeper.origin_city || keeper.city || ''}${keeper.destination_city ? ' → ' + keeper.destination_city : ''}`.trim() ||
+      keeper.service_code ||
+      `${keeper.city || ''} ${keeper.service_type || 'Transport'}`.trim()
+
+    const usedTierKeys = new Map<string, number>()
+    for (const r of sorted) {
+      const rate = toNum(r.base_rate_eur)
+      if (rate <= 0) continue // no usable rate for this vehicle row — skip
+      const tier = TIER_BY_ALIAS.get(normLower(r.vehicle_type))
+      let tierKey = tier ? tier.key : vehicleSlug(r.vehicle_type)
+      // Disambiguate if two rows map to the same tier within a group (keeps option
+      // ids unique; buildTransportTierIndex still groups by the `${keeperId}` prefix).
+      const seen = usedTierKeys.get(tierKey) ?? 0
+      usedTierKeys.set(tierKey, seen + 1)
+      if (seen > 0) tierKey = `${tierKey}_${seen + 1}`
+
+      const capMin = r.capacity_min != null ? Number(r.capacity_min) : (tier ? tier.capMin : 1)
+      const capMax = r.capacity_max != null ? Number(r.capacity_max) : (tier ? tier.capMax : 99)
+      const vlabel = tier ? tier.key.charAt(0).toUpperCase() + tier.key.slice(1) : (r.vehicle_type || 'Vehicle')
+
+      options.push({
+        id: `${keeper.id}__${tierKey}`,
+        name: `${vlabel} (${capMin}-${capMax} pax) — ${label}`,
+        rateEur: rate,
+        rateNonEur: toNum(r.base_rate_non_eur) || rate,
+        city: r.origin_city || r.city,
+        details: `${vlabel} | ${r.service_type || ''}`.trim(),
+        capacity_min: capMin,
+        capacity_max: capMax,
+        service_type: r.service_type,
+        origin_city: r.origin_city || r.city,
+        destination_city: r.destination_city,
+      })
+    }
+  }
+  return options
 }
