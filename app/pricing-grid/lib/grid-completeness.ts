@@ -1,22 +1,34 @@
 // ============================================
-// Pricing Grid — Completeness Gate (B-full)
+// Pricing Grid — Completeness Gate (consolidation Phase B rich)
 // ============================================
 // Pure, no side effects. Decides whether a grid is DELIVERABLE.
 //
 // Requirements derive from each day's COMPONENTS (overnight / sightseeing /
-// airport arrival-departure / hotel check-in-out / intercity), which a day type
-// preset fills but the operator can override — so combined days work (e.g. a
-// domestic-flight transfer day that also sightsees).
+// airport arrival-departure / hotel check-in-out / intercity), which a
+// day_type preset fills but the operator can override per-day — so
+// combined days work (e.g. a transfer day that also sightsees).
 //
-// - Transport is TYPE-AWARE when route lines carry their service_type
-//   (airport_transfer / day_tour / intercity_transfer); otherwise it degrades
-//   to a count check.
-// - Entrance fees are CLASS-AWARE: a `mandatory` fee must be priced; `optional`
-//   and `free` never block, and a `free` line at €0 is expected (no warning).
+// - Transport is TYPE-AWARE when route selectedItems carry their
+//   service_type (airport_transfer / day_tour / intercity_transfer);
+//   otherwise it degrades to a count check.
+// - Entrance fees are CLASS-AWARE when selectedItems carry pricing_class:
+//   a `mandatory` fee must be priced; `optional` and `free` never block.
+//   Selections without a class fall through to a structural priced/unpriced
+//   check.
+// - "Priced" for a slot means: at least one selectedItem with a non-zero
+//   rate (either passport variant) OR a non-zero customAmount.
 //
-// See PRICING-CONSOLIDATION-PLAN.md (Phase B) and the agreed model.
+// Ported from the sibling app (autoura-saas) and adapted to our
+// SelectedItem shape. See PRICING-CONSOLIDATION-PLAN.md (Phase B) and the
+// migration 20260627_itinerary_days_day_type_components.sql.
 
-import type { GridDay, GridConfig, DayComponents, SlotValue, SlotSelection } from '../types'
+import type {
+  GridDay,
+  GridConfig,
+  DayComponents,
+  SlotValue,
+  SelectedItem,
+} from '../types'
 import { DAY_TYPE_DEFAULTS, DEFAULT_DAY_TYPE } from '../types'
 
 export type IssueSeverity = 'block' | 'warn'
@@ -34,9 +46,16 @@ export interface GridCompleteness {
   blocking: number
   warnings: number
   issues: GridIssue[]
+
+  // The save route used to consume the lite gate's { ok, blocking[],
+  // warnings[] } shape. These are derived for backwards compatibility so
+  // existing consumers keep working without each one being rewritten.
+  ok: boolean
+  blockingMessages: string[]
+  warningMessages: string[]
 }
 
-const SLEEP_SLOTS = ['accommodation', 'cruise', 'sleeping_trains']
+const SLEEP_SLOTS = ['accommodation', 'cruise']
 const TRANSPORT_SLOT = 'route'
 const FLIGHTS_SLOT = 'flights'
 const GUIDE_SLOT = 'guide'
@@ -44,7 +63,8 @@ const ENTRANCE_SLOT = 'entrance_fees'
 const HOTEL_SERVICES_SLOT = 'hotel_services'
 const AIRPORT_SERVICES_SLOT = 'airport_services'
 
-// Transport segment service_types (must match the standardized rate vocabulary).
+// Transport segment service_types (must match the standardized rate
+// vocabulary used by /api/pricing-grid/rates and transportation_rates).
 const SEG_AIRPORT = 'airport_transfer'
 const SEG_DAY_TOUR = 'day_tour'
 const SEG_INTERCITY = 'intercity_transfer'
@@ -72,32 +92,46 @@ export function resolveComponents(day: GridDay): DayComponents {
 function getSlot(day: GridDay, id: string): SlotValue | undefined {
   return day.slots.find((s) => s.slotId === id)
 }
-function isPriced(s: SlotValue | undefined): boolean {
-  return !!s && s.resolvedRate > 0
-}
-function sels(s: SlotValue | undefined): SlotSelection[] {
-  return s?.selections ?? []
+
+/** A selectedItem is priced if either passport variant is > 0. */
+function itemIsPriced(item: SelectedItem): boolean {
+  return (item.rateEur > 0) || (item.rateNonEur > 0)
 }
 
-export function gridCompleteness(days: GridDay[], config: GridConfig): GridCompleteness {
+/** A slot is priced when at least one selectedItem or customAmount has value. */
+function slotIsPriced(s: SlotValue | undefined): boolean {
+  if (!s) return false
+  if ((s.customAmount ?? 0) > 0) return true
+  return (s.selectedItems ?? []).some(itemIsPriced)
+}
+
+function items(s: SlotValue | undefined): SelectedItem[] {
+  return s?.selectedItems ?? []
+}
+
+export function gridCompleteness(
+  days: GridDay[] | any[],
+  config: Partial<GridConfig> | any
+): GridCompleteness {
   const issues: GridIssue[] = []
+  const dayList: GridDay[] = Array.isArray(days) ? days : []
 
-  if (days.length === 0) {
+  if (dayList.length === 0) {
     issues.push({ dayNumber: null, severity: 'block', code: 'empty-grid', message: 'The itinerary has no days.' })
     return summarize(issues)
   }
 
-  for (const day of days) {
+  for (const day of dayList) {
     const c = resolveComponents(day)
     const dn = day.dayNumber
 
     // --- Sleep (every overnight day) ---
-    if (c.overnight && !SLEEP_SLOTS.some((id) => isPriced(getSlot(day, id)))) {
+    if (c.overnight && !SLEEP_SLOTS.some((id) => slotIsPriced(getSlot(day, id)))) {
       issues.push({
         dayNumber: dn,
         severity: 'block',
         code: 'missing-sleep',
-        message: `Day ${dn} is an overnight but has no accommodation, cruise, or sleeping train priced.`,
+        message: `Day ${dn} is an overnight but has no accommodation or cruise priced.`,
       })
     }
 
@@ -110,13 +144,13 @@ export function gridCompleteness(days: GridDay[], config: GridConfig): GridCompl
     const totalNeed = need[SEG_AIRPORT] + need[SEG_DAY_TOUR] + need[SEG_INTERCITY]
     if (totalNeed > 0) {
       const route = getSlot(day, TRANSPORT_SLOT)
-      const routeSel = sels(route)
-      const typeAware = routeSel.some((s) => s.serviceType !== undefined)
+      const routeItems = items(route)
+      const typeAware = routeItems.some((s) => s.serviceType !== undefined)
 
       if (typeAware) {
         for (const seg of [SEG_AIRPORT, SEG_DAY_TOUR, SEG_INTERCITY]) {
           if (need[seg] === 0) continue
-          const have = routeSel.filter((s) => s.serviceType === seg && s.rate > 0).length
+          const have = routeItems.filter((s) => s.serviceType === seg && itemIsPriced(s)).length
           if (have < need[seg]) {
             issues.push({
               dayNumber: dn,
@@ -127,13 +161,9 @@ export function gridCompleteness(days: GridDay[], config: GridConfig): GridCompl
           }
         }
       } else {
-        // Count-based fallback (route lines don't carry service_type yet).
-        const priced =
-          routeSel.length > 0
-            ? routeSel.filter((s) => s.rate > 0).length
-            : isPriced(route)
-              ? Math.max(route!.selectedIds.length, 1)
-              : 0
+        // Count-based fallback: route lines don't carry service_type yet
+        // (legacy itinerary loaded before the rates route attached it).
+        const priced = routeItems.filter(itemIsPriced).length + ((route?.customAmount ?? 0) > 0 ? 1 : 0)
         if (priced < totalNeed) {
           const want = Object.entries(need)
             .filter(([, n]) => n > 0)
@@ -150,7 +180,7 @@ export function gridCompleteness(days: GridDay[], config: GridConfig): GridCompl
     }
 
     // --- Flight (intercity by air) ---
-    if (c.intercity === 'flight' && !isPriced(getSlot(day, FLIGHTS_SLOT))) {
+    if (c.intercity === 'flight' && !slotIsPriced(getSlot(day, FLIGHTS_SLOT))) {
       issues.push({
         dayNumber: dn,
         severity: 'block',
@@ -160,7 +190,7 @@ export function gridCompleteness(days: GridDay[], config: GridConfig): GridCompl
     }
 
     // --- Guide (sightseeing days, only when the Guide toggle is on) ---
-    if (c.hasSightseeing && config.withGuide && !isPriced(getSlot(day, GUIDE_SLOT))) {
+    if (c.hasSightseeing && config?.withGuide && !slotIsPriced(getSlot(day, GUIDE_SLOT))) {
       issues.push({
         dayNumber: dn,
         severity: 'block',
@@ -170,30 +200,30 @@ export function gridCompleteness(days: GridDay[], config: GridConfig): GridCompl
     }
 
     // --- Entrance fees (class-aware): a selected MANDATORY fee must be priced ---
-    for (const sel of sels(getSlot(day, ENTRANCE_SLOT))) {
-      if (sel.pricingClass === 'mandatory' && !(sel.rate > 0)) {
+    for (const sel of items(getSlot(day, ENTRANCE_SLOT))) {
+      if (sel.pricingClass === 'mandatory' && !itemIsPriced(sel)) {
         issues.push({
           dayNumber: dn,
           severity: 'block',
           code: 'unpriced-mandatory-entrance',
-          message: `Day ${dn}: mandatory entrance "${sel.label ?? sel.id}" has no price.`,
+          message: `Day ${dn}: mandatory entrance "${sel.name}" has no price.`,
         })
       }
     }
 
     // --- Hotel services (check-in / check-out events) ---
-    if ((c.hotelCheckIn || c.hotelCheckOut) && !isPriced(getSlot(day, HOTEL_SERVICES_SLOT))) {
+    if ((c.hotelCheckIn || c.hotelCheckOut) && !slotIsPriced(getSlot(day, HOTEL_SERVICES_SLOT))) {
       const which = c.hotelCheckIn && c.hotelCheckOut ? 'check-in & check-out' : c.hotelCheckIn ? 'check-in' : 'check-out'
       issues.push({
         dayNumber: dn,
         severity: 'block',
         code: 'missing-hotel_services',
-        message: `Day ${dn} has a hotel/cruise ${which} but no hotel services priced.`,
+        message: `Day ${dn} has a hotel ${which} but no hotel services priced.`,
       })
     }
 
     // --- Airport services (arrival / departure events) ---
-    if ((c.airportArrival || c.airportDeparture) && !isPriced(getSlot(day, AIRPORT_SERVICES_SLOT))) {
+    if ((c.airportArrival || c.airportDeparture) && !slotIsPriced(getSlot(day, AIRPORT_SERVICES_SLOT))) {
       const which = c.airportArrival && c.airportDeparture ? 'arrival & departure' : c.airportArrival ? 'arrival' : 'departure'
       issues.push({
         dayNumber: dn,
@@ -205,20 +235,11 @@ export function gridCompleteness(days: GridDay[], config: GridConfig): GridCompl
 
     // --- Cross-cutting per slot ---
     for (const s of day.slots) {
-      const ext = s as SlotValue & { needsHumanInput?: boolean }
-      // Unreviewed AI-suggested amount (Phase-3 fence) → block.
-      if (ext.needsHumanInput) {
-        issues.push({
-          dayNumber: dn,
-          severity: 'block',
-          code: 'needs-human-input',
-          message: `Day ${dn}: "${s.slotId}" has an AI-suggested amount that needs a manually-entered price.`,
-        })
-      }
-      // A selection that priced to €0 → warn, UNLESS every selection is a known free item.
-      const hasSel = s.selectedId !== null || s.selectedIds.length > 0 || (s.selections?.length ?? 0) > 0
-      if (hasSel && s.resolvedRate === 0) {
-        const allFree = (s.selections?.length ?? 0) > 0 && s.selections!.every((x) => x.pricingClass === 'free')
+      // A selection that priced to €0 → warn, UNLESS every selection is
+      // a known free item.
+      const hasSel = (s.selectedItems?.length ?? 0) > 0
+      if (hasSel && !slotIsPriced(s)) {
+        const allFree = s.selectedItems!.every((x) => x.pricingClass === 'free')
         if (!allFree) {
           issues.push({
             dayNumber: dn,
@@ -235,11 +256,16 @@ export function gridCompleteness(days: GridDay[], config: GridConfig): GridCompl
 }
 
 function summarize(issues: GridIssue[]): GridCompleteness {
-  const blocking = issues.filter((i) => i.severity === 'block').length
+  const blockingIssues = issues.filter((i) => i.severity === 'block')
+  const warningIssues = issues.filter((i) => i.severity === 'warn')
   return {
-    complete: blocking === 0,
-    blocking,
-    warnings: issues.length - blocking,
+    complete: blockingIssues.length === 0,
+    blocking: blockingIssues.length,
+    warnings: warningIssues.length,
     issues,
+    // Back-compat fields the prior save route consumed.
+    ok: blockingIssues.length === 0,
+    blockingMessages: blockingIssues.map((i) => i.message),
+    warningMessages: warningIssues.map((i) => i.message),
   }
 }

@@ -2,6 +2,12 @@
 // POST /api/pricing-grid/save
 // Save grid to itinerary + services (B2C/B2B)
 // ============================================
+//
+// Pricing parity note: per-service costs are derived from the grid's
+// passport-aware `selectedItems` (rateEur / rateNonEur) exactly as in
+// travel-ops-pro — group slots charged once, per-person slots × pax, custom
+// amounts honoured. The tenant_id / client_id persistence model and the B2B
+// quote RPC are the sibling's own and are preserved unchanged.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -10,6 +16,28 @@ function generateItineraryCode(): string {
   const year = new Date().getFullYear()
   const random = Math.floor(Math.random() * 9000) + 1000
   return `ITN-S-${year}-${random}`
+}
+
+// Group slots are charged once for the whole group; per-person slots scale by pax.
+const GRID_GROUP_SLOTS = ['route', 'guide', 'airport_services', 'hotel_services', 'tipping', 'boat_rides', 'other_group']
+
+// Passport-aware rate for one selected item (mirrors calculator.ts getRate).
+function itemRate(item: any, passport: string): number {
+  return passport === 'eu' ? (Number(item.rateEur) || 0) : (Number(item.rateNonEur) || 0)
+}
+
+// Supplier (cost) total for one slot under the given passport, before margin.
+function slotSupplierCost(slot: any, passport: string, pax: number): number {
+  const isGroup = GRID_GROUP_SLOTS.includes(slot.slotId)
+  if (slot.customAmount && slot.customAmount > 0) {
+    return isGroup ? slot.customAmount : slot.customAmount * pax
+  }
+  let line = 0
+  for (const item of (slot.selectedItems || [])) {
+    const rate = itemRate(item, passport)
+    line += isGroup ? rate : rate * pax
+  }
+  return line
 }
 
 export async function POST(request: NextRequest) {
@@ -31,6 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     const pax = Math.max(config.pax || 1, 1)
+    const passport = config.passport || 'non_eu'
     const itineraryCode = generateItineraryCode()
 
     // Calculate dates
@@ -39,17 +68,14 @@ export async function POST(request: NextRequest) {
     const endDate = new Date(new Date(startDate).getTime() + (totalDays - 1) * 86400000).toISOString().split('T')[0]
 
     // Server-authoritative pricing total. Sum the exact services we're about to
-    // write (the source of truth) instead of trusting the client `totals` to be
-    // present/non-zero — that's why itinerary.total_cost previously persisted 0
-    // while the services held real prices. total_cost stores the CLIENT/selling
-    // price (how the header, invoice and PDF consume it).
-    const GRID_GROUP_SLOTS = ['route', 'guide', 'airport_services', 'hotel_services', 'tipping', 'boat_rides', 'other_group']
+    // write (the source of truth) from the passport-aware selectedItems instead
+    // of trusting the client `totals` to be present/non-zero — that's why
+    // itinerary.total_cost previously persisted 0 while the services held real
+    // prices. total_cost stores the CLIENT/selling price (how the header,
+    // invoice and PDF consume it).
     const supplierTotal = (days || []).reduce((sum: number, day: any) => {
       return sum + (day.slots || []).reduce((dsum: number, slot: any) => {
-        if (!slot || (slot.resolvedRate === 0 && !slot.customAmount)) return dsum
-        const isGroup = GRID_GROUP_SLOTS.includes(slot.slotId)
-        const rate = Number(slot.resolvedRate) || 0
-        return dsum + (isGroup ? rate : rate * pax)
+        return dsum + slotSupplierCost(slot, passport, pax)
       }, 0)
     }, 0)
     const marginPct = config.marginPercent || 25
@@ -161,24 +187,48 @@ export async function POST(request: NextRequest) {
       }
       daysCreated++
 
-      // 3. Create services from non-empty slots
+      // 3. Create services from non-empty slots. One service row per selected
+      //    item (passport-aware rate), plus custom-amount slots. Group slots are
+      //    charged once; per-person slots × pax — identical to calculator.ts.
       const services: any[] = []
       for (const slot of day.slots) {
-        if (slot.resolvedRate === 0 && !slot.customAmount) continue
+        const hasItems = (slot.selectedItems?.length ?? 0) > 0
+        const hasCustom = slot.customAmount && slot.customAmount > 0
+        if (!hasItems && !hasCustom) continue
 
-        const isGroup = ['route', 'guide', 'airport_services', 'hotel_services', 'tipping', 'boat_rides', 'other_group'].includes(slot.slotId)
+        const isGroup = GRID_GROUP_SLOTS.includes(slot.slotId)
+        const serviceType = getServiceType(slot.slotId)
 
-        services.push({
-          itinerary_id: itineraryId,
-          day_id: dayRecord.id,
-          service_type: getServiceType(slot.slotId),
-          service_name: slot.label || slot.slotId.replace(/_/g, ' '),
-          description: `[pricing-grid:${slot.slotId}] ${slot.label || ''}`,
-          quantity: isGroup ? 1 : pax,
-          unit_cost: slot.resolvedRate,
-          total_cost: isGroup ? slot.resolvedRate : slot.resolvedRate * pax,
-          is_included: true,
-        })
+        if (hasCustom) {
+          const unit = slot.customAmount
+          services.push({
+            itinerary_id: itineraryId,
+            day_id: dayRecord.id,
+            service_type: serviceType,
+            service_name: slot.slotId === 'other_group' ? 'Other (Group)' : 'Other (Per Person)',
+            description: `[pricing-grid:${slot.slotId}] custom`,
+            quantity: isGroup ? 1 : pax,
+            unit_cost: unit,
+            total_cost: isGroup ? unit : unit * pax,
+            is_included: true,
+          })
+          continue
+        }
+
+        for (const item of (slot.selectedItems || [])) {
+          const rate = itemRate(item, passport)
+          services.push({
+            itinerary_id: itineraryId,
+            day_id: dayRecord.id,
+            service_type: serviceType,
+            service_name: item.name || slot.slotId.replace(/_/g, ' '),
+            description: `[pricing-grid:${slot.slotId}] ${item.name || ''}`,
+            quantity: isGroup ? 1 : pax,
+            unit_cost: rate,
+            total_cost: isGroup ? rate : rate * pax,
+            is_included: true,
+          })
+        }
       }
 
       if (services.length > 0) {

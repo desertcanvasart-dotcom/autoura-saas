@@ -438,9 +438,9 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
     // 5. Auto-fill water on days that don't have it
     for (const day of days) {
       const waterSlot = day.slots.find((s: any) => s.slotId === 'water')
-      if (waterSlot && waterSlot.resolvedRate === 0 && waterSlot.customAmount === null) {
-        waterSlot.customAmount = 1
-        waterSlot.resolvedRate = 1
+      const waterEmpty = waterSlot && (waterSlot.selectedItems?.length ?? 0) === 0 && !waterSlot.customAmount
+      if (waterEmpty) {
+        waterSlot.customAmount = 1 // €1 pp/day (per-person slot)
         waterSlot.label = 'Water (€1 pp/day)'
       }
     }
@@ -485,14 +485,22 @@ export function buildSlotsFromAI(
   aiSlots: Record<string, any>,
   rateMap: Map<string, { rate: number; rateNonEur: number; label: string; table: string }>
 ) {
+  // The 15 fixed grid slots (matches app/pricing-grid/types SLOT_DEFINITIONS).
   const ALL_SLOT_IDS = [
     'route', 'guide', 'airport_services', 'hotel_services', 'tipping', 'boat_rides', 'other_group',
-    'accommodation', 'entrance_fees', 'flights', 'experiences', 'meals', 'water', 'cruise', 'sleeping_trains', 'other_pp',
+    'accommodation', 'entrance_fees', 'flights', 'experiences', 'meals', 'water', 'cruise', 'other_pp',
   ]
 
   const MULTI_SLOTS = new Set(['route', 'airport_services', 'hotel_services', 'tipping', 'boat_rides', 'entrance_fees', 'flights', 'experiences', 'meals'])
-  const SINGLE_SLOTS = new Set(['guide', 'accommodation', 'cruise', 'sleeping_trains'])
+  const SINGLE_SLOTS = new Set(['guide', 'accommodation', 'cruise'])
   const CUSTOM_SLOTS = new Set(['water', 'other_group', 'other_pp'])
+
+  // Build a passport-aware SelectedItem from a rate id (matches types SelectedItem).
+  const toItem = (id: string) => {
+    const info = rateMap.get(id)
+    if (!info) return null
+    return { rateId: id, name: info.label || '', rateEur: info.rate || 0, rateNonEur: info.rateNonEur || 0 }
+  }
 
   return ALL_SLOT_IDS.map(slotId => {
     const raw = aiSlots[slotId]
@@ -507,10 +515,8 @@ export function buildSlotsFromAI(
       const needsHumanInput = slotId !== 'water' && aiSuggested !== null
       return {
         slotId,
-        selectedId: null,
-        selectedIds: [],
-        customAmount: null,
-        resolvedRate: 0,
+        selectedItems: [],
+        customAmount: 0,
         aiSuggested,
         needsHumanInput,
         label: needsHumanInput ? `Needs manual price (AI hint: €${aiSuggested})` : '',
@@ -519,37 +525,30 @@ export function buildSlotsFromAI(
 
     if (SINGLE_SLOTS.has(slotId)) {
       const id = typeof raw === 'string' ? raw : null
-      const rateInfo = id ? rateMap.get(id) : null
+      const item = id ? toItem(id) : null
       return {
         slotId,
-        selectedId: rateInfo ? id : null,
-        selectedIds: [],
-        customAmount: null,
-        resolvedRate: rateInfo?.rate || 0,
-        label: rateInfo?.label || '',
+        selectedItems: item ? [item] : [],
+        customAmount: 0,
+        label: item?.name || '',
       }
     }
 
     if (MULTI_SLOTS.has(slotId)) {
       const ids = Array.isArray(raw) ? raw.filter((id: string) => rateMap.has(id)) : []
-      const totalRate = ids.reduce((sum: number, id: string) => sum + (rateMap.get(id)?.rate || 0), 0)
-      const labels = ids.map((id: string) => rateMap.get(id)?.label || '').filter(Boolean)
+      const items = ids.map((id: string) => toItem(id)).filter(Boolean)
       return {
         slotId,
-        selectedId: null,
-        selectedIds: ids,
-        customAmount: null,
-        resolvedRate: totalRate,
-        label: labels.join(', '),
+        selectedItems: items,
+        customAmount: 0,
+        label: items.map((it: any) => it.name).filter(Boolean).join(', '),
       }
     }
 
     return {
       slotId,
-      selectedId: null,
-      selectedIds: [],
-      customAmount: null,
-      resolvedRate: 0,
+      selectedItems: [],
+      customAmount: 0,
       label: '',
     }
   })
