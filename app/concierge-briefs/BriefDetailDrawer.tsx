@@ -111,6 +111,8 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange }: 
   const [brief, setBrief] = useState<FullBrief | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [itinerary, setItinerary] = useState<{ id: string; code: string; name: string } | null>(null)
+  const [committing, setCommitting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,12 +122,36 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange }: 
         const result = await res.json()
         if (result.success) setBrief(result.data)
       }
+      // Is an itinerary already committed from this brief?
+      const itinRes = await fetch(`/api/concierge-briefs/${briefId}/commit-itinerary`)
+      if (itinRes.ok) {
+        const itinResult = await itinRes.json()
+        const it = itinResult?.data?.itinerary
+        setItinerary(it ? { id: it.id, code: it.itinerary_code, name: it.trip_name } : null)
+      }
     } catch (e) {
       console.error('Error loading brief:', e)
     } finally {
       setLoading(false)
     }
   }, [briefId])
+
+  const handleCommitItinerary = async () => {
+    setCommitting(true)
+    try {
+      const res = await fetch(`/api/concierge-briefs/${briefId}/commit-itinerary`, { method: 'POST' })
+      const result = await res.json()
+      if (res.ok && result.success) {
+        setItinerary({ id: result.data.itineraryId, code: result.data.itineraryCode, name: result.data.tripName })
+      } else {
+        alert(result.error || 'Failed to create itinerary from brief')
+      }
+    } catch (e) {
+      alert('Failed to create itinerary from brief')
+    } finally {
+      setCommitting(false)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -272,25 +298,48 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange }: 
 
         {/* Footer actions */}
         {brief && (
-          <div className="border-t border-gray-200 px-5 py-3 flex items-center justify-between gap-2 shrink-0">
-            {brief.client_id ? (
-              <Link href={`/clients/${brief.client_id}`} className="inline-flex items-center gap-1 text-sm text-[#647C47] hover:underline">
-                <ExternalLink className="h-4 w-4" /> View client
-              </Link>
-            ) : <span />}
-            <div className="flex items-center gap-2">
-              {(ACTIONS[brief.review_status as StatusKey] || []).map(a => (
+          <div className="border-t border-gray-200 px-5 py-3 flex flex-col gap-2 shrink-0">
+            {/* Itinerary: create from the brief, or jump to the one already made */}
+            <div className="flex items-center justify-between gap-2">
+              {itinerary ? (
+                <Link href={`/itineraries/${itinerary.id}`} className="inline-flex items-center gap-1 text-sm text-[#647C47] hover:underline">
+                  <ExternalLink className="h-4 w-4" /> View itinerary ({itinerary.code})
+                </Link>
+              ) : (
+                <span className="text-xs text-gray-400">No itinerary yet</span>
+              )}
+              {!itinerary && (
                 <button
-                  key={a.to}
-                  onClick={() => handleStatus(a.to)}
-                  disabled={updating}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
-                    a.primary ? 'bg-[#647C47] text-white hover:bg-[#4f6238]' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
-                  }`}
+                  onClick={handleCommitItinerary}
+                  disabled={committing}
+                  className="px-3 py-1.5 text-sm font-medium rounded-lg border border-[#647C47] text-[#647C47] hover:bg-[#647C47]/5 transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
                 >
-                  {a.label}
+                  {committing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Create itinerary
                 </button>
-              ))}
+              )}
+            </div>
+            {/* Client + triage status actions */}
+            <div className="flex items-center justify-between gap-2">
+              {brief.client_id ? (
+                <Link href={`/clients/${brief.client_id}`} className="inline-flex items-center gap-1 text-sm text-[#647C47] hover:underline">
+                  <ExternalLink className="h-4 w-4" /> View client
+                </Link>
+              ) : <span />}
+              <div className="flex items-center gap-2">
+                {(ACTIONS[brief.review_status as StatusKey] || []).map(a => (
+                  <button
+                    key={a.to}
+                    onClick={() => handleStatus(a.to)}
+                    disabled={updating}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                      a.primary ? 'bg-[#647C47] text-white hover:bg-[#4f6238]' : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

@@ -33,6 +33,7 @@ import {
 } from '@/lib/concierge-webhook-auth'
 import { validateBrief, mapBrief } from '@/lib/concierge-brief-schema'
 import { ingestBrief, type IngestOutcome } from '@/lib/concierge-brief-intake'
+import { promoteBriefToThread } from '@/lib/concierge/promote-brief-to-thread'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -154,6 +155,25 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await ingestBrief(mapped, { requestId, rawPayload: validation.payload }, supabase, tenantId)
+
+    // Promote the brief into a Copilot thread so operators see it in the inbox
+    // alongside WhatsApp/email. Only on a new or updated brief (not a duplicate
+    // replay / older revision). NON-FATAL: a promotion failure must never fail
+    // the webhook — the brief is already durably stored.
+    let threadId: string | null = null
+    if (result.outcome === 'received' || result.outcome === 'updated') {
+      try {
+        const promotion = await promoteBriefToThread(result.briefId, tenantId, supabase)
+        threadId = promotion.threadId
+      } catch (promoteErr: any) {
+        console.warn('[concierge] promote-to-thread failed (non-fatal)', {
+          requestId,
+          brief_id: result.briefId,
+          error: promoteErr?.message,
+        })
+      }
+    }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || ''
     return json(
       {
@@ -165,6 +185,7 @@ export async function POST(request: NextRequest) {
           status: STATUS_LABEL[result.outcome],
           review_status: result.reviewStatus,
           client_id: result.clientId,
+          thread_id: threadId,
           record_url: result.clientId && appUrl ? `${appUrl}/clients/${result.clientId}` : null,
         },
       },
