@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
       line_items: body.line_items || null,
       notes: body.notes || null,
       itinerary_id: body.itinerary_id || null,
+      booking_id: body.booking_id || null,
       client_invoice_id: body.client_invoice_id || null,
       document_url: body.document_url || null,
       document_filename: body.document_filename || null,
