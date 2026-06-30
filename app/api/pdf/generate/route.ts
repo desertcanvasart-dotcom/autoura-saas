@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import puppeteer from 'puppeteer'
+import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
 interface Itinerary {
   itinerary_code: string
@@ -622,6 +623,16 @@ export async function POST(request: NextRequest) {
     
     if (!itinerary) {
       return NextResponse.json({ error: 'Itinerary data required' }, { status: 400 })
+    }
+
+    // Output gate (harness Layer 2): never render a customer PDF for a
+    // non-deliverable price.
+    const priceCheck = checkAmountDeliverable(itinerary.total_cost, { currency: itinerary.currency })
+    if (!priceCheck.ok) {
+      return NextResponse.json(
+        { error: 'Itinerary price is not deliverable', violations: priceCheck.violations },
+        { status: 422 }
+      )
     }
 
     // Generate HTML
