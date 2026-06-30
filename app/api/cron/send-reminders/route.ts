@@ -1,36 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/app/supabase'
+import { sendMail } from '@/lib/email-send'
 
 // Verify cron secret for security
 const CRON_SECRET = process.env.CRON_SECRET
 
-// Email sending function - reused from main route
+// Email sending function — sends directly via the shared mail helper.
 async function sendReminderEmail(params: {
   to: string
   subject: string
   html: string
 }): Promise<{ success: boolean; error?: string }> {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: params.to,
-        subject: params.subject,
-        html: params.html,
-        type: 'payment_reminder'
-      })
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      return { success: false, error: error.message || 'Failed to send' }
-    }
-
-    return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
-  }
+  const result = await sendMail({
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
+  })
+  return { success: result.success, error: result.error }
 }
 
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
