@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
+import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,6 +54,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Itinerary not found' },
         { status: 404 }
+      )
+    }
+
+    // Output gate (harness Layer 2): never send a non-deliverable price.
+    const priceCheck = checkAmountDeliverable(itinerary.total_cost, { currency: itinerary.currency })
+    if (!priceCheck.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Quote price is not deliverable', violations: priceCheck.violations },
+        { status: 422 }
       )
     }
 
