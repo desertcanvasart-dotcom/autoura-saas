@@ -28,6 +28,9 @@
 import { createClient } from '@supabase/supabase-js'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
+// The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
+// grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
+import { priceAcrossPax } from '@/lib/pricing/pax-range'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -1857,12 +1860,16 @@ export async function calculateDayBasedPricing(
   // STEP 10: Calculate for each pax count
   // ============================================
 
-  const paxPricing: PaxPricingResult[] = []
-
-  for (const numPax of PAX_COUNTS) {
-    // ----- Transport cost (varies with vehicle size) -----
+  // Transport is the only pax-dependent cost — the vehicle tier is re-selected
+  // by group size. Factor it into a callback and feed the SHARED core primitive
+  // (lib/pricing/pax-range.ts), the same engine the pricing grid feeds, so the
+  // B2B rate sheet is ONE engine rather than a parallel inline copy. This is
+  // behaviour-preserving: identical decomposition (fixedCosts + transport(pax) +
+  // perPaxCosts×pax), identical margin/rounding, and the same tour-leader cost.
+  // The core calls transportAtPax(pax) for +0 and transportAtPax(pax+1) for +1,
+  // reproducing the original two inline loops (and their hole-recording) exactly.
+  const transportAtPax = (pax: number): number => {
     let transportCost = 0
-
     for (const info of transportInfoByDay) {
       if (!info.requiresTransport) continue
 
@@ -1873,7 +1880,7 @@ export async function calculateDayBasedPricing(
       if (needs.useSpecialVehicle && needs.specialVehicleType) {
         vehicleType = needs.specialVehicleType
       } else {
-        vehicleType = getVehicleTypeByPax(numPax, info.city)
+        vehicleType = getVehicleTypeByPax(pax, info.city)
       }
 
       const match = findTransportRate(transportCache, {
@@ -1902,79 +1909,19 @@ export async function calculateDayBasedPricing(
         })
       }
     }
-
-    // ----- WITHOUT Tour Leader (+0) -----
-    const totalCostWithoutLeader = fixedCosts + transportCost + (perPaxCosts * numPax)
-    const marginWithoutLeader = totalCostWithoutLeader * (marginPercent / 100)
-    const sellingWithoutLeader = totalCostWithoutLeader + marginWithoutLeader
-    const perPersonWithoutLeader = sellingWithoutLeader / numPax
-
-    // ----- WITH Tour Leader (+1) -----
-    let transportCostWithLeader = 0
-
-    for (const info of transportInfoByDay) {
-      if (!info.requiresTransport) continue
-
-      const { needs } = info
-
-      let vehicleType: VehicleType
-      if (needs.useSpecialVehicle && needs.specialVehicleType) {
-        vehicleType = needs.specialVehicleType
-      } else {
-        vehicleType = getVehicleTypeByPax(numPax + 1, info.city) // +1 for tour leader
-      }
-
-      const match = findTransportRate(transportCache, {
-        serviceType: needs.serviceType,
-        city: info.city,
-        duration: needs.duration,
-        area: needs.area,
-        vehicleType,
-        originCity: itinerary[info.day - 2]?.city,
-        destinationCity: info.city
-      })
-
-      if (match && match.source === 'db') {
-        transportCostWithLeader += match.rate.base_rate_eur
-      } else {
-        addHole({
-          kind: 'transport',
-          reason: match ? 'fuzzy' : 'missing',
-          tier,
-          dayNumber: info.day,
-          city: info.city,
-          vehicleType,
-          lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
-          message: `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
-        })
-      }
-    }
-
-    // Tour leader costs: single room (PPD + single supplement) + their own per-pax costs
-    const tourLeaderCost = accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax
-
-    const totalCostWithLeader = fixedCosts + transportCostWithLeader + (perPaxCosts * numPax) + tourLeaderCost
-    const marginWithLeader = totalCostWithLeader * (marginPercent / 100)
-    const sellingWithLeader = totalCostWithLeader + marginWithLeader
-    const perPersonWithLeader = sellingWithLeader / numPax
-
-    paxPricing.push({
-      numPax,
-      withoutLeader: {
-        totalCost: Math.round(totalCostWithoutLeader * 100) / 100,
-        marginAmount: Math.round(marginWithoutLeader * 100) / 100,
-        sellingPrice: Math.round(sellingWithoutLeader * 100) / 100,
-        pricePerPerson: Math.round(perPersonWithoutLeader * 100) / 100
-      },
-      withLeader: {
-        totalCost: Math.round(totalCostWithLeader * 100) / 100,
-        tourLeaderCost: Math.round(tourLeaderCost * 100) / 100,
-        marginAmount: Math.round(marginWithLeader * 100) / 100,
-        sellingPrice: Math.round(sellingWithLeader * 100) / 100,
-        pricePerPerson: Math.round(perPersonWithLeader * 100) / 100
-      }
-    })
+    return transportCost
   }
+
+  const paxPricing: PaxPricingResult[] = priceAcrossPax({
+    groupFixed: fixedCosts,
+    perPerson: perPaxCosts,
+    marginPercent,
+    transportAt: transportAtPax,
+    // Tour leader: single room (PPD + single supplement) + their own per-pax costs
+    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax,
+    paxFrom: PAX_COUNTS[0],
+    paxTo: PAX_COUNTS[PAX_COUNTS.length - 1],
+  })
 
   // ============================================
   // STEP 11: Return result

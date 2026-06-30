@@ -1,58 +1,79 @@
 // ============================================
-// Pricing Grid Module — Type Definitions
+// PRICING GRID — Type Definitions
 // ============================================
 
-// --- Enums / Literals ---
+// --- Grid Configuration (header controls) ---
 
 export type Tier = 'budget' | 'standard' | 'deluxe' | 'luxury'
-export type Currency = 'EUR' | 'USD' | 'GBP' | 'EGP'
-export type PassportType = 'eu' | 'non_eu'
 export type ClientType = 'b2b' | 'b2c'
-export type SlotCategory = 'group' | 'per_person'
-export type SlotInputMode = 'single' | 'multi' | 'custom' | 'auto'
+export type PassportType = 'eu' | 'non_eu'
 
-// Per-day type (B-full completeness): drives which slots a day is REQUIRED to
-// have priced before the grid is deliverable. See lib grid-completeness.
+export interface GridConfig {
+  pax: number
+  passport: PassportType
+  tier: Tier
+  clientType: ClientType
+  withGuide: boolean
+  currency: string
+  marginPercent: number
+  exchangeRate: number | null  // EUR → target currency
+  startDate: string  // ISO date string (YYYY-MM-DD) — for seasonality pricing
+  // Client & trip info (maps to itineraries table)
+  clientName: string
+  clientEmail: string
+  clientPhone: string
+  tourName: string
+  nationality: string
+  // Linked itinerary (set after save or load)
+  itineraryId: string | null
+  itineraryCode: string | null
+  // B2B partner (when clientType === 'b2b')
+  partnerId: string | null
+  partnerName: string
+  // Linked CRM client (multi-tenant): the itinerary/quote is stamped with this
+  // client_id on save. Null for ad-hoc quotes not tied to a CRM client.
+  clientId: string | null
+}
+
+// --- Day Type Preset + Component Model (consolidation Phase B / rich gate) ---
+//
+// Each day in the grid carries a `dayType` preset that fills the component
+// flags via DAY_TYPE_DEFAULTS. Per-day boolean overrides on GridDay take
+// precedence when set, so a "transfer day that also sightsees" is just a
+// transfer preset with hasSightseeing = true.
+//
+// The rich completeness gate (grid-completeness.ts) reads these via
+// resolveComponents(day) to decide what each day requires and what's
+// missing. The 6 day_type values map 1:1 to the DB CHECK constraint added
+// in migrations/20260627_itinerary_days_day_type_components.sql.
+
 export type DayType = 'arrival' | 'tour' | 'transfer' | 'cruise' | 'free' | 'departure'
 
 export const DAY_TYPES: DayType[] = ['arrival', 'tour', 'transfer', 'cruise', 'free', 'departure']
 
 export const DAY_TYPE_LABELS: Record<DayType, string> = {
-  arrival: 'Arrival',
-  tour: 'Day Tour',
-  transfer: 'Transfer',
-  cruise: 'Cruise Night',
-  free: 'Free / Leisure',
-  departure: 'Departure',
+  arrival:   'Arrival (airport in + hotel check-in)',
+  tour:      'Tour (overnight + sightseeing)',
+  transfer:  'Transfer (intercity by road)',
+  cruise:    'Cruise (on board)',
+  free:      'Free day (overnight, no sightseeing)',
+  departure: 'Departure (hotel check-out + airport out)',
 }
 
-/** Default day type when none is set (most days are guided sightseeing days). */
 export const DEFAULT_DAY_TYPE: DayType = 'tour'
 
-// Per-day transition EVENTS — these (not the day type) drive airport & hotel
-// service requirements, because the same event can occur on different day types
-// (e.g. a domestic-flight Transfer day has BOTH airport events). A day with a
-// check-in OR check-out requires hotel services; a day with an airport arrival
-// OR departure requires airport services.
-// How a city-to-city move happens on a transfer day (drives the transport
-// segment kind required): none, by road, or by domestic flight.
-export type IntercityMode = 'none' | 'road' | 'flight'
+export type Intercity = 'none' | 'road' | 'flight'
 
-// The full set of components that can occur on a day. Requirements derive from
-// THESE (not the day type directly), so combined days work — e.g. a domestic
-// flight Transfer day that also sightsees has hasSightseeing + intercity:'flight'
-// + airport events all at once.
 export interface DayComponents {
-  overnight: boolean           // sleeps somewhere tonight  → requires a sleep slot
-  hasSightseeing: boolean       // day tour                  → day-tour transport + guide(if on) + mandatory entrances
-  airportArrival: boolean       // met at arrival airport    → airport services + airport transfer
-  airportDeparture: boolean     // assisted at dep. airport  → airport services + airport transfer
-  hotelCheckIn: boolean         // into hotel / embark cruise → hotel services
-  hotelCheckOut: boolean        // out of hotel / disembark   → hotel services
-  intercity: IntercityMode      // road → intercity transfer; flight → flights slot
+  overnight: boolean
+  hasSightseeing: boolean
+  airportArrival: boolean
+  airportDeparture: boolean
+  hotelCheckIn: boolean
+  hotelCheckOut: boolean
+  intercity: Intercity
 }
 
-/** Default components per day type — a preset the operator can override per day. */
 export const DAY_TYPE_DEFAULTS: Record<DayType, DayComponents> = {
   arrival:   { overnight: true,  hasSightseeing: false, airportArrival: true,  airportDeparture: false, hotelCheckIn: true,  hotelCheckOut: false, intercity: 'none' },
   tour:      { overnight: true,  hasSightseeing: true,  airportArrival: false, airportDeparture: false, hotelCheckIn: false, hotelCheckOut: false, intercity: 'none' },
@@ -62,131 +83,72 @@ export const DAY_TYPE_DEFAULTS: Record<DayType, DayComponents> = {
   departure: { overnight: false, hasSightseeing: false, airportArrival: false, airportDeparture: true,  hotelCheckIn: false, hotelCheckOut: true,  intercity: 'none' },
 }
 
-// Entrance-fee class: mandatory (always charged), optional (paid on request),
-// free (no charge — €0 is expected, not "missing").
+// Entrance-fee class — used by the rich gate so a `mandatory` fee that's
+// not priced blocks save, while `optional` / `free` are never required.
+// Selections that carry this attribute are gate-aware; ones that don't
+// fall through to the count-based fallback path.
 export type PricingClass = 'mandatory' | 'optional' | 'free'
 
-export const TIERS: Tier[] = ['budget', 'standard', 'deluxe', 'luxury']
-export const CURRENCIES: Currency[] = ['EUR', 'USD', 'GBP', 'EGP']
-export const DEFAULT_MARGINS: Record<ClientType, number> = { b2b: 10, b2c: 25 }
+// --- Slot Definitions (fixed structure) ---
 
-export const VEHICLE_TIERS = [
-  { label: 'Sedan', minPax: 1, maxPax: 2 },
-  { label: 'Minivan', minPax: 3, maxPax: 7 },
-  { label: 'Van', minPax: 8, maxPax: 12 },
-  { label: 'Minibus', minPax: 13, maxPax: 20 },
-  { label: 'Bus', minPax: 21, maxPax: 45 },
-] as const
-
-// --- Grid Configuration ---
-
-export interface GridConfig {
-  pax: number
-  passport: PassportType
-  tier: Tier
-  clientType: ClientType
-  withGuide: boolean
-  currency: Currency
-  marginPercent: number
-  exchangeRate: number | null
-  startDate: string
-  clientName: string
-  clientEmail: string
-  clientPhone: string
-  tourName: string
-  nationality: string
-  itineraryId: string | null
-  partnerId: string | null
-  clientId: string | null
-}
-
-export const DEFAULT_CONFIG: GridConfig = {
-  pax: 2,
-  passport: 'non_eu',
-  tier: 'standard',
-  clientType: 'b2c',
-  withGuide: true,
-  currency: 'EUR',
-  marginPercent: 25,
-  exchangeRate: null,
-  startDate: new Date().toISOString().split('T')[0],
-  clientName: '',
-  clientEmail: '',
-  clientPhone: '',
-  tourName: '',
-  nationality: '',
-  itineraryId: null,
-  partnerId: null,
-  clientId: null,
-}
-
-// --- Slot Definitions ---
+export type SlotBucket = 'group' | 'per_person'
+export type SelectionMode = 'single' | 'multi' | 'custom' | 'auto'
 
 export interface SlotDefinition {
-  id: string
+  slotId: string
   label: string
+  bucket: SlotBucket
+  selectionMode: SelectionMode
   icon: string
-  category: SlotCategory
-  mode: SlotInputMode
-  rateTable: string | null // null for manual/custom entry
-  conditionalOn?: string   // config field that controls visibility
+  rateTable: string | null  // null = manual entry
 }
 
-// --- Slot Values ---
+// All 16 fixed slots
+export const SLOT_DEFINITIONS: SlotDefinition[] = [
+  // GROUP SERVICES (charged once, divided by pax)
+  { slotId: 'route',            label: 'Transport',        bucket: 'group',      selectionMode: 'multi',  icon: '🚗', rateTable: 'transportation_rates' },
+  { slotId: 'guide',            label: 'Guide',            bucket: 'group',      selectionMode: 'single', icon: '👨‍🏫', rateTable: 'guide_rates' },
+  { slotId: 'airport_services', label: 'Airport Services', bucket: 'group',      selectionMode: 'multi',  icon: '✈️', rateTable: 'airport_staff_rates' },
+  { slotId: 'hotel_services',   label: 'Hotel Services',   bucket: 'group',      selectionMode: 'multi',  icon: '🏨', rateTable: 'hotel_staff_rates' },
+  { slotId: 'tipping',          label: 'Tipping',          bucket: 'group',      selectionMode: 'multi',  icon: '💰', rateTable: 'tipping_rates' },
+  { slotId: 'boat_rides',       label: 'Boat Rides',       bucket: 'group',      selectionMode: 'multi',  icon: '⛵', rateTable: 'activity_rates' },
+  { slotId: 'other_group',      label: 'Other (Group)',    bucket: 'group',      selectionMode: 'custom', icon: '📋', rateTable: null },
+  // PER-PERSON SERVICES (multiplied by pax)
+  { slotId: 'accommodation',    label: 'Accommodation',    bucket: 'per_person', selectionMode: 'single', icon: '🛏️', rateTable: 'accommodation_rates' },
+  { slotId: 'entrance_fees',    label: 'Entrance Fees',    bucket: 'per_person', selectionMode: 'multi',  icon: '🎫', rateTable: 'entrance_fees' },
+  { slotId: 'flights',          label: 'Flights',          bucket: 'per_person', selectionMode: 'multi',  icon: '🛩️', rateTable: null },
+  { slotId: 'experiences',      label: 'Experiences',      bucket: 'per_person', selectionMode: 'multi',  icon: '🎈', rateTable: 'activity_rates' },
+  { slotId: 'meals',            label: 'Meals',            bucket: 'per_person', selectionMode: 'multi',  icon: '🍽️', rateTable: 'meal_rates' },
+  { slotId: 'water',            label: 'Water',            bucket: 'per_person', selectionMode: 'single', icon: '💧', rateTable: null },
+  { slotId: 'cruise',           label: 'Nile Cruise',      bucket: 'per_person', selectionMode: 'single', icon: '🚢', rateTable: 'cruise_rates' },
+  { slotId: 'other_pp',         label: 'Other (PP)',       bucket: 'per_person', selectionMode: 'custom', icon: '📋', rateTable: null },
+]
 
-// A single resolved selection within a slot. Carries the metadata the
-// completeness gate needs to reason precisely: a transport line's segment kind
-// (service_type) and an entrance fee's pricing class. Populated from the chosen
-// rate option at selection time (manual or AI). Optional for back-compat.
-export interface SlotSelection {
-  id: string
-  rate: number
-  label?: string
-  serviceType?: string        // transport: 'airport_transfer' | 'intercity_transfer' | 'day_tour' | ...
-  pricingClass?: PricingClass // entrance fees: mandatory | optional | free
+export const GROUP_SLOTS = SLOT_DEFINITIONS.filter(s => s.bucket === 'group')
+export const PP_SLOTS = SLOT_DEFINITIONS.filter(s => s.bucket === 'per_person')
+
+// --- Runtime Slot Values ---
+
+export interface SelectedItem {
+  rateId: string
+  name: string
+  rateEur: number
+  rateNonEur: number
+  // Optional metadata attached at selection time so the rich gate can do
+  // type/class-aware checks. Slot pickers populate these from the rate row;
+  // legacy selections without them fall through to the gate's count-based
+  // path. See app/pricing-grid/lib/grid-completeness.ts.
+  serviceType?: string         // e.g. 'airport_transfer' / 'day_tour' / 'intercity_transfer' on route slot
+  pricingClass?: PricingClass  // 'mandatory' / 'optional' / 'free' on entrance_fees
 }
 
 export interface SlotValue {
   slotId: string
-  selectedId: string | null        // for single-select
-  selectedIds: string[]            // for multi-select
-  customAmount: number | null      // for custom entry
-  resolvedRate: number             // computed EUR amount for this slot (sum of selections)
-  label: string                    // display label for selections
-  /** Per-selection detail (segment type / pricing class). Enables type/class-aware completeness. */
-  selections?: SlotSelection[]
+  selectedItems: SelectedItem[]
+  customAmount: number  // For 'custom' slots (Other Group / Other PP)
 }
 
-export function emptySlotValue(slotId: string): SlotValue {
-  return {
-    slotId,
-    selectedId: null,
-    selectedIds: [],
-    customAmount: null,
-    resolvedRate: 0,
-    label: '',
-  }
-}
-
-// --- Rate Options (from DB) ---
-
-export interface RateOption {
-  id: string
-  label: string
-  rateEur: number
-  rateNonEur: number
-  city?: string
-  tier?: string
-  category?: string
-  details?: Record<string, any>
-  // Completeness metadata (B-full), carried into the slot on selection.
-  serviceType?: string
-  pricingClass?: PricingClass
-}
-
-export type AllRates = Record<string, RateOption[]>
-
-// --- Grid Day ---
+// --- Day State ---
 
 export interface GridDay {
   id: string
@@ -196,17 +158,61 @@ export interface GridDay {
   description: string
   isExpanded: boolean
   slots: SlotValue[]
-  /** B-full: a one-click preset that fills the component flags below. Defaults to DEFAULT_DAY_TYPE. */
+  // Day-type preset + per-component overrides (consolidation Phase B rich).
+  // dayType picks a preset from DAY_TYPE_DEFAULTS; the override fields below
+  // (each nullable / undefined = "use the preset's default") let operators
+  // build combined days like "transfer + sightseeing". resolveComponents()
+  // in grid-completeness.ts merges the two.
   dayType?: DayType
-  // B-full day components — when set, these OVERRIDE the dayType preset defaults.
-  // Requirements are computed from these (see grid-completeness).
   overnight?: boolean
   hasSightseeing?: boolean
   airportArrival?: boolean
   airportDeparture?: boolean
   hotelCheckIn?: boolean
   hotelCheckOut?: boolean
-  intercity?: IntercityMode
+  intercity?: Intercity
+}
+
+// --- Rate Options (fetched from DB, used in dropdowns) ---
+
+export interface RateOption {
+  id: string
+  name: string
+  rateEur: number
+  rateNonEur: number
+  city?: string
+  category?: string
+  details?: string  // e.g., "4★", "Standard cabin", "Aswan → Luxor"
+  // Optional metadata used by the rich gate. Transport rates carry
+  // service_type (airport_transfer / day_tour / intercity_transfer / etc.);
+  // entrance fees carry pricing_class (mandatory / optional / free). Slot
+  // pickers pass these through to SelectedItem so the gate can do
+  // type-/class-aware checks.
+  service_type?: string
+  pricing_class?: PricingClass
+  // Vehicle-tier capacity (transport rates only). The rates route expands each
+  // transportation_rates row into one option per vehicle tier (sedan/minivan/
+  // van/minibus/bus), each carrying its capacity band. The multi-pax engine
+  // (calculator.ts → buildTransportTierIndex) uses these to re-select the right
+  // vehicle as group size grows — the one cost that is non-linear in pax.
+  capacity_min?: number
+  capacity_max?: number
+}
+
+export interface AllRates {
+  route: RateOption[]
+  guide: RateOption[]
+  airport_services: RateOption[]
+  hotel_services: RateOption[]
+  tipping: RateOption[]
+  boat_rides: RateOption[]
+  accommodation: RateOption[]
+  entrance_fees: RateOption[]
+  flights: RateOption[]
+  experiences: RateOption[]
+  meals: RateOption[]
+  water: RateOption[]
+  cruise: RateOption[]
 }
 
 // --- Calculation Results ---
@@ -227,62 +233,19 @@ export interface GridTotals {
   sellingPriceTotal: number
 }
 
-export const EMPTY_TOTALS: GridTotals = {
-  costPerPerson: 0,
-  totalCost: 0,
-  marginAmount: 0,
-  sellingPricePerPerson: 0,
-  sellingPriceTotal: 0,
-}
+// --- Multi-Pax Rate Sheet (B2B shape of the one grid engine) ---
+//
+// The grid produces a single quote per GridConfig.pax. The B2B "shape" is the
+// same trip priced across a pax RANGE, with the vehicle tier re-selected per
+// pax count. The per-pax row shape lives in the canonical core primitive
+// (lib/pricing/pax-range.ts) so both shapes — grid and auto-pricing — share it.
+import type { PaxPricingRow } from '@/lib/pricing/pax-range'
+export type { PaxPriceCell, PaxPricingRow } from '@/lib/pricing/pax-range'
 
-// --- Exchange Rates ---
-
-export type ExchangeRates = Record<Currency, number>
-
-// --- AI Parse Result ---
-
-export interface ParseResult {
-  days: GridDay[]
-  metadata: {
-    clientName?: string
-    clientEmail?: string
-    clientPhone?: string
-    pax?: number
-    startDate?: string
-    passport?: PassportType
-    tourName?: string
-    nationality?: string
-  }
-  generationMode: 'parsed' | 'generated'
-}
-
-// --- Save Result ---
-
-export interface SaveResult {
-  itineraryId: string
-  itineraryCode: string
-  daysCreated: number
-  servicesCreated: number
-  quoteId?: string
-  redirectUrl?: string
-}
-
-// --- Review Phase (structure-only, no pricing) ---
-
-export type GridPhase = 'input' | 'review' | 'pricing'
-
-export interface ReviewService {
-  id: string
-  text: string
-  category: 'group' | 'per_person'
-}
-
-export interface ReviewDay {
-  id: string
-  dayNumber: number
-  title: string
-  city: string
-  description: string
-  services: ReviewService[]
-  isExpanded: boolean
+export interface PaxRangeResult {
+  paxPricing: PaxPricingRow[]
+  // One number for the whole tour (single-room add-on), summed from
+  // accommodation single-supplement selections + cruise single rates.
+  singleSupplement: number
+  currency: string
 }
