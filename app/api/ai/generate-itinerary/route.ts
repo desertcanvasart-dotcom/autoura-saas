@@ -4,11 +4,9 @@ import { requireAuth } from '@/lib/supabase-server'
 import { getMemoriesForPrompt, logAgentRun } from '@/lib/agent-memory'
 import { checkLimit, trackUsage } from '@/lib/billing-middleware'
 import { applyDayRules } from '@/lib/ai/day-rules-engine'
-import { EGYPT_TRAVEL_GLOSSARY } from '@/lib/ai/egypt-glossary'
-import type { ServiceTier, InputMode, PackageType, ExtractedDay } from '@/lib/ai/parsing-utils'
+import type { ServiceTier, InputMode, ExtractedDay } from '@/lib/ai/parsing-utils'
 import {
-  VALID_TIERS, TIER_MAP, TIER_DESCRIPTIONS, DEFAULT_MARGIN_PERCENT,
-  isValidDate, toNumber, normalizeTier, calculateExpectedDays, preParseRawItinerary,
+  isValidDate, toNumber, normalizeTier, calculateExpectedDays,
 } from '@/lib/ai/parsing-utils'
 import { detectCruiseRequest, determinePackageType } from '@/lib/ai/cruise-detection'
 import type { CruiseDetectionResult } from '@/lib/ai/cruise-detection'
@@ -63,13 +61,9 @@ async function createItineraryRecord(supabase: any, data: Record<string, any>): 
 }
 
 
-// (Egypt glossary, parsing helpers, ExtractedDay, calculateExpectedDays,
-//  CruiseDetectionResult, detectCruiseRequest moved to lib/ai modules)
-
-// ============================================
-// (Cruise content lookup, cruise rate, content library, user preferences,
-//  prompt builders, determinePackageType moved to lib/ai modules)
-// ============================================
+// Itinerary-generation helpers (glossary, parsing, cruise detection/pricing,
+// content library, user preferences, prompt builders, service creation) now
+// live in lib/ai/* — see imports above.
 
 // ============================================
 // HELPER: CREATE QUOTES AFTER ITINERARY
