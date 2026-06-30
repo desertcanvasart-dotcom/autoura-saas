@@ -20,6 +20,12 @@ export type HoleKind =
   | 'tipping'
   | 'airport_service'
   | 'hotel_service'
+  // Used by the AI build-quote route (consolidation Phase D) when no tour
+  // template matches strongly enough to back a deliverable price. Different
+  // from the rate-level kinds above — this is a hole at the template-match
+  // step, before any rate lookup happens. The caller surfaces it the same
+  // way as a missing rate: needs_manual_pricing + a holes array.
+  | 'template'
 
 /**
  * A gap in the rate data that prevents a definite price.

@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { matchTourTemplate, getTemplateWithPricing } from '@/lib/tour-matcher-service'
-import { calculatePricingFromRates, getFallbackRates } from '@/lib/rate-lookup-service'
+import type { PricingHole } from '@/lib/pricing-types'
+
+// Consolidation Phase D — this route used to fall back to
+// `calculatePricingFromRates` / `getFallbackRates` from lib/rate-lookup-service.ts
+// whenever no tour template matched. Those paths multiplied DB rates by a
+// hardcoded TIER_MULTIPLIERS table (or returned invented €50 sedan / €18
+// entrance numbers) and reported success:true — a price not backed by any
+// real rate row. Per the pricing harness (no fabrication) and
+// PRICING-CONSOLIDATION-PLAN.md, the right behavior is: if no template-backed
+// price is available, return a structured `template` hole and force manual
+// review. rate-lookup-service.ts is deleted; this is its last caller.
 
 // ============================================
 // QUOTE BUILDER API
@@ -9,7 +19,7 @@ import { calculatePricingFromRates, getFallbackRates } from '@/lib/rate-lookup-s
 //
 // Single endpoint that:
 // 1. Matches request to tour templates
-// 2. Calculates pricing from real rates
+// 2. Returns template-backed pricing, or structured holes (no synthesis)
 // 3. Returns ready-to-use quote data
 // ============================================
 
@@ -128,11 +138,26 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // STEP 2: CALCULATE PRICING
+    // STEP 2: CALCULATE PRICING — TEMPLATE-BACKED ONLY
     // ============================================
-    let pricingResult
+    // The only path that produces a deliverable price is the template-backed
+    // path: a tour template existed, getTemplateWithPricing returned at least
+    // one tour_pricing row for the requested pax/passport split, and we hand
+    // that row through as the canonical pricing. No synthesis, no fabrication.
+    //
+    // If a template matches but has no tour_pricing rows for the requested
+    // pax tier, or no template matches at all, this route returns a structured
+    // `needs_manual_pricing` response with the holes that prevented a price.
+    let pricingResult: {
+      success: true
+      total_cost: number
+      per_person_cost: number
+      source: 'template_pricing'
+      breakdown: Record<string, unknown>
+      complete: true
+      holes: PricingHole[]
+    } | null = null
 
-    // Try to use template pricing first
     if (templateData && templateData.pricing && templateData.pricing.length > 0) {
       // Use pre-calculated pricing from tour_pricing table
       const pricing = templateData.pricing[0]
@@ -147,51 +172,49 @@ export async function POST(request: NextRequest) {
           entrances: { total: pricing.total_entrances, per_person: pricing.total_entrances / totalPax },
           meals: { total: pricing.total_meals },
           accommodation: { total: pricing.total_accommodation }
-        }
+        },
+        complete: true,
+        holes: [],
       }
     } else {
-      // Calculate from rate tables
-      const city = cities[0] || 
-                   (templateData?.template?.cities_covered?.[0]) || 
-                   'Cairo'
-
-      try {
-        const calculated = await calculatePricingFromRates(supabase, {
-          city,
-          pax: totalPax,
-          language,
-          is_euro_passport: isEuroPassport,
-          duration_days,
-          num_adults,
-          num_children,
-          include_lunch,
-          include_dinner,
-          include_accommodation,
-          hotel_standard: budget_level as 'budget' | 'standard' | 'luxury',
-          attractions: attractions.length > 0 ? attractions : undefined
+      // No deliverable template-backed price. Build the structured hole so the
+      // caller can surface exactly why no price was emitted (same shape the
+      // grid and day engine use), instead of fabricating a number.
+      const holes: PricingHole[] = []
+      if (!matchResult?.best_match) {
+        holes.push({
+          kind: 'template',
+          reason: 'missing',
+          tier: budget_level,
+          lookupAttempted: `tour_template match for "${tour_requested ?? ''}" across ${cities.length} city(ies)`,
+          message: `No tour template matched this request. Add a matching template (or improve scoring), or price this quote manually.`,
         })
-
-        if (calculated.success && calculated.total_cost > 0) {
-          pricingResult = {
-            ...calculated,
-            source: 'database_rates'
-          }
-        } else {
-          throw new Error('No rates found')
-        }
-      } catch (e) {
-        // Fallback to hardcoded rates
-        const fallback = getFallbackRates({
-          pax: totalPax,
-          duration_days,
-          language,
-          is_euro_passport: isEuroPassport
+      } else if (matchResult.best_match.match_score < 50) {
+        holes.push({
+          kind: 'template',
+          reason: 'fuzzy',
+          tier: budget_level,
+          lookupAttempted: `tour_template match for "${tour_requested ?? ''}" (best score ${matchResult.best_match.match_score} < 50)`,
+          message: `Best matching template "${matchResult.best_match.template_name}" scored only ${matchResult.best_match.match_score} — too low to use safely. Refine the request or price manually.`,
         })
-        pricingResult = {
-          ...fallback,
-          source: 'fallback_rates'
-        }
+      } else {
+        holes.push({
+          kind: 'template',
+          reason: 'missing',
+          tier: budget_level,
+          lookupAttempted: `tour_pricing rows for template ${matchResult.best_match.template_id} at ${totalPax} pax ${isEuroPassport ? 'EUR' : 'non-EUR'}`,
+          message: `Template "${matchResult.best_match.template_name}" matched but has no pricing row for ${totalPax} pax ${isEuroPassport ? 'EUR' : 'non-EUR'}. Add the missing pricing row in tour_pricing or price manually.`,
+        })
       }
+
+      return NextResponse.json({
+        success: false,
+        needs_manual_pricing: true,
+        complete: false,
+        holes,
+        reason: 'no_template_backed_price',
+        message: holes[0].message,
+      })
     }
 
     // ============================================
@@ -224,14 +247,17 @@ export async function POST(request: NextRequest) {
         all_matches: matchResult.matches?.slice(0, 3) || []
       } : null,
 
-      // Pricing
+      // Pricing — always template_pricing now; complete/holes propagated per
+      // consolidation Phase D so callers can render the same "needs attention"
+      // UI as the grid surface.
       pricing: {
         total_cost: pricingResult.total_cost,
         per_person_cost: pricingResult.per_person_cost,
         currency: 'EUR',
         source: pricingResult.source,
         breakdown: pricingResult.breakdown,
-        rates_used: pricingResult.rates_used || null
+        complete: pricingResult.complete,
+        holes: pricingResult.holes,
       },
 
       // Template details (if matched)

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
 // ============================================
 // B2B QUOTE CONVERT TO ITINERARY API
@@ -54,6 +55,16 @@ export async function POST(
       return NextResponse.json(
         { error: 'Quote already converted', itinerary_id: q.converted_to_itinerary_id },
         { status: 400 }
+      )
+    }
+
+    // Output gate (harness Layer 2): don't convert a quote with a non-deliverable
+    // price into a "quoted" itinerary that then flows to PDFs/invoices.
+    const priceCheck = checkAmountDeliverable(q.selling_price, { currency: q.currency })
+    if (!priceCheck.ok) {
+      return NextResponse.json(
+        { error: 'Quote price is not deliverable', violations: priceCheck.violations },
+        { status: 422 }
       )
     }
 

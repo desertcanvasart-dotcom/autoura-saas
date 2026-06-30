@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { generateEmailTemplate } from '@/lib/communication-utils'
 import { requireAuth } from '@/lib/supabase-server'
+import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
 export async function POST(request: Request) {
   try {
@@ -27,6 +28,16 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: 'Client email is required' },
         { status: 400 }
+      )
+    }
+
+    // Itinerary email with PDF — output gate (harness Layer 2): never email a
+    // non-deliverable price.
+    const priceCheck = checkAmountDeliverable(totalCost, { currency })
+    if (!priceCheck.ok) {
+      return NextResponse.json(
+        { success: false, error: 'Itinerary price is not deliverable', violations: priceCheck.violations },
+        { status: 422 }
       )
     }
 
