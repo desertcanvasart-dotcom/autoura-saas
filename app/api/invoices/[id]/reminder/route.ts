@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { sendMail } from '@/lib/email-send'
 
 // Reuse the email generation from the main route
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
@@ -181,21 +182,14 @@ export async function POST(
 
     const { subject, html } = generateReminderEmail(invoice, 'manual')
 
-    // Send email via your email service
-    const emailResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: invoice.client_email,
-        subject,
-        html,
-        type: 'payment_reminder'
-      })
+    // Send email via the shared mail helper
+    const emailResult = await sendMail({
+      to: invoice.client_email,
+      subject,
+      html,
     })
 
-    if (!emailResponse.ok) {
-      const errorData = await emailResponse.json()
-      
+    if (!emailResult.success) {
       // Log failed attempt
       await supabase
         .from('invoice_reminders')
@@ -205,11 +199,11 @@ export async function POST(
           recipient_email: invoice.client_email,
           subject,
           status: 'failed',
-          error_message: errorData.error || 'Failed to send'
+          error_message: emailResult.error || 'Failed to send'
         })
 
       return NextResponse.json(
-        { success: false, error: errorData.error || 'Failed to send email' },
+        { success: false, error: emailResult.error || 'Failed to send email' },
         { status: 500 }
       )
     }
