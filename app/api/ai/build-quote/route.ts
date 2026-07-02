@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { matchTourTemplate, getTemplateWithPricing } from '@/lib/tour-matcher-service'
-import { calculatePricingFromRates, getFallbackRates } from '@/lib/rate-lookup-service'
+import { calculatePricingFromRates } from '@/lib/rate-lookup-service'
 
 // ============================================
 // QUOTE BUILDER API
@@ -155,42 +155,26 @@ export async function POST(request: NextRequest) {
                    (templateData?.template?.cities_covered?.[0]) || 
                    'Cairo'
 
-      try {
-        const calculated = await calculatePricingFromRates(supabase, {
-          city,
-          pax: totalPax,
-          language,
-          is_euro_passport: isEuroPassport,
-          duration_days,
-          num_adults,
-          num_children,
-          include_lunch,
-          include_dinner,
-          include_accommodation,
-          hotel_standard: budget_level as 'budget' | 'standard' | 'luxury',
-          attractions: attractions.length > 0 ? attractions : undefined
-        })
+      const calculated = await calculatePricingFromRates(supabase, {
+        city,
+        pax: totalPax,
+        language,
+        is_euro_passport: isEuroPassport,
+        duration_days,
+        num_adults,
+        num_children,
+        include_lunch,
+        include_dinner,
+        include_accommodation,
+        hotel_standard: budget_level as 'budget' | 'standard' | 'luxury',
+        attractions: attractions.length > 0 ? attractions : undefined
+      })
 
-        if (calculated.success && calculated.total_cost > 0) {
-          pricingResult = {
-            ...calculated,
-            source: 'database_rates'
-          }
-        } else {
-          throw new Error('No rates found')
-        }
-      } catch (e) {
-        // Fallback to hardcoded rates
-        const fallback = getFallbackRates({
-          pax: totalPax,
-          duration_days,
-          language,
-          is_euro_passport: isEuroPassport
-        })
-        pricingResult = {
-          ...fallback,
-          source: 'fallback_rates'
-        }
+      // Never fabricate: an incomplete calculation is returned WITHOUT a
+      // deliverable price — the holes tell the operator what rate data to add.
+      pricingResult = {
+        ...calculated,
+        source: 'database_rates'
       }
     }
 

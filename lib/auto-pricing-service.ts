@@ -776,32 +776,78 @@ export async function getCruiseRates(
 }
 
 /**
- * Get hotel rates for a city and tier
- * Uses PPD model: ppd_eur (Per Person Double) + single_supplement_eur
- * Falls back to legacy calculation if PPD fields not available
+ * Detect the hotel season (peak | high | low) for a travel date from the
+ * accommodation row's season-boundary columns (migration 103). Seasons recur
+ * annually, so dates are compared by month/day (the stored year is ignored).
+ * Defaults to 'low' — mirrors detectCruiseSeason.
+ */
+export function detectHotelSeason(hotel: any, startDate: string): 'low' | 'high' | 'peak' {
+  const d = new Date(startDate)
+  if (isNaN(d.getTime())) return 'low'
+  const mmdd = (d.getMonth() + 1) * 100 + d.getDate()
+  const toMmdd = (s: string | null | undefined): number | null => {
+    if (!s) return null
+    const x = new Date(s)
+    if (isNaN(x.getTime())) return null
+    return (x.getMonth() + 1) * 100 + x.getDate()
+  }
+  const inRange = (start: number | null, end: number | null): boolean => {
+    if (start == null || end == null) return false
+    return start <= end ? (mmdd >= start && mmdd <= end) : (mmdd >= start || mmdd <= end)
+  }
+  if (inRange(toMmdd(hotel.peak_season_from), toMmdd(hotel.peak_season_to))) return 'peak'
+  if (inRange(toMmdd(hotel.peak_season_2_from), toMmdd(hotel.peak_season_2_to))) return 'peak'
+  if (inRange(toMmdd(hotel.high_season_from), toMmdd(hotel.high_season_to))) return 'high'
+  return 'low'
+}
+
+/**
+ * Get hotel rates for a city and tier (season-aware PPD model, mirrors
+ * getCruiseRates). Picks the seasonal PPD for the travel date's season
+ * (low = ppd_eur, high = high_season_ppd_eur, peak = peak_season_ppd_eur)
+ * + matching single supplement + triple reduction. Falls back to the base
+ * (low) PPD when a seasonal column is unset, then to legacy rates.
+ * No travelDate => low season (prior behaviour).
  */
 export async function getHotelRates(
   city: string,
-  tier: ServiceTier
+  tier: ServiceTier,
+  travelDate?: string
 ): Promise<{
   hotelName: string
   ppdNight: number
   singleSuppNight: number
   tripleRedNight: number
+  season: 'low' | 'high' | 'peak'
   source: RateSource
 } | null> {
   const cityNorm = city.trim().toLowerCase()
 
   const mapRow = (hotel: any, source: RateSource) => {
-    // Use new PPD fields if available, otherwise derive from legacy fields
-    const ppd = hotel.ppd_eur ?? (hotel.double_rate_eur ? hotel.double_rate_eur / 2 : 0)
-    const singleSupp = hotel.single_supplement_eur ?? Math.max(0, (hotel.single_rate_eur || 0) - ppd)
-    const tripleRed = hotel.triple_reduction_eur ?? 0
+    const season = travelDate ? detectHotelSeason(hotel, travelDate) : 'low'
+
+    // Base (low season) PPD; legacy fields as last resort
+    const basePpd = hotel.ppd_eur ?? (hotel.double_rate_eur ? hotel.double_rate_eur / 2 : 0)
+    const baseSupp = hotel.single_supplement_eur ?? Math.max(0, (hotel.single_rate_eur || 0) - basePpd)
+    const baseRed = hotel.triple_reduction_eur ?? 0
+
+    // Seasonal columns; unset seasonal column falls back to the base rate
+    const ppd = (season === 'peak' ? hotel.peak_season_ppd_eur
+      : season === 'high' ? hotel.high_season_ppd_eur
+      : null) ?? basePpd
+    const singleSupp = (season === 'peak' ? hotel.peak_season_single_supplement_eur
+      : season === 'high' ? hotel.high_season_single_supplement_eur
+      : null) ?? baseSupp
+    const tripleRed = (season === 'peak' ? hotel.peak_season_triple_reduction_eur
+      : season === 'high' ? hotel.high_season_triple_reduction_eur
+      : null) ?? baseRed
+
     return {
       hotelName: hotel.property_name || hotel.name,
       ppdNight: ppd,
       singleSuppNight: Math.max(0, singleSupp),
       tripleRedNight: Math.max(0, tripleRed),
+      season,
       source,
     }
   }
@@ -1330,7 +1376,7 @@ export async function calculateDayBasedPricing(
   const hotelCities = [...new Set(hotelDays.map(d => d.city))]
   const hotelRatesMap = new Map<string, NonNullable<Awaited<ReturnType<typeof getHotelRates>>>>()
   for (const city of hotelCities) {
-    const rates = await getHotelRates(city, tier)
+    const rates = await getHotelRates(city, tier, travelDate)
     if (rates && rates.source === 'db') {
       hotelRatesMap.set(city, rates)
     } else {

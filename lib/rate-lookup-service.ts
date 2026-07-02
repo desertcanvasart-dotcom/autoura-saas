@@ -238,6 +238,9 @@ export interface RatesUsed {
   sleeping_train: SleepingTrainRate | null
   train: TrainRate | null
   tipping: TippingRate[]
+  /** Rate gaps found during lookup. A hole is NEVER filled with a guessed
+   *  number — see the pricing harness policy (lib/pricing-types.ts). */
+  holes: string[]
 }
 
 export interface PricingBreakdown {
@@ -331,6 +334,11 @@ export interface PricingRuleApplied {
 
 export interface PricingCalculation {
   success: boolean
+  /** True only when every requested component priced from a real rate row.
+   *  When false, total_cost covers only the priced components — it is NOT a
+   *  deliverable price; `holes` lists what's missing. */
+  complete: boolean
+  holes: string[]
   total_cost: number
   per_person_cost: number
   tier_used: ServiceTier
@@ -573,7 +581,8 @@ export async function lookupRates(
     cruise: null,
     sleeping_train: null,
     train: null,
-    tipping: []
+    tipping: [],
+    holes: []
   }
 
   try {
@@ -628,9 +637,14 @@ export async function lookupRates(
           .order('capacity_min', { ascending: true })
           .limit(1)
 
-        const ratePerDay = vehicleRates && vehicleRates.length > 0 
-          ? toNumber(vehicleRates[0].base_rate_eur, 50)
-          : toNumber(suitableVehicle.daily_rate_eur, 50)
+        // Only real rate rows — never a guessed default
+        const ratePerDay = vehicleRates && vehicleRates.length > 0
+          ? toNumber(vehicleRates[0].base_rate_eur, 0)
+          : toNumber(suitableVehicle.daily_rate_eur, 0)
+
+        if (ratePerDay <= 0) {
+          result.holes.push(`transport: no rate for ${serviceType} in ${params.city || 'Cairo'} (vehicle ${suitableVehicle.vehicle_type})`)
+        }
 
         result.vehicle = {
           id: suitableVehicle.id,
@@ -686,9 +700,14 @@ export async function lookupRates(
         .eq('guide_language', params.language)
         .limit(1)
 
+      // Only real rate rows — never a guessed default
       const dailyRate = guideRates && guideRates.length > 0
-        ? toNumber(guideRates[0].base_rate_eur, 55)
-        : toNumber(selectedGuide.daily_rate_eur, 55)
+        ? toNumber(guideRates[0].base_rate_eur, 0)
+        : toNumber(selectedGuide.daily_rate_eur, 0)
+
+      if (dailyRate <= 0) {
+        result.holes.push(`guide: no ${params.language} guide rate (guide ${selectedGuide.name})`)
+      }
 
       result.guide = {
         id: selectedGuide.id,
@@ -709,11 +728,15 @@ export async function lookupRates(
 
       if (guideRates && guideRates.length > 0) {
         const rate = guideRates[0]
+        const dailyRate = toNumber(rate.base_rate_eur, 0)
+        if (dailyRate <= 0) {
+          result.holes.push(`guide: ${params.language} guide rate row exists but has no usable rate`)
+        }
         result.guide = {
           id: rate.id,
           name: `${params.language} Speaking Guide`,
           languages: [params.language],
-          daily_rate_eur: toNumber(rate.base_rate_eur, 55),
+          daily_rate_eur: dailyRate,
           tier: 'standard',
           is_preferred: false
         }
@@ -735,15 +758,22 @@ export async function lookupRates(
 
       if (!attractionError && attractions && attractions.length > 0) {
 
-        result.attractions = attractions.map(a => ({
-          id: a.id,
-          name: a.attraction_name,
-          city: a.city,
-          entrance_fee_eur: toNumber(a.eur_rate, 0),
-          entrance_fee_non_eur: toNumber(a.non_eur_rate, a.eur_rate || 0),
-          child_rate_eur: toNumber(a.child_rate_eur, 0),
-          child_rate_non_eur: toNumber(a.child_rate_non_eur, 0)
-        }))
+        result.attractions = attractions.map(a => {
+          // Never substitute the EUR rate for a missing non-EUR rate — that's
+          // a different (usually higher) price class. Flag the gap instead.
+          if (!params.is_euro_passport && a.non_eur_rate == null && a.eur_rate != null) {
+            result.holes.push(`entrance: ${a.attraction_name} has no non-EUR rate`)
+          }
+          return {
+            id: a.id,
+            name: a.attraction_name,
+            city: a.city,
+            entrance_fee_eur: toNumber(a.eur_rate, 0),
+            entrance_fee_non_eur: toNumber(a.non_eur_rate, 0),
+            child_rate_eur: toNumber(a.child_rate_eur, 0),
+            child_rate_non_eur: toNumber(a.child_rate_non_eur, 0)
+          }
+        })
       }
     } else if (params.city) {
       const { data: attractions } = await supabase
@@ -755,15 +785,20 @@ export async function lookupRates(
 
       if (attractions && attractions.length > 0) {
 
-        result.attractions = attractions.map(a => ({
-          id: a.id,
-          name: a.attraction_name,
-          city: a.city,
-          entrance_fee_eur: toNumber(a.eur_rate, 0),
-          entrance_fee_non_eur: toNumber(a.non_eur_rate, a.eur_rate || 0),
-          child_rate_eur: toNumber(a.child_rate_eur, 0),
-          child_rate_non_eur: toNumber(a.child_rate_non_eur, 0)
-        }))
+        result.attractions = attractions.map(a => {
+          if (!params.is_euro_passport && a.non_eur_rate == null && a.eur_rate != null) {
+            result.holes.push(`entrance: ${a.attraction_name} has no non-EUR rate`)
+          }
+          return {
+            id: a.id,
+            name: a.attraction_name,
+            city: a.city,
+            entrance_fee_eur: toNumber(a.eur_rate, 0),
+            entrance_fee_non_eur: toNumber(a.non_eur_rate, 0),
+            child_rate_eur: toNumber(a.child_rate_eur, 0),
+            child_rate_non_eur: toNumber(a.child_rate_non_eur, 0)
+          }
+        })
       }
     }
 
@@ -799,12 +834,22 @@ export async function lookupRates(
 
         const tierMultiplier = TIER_MULTIPLIERS[tier]
 
+        // Only real rate rows — a missing lunch/dinner rate is a hole, not €12/€18
+        const lunchRate = toNumber(restaurant.lunch_rate_eur, 0)
+        const dinnerRate = toNumber(restaurant.dinner_rate_eur, 0)
+        if (params.include_lunch && lunchRate <= 0) {
+          result.holes.push(`meal: ${restaurant.name} has no lunch rate`)
+        }
+        if (params.include_dinner && dinnerRate <= 0) {
+          result.holes.push(`meal: ${restaurant.name} has no dinner rate`)
+        }
+
         result.restaurant = {
           id: restaurant.id,
           name: restaurant.name,
           city: restaurant.city,
-          lunch_rate_eur: Math.round(toNumber(restaurant.lunch_rate_eur, 12) * tierMultiplier),
-          dinner_rate_eur: Math.round(toNumber(restaurant.dinner_rate_eur, 18) * tierMultiplier),
+          lunch_rate_eur: Math.round(lunchRate * tierMultiplier),
+          dinner_rate_eur: Math.round(dinnerRate * tierMultiplier),
           tier: restaurant.tier,
           is_preferred: restaurant.is_preferred || false
         }
@@ -818,12 +863,20 @@ export async function lookupRates(
         if (mealRates && mealRates.length > 0) {
           const meal = mealRates[0]
           const tierMultiplier = TIER_MULTIPLIERS[tier]
+          const lunchRate = toNumber(meal.lunch_rate_eur, 0)
+          const dinnerRate = toNumber(meal.dinner_rate_eur, 0)
+          if (params.include_lunch && lunchRate <= 0) {
+            result.holes.push('meal: meal_rates row has no lunch rate')
+          }
+          if (params.include_dinner && dinnerRate <= 0) {
+            result.holes.push('meal: meal_rates row has no dinner rate')
+          }
           result.restaurant = {
             id: meal.id,
             name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Restaurant`,
             city: params.city || 'Cairo',
-            lunch_rate_eur: Math.round(toNumber(meal.lunch_rate_eur, 12) * tierMultiplier),
-            dinner_rate_eur: Math.round(toNumber(meal.dinner_rate_eur, 18) * tierMultiplier),
+            lunch_rate_eur: Math.round(lunchRate * tierMultiplier),
+            dinner_rate_eur: Math.round(dinnerRate * tierMultiplier),
             tier: tier,
             is_preferred: false
           }
@@ -863,36 +916,26 @@ export async function lookupRates(
       if (hotels && hotels.length > 0) {
         const hotel = hotels[0]
 
+        // A €0 double rate (DEFAULT 0 column) is a data hole, not a priced hotel
+        const rateDouble = toNumber(hotel.rate_double_eur, 0)
+        if (rateDouble <= 0) {
+          result.holes.push(`hotel: ${hotel.name} (${hotel.city}) has no double-room rate`)
+        }
 
         result.hotel = {
           id: hotel.id,
           name: hotel.name,
           city: hotel.city,
           rate_single_eur: toNumber(hotel.rate_single_eur, 0),
-          rate_double_eur: toNumber(hotel.rate_double_eur, 0),
+          rate_double_eur: rateDouble,
           rate_triple_eur: toNumber(hotel.rate_triple_eur, 0),
           star_rating: toNumber(hotel.star_rating, 4),
           tier: hotel.tier,
           is_preferred: hotel.is_preferred || false
         }
       } else {
-        const defaultRates: Record<ServiceTier, number> = {
-          'budget': 45,
-          'standard': 80,
-          'deluxe': 120,
-          'luxury': 180
-        }
-        result.hotel = {
-          id: 'default',
-          name: `${tier.charAt(0).toUpperCase() + tier.slice(1)} Hotel`,
-          city: params.city || 'Cairo',
-          rate_single_eur: defaultRates[tier] * 0.8,
-          rate_double_eur: defaultRates[tier],
-          rate_triple_eur: defaultRates[tier] * 1.2,
-          star_rating: tier === 'luxury' ? 5 : tier === 'deluxe' ? 4 : tier === 'standard' ? 4 : 3,
-          tier: tier,
-          is_preferred: false
-        }
+        // No invented default-rate hotel — record the hole
+        result.holes.push(`hotel: no ${tier} hotel found in ${params.city || 'Cairo'}`)
       }
     }
 
@@ -931,6 +974,12 @@ export async function lookupRates(
         const staff = airportStaff[0]
         const rate = staffRates && staffRates.length > 0 ? staffRates[0] : null
 
+        // Only a real airport_staff_rates row counts — never a flat €25 guess
+        const rateEur = rate ? toNumber(rate.rate_eur, 0) : 0
+        if (rateEur <= 0) {
+          result.holes.push(`airport_service: no rate for ${params.airport_code}`)
+        }
+
         result.airport_staff = {
           id: staff.id,
           service_code: staff.id,
@@ -938,7 +987,7 @@ export async function lookupRates(
           airport_name: rate?.airport_name || params.airport_code,
           service_type: params.airport_service_type || 'meet_greet',
           direction: 'both',
-          rate_eur: rate ? toNumber(rate.rate_eur, 25) : 25,
+          rate_eur: rateEur,
           tier: staff.tier,
           is_preferred: staff.is_preferred || false
         }
@@ -979,12 +1028,18 @@ export async function lookupRates(
         const staff = hotelStaff[0]
         const rate = staffRates && staffRates.length > 0 ? staffRates[0] : null
 
+        // Only a real hotel_staff_rates row counts — never a flat €15 guess
+        const rateEur = rate ? toNumber(rate.rate_eur, 0) : 0
+        if (rateEur <= 0) {
+          result.holes.push('hotel_service: no hotel staff rate found')
+        }
+
         result.hotel_staff = {
           id: staff.id,
           service_code: staff.id,
           service_type: 'full_service',
           hotel_category: tier,
-          rate_eur: rate ? toNumber(rate.rate_eur, 15) : 15,
+          rate_eur: rateEur,
           tier: staff.tier,
           is_preferred: staff.is_preferred || false
         }
@@ -1190,6 +1245,8 @@ export async function calculatePricingFromRates(
 
   const result: PricingCalculation = {
     success: false,
+    complete: false,
+    holes: [],
     total_cost: 0,
     per_person_cost: 0,
     tier_used: tier,
@@ -1257,9 +1314,9 @@ export async function calculatePricingFromRates(
     let totalEntrancePerPerson = 0
 
     for (const attraction of rates.attractions) {
-      const adultFee = params.is_euro_passport 
-        ? toNumber(attraction.entrance_fee_eur, 0) 
-        : toNumber(attraction.entrance_fee_non_eur, attraction.entrance_fee_eur || 0)
+      const adultFee = params.is_euro_passport
+        ? toNumber(attraction.entrance_fee_eur, 0)
+        : toNumber(attraction.entrance_fee_non_eur, 0)
 
       // Check for pricing rule override
       if (params.checkPricingRules && pricingRules.length > 0) {
@@ -1503,6 +1560,42 @@ export async function calculatePricingFromRates(
   result.margin_amount = Math.round(marginAmount * 100) / 100
   result.rules_applied = rulesApplied
 
+  // ============================================
+  // HOLE CHECK — a requested component with no real rate makes the result
+  // incomplete. total_cost then only covers the priced components and must
+  // not be delivered as a final price.
+  // ============================================
+  const holes = [...rates.holes]
+
+  if (!rates.vehicle) holes.push('transport: no vehicle/rate found')
+  if (!rates.guide) holes.push(`guide: no ${params.language} guide found`)
+  if ((params.include_lunch || params.include_dinner) && !rates.restaurant) {
+    holes.push('meal: no restaurant or meal rate found')
+  }
+  if (params.include_accommodation && !rates.hotel) {
+    holes.push('hotel: no hotel rate found')
+  }
+  if (params.include_airport_service && params.airport_code && !rates.airport_staff) {
+    holes.push(`airport_service: no staff found for ${params.airport_code}`)
+  }
+  if (params.include_cruise && params.cruise_embark_city && !rates.cruise) {
+    holes.push(`cruise: no cruise found ${params.cruise_embark_city} → ${params.cruise_disembark_city}`)
+  }
+  if (params.include_sleeping_train && params.sleeping_train_origin && !rates.sleeping_train) {
+    holes.push(`sleeping_train: no rate ${params.sleeping_train_origin} → ${params.sleeping_train_destination}`)
+  }
+  if (params.include_train && params.train_origin && !rates.train) {
+    holes.push(`train: no rate ${params.train_origin} → ${params.train_destination}`)
+  }
+  if ((params.attractions?.length || 0) > 0 && rates.attractions.length === 0) {
+    holes.push('entrance: none of the requested attractions matched a fee row')
+  }
+  if (params.include_tips !== false && rates.tipping.length === 0) {
+    holes.push('tipping: no tipping rates found')
+  }
+
+  result.holes = holes
+  result.complete = holes.length === 0
   result.success = true
 
 
@@ -1522,120 +1615,4 @@ export async function calculatePricingFromRates(
 
 
   return result
-}
-
-// ============================================
-// FALLBACK RATES (when database is empty)
-// ============================================
-
-export function getFallbackRates(params: {
-  pax: number
-  duration_days: number
-  language: string
-  is_euro_passport: boolean
-  tier?: ServiceTier
-  mode?: PricingMode
-  marginPercent?: number
-}): PricingCalculation {
-  const { pax, duration_days } = params
-  const tier = normalizeTier(params.tier)
-  const mode = params.mode || 'b2c'
-  const marginPercent = params.marginPercent ?? 25
-  const tierMultiplier = TIER_MULTIPLIERS[tier]
-
-  // Base rates adjusted by tier
-  const vehiclePerDay = Math.round((pax <= 2 ? 50 : pax <= 6 ? 110 : pax <= 10 ? 150 : 200) * tierMultiplier)
-  const guidePerDay = Math.round((params.language === 'English' ? 50 : 90) * tierMultiplier)
-  const entrancePerPerson = params.is_euro_passport ? 18 : 25
-  const lunchPerPerson = Math.round(12 * tierMultiplier)
-  const tipPerDay = Math.round(15 * tierMultiplier)
-  const waterPerPerson = 2
-
-  const transportTotal = vehiclePerDay * duration_days
-  const guideTotal = guidePerDay * duration_days
-  const entranceTotal = entrancePerPerson * pax * duration_days
-  const lunchTotal = lunchPerPerson * pax * duration_days
-  const tipsTotal = tipPerDay * duration_days
-  const waterTotal = waterPerPerson * pax * duration_days
-
-  const supplierCost = transportTotal + guideTotal + entranceTotal + lunchTotal + tipsTotal + waterTotal
-
-  // Apply margin for B2C
-  let totalCost = supplierCost
-  let marginAmount = 0
-  if (mode === 'b2c' && marginPercent > 0) {
-    marginAmount = supplierCost * (marginPercent / 100)
-    totalCost = supplierCost + marginAmount
-  }
-
-  return {
-    success: true,
-    total_cost: totalCost,
-    per_person_cost: totalCost / pax,
-    tier_used: tier,
-    preferred_suppliers_count: 0,
-    mode,
-    supplier_cost: supplierCost,
-    margin_percent: marginPercent,
-    margin_amount: marginAmount,
-    rules_applied: [],
-    breakdown: {
-      transportation: { 
-        total: transportTotal, 
-        per_day: vehiclePerDay, 
-        vehicle_type: pax <= 2 ? 'Sedan' : pax <= 6 ? 'Minivan' : pax <= 10 ? 'Van' : 'Bus',
-        service_type: 'day_tour',
-        is_preferred: false
-      },
-      guide: { 
-        total: guideTotal, 
-        per_day: guidePerDay, 
-        language: params.language,
-        is_preferred: false 
-      },
-      entrances: { 
-        total: entranceTotal, 
-        per_person: entrancePerPerson * duration_days, 
-        count: 3, 
-        passport_type: params.is_euro_passport ? 'EUR' : 'non-EUR' 
-      },
-      meals: { 
-        lunch_total: lunchTotal, 
-        dinner_total: 0, 
-        per_person_lunch: lunchPerPerson * duration_days,
-        per_person_dinner: 0,
-        is_preferred: false
-      },
-      accommodation: { total: 0, per_night: 0, rooms: 0, nights: 0, is_preferred: false },
-      airport_staff: { total: 0, arrivals: 0, departures: 0, service_type: '', is_preferred: false },
-      hotel_staff: { total: 0, per_stay: 0, num_stays: 0, is_preferred: false },
-      cruise: { total: 0, per_person: 0, ship_name: '', cabin_type: '', nights: 0, is_preferred: false },
-      sleeping_train: { total: 0, per_person: 0, cabin_type: '', is_roundtrip: false },
-      train: { total: 0, per_person: 0, class_type: '' },
-      tips: { 
-        total: tipsTotal, 
-        per_day: tipPerDay,
-        breakdown: [
-          { role: 'guide', amount: tipPerDay * duration_days * 0.67 }, 
-          { role: 'driver', amount: tipPerDay * duration_days * 0.33 }
-        ] 
-      },
-      water: { total: waterTotal, per_person: waterPerPerson * duration_days }
-    },
-    rates_used: {
-      success: false,
-      tier_used: tier,
-      vehicle: null,
-      guide: null,
-      attractions: [],
-      restaurant: null,
-      hotel: null,
-      airport_staff: null,
-      hotel_staff: null,
-      cruise: null,
-      sleeping_train: null,
-      train: null,
-      tipping: []
-    }
-  }
 }
