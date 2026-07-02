@@ -13,6 +13,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase-server'
+import { sendSystemEmail } from '@/lib/email'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface CreateNotificationInput {
@@ -100,7 +101,7 @@ export async function createNotification(input: CreateNotificationInput) {
   return notification
 }
 
-// Helper function to send an email notification via the Gmail API route.
+// Helper function to send an email notification via Resend (system transport).
 async function sendEmailNotification(
   toEmail: string,
   toName: string,
@@ -175,22 +176,9 @@ async function sendEmailNotification(
     </html>
   `
 
-  const response = await fetch(`${baseUrl}/api/gmail/send`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-cron-secret': process.env.CRON_SECRET || '',
-    },
-    body: JSON.stringify({
-      to: toEmail,
-      subject: `[Autoura] ${subject}`,
-      html: htmlContent,
-    }),
+  return sendSystemEmail({
+    to: toEmail,
+    subject: `[Autoura] ${subject}`,
+    html: htmlContent,
   })
-
-  if (!response.ok) {
-    throw new Error('Failed to send email via Gmail API')
-  }
-
-  return response.json()
 }
