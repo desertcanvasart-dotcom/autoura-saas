@@ -1417,10 +1417,15 @@ export async function calculateDayBasedPricing(
     }
   }
 
+  // Fetch per-city hotel rates concurrently (deduped cities), then apply in
+  // deterministic order so results/holes match the previous serial version.
   const hotelCities = [...new Set(hotelDays.map(d => d.city))]
   const hotelRatesMap = new Map<string, NonNullable<Awaited<ReturnType<typeof getHotelRates>>>>()
-  for (const city of hotelCities) {
-    const rates = await getHotelRates(city, tier, travelDate)
+  const hotelResults = await Promise.all(
+    hotelCities.map(city => getHotelRates(city, tier, travelDate))
+  )
+  hotelCities.forEach((city, i) => {
+    const rates = hotelResults[i]
     if (rates && rates.source === 'db') {
       hotelRatesMap.set(city, rates)
     } else {
@@ -1433,14 +1438,17 @@ export async function calculateDayBasedPricing(
         message: `No exact ${tier} hotel rate for ${city}. Add it in Rates → Hotels.`,
       })
     }
-  }
+  })
 
-  const guideRate = await getGuideRate(language, tier)
-  const mealRates = await getMealRates(tier)
-  const tippingRate = await getTippingRate(tier)
-  // Water cost is admin-configurable via Rates → Fixed Costs (fixed_daily_costs);
-  // falls back to €2 (the previous hardcoded value) if the table is empty.
-  const fixedDailyCosts = await getFixedDailyCosts()
+  // These four are independent — fetch concurrently. Water cost is
+  // admin-configurable via Rates → Fixed Costs (fixed_daily_costs); falls back
+  // to €2 (the previous hardcoded value) if the table is empty.
+  const [guideRate, mealRates, tippingRate, fixedDailyCosts] = await Promise.all([
+    getGuideRate(language, tier),
+    getMealRates(tier),
+    getTippingRate(tier),
+    getFixedDailyCosts(),
+  ])
   const waterCostPerPax = fixedDailyCosts.waterPerPersonPerDay
 
   // ============================================
@@ -1709,44 +1717,55 @@ export async function calculateDayBasedPricing(
   }
 
   // ----- Entrance Fees (per pax) -----
+  // Collect unique attractions in first-seen order, fetch all concurrently
+  // (was one serial round-trip per attraction — the main N+1), then apply in
+  // order so the accumulated fee, service list, and holes are unchanged.
   let entranceFeesPerPax = 0
   const processedAttractions = new Set<string>()
-
+  const entranceLookups: { attraction: string; day: any }[] = []
   for (const day of itinerary) {
     for (const attraction of day.attractions) {
-      if (processedAttractions.has(attraction.toLowerCase())) continue
-      processedAttractions.add(attraction.toLowerCase())
-
-      const fee = await getEntranceFee(attraction, isEurPassport)
-      if (fee && fee.source === 'db' && fee.rate > 0) {
-        entranceFeesPerPax += fee.rate
-        services.push({
-          id: `entrance-${fee.id}`,
-          dayNumber: day.day,
-          serviceType: 'entrance',
-          serviceName: fee.name,
-          quantity: 1,
-          quantityMode: 'per_pax',
-          unitCost: fee.rate,
-          lineTotal: fee.rate,
-          rateSource: 'entrance_fees',
-          isPerPax: true,
-          isOptional: false,
-          notes: isEurPassport ? 'EUR rate' : 'non-EUR rate'
-        })
-      } else {
-        addHole({
-          kind: 'entrance',
-          reason: fee ? 'fuzzy' : 'missing',
-          tier,
-          dayNumber: day.day,
-          attraction,
-          lookupAttempted: `entrance fee "${attraction}"`,
-          message: `No exact entrance fee for "${attraction}". Add it in Rates → Attractions.`,
-        })
-      }
+      const key = attraction.toLowerCase()
+      if (processedAttractions.has(key)) continue
+      processedAttractions.add(key)
+      entranceLookups.push({ attraction, day })
     }
   }
+
+  const entranceFees = await Promise.all(
+    entranceLookups.map(l => getEntranceFee(l.attraction, isEurPassport))
+  )
+
+  entranceLookups.forEach(({ attraction, day }, i) => {
+    const fee = entranceFees[i]
+    if (fee && fee.source === 'db' && fee.rate > 0) {
+      entranceFeesPerPax += fee.rate
+      services.push({
+        id: `entrance-${fee.id}`,
+        dayNumber: day.day,
+        serviceType: 'entrance',
+        serviceName: fee.name,
+        quantity: 1,
+        quantityMode: 'per_pax',
+        unitCost: fee.rate,
+        lineTotal: fee.rate,
+        rateSource: 'entrance_fees',
+        isPerPax: true,
+        isOptional: false,
+        notes: isEurPassport ? 'EUR rate' : 'non-EUR rate'
+      })
+    } else {
+      addHole({
+        kind: 'entrance',
+        reason: fee ? 'fuzzy' : 'missing',
+        tier,
+        dayNumber: day.day,
+        attraction,
+        lookupAttempted: `entrance fee "${attraction}"`,
+        message: `No exact entrance fee for "${attraction}". Add it in Rates → Attractions.`,
+      })
+    }
+  })
 
   // ----- External Meals (per pax) -----
   let externalMealsPerPax = 0
