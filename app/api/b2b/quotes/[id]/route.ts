@@ -42,6 +42,7 @@ export async function GET(
         b2b_partners (company_name, partner_code, contact_name, email)
       `)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .single()
 
     if (error) {
@@ -74,14 +75,15 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    // Remove id from body if present to avoid conflicts
-    const { id: _, ...updates } = body
+    // Remove id and tenant_id from body if present to avoid conflicts / reassignment
+    const { id: _, tenant_id: _ignoredTenantId, ...updates } = body
     updates.updated_at = new Date().toISOString()
 
     const { data, error } = await (getSupabaseAdmin() as any)
       .from('tour_quotes')
       .update(updates)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select()
       .single()
 
@@ -118,6 +120,7 @@ export async function DELETE(
       .from('tour_quotes')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('Error deleting quote:', error)

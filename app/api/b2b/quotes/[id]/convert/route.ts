@@ -43,6 +43,7 @@ export async function POST(
         b2b_partners (company_name, partner_code)
       `)
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .single()
 
     if (quoteError || !quote) {
@@ -197,6 +198,7 @@ export async function POST(
         converted_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('tenant_id', tenantId)
 
     return NextResponse.json({
       success: true,

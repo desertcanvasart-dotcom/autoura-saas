@@ -645,6 +645,7 @@ export async function GET(
         b2b_partners (company_name, partner_code, contact_name, email)
       `)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .single()
 
     if (error || !quote) {

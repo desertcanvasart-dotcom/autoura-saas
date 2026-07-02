@@ -20,6 +20,7 @@ export async function GET() {
     const { data, error } = await supabaseAdmin
       .from('b2b_pricing_rules')
       .select('*')
+      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
       .order('service_name')
 
     if (error) {
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('b2b_pricing_rules')
       .insert({
+        tenant_id: authResult.tenant_id,
         rate_table: body.rate_table || 'activity_rates',
         service_name: body.service_name,
         service_category: body.service_category || 'activity',

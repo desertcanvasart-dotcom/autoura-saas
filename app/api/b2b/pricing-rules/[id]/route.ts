@@ -51,6 +51,7 @@ export async function PUT(
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select()
       .single()
 
@@ -86,6 +87,7 @@ export async function DELETE(
       .from('b2b_pricing_rules')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('Error deleting pricing rule:', error)

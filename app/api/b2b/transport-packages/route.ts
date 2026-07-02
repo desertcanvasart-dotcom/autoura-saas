@@ -19,6 +19,7 @@ export async function GET() {
     const { data, error } = await (createAdminClient() as any)
       .from('b2b_transport_packages')
       .select('*')
+      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
       .order('package_name')
 
     if (error) {
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await (createAdminClient() as any)
       .from('b2b_transport_packages')
       .insert({
+        tenant_id: authResult.tenant_id,
         package_code: body.package_code || `PKG-${Date.now()}`,
         package_name: body.package_name,
         package_type: body.package_type || 'cruise_sightseeing',

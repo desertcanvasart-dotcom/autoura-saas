@@ -77,10 +77,11 @@ function getSeason(date: Date): 'low' | 'high' | 'peak' {
 }
 
 // Check for B2B pricing rules for an activity (kept for tiered pricing like felucca)
-async function getB2BPricingRule(serviceName: string): Promise<any | null> {
+async function getB2BPricingRule(serviceName: string, tenantId?: string): Promise<any | null> {
   const { data, error } = await (getSupabaseAdmin() as any)
     .from('b2b_pricing_rules')
     .select('*')
+    .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
     .eq('is_active', true)
     .ilike('service_name', `%${serviceName.split(' ')[0]}%`)
     .limit(1)
@@ -90,10 +91,11 @@ async function getB2BPricingRule(serviceName: string): Promise<any | null> {
 }
 
 // Get transport package for cruise sightseeing (kept for package deals)
-async function getTransportPackage(packageType: string, originCity: string, destCity: string): Promise<any | null> {
+async function getTransportPackage(packageType: string, originCity: string, destCity: string, tenantId?: string): Promise<any | null> {
   const { data, error } = await (getSupabaseAdmin() as any)
     .from('b2b_transport_packages')
     .select('*')
+    .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
     .eq('package_type', packageType)
     .eq('origin_city', originCity)
     .eq('destination_city', destCity)
@@ -540,6 +542,7 @@ export async function POST(request: NextRequest) {
         .select('margin_percent_override')
         .eq('partner_id', partner_id)
         .eq('variation_id', variation_id)
+        .eq('tenant_id', tenantId)
         .eq('is_active', true)
         .single()
 
@@ -567,7 +570,7 @@ export async function POST(request: NextRequest) {
       // STEP 1: Check for B2B pricing rules (tiered pricing like felucca)
       // ============================================
       if (service.rate_type === 'activity' && service.service_name) {
-        const b2bRule = await getB2BPricingRule(service.service_name)
+        const b2bRule = await getB2BPricingRule(service.service_name, tenantId)
 
         if (b2bRule) {
           const priceResult = applyB2BPricingRule(b2bRule, num_pax)
@@ -586,7 +589,7 @@ export async function POST(request: NextRequest) {
       // ============================================
       if (rateSource === 'manual' && service.service_category === 'transportation') {
         if (service.service_name?.toLowerCase().includes('sightseeing')) {
-          const pkg = await getTransportPackage('cruise_sightseeing', 'Luxor', 'Aswan')
+          const pkg = await getTransportPackage('cruise_sightseeing', 'Luxor', 'Aswan', tenantId)
           if (pkg) {
             const vehicle = selectVehicleFromPackage(pkg, num_pax)
             unitCost = vehicle.rate
@@ -599,7 +602,7 @@ export async function POST(request: NextRequest) {
         }
         else if (service.service_name?.toLowerCase().includes('transfer') || 
                  service.service_name?.toLowerCase().includes('airport')) {
-          const pkg = await getTransportPackage('cruise_transfer', 'Luxor', 'Aswan')
+          const pkg = await getTransportPackage('cruise_transfer', 'Luxor', 'Aswan', tenantId)
           if (pkg) {
             const vehicle = selectVehicleFromPackage(pkg, num_pax)
             unitCost = vehicle.rate
