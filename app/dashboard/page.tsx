@@ -55,6 +55,7 @@ export default function DashboardPage() {
   const [upcomingFollowups, setUpcomingFollowups] = useState<any[]>([])
   const [recentQuotes, setRecentQuotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [userName, setUserName] = useState<string>('')
 
   useEffect(() => {
@@ -92,28 +93,41 @@ export default function DashboardPage() {
 
   async function loadDashboardData() {
     try {
+      setError(null)
       const today = new Date()
       const thirtyDaysLater = new Date()
       thirtyDaysLater.setDate(today.getDate() + 30)
 
-      // Run all queries in parallel for better performance
+      // Run all queries in parallel. Totals use exact COUNT queries (head:true,
+      // no rows fetched) so they are accurate regardless of volume — the old
+      // code counted .length off capped .limit(100)/50 fetches, undercounting
+      // any tenant past those caps. RLS scopes every query to the tenant.
       const [
-        clientsResult,
+        clientsCountResult,
+        recentClientsResult,
         activeClientsResult,
         pendingFollowupsResult,
         overdueFollowupsResult,
         upcomingFollowupsResult,
-        quotesRes,
+        totalQuotesResult,
+        sentQuotesResult,
+        acceptedQuotesResult,
+        recentQuotesResult,
         bookingsRes
       ] = await Promise.all([
-        // Total clients count + recent 5
+        // Total clients — exact count
+        supabase
+          .from('clients')
+          .select('id', { count: 'exact', head: true }),
+
+        // Recent 5 clients for the list
         supabase
           .from('clients')
           .select('id, full_name, email, phone, status, created_at')
           .order('created_at', { ascending: false })
-          .limit(100),
+          .limit(5),
 
-        // Active clients count (filtered in DB)
+        // Active clients count
         supabase
           .from('clients')
           .select('id', { count: 'exact', head: true })
@@ -125,7 +139,7 @@ export default function DashboardPage() {
           .select('id', { count: 'exact', head: true })
           .eq('status', 'pending'),
 
-        // Overdue followups count (filtered in DB)
+        // Overdue followups count
         supabase
           .from('client_followups')
           .select('id', { count: 'exact', head: true })
@@ -144,39 +158,51 @@ export default function DashboardPage() {
           .order('due_date', { ascending: true })
           .limit(5),
 
-        // B2C Quotes
-        fetch('/api/quotes/b2c?limit=50'),
+        // Total B2C quotes — exact count
+        supabase
+          .from('b2c_quotes')
+          .select('id', { count: 'exact', head: true }),
 
-        // Bookings (upcoming in next 30 days)
+        // Quotes sent (anything past draft)
+        supabase
+          .from('b2c_quotes')
+          .select('id', { count: 'exact', head: true })
+          .neq('status', 'draft'),
+
+        // Quotes accepted (b2c_quotes has no 'confirmed' status; 'accepted' is it)
+        supabase
+          .from('b2c_quotes')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'accepted'),
+
+        // Recent 5 quotes for the activity list (client name via join)
+        supabase
+          .from('b2c_quotes')
+          .select('id, quote_number, status, created_at, clients (full_name)')
+          .order('created_at', { ascending: false })
+          .limit(5),
+
+        // Bookings (upcoming in next 30 days) — still via API
         fetch('/api/bookings?limit=50')
       ])
 
-      const clients = clientsResult.data || []
-      const totalClients = clients.length
+      // A failure on the core count query means the numbers are unreliable —
+      // surface it instead of rendering misleading zeros.
+      if (clientsCountResult.error) throw clientsCountResult.error
+
+      const totalClients = clientsCountResult.count || 0
       const activeClients = activeClientsResult.count || 0
       const pendingFollowups = pendingFollowupsResult.count || 0
       const overdueFollowups = overdueFollowupsResult.count || 0
+      const totalQuotes = totalQuotesResult.count || 0
+      const quotesSent = sentQuotesResult.count || 0
+      const quotesConfirmed = acceptedQuotesResult.count || 0
 
-      // Process B2C quotes
-      let quotes: any[] = []
-      try {
-        const quotesData = await quotesRes.json()
-        quotes = quotesData.data || quotesData.quotes || []
-      } catch (e) {
-
-        // Fallback to itineraries if quotes API doesn't exist yet
-        const fallbackRes = await fetch('/api/itineraries?limit=50')
-        const fallbackData = await fallbackRes.json()
-        quotes = fallbackData.data || []
-      }
-
-      // Process bookings for upcoming trips
-      let bookings: any[] = []
+      // Bookings upcoming in next 30 days (optional API; failure is non-fatal)
       let upcomingBookings = 0
       try {
         const bookingsData = await bookingsRes.json()
-        bookings = bookingsData.data || bookingsData.bookings || []
-        // Count upcoming bookings (confirmed, in next 30 days)
+        const bookings = bookingsData.data || bookingsData.bookings || []
         upcomingBookings = bookings.filter((b: any) => {
           if (!b.start_date && !b.travel_date) return false
           const startDate = new Date(b.start_date || b.travel_date)
@@ -184,37 +210,37 @@ export default function DashboardPage() {
                  (b.status === 'confirmed' || b.status === 'active')
         }).length
       } catch (e) {
-
+        // bookings API is optional — leave upcomingBookings at 0
       }
 
-      // Get recent clients (already sorted by created_at)
-      const recentClients = clients.slice(0, 5)
-
-      // Get recent quotes
-      const recentQuotes = quotes.slice(0, 5).map((q: any) => ({
-        id: q.id,
-        action: `Quote ${q.quote_number || q.itinerary_code || q.id} for ${q.client_name || 'Client'}`,
-        time: new Date(q.created_at).toLocaleString(),
-        status: q.status
-      }))
+      const recentQuotes = (recentQuotesResult.data || []).map((q: any) => {
+        const client = Array.isArray(q.clients) ? q.clients[0] : q.clients
+        return {
+          id: q.id,
+          action: `Quote ${q.quote_number || q.id} for ${client?.full_name || 'Client'}`,
+          time: new Date(q.created_at).toLocaleString(),
+          status: q.status
+        }
+      })
 
       setStats({
         totalClients,
         activeClients,
         pendingFollowups,
         overdueFollowups,
-        totalQuotes: quotes.length,
-        quotesSent: quotes.filter((q: any) => q.status === 'sent' || q.status === 'confirmed' || q.status === 'accepted').length,
-        quotesConfirmed: quotes.filter((q: any) => q.status === 'confirmed' || q.status === 'accepted').length,
+        totalQuotes,
+        quotesSent,
+        quotesConfirmed,
         upcomingTrips: 0, // Legacy field
         upcomingBookings,
         recentActivity: 0
       })
-      setRecentClients(recentClients)
+      setRecentClients(recentClientsResult.data || [])
       setUpcomingFollowups(upcomingFollowupsResult.data || [])
       setRecentQuotes(recentQuotes)
     } catch (error) {
       console.error('Error loading dashboard:', error)
+      setError('We couldn’t load your dashboard data. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -224,6 +250,25 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 lg:p-6">
+        <div className="max-w-md mx-auto mt-12 bg-white rounded-lg shadow-sm border border-danger/30 p-6 text-center">
+          <AlertCircle className="w-10 h-10 text-danger mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">Couldn’t load your dashboard</h2>
+          <p className="text-sm text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => { setLoading(true); loadDashboardData() }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Activity className="w-4 h-4" />
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
@@ -247,8 +292,7 @@ export default function DashboardPage() {
           title="Total Clients"
           value={stats.totalClients}
           icon={Users}
-          trend="+12%"
-          trendUp={true}
+          subtitle={stats.activeClients > 0 ? `${stats.activeClients} active` : undefined}
           href="/clients"
           color="primary"
         />
@@ -269,8 +313,7 @@ export default function DashboardPage() {
           title="Client Quotes"
           value={stats.totalQuotes}
           icon={FileText}
-          trend="+8%"
-          trendUp={true}
+          subtitle={stats.quotesSent > 0 ? `${stats.quotesSent} sent` : undefined}
           href="/quotes/b2c"
           color="purple"
         />
