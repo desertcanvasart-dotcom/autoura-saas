@@ -184,3 +184,33 @@ CREATE POLICY "Users can update their tenant b2b_transport_packages" ON b2b_tran
   FOR UPDATE USING (tenant_id = get_user_tenant_id());
 CREATE POLICY "Users can delete their tenant b2b_transport_packages" ON b2b_transport_packages
   FOR DELETE USING (tenant_id = get_user_tenant_id());
+
+-- =====================================================
+-- 5. Single-tenant fallback claim
+-- =====================================================
+-- The current production reality is a single tenant. When exactly one tenant
+-- exists, any row still NULL after the FK backfills (orphan quotes, and the
+-- two catalog tables that had no FK to backfill) is unambiguously theirs —
+-- claim it so there are no dangling shared/legacy rows. In a genuine
+-- multi-tenant DB we leave them NULL (already RAISE WARNING'd above) for
+-- manual assignment rather than guessing.
+DO $$
+DECLARE
+  the_tenant UUID;
+  t TEXT;
+  n INTEGER;
+BEGIN
+  IF (SELECT count(*) FROM tenants) <> 1 THEN
+    RETURN;
+  END IF;
+  SELECT id INTO the_tenant FROM tenants LIMIT 1;
+
+  FOREACH t IN ARRAY ARRAY['tour_quotes', 'b2b_partner_pricing', 'b2b_pricing_rules', 'b2b_transport_packages']
+  LOOP
+    EXECUTE format('UPDATE %I SET tenant_id = $1 WHERE tenant_id IS NULL', t) USING the_tenant;
+    GET DIAGNOSTICS n = ROW_COUNT;
+    IF n > 0 THEN
+      RAISE NOTICE 'Claimed % NULL-tenant row(s) in % for the sole tenant %', n, t, the_tenant;
+    END IF;
+  END LOOP;
+END $$;
