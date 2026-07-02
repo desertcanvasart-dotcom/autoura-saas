@@ -13,6 +13,7 @@ import {
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // CONSTANTS
@@ -499,24 +500,24 @@ export default function AttractionsContent() {
 
     filteredAttractions.forEach(rate => {
       const row = [
-        rate.service_code || '',
-        `"${(rate.attraction_name || '').replace(/"/g, '""')}"`,
-        rate.city || '',
-        rate.fee_type || '',
+        csvCell(rate.service_code),
+        csvCell(rate.attraction_name),
+        csvCell(rate.city),
+        csvCell(rate.fee_type),
         rate.eur_rate || 0,
         rate.non_eur_rate || 0,
         rate.egyptian_rate || 0,
         rate.student_discount_percentage || 0,
         rate.child_discount_percent || 0,
-        rate.season || '',
-        rate.rate_valid_from || '',
-        rate.rate_valid_to || '',
-        rate.category || '',
-        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        csvCell(rate.season),
+        csvCell(rate.rate_valid_from),
+        csvCell(rate.rate_valid_to),
+        csvCell(rate.category),
+        csvCell(rate.notes),
         rate.is_active ? 'true' : 'false',
         rate.is_addon ? 'true' : 'false',
-        `"${(rate.addon_note || '').replace(/"/g, '""')}"`,
-        rate.supplier_id || ''
+        csvCell(rate.addon_note),
+        csvCell(rate.supplier_id)
       ]
       csvRows.push(row.join(','))
     })

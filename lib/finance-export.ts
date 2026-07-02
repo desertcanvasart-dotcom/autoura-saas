@@ -37,7 +37,7 @@ export interface PDFExportOptions {
 // exported field like `=HYPERLINK(...)` or `=cmd|...` can exfiltrate data or
 // run on open. Prefix such values with a single quote (the standard
 // mitigation), then apply normal CSV quoting.
-export function csvCell(value: string): string {
+export function csvCell(value: unknown): string {
   const s = String(value ?? '')
   const guarded = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
   return `"${guarded.replace(/"/g, '""')}"`

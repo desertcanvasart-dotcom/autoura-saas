@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // EGYPTIAN CITIES - Complete List
@@ -970,17 +971,17 @@ export default function HotelsContent() {
     ]
 
     const rows = filteredRates.map(r => [
-      r.service_code,
-      r.property_name,
-      r.property_type || 'hotel',
-      r.city || '',
-      r.board_basis || '',
-      r.tier || 'standard',
-      r.contact_name || '',
-      r.contact_email || '',
-      r.contact_phone || '',
-      r.reservations_email || '',
-      r.reservations_phone || '',
+      csvCell(r.service_code),
+      csvCell(r.property_name),
+      csvCell(r.property_type || 'hotel'),
+      csvCell(r.city),
+      csvCell(r.board_basis),
+      csvCell(r.tier || 'standard'),
+      csvCell(r.contact_name),
+      csvCell(r.contact_email),
+      csvCell(r.contact_phone),
+      csvCell(r.reservations_email),
+      csvCell(r.reservations_phone),
       // PPD Model - Low Season
       r.ppd_eur || 0,
       r.ppd_non_eur || 0,
@@ -990,8 +991,8 @@ export default function HotelsContent() {
       r.triple_reduction_non_eur || 0,
       r.suite_rate_eur || 0,
       r.suite_rate_non_eur || 0,
-      r.low_season_from || '',
-      r.low_season_to || '',
+      csvCell(r.low_season_from),
+      csvCell(r.low_season_to),
       // PPD Model - High Season
       r.high_season_ppd_eur || 0,
       r.high_season_ppd_non_eur || 0,
@@ -1001,8 +1002,8 @@ export default function HotelsContent() {
       r.high_season_triple_reduction_non_eur || 0,
       r.high_season_suite_eur || 0,
       r.high_season_suite_non_eur || 0,
-      r.high_season_from || '',
-      r.high_season_to || '',
+      csvCell(r.high_season_from),
+      csvCell(r.high_season_to),
       // PPD Model - Peak Season
       r.peak_season_ppd_eur || 0,
       r.peak_season_ppd_non_eur || 0,
@@ -1012,22 +1013,22 @@ export default function HotelsContent() {
       r.peak_season_triple_reduction_non_eur || 0,
       r.peak_season_suite_eur || 0,
       r.peak_season_suite_non_eur || 0,
-      r.peak_season_from || '',
-      r.peak_season_to || '',
-      r.peak_season_2_from || '',
-      r.peak_season_2_to || '',
+      csvCell(r.peak_season_from),
+      csvCell(r.peak_season_to),
+      csvCell(r.peak_season_2_from),
+      csvCell(r.peak_season_2_to),
       // Validity & Other
-      r.rate_valid_from || '',
-      r.rate_valid_to || '',
-      r.supplier?.name || r.supplier_name || '',
-      (r.notes || '').replace(/"/g, '""'),
-      r.supplements ? JSON.stringify(r.supplements).replace(/"/g, '""') : '',
+      csvCell(r.rate_valid_from),
+      csvCell(r.rate_valid_to),
+      csvCell(r.supplier?.name || r.supplier_name),
+      csvCell(r.notes),
+      csvCell(r.supplements ? JSON.stringify(r.supplements) : ''),
       r.is_active ? 'Yes' : 'No'
     ])
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map(row => row.join(','))
     ].join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })

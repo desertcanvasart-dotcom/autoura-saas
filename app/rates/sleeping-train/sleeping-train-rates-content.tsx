@@ -30,6 +30,7 @@ import {
   XCircle,
   Info
 } from 'lucide-react'
+import { csvCell } from '@/lib/finance-export'
 
 // Sleeping train routes (Cairo-Luxor-Aswan corridor)
 const SLEEPER_CITIES = [
@@ -320,8 +321,8 @@ export default function SleepingTrainRatesContent() {
         headers.map(header => {
           const value = rate[header as keyof SleepingTrainRate]
           if (value === null || value === undefined) return ''
-          if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
-            return `"${value.replace(/"/g, '""')}"`
+          if (typeof value === 'string') {
+            return csvCell(value)
           }
           return value
         }).join(',')

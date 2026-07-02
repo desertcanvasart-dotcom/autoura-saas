@@ -29,6 +29,7 @@ import {
   Info
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // Egyptian cities
 const EGYPT_CITIES = [
@@ -389,25 +390,25 @@ export default function MealRatesContent() {
     const csvRows = [
       headers.join(','),
       ...filteredRates.map(rate => [
-        rate.service_code || '',
-        `"${(rate.restaurant_name || '').replace(/"/g, '""')}"`,
-        rate.meal_type || '',
-        rate.cuisine_type || '',
-        rate.restaurant_type || '',
-        rate.city || '',
+        csvCell(rate.service_code),
+        csvCell(rate.restaurant_name),
+        csvCell(rate.meal_type),
+        csvCell(rate.cuisine_type),
+        csvCell(rate.restaurant_type),
+        csvCell(rate.city),
         rate.base_rate_eur || 0,
         rate.base_rate_non_eur || 0,
-        rate.season || '',
-        rate.rate_valid_from || '',
-        rate.rate_valid_to || '',
-        rate.supplier_id || '',
-        `"${(rate.supplier_name || '').replace(/"/g, '""')}"`,
-        rate.tier || '',
-        rate.meal_category || '',
-        `"${(rate.dietary_options || []).join(';')}"`,
+        csvCell(rate.season),
+        csvCell(rate.rate_valid_from),
+        csvCell(rate.rate_valid_to),
+        csvCell(rate.supplier_id),
+        csvCell(rate.supplier_name),
+        csvCell(rate.tier),
+        csvCell(rate.meal_category),
+        csvCell((rate.dietary_options || []).join(';')),
         rate.per_person_rate ? 'true' : 'false',
         rate.minimum_pax || 1,
-        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        csvCell(rate.notes),
         rate.is_active ? 'true' : 'false'
       ].join(','))
     ]
