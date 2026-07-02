@@ -1,6 +1,19 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// ============================================
+// API ROUTES THAT SELF-AUTHENTICATE
+// ============================================
+// These don't carry a Supabase session — they verify themselves another way
+// (HMAC for webhooks, OAuth state for callbacks, CRON_SECRET for cron jobs,
+// or are pre-session steps in an auth flow like signup verification).
+// Every other /api/* route MUST go through the session check below.
+const SELF_AUTH_API_PREFIXES = [
+  '/api/webhooks/',         // HMAC-verified inbound (e.g. concierge brief)
+  '/api/auth/',             // login / signup / OAuth callbacks (no session yet)
+  '/api/cron/',             // cron-job-only, verifies CRON_SECRET inside the handler
+]
+
 // Define route permissions - which roles can access which routes
 const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // Admin only
@@ -115,10 +128,26 @@ export async function middleware(request: NextRequest) {
     (route !== '/' && request.nextUrl.pathname.startsWith(route + '/'))
   )
 
-  // Allow all API routes (they handle their own auth)
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')
+  const isSelfAuthApi = isApiRoute && SELF_AUTH_API_PREFIXES.some(
+    prefix => request.nextUrl.pathname.startsWith(prefix)
+  )
 
-  // If user is not logged in and trying to access protected route
+  // Centralised /api/* auth gate. Every API route except the self-auth
+  // allowlist (HMAC webhooks, OAuth callbacks, cron jobs) MUST have a
+  // session — return 401 JSON rather than redirecting, since the caller
+  // is an API client, not a browser.
+  // Prior to this gate, every /api/* route was reachable without a
+  // session and relied on each handler's individual auth check, which
+  // is exactly the bug the main app's audit closed.
+  if (isApiRoute && !isSelfAuthApi && !user) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    )
+  }
+
+  // If user is not logged in and trying to access a protected page route
   if (!user && !isPublicRoute && !isApiRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }

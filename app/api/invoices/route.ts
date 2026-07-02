@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-numbering'
 
 /**
  * GET /api/invoices
@@ -151,32 +152,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate invoice number with type suffix
-    const year = new Date().getFullYear()
-
-    // Try to use sequence function (works even with authenticated client)
-    const { data: seqData, error: seqError } = await supabase
-      .rpc('nextval', { seq_name: 'invoice_number_seq' })
-
-    let baseNumber = 1
-    if (!seqError && seqData) {
-      baseNumber = seqData
-    } else {
-      // Fallback: count invoices in THIS TENANT only (RLS filters automatically)
-      const { count } = await supabase
-        .from('invoices')
-        .select('*', { count: 'exact', head: true })
-      baseNumber = (count || 0) + 1
-    }
-
-    // Determine invoice type and number suffix
+    // Invoice number generation goes through nextDocumentNumber (sequence-first
+    // with a year-scoped lexicographic-MAX fallback that accepts 0 and tolerates
+    // row deletions), and the INSERT below is wrapped in insertWithUniqueRetry
+    // so a 23505 violation from the new UNIQUE constraint regenerates the
+    // number rather than crashing the request. The deposit/final type suffix
+    // is appended at row-build time so the same base number stays in sync.
     const invoiceType = body.invoice_type || 'standard'
-    let invoiceNumber = `INV-${year}-${String(baseNumber).padStart(3, '0')}`
-
-    if (invoiceType === 'deposit') {
-      invoiceNumber = `INV-${year}-${String(baseNumber).padStart(3, '0')}-DEP`
-    } else if (invoiceType === 'final') {
-      invoiceNumber = `INV-${year}-${String(baseNumber).padStart(3, '0')}-FIN`
+    const buildInvoiceNumber = async () => {
+      const base = await nextDocumentNumber({
+        supabase,
+        prefix: 'INV',
+        sequenceName: 'invoice_number_seq',
+        table: 'invoices',
+        column: 'invoice_number',
+      })
+      if (invoiceType === 'deposit') return `${base}-DEP`
+      if (invoiceType === 'final') return `${base}-FIN`
+      return base
     }
 
     // Calculate amounts based on invoice type
@@ -218,9 +211,8 @@ export async function POST(request: NextRequest) {
       }]
     }
 
-    const newInvoice = {
+    const baseInvoice = {
       tenant_id, // ✅ Explicit tenant_id
-      invoice_number: invoiceNumber,
       invoice_type: invoiceType,
       deposit_percent: depositPercent,
       parent_invoice_id: body.parent_invoice_id || null,
@@ -247,11 +239,10 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    const { data, error } = await supabase
-      .from('invoices')
-      .insert([newInvoice])
-      .select()
-      .single()
+    const { data, error } = await insertWithUniqueRetry({
+      generateRow: async () => ({ ...baseInvoice, invoice_number: await buildInvoiceNumber() }),
+      insert: async (row) => await supabase.from('invoices').insert([row]).select().single(),
+    })
 
     if (error) {
       console.error('❌ Error creating invoice:', error)

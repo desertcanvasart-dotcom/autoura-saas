@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedClient, createAdminClient } from '@/lib/supabase-server'
+import { createAdminClient } from '@/lib/supabase-server'
 import { getTokensFromCode, getUserEmail } from '@/lib/gmail'
+import { verifyState } from '@/lib/oauth-state'
 
 function getSupabase() {
   return createAdminClient()
@@ -24,20 +25,14 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Authenticate via the session cookies (this redirect runs in the user's own
-  // browser). The tokens are stored against the SESSION user, never the
-  // attacker-controllable `state` parameter.
-  const authClient = await createAuthenticatedClient()
-  const { data: { user }, error: userError } = await authClient.auth.getUser()
-
-  if (userError || !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
-  // Reject forged callbacks: state must match the logged-in user
-  if (state !== user.id) {
+  // Verify the signed state before trusting the embedded user id — without
+  // this, an attacker could initiate their own Google OAuth flow with
+  // state=<victim_user_id> and have THEIR tokens written to the victim's
+  // gmail_tokens row, hijacking the victim's email-sync identity.
+  const userId = verifyState(state)
+  if (!userId) {
     return NextResponse.redirect(
-      new URL('/settings/email?error=state_mismatch', request.url)
+      new URL('/settings/email?error=invalid_state', request.url)
     )
   }
 
@@ -59,7 +54,7 @@ export async function GET(request: NextRequest) {
     const { error: dbError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .upsert({
-        user_id: user.id,
+        user_id: userId,
         email,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,

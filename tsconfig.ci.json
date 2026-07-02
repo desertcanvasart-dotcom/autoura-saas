@@ -14,6 +14,7 @@
     "lib/pricing-coverage.ts",
     "lib/rate-validation.ts",
     "lib/pricing/rate-resolution.ts",
+    "lib/pricing/pax-range.ts",
     "lib/auto-pricing-service.ts",
     "lib/tourCalculator.ts",
     "app/pricing-grid/lib/grid-completeness.ts",

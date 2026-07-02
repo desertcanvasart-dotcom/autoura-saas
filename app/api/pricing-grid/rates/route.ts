@@ -1,326 +1,317 @@
-// ============================================
-// GET /api/pricing-grid/rates?tier={tier}
-// Fetches all rate options from 12 Supabase tables
-// ============================================
+// GET /api/pricing-grid/rates?tier=standard
+// Fetches all available rate options from existing Supabase tables,
+// structured by grid slot for dropdown population.
+//
+// Multi-tenant: rates are read through the caller's RLS-scoped client
+// (requireAuth), so every table read is automatically filtered to the
+// authenticated user's tenant.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 
-interface RateOption {
-  id: string
-  label: string
-  rateEur: number
-  rateNonEur: number
-  city?: string
-  tier?: string
-  category?: string
-  details?: Record<string, any>
-  // Completeness metadata (B-full) — carried into the grid slot on selection so
-  // the gate can be transport-type-aware and entrance-class-aware.
-  serviceType?: string // transport: airport_transfer | intercity_transfer | day_tour | ...
-  pricingClass?: 'mandatory' | 'optional' | 'free' // entrance fees
-}
-
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error || !authResult.supabase) {
       return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
+        { success: false, error: authResult.error || 'Auth failed' },
+        { status: authResult.status || 401 }
       )
     }
     const { supabase } = authResult
-    if (!supabase) {
-      return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
-    }
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
 
-    // Fetch all 12 rate tables in parallel
+    // Fetch all rate tables in parallel
     const [
-      transportRes,
-      guideRes,
-      airportRes,
-      hotelStaffRes,
-      tippingRes,
-      activityRes,
-      accommodationRes,
-      entranceRes,
-      flightRes,
-      mealRes,
-      cruiseRes,
-      sleepingTrainRes,
+      { data: transportRates },
+      { data: guideRates },
+      { data: airportRates },
+      { data: hotelServiceRates },
+      { data: tippingRates },
+      { data: activityRates },
+      { data: accommodationRates },
+      { data: entranceFees },
+      { data: mealRates },
+      { data: cruiseRates },
+      { data: cruiseTransportPkgs },
+      { data: flightRates },
     ] = await Promise.all([
       supabase.from('transportation_rates').select('*').eq('is_active', true),
-      supabase.from('guide_rates').select('*'),
+      supabase.from('guide_rates').select('*').eq('is_active', true),
       supabase.from('airport_staff_rates').select('*').eq('is_active', true),
       supabase.from('hotel_staff_rates').select('*').eq('is_active', true),
       supabase.from('tipping_rates').select('*').eq('is_active', true),
-      supabase.from('activity_rates').select('*'),
-      supabase.from('accommodation_rates').select('*').eq('tier', tier),
-      supabase.from('entrance_fees').select('*'),
-      supabase.from('flight_rates').select('*').eq('is_active', true),
-      supabase.from('meal_rates').select('*'),
+      supabase.from('activity_rates').select('*').eq('is_active', true),
+      supabase.from('accommodation_rates').select('*').eq('is_active', true).eq('tier', tier),
+      supabase.from('entrance_fees').select('*').eq('is_active', true),
+      supabase.from('meal_rates').select('*').eq('is_active', true),
       supabase.from('nile_cruises').select('*').eq('is_active', true).eq('tier', tier),
-      supabase.from('sleeping_train_rates').select('*').eq('is_active', true),
+      supabase.from('b2b_transport_packages').select('*').eq('is_active', true),
+      supabase.from('flight_rates').select('*').eq('is_active', true),
     ])
 
-    // --- Transform each table into RateOption[] ---
+    // Map to RateOption format per slot. Transport tiering is built by
+    // groupVehicleRowsToTiers() at module scope (see below).
+    const rates = {
+      route: [
+        // All transport in one slot. This app stores transportation_rates as ONE
+        // ROW PER VEHICLE; group them into per-route tier sets so the grid's
+        // buildTransportTierIndex can re-select the vehicle as group size grows.
+        // Read-only — no schema change; uses the same grouping key as
+        // travel-ops-pro migration 20260205_transportation_rates_restructure.
+        ...groupVehicleRowsToTiers(transportRates || []),
+        // Cruise transport packages (bundled sightseeing vehicle for cruise days)
+        ...(cruiseTransportPkgs || []).map((r: any) => ({
+          id: r.id,
+          name: `${r.package_name} (${r.origin_city}→${r.destination_city}, ${r.duration_days}d)`,
+          rateEur: toNum(r.sedan_rate),
+          rateNonEur: toNum(r.sedan_rate),
+          city: r.origin_city,
+          details: `cruise_package | ${r.description || ''}`,
+          service_type: 'cruise_transport_package',
+          package_type: r.package_type,
+          sedan_rate: toNum(r.sedan_rate),
+          minivan_rate: toNum(r.minivan_rate),
+          van_rate: toNum(r.van_rate),
+          minibus_rate: toNum(r.minibus_rate),
+          bus_rate: toNum(r.bus_rate),
+        })),
+      ],
 
-    // Transport: expand by vehicle tier (capacity ranges)
-    const route: RateOption[] = (transportRes.data || [])
-      .filter((r: any) => r.service_type !== 'day_tour' || true) // include all types
-      .map((r: any) => ({
+      guide: (guideRates || []).map((r: any) => ({
         id: r.id,
-        label: [
-          r.service_type?.replace(/_/g, ' '),
-          r.vehicle_type,
-          r.origin_city || r.city,
-          r.destination_city ? `→ ${r.destination_city}` : '',
-          r.capacity_min && r.capacity_max ? `(${r.capacity_min}-${r.capacity_max} pax)` : '',
-        ].filter(Boolean).join(' | '),
-        rateEur: Number(r.base_rate_eur) || 0,
-        rateNonEur: Number(r.base_rate_non_eur) || Number(r.base_rate_eur) || 0,
-        city: r.origin_city || r.city,
-        category: r.service_type,
-        serviceType: r.service_type, // → carried into the slot for type-aware completeness
-        details: {
-          service_type: r.service_type,
-          vehicle_type: r.vehicle_type,
-          origin_city: r.origin_city || r.city,
-          destination_city: r.destination_city,
-          capacity_min: r.capacity_min,
-          capacity_max: r.capacity_max,
-        },
-      }))
-
-    // Guide rates
-    const guide: RateOption[] = (guideRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: [
-        r.guide_language || r.guide_type || 'Guide',
-        r.city,
-        r.tour_duration === 'half_day' ? '(Half Day)' : '(Full Day)',
-      ].filter(Boolean).join(' | '),
-      rateEur: Number(r.base_rate_eur) || Number(r.full_day_rate) || 0,
-      rateNonEur: Number(r.base_rate_non_eur) || Number(r.base_rate_eur) || Number(r.full_day_rate) || 0,
-      city: r.city,
-      details: {
-        guide_type: r.guide_type,
-        guide_language: r.guide_language,
-        half_day_rate: r.half_day_rate,
-        full_day_rate: r.full_day_rate,
-      },
-    }))
-
-    // Airport services
-    const airport_services: RateOption[] = (airportRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: [
-        r.service_type?.replace(/_/g, ' '),
-        r.airport_code,
-        r.direction,
-      ].filter(Boolean).join(' | '),
-      rateEur: Number(r.rate_eur) || 0,
-      rateNonEur: Number(r.rate_eur) || 0,
-      city: r.airport_code,
-      category: r.service_type,
-      details: { direction: r.direction, airport_code: r.airport_code },
-    }))
-
-    // Hotel services
-    const hotel_services: RateOption[] = (hotelStaffRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: [
-        r.service_type?.replace(/_/g, ' '),
-        r.hotel_category !== 'all' ? `(${r.hotel_category})` : '',
-      ].filter(Boolean).join(' '),
-      rateEur: Number(r.rate_eur) || 0,
-      rateNonEur: Number(r.rate_eur) || 0,
-      category: r.service_type,
-      details: { hotel_category: r.hotel_category },
-    }))
-
-    // Tipping
-    const tipping: RateOption[] = (tippingRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: [
-        r.role_type?.replace(/_/g, ' '),
-        r.context ? `(${r.context})` : '',
-        r.rate_unit ? `per ${r.rate_unit.replace(/_/g, ' ')}` : '',
-      ].filter(Boolean).join(' '),
-      rateEur: Number(r.rate_eur) || 0,
-      rateNonEur: Number(r.rate_eur) || 0,
-      category: r.role_type,
-      details: { role_type: r.role_type, rate_unit: r.rate_unit, context: r.context },
-    }))
-
-    // Boat rides (activity_rates where category is boat-related)
-    const boat_rides: RateOption[] = (activityRes.data || [])
-      .filter((r: any) => {
-        const cat = (r.activity_category || '').toLowerCase()
-        const name = (r.activity_name || '').toLowerCase()
-        return cat.includes('boat') || cat.includes('felucca') || cat.includes('sail') ||
-               name.includes('boat') || name.includes('felucca') || name.includes('sail')
-      })
-      .map((r: any) => ({
-        id: r.id,
-        label: `${r.activity_name}${r.city ? ` | ${r.city}` : ''}`,
-        rateEur: Number(r.base_rate_eur) || 0,
-        rateNonEur: Number(r.base_rate_non_eur) || Number(r.base_rate_eur) || 0,
+        name: `${r.guide_language || 'Guide'} (${r.guide_type || 'Egyptologist'})`,
+        rateEur: toNum(r.base_rate_eur || r.rate_eur),
+        rateNonEur: toNum(r.base_rate_non_eur || r.rate_non_eur || r.base_rate_eur || r.rate_eur),
         city: r.city,
-        category: 'boat',
-      }))
+        details: r.guide_language,
+      })),
 
-    // Accommodation (filtered by tier already)
-    const accommodation: RateOption[] = (accommodationRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: [r.hotel_name, r.room_type, r.city].filter(Boolean).join(' | '),
-      rateEur: Number(r.rate_low_season_dbl) || Number(r.rate_high_season_dbl) || 0,
-      rateNonEur: Number(r.rate_low_season_dbl) || Number(r.rate_high_season_dbl) || 0,
-      city: r.city,
-      tier: r.tier,
-      details: {
-        hotel_name: r.hotel_name,
-        room_type: r.room_type,
-        rate_low_season_sgl: Number(r.rate_low_season_sgl) || 0,
-        rate_low_season_dbl: Number(r.rate_low_season_dbl) || 0,
-        rate_high_season_sgl: Number(r.rate_high_season_sgl) || 0,
-        rate_high_season_dbl: Number(r.rate_high_season_dbl) || 0,
-        rate_peak_season_sgl: Number(r.rate_peak_season_sgl) || 0,
-        rate_peak_season_dbl: Number(r.rate_peak_season_dbl) || 0,
-      },
-    }))
+      airport_services: (airportRates || []).map((r: any) => ({
+        id: r.id,
+        name: `${r.airport_code} — ${r.direction || 'both'} (${r.airport_code})`,
+        rateEur: toNum(r.rate_eur),
+        rateNonEur: toNum(r.rate_eur),
+        city: r.airport_code,
+        details: `${r.direction || 'both'} | ${r.description || ''}`.trim(),
+      })),
 
-    // Entrance fees
-    const entrance_fees: RateOption[] = (entranceRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: `${r.attraction_name}${r.city ? ` | ${r.city}` : ''}`,
-      rateEur: Number(r.eur_rate) || 0,
-      rateNonEur: Number(r.non_eur_rate) || Number(r.eur_rate) || 0,
-      city: r.city,
-      category: r.category,
-      // Derive class until pricing_class is populated: is_addon ⇒ optional, else mandatory.
-      // (A genuinely free site should be tagged pricing_class: 'free' explicitly.)
-      pricingClass: (r.pricing_class as 'mandatory' | 'optional' | 'free') || (r.is_addon ? 'optional' : 'mandatory'),
-      details: { is_addon: r.is_addon, fee_type: r.fee_type, pricing_class: r.pricing_class },
-    }))
+      hotel_services: (hotelServiceRates || []).map((r: any) => {
+        // Build a readable name from service_type + category + destination
+        const typeLabel = (r.service_type || 'service').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+        const catLabel = r.hotel_category && r.hotel_category !== 'all' ? ` (${r.hotel_category})` : ''
+        const destLabel = r.destination ? ` — ${r.destination}` : ''
+        return {
+          id: r.id,
+          name: `${typeLabel}${catLabel}${destLabel}`,
+          rateEur: toNum(r.rate_eur),
+          rateNonEur: toNum(r.rate_eur),
+          category: r.hotel_category,
+          city: r.destination,  // Use destination as city for filtering
+          details: r.description || `${typeLabel} | ${r.hotel_category || 'all'}`,
+        }
+      }),
 
-    // Flights
-    const flights: RateOption[] = (flightRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: [
-        r.route_name || `${r.route_from} → ${r.route_to}`,
-        r.airline,
-        r.cabin_class,
-      ].filter(Boolean).join(' | '),
-      rateEur: Number(r.base_rate_eur) || 0,
-      rateNonEur: Number(r.base_rate_non_eur) || Number(r.base_rate_eur) || 0,
-      city: r.route_from,
-      details: {
+      tipping: (tippingRates || []).map((r: any) => ({
+        id: r.id,
+        name: r.role || r.service_code || 'Tip',
+        rateEur: toNum(r.rate_eur || r.amount_eur),
+        rateNonEur: toNum(r.rate_eur || r.amount_eur),
+        details: r.description,
+      })),
+
+      boat_rides: (activityRates || [])
+        .filter((r: any) => /boat|felucca|motor/i.test(r.activity_name || r.category || ''))
+        .map((r: any) => ({
+          id: r.id,
+          name: r.activity_name,
+          rateEur: toNum(r.rate_eur || r.base_rate_eur),
+          rateNonEur: toNum(r.rate_non_eur || r.base_rate_non_eur || r.rate_eur || r.base_rate_eur),
+          city: r.city,
+          details: r.pricing_type,
+        })),
+
+      accommodation: (accommodationRates || []).map((r: any) => ({
+        id: r.id,
+        name: `${r.property_name} ${r.city} (${r.tier} | ${r.board_basis || 'BB'})`,
+        rateEur: toNum(r.pp_double_eur),
+        rateNonEur: toNum(r.pp_double_non_eur),
+        city: r.city,
+        details: `${r.tier} | ${r.board_basis || 'BB'}`,
+        board_basis: r.board_basis || 'BB',
+        single_supp_eur: toNum(r.single_supp_eur),
+        single_supp_non_eur: toNum(r.single_supp_non_eur),
+      })),
+
+      entrance_fees: (entranceFees || []).map((r: any) => ({
+        id: r.id,
+        name: r.attraction_name,
+        rateEur: toNum(r.eur_rate),
+        rateNonEur: toNum(r.non_eur_rate),
+        city: r.city,
+        category: r.category,
+      })),
+
+      flights: (flightRates || []).map((r: any) => ({
+        id: r.id,
+        name: `${r.airline} ${r.route_from}→${r.route_to} (${r.cabin_class})`,
+        rateEur: toNum(r.base_rate_eur) + toNum(r.tax_eur),
+        rateNonEur: toNum(r.base_rate_non_eur || r.base_rate_eur) + toNum(r.tax_non_eur || r.tax_eur),
+        city: r.route_from,
+        details: `${r.airline} | ${r.flight_number || ''} | ${r.cabin_class}`,
         route_from: r.route_from,
         route_to: r.route_to,
-        airline: r.airline,
-        cabin_class: r.cabin_class,
-        tax_eur: Number(r.tax_eur) || 0,
-        tax_non_eur: Number(r.tax_non_eur) || 0,
-      },
-    }))
+      })),
 
-    // Experiences (non-boat activities)
-    const experiences: RateOption[] = (activityRes.data || [])
-      .filter((r: any) => {
-        const cat = (r.activity_category || '').toLowerCase()
-        const name = (r.activity_name || '').toLowerCase()
-        return !cat.includes('boat') && !cat.includes('felucca') && !cat.includes('sail') &&
-               !name.includes('boat') && !name.includes('felucca') && !name.includes('sail')
-      })
-      .map((r: any) => ({
+      experiences: (activityRates || [])
+        .filter((r: any) => !/boat|felucca|motor/i.test(r.activity_name || r.category || ''))
+        .map((r: any) => ({
+          id: r.id,
+          name: r.activity_name,
+          rateEur: toNum(r.rate_eur || r.base_rate_eur),
+          rateNonEur: toNum(r.rate_non_eur || r.base_rate_non_eur || r.rate_eur || r.base_rate_eur),
+          city: r.city,
+          details: r.pricing_type,
+        })),
+
+      meals: (mealRates || []).map((r: any) => ({
         id: r.id,
-        label: `${r.activity_name}${r.city ? ` | ${r.city}` : ''}`,
-        rateEur: Number(r.base_rate_eur) || 0,
-        rateNonEur: Number(r.base_rate_non_eur) || Number(r.base_rate_eur) || 0,
+        name: `${r.meal_type} - ${r.restaurant_name || 'Restaurant'} (${r.city})`,
+        rateEur: toNum(r.base_rate_eur || r.rate_eur),
+        rateNonEur: toNum(r.base_rate_non_eur || r.rate_non_eur || r.base_rate_eur || r.rate_eur),
         city: r.city,
-        category: r.activity_category,
-      }))
+        category: r.meal_type,
+        details: r.restaurant_name,
+      })),
 
-    // Meals
-    const meals: RateOption[] = (mealRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: [r.restaurant_name, r.meal_type, r.city].filter(Boolean).join(' | '),
-      rateEur: Number(r.base_rate_eur) || 0,
-      rateNonEur: Number(r.base_rate_non_eur) || Number(r.base_rate_eur) || 0,
-      city: r.city,
-      tier: r.tier,
-      category: r.meal_type,
-    }))
+      water: [
+        { id: 'water-standard', name: 'Water Bottles', rateEur: 0.50, rateNonEur: 0.50, details: 'Per person per day' }
+      ],
 
-    // Nile Cruises (filtered by tier already)
-    const cruise: RateOption[] = (cruiseRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: [r.ship_name, r.cabin_type, r.route_name].filter(Boolean).join(' | '),
-      rateEur: Number(r.ppd_eur) || Number(r.rate_double_eur) || 0,
-      rateNonEur: Number(r.ppd_non_eur) || Number(r.ppd_eur) || 0,
-      tier: r.tier,
-      details: {
-        ship_name: r.ship_name,
-        cabin_type: r.cabin_type,
-        ppd_eur: Number(r.ppd_eur) || 0,
-        ppd_non_eur: Number(r.ppd_non_eur) || 0,
-        single_supplement_eur: Number(r.single_supplement_eur) || 0,
-        single_supplement_non_eur: Number(r.single_supplement_non_eur) || 0,
-        embark_city: r.embark_city,
-        disembark_city: r.disembark_city,
+      cruise: (cruiseRates || []).map((r: any) => ({
+        id: r.id,
+        name: `${r.ship_name} (${r.duration_nights}N, ${r.cabin_type})`,
+        rateEur: toNum(r.rate_double_eur || r.rate_low_double_eur),
+        rateNonEur: toNum(r.rate_double_non_eur || r.rate_low_double_non_eur || r.rate_double_eur || r.rate_low_double_eur),
+        details: `${r.route_name || ''} | ${r.tier || ''} | ${r.cabin_type || 'Standard'}`,
+        single_rate_eur: toNum(r.rate_single_eur || r.rate_low_single_eur),
+        single_rate_non_eur: toNum(r.rate_single_non_eur || r.rate_low_single_non_eur),
         duration_nights: r.duration_nights,
-        meals_included: r.meals_included,
-        sightseeing_included: r.sightseeing_included,
-      },
-    }))
+        ship_category: r.ship_category,
+      })),
+    }
 
-    // Sleeping trains
-    const sleeping_trains: RateOption[] = (sleepingTrainRes.data || []).map((r: any) => ({
-      id: r.id,
-      label: [
-        `${r.origin_city} → ${r.destination_city}`,
-        r.cabin_type,
-        r.operator_name,
-      ].filter(Boolean).join(' | '),
-      rateEur: Number(r.rate_oneway_eur) || 0,
-      rateNonEur: Number(r.rate_oneway_non_eur) || Number(r.rate_oneway_eur) || 0,
-      details: {
-        origin_city: r.origin_city,
-        destination_city: r.destination_city,
-        cabin_type: r.cabin_type,
-        departure_time: r.departure_time,
-        arrival_time: r.arrival_time,
-      },
-    }))
-
-    return NextResponse.json({
-      success: true,
-      rates: {
-        route,
-        guide,
-        airport_services,
-        hotel_services,
-        tipping,
-        boat_rides,
-        accommodation,
-        entrance_fees,
-        flights,
-        experiences,
-        meals,
-        cruise,
-        sleeping_trains,
-      },
-    })
+    return NextResponse.json({ success: true, data: rates })
   } catch (error: any) {
-    console.error('Pricing grid rates error:', error)
-    return NextResponse.json(
-      { success: false, error: error.message || 'Failed to fetch rates' },
-      { status: 500 }
-    )
+    console.error('Failed to fetch grid rates:', error)
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
+}
+
+function toNum(v: any): number {
+  const n = parseFloat(v)
+  return isNaN(n) ? 0 : n
+}
+
+// ============================================================================
+// Transport tiering (Option B) — read the one-row-per-vehicle
+// transportation_rates model and synthesize the tier set the grid expects.
+// ============================================================================
+// The grid calculator (buildTransportTierIndex / resolveTransportRate) expects
+// each transport SERVICE to expose its vehicle tiers as options whose id is
+// `${rowId}__${tier}` carrying a capacity band, so the right vehicle is
+// re-selected as group size grows. travel-ops-pro stores those tiers as columns
+// on ONE row; this app stores ONE ROW PER VEHICLE. We group the rows here — by
+// the same key travel-ops-pro migration 20260205 used — and emit the same option
+// shape. Pure and read-only: the table is never modified.
+
+interface VehicleTierDef { key: string; capMin: number; capMax: number; aliases: string[] }
+const VEHICLE_TIER_DEFS: VehicleTierDef[] = [
+  { key: 'sedan',   capMin: 1,  capMax: 2,  aliases: ['sedan', 'car', 'saloon'] },
+  { key: 'minivan', capMin: 3,  capMax: 7,  aliases: ['minivan', 'mini van', 'mpv'] },
+  { key: 'van',     capMin: 8,  capMax: 12, aliases: ['van', 'h1', 'hiace'] },
+  { key: 'minibus', capMin: 13, capMax: 20, aliases: ['minibus', 'mini bus', 'coaster'] },
+  { key: 'bus',     capMin: 21, capMax: 45, aliases: ['bus', 'coach'] },
+]
+const TIER_BY_ALIAS = new Map<string, VehicleTierDef>()
+for (const t of VEHICLE_TIER_DEFS) for (const a of t.aliases) TIER_BY_ALIAS.set(a, t)
+
+function normLower(v: any): string {
+  return String(v ?? '').toLowerCase().trim()
+}
+
+function vehicleSlug(v: any): string {
+  return normLower(v).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'vehicle'
+}
+
+/**
+ * Group per-vehicle transportation_rates rows into the grid's tiered option
+ * shape. Rows are grouped by (service_type, city, origin_city, destination_city,
+ * route_name); each group's stable keeper id (earliest created_at, then lowest
+ * id) becomes the option rowId, so all of a route's vehicles share one
+ * `${keeperId}__${tier}` family and buildTransportTierIndex re-selects by pax.
+ * Each vehicle row keeps its own rate + capacity band (falling back to the
+ * canonical tier band when the row's capacity columns are null).
+ */
+export function groupVehicleRowsToTiers(rows: any[]): any[] {
+  const groupKey = (r: any) =>
+    [normLower(r.service_type), normLower(r.city), normLower(r.origin_city),
+     normLower(r.destination_city), normLower(r.route_name)].join('|')
+
+  const groups = new Map<string, any[]>()
+  for (const r of rows) {
+    const k = groupKey(r)
+    const arr = groups.get(k)
+    if (arr) arr.push(r)
+    else groups.set(k, [r])
+  }
+
+  const options: any[] = []
+  for (const groupRows of groups.values()) {
+    const sorted = [...groupRows].sort((a, b) => {
+      const ca = String(a.created_at ?? ''), cb = String(b.created_at ?? '')
+      if (ca !== cb) return ca < cb ? -1 : 1
+      return String(a.id) < String(b.id) ? -1 : 1
+    })
+    const keeper = sorted[0]
+    const label =
+      keeper.route_name ||
+      `${keeper.origin_city || keeper.city || ''}${keeper.destination_city ? ' → ' + keeper.destination_city : ''}`.trim() ||
+      keeper.service_code ||
+      `${keeper.city || ''} ${keeper.service_type || 'Transport'}`.trim()
+
+    const usedTierKeys = new Map<string, number>()
+    for (const r of sorted) {
+      const rate = toNum(r.base_rate_eur)
+      if (rate <= 0) continue // no usable rate for this vehicle row — skip
+      const tier = TIER_BY_ALIAS.get(normLower(r.vehicle_type))
+      let tierKey = tier ? tier.key : vehicleSlug(r.vehicle_type)
+      // Disambiguate if two rows map to the same tier within a group (keeps option
+      // ids unique; buildTransportTierIndex still groups by the `${keeperId}` prefix).
+      const seen = usedTierKeys.get(tierKey) ?? 0
+      usedTierKeys.set(tierKey, seen + 1)
+      if (seen > 0) tierKey = `${tierKey}_${seen + 1}`
+
+      const capMin = r.capacity_min != null ? Number(r.capacity_min) : (tier ? tier.capMin : 1)
+      const capMax = r.capacity_max != null ? Number(r.capacity_max) : (tier ? tier.capMax : 99)
+      const vlabel = tier ? tier.key.charAt(0).toUpperCase() + tier.key.slice(1) : (r.vehicle_type || 'Vehicle')
+
+      options.push({
+        id: `${keeper.id}__${tierKey}`,
+        name: `${vlabel} (${capMin}-${capMax} pax) — ${label}`,
+        rateEur: rate,
+        rateNonEur: toNum(r.base_rate_non_eur) || rate,
+        city: r.origin_city || r.city,
+        details: `${vlabel} | ${r.service_type || ''}`.trim(),
+        capacity_min: capMin,
+        capacity_max: capMax,
+        service_type: r.service_type,
+        origin_city: r.origin_city || r.city,
+        destination_city: r.destination_city,
+      })
+    }
+  }
+  return options
 }

@@ -61,13 +61,17 @@ export async function PUT(
       updated_at: new Date().toISOString()
     }
 
-    // List of allowed fields to update
+    // List of allowed fields to update.
+    // amount_paid / balance_due / paid_at are DERIVED from payment activity
+    // (see the payments routes) and MUST NOT be writable through this edit
+    // endpoint — otherwise a caller could PUT { amount_paid: 9999, paid_at: ... }
+    // and mark the invoice paid without recording an actual payment.
     const allowedFields = [
       'client_id', 'itinerary_id', 'client_name', 'client_email',
       'line_items', 'subtotal', 'tax_rate', 'tax_amount', 'discount_amount',
-      'total_amount', 'currency', 'amount_paid', 'balance_due', 'status',
+      'total_amount', 'currency', 'status',
       'issue_date', 'due_date', 'notes', 'payment_terms', 'payment_instructions',
-      'sent_at', 'paid_at'
+      'sent_at'
     ]
 
     for (const field of allowedFields) {

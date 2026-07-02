@@ -1,5 +1,6 @@
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
+import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
 // Map service types to document types
 // null = skip (no document needed)
@@ -152,7 +153,15 @@ export async function POST(
       return NextResponse.json({ error: 'Itinerary not found' }, { status: 404 })
     }
 
-
+    // Output gate (harness Layer 2): don't generate operational paperwork for an
+    // itinerary whose price isn't deliverable.
+    const priceCheck = checkAmountDeliverable(itinerary.total_cost, { currency: itinerary.currency })
+    if (!priceCheck.ok) {
+      return NextResponse.json(
+        { error: 'Itinerary price is not deliverable', violations: priceCheck.violations },
+        { status: 422 }
+      )
+    }
 
     // Fetch all days with services
     const { data: days, error: daysError } = await supabase

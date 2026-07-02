@@ -1,56 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { sendMail } from '@/lib/email-send'
 
-// Email service - adjust based on your setup (Resend, SendGrid, etc.)
-// This example uses a generic sendEmail function - replace with your actual implementation
+// Sends a reminder email directly via the shared mail helper.
 async function sendReminderEmail(params: {
   to: string
   subject: string
   html: string
   invoiceNumber: string
 }): Promise<{ success: boolean; error?: string }> {
-  try {
-    // Option 1: If using Resend
-    // const resend = new Resend(process.env.RESEND_API_KEY)
-    // await resend.emails.send({
-    //   from: 'Travel2Egypt <invoices@travel2egypt.com>',
-    //   to: params.to,
-    //   subject: params.subject,
-    //   html: params.html
-    // })
-
-    // Option 2: If using SendGrid
-    // const sgMail = require('@sendgrid/mail')
-    // sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-    // await sgMail.send({
-    //   to: params.to,
-    //   from: 'invoices@travel2egypt.com',
-    //   subject: params.subject,
-    //   html: params.html
-    // })
-
-    // Option 3: If using your existing /api/send-email endpoint
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: params.to,
-        subject: params.subject,
-        html: params.html,
-        type: 'payment_reminder'
-      })
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      return { success: false, error: error.message || 'Failed to send email' }
-    }
-
-    return { success: true }
-  } catch (error: any) {
-    console.error('Error sending reminder email:', error)
-    return { success: false, error: error.message }
-  }
+  const result = await sendMail({
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
+  })
+  return { success: result.success, error: result.error }
 }
 
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {

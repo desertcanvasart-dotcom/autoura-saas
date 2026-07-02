@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { matchTourTemplate, getTemplateWithPricing } from '@/lib/tour-matcher-service'
-import { calculatePricingFromRates } from '@/lib/rate-lookup-service'
+import type { PricingHole } from '@/lib/pricing-types'
+
+// Pricing consolidation: this route used to fall back to
+// `calculatePricingFromRates` / `getFallbackRates` from lib/rate-lookup-service
+// whenever no tour template matched. Those silently multiplied a DB rate by a
+// TIER_MULTIPLIERS table (and hardcoded fallbacks) — fabricating a price not
+// backed by any real rate row. Per the pricing harness (no fabrication), the
+// right behaviour is: if no template-backed price is available, return a
+// structured hole and force manual review. Matches travel-ops-pro.
 
 // ============================================
 // QUOTE BUILDER API
@@ -150,32 +158,45 @@ export async function POST(request: NextRequest) {
         }
       }
     } else {
-      // Calculate from rate tables
-      const city = cities[0] || 
-                   (templateData?.template?.cities_covered?.[0]) || 
-                   'Cairo'
-
-      const calculated = await calculatePricingFromRates(supabase, {
-        city,
-        pax: totalPax,
-        language,
-        is_euro_passport: isEuroPassport,
-        duration_days,
-        num_adults,
-        num_children,
-        include_lunch,
-        include_dinner,
-        include_accommodation,
-        hotel_standard: budget_level as 'budget' | 'standard' | 'luxury',
-        attractions: attractions.length > 0 ? attractions : undefined
-      })
-
-      // Never fabricate: an incomplete calculation is returned WITHOUT a
-      // deliverable price — the holes tell the operator what rate data to add.
-      pricingResult = {
-        ...calculated,
-        source: 'database_rates'
+      // No deliverable template-backed price. Instead of fabricating one from
+      // rate-lookup-service (TIER_MULTIPLIERS / hardcoded fallbacks), build the
+      // structured hole so the caller can surface exactly why no price was
+      // emitted and route the request to manual pricing.
+      const holes: PricingHole[] = []
+      if (!matchResult?.best_match) {
+        holes.push({
+          kind: 'template',
+          reason: 'missing',
+          tier: budget_level,
+          lookupAttempted: `tour_template match for "${tour_requested ?? ''}" across ${cities.length} city(ies)`,
+          message: `No tour template matched this request. Add a matching template (or improve scoring), or price this quote manually.`,
+        })
+      } else if (matchResult.best_match.match_score < 50) {
+        holes.push({
+          kind: 'template',
+          reason: 'fuzzy',
+          tier: budget_level,
+          lookupAttempted: `tour_template match for "${tour_requested ?? ''}" (best score ${matchResult.best_match.match_score} < 50)`,
+          message: `Best matching template "${matchResult.best_match.template_name}" scored only ${matchResult.best_match.match_score} — too low to use safely. Refine the request or price manually.`,
+        })
+      } else {
+        holes.push({
+          kind: 'template',
+          reason: 'missing',
+          tier: budget_level,
+          lookupAttempted: `tour_pricing rows for template ${matchResult.best_match.template_id} at ${totalPax} pax ${isEuroPassport ? 'EUR' : 'non-EUR'}`,
+          message: `Template "${matchResult.best_match.template_name}" matched but has no pricing row for ${totalPax} pax ${isEuroPassport ? 'EUR' : 'non-EUR'}. Add the missing pricing row in tour_pricing or price manually.`,
+        })
       }
+
+      return NextResponse.json({
+        success: false,
+        needs_manual_pricing: true,
+        complete: false,
+        holes,
+        reason: 'no_template_backed_price',
+        message: holes[0].message,
+      })
     }
 
     // ============================================
@@ -208,14 +229,16 @@ export async function POST(request: NextRequest) {
         all_matches: matchResult.matches?.slice(0, 3) || []
       } : null,
 
-      // Pricing
+      // Pricing — always template_pricing now (the no-template path returns a
+      // structured hole above); complete/holes propagated instead of rates_used.
       pricing: {
         total_cost: pricingResult.total_cost,
         per_person_cost: pricingResult.per_person_cost,
         currency: 'EUR',
         source: pricingResult.source,
         breakdown: pricingResult.breakdown,
-        rates_used: pricingResult.rates_used || null
+        complete: true,
+        holes: [],
       },
 
       // Template details (if matched)

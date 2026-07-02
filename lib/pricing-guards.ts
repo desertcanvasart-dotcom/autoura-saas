@@ -151,6 +151,25 @@ export function checkQuoteRowDeliverable(
   return { ok: violations.length === 0, violations, holes: [] }
 }
 
+/**
+ * Output gate for a single emitted amount (itinerary total, invoice total,
+ * quote selling price) at send/PDF time. The stored value carries no
+ * completeness metadata, so this enforces structural sanity only
+ * (zero/negative/NaN, currency present). Mirrors the consolidation Layer-2
+ * gate used on every customer-facing emit path.
+ */
+export function checkAmountDeliverable(
+  amount: number | null | undefined,
+  opts: { label?: string; currency?: string | null; pricePerPerson?: number | null; numPax?: number | null } = {}
+): DeliverableCheck {
+  return checkDeliverablePrice({
+    sellingPrice: amount,
+    pricePerPerson: opts.pricePerPerson,
+    numPax: opts.numPax,
+    currency: opts.currency,
+  })
+}
+
 export class PriceNotDeliverableError extends Error {
   readonly violations: string[]
   readonly holes: PricingHole[]

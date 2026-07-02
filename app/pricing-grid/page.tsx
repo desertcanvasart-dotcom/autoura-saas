@@ -1,89 +1,147 @@
 'use client'
 
-import { Suspense, useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Plus, RotateCcw, ArrowRight, ArrowLeft, Loader2, DollarSign } from 'lucide-react'
-
-import type {
-  GridConfig, GridDay, GridTotals, AllRates, SlotValue, ExchangeRates, Currency,
-  GridPhase, ReviewDay,
-} from './types'
-import { DEFAULT_CONFIG, EMPTY_TOTALS, DEFAULT_MARGINS } from './types'
-import { createEmptySlots, mapServiceToSlot } from './lib/slot-mapping'
-import { calculateGrandTotals } from './lib/calculator'
-import { gridCompleteness } from './lib/grid-completeness'
-
+import type { GridConfig, GridDay, AllRates, SlotValue, GridTotals } from './types'
+import { SLOT_DEFINITIONS } from './types'
+import { calculateGrandTotals, calculateDay } from './lib/calculator'
+import { mapServicesToSlots } from './lib/slot-mapping'
+import GridHeader from './components/GridHeader'
+import ClientInfoBar from './components/ClientInfoBar'
+import InputPanel from './components/InputPanel'
+import DayRow from './components/DayRow'
+import GridSummary from './components/GridSummary'
 import { showToast } from '@/app/contexts/ToastContext'
-import { useConfirmDialog } from '@/components/ConfirmDialog'
-import GridHeader from '@/components/pricing-grid/GridHeader'
-import InputPanel from '@/components/pricing-grid/InputPanel'
-import ClientInfoBar from '@/components/pricing-grid/ClientInfoBar'
-import DayRow from '@/components/pricing-grid/DayRow'
-import GridSummary from '@/components/pricing-grid/GridSummary'
-import ReviewDayCard from '@/components/pricing-grid/ReviewDayCard'
 
-const STORAGE_KEY = 'pricing-grid-state'
+// ============================================
+// LOCAL STORAGE PERSISTENCE
+// ============================================
 
-// Convert reviewed days into clean text for the pricing parse
-function reviewDaysToText(reviewDays: ReviewDay[], config: GridConfig): string {
-  let text = ''
-  if (config.tourName) text += `Tour: ${config.tourName}\n`
-  if (config.clientName) text += `Client: ${config.clientName}\n`
-  if (config.pax) text += `Travelers: ${config.pax}\n`
-  if (config.startDate) text += `Start date: ${config.startDate}\n`
-  if (config.nationality) text += `Nationality: ${config.nationality}\n`
-  text += '\n'
+const STORAGE_KEY_CONFIG = 'pricing-grid-config'
+const STORAGE_KEY_DAYS = 'pricing-grid-days'
 
-  for (const day of reviewDays) {
-    text += `Day ${day.dayNumber}: ${day.title}\n`
-    text += `City: ${day.city}\n`
-    if (day.description) text += `${day.description}\n`
-    for (const svc of day.services) {
-      const prefix = svc.category === 'group' ? '[GROUP]' : '[PP]'
-      text += `- ${prefix} ${svc.text}\n`
-    }
-    text += '\n'
+function saveToStorage(key: string, data: any) {
+  try { localStorage.setItem(key, JSON.stringify(data)) } catch (e) { /* ignore */ }
+}
+
+function loadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    const stored = localStorage.getItem(key)
+    if (stored) return JSON.parse(stored) as T
+  } catch (e) { /* ignore */ }
+  return fallback
+}
+
+function clearStorage() {
+  try {
+    localStorage.removeItem(STORAGE_KEY_CONFIG)
+    localStorage.removeItem(STORAGE_KEY_DAYS)
+  } catch (e) { /* ignore */ }
+}
+
+// ============================================
+// DEFAULT CONFIG
+// ============================================
+
+const DEFAULT_CONFIG: GridConfig = {
+  pax: 2,
+  passport: 'non_eu',
+  tier: 'standard',
+  clientType: 'b2c',
+  withGuide: true,
+  currency: 'EUR',
+  marginPercent: 25,
+  exchangeRate: null,
+  startDate: new Date().toISOString().split('T')[0],
+  clientName: '',
+  clientEmail: '',
+  clientPhone: '',
+  tourName: '',
+  nationality: '',
+  itineraryId: null,
+  itineraryCode: null,
+  partnerId: null,
+  partnerName: '',
+  clientId: null,
+}
+
+// ============================================
+// HELPERS
+// ============================================
+
+function createEmptyDay(dayNumber: number): GridDay {
+  return {
+    id: crypto.randomUUID(),
+    dayNumber,
+    title: `Day ${dayNumber}`,
+    city: '',
+    description: '',
+    isExpanded: false,
+    slots: SLOT_DEFINITIONS.map(def => ({
+      slotId: def.slotId,
+      selectedItems: [],
+      customAmount: 0,
+    })),
   }
-  return text.trim()
+}
+
+// ============================================
+// MAIN PAGE COMPONENT
+// ============================================
+
+export default function PricingGridPage() {
+  return (
+    <Suspense fallback={<div className="max-w-7xl mx-auto p-6 text-center text-gray-500">Loading...</div>}>
+      <PricingGridContent />
+    </Suspense>
+  )
 }
 
 function PricingGridContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const dialog = useConfirmDialog()
-
-  // --- Phase State ---
-  const [phase, setPhase] = useState<GridPhase>('input')
-  const [reviewDays, setReviewDays] = useState<ReviewDay[]>([])
-
-  // --- Core State ---
-  const [config, setConfig] = useState<GridConfig>(DEFAULT_CONFIG)
-  const [days, setDays] = useState<GridDay[]>([])
-  const [rates, setRates] = useState<AllRates>({})
-  const [totals, setTotals] = useState<GridTotals>(EMPTY_TOTALS)
-
-  // --- UI State ---
+  const [config, setConfig] = useState<GridConfig>(() =>
+    loadFromStorage(STORAGE_KEY_CONFIG, DEFAULT_CONFIG)
+  )
+  const [days, setDays] = useState<GridDay[]>(() =>
+    loadFromStorage(STORAGE_KEY_DAYS, [])
+  )
+  const [rates, setRates] = useState<AllRates | null>(null)
+  const [loading, setLoading] = useState(true)
   const [isParsing, setIsParsing] = useState(false)
-  const [isPricing, setIsPricing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [isLoadingRates, setIsLoadingRates] = useState(false)
-  const [savedUrl, setSavedUrl] = useState<string | null>(null)
-  const [parseError, setParseError] = useState('')
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null)
+  const [savedQuoteNumber, setSavedQuoteNumber] = useState<string | null>(null)
 
-  // --- Refs ---
-  const exchangeRatesRef = useRef<ExchangeRates>({ EUR: 1, USD: 1.08, GBP: 0.86, EGP: 52.5 })
-  const prevTierRef = useRef(config.tier)
-  const isInitialLoadRef = useRef(true)
+  const isInitialLoad = useRef(true)
 
-  // --- Always start fresh on mount ---
+  // Persist to localStorage
   useEffect(() => {
-    localStorage.removeItem(STORAGE_KEY)
-    isInitialLoadRef.current = false
+    if (isInitialLoad.current) return
+    saveToStorage(STORAGE_KEY_CONFIG, config)
+  }, [config])
+
+  useEffect(() => {
+    if (isInitialLoad.current) return
+    saveToStorage(STORAGE_KEY_DAYS, days)
+  }, [days])
+
+  useEffect(() => {
+    isInitialLoad.current = false
   }, [])
 
-  // --- Fetch user preferences on mount ---
+  // Load user preferences as defaults (tier, margin, currency) on first load
+  const hasLoadedPrefs = useRef(false)
   useEffect(() => {
-    async function loadPrefs() {
+    if (hasLoadedPrefs.current) return
+    hasLoadedPrefs.current = true
+    // Only apply preferences if config is at defaults (no localStorage override)
+    const isDefault = config.tier === DEFAULT_CONFIG.tier &&
+      config.marginPercent === DEFAULT_CONFIG.marginPercent &&
+      config.currency === DEFAULT_CONFIG.currency
+    if (!isDefault) return
+
+    const loadPrefs = async () => {
       try {
         const res = await fetch('/api/user-preferences')
         const data = await res.json()
@@ -96,674 +154,637 @@ function PricingGridContent() {
             currency: prefs.default_currency || prev.currency,
           }))
         }
-      } catch {}
-    }
-    loadPrefs()
-  }, [])
-
-  // --- Fetch exchange rates on mount ---
-  useEffect(() => {
-    async function loadExchangeRates() {
-      try {
-        const res = await fetch('/api/exchange-rates')
-        const data = await res.json()
-        if (data.success && data.data) {
-          const ratesMap: ExchangeRates = { EUR: 1, USD: 1.08, GBP: 0.86, EGP: 52.5 }
-          for (const r of data.data) {
-            if (r.target_currency && r.rate) {
-              ratesMap[r.target_currency as Currency] = Number(r.rate)
-            }
-          }
-          exchangeRatesRef.current = ratesMap
-          setConfig(prev => ({
-            ...prev,
-            exchangeRate: prev.currency === 'EUR' ? null : ratesMap[prev.currency] || null,
-          }))
-        }
-      } catch {}
-    }
-    loadExchangeRates()
-  }, [])
-
-  // --- Fetch rates when tier changes ---
-  useEffect(() => {
-    async function loadRates() {
-      setIsLoadingRates(true)
-      try {
-        const res = await fetch(`/api/pricing-grid/rates?tier=${config.tier}`)
-        const data = await res.json()
-        if (data.success && data.rates) {
-          setRates(data.rates)
-
-          if (prevTierRef.current !== config.tier && !isInitialLoadRef.current) {
-            autoSwapTierSlots(data.rates)
-          }
-          prevTierRef.current = config.tier
-        }
       } catch (err) {
-        console.error('Failed to load rates:', err)
-      } finally {
-        setIsLoadingRates(false)
+        console.error('Failed to load user preferences:', err)
       }
     }
-    loadRates()
-  }, [config.tier])
+    loadPrefs()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // --- Update exchange rate when currency changes ---
-  useEffect(() => {
-    const rate = config.currency === 'EUR' ? null : exchangeRatesRef.current[config.currency] || null
-    setConfig(prev => ({ ...prev, exchangeRate: rate }))
-  }, [config.currency])
-
-  // --- Recalculate totals on any change ---
-  useEffect(() => {
-    const newTotals = calculateGrandTotals(days, config)
-    setTotals(newTotals)
-  }, [days, config.pax, config.marginPercent, config.withGuide])
-
-  // --- Handle URL params (from inbox integration) ---
-  useEffect(() => {
-    // ?itinerary=<id> → load an existing itinerary straight into the grid
-    // (e.g. redirected from the itinerary editor's "Re-price in grid").
-    const itineraryParam = searchParams.get('itinerary')
-    if (itineraryParam) {
-      handleLoadItinerary(itineraryParam).catch(() => setParseError('Failed to load itinerary'))
-      return
+  // Fetch rates
+  const fetchRates = useCallback(async (tier: string) => {
+    try {
+      setLoading(true)
+      const res = await fetch(`/api/pricing-grid/rates?tier=${tier}`)
+      const data = await res.json()
+      if (data.success) setRates(data.data)
+    } catch (err) {
+      console.error('Failed to fetch rates:', err)
+    } finally {
+      setLoading(false)
     }
-    const conversation = searchParams.get('conversation')
-    const clientName = searchParams.get('clientName')
-    const email = searchParams.get('email')
-    const phone = searchParams.get('phone')
-    const paxParam = searchParams.get('pax')
-    const tierParam = searchParams.get('tier')
-    const tourNameParam = searchParams.get('tourName')
-    const nationalityParam = searchParams.get('nationality')
-    const clientIdParam = searchParams.get('clientId')
+  }, [])
 
-    const hasConfigParams = clientName || email || phone || paxParam || tierParam || tourNameParam || nationalityParam || clientIdParam
+  useEffect(() => {
+    fetchRates(config.tier)
+  }, [config.tier, fetchRates])
 
-    if (conversation) {
-      try {
-        const text = decodeURIComponent(escape(atob(conversation)))
-        if (text.trim()) {
-          setConfig(prev => ({
-            ...prev,
-            clientName: clientName || prev.clientName,
-            clientEmail: email || prev.clientEmail,
-            clientPhone: phone || prev.clientPhone,
-            ...(paxParam ? { pax: parseInt(paxParam) || prev.pax } : {}),
-            ...(tierParam ? { tier: tierParam as any } : {}),
-            ...(tourNameParam ? { tourName: tourNameParam } : {}),
-            ...(nationalityParam ? { nationality: nationalityParam } : {}),
-            ...(clientIdParam ? { clientId: clientIdParam } : {}),
-          }))
-          handleParse(text)
-        }
-      } catch {}
-    } else if (hasConfigParams) {
-      setConfig(prev => ({
-        ...prev,
-        clientName: clientName || prev.clientName,
-        clientEmail: email || prev.clientEmail,
-        clientPhone: phone || prev.clientPhone,
-        ...(paxParam ? { pax: parseInt(paxParam) || prev.pax } : {}),
-        ...(tierParam ? { tier: tierParam as any } : {}),
-        ...(tourNameParam ? { tourName: tourNameParam } : {}),
-        ...(nationalityParam ? { nationality: nationalityParam } : {}),
-        ...(clientIdParam ? { clientId: clientIdParam } : {}),
-      }))
-    }
-  }, [searchParams])
+  // Auto-swap accommodation and cruise when tier changes
+  const prevTierRef = useRef(config.tier)
+  useEffect(() => {
+    if (!rates || days.length === 0) return
+    // Only run when tier actually changed (not on initial load)
+    if (prevTierRef.current === config.tier) return
+    prevTierRef.current = config.tier
 
-  // --- Auto-swap tier-dependent slots ---
-  const autoSwapTierSlots = useCallback((newRates: AllRates) => {
     setDays(prevDays => prevDays.map(day => ({
       ...day,
       slots: day.slots.map(slot => {
-        if (slot.slotId === 'accommodation' && slot.selectedId) {
-          const city = day.city
-          const match = (newRates.accommodation || []).find(
-            (r: any) => r.city?.toLowerCase() === city?.toLowerCase()
+        // Swap accommodation: match by city
+        if (slot.slotId === 'accommodation' && slot.selectedItems.length > 0) {
+          const dayCity = day.city?.toLowerCase()?.trim()
+          const newHotel = (rates as AllRates).accommodation.find(
+            (r: any) => r.city?.toLowerCase()?.trim() === dayCity
           )
-          if (match) {
-            return { ...slot, selectedId: match.id, resolvedRate: match.rateEur, label: match.label }
+          if (newHotel) {
+            return {
+              ...slot,
+              selectedItems: [{
+                rateId: newHotel.id,
+                name: newHotel.name,
+                rateEur: newHotel.rateEur,
+                rateNonEur: newHotel.rateNonEur,
+              }],
+            }
           }
-          return { ...slot, selectedId: null, resolvedRate: 0, label: '' }
+          // No hotel in new tier for this city — clear selection
+          return { ...slot, selectedItems: [] }
         }
-        if (slot.slotId === 'cruise' && slot.selectedId) {
-          const match = (newRates.cruise || [])[0]
-          if (match) {
-            return { ...slot, selectedId: match.id, resolvedRate: match.rateEur, label: match.label }
+
+        // Swap cruise: pick the first cruise in the new tier
+        if (slot.slotId === 'cruise' && slot.selectedItems.length > 0) {
+          const newCruise = (rates as AllRates).cruise[0]
+          if (newCruise) {
+            return {
+              ...slot,
+              selectedItems: [{
+                rateId: newCruise.id,
+                name: newCruise.name,
+                rateEur: newCruise.rateEur,
+                rateNonEur: newCruise.rateNonEur,
+              }],
+            }
           }
-          return { ...slot, selectedId: null, resolvedRate: 0, label: '' }
+          return { ...slot, selectedItems: [] }
         }
+
         return slot
       }),
     })))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rates])
+
+  // Pre-fetch all exchange rates once on mount, then currency switching is instant
+  const exchangeRatesCache = useRef<Record<string, number> | null>(null)
+  useEffect(() => {
+    const prefetch = async () => {
+      try {
+        const res = await fetch('/api/exchange-rates?base=EUR')
+        const data = await res.json()
+        if (data.success && data.data?.rates) {
+          exchangeRatesCache.current = data.data.rates
+          // Apply if currency is already non-EUR
+          if (config.currency !== 'EUR' && data.data.rates[config.currency]) {
+            setConfig(prev => ({ ...prev, exchangeRate: data.data.rates[prev.currency] }))
+          }
+        }
+      } catch (err) {
+        console.error('Failed to prefetch exchange rates:', err)
+      }
+    }
+    prefetch()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Completeness (B-full): which days are missing required components.
-  const completeness = useMemo(() => gridCompleteness(days, config), [days, config])
+  // Apply exchange rate instantly from cache when currency changes
+  useEffect(() => {
+    if (config.currency === 'EUR') {
+      if (config.exchangeRate !== null) {
+        setConfig(prev => ({ ...prev, exchangeRate: null }))
+      }
+      return
+    }
+    // Use cached rates (instant) — no API call needed
+    const cached = exchangeRatesCache.current
+    if (cached && cached[config.currency]) {
+      setConfig(prev => ({ ...prev, exchangeRate: cached[prev.currency] }))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.currency])
 
-  // --- Handlers ---
+  // --- URL Params: Auto-load conversation from inbox redirect ---
+  const searchParams = useSearchParams()
+  const hasProcessedParams = useRef(false)
+  const pendingParseText = useRef<string | null>(null)
 
-  const handleConfigChange = useCallback((updates: Partial<GridConfig>) => {
-    setConfig(prev => ({ ...prev, ...updates }))
-  }, [])
+  // Effect 1: Decode URL params and store text for parsing
+  useEffect(() => {
+    if (hasProcessedParams.current) return
+    const conversationParam = searchParams?.get('conversation')
+    if (!conversationParam) return
+    hasProcessedParams.current = true
 
-  // Parse text into structure only (no pricing) → review phase
-  const handleParse = useCallback(async (text: string) => {
-    setIsParsing(true)
-    setParseError('')
-    setSavedUrl(null)
+    // Decode conversation (handle both standard and URL-safe base64)
+    const isBase64 = searchParams?.get('encoded') === 'base64'
+    let decodedText = conversationParam
 
+    if (isBase64) {
+      try {
+        // Convert URL-safe base64 back to standard base64
+        let base64 = conversationParam.replace(/-/g, '+').replace(/_/g, '/')
+        while (base64.length % 4) base64 += '='
+        // Proper Unicode base64 decoding
+        const binaryString = atob(base64)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
+        }
+        decodedText = new TextDecoder('utf-8').decode(bytes)
+      } catch (e) {
+        console.error('Failed to decode base64 conversation:', e)
+        try { decodedText = decodeURIComponent(conversationParam) } catch { /* use raw */ }
+      }
+    }
+
+    // Clear existing state — start fresh for this new conversation
+    setDays([])
+    setSaveMessage(null)
+    setSavedQuoteId(null)
+    setSavedQuoteNumber(null)
+
+    // Pre-fill client info from URL params and reset itinerary link
+    const emailParam = searchParams?.get('email')
+    const phoneParam = searchParams?.get('phone')
+    const clientNameParam = searchParams?.get('clientName')
+    setConfig(prev => ({
+      ...prev,
+      clientEmail: emailParam || '',
+      clientPhone: phoneParam || '',
+      clientName: clientNameParam || '',
+      itineraryId: null,
+      itineraryCode: null,
+    }))
+
+    // Clear localStorage so reload doesn't bring back old data
+    clearStorage()
+
+    // Clean URL (remove params without page reload)
+    window.history.replaceState({}, '', '/pricing-grid')
+
+    // Store decoded text — the rates effect will trigger parsing when ready
+    if (decodedText.trim()) {
+      pendingParseText.current = decodedText
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  // Effect 2: Auto-parse once rates are loaded (fires immediately if rates already exist)
+  useEffect(() => {
+    if (!rates || !pendingParseText.current) return
+    const text = pendingParseText.current
+    pendingParseText.current = null // Clear to prevent re-firing
+    handleParseDays(text)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rates])
+
+  // --- Day Management ---
+  const addDay = () => setDays(prev => [...prev, createEmptyDay(prev.length + 1)])
+
+  const removeDay = (dayId: string) => {
+    setDays(prev => prev.filter(d => d.id !== dayId).map((d, i) => ({ ...d, dayNumber: i + 1 })))
+  }
+
+  const toggleExpand = (dayId: string) => {
+    setDays(prev => prev.map(d => d.id === dayId ? { ...d, isExpanded: !d.isExpanded } : d))
+  }
+
+  const expandAll = () => setDays(prev => prev.map(d => ({ ...d, isExpanded: true })))
+  const collapseAll = () => setDays(prev => prev.map(d => ({ ...d, isExpanded: false })))
+
+  const updateDay = (dayId: string, partial: Partial<GridDay>) => {
+    setDays(prev => prev.map(d => d.id === dayId ? { ...d, ...partial } : d))
+  }
+
+  const updateSlot = (dayId: string, slotId: string, value: SlotValue) => {
+    setDays(prev => prev.map(d => {
+      if (d.id !== dayId) return d
+      let updatedSlots = d.slots.map(s => s.slotId === slotId ? value : s)
+
+      // Reactive meal adjustment: when accommodation changes, update meals based on board basis
+      if (slotId === 'accommodation' && rates) {
+        const hotelId = value.selectedItems[0]?.rateId
+        const hotelRate = (rates as AllRates).accommodation.find((r: any) => r.id === hotelId)
+        const boardBasis = ((hotelRate as any)?.board_basis || 'BB').toUpperCase()
+        const cityLower = d.city?.toLowerCase()?.trim()
+
+        // Determine which outside meals are needed
+        let needsLunch = false
+        let needsDinner = false
+        switch (boardBasis) {
+          case 'FB': case 'AI': break // All meals included
+          case 'HB': needsLunch = true; break // Dinner included, need lunch
+          case 'BB': case 'RO': default: needsLunch = true; needsDinner = true; break
+        }
+
+        // Find meal rates for this city
+        const cityMeals = (rates as AllRates).meals.filter(
+          (m: any) => m.city?.toLowerCase()?.trim() === cityLower
+        )
+        const lunch = cityMeals.find((m: any) => /lunch/i.test(m.category || m.name || ''))
+        const dinner = cityMeals.find((m: any) => /dinner/i.test(m.category || m.name || ''))
+
+        const mealItems: typeof value.selectedItems = []
+        if (needsLunch && lunch) {
+          mealItems.push({ rateId: lunch.id, name: lunch.name, rateEur: lunch.rateEur, rateNonEur: lunch.rateNonEur })
+        }
+        if (needsDinner && dinner) {
+          mealItems.push({ rateId: dinner.id, name: dinner.name, rateEur: dinner.rateEur, rateNonEur: dinner.rateNonEur })
+        }
+
+        updatedSlots = updatedSlots.map(s =>
+          s.slotId === 'meals' ? { ...s, selectedItems: mealItems } : s
+        )
+      }
+
+      return { ...d, slots: updatedSlots }
+    }))
+  }
+
+  // --- Clear All ---
+  const handleClearAll = () => {
+    setDays([])
+    setConfig(DEFAULT_CONFIG)
+    clearStorage()
+    setSaveMessage(null)
+  }
+
+  // --- Parse Text via AI ---
+  const handleParseDays = async (text: string) => {
     try {
+      setIsParsing(true)
+      setSaveMessage(null)
+      // Clear old data immediately so the loading indicator shows
+      // and the user knows a fresh parse is starting
+      setDays([])
+      setConfig(prev => ({ ...prev, itineraryId: null, itineraryCode: null }))
       const res = await fetch('/api/pricing-grid/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, tier: config.tier, pax: config.pax, mode: 'structure' }),
+        body: JSON.stringify({ text, tier: config.tier, pax: config.pax })
       })
       const data = await res.json()
-
-      if (!data.success) {
-        throw new Error(data.error || 'Parse failed')
-      }
-
-      setReviewDays(data.days || [])
-      setPhase('review')
-
-      if (data.metadata) {
-        const m = data.metadata
+      if (data.success && data.days) {
+        const parsedDays: GridDay[] = data.days.map((pd: any, idx: number) => ({
+          id: crypto.randomUUID(),
+          dayNumber: pd.dayNumber || idx + 1,
+          title: pd.title || `Day ${idx + 1}`,
+          city: pd.city || '',
+          description: pd.description || '',
+          isExpanded: false,
+          slots: SLOT_DEFINITIONS.map(def => {
+            const slotData = pd.slots?.[def.slotId]
+            if (!slotData) return { slotId: def.slotId, selectedItems: [], customAmount: 0 }
+            return {
+              slotId: def.slotId,
+              selectedItems: (slotData.selectedItems || []).map((item: any) => ({
+                rateId: item.rateId,
+                name: item.name,
+                rateEur: item.rateEur || 0,
+                rateNonEur: item.rateNonEur || 0,
+              })),
+              customAmount: slotData.customAmount || 0,
+            }
+          }),
+        }))
+        setDays(parsedDays)
+        // Show indicator if itinerary was AI-generated (not parsed from detailed text)
+        if (data.generationMode === 'generated') {
+          setSaveMessage('✨ AI-suggested itinerary based on inquiry — review and adjust as needed')
+        }
+        // Apply AI-extracted metadata to config (URL params take precedence)
+        const meta = data.metadata
         setConfig(prev => ({
           ...prev,
-          clientName: m.clientName || prev.clientName,
-          clientEmail: m.clientEmail || prev.clientEmail,
-          clientPhone: m.clientPhone || prev.clientPhone,
-          pax: m.pax || prev.pax,
-          startDate: m.startDate || prev.startDate,
-          passport: m.passport || prev.passport,
-          tourName: m.tourName || prev.tourName,
-          nationality: m.nationality || prev.nationality,
+          itineraryId: null,
+          itineraryCode: null,
+          // Only apply metadata fields if they exist and the field isn't already set
+          ...(meta?.pax != null && { pax: meta.pax }),
+          ...(meta?.startDate && { startDate: meta.startDate }),
+          ...(meta?.passport && { passport: meta.passport as 'eu' | 'non_eu' }),
+          ...(meta?.tourName && { tourName: meta.tourName }),
+          ...(meta?.nationality && { nationality: meta.nationality }),
+          // Client name: URL param takes precedence, then AI-extracted
+          ...(meta?.clientName && !prev.clientName && { clientName: meta.clientName }),
         }))
+      } else {
+        showToast('error', data.error || 'Failed to parse text')
       }
-    } catch (err: any) {
-      setParseError(err.message || 'Failed to parse')
-      throw err
+    } catch (err) {
+      console.error('Parse error:', err)
+      showToast('error', 'Failed to parse text')
     } finally {
       setIsParsing(false)
     }
-  }, [config.tier, config.pax])
+  }
 
-  // Submit reviewed itinerary to pricing (rate matching)
-  const handleSubmitToPricing = useCallback(async () => {
-    if (reviewDays.length === 0) return
-    setIsPricing(true)
-    setParseError('')
-
+  // --- Load from Existing Itinerary (full restore) ---
+  const handleLoadItinerary = async (itineraryId: string) => {
     try {
-      const text = reviewDaysToText(reviewDays, config)
-      const res = await fetch('/api/pricing-grid/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, tier: config.tier, pax: config.pax, mode: 'full' }),
-      })
-      const data = await res.json()
+      // Fetch itinerary header
+      const headerRes = await fetch(`/api/itineraries/${itineraryId}`)
+      const headerData = await headerRes.json()
 
-      if (!data.success) {
-        throw new Error(data.error || 'Pricing failed')
+      if (!headerData.success || !headerData.data) {
+        showToast('error', 'Failed to load itinerary')
+        return
       }
 
-      setDays(data.days || [])
-      setPhase('pricing')
-    } catch (err: any) {
-      setParseError(err.message || 'Failed to apply pricing')
-    } finally {
-      setIsPricing(false)
-    }
-  }, [reviewDays, config])
+      const itn = headerData.data
 
-  const handleBackToReview = useCallback(() => {
-    setPhase('review')
-    setDays([])
-  }, [])
-
-  const handleLoadItinerary = useCallback(async (id: string) => {
-    setIsParsing(true)
-    try {
-      const res = await fetch(`/api/itineraries/${id}?include=days`)
-      const data = await res.json()
-      if (!data.success || !data.data) {
-        throw new Error('Itinerary not found')
-      }
-
-      const itn = data.data
+      // Update config from itinerary
       setConfig(prev => ({
         ...prev,
-        clientName: itn.client_name || prev.clientName,
-        clientEmail: itn.client_email || prev.clientEmail,
-        clientPhone: itn.client_phone || prev.clientPhone,
-        tourName: itn.trip_name || prev.tourName,
-        pax: itn.num_adults || prev.pax,
-        tier: itn.tier || prev.tier,
+        clientName: itn.client_name || '',
+        clientEmail: itn.client_email || '',
+        clientPhone: itn.client_phone || '',
+        tourName: itn.trip_name || '',
+        pax: itn.num_adults || 2,
+        tier: itn.tier || 'standard',
+        currency: itn.currency || 'EUR',
         startDate: itn.start_date || prev.startDate,
+        clientType: itn.source?.startsWith('b2b') ? 'b2b' : 'b2c',
+        partnerId: itn.partner_id || null,
         itineraryId: itn.id,
+        itineraryCode: itn.itinerary_code,
       }))
 
-      if (itn.itinerary_days) {
-        const loadedDays: GridDay[] = itn.itinerary_days.map((d: any, i: number) => {
-          // Restore priced slots from grid-tagged services ([pricing-grid:slotId]).
-          const slots = createEmptySlots()
-          for (const svc of (d.itinerary_services || [])) {
-            const mapped = mapServiceToSlot(svc)
-            if (!mapped) continue
-            const slot = slots.find(s => s.slotId === mapped.slotId)
-            if (!slot) continue
-            slot.resolvedRate += mapped.rate
-            slot.label = slot.label ? `${slot.label}, ${mapped.label}` : mapped.label
-            slot.selectedId = svc.id
-            slot.selectedIds = [...slot.selectedIds, svc.id]
-            slot.selections = [...(slot.selections || []), { id: svc.id, rate: mapped.rate, label: mapped.label }]
-          }
+      // Fetch days with services
+      const daysRes = await fetch(`/api/itineraries/${itineraryId}/days?language=en`)
+      const daysData = await daysRes.json()
+
+      if (daysData.success && daysData.data) {
+        const loadedDays: GridDay[] = daysData.data.map((dayData: any, idx: number) => {
+          // Reverse-map services to slots
+          const services = dayData.services || []
+          const slots = services.length > 0
+            ? mapServicesToSlots(services, itn.num_adults || 2)
+            : SLOT_DEFINITIONS.map(def => ({ slotId: def.slotId, selectedItems: [], customAmount: 0 }))
+
           return {
-            id: d.id || crypto.randomUUID(),
-            dayNumber: d.day_number || i + 1,
-            title: d.title || `Day ${i + 1}`,
-            city: d.city || '',
-            description: d.description || '',
-            isExpanded: i === 0,
+            id: crypto.randomUUID(),
+            dayNumber: dayData.day_number || idx + 1,
+            title: dayData.title || `Day ${idx + 1}`,
+            city: dayData.city || '',
+            description: dayData.description || '',
+            isExpanded: false,
             slots,
+            // Consolidation Phase B: restore the day-type preset + component
+            // overrides so the rich gridCompleteness gate has its inputs.
+            // Columns may be undefined for pre-migration rows — that's fine,
+            // resolveComponents() falls back to DAY_TYPE_DEFAULTS[DEFAULT_DAY_TYPE].
+            dayType: dayData.day_type ?? undefined,
+            overnight: dayData.overnight ?? undefined,
+            hasSightseeing: dayData.has_sightseeing ?? undefined,
+            airportArrival: dayData.airport_arrival ?? undefined,
+            airportDeparture: dayData.airport_departure ?? undefined,
+            hotelCheckIn: dayData.hotel_check_in ?? undefined,
+            hotelCheckOut: dayData.hotel_check_out ?? undefined,
+            intercity: dayData.intercity ?? undefined,
           }
         })
         setDays(loadedDays)
-        setPhase('pricing')
+        setSaveMessage(`Loaded ${itn.itinerary_code}`)
       }
-    } catch (err: any) {
-      throw err
-    } finally {
-      setIsParsing(false)
+    } catch (err) {
+      console.error('Load error:', err)
+      showToast('error', 'Failed to load itinerary')
     }
-  }, [])
+  }
 
-  const handleSave = useCallback(async () => {
-    if (days.length === 0) return
+  // Auto-load an itinerary passed via ?itinerary=<id> (e.g. from the itinerary
+  // editor's "Price in Grid"). The grid is the single pricing surface, so the
+  // editor redirects here instead of calling the retired calculate-pricing route.
+  const hasLoadedItineraryParam = useRef(false)
+  useEffect(() => {
+    if (hasLoadedItineraryParam.current) return
+    const itineraryParam = searchParams?.get('itinerary')
+    if (!itineraryParam) return
+    hasLoadedItineraryParam.current = true
+    handleLoadItinerary(itineraryParam)
+    // Clean the URL so a reload doesn't reload-by-param.
+    window.history.replaceState({}, '', '/pricing-grid')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
-    // Completeness gate (B-full): don't silently save an under-priced grid.
-    const check = gridCompleteness(days, config)
-    if (check.blocking > 0) {
-      const proceed = await dialog.confirm({
-        message:
-          `This itinerary has ${check.blocking} blocking issue(s) that make the price incomplete:\n\n` +
-          check.issues
-            .filter((i) => i.severity === 'block')
-            .slice(0, 12)
-            .map((i) => `• ${i.message}`)
-            .join('\n') +
-          `\n\nSave anyway as a draft? It won't be deliverable until these are resolved.`,
-        variant: 'warning',
-      })
-      if (!proceed) return
+  // --- Save to Database ---
+  const handleSave = async () => {
+    if (days.length === 0) {
+      showToast('error', 'No days to save. Parse or add days first.')
+      return
     }
-
-    setIsSaving(true)
-    setSavedUrl(null)
 
     try {
+      setIsSaving(true)
+      setSaveMessage(null)
+
       const res = await fetch('/api/pricing-grid/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config, days, totals }),
+        body: JSON.stringify({ config, days, totals })
       })
+
       const data = await res.json()
 
-      if (!data.success) {
-        throw new Error(data.error || 'Save failed')
-      }
+      if (data.success) {
+        setConfig(prev => ({
+          ...prev,
+          itineraryId: data.itineraryId,
+          itineraryCode: data.itineraryCode,
+        }))
 
-      setConfig(prev => ({ ...prev, itineraryId: data.itineraryId }))
-      setSavedUrl(data.redirectUrl || `/itineraries/${data.itineraryId}`)
+        // For B2B: create quote + template, then redirect to /tours/manage
+        if (config.clientType === 'b2b') {
+          try {
+            // Step 1: Create B2B quote
+            const quoteRes = await fetch('/api/b2b/quote-from-itinerary', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                itinerary_id: data.itineraryId,
+                partner_id: config.partnerId || undefined,
+                margin_percent: config.marginPercent,
+                is_eur_passport: config.passport === 'eu',
+                language: 'English',
+              })
+            })
+            const quoteData = await quoteRes.json()
+            const quoteId = quoteData.data?.id || quoteData.id
+            const quoteNum = quoteData.data?.quote_number || quoteData.quote_number
+            if (quoteId) {
+              setSavedQuoteId(quoteId)
+              setSavedQuoteNumber(quoteNum || null)
+            }
 
-      localStorage.removeItem(STORAGE_KEY)
+            // Step 2: Create tour template from itinerary
+            const templateRes = await fetch('/api/b2b/create-template-from-itinerary', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                itinerary_id: data.itineraryId,
+                tier: config.tier || 'standard',
+              })
+            })
+            const templateData = await templateRes.json()
 
-      if (data.redirectUrl && config.clientType === 'b2b') {
-        router.push(data.redirectUrl)
+            if (templateData.success && templateData.data?.variation_id) {
+              setSaveMessage(`Saved as ${data.itineraryCode} + B2B Quote ${quoteNum || ''} — Redirecting to B2B Calculator...`)
+              // Redirect to B2B calculator which has full Plus 0/Plus 1 pricing table
+              setTimeout(() => {
+                router.push(`/b2b/calculator/${templateData.data.variation_id}`)
+              }, 1000)
+            } else {
+              setSaveMessage(`Saved as ${data.itineraryCode} + B2B Quote ${quoteNum || ''} (template creation: ${templateData.error || 'failed'})`)
+            }
+          } catch (quoteErr) {
+            console.error('B2B quote/template creation error:', quoteErr)
+            setSaveMessage(`Saved as ${data.itineraryCode} (B2B processing failed)`)
+          }
+        } else {
+          setSavedQuoteId(null)
+          setSavedQuoteNumber(null)
+          setSaveMessage(`Saved as ${data.itineraryCode}`)
+        }
+      } else {
+        showToast('error', `Save failed: ${data.error}`)
       }
     } catch (err: any) {
-      showToast('error', `Save failed: ${err.message}`)
+      console.error('Save error:', err)
+      showToast('error', `Failed to save itinerary: ${err?.message || 'Network error'}`)
     } finally {
       setIsSaving(false)
     }
-  }, [config, days, totals, router, dialog])
+  }
 
-  const handleUpdateSlot = useCallback((dayId: string, slotId: string, value: SlotValue) => {
-    setDays(prev => prev.map(d =>
-      d.id === dayId
-        ? { ...d, slots: d.slots.map(s => s.slotId === slotId ? value : s) }
-        : d
-    ))
-  }, [])
-
-  const handleUpdateDay = useCallback((dayId: string, updates: Partial<GridDay>) => {
-    setDays(prev => prev.map(d => d.id === dayId ? { ...d, ...updates } : d))
-  }, [])
-
-  const handleToggleExpand = useCallback((dayId: string) => {
-    setDays(prev => prev.map(d => d.id === dayId ? { ...d, isExpanded: !d.isExpanded } : d))
-  }, [])
-
-  const handleRemoveDay = useCallback((dayId: string) => {
-    setDays(prev => {
-      const filtered = prev.filter(d => d.id !== dayId)
-      return filtered.map((d, i) => ({ ...d, dayNumber: i + 1 }))
-    })
-  }, [])
-
-  const handleDuplicateDay = useCallback((dayId: string) => {
-    setDays(prev => {
-      const idx = prev.findIndex(d => d.id === dayId)
-      if (idx === -1) return prev
-      const original = prev[idx]
-      const clone: GridDay = {
-        ...original,
-        id: crypto.randomUUID(),
-        dayNumber: idx + 2,
-        title: `${original.title} (copy)`,
-        slots: original.slots.map(s => ({ ...s })),
-      }
-      const newDays = [...prev]
-      newDays.splice(idx + 1, 0, clone)
-      return newDays.map((d, i) => ({ ...d, dayNumber: i + 1 }))
-    })
-  }, [])
-
-  const handleAddDay = useCallback(() => {
-    const newDay: GridDay = {
-      id: crypto.randomUUID(),
-      dayNumber: days.length + 1,
-      title: '',
-      city: days.length > 0 ? days[days.length - 1].city : '',
-      description: '',
-      isExpanded: true,
-      slots: createEmptySlots(),
-    }
-    setDays(prev => [...prev, newDay])
-  }, [days.length])
-
-  // Review phase: add/remove/duplicate/update days
-  const handleReviewAddDay = useCallback(() => {
-    const newDay: ReviewDay = {
-      id: crypto.randomUUID(),
-      dayNumber: reviewDays.length + 1,
-      title: '',
-      city: reviewDays.length > 0 ? reviewDays[reviewDays.length - 1].city : '',
-      description: '',
-      services: [],
-      isExpanded: true,
-    }
-    setReviewDays(prev => [...prev, newDay])
-  }, [reviewDays.length])
-
-  const handleReviewUpdateDay = useCallback((dayId: string, updates: Partial<ReviewDay>) => {
-    setReviewDays(prev => prev.map(d => d.id === dayId ? { ...d, ...updates } : d))
-  }, [])
-
-  const handleReviewRemoveDay = useCallback((dayId: string) => {
-    setReviewDays(prev => {
-      const filtered = prev.filter(d => d.id !== dayId)
-      return filtered.map((d, i) => ({ ...d, dayNumber: i + 1 }))
-    })
-  }, [])
-
-  const handleReviewDuplicateDay = useCallback((dayId: string) => {
-    setReviewDays(prev => {
-      const idx = prev.findIndex(d => d.id === dayId)
-      if (idx === -1) return prev
-      const original = prev[idx]
-      const clone: ReviewDay = {
-        ...original,
-        id: crypto.randomUUID(),
-        dayNumber: idx + 2,
-        title: `${original.title} (copy)`,
-        services: original.services.map(s => ({ ...s, id: crypto.randomUUID() })),
-      }
-      const newDays = [...prev]
-      newDays.splice(idx + 1, 0, clone)
-      return newDays.map((d, i) => ({ ...d, dayNumber: i + 1 }))
-    })
-  }, [])
-
-  const handleReviewToggleExpand = useCallback((dayId: string) => {
-    setReviewDays(prev => prev.map(d => d.id === dayId ? { ...d, isExpanded: !d.isExpanded } : d))
-  }, [])
-
-  const handleReset = useCallback(async () => {
-    if (await dialog.confirm({ message: 'Clear everything and start over? This cannot be undone.', variant: 'danger', confirmText: 'Clear' })) {
-      setDays([])
-      setReviewDays([])
-      setConfig(DEFAULT_CONFIG)
-      setSavedUrl(null)
-      setPhase('input')
-      localStorage.removeItem(STORAGE_KEY)
-    }
-  }, [dialog])
+  // --- Calculate Totals ---
+  const totals: GridTotals = days.length > 0
+    ? calculateGrandTotals(days, config)
+    : { costPerPerson: 0, totalCost: 0, marginAmount: 0, sellingPricePerPerson: 0, sellingPriceTotal: 0 }
 
   // --- Render ---
+  if (loading && !rates) {
+    return (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="text-center py-20 text-gray-500">Loading rates...</div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <GridHeader config={config} totals={totals} onConfigChange={handleConfigChange} />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-8 bg-gray-50 min-h-screen">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-3 pb-2 bg-gray-50">
+        <GridHeader config={config} onChange={setConfig} totals={totals} />
+      </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-4 space-y-4">
-        {/* Phase indicator */}
-        {phase !== 'input' && (
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <button
-              onClick={handleReset}
-              className="px-3 py-1 rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 transition-colors"
-            >
-              1. Input
-            </button>
-            <ArrowRight className="w-3 h-3 text-gray-400" />
-            <button
-              onClick={phase === 'pricing' ? handleBackToReview : undefined}
-              className={`px-3 py-1 rounded-full transition-colors ${phase === 'review' ? 'bg-[#647C47] text-white' : phase === 'pricing' ? 'bg-gray-200 text-gray-500 hover:bg-gray-300 cursor-pointer' : 'bg-gray-200 text-gray-400'}`}
-            >
-              2. Review
-            </button>
-            <ArrowRight className="w-3 h-3 text-gray-400" />
-            <span className={`px-3 py-1 rounded-full ${phase === 'pricing' ? 'bg-[#647C47] text-white' : 'bg-gray-200 text-gray-400'}`}>
-              3. Pricing
-            </span>
+      {/* Client Info */}
+      <ClientInfoBar config={config} onChange={setConfig} />
+
+      {/* Input Panel */}
+      <InputPanel
+        onParseDays={handleParseDays}
+        onAddDay={addDay}
+        onLoadItinerary={handleLoadItinerary}
+        onClearAll={handleClearAll}
+        isParsing={isParsing}
+        hasDays={days.length > 0}
+      />
+
+      {/* Days Grid */}
+      {days.length === 0 ? (
+        isParsing ? (
+          <div className="text-center py-24 border-2 border-dashed border-green-200 rounded-xl bg-white">
+            <div className="inline-flex items-center justify-center w-16 h-16 mb-4 rounded-full bg-green-50">
+              <svg className="w-8 h-8 text-green-600 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            </div>
+            <p className="text-base font-semibold text-gray-700 mb-1">Building your itinerary...</p>
+            <p className="text-sm text-gray-500 mb-4">Matching services to rates and filling in details</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
           </div>
-        )}
-
-        {/* Client Info */}
-        <ClientInfoBar config={config} onConfigChange={handleConfigChange} />
-
-        {/* ========== INPUT PHASE ========== */}
-        {phase === 'input' && (
-          <>
-            <InputPanel
-              onParse={handleParse}
-              onLoadItinerary={handleLoadItinerary}
-              isParsing={isParsing}
-            />
-
-            {parseError && (
-              <div className="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3 border border-red-200">
-                {parseError}
-              </div>
-            )}
-
-            {isParsing && (
-              <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#647C47] mx-auto mb-4"></div>
-                <p className="text-gray-600 font-medium">Parsing your itinerary...</p>
-                <p className="text-gray-400 text-sm mt-1">AI is extracting the itinerary structure</p>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ========== REVIEW PHASE ========== */}
-        {phase === 'review' && (
-          <>
-            {parseError && (
-              <div className="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-3 border border-red-200">
-                {parseError}
-              </div>
-            )}
-
-            {/* Review day cards */}
-            {reviewDays.length > 0 && (
-              <div className="space-y-3">
-                {reviewDays.map(day => (
-                  <ReviewDayCard
-                    key={day.id}
-                    day={day}
-                    onUpdate={updates => handleReviewUpdateDay(day.id, updates)}
-                    onRemove={() => handleReviewRemoveDay(day.id)}
-                    onDuplicate={() => handleReviewDuplicateDay(day.id)}
-                    onToggleExpand={() => handleReviewToggleExpand(day.id)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Add Day + Reset */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleReviewAddDay}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-[#647C47] bg-[#647C47]/5 border border-[#647C47]/20 rounded-lg hover:bg-[#647C47]/10 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Day
+        ) : (
+          <div className="text-center py-24 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-white">
+            <div className="text-3xl mb-3 opacity-50">+</div>
+            <p className="text-base mb-1 font-medium">No days yet</p>
+            <p className="text-sm text-gray-400">Paste text, load an itinerary, or add days manually</p>
+          </div>
+        )
+      ) : (
+        <>
+          {/* Toolbar */}
+          <div className="flex items-center justify-between mb-2 px-1">
+            <div className="text-xs text-gray-500">
+              <span className="font-semibold text-gray-700">{days.length}</span> days
+              {' · '}
+              <span className="font-semibold text-gray-700">{config.pax}</span> pax
+              {' · '}
+              <span className="font-semibold text-gray-700 capitalize">{config.tier}</span>
+              {config.itineraryCode && (
+                <>
+                  {' · '}
+                  <span className="font-semibold text-green-700">{config.itineraryCode}</span>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={expandAll} className="px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+                Expand All
               </button>
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Start Over
+              <span className="text-gray-300">|</span>
+              <button onClick={collapseAll} className="px-2.5 py-1 text-[11px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors">
+                Collapse All
               </button>
             </div>
+          </div>
 
-            {/* Submit to Pricing */}
-            {reviewDays.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">
-                      {reviewDays.length} day{reviewDays.length !== 1 ? 's' : ''} &middot; {reviewDays.reduce((sum, d) => sum + d.services.length, 0)} services
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Review the itinerary above, then submit to apply pricing from your rate database
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleSubmitToPricing}
-                    disabled={isPricing || reviewDays.length === 0}
-                    className="btn-primary px-6 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isPricing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Applying Pricing...
-                      </>
-                    ) : (
-                      <>
-                        <DollarSign className="w-4 h-4" />
-                        Submit to Pricing
-                      </>
-                    )}
-                  </button>
-                </div>
+          {/* Day Cards */}
+          <div className="space-y-2">
+            {days.map(day => (
+              <DayRow
+                key={day.id}
+                day={day}
+                allDays={days}
+                config={config}
+                rates={rates || {} as AllRates}
+                onToggleExpand={() => toggleExpand(day.id)}
+                onUpdateSlot={(slotId, value) => updateSlot(day.id, slotId, value)}
+                onUpdateDay={(partial) => updateDay(day.id, partial)}
+                onRemoveDay={() => removeDay(day.id)}
+              />
+            ))}
+          </div>
 
-                {isPricing && (
-                  <div className="mt-4 bg-[#647C47]/5 rounded-lg p-4 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47] mx-auto mb-3"></div>
-                    <p className="text-sm text-gray-600">Matching services to your rate database...</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ========== PRICING PHASE ========== */}
-        {phase === 'pricing' && (
-          <>
-            {/* Back to review */}
-            <button
-              onClick={handleBackToReview}
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#647C47] transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Review
-            </button>
-
-            {/* Day Cards */}
-            {!isParsing && days.length > 0 && (
-              <div className="space-y-3">
-                {days.map(day => (
-                  <DayRow
-                    key={day.id}
-                    day={day}
-                    config={config}
-                    rates={rates}
-                    onToggleExpand={() => handleToggleExpand(day.id)}
-                    onUpdateSlot={(slotId, value) => handleUpdateSlot(day.id, slotId, value)}
-                    onUpdateDay={(updates) => handleUpdateDay(day.id, updates)}
-                    onRemove={() => handleRemoveDay(day.id)}
-                    onDuplicate={() => handleDuplicateDay(day.id)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Add Day + Reset */}
-            {!isParsing && (
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleAddDay}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-[#647C47] bg-[#647C47]/5 border border-[#647C47]/20 rounded-lg hover:bg-[#647C47]/10 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Day
-                </button>
-                <button
-                  onClick={handleReset}
-                  className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-500 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Start Over
-                </button>
-              </div>
-            )}
-
-            {/* Summary */}
-            <GridSummary
-              config={config}
-              totals={totals}
-              dayCount={days.length}
-              isSaving={isSaving}
-              savedUrl={savedUrl}
-              onSave={handleSave}
-              completeness={completeness}
-            />
-          </>
-        )}
-      </div>
+          {/* Grand Summary + Save */}
+          <GridSummary
+            totals={totals}
+            config={config}
+            dayCount={days.length}
+            onSave={handleSave}
+            isSaving={isSaving}
+            savedItineraryId={config.itineraryId}
+            savedItineraryCode={config.itineraryCode}
+            savedQuoteId={savedQuoteId}
+            savedQuoteNumber={savedQuoteNumber}
+            saveMessage={saveMessage}
+          />
+        </>
+      )}
     </div>
-  )
-}
-
-export default function PricingGridPage() {
-  return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#647C47]"></div>
-      </div>
-    }>
-      <PricingGridContent />
-    </Suspense>
   )
 }
