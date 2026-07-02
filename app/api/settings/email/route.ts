@@ -30,11 +30,13 @@ export async function GET(_request: NextRequest) {
 
     // Actual Gmail connection from gmail_tokens (RLS-scoped to this tenant).
     // Prefer this user's token, then fall back to the tenant's most recent.
-    let tokenData: { email_address?: string | null } | null = null
+    // The OAuth callback writes the connected address to `email` (the live
+    // column); migration 007's `email_address` was stale. Read `email`.
+    let tokenData: { email?: string | null } | null = null
 
     const { data: userToken } = await supabase
       .from('gmail_tokens')
-      .select('email_address, updated_at')
+      .select('email, updated_at')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(1)
@@ -44,14 +46,14 @@ export async function GET(_request: NextRequest) {
     if (!tokenData) {
       const { data: anyToken } = await supabase
         .from('gmail_tokens')
-        .select('email_address, updated_at')
+        .select('email, updated_at')
         .order('updated_at', { ascending: false })
         .limit(1)
         .maybeSingle()
       if (anyToken) tokenData = anyToken
     }
 
-    const gmailEmail = String(tokenData?.email_address || '')
+    const gmailEmail = String(tokenData?.email || '')
     const gmailConnected = !!gmailEmail
 
     return NextResponse.json({

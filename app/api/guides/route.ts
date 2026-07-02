@@ -163,10 +163,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create guide as a supplier with type='guide'
+    // Create guide as a supplier. Set BOTH type and supplier_type: the GET
+    // list filters on supplier_type, and while a DB trigger mirrors the two,
+    // setting both keeps this correct even if that trigger is absent.
     const guideData = {
       tenant_id: authResult.tenant_id,
       type: 'guide',
+      supplier_type: 'guide',
       name: body.name,
       contact_email: body.email || null,
       contact_phone: body.phone || body.contact_phone || null,
