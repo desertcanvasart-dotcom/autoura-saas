@@ -21,6 +21,7 @@ import {
   X
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
+import { sanitizeEmailHtml } from '@/lib/sanitize-html'
 
 interface EmailSignature {
   id: string
@@ -381,7 +382,7 @@ function EmailSettingsContent() {
                       </div>
                       <div 
                         className="mt-2 text-xs text-gray-600 prose prose-sm max-w-none"
-                        dangerouslySetInnerHTML={{ __html: sig.content }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(sig.content) }}
                       />
                     </div>
                   ))}

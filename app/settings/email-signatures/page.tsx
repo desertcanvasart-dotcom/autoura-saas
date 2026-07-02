@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Loader2, Trash2, Edit3, X, Save, Star, PenLine, Check } from 'lucide-react'
 import RichReplyEditor from '@/components/unified/RichReplyEditor'
+import { sanitizeEmailHtml } from '@/lib/sanitize-html'
 
 interface Signature {
   id: string
@@ -128,7 +129,7 @@ function SignatureCard({
           </div>
           <div
             className="text-sm text-gray-600 prose prose-sm max-w-none [&_p]:my-1 [&_*]:!text-sm"
-            dangerouslySetInnerHTML={{ __html: signature.content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(signature.content) }}
           />
         </div>
         <div className="flex flex-col gap-1 flex-shrink-0">
