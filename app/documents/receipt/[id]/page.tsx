@@ -18,6 +18,7 @@ import {
   Phone
 } from 'lucide-react'
 import { downloadReceiptPDF } from '@/lib/receipt-pdf-generator'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface Payment {
   id: string
@@ -91,7 +92,7 @@ export default function ReceiptPage() {
       })
     } catch (error) {
       console.error('Error downloading PDF:', error)
-      alert('Failed to download receipt')
+      showToast('error', 'Failed to download receipt')
     } finally {
       setDownloading(false)
     }
@@ -99,7 +100,7 @@ export default function ReceiptPage() {
 
   const handleSendWhatsApp = async () => {
     if (!payment?.client_phone) {
-      alert('No phone number available for this client')
+      showToast('error', 'No phone number available for this client')
       return
     }
 
@@ -118,11 +119,11 @@ export default function ReceiptPage() {
         setSent(true)
         setTimeout(() => setSent(false), 3000)
       } else {
-        alert(data.error || 'Failed to send receipt')
+        showToast('error', data.error || 'Failed to send receipt')
       }
     } catch (error) {
       console.error('Error sending receipt:', error)
-      alert('Failed to send receipt via WhatsApp')
+      showToast('error', 'Failed to send receipt via WhatsApp')
     } finally {
       setSending(false)
     }

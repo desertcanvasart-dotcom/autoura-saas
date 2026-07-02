@@ -9,6 +9,8 @@ import {
   Trash2, Download, Check, X, SlidersHorizontal, ChevronLeft
 } from 'lucide-react'
 import RequireFeature from '@/components/RequireFeature'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface B2CQuote {
   id: string
@@ -52,6 +54,7 @@ const TIER_COLORS: Record<string, { bg: string; text: string }> = {
 
 export default function B2CQuotesPage() {
   const supabase = createClient()
+  const dialog = useConfirmDialog()
   const [quotes, setQuotes] = useState<B2CQuote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -253,9 +256,9 @@ export default function B2CQuotesPage() {
   const handleBulkStatusChange = async (newStatus: string) => {
     if (selectedQuotes.size === 0) return
 
-    const confirmed = confirm(
-      `Are you sure you want to change ${selectedQuotes.size} quote(s) to "${newStatus}"?`
-    )
+    const confirmed = await dialog.confirm({
+      message: `Are you sure you want to change ${selectedQuotes.size} quote(s) to "${newStatus}"?`
+    })
     if (!confirmed) return
 
     try {
@@ -277,7 +280,7 @@ export default function B2CQuotesPage() {
       await fetchQuotes()
       setSelectedQuotes(new Set())
     } catch (err: any) {
-      alert(`Error: ${err.message}`)
+      showToast('error', `Error: ${err.message}`)
     } finally {
       setBulkActionLoading(false)
     }
@@ -286,9 +289,11 @@ export default function B2CQuotesPage() {
   const handleBulkDelete = async () => {
     if (selectedQuotes.size === 0) return
 
-    const confirmed = confirm(
-      `Are you sure you want to delete ${selectedQuotes.size} quote(s)? This action cannot be undone.`
-    )
+    const confirmed = await dialog.confirm({
+      message: `Are you sure you want to delete ${selectedQuotes.size} quote(s)? This action cannot be undone.`,
+      variant: 'danger',
+      confirmText: 'Delete'
+    })
     if (!confirmed) return
 
     try {
@@ -309,7 +314,7 @@ export default function B2CQuotesPage() {
       await fetchQuotes()
       setSelectedQuotes(new Set())
     } catch (err: any) {
-      alert(`Error: ${err.message}`)
+      showToast('error', `Error: ${err.message}`)
     } finally {
       setBulkActionLoading(false)
     }

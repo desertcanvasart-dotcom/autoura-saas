@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import RequireFeature from '@/components/RequireFeature'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface ClientSummary {
   id: string
@@ -208,7 +209,7 @@ export default function ClientsPage() {
       fetchClients()
     } catch (error) {
       console.error('Error deleting client:', error)
-      alert('Failed to delete client. Please try again.')
+      showToast('error', 'Failed to delete client. Please try again.')
     } finally {
       setDeleting(false)
     }

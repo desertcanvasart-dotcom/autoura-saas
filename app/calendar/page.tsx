@@ -52,6 +52,7 @@ import {
   PointerSensor,
   closestCenter
 } from '@dnd-kit/core'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface BookingResource {
   id: string
@@ -460,7 +461,7 @@ export default function CalendarPage() {
     if (!booking) return
     
     if (newDate < startOfDay(new Date())) {
-      alert('Cannot move booking to a past date')
+      showToast('error', 'Cannot move booking to a past date')
       return
     }
     
@@ -512,11 +513,11 @@ export default function CalendarPage() {
         setShowConfirmModal(false)
         setPendingMove(null)
       } else {
-        alert('Failed to update booking: ' + data.error)
+        showToast('error', 'Failed to update booking: ' + data.error)
       }
     } catch (error) {
       console.error('Error updating booking:', error)
-      alert('Failed to update booking')
+      showToast('error', 'Failed to update booking')
     }
   }
 

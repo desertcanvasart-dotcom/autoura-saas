@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, X, Receipt } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface AddExpenseFromItineraryProps {
   itineraryId: string
@@ -121,11 +122,11 @@ export default function AddExpenseFromItinerary({
         onExpenseAdded?.()
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to save expense')
+        showToast('error', error.error || 'Failed to save expense')
       }
     } catch (error) {
       console.error('Error saving expense:', error)
-      alert('Failed to save expense')
+      showToast('error', 'Failed to save expense')
     } finally {
       setSaving(false)
     }

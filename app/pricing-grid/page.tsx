@@ -13,6 +13,8 @@ import { createEmptySlots, mapServiceToSlot } from './lib/slot-mapping'
 import { calculateGrandTotals } from './lib/calculator'
 import { gridCompleteness } from './lib/grid-completeness'
 
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 import GridHeader from '@/components/pricing-grid/GridHeader'
 import InputPanel from '@/components/pricing-grid/InputPanel'
 import ClientInfoBar from '@/components/pricing-grid/ClientInfoBar'
@@ -48,6 +50,7 @@ function reviewDaysToText(reviewDays: ReviewDay[], config: GridConfig): string {
 function PricingGridContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const dialog = useConfirmDialog()
 
   // --- Phase State ---
   const [phase, setPhase] = useState<GridPhase>('input')
@@ -387,15 +390,17 @@ function PricingGridContent() {
     // Completeness gate (B-full): don't silently save an under-priced grid.
     const check = gridCompleteness(days, config)
     if (check.blocking > 0) {
-      const proceed = window.confirm(
-        `This itinerary has ${check.blocking} blocking issue(s) that make the price incomplete:\n\n` +
-        check.issues
-          .filter((i) => i.severity === 'block')
-          .slice(0, 12)
-          .map((i) => `• ${i.message}`)
-          .join('\n') +
-        `\n\nSave anyway as a draft? It won't be deliverable until these are resolved.`
-      )
+      const proceed = await dialog.confirm({
+        message:
+          `This itinerary has ${check.blocking} blocking issue(s) that make the price incomplete:\n\n` +
+          check.issues
+            .filter((i) => i.severity === 'block')
+            .slice(0, 12)
+            .map((i) => `• ${i.message}`)
+            .join('\n') +
+          `\n\nSave anyway as a draft? It won't be deliverable until these are resolved.`,
+        variant: 'warning',
+      })
       if (!proceed) return
     }
 
@@ -423,11 +428,11 @@ function PricingGridContent() {
         router.push(data.redirectUrl)
       }
     } catch (err: any) {
-      alert(`Save failed: ${err.message}`)
+      showToast('error', `Save failed: ${err.message}`)
     } finally {
       setIsSaving(false)
     }
-  }, [config, days, totals, router])
+  }, [config, days, totals, router, dialog])
 
   const handleUpdateSlot = useCallback((dayId: string, slotId: string, value: SlotValue) => {
     setDays(prev => prev.map(d =>
@@ -530,8 +535,8 @@ function PricingGridContent() {
     setReviewDays(prev => prev.map(d => d.id === dayId ? { ...d, isExpanded: !d.isExpanded } : d))
   }, [])
 
-  const handleReset = useCallback(() => {
-    if (confirm('Clear everything and start over? This cannot be undone.')) {
+  const handleReset = useCallback(async () => {
+    if (await dialog.confirm({ message: 'Clear everything and start over? This cannot be undone.', variant: 'danger', confirmText: 'Clear' })) {
       setDays([])
       setReviewDays([])
       setConfig(DEFAULT_CONFIG)
@@ -539,7 +544,7 @@ function PricingGridContent() {
       setPhase('input')
       localStorage.removeItem(STORAGE_KEY)
     }
-  }, [])
+  }, [dialog])
 
   // --- Render ---
   return (

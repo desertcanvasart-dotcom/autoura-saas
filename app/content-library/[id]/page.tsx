@@ -36,8 +36,9 @@ import {
   getSchemaBySlug,
   getDefaultMetadata,
   type CategorySchema,
-  type CategoryField 
+  type CategoryField
 } from '@/lib/content-library/category-schemas'
+import { showToast } from '@/app/contexts/ToastContext'
 
 // =====================================================
 // TYPES
@@ -695,7 +696,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
   // Save content
   const handleSave = async () => {
     if (!formData.name || !formData.category_id) {
-      alert('Please fill in required fields')
+      showToast('error', 'Please fill in required fields')
       return
     }
 
@@ -720,11 +721,11 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
         router.push('/content-library')
       } else {
         const error = await res.json()
-        alert(error.message || 'Error saving content')
+        showToast('error', error.message || 'Error saving content')
       }
     } catch (error) {
       console.error('Error saving:', error)
-      alert('Error saving content')
+      showToast('error', 'Error saving content')
     } finally {
       setSaving(false)
     }

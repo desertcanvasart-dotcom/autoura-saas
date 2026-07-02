@@ -10,6 +10,8 @@ import {
   Settings, Filter, UserCheck, UserX
 } from 'lucide-react'
 import CopilotSuggestPanel from '@/components/CopilotSuggestPanel'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // Supported languages for translation
 const SUPPORTED_LANGUAGES = [
@@ -376,6 +378,7 @@ function AgentsManagementModal({
   onClose: () => void
   onRefresh: () => void
 }) {
+  const dialog = useConfirmDialog()
   const [newAgentName, setNewAgentName] = useState('')
   const [newAgentEmail, setNewAgentEmail] = useState('')
   const [isAdding, setIsAdding] = useState(false)
@@ -415,7 +418,7 @@ function AgentsManagementModal({
   }
 
   const deleteAgent = async (agentId: string) => {
-    if (!confirm('Are you sure you want to deactivate this agent?')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to deactivate this agent?', variant: 'danger', confirmText: 'Deactivate' }))) return
     try {
       await fetch(`/api/whatsapp/agents?id=${agentId}`, { method: 'DELETE' })
       onRefresh()
@@ -655,7 +658,7 @@ export default function WhatsAppInboxPage() {
     if (currentAgentId) {
       assignConversation(currentAgentId, 'claim')
     } else {
-      alert('Please set yourself as an agent first in the Agents settings')
+      showToast('warning', 'Please set yourself as an agent first in the Agents settings')
       setShowAgentsModal(true)
     }
   }

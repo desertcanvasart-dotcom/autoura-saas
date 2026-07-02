@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Clock, Eye, Send, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface StatusManagerProps {
   quoteId: string
@@ -78,6 +79,7 @@ export default function StatusManager({
   currentStatus,
   onStatusChange
 }: StatusManagerProps) {
+  const dialog = useConfirmDialog()
   const [isChanging, setIsChanging] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,10 +98,11 @@ export default function StatusManager({
     const criticalStatuses = ['accepted', 'rejected', 'expired']
     if (criticalStatuses.includes(newStatus)) {
       const statusLabel = STATUS_CONFIG[newStatus].label
-      const confirmed = confirm(
-        `Are you sure you want to mark this quote as ${statusLabel}?\n\n` +
-        `This will update the quote status to "${statusLabel}".`
-      )
+      const confirmed = await dialog.confirm({
+        message:
+          `Are you sure you want to mark this quote as ${statusLabel}?\n\n` +
+          `This will update the quote status to "${statusLabel}".`,
+      })
       if (!confirmed) {
         setShowDropdown(false)
         return

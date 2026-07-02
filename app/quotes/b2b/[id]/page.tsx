@@ -11,6 +11,8 @@ import {
   ArrowLeft, Edit, Download, Send, Clock, AlertCircle, Loader2,
   MapPin, Users, CheckCircle, XCircle, Eye, Globe, MessageCircle
 } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface B2BQuote {
   id: string
@@ -68,6 +70,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
 export default function B2BQuoteDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
   const router = useRouter()
+  const dialog = useConfirmDialog()
   const [quote, setQuote] = useState<B2BQuote | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -140,7 +143,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
       // Refresh quote data to get updated PDF URL
       await fetchQuote()
     } catch (err: any) {
-      alert(`Error generating PDF: ${err.message}`)
+      showToast('error', `Error generating PDF: ${err.message}`)
     } finally {
       setPdfGenerating(false)
     }
@@ -149,14 +152,14 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
   const handleSendQuote = async (method: 'email' | 'whatsapp' = 'email') => {
     if (method === 'email') {
       if (!quote || !quote.b2b_partners?.email) {
-        alert('Cannot send rate sheet: No partner email address found')
+        showToast('error', 'Cannot send rate sheet: No partner email address found')
         return
       }
 
       const recipientName = quote.b2b_partners.contact_name || quote.b2b_partners.company_name
-      const confirmed = confirm(
-        `Send this rate sheet to ${recipientName} via email at ${quote.b2b_partners.email}?`
-      )
+      const confirmed = await dialog.confirm({
+        message: `Send this rate sheet to ${recipientName} via email at ${quote.b2b_partners.email}?`
+      })
 
       if (!confirmed) return
 
@@ -176,26 +179,26 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
           throw new Error(data.error || 'Failed to send rate sheet')
         }
 
-        alert(`Rate sheet sent successfully via email to ${data.email}!`)
+        showToast('success', `Rate sheet sent successfully via email to ${data.email}!`)
 
         // Refresh quote data to update status
         await fetchQuote()
       } catch (err: any) {
-        alert(`Error sending rate sheet: ${err.message}`)
+        showToast('error', `Error sending rate sheet: ${err.message}`)
       } finally {
         setSending(false)
       }
     } else {
       // WhatsApp
       if (!quote || !quote.b2b_partners?.phone) {
-        alert('Cannot send rate sheet: No partner phone number found')
+        showToast('error', 'Cannot send rate sheet: No partner phone number found')
         return
       }
 
       const recipientName = quote.b2b_partners.contact_name || quote.b2b_partners.company_name
-      const confirmed = confirm(
-        `Send this rate sheet to ${recipientName} via WhatsApp at ${quote.b2b_partners.phone}?`
-      )
+      const confirmed = await dialog.confirm({
+        message: `Send this rate sheet to ${recipientName} via WhatsApp at ${quote.b2b_partners.phone}?`
+      })
 
       if (!confirmed) return
 
@@ -215,12 +218,12 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
           throw new Error(data.error || 'Failed to send rate sheet')
         }
 
-        alert(`Rate sheet sent successfully via WhatsApp to ${data.phone}!${data.warning ? '\n\nNote: ' + data.warning : ''}`)
+        showToast('success', `Rate sheet sent successfully via WhatsApp to ${data.phone}!${data.warning ? '\n\nNote: ' + data.warning : ''}`)
 
         // Refresh quote data to update status
         await fetchQuote()
       } catch (err: any) {
-        alert(`Error sending rate sheet via WhatsApp: ${err.message}`)
+        showToast('error', `Error sending rate sheet via WhatsApp: ${err.message}`)
       } finally {
         setSending(false)
       }

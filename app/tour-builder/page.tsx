@@ -6,6 +6,7 @@ import TourSetup from './components/TourSetup'
 import DayPlanner from './components/DayPlanner'
 import PricingSidebar from './components/PricingSidebar'
 import { Users, Globe, ArrowLeft, Save, FileDown } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
 
 export default function TourBuilderPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1)
@@ -134,13 +135,13 @@ export default function TourBuilderPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert(`✅ Tour saved successfully!\n\nTour Code: ${data.data.tour_code}\nTour Name: ${data.data.tour_name}`)
+        showToast('success', `✅ Tour saved successfully!\n\nTour Code: ${data.data.tour_code}\nTour Name: ${data.data.tour_name}`)
       } else {
-        alert(`❌ Failed to save tour:\n${data.error}`)
+        showToast('error', `❌ Failed to save tour:\n${data.error}`)
       }
     } catch (error) {
       console.error('Failed to save tour:', error)
-      alert('❌ Error saving tour. Please try again.')
+      showToast('error', '❌ Error saving tour. Please try again.')
     } finally {
       setIsSaving(false)
     }
@@ -370,7 +371,7 @@ export default function TourBuilderPage() {
                           a.click()
                           window.URL.revokeObjectURL(url)
                         } catch (error) {
-                          alert('Failed to export PDF')
+                          showToast('error', 'Failed to export PDF')
                         }
                       }}
                       className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold flex items-center gap-2"

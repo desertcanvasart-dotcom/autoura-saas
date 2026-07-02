@@ -26,6 +26,7 @@ import {
   Crown,
   Star
 } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // ============================================
 // CONSTANTS
@@ -167,6 +168,7 @@ function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => vo
 // ============================================
 
 export default function RestaurantsContent() {
+  const dialog = useConfirmDialog()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [restaurants, setRestaurants] = useState<Restaurant[]>([])
@@ -397,7 +399,7 @@ export default function RestaurantsContent() {
 
   // Delete restaurant
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete "${name}"?`)) return
+    if (!(await dialog.confirm({ message: `Are you sure you want to delete "${name}"?`, variant: 'danger', confirmText: 'Delete' }))) return
     
     try {
       const response = await fetch(`/api/resources/restaurants/${id}`, {

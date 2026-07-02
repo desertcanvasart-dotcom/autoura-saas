@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { 
-  Send, 
+import { showToast } from '@/app/contexts/ToastContext'
+import {
+  Send,
   Mail, 
   MessageSquare, 
   FileText,
@@ -189,7 +190,7 @@ function QuickSendModal({ client, itinerary, category, onClose }: QuickSendModal
       const recipient = channel === 'email' ? client.email : client.phone
       
       if (!recipient) {
-        alert(`Client has no ${channel === 'email' ? 'email' : 'phone'} address`)
+        showToast('error', `Client has no ${channel === 'email' ? 'email' : 'phone'} address`)
         setSending(false)
         return
       }
@@ -220,11 +221,11 @@ function QuickSendModal({ client, itinerary, category, onClose }: QuickSendModal
         }, 1500)
       } else {
         const data = await response.json()
-        alert(data.error || 'Failed to send message')
+        showToast('error', data.error || 'Failed to send message')
       }
     } catch (error) {
       console.error('Error sending:', error)
-      alert('Failed to send message')
+      showToast('error', 'Failed to send message')
     } finally {
       setSending(false)
     }

@@ -32,6 +32,7 @@ import {
 
 // Import DayBuilder component
 import DayBuilder from './DayBuilder'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // ============================================
 // INTERFACES
@@ -774,6 +775,7 @@ function DayBuilderModal({ template, onClose, onSave }: DayBuilderModalProps) {
 // ============================================
 
 export default function TourManagerContent() {
+  const dialog = useConfirmDialog()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [templates, setTemplates] = useState<TourTemplate[]>([])
   const [themes, setThemes] = useState<TourTheme[]>([])  // Renamed from categories
@@ -1219,8 +1221,8 @@ export default function TourManagerContent() {
             // Ask to open Day Builder
             if (data.data) {
               const newTemplate = { ...data.data, duration_days: formData.duration_days }
-              setTimeout(() => {
-                if (confirm('Would you like to add activities to this tour now?')) {
+              setTimeout(async () => {
+                if (await dialog.confirm({ message: 'Would you like to add activities to this tour now?' })) {
                   setDayBuilderTemplate(newTemplate)
                 }
               }, 500)
@@ -1245,7 +1247,7 @@ export default function TourManagerContent() {
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This will also delete all variations and days.`)) return
+    if (!(await dialog.confirmDelete(name, `Delete "${name}"? This will also delete all variations and days.`))) return
     
     try {
       const response = await fetch(`/api/tours/templates/${id}`, {

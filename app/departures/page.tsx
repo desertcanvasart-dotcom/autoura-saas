@@ -20,6 +20,7 @@ import {
   Clock,
   MapPin
 } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // ============================================
 // TYPES
@@ -75,6 +76,7 @@ const STATUS_CONFIG = {
 // ============================================
 
 export default function DeparturesPage() {
+  const dialog = useConfirmDialog()
   const [loading, setLoading] = useState(true)
   const [departures, setDepartures] = useState<TourDeparture[]>([])
   const [templates, setTemplates] = useState<TourTemplate[]>([])
@@ -236,7 +238,7 @@ export default function DeparturesPage() {
   // ============================================
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this departure?')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to delete this departure?', variant: 'danger', confirmText: 'Delete' }))) return
 
     setDeletingId(id)
     try {

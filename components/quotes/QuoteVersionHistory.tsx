@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { History, RotateCcw, Eye, AlertCircle, Clock, User } from 'lucide-react';
+import { showToast } from '@/app/contexts/ToastContext';
+import { useConfirmDialog } from '@/components/ConfirmDialog';
 
 interface QuoteVersion {
   id: string;
@@ -27,6 +29,7 @@ export default function QuoteVersionHistory({
   quoteId,
   onRevert
 }: QuoteVersionHistoryProps) {
+  const dialog = useConfirmDialog();
   const [versions, setVersions] = useState<QuoteVersion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +60,7 @@ export default function QuoteVersionHistory({
   };
 
   const handleRevert = async (versionNumber: number) => {
-    if (!confirm(`Are you sure you want to revert to version ${versionNumber}? This will create a new version with the old data.`)) {
+    if (!(await dialog.confirm({ message: `Are you sure you want to revert to version ${versionNumber}? This will create a new version with the old data.`, variant: 'warning', confirmText: 'Revert' }))) {
       return;
     }
 
@@ -75,14 +78,14 @@ export default function QuoteVersionHistory({
       const data = await response.json();
 
       if (data.success) {
-        alert(`Successfully reverted to version ${versionNumber}`);
+        showToast('success', `Successfully reverted to version ${versionNumber}`);
         await fetchVersions(); // Refresh version list
         if (onRevert) onRevert(); // Callback to refresh parent quote data
       } else {
-        alert(`Revert failed: ${data.error}`);
+        showToast('error', `Revert failed: ${data.error}`);
       }
     } catch (err: any) {
-      alert(`Error reverting: ${err.message}`);
+      showToast('error', `Error reverting: ${err.message}`);
     } finally {
       setReverting(null);
     }
@@ -99,10 +102,10 @@ export default function QuoteVersionHistory({
         setSelectedVersion(data.version);
         setShowVersionData(true);
       } else {
-        alert(`Failed to load version: ${data.error}`);
+        showToast('error', `Failed to load version: ${data.error}`);
       }
     } catch (err: any) {
-      alert(`Error loading version: ${err.message}`);
+      showToast('error', `Error loading version: ${err.message}`);
     }
   };
 

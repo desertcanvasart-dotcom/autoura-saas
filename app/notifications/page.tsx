@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Loader2
 } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Notification {
   id: string
@@ -33,6 +34,7 @@ interface Notification {
 }
 
 export default function NotificationsPage() {
+  const dialog = useConfirmDialog()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
@@ -96,7 +98,7 @@ export default function NotificationsPage() {
   }
 
   const deleteNotification = async (id: string) => {
-    if (!confirm('Delete this notification?')) return
+    if (!(await dialog.confirm({ message: 'Delete this notification?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/notifications/${id}`, {

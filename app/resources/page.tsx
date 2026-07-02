@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // ============================================
 // INTERFACES
@@ -132,7 +134,8 @@ export default function ResourcesPage() {
   const [selectedCity, setSelectedCity] = useState('all')
   const [activeTab, setActiveTab] = useState<TabType>('guides')
   const [showInactiveResources, setShowInactiveResources] = useState(false)
-  
+  const dialog = useConfirmDialog()
+
   // Delete confirmation state
   const [deleteModal, setDeleteModal] = useState<{
     show: boolean
@@ -237,14 +240,14 @@ export default function ResourcesPage() {
       const data = await response.json()
 
       if (data.success) {
-        alert(`${deleteModal.name} deleted successfully!`)
+        showToast('success', `${deleteModal.name} deleted successfully!`)
         fetchAllResources() // Refresh data
       } else {
-        alert(`Error: ${data.error}`)
+        showToast('error', `${data.error}`)
       }
     } catch (error) {
       console.error('Delete error:', error)
-      alert('Failed to delete resource')
+      showToast('error', 'Failed to delete resource')
     }
 
     setDeleteModal({ show: false, type: null, id: null, name: '' })
@@ -735,17 +738,17 @@ export default function ResourcesPage() {
                           >
                             Edit
                           </Link>
-                          <button 
-                            onClick={() => {
-                              if (confirm(`Delete ${guide.name}?`)) {
+                          <button
+                            onClick={async () => {
+                              if (await dialog.confirm({ message: `Delete ${guide.name}?`, variant: 'danger', confirmText: 'Delete' })) {
                                 fetch(`/api/resources/guides/${guide.id}`, { method: 'DELETE' })
                                   .then(res => res.json())
                                   .then(data => {
                                     if (data.success) {
-                                      alert('Guide deleted!')
+                                      showToast('success', 'Guide deleted!')
                                       fetchAllResources()
                                     } else {
-                                      alert('Error: ' + data.error)
+                                      showToast('error', data.error)
                                     }
                                   })
                               }
@@ -829,17 +832,17 @@ export default function ResourcesPage() {
                           >
                             Edit
                           </Link>
-                          <button 
-                            onClick={() => {
-                              if (confirm(`Delete ${vehicle.name}?`)) {
+                          <button
+                            onClick={async () => {
+                              if (await dialog.confirm({ message: `Delete ${vehicle.name}?`, variant: 'danger', confirmText: 'Delete' })) {
                                 fetch(`/api/resources/vehicles/${vehicle.id}`, { method: 'DELETE' })
                                   .then(res => res.json())
                                   .then(data => {
                                     if (data.success) {
-                                      alert('Vehicle deleted!')
+                                      showToast('success', 'Vehicle deleted!')
                                       fetchAllResources()
                                     } else {
-                                      alert('Error: ' + data.error)
+                                      showToast('error', data.error)
                                     }
                                   })
                               }

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 import { sanitizeEmailHtml } from '@/lib/sanitize-html'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface EmailSignature {
   id: string
@@ -40,6 +41,7 @@ interface EmailTemplate {
 
 function EmailSettingsContent() {
   const { user } = useAuth()
+  const dialog = useConfirmDialog()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [connecting, setConnecting] = useState(false)
@@ -146,7 +148,8 @@ function EmailSettingsContent() {
   }
 
   const handleDisconnectGmail = async () => {
-    if (!user || !confirm('Are you sure you want to disconnect Gmail?')) return
+    if (!user) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to disconnect Gmail?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const { error } = await supabase
@@ -165,7 +168,8 @@ function EmailSettingsContent() {
   }
 
   const handleDeleteSignature = async (id: string) => {
-    if (!user || !confirm('Delete this signature?')) return
+    if (!user) return
+    if (!(await dialog.confirm({ message: 'Delete this signature?', variant: 'danger', confirmText: 'Delete' }))) return
     
     try {
       await fetch('/api/email/signatures', {
@@ -180,7 +184,8 @@ function EmailSettingsContent() {
   }
 
   const handleDeleteTemplate = async (id: string) => {
-    if (!user || !confirm('Delete this template?')) return
+    if (!user) return
+    if (!(await dialog.confirm({ message: 'Delete this template?', variant: 'danger', confirmText: 'Delete' }))) return
     
     try {
       await fetch('/api/email/templates', {

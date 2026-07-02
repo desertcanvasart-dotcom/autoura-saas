@@ -15,6 +15,7 @@ import {
   XCircle,
   Users
 } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface TeamMember {
   id: string
@@ -47,6 +48,7 @@ const ROLES = [
 ]
 
 export default function TeamMembersPage() {
+  const dialog = useConfirmDialog()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [loading, setLoading] = useState(true)
@@ -151,7 +153,7 @@ export default function TeamMembersPage() {
   }
 
   const handleDelete = async (member: TeamMember) => {
-    if (!confirm(`Are you sure you want to deactivate ${member.name}?`)) return
+    if (!(await dialog.confirm({ message: `Are you sure you want to deactivate ${member.name}?`, variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/team-members/${member.id}`, {
