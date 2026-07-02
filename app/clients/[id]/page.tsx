@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/app/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import ClientTimeline from '@/components/ClientTimeline'
 import AddFollowupModal from '@/components/AddFollowupModal'

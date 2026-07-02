@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import RequireFeature from '@/components/RequireFeature'
 

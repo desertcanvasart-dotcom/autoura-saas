@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import {
   Calendar, Clock, AlertCircle, CheckCircle, Phone, Mail, 

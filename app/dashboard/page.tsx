@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/app/supabase'
 import { useTenant } from '@/app/contexts/TenantContext'
 import Link from 'next/link'
 import {
