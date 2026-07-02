@@ -184,6 +184,10 @@ export default function InboxPage() {
   const [folder, setFolder] = useState<FolderType>('inbox')
   const [starredEmails, setStarredEmails] = useState<Set<string>>(new Set())
   const [isFolderCollapsed, setIsFolderCollapsed] = useState(false)
+  // Cancels the in-flight email-list fetch when a new one starts (e.g. a fast
+  // folder switch), so a slow response for the old folder can't overwrite the
+  // new folder's list with stale data.
+  const emailFetchController = useRef<AbortController | null>(null)
 
   const [customLabels, setCustomLabels] = useState<GmailLabel[]>([])
   const [showLabelModal, setShowLabelModal] = useState(false)
@@ -343,6 +347,11 @@ export default function InboxPage() {
   const fetchFreshEmails = async (query?: string, currentFolder?: FolderType, isBackground = false, pageToken?: string) => {
     if (!user) return
 
+    // Supersede any previous list fetch (folder-switch race guard).
+    emailFetchController.current?.abort()
+    const controller = new AbortController()
+    emailFetchController.current = controller
+
     try {
       const params = new URLSearchParams({
         userId: user.id,
@@ -367,8 +376,11 @@ export default function InboxPage() {
 
       if (folderQuery) params.append('query', folderQuery.trim())
 
-      const response = await fetch(`/api/gmail/emails?${params}`)
+      const response = await fetch(`/api/gmail/emails?${params}`, { signal: controller.signal })
       const data = await response.json()
+
+      // A newer fetch (or folder switch) superseded this one — drop the result.
+      if (controller.signal.aborted) return
 
       if (data.error) {
         throw new Error(data.error)
@@ -397,11 +409,14 @@ export default function InboxPage() {
 
       setError(null)
     } catch (err: any) {
+      // Abort is expected on supersede — not a user-facing error.
+      if (err?.name === 'AbortError' || controller.signal.aborted) return
       if (!isBackground) {
         setError(err.message)
       }
     } finally {
-      if (!isBackground) {
+      // Only the current (non-superseded) fetch clears the refreshing state.
+      if (!isBackground && !controller.signal.aborted) {
         setRefreshing(false)
       }
     }
