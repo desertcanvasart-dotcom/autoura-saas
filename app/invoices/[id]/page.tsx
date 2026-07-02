@@ -28,6 +28,8 @@ import {
 } from 'lucide-react'
 import { downloadInvoicePDF } from '@/lib/invoice-pdf-generator'
 import { downloadReceiptPDF } from '@/lib/receipt-pdf-generator'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Invoice {
   id: string
@@ -136,6 +138,7 @@ const REMINDER_TYPE_LABELS: Record<string, string> = {
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const router = useRouter()
+  const dialog = useConfirmDialog()
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [linkedInvoice, setLinkedInvoice] = useState<Invoice | null>(null)
   const [childInvoice, setChildInvoice] = useState<Invoice | null>(null)
@@ -251,11 +254,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         })
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to record payment')
+        showToast('error', error.error || 'Failed to record payment')
       }
     } catch (error) {
       console.error('Error recording payment:', error)
-      alert('Failed to record payment')
+      showToast('error', 'Failed to record payment')
     } finally {
       setSavingPayment(false)
     }
@@ -284,7 +287,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       downloadInvoicePDF(invoice)
     } catch (error) {
       console.error('Error generating PDF:', error)
-      alert('Failed to generate PDF. Please try again.')
+      showToast('error', 'Failed to generate PDF. Please try again.')
     } finally {
       setGeneratingPDF(false)
     }
@@ -307,11 +310,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         throw new Error(data.error || 'Failed to send invoice')
       }
       
-      alert('Invoice sent via WhatsApp! ✅')
+      showToast('success', 'Invoice sent via WhatsApp! ✅')
       fetchInvoice()
     } catch (error: any) {
       console.error('Error sending WhatsApp:', error)
-      alert(`Failed to send: ${error.message}`)
+      showToast('error', `Failed to send: ${error.message}`)
     } finally {
       setSendingWhatsApp(false)
     }
@@ -337,7 +340,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const handleDeletePayment = async (paymentId: string) => {
-    if (!confirm('Are you sure you want to delete this payment?')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to delete this payment?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/invoices/${resolvedParams.id}/payments/${paymentId}`, {
@@ -355,7 +358,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
   const handleCreateFinalInvoice = async () => {
     if (!invoice) return
     
-    if (!confirm('Create a Final Invoice for the remaining balance?')) return
+    if (!(await dialog.confirm({ message: 'Create a Final Invoice for the remaining balance?' }))) return
 
     setCreatingFinalInvoice(true)
     try {
@@ -395,11 +398,11 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         router.push(`/invoices/${newInvoice.id}`)
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to create final invoice')
+        showToast('error', error.error || 'Failed to create final invoice')
       }
     } catch (error) {
       console.error('Error creating final invoice:', error)
-      alert('Failed to create final invoice')
+      showToast('error', 'Failed to create final invoice')
     } finally {
       setCreatingFinalInvoice(false)
     }

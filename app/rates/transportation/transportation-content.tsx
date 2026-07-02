@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 interface TransportationRate {
   id: string
@@ -436,21 +437,21 @@ export default function TransportationContent() {
       headers.join(','),
       ...filteredRates.map(rate => {
         const values = [
-          `"${rate.service_code || ''}"`,
-          `"${rate.service_type || ''}"`,
-          `"${rate.vehicle_type || ''}"`,
+          csvCell(rate.service_code),
+          csvCell(rate.service_type),
+          csvCell(rate.vehicle_type),
           rate.capacity_min || 1,
           rate.capacity_max || 2,
-          `"${rate.city || ''}"`,
-          `"${rate.destination_city || ''}"`,
+          csvCell(rate.city),
+          csvCell(rate.destination_city),
           rate.base_rate_eur || 0,
           rate.base_rate_non || rate.base_rate_non_eur || 0,
-          `"${rate.season || ''}"`,
-          `"${rate.rate_valid_from || ''}"`,
-          `"${rate.rate_valid_to || ''}"`,
-          `"${rate.supplier_id || ''}"`,
-          `"${rate.supplier_name || rate.suppliers?.name || ''}"`,
-          `"${(rate.notes || '').replace(/"/g, '""')}"`,
+          csvCell(rate.season),
+          csvCell(rate.rate_valid_from),
+          csvCell(rate.rate_valid_to),
+          csvCell(rate.supplier_id),
+          csvCell(rate.supplier_name || rate.suppliers?.name),
+          csvCell(rate.notes),
           rate.is_active ? 'true' : 'false'
         ]
         return values.join(',')

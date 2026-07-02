@@ -121,9 +121,11 @@ export async function middleware(request: NextRequest) {
     '/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept',
     '/about', '/contact', '/docs', '/integrations', '/privacy', '/terms',
   ]
-  const isPublicRoute = publicRoutes.some(route => 
-    request.nextUrl.pathname === route || 
-    (route !== '/' && request.nextUrl.pathname.startsWith(route))
+  // Exact match or a true sub-path ('/contact/foo'), never a shared prefix
+  // ('/contacts' must NOT match public '/contact').
+  const isPublicRoute = publicRoutes.some(route =>
+    request.nextUrl.pathname === route ||
+    (route !== '/' && request.nextUrl.pathname.startsWith(route + '/'))
   )
 
   const isApiRoute = request.nextUrl.pathname.startsWith('/api')

@@ -8,6 +8,7 @@ import ImpersonationBanner from "@/components/ImpersonationBanner"
 import { AuthProvider } from './contexts/AuthContext'
 import { TenantProvider } from './contexts/TenantContext'
 import { ConfirmDialogProvider } from '@/components/ConfirmDialog'
+import { Toaster } from './contexts/ToastContext'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -30,6 +31,7 @@ export default function RootLayout({
         <AuthProvider>
           <TenantProvider>
             <ConfirmDialogProvider>
+              <Toaster />
               <ImpersonationBanner />
               {isPublicPage ? (
                 // Public pages - no sidebar

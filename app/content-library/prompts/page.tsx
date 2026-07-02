@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { Plus, Edit, Trash2, Copy, Star, Eye, X, Loader2, Sparkles } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface PromptTemplate {
   id: string
@@ -43,6 +44,7 @@ const EMPTY_FORM: Omit<PromptTemplate, 'id' | 'created_at' | 'version'> = {
 }
 
 function PromptsContent() {
+  const dialog = useConfirmDialog()
   const [prompts, setPrompts] = useState<PromptTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -95,7 +97,7 @@ function PromptsContent() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this prompt template?')) return
+    if (!(await dialog.confirm({ message: 'Delete this prompt template?', variant: 'danger', confirmText: 'Delete' }))) return
     await fetch(`/api/content-library/prompts?id=${id}`, { method: 'DELETE' })
     fetchPrompts()
   }

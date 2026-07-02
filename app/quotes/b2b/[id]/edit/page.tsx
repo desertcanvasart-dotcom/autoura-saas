@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft, Save, Loader2, AlertCircle, RefreshCw
 } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface B2BQuote {
   id: string
@@ -190,7 +191,7 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
       // If recalculate, refresh the page to show new pricing table
       if (recalculate) {
         await fetchQuote()
-        alert('Pricing table recalculated successfully!')
+        showToast('success', 'Pricing table recalculated successfully!')
       } else {
         // Redirect to detail page
         router.push(`/quotes/b2b/${quote.id}`)

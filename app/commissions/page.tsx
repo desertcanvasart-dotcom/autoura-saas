@@ -32,6 +32,8 @@ import {
   Heart
 } from 'lucide-react'
 import Link from 'next/link'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Commission {
   id: string
@@ -158,6 +160,7 @@ export default function CommissionsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [saving, setSaving] = useState(false)
+  const dialog = useConfirmDialog()
 
   const fetchCommissions = useCallback(async () => {
     try {
@@ -238,11 +241,11 @@ export default function CommissionsPage() {
         fetchCommissions()
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to save commission')
+        showToast('error', error.error || 'Failed to save commission')
       }
     } catch (error) {
       console.error('Error saving commission:', error)
-      alert('Failed to save commission')
+      showToast('error', 'Failed to save commission')
     } finally {
       setSaving(false)
     }
@@ -271,7 +274,7 @@ export default function CommissionsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this commission record?')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to delete this commission record?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/commissions/${id}`, { method: 'DELETE' })

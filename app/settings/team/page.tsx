@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { createClient } from '@/app/supabase'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 import Link from 'next/link'
 import {
   Users,
@@ -41,6 +42,7 @@ interface TenantMemberWithUser {
 
 export default function TeamManagementPage() {
   const { tenant, tenantMember, canManageMembers } = useTenant()
+  const dialog = useConfirmDialog()
   const [members, setMembers] = useState<TenantMemberWithUser[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -108,7 +110,7 @@ export default function TeamManagementPage() {
   const handleRemoveMember = async (memberId: string) => {
     if (!canManageMembers) return
 
-    if (!confirm('Are you sure you want to remove this team member?')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to remove this team member?', variant: 'danger', confirmText: 'Delete' }))) return
 
     setActionLoading(memberId)
     try {

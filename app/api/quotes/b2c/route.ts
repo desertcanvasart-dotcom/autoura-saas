@@ -1,38 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
-
-// Create authenticated Supabase client from request
-async function createAuthenticatedClient() {
-  const cookieStore = await cookies();
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      auth: {
-        persistSession: false,
-      },
-      global: {
-        headers: {
-          cookie: cookieStore.toString(),
-        },
-      },
-    }
-  );
-}
-
-// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server';
 
 /**
  * GET /api/quotes/b2c
@@ -40,17 +7,15 @@ function getSupabaseAdmin() {
  */
 export async function GET(request: NextRequest) {
   try {
-    // Create authenticated client - RLS will automatically filter by tenant
-    const supabase = await createAuthenticatedClient();
-
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({
-        success: false,
-        error: 'Not authenticated'
-      }, { status: 401 })
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
     }
+
+    const supabase = createAdminClient();
 
     const { searchParams } = new URL(request.url);
 
@@ -64,7 +29,7 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get('client_id');
     const itineraryId = searchParams.get('itinerary_id');
 
-    // Build query - RLS policies will automatically filter by tenant_id
+    // Build query - explicitly scoped to the authenticated user's tenant
     let query = supabase
       .from('b2c_quotes')
       .select(`
@@ -83,6 +48,7 @@ export async function GET(request: NextRequest) {
           end_date
         )
       `, { count: 'exact' })
+      .eq('tenant_id', authResult.tenant_id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -133,31 +99,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Create authenticated client - RLS will enforce tenant isolation
-    const supabase = await createAuthenticatedClient();
-
-    // Get user's tenant_id from their membership
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const authResult = await requireAuth()
+    if (authResult.error) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
     }
 
-    const { data: membership, error: membershipError } = await supabase
-      .from('tenant_members')
-      .select('tenant_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single();
-
-    if (membershipError || !membership) {
-      return NextResponse.json(
-        { success: false, error: 'User does not belong to any tenant' },
-        { status: 403 }
-      );
-    }
+    const supabase = createAdminClient();
 
     const body = await request.json();
     const {
@@ -185,7 +135,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate quote number using admin client (RPC needs admin)
-    const { data: quoteNumber, error: seqError } = await (getSupabaseAdmin() as any)
+    const { data: quoteNumber, error: seqError } = await (supabase as any)
       .rpc('generate_b2c_quote_number');
 
     if (seqError) {
@@ -196,11 +146,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create quote - RLS will automatically validate tenant_id
+    // Create quote - tenant_id forced from the authenticated session
     const { data: quote, error: insertError } = await supabase
       .from('b2c_quotes')
       .insert({
-        tenant_id: membership.tenant_id,
+        tenant_id: authResult.tenant_id,
         itinerary_id,
         client_id,
         quote_number: quoteNumber,

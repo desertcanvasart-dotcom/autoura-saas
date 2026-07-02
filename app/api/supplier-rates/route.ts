@@ -3,20 +3,7 @@
 // Used by Suppliers page "Rates" tab
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // Map supplier type to rate table(s)
 const SUPPLIER_RATE_TABLES: Record<string, string[]> = {
@@ -32,8 +19,26 @@ const SUPPLIER_RATE_TABLES: Record<string, string[]> = {
   tour_operator: ['train_rates', 'sleeping_train_rates'],
 }
 
+// Tables whose rows are tenant-owned (tenant_id NOT NULL)
+const TENANT_SCOPED_TABLES = new Set([
+  'transportation_rates', 'accommodation_rates', 'guide_rates',
+  'nile_cruises', 'activity_rates', 'meal_rates',
+])
+
+// Tables with shared/global catalog rows (tenant_id nullable)
+const SHARED_CATALOG_TABLES = new Set(['train_rates', 'sleeping_train_rates'])
+
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const supabaseAdmin = createAdminClient()
     const searchParams = request.nextUrl.searchParams
     const supplierId = searchParams.get('supplier_id')
     const supplierType = searchParams.get('supplier_type')
@@ -59,10 +64,19 @@ export async function GET(request: NextRequest) {
     // Fetch rates from each table
     for (const table of rateTables) {
       try {
-        const { data, error } = await (getSupabaseAdmin() as any)
+        let query = (supabaseAdmin as any)
           .from(table)
           .select('*')
           .eq('supplier_id', supplierId)
+
+        if (TENANT_SCOPED_TABLES.has(table)) {
+          query = query.eq('tenant_id', authResult.tenant_id)
+        } else if (SHARED_CATALOG_TABLES.has(table)) {
+          // Tenant rows + shared/global catalog rows (tenant_id IS NULL)
+          query = query.or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
+        }
+
+        const { data, error } = await query
           .order('created_at', { ascending: false })
 
         if (!error && data && data.length > 0) {

@@ -7,32 +7,31 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getTemplatePriceRange } from '@/lib/auto-pricing-service'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 export async function POST(request: NextRequest) {
   try {
-    // Optional: verify cron secret for automated calls
+    // Cron path: valid only when CRON_SECRET is configured AND matches (fail closed).
+    // Cron calls recalculate all tenants; session calls are scoped to the user's tenant.
     const { searchParams } = new URL(request.url)
-    const secret = searchParams.get('secret')
     const cronSecret = process.env.CRON_SECRET
+    const providedSecret = searchParams.get('secret') || request.headers.get('x-cron-secret')
+    const isCronCall = Boolean(cronSecret && providedSecret === cronSecret)
 
-    // Allow if no secret is configured, or if it matches
-    if (cronSecret && secret !== cronSecret) {
-      // Also check authorization header for manual calls
-      const authHeader = request.headers.get('authorization')
-      if (!authHeader) {
+    let tenantId: string | null = null
+    if (!isCronCall) {
+      const authResult = await requireAuth()
+      if (authResult.error) {
         return NextResponse.json(
-          { success: false, error: 'Unauthorized' },
-          { status: 401 }
+          { success: false, error: authResult.error },
+          { status: authResult.status }
         )
       }
+      tenantId = authResult.tenant_id
     }
+
+    const supabaseAdmin = createAdminClient()
 
     // Parse request body for optional template ID
     let templateId: string | null = null
@@ -51,6 +50,10 @@ export async function POST(request: NextRequest) {
       .from('tour_templates')
       .select('id, template_name, duration_days, uses_day_builder, pricing_mode')
       .eq('is_active', true)
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId)
+    }
 
     if (templateId) {
       query = query.eq('id', templateId)
@@ -98,19 +101,27 @@ export async function POST(request: NextRequest) {
         // `selling_price_per_person`). Keep this column name in sync if the
         // tour_variations pricing schema changes.
         if (startingPrice === null) {
-          const { data: variations } = await supabaseAdmin
+          let variationsQuery = supabaseAdmin
             .from('tour_variations')
             .select('id')
             .eq('template_id', template.id)
             .eq('is_active', true)
+          if (tenantId) {
+            variationsQuery = variationsQuery.eq('tenant_id', tenantId)
+          }
+          const { data: variations } = await variationsQuery
 
           if (variations && variations.length > 0) {
-            const { data: pricing } = await supabaseAdmin
+            let pricingQuery = supabaseAdmin
               .from('variation_pricing')
               .select('price_per_person, tour_variations!inner(tier)')
               .in('variation_id', variations.map(v => v.id))
               .order('price_per_person', { ascending: true })
               .limit(1)
+            if (tenantId) {
+              pricingQuery = pricingQuery.eq('tenant_id', tenantId)
+            }
+            const { data: pricing } = await pricingQuery
 
             if (pricing && pricing.length > 0) {
               startingPrice = Math.round(pricing[0].price_per_person)
@@ -131,7 +142,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Update the template with cached price
-        const { error: updateError } = await supabaseAdmin
+        let updateQuery = supabaseAdmin
           .from('tour_templates')
           .update({
             cached_starting_price: startingPrice,
@@ -139,6 +150,10 @@ export async function POST(request: NextRequest) {
             cached_price_updated_at: new Date().toISOString()
           })
           .eq('id', template.id)
+        if (tenantId) {
+          updateQuery = updateQuery.eq('tenant_id', tenantId)
+        }
+        const { error: updateError } = await updateQuery
 
         if (updateError) {
           console.error(`❌ Error updating ${template.template_name}:`, updateError)
@@ -198,11 +213,22 @@ export async function POST(request: NextRequest) {
 // GET endpoint to check status or trigger recalculation
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const supabaseAdmin = createAdminClient()
+
     // Check how many templates need price updates
     const { data: templates, error } = await supabaseAdmin
       .from('tour_templates')
       .select('id, template_name, cached_starting_price, cached_price_updated_at')
       .eq('is_active', true)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })

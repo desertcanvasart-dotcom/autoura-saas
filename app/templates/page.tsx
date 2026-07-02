@@ -33,6 +33,8 @@ import {
   Handshake
 } from 'lucide-react'
 import { useTenant } from '../contexts/TenantContext'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // ============================================
 // TYPES
@@ -157,6 +159,7 @@ const SUBCATEGORY_TO_SUPPLIER_TYPE: Record<string, string> = {
 
 export default function TemplatesPage() {
   const { hasB2B } = useTenant()
+  const dialog = useConfirmDialog()
   const [templates, setTemplates] = useState<Template[]>([])
   const [placeholders, setPlaceholders] = useState<Placeholder[]>([])
   const [loading, setLoading] = useState(true)
@@ -348,7 +351,7 @@ export default function TemplatesPage() {
   }
 
   const handleDelete = async (template: Template) => {
-    if (!confirm(`Delete template "${template.name}"?`)) return
+    if (!(await dialog.confirm({ message: `Delete template "${template.name}"?`, variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/templates/${template.id}`, {
@@ -1362,13 +1365,13 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
 
   const handleSend = async () => {
     if (!selectedRecipient) {
-      alert('Please select a recipient')
+      showToast('error', 'Please select a recipient')
       return
     }
 
     const recipientContact = channel === 'email' ? selectedRecipient.email : selectedRecipient.phone
     if (!recipientContact) {
-      alert(`No ${channel === 'email' ? 'email' : 'phone number'} available for this recipient`)
+      showToast('error', `No ${channel === 'email' ? 'email' : 'phone number'} available for this recipient`)
       return
     }
 
@@ -1392,15 +1395,15 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
       })
 
       if (response.ok) {
-        alert('Message sent successfully!')
+        showToast('success', 'Message sent successfully!')
         onClose()
       } else {
         const data = await response.json()
-        alert(data.error || 'Failed to send message')
+        showToast('error', data.error || 'Failed to send message')
       }
     } catch (error) {
       console.error('Error sending:', error)
-      alert('Failed to send message')
+      showToast('error', 'Failed to send message')
     } finally {
       setSending(false)
     }
@@ -1409,18 +1412,18 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
   // Schedule send handler
   const handleScheduleSend = async () => {
     if (!selectedRecipient) {
-      alert('Please select a recipient')
+      showToast('error', 'Please select a recipient')
       return
     }
 
     if (!scheduledFor) {
-      alert('Please select a date and time')
+      showToast('error', 'Please select a date and time')
       return
     }
 
     const recipientContact = channel === 'email' ? selectedRecipient.email : selectedRecipient.phone
     if (!recipientContact) {
-      alert(`No ${channel === 'email' ? 'email' : 'phone number'} available for this recipient`)
+      showToast('error', `No ${channel === 'email' ? 'email' : 'phone number'} available for this recipient`)
       return
     }
 
@@ -1445,15 +1448,15 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
       })
 
       if (response.ok) {
-        alert(`Message scheduled for ${new Date(scheduledFor).toLocaleString()}`)
+        showToast('success', `Message scheduled for ${new Date(scheduledFor).toLocaleString()}`)
         onClose()
       } else {
         const data = await response.json()
-        alert(data.error || 'Failed to schedule message')
+        showToast('error', data.error || 'Failed to schedule message')
       }
     } catch (error) {
       console.error('Error scheduling:', error)
-      alert('Failed to schedule message')
+      showToast('error', 'Failed to schedule message')
     } finally {
       setSending(false)
     }
@@ -1462,7 +1465,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
   // Bulk send handler
   const handleBulkSend = async () => {
     if (selectedRecipients.length === 0) {
-      alert('Please select at least one recipient')
+      showToast('error', 'Please select at least one recipient')
       return
     }
 
@@ -1553,7 +1556,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
     }
 
     setSending(false)
-    alert(`Bulk send complete!\n✓ Sent: ${sent}\n✗ Failed: ${failed}`)
+    showToast('success', `Bulk send complete!\n✓ Sent: ${sent}\n✗ Failed: ${failed}`)
 
     if (failed === 0) {
       onClose()

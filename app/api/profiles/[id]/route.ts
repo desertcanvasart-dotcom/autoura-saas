@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
+// Verify the target user belongs to the caller's tenant (user_profiles has no tenant_id)
+async function isTenantMember(adminClient: any, tenantId: string, userId: string): Promise<boolean> {
+  const { data } = await adminClient
+    .from('tenant_members')
+    .select('user_id')
+    .eq('tenant_id', tenantId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  return !!data
 }
 
 // GET - Get single profile
@@ -20,9 +18,26 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
 
-    const { data, error } = await (getSupabase() as any)
+    const adminClient = createAdminClient()
+
+    if (!(await isTenantMember(adminClient, authResult.tenant_id!, id))) {
+      return NextResponse.json(
+        { success: false, error: 'Profile not found' },
+        { status: 404 }
+      )
+    }
+
+    const { data, error } = await (adminClient as any)
       .from('user_profiles')
       .select('*')
       .eq('id', id)
@@ -49,6 +64,14 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
     const body = await request.json()
 
@@ -69,7 +92,35 @@ export async function PUT(
       )
     }
 
-    const { data, error } = await (getSupabase() as any)
+    const isSelf = authResult.user?.id === id
+    const isManager = ['owner', 'admin', 'manager'].includes(authResult.role || '')
+
+    if (!isSelf && !isManager) {
+      return NextResponse.json(
+        { success: false, error: 'Insufficient permissions' },
+        { status: 403 }
+      )
+    }
+
+    // Privileged fields (role changes, activation) require a manager+ role,
+    // even for self-updates (prevents privilege escalation)
+    if (!isManager && (updateData.role !== undefined || updateData.is_active !== undefined)) {
+      return NextResponse.json(
+        { success: false, error: 'Insufficient permissions' },
+        { status: 403 }
+      )
+    }
+
+    const adminClient = createAdminClient()
+
+    if (!(await isTenantMember(adminClient, authResult.tenant_id!, id))) {
+      return NextResponse.json(
+        { success: false, error: 'Profile not found' },
+        { status: 404 }
+      )
+    }
+
+    const { data, error } = await (adminClient as any)
       .from('user_profiles')
       .update(updateData)
       .eq('id', id)

@@ -1,33 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
-    
-    const { data, error } = await (getSupabaseAdmin() as any)
+
+    const { data, error } = await (createAdminClient() as any)
       .from('activity_rates')
       .select(`
         *,
         supplier:supplier_id (id, name, city, contact_phone, contact_email)
       `)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .single()
     
     if (error) throw error
@@ -47,16 +43,28 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
     const body = await request.json()
-    
-    const { data, error } = await (getSupabaseAdmin() as any)
+
+    // Never allow re-assigning a row to another tenant via body
+    const { tenant_id: _ignoredTenantId, ...updates } = body
+
+    const { data, error } = await (createAdminClient() as any)
       .from('activity_rates')
       .update({
-        ...body,
+        ...updates,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select(`
         *,
         supplier:supplier_id (id, name, city)
@@ -80,12 +88,21 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
-    
-    const { error } = await getSupabaseAdmin()
+
+    const { error } = await createAdminClient()
       .from('activity_rates')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
     
     if (error) throw error
     

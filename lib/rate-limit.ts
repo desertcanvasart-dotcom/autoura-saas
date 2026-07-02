@@ -9,7 +9,11 @@ interface RateLimitRecord {
   resetTime: number
 }
 
-// In-memory store (use Redis in production for multi-instance)
+// In-memory store. NOTE: this is PER-INSTANCE and non-durable — with N app
+// instances the effective limit is roughly N× and counters reset on deploy.
+// It's a best-effort speed bump, not a hard guarantee. For a real distributed
+// limit, back checkRateLimit with a shared store (Redis/Upstash) keyed the
+// same way; the call sites don't change.
 const rateLimitStore = new Map<string, RateLimitRecord>()
 
 // Cleanup old records every 5 minutes
@@ -116,20 +120,61 @@ export function checkRateLimit(
 // HELPER TO GET CLIENT IDENTIFIER
 // ============================================
 
+const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
+const IPV6_RE = /^[0-9a-fA-F:]+$/
+
+function isValidIp(value: string): boolean {
+  if (IPV4_RE.test(value)) {
+    return value.split('.').every(o => Number(o) <= 255)
+  }
+  return value.includes(':') && IPV6_RE.test(value)
+}
+
+/**
+ * Best-effort client IP, resistant to X-Forwarded-For spoofing.
+ *
+ * X-Forwarded-For is client-controllable: a client can PREPEND arbitrary
+ * entries, and each proxy APPENDS the address it saw. So the trustworthy
+ * client IP is not the leftmost entry (the old bug — trivially spoofed to
+ * rotate identifiers and bypass the limit) but the one the outermost trusted
+ * proxy appended: the Nth entry from the right, where N = number of trusted
+ * proxy hops (TRUSTED_PROXY_COUNT, default 1 for a single edge like Railway).
+ * Values that don't parse as an IP are rejected so a garbage header can't
+ * mint unlimited identifiers.
+ */
 export function getClientIdentifier(request: NextRequest): string {
-  // Try to get real IP (behind proxy)
+  const hops = Math.max(1, parseInt(process.env.TRUSTED_PROXY_COUNT || '1', 10) || 1)
+
   const forwardedFor = request.headers.get('x-forwarded-for')
   if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim()
+    const parts = forwardedFor.split(',').map(p => p.trim()).filter(Boolean)
+    // The address the outermost trusted proxy observed.
+    const candidate = parts[parts.length - hops]
+    if (candidate && isValidIp(candidate)) {
+      return candidate
+    }
   }
-  
-  const realIp = request.headers.get('x-real-ip')
-  if (realIp) {
+
+  const realIp = request.headers.get('x-real-ip')?.trim()
+  if (realIp && isValidIp(realIp)) {
     return realIp
   }
-  
-  // Fallback
+
+  // Can't establish a trustworthy IP → one shared bucket (fail closed toward
+  // limiting, not toward unlimited per-request identifiers).
   return 'unknown'
+}
+
+/**
+ * Preferred rate-limit identifier. An authenticated user id can't be spoofed
+ * (it comes from the verified session), so use it when available; fall back to
+ * the hardened client IP for anonymous requests.
+ */
+export function getRateLimitIdentifier(
+  request: NextRequest,
+  userId?: string | null
+): string {
+  return userId ? `user:${userId}` : `ip:${getClientIdentifier(request)}`
 }
 
 // ============================================

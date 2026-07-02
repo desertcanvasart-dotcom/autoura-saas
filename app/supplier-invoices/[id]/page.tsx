@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Loader2, FileText, Check, DollarSign, AlertTriangle, Upload, Link2, X, Trash2 } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 const SYM: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
 const money = (n: number, c = 'EUR') => `${SYM[c] || c + ' '}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -13,6 +15,7 @@ const MATCH_BADGE: Record<string, string> = { unmatched: 'bg-amber-100 text-ambe
 export default function SupplierInvoiceDetail() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const dialog = useConfirmDialog()
   const [inv, setInv] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
@@ -39,7 +42,7 @@ export default function SupplierInvoiceDetail() {
 
   const action = async (key: string, fn: () => Promise<Response>) => {
     setBusy(key)
-    try { const res = await fn(); const d = await res.json(); if (!res.ok || d.success === false) alert(d.error || 'Action failed'); await load() }
+    try { const res = await fn(); const d = await res.json(); if (!res.ok || d.success === false) showToast('error', d.error || 'Action failed'); await load() }
     catch (e) { console.error(e) } finally { setBusy(null) }
   }
 
@@ -141,7 +144,7 @@ export default function SupplierInvoiceDetail() {
         <button disabled={busy !== null || inv.status === 'disputed'} onClick={() => { const r = prompt('Reason for dispute:'); if (r != null) action('dispute', () => fetch(`/api/supplier-invoices/${id}/dispute`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: r }) })) }}
           className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Dispute</button>
         <div className="ml-auto flex items-center gap-2">
-          <button disabled={busy !== null || (!canApprove && inv.match_status !== 'discrepancy' && inv.match_status !== 'partial')} onClick={() => { const override = inv.match_status !== 'matched'; if (override && !confirm('Invoice is not fully matched. Approve with a discrepancy?')) return; action('approve', () => fetch(`/api/supplier-invoices/${id}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ override }) })) }}
+          <button disabled={busy !== null || (!canApprove && inv.match_status !== 'discrepancy' && inv.match_status !== 'partial')} onClick={async () => { const override = inv.match_status !== 'matched'; if (override && !(await dialog.confirm({ message: 'Invoice is not fully matched. Approve with a discrepancy?', variant: 'warning' }))) return; action('approve', () => fetch(`/api/supplier-invoices/${id}/approve`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ override }) })) }}
             className="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center gap-1"><Check className="h-3.5 w-3.5" /> Approve</button>
           <button disabled={busy !== null || !canPay} onClick={() => { const ref = prompt('Payment reference (optional):') || undefined; action('pay', () => fetch(`/api/supplier-invoices/${id}/pay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_reference: ref }) })) }}
             className="px-4 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50 inline-flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" /> Mark paid</button>

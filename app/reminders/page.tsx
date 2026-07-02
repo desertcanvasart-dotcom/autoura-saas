@@ -21,6 +21,8 @@ import {
   ChevronLeft,
   Filter
 } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface PendingReminder {
   invoice_id: string
@@ -99,6 +101,7 @@ export default function PaymentRemindersPage() {
   const [historyFilter, setHistoryFilter] = useState<'all' | 'sent' | 'failed'>('all')
   const [historyPage, setHistoryPage] = useState(0)
   const [hasMoreHistory, setHasMoreHistory] = useState(false)
+  const dialog = useConfirmDialog()
 
   const fetchPendingReminders = useCallback(async () => {
     try {
@@ -165,13 +168,13 @@ export default function PaymentRemindersPage() {
       
       if (result.success) {
         setPendingReminders(prev => prev.filter(r => r.invoice_id !== invoiceId))
-        alert(`Reminder sent successfully!`)
+        showToast('success', `Reminder sent successfully!`)
       } else {
-        alert(result.error || 'Failed to send reminder')
+        showToast('error', result.error || 'Failed to send reminder')
       }
     } catch (error) {
       console.error('Error sending reminder:', error)
-      alert('Failed to send reminder')
+      showToast('error', 'Failed to send reminder')
     } finally {
       setSendingId(null)
     }
@@ -195,11 +198,11 @@ export default function PaymentRemindersPage() {
             : r
         ))
       } else {
-        alert(result.error || 'Failed to toggle pause status')
+        showToast('error', result.error || 'Failed to toggle pause status')
       }
     } catch (error) {
       console.error('Error toggling pause:', error)
-      alert('Failed to toggle pause status')
+      showToast('error', 'Failed to toggle pause status')
     } finally {
       setTogglingId(null)
     }
@@ -207,7 +210,7 @@ export default function PaymentRemindersPage() {
 
   const handleSendSelected = async () => {
     if (selectedIds.size === 0) {
-      alert('Please select invoices to send reminders')
+      showToast('error', 'Please select invoices to send reminders')
       return
     }
 
@@ -235,7 +238,7 @@ export default function PaymentRemindersPage() {
 
   const handleSendAll = async () => {
     const activeReminders = pendingReminders.filter(r => !r.reminder_paused)
-    if (!confirm(`Are you sure you want to send reminders to all ${activeReminders.length} active invoices?`)) {
+    if (!(await dialog.confirm({ message: `Are you sure you want to send reminders to all ${activeReminders.length} active invoices?` }))) {
       return
     }
 

@@ -32,6 +32,17 @@ export interface PDFExportOptions {
 // CSV EXPORT
 // ============================================
 
+// Neutralize spreadsheet formula injection: a cell whose value starts with
+// = + - @ (or tab / CR) is executed as a formula by Excel/Sheets, so an
+// exported field like `=HYPERLINK(...)` or `=cmd|...` can exfiltrate data or
+// run on open. Prefix such values with a single quote (the standard
+// mitigation), then apply normal CSV quoting.
+export function csvCell(value: unknown): string {
+  const s = String(value ?? '')
+  const guarded = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+  return `"${guarded.replace(/"/g, '""')}"`
+}
+
 export function exportFinanceCSV(
   data: Record<string, unknown>[],
   columns: ExportColumn[],
@@ -44,13 +55,12 @@ export function exportFinanceCSV(
     columns.map(col => {
       const value = row[col.key]
       const formatted = col.format ? col.format(value) : String(value ?? '')
-      // Escape quotes and wrap in quotes for CSV safety
-      return `"${String(formatted).replace(/"/g, '""')}"`
+      return csvCell(formatted)
     })
   )
 
   const csvContent = [
-    headers.map(h => `"${h}"`).join(','),
+    headers.map(h => csvCell(h)).join(','),
     ...rows.map(row => row.join(','))
   ].join('\n')
 

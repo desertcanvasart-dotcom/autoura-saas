@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Download, Loader2, FileText, Calendar, CreditCard } from 'lucide-react'
 import { downloadInvoicePDF } from '@/lib/invoice-pdf-generator'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface Payment {
   id: string
@@ -95,7 +96,7 @@ export default function InvoicePage() {
       downloadInvoicePDF(invoiceData)
     } catch (error) {
       console.error('Error downloading PDF:', error)
-      alert('Failed to download invoice')
+      showToast('error', 'Failed to download invoice')
     } finally {
       setDownloading(false)
     }

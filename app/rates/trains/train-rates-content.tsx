@@ -29,6 +29,7 @@ import {
   Info
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // Egyptian cities with train stations
 const TRAIN_CITIES = [
@@ -337,8 +338,8 @@ export default function TrainRatesContent() {
         return headers.map(header => {
           const value = rate[header as keyof TrainRate]
           if (value === null || value === undefined) return ''
-          if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
-            return `"${value.replace(/"/g, '""')}"`
+          if (typeof value === 'string') {
+            return csvCell(value)
           }
           return value
         }).join(',')

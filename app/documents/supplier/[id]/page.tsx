@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Download, Send, Mail, MessageSquare, Printer, CheckCircle } from 'lucide-react'
 import { generateSupplierDocumentPDF } from '@/lib/supplier-document-pdf'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface SupplierDocument {
   id: string
@@ -107,7 +108,7 @@ export default function SupplierDocumentViewPage() {
 
   const handleSendEmail = async () => {
     if (!document || !document.supplier_contact_email) {
-      alert('Supplier email not available')
+      showToast('error', 'Supplier email not available')
       return
     }
     
@@ -142,11 +143,11 @@ export default function SupplierDocumentViewPage() {
         fetchDocument()
         setTimeout(() => setActionSuccess(null), 5000)
       } else {
-        alert('Failed to send email')
+        showToast('error', 'Failed to send email')
       }
     } catch (error) {
       console.error('Error sending email:', error)
-      alert('Failed to send email')
+      showToast('error', 'Failed to send email')
     } finally {
       setActionLoading(null)
     }
@@ -154,7 +155,7 @@ export default function SupplierDocumentViewPage() {
 
   const handleSendWhatsApp = () => {
     if (!document || !document.supplier_contact_phone) {
-      alert('Supplier phone not available')
+      showToast('error', 'Supplier phone not available')
       return
     }
     
@@ -193,7 +194,7 @@ export default function SupplierDocumentViewPage() {
       fetchDocument()
       setTimeout(() => setActionSuccess(null), 5000)
     } catch (error) {
-      alert('Failed to update status')
+      showToast('error', 'Failed to update status')
     } finally {
       setActionLoading(null)
     }

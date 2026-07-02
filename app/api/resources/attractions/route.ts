@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
     const supplierId = searchParams.get('supplier_id')
     const city = searchParams.get('city')
@@ -23,12 +18,13 @@ export async function GET(request: NextRequest) {
     const activityType = searchParams.get('activity_type')
     const activeOnly = searchParams.get('active_only') === 'true'
 
-    let query = (getSupabaseAdmin() as any)
+    let query = (createAdminClient() as any)
       .from('activity_rates')
       .select(`
         *,
         supplier:supplier_id (id, name, city, contact_phone, contact_email)
       `)
+      .eq('tenant_id', authResult.tenant_id)
       .order('activity_name')
       .order('activity_category')
 
@@ -51,14 +47,23 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const body = await request.json()
 
     const newRate = {
       ...body,
-      supplier_id: body.supplier_id || null
+      supplier_id: body.supplier_id || null,
+      tenant_id: authResult.tenant_id
     }
 
-    const { data, error } = await (getSupabaseAdmin() as any)
+    const { data, error } = await (createAdminClient() as any)
       .from('activity_rates')
       .insert([newRate])
       .select(`*, supplier:supplier_id (id, name, city)`)

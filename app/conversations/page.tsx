@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import UnifiedConversationComposer from '@/components/unified/UnifiedConversationComposer'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface Message {
   id: string
@@ -202,10 +203,10 @@ export default function ConversationsPage() {
               })
               const data = await res.json()
               if (res.ok && data.success !== false) {
-                alert(`Synced ${data.messages_created || 0} messages (${data.conversations_created || 0} new, ${data.conversations_updated || 0} updated)`)
+                showToast('success', `Synced ${data.messages_created || 0} messages (${data.conversations_created || 0} new, ${data.conversations_updated || 0} updated)`)
                 fetchConversations()
               } else {
-                alert(data.error || 'Sync failed')
+                showToast('error', data.error || 'Sync failed')
               }
             }}
             className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"

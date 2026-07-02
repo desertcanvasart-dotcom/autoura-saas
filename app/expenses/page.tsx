@@ -26,6 +26,8 @@ import {
   Filter
 } from 'lucide-react'
 import Link from 'next/link'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Expense {
   id: string
@@ -162,6 +164,7 @@ export default function ExpensesPage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'chart'>('list')
   const [currentPage, setCurrentPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
+  const dialog = useConfirmDialog()
 
   const fetchExpenses = useCallback(async () => {
     try {
@@ -255,29 +258,29 @@ export default function ExpensesPage() {
         fetchExpenses()
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to save expense')
+        showToast('error', error.error || 'Failed to save expense')
       }
     } catch (error) {
       console.error('Error saving expense:', error)
-      alert('Failed to save expense')
+      showToast('error', 'Failed to save expense')
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this expense?')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to delete this expense?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
       if (response.ok) {
         fetchExpenses()
       } else {
-        alert('Failed to delete expense')
+        showToast('error', 'Failed to delete expense')
       }
     } catch (error) {
       console.error('Error deleting expense:', error)
-      alert('Failed to delete expense')
+      showToast('error', 'Failed to delete expense')
     }
   }
 

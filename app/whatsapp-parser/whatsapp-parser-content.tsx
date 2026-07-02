@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/app/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   CheckCircle, AlertCircle, Users, Calendar, MapPin,

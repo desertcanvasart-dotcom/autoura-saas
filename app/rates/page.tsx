@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // INTERFACES
@@ -451,8 +452,8 @@ export default function RatesPage() {
     if (!currentRates.length) return
     
     const headers = Object.keys(currentRates[0]).join(',')
-    const rows = currentRates.map(rate => 
-      Object.values(rate).map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')
+    const rows = currentRates.map(rate =>
+      Object.values(rate).map(v => csvCell(v as string)).join(',')
     ).join('\n')
     
     const csvContent = `${headers}\n${rows}`

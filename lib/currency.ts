@@ -31,23 +31,6 @@ export const CURRENCY_NAMES: Record<CurrencyCode, string> = {
   EGP: 'Egyptian Pound'
 }
 
-// Default fallback rates (EUR as base)
-// These are used only if database rates aren't available
-export const DEFAULT_RATES: Record<string, number> = {
-  'EUR_USD': 1.08,
-  'EUR_GBP': 0.86,
-  'EUR_EGP': 53.50,
-  'USD_EUR': 0.926,
-  'USD_GBP': 0.796,
-  'USD_EGP': 49.54,
-  'GBP_EUR': 1.163,
-  'GBP_USD': 1.256,
-  'GBP_EGP': 62.21,
-  'EGP_EUR': 0.0187,
-  'EGP_USD': 0.0202,
-  'EGP_GBP': 0.0161,
-}
-
 /**
  * Get the currency symbol for a currency code
  */
@@ -63,14 +46,19 @@ export function getCurrencyName(currency: string): string {
 }
 
 /**
- * Convert an amount from one currency to another using provided rates
+ * Convert an amount from one currency to another using provided rates.
+ *
+ * Returns null when no rate is available. NEVER returns the unconverted
+ * amount — rendering 1000 EGP as €1,000 is a ~53× error. Callers must
+ * handle null (show the original amount with its ORIGINAL currency symbol,
+ * or a placeholder).
  */
 export function convertCurrency(
   amount: number,
   fromCurrency: string,
   toCurrency: string,
   rates: ExchangeRate[]
-): number {
+): number | null {
   if (fromCurrency === toCurrency) {
     return amount
   }
@@ -93,15 +81,8 @@ export function convertCurrency(
     return amount / reverseRate.rate
   }
 
-  // Fall back to default rates
-  const fallbackKey = `${fromCurrency}_${toCurrency}`
-  if (DEFAULT_RATES[fallbackKey]) {
-    return amount * DEFAULT_RATES[fallbackKey]
-  }
-
-  // If no rate found, return original amount
   console.warn(`No exchange rate found for ${fromCurrency} to ${toCurrency}`)
-  return amount
+  return null
 }
 
 /**
@@ -192,9 +173,7 @@ export function getExchangeRate(
     return 1 / reverseRate.rate
   }
 
-  // Fallback
-  const fallbackKey = `${fromCurrency}_${toCurrency}`
-  return DEFAULT_RATES[fallbackKey] || null
+  return null
 }
 
 /**
@@ -229,6 +208,11 @@ export function createCurrencyConverter(
         toCurrency,
         rates
       )
+      // No rate: show the amount honestly in its ORIGINAL currency rather
+      // than mislabeling it with the target symbol.
+      if (converted === null) {
+        return formatCurrency(amount, fromCurrency || defaultFromCurrency, formatOptions)
+      }
       return formatCurrency(converted, toCurrency, formatOptions)
     },
     getRate: (toCurrency: string, fromCurrency?: string) => {
@@ -245,8 +229,8 @@ export function batchConvert(
   fromCurrency: string,
   toCurrency: string,
   rates: ExchangeRate[]
-): Record<string, number> {
-  const result: Record<string, number> = {}
+): Record<string, number | null> {
+  const result: Record<string, number | null> = {}
 
   for (const [key, value] of Object.entries(values)) {
     result[key] = convertCurrency(value, fromCurrency, toCurrency, rates)

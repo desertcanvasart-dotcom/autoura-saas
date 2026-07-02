@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // CONSTANTS
@@ -338,13 +339,13 @@ export default function TippingPage() {
     const csvContent = [
       headers.join(','),
       ...filteredRates.map(rate => [
-        `"${rate.service_code || ''}"`,
-        `"${rate.role_type || ''}"`,
-        `"${rate.context || ''}"`,
-        `"${rate.rate_unit || ''}"`,
+        csvCell(rate.service_code),
+        csvCell(rate.role_type),
+        csvCell(rate.context),
+        csvCell(rate.rate_unit),
         rate.rate_eur,
-        `"${(rate.description || '').replace(/"/g, '""')}"`,
-        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        csvCell(rate.description),
+        csvCell(rate.notes),
         rate.is_active
       ].join(','))
     ].join('\n')

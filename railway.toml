@@ -5,6 +5,12 @@
 [deploy]
 startCommand = "npm run start"
 
-[[cron]]
-schedule = "0 2 * * *"
-command = "curl -s -X POST $APP_URL/api/cron/process-agent-memory -H 'x-cron-secret: $CRON_SECRET' || true"
+# NOTE: Railway has no `[[cron]]` table — cron is configured per-service in the
+# dashboard (Settings → Cron Schedule), and it runs that service's START
+# COMMAND (which must exit when done). The nightly agent-memory job therefore
+# lives in a SEPARATE Railway service:
+#   Start Command: npm run cron:agent-memory   (scripts/cron-agent-memory.mjs)
+#   Cron Schedule: 0 2 * * *
+#   Env:           APP_URL, CRON_SECRET
+# The old inert `[[cron]]` block was removed (wrong syntax + it single-quoted
+# $CRON_SECRET so the secret never expanded).

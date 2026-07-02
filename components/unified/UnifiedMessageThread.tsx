@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Loader2, Mail, Star, Archive, User, Send } from 'lucide-react'
 import EmailReplyComposer from './EmailReplyComposer'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { sanitizeEmailHtml } from '@/lib/sanitize-html'
 
 interface Message {
   id: string
@@ -136,7 +137,7 @@ export default function UnifiedMessageThread({ conversation, onConversationUpdat
                 </div>
                 {msg.body_html ? (
                   <div className="text-sm text-gray-700 prose prose-sm max-w-none [&_*]:!text-sm [&_img]:!max-w-full"
-                    dangerouslySetInnerHTML={{ __html: msg.body_html }} />
+                    dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(msg.body_html) }} />
                 ) : (
                   <p className="text-sm text-gray-700 whitespace-pre-wrap">{msg.body_text || msg.snippet}</p>
                 )}

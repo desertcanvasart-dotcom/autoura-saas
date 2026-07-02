@@ -1,18 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // GET /api/partners/[id]/template-data?type=hotel|guide|restaurant|airport_staff
 export async function GET(
@@ -20,6 +7,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const adminClient = createAdminClient()
+    const tenant_id = authResult.tenant_id
+
     // Next.js 15: params is now a Promise
     const { id: partnerId } = await params
     const { searchParams } = new URL(request.url)
@@ -34,10 +32,11 @@ export async function GET(
 
     switch (type) {
       case 'hotel':
-        const { data: hotel, error: hotelError } = await (getSupabase() as any)
+        const { data: hotel, error: hotelError } = await (adminClient as any)
           .from('hotel_contacts')
           .select('*')
           .eq('id', partnerId)
+          .eq('tenant_id', tenant_id)
           .single()
         
         if (hotelError || !hotel) {
@@ -61,10 +60,11 @@ export async function GET(
         break
 
       case 'guide':
-        const { data: guide, error: guideError } = await (getSupabase() as any)
+        const { data: guide, error: guideError } = await (adminClient as any)
           .from('guides')
           .select('*')
           .eq('id', partnerId)
+          .eq('tenant_id', tenant_id)
           .single()
         
         if (guideError || !guide) {
@@ -86,10 +86,11 @@ export async function GET(
         break
 
       case 'restaurant':
-        const { data: restaurant, error: restaurantError } = await (getSupabase() as any)
+        const { data: restaurant, error: restaurantError } = await (adminClient as any)
           .from('restaurant_contacts')
           .select('*')
           .eq('id', partnerId)
+          .eq('tenant_id', tenant_id)
           .single()
         
         if (restaurantError || !restaurant) {
@@ -113,10 +114,11 @@ export async function GET(
         break
 
       case 'airport_staff':
-        const { data: staff, error: staffError } = await (getSupabase() as any)
+        const { data: staff, error: staffError } = await (adminClient as any)
           .from('airport_staff')
           .select('*')
           .eq('id', partnerId)
+          .eq('tenant_id', tenant_id)
           .single()
         
         if (staffError || !staff) {

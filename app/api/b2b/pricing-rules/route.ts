@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // B2B PRICING RULES API
@@ -8,10 +8,19 @@ import { createAdminClient } from '@/lib/supabase-server'
 
 export async function GET() {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const supabaseAdmin = createAdminClient()
     const { data, error } = await supabaseAdmin
       .from('b2b_pricing_rules')
       .select('*')
+      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
       .order('service_name')
 
     if (error) {
@@ -28,12 +37,21 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const supabaseAdmin = createAdminClient()
     const body = await request.json()
 
     const { data, error } = await supabaseAdmin
       .from('b2b_pricing_rules')
       .insert({
+        tenant_id: authResult.tenant_id,
         rate_table: body.rate_table || 'activity_rates',
         service_name: body.service_name,
         service_category: body.service_category || 'activity',

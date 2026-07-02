@@ -7,6 +7,8 @@ import {
   Check, AlertCircle, Loader2, MapPin, Clock, Plus, Trash2, Calendar,
   ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor
 } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // Types
 interface Resource {
@@ -215,6 +217,7 @@ export default function ResourceAssignmentV2({
   tripName,
   onUpdate
 }: ResourceAssignmentV2Props) {
+  const dialog = useConfirmDialog()
   const [activeTab, setActiveTab] = useState('guide')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -413,7 +416,7 @@ export default function ResourceAssignmentV2({
 
   const handleAddResource = async () => {
     if (!addFormData.resource_id) {
-      alert('Please select a resource')
+      showToast('error', 'Please select a resource')
       return
     }
 
@@ -467,18 +470,18 @@ export default function ResourceAssignmentV2({
         resetAddForm()
         if (onUpdate) onUpdate()
       } else {
-        alert(data.error || 'Failed to add resource')
+        showToast('error', data.error || 'Failed to add resource')
       }
     } catch (error) {
       console.error('Error adding resource:', error)
-      alert('Failed to add resource')
+      showToast('error', 'Failed to add resource')
     } finally {
       setSaving(false)
     }
   }
 
   const handleRemoveResource = async (resourceId: string) => {
-    if (!confirm('Remove this resource assignment?')) return
+    if (!(await dialog.confirm({ message: 'Remove this resource assignment?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/itinerary-resources?id=${resourceId}`, {
@@ -492,11 +495,11 @@ export default function ResourceAssignmentV2({
         await fetchConflicts()
         if (onUpdate) onUpdate()
       } else {
-        alert(data.error || 'Failed to remove resource')
+        showToast('error', data.error || 'Failed to remove resource')
       }
     } catch (error) {
       console.error('Error removing resource:', error)
-      alert('Failed to remove resource')
+      showToast('error', 'Failed to remove resource')
     }
   }
 
@@ -551,11 +554,11 @@ export default function ResourceAssignmentV2({
           })
         }, 3000)
       } else {
-        alert(data.error || 'Failed to send WhatsApp notification')
+        showToast('error', data.error || 'Failed to send WhatsApp notification')
       }
     } catch (error) {
       console.error('Error sending WhatsApp:', error)
-      alert('Failed to send WhatsApp notification')
+      showToast('error', 'Failed to send WhatsApp notification')
     } finally {
       setSendingWhatsApp(null)
     }

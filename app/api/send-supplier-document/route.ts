@@ -99,11 +99,14 @@ function buildEmailWithAttachment(to: string, subject: string, body: string, fil
   const fromName = process.env.BUSINESS_NAME || 'AUTOURA'
   const boundary = `boundary_${Date.now()}`
 
+  // Strip CR/LF from header values to prevent header/Bcc injection.
+  const stripHeader = (v: string) => String(v ?? '').replace(/[\r\n]+/g, ' ').trim()
+
   const emailParts = [
     `From: ${fromName} <${fromAddress}>`,
-    `To: ${to}`,
+    `To: ${stripHeader(to)}`,
     `Bcc: ${fromAddress}`,
-    `Subject: ${subject}`,
+    `Subject: ${stripHeader(subject)}`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',

@@ -1,26 +1,26 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // B2B QUOTES API
 // File: app/api/b2b/quotes/route.ts
 // ============================================
 
-// Lazy-initialized Supabase admin client (avoids build-time errors)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
+// Service-role client (auth is enforced per-handler via requireAuth)
 function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
+  return createAdminClient()
 }
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const partner_id = searchParams.get('partner_id')
@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
           b2b_partners (company_name, partner_code, contact_name, email)
         `)
         .eq('id', id)
+        .eq('tenant_id', authResult.tenant_id)
         .single()
 
       if (error) throw error
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
         tour_variations (variation_name, variation_code, tier, tour_templates (template_name, template_code)),
         b2b_partners (company_name, partner_code)
       `)
+      .eq('tenant_id', authResult.tenant_id)
       .order('created_at', { ascending: false })
       .limit(limit)
 
@@ -69,6 +71,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const body = await request.json()
     const {
       variation_id,
@@ -116,6 +126,7 @@ export async function POST(request: NextRequest) {
     const { data: quote, error } = await (getSupabaseAdmin() as any)
       .from('tour_quotes')
       .insert({
+        tenant_id: authResult.tenant_id,
         variation_id,
         partner_id: partner_id || null,
         client_name,
@@ -162,8 +173,16 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const body = await request.json()
-    const { id, ...updates } = body
+    const { id, tenant_id: _ignoredTenantId, ...updates } = body
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 })
@@ -175,6 +194,7 @@ export async function PUT(request: NextRequest) {
       .from('tour_quotes')
       .update(updates)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select()
       .single()
 
@@ -187,6 +207,14 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (authResult.error) {
+    return NextResponse.json(
+      { success: false, error: authResult.error },
+      { status: authResult.status }
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get('id')
 
@@ -199,6 +227,7 @@ export async function DELETE(request: NextRequest) {
       .from('tour_quotes')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) throw error
     return NextResponse.json({ success: true })

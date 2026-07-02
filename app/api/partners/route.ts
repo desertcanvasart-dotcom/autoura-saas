@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // GET /api/partners?type=hotel|guide|restaurant|airport_staff&search=xxx
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const adminClient = createAdminClient()
+    const tenant_id = authResult.tenant_id
+
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') // hotel, guide, restaurant, airport_staff, or 'all'
     const search = searchParams.get('search')
@@ -34,9 +32,10 @@ export async function GET(request: NextRequest) {
 
       switch (partnerType) {
         case 'hotel':
-          const { data: hotels } = await (getSupabase() as any)
+          const { data: hotels } = await (adminClient as any)
             .from('hotel_contacts')
             .select('id, name, property_type, city, contact_person, phone, email, whatsapp, address, star_rating')
+            .eq('tenant_id', tenant_id)
             .eq('is_active', true)
             .order('name', { ascending: true })
             .limit(limit)
@@ -57,9 +56,10 @@ export async function GET(request: NextRequest) {
           break
 
         case 'guide':
-          const { data: guides } = await (getSupabase() as any)
+          const { data: guides } = await (adminClient as any)
             .from('guides')
             .select('id, name, phone, email, languages, specialties, daily_rate, hourly_rate')
+            .eq('tenant_id', tenant_id)
             .eq('is_active', true)
             .order('name', { ascending: true })
             .limit(limit)
@@ -85,9 +85,10 @@ export async function GET(request: NextRequest) {
           break
 
         case 'restaurant':
-          const { data: restaurants } = await (getSupabase() as any)
+          const { data: restaurants } = await (adminClient as any)
             .from('restaurant_contacts')
             .select('id, name, restaurant_type, cuisine_type, city, contact_person, phone, email, whatsapp, address')
+            .eq('tenant_id', tenant_id)
             .eq('is_active', true)
             .order('name', { ascending: true })
             .limit(limit)
@@ -108,9 +109,10 @@ export async function GET(request: NextRequest) {
           break
 
         case 'airport_staff':
-          const { data: airportStaff } = await (getSupabase() as any)
+          const { data: airportStaff } = await (adminClient as any)
             .from('airport_staff')
             .select('id, name, role, airport_location, phone, email, whatsapp, languages')
+            .eq('tenant_id', tenant_id)
             .eq('is_active', true)
             .order('name', { ascending: true })
             .limit(limit)

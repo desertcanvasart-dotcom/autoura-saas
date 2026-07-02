@@ -1,32 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { checkRateLimit, getRateLimitIdentifier, rateLimitResponse } from '@/lib/rate-limit'
 
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
+// Role hierarchy for invitation gating. An inviter may only assign roles
+// strictly below their own rank, so no invitation can escalate privileges
+// (in particular, a second owner can never be created via this API).
+const ROLE_RANK: Record<string, number> = {
+  owner: 5,
+  admin: 4,
+  manager: 3,
+  member: 2,
+  viewer: 1,
 }
 
-// GET - List all invitations (admin/manager only)
+// GET - List invitations for the caller's tenant (manager+)
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    if ((ROLE_RANK[authResult.role || ''] || 0) < ROLE_RANK.manager) {
+      return NextResponse.json(
+        { success: false, error: 'Insufficient permissions' },
+        { status: 403 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') // pending, accepted, expired, all
 
-    let query = (getSupabase() as any)
+    let query = (createAdminClient() as any)
       .from('tenant_invitations')
       .select(`
         *,
         inviter:user_profiles!invited_by(id, full_name, email)
       `)
+      .eq('tenant_id', authResult.tenant_id)
       .order('created_at', { ascending: false })
 
     if (status === 'pending') {
@@ -54,19 +69,36 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new invitation (admin/manager only)
+// POST - Create new invitation (manager+; invited role must rank below the inviter's)
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { email, role = 'member', invited_by, tenant_id } = body
-
-    // Validate tenant_id
-    if (!tenant_id) {
+    const authResult = await requireAuth()
+    if (authResult.error) {
       return NextResponse.json(
-        { success: false, error: 'Tenant ID is required' },
-        { status: 400 }
+        { success: false, error: authResult.error },
+        { status: authResult.status }
       )
     }
+
+    const inviterRank = ROLE_RANK[authResult.role || ''] || 0
+    if (inviterRank < ROLE_RANK.manager) {
+      return NextResponse.json(
+        { success: false, error: 'Insufficient permissions' },
+        { status: 403 }
+      )
+    }
+
+    // Throttle invite creation per authenticated user (un-spoofable id).
+    const rl = checkRateLimit(getRateLimitIdentifier(request, authResult.user!.id), 'invitation')
+    if (!rl.success) {
+      return rateLimitResponse(rl)
+    }
+
+    const body = await request.json()
+    const { email, role = 'member' } = body
+    // tenant_id and invited_by always come from the session — never the body.
+    const tenant_id = authResult.tenant_id
+    const invited_by = authResult.user!.id
 
     // Validate email
     if (!email || !email.includes('@')) {
@@ -77,16 +109,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate role
-    const validRoles = ['owner', 'admin', 'manager', 'member', 'viewer']
-    if (!validRoles.includes(role)) {
+    if (!(role in ROLE_RANK)) {
       return NextResponse.json(
         { success: false, error: 'Invalid role' },
         { status: 400 }
       )
     }
+    if (ROLE_RANK[role] >= inviterRank) {
+      return NextResponse.json(
+        { success: false, error: 'You can only invite roles below your own' },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
 
     // Check if user already exists
-    const { data: existingUser } = await (getSupabase() as any)
+    const { data: existingUser } = await (supabase as any)
       .from('user_profiles')
       .select('id, email')
       .eq('email', email.toLowerCase())
@@ -99,10 +138,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if there's already a pending invitation
-    const { data: existingInvitation } = await (getSupabase() as any)
+    // Check if there's already a pending invitation for this tenant
+    const { data: existingInvitation } = await (supabase as any)
       .from('tenant_invitations')
       .select('id')
+      .eq('tenant_id', tenant_id)
       .eq('email', email.toLowerCase())
       .is('accepted_at', null)
       .gt('expires_at', new Date().toISOString())
@@ -117,13 +157,13 @@ export async function POST(request: NextRequest) {
 
     // Generate secure token
     const token = crypto.randomBytes(32).toString('hex')
-    
+
     // Set expiration to 7 days from now
     const expiresAt = new Date()
     expiresAt.setDate(expiresAt.getDate() + 7)
 
     // Create invitation
-    const { data: invitation, error } = await (getSupabase() as any)
+    const { data: invitation, error } = await (supabase as any)
       .from('tenant_invitations')
       .insert({
         tenant_id,
@@ -163,7 +203,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Mark invitation as accepted
+// PUT - Mark invitation as accepted (token-gated: the secret token IS the
+// credential here, since the accepting user has no session yet)
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
@@ -176,22 +217,22 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Update invitation status
-    const { data, error } = await (getSupabase() as any)
+    // Only a pending, unexpired invitation can be accepted
+    const { data, error } = await (createAdminClient() as any)
       .from('tenant_invitations')
       .update({
         status: 'accepted',
         accepted_at: new Date().toISOString()
       })
       .eq('invitation_token', token)
+      .is('accepted_at', null)
+      .gt('expires_at', new Date().toISOString())
       .select()
       .single()
 
-    if (error) throw error
-
-    if (!data) {
+    if (error || !data) {
       return NextResponse.json(
-        { success: false, error: 'Invitation not found' },
+        { success: false, error: 'Invitation not found, expired, or already used' },
         { status: 404 }
       )
     }
@@ -209,9 +250,24 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - Cancel/delete invitation
+// DELETE - Cancel/delete invitation (manager+, own tenant only)
 export async function DELETE(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    if ((ROLE_RANK[authResult.role || ''] || 0) < ROLE_RANK.manager) {
+      return NextResponse.json(
+        { success: false, error: 'Insufficient permissions' },
+        { status: 403 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
@@ -222,10 +278,11 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const { error } = await getSupabase()
+    const { error } = await createAdminClient()
       .from('tenant_invitations')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) throw error
 
@@ -249,7 +306,7 @@ async function sendInvitationEmail(
   inviteUrl: string
 ) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
-  
+
   const roleLabels: Record<string, string> = {
     admin: 'Administrator',
     manager: 'Manager',
@@ -271,28 +328,28 @@ async function sendInvitationEmail(
           <div style="background-color: #647C47; padding: 32px; text-align: center;">
             <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">You're Invited! 🎉</h1>
           </div>
-          
+
           <!-- Content -->
           <div style="padding: 32px;">
             <p style="color: #374151; font-size: 16px; margin: 0 0 16px 0;">
               You've been invited to join <strong>Autoura</strong> as a <strong>${roleLabels[role] || role}</strong>.
             </p>
-            
+
             <p style="color: #6b7280; font-size: 14px; margin: 0 0 24px 0;">
               Autoura is a travel operations management platform that helps teams manage clients, itineraries, tasks, and more.
             </p>
-            
+
             <div style="text-align: center; margin: 32px 0;">
               <a href="${inviteUrl}" style="display: inline-block; background-color: #647C47; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
                 Accept Invitation
               </a>
             </div>
-            
+
             <p style="color: #9ca3af; font-size: 12px; margin: 24px 0 0 0; text-align: center;">
               This invitation will expire in 7 days.
             </p>
           </div>
-          
+
           <!-- Footer -->
           <div style="background-color: #f9fafb; padding: 16px 24px; border-top: 1px solid #e5e7eb;">
             <p style="color: #9ca3af; font-size: 11px; margin: 0; text-align: center;">
@@ -307,7 +364,10 @@ async function sendInvitationEmail(
 
   const response = await fetch(`${baseUrl}/api/gmail/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-cron-secret': process.env.CRON_SECRET || '',
+    },
     body: JSON.stringify({
       to: toEmail,
       subject: `You're invited to join Autoura`,

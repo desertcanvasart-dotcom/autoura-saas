@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { Download, Upload, FileText, AlertCircle, CheckCircle, X, Loader2 } from 'lucide-react'
 
+import { showToast } from '@/app/contexts/ToastContext'
 import { RATE_TABLE_CONFIGS } from '@/lib/bulk-rate-service'
 import type { ValidationError } from '@/lib/bulk-rate-service'
 
@@ -64,7 +65,7 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
       URL.revokeObjectURL(url)
     } catch (err: any) {
       console.error('Export failed:', err)
-      alert(`Export failed: ${err.message}`)
+      showToast('error', `Export failed: ${err.message}`)
     } finally {
       setExporting(false)
     }

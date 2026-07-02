@@ -1,23 +1,10 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // AVAILABLE RATES API
 // File: app/api/rates/available/route.ts
 // ============================================
-
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
 
 interface AvailableRate {
   rate_type: string
@@ -34,6 +21,15 @@ interface AvailableRate {
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const supabaseAdmin = createAdminClient()
     const { searchParams } = new URL(request.url)
     const rate_type = searchParams.get('type')
     const city = searchParams.get('city')
@@ -43,9 +39,10 @@ export async function GET(request: NextRequest) {
 
     // Transportation rates
     if (!rate_type || rate_type === 'transportation') {
-      const { data } = await (getSupabaseAdmin() as any)
+      const { data } = await (supabaseAdmin as any)
         .from('transportation_rates')
         .select('id, service_type, vehicle_type, origin_city, destination_city, base_rate_eur, base_rate_non_eur, capacity, supplier_id, suppliers (name)')
+        .eq('tenant_id', authResult.tenant_id)
         .eq('is_active', true)
         .order('origin_city')
 
@@ -69,9 +66,10 @@ export async function GET(request: NextRequest) {
 
     // Guide rates
     if (!rate_type || rate_type === 'guide') {
-      const { data } = await (getSupabaseAdmin() as any)
+      const { data } = await (supabaseAdmin as any)
         .from('guide_rates')
         .select('id, guide_type, city, half_day_rate, full_day_rate, supplier_id, suppliers (name)')
+        .eq('tenant_id', authResult.tenant_id)
         .eq('is_active', true)
         .order('city')
 
@@ -95,9 +93,10 @@ export async function GET(request: NextRequest) {
 
     // Activity rates
     if (!rate_type || rate_type === 'activity') {
-      const { data } = await (getSupabaseAdmin() as any)
+      const { data } = await (supabaseAdmin as any)
         .from('activity_rates')
         .select('id, activity_name, activity_category, city, base_rate_eur, base_rate_non_eur, supplier_id, suppliers (name)')
+        .eq('tenant_id', authResult.tenant_id)
         .eq('is_active', true)
         .order('activity_name')
 
@@ -121,9 +120,10 @@ export async function GET(request: NextRequest) {
 
     // Meal rates
     if (!rate_type || rate_type === 'meal') {
-      const { data } = await (getSupabaseAdmin() as any)
+      const { data } = await (supabaseAdmin as any)
         .from('meal_rates')
         .select('id, restaurant_name, meal_type, tier, cuisine, city, base_rate_eur, base_rate_non_eur, supplier_id, suppliers (name)')
+        .eq('tenant_id', authResult.tenant_id)
         .eq('is_active', true)
         .order('restaurant_name')
 
@@ -147,9 +147,10 @@ export async function GET(request: NextRequest) {
 
     // Accommodation rates
     if (!rate_type || rate_type === 'accommodation') {
-      const { data } = await (getSupabaseAdmin() as any)
+      const { data } = await (supabaseAdmin as any)
         .from('accommodation_rates')
         .select('id, hotel_name, room_type, city, star_rating, rate_low_season_sgl, rate_high_season_sgl, rate_peak_season_sgl, supplier_id, suppliers (name)')
+        .eq('tenant_id', authResult.tenant_id)
         .eq('is_active', true)
         .order('hotel_name')
 
@@ -173,9 +174,10 @@ export async function GET(request: NextRequest) {
 
     // Cruise rates
     if (!rate_type || rate_type === 'cruise') {
-      const { data } = await (getSupabaseAdmin() as any)
+      const { data } = await (supabaseAdmin as any)
         .from('nile_cruises')
         .select('id, ship_name, cabin_type, cruise_type, nights, rate_low_season, rate_high_season, rate_peak_season, supplier_id, suppliers (name)')
+        .eq('tenant_id', authResult.tenant_id)
         .eq('is_active', true)
         .order('ship_name')
 

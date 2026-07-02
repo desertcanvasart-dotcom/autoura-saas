@@ -33,6 +33,7 @@ import {
   Info
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // Egyptian cities
 const EGYPT_CITIES = [
@@ -316,24 +317,24 @@ export default function GuideRatesContent() {
     ]
 
     const rows = filteredRates.map(rate => [
-      rate.service_code || '',
-      rate.guide_language || '',
-      rate.guide_type || '',
-      rate.city || '',
-      rate.tour_duration || '',
+      csvCell(rate.service_code),
+      csvCell(rate.guide_language),
+      csvCell(rate.guide_type),
+      csvCell(rate.city),
+      csvCell(rate.tour_duration),
       rate.base_rate_eur?.toString() || '0',
       rate.base_rate_non_eur?.toString() || '0',
-      rate.season || '',
-      rate.rate_valid_from || '',
-      rate.rate_valid_to || '',
-      rate.supplier_id || '',
-      (rate.notes || '').replace(/"/g, '""'), // Escape quotes in notes
+      csvCell(rate.season),
+      csvCell(rate.rate_valid_from),
+      csvCell(rate.rate_valid_to),
+      csvCell(rate.supplier_id),
+      csvCell(rate.notes),
       rate.is_active ? 'true' : 'false'
     ])
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map(row => row.join(','))
     ].join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })

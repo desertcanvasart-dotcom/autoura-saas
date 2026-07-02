@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, UserCog, Shield, ToggleLeft, ToggleRight, Users, Activity, Save, Loader2 } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const dialog = useConfirmDialog()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState('')
@@ -57,7 +59,7 @@ export default function TenantDetailPage() {
   }
 
   const handleDeactivate = async () => {
-    if (!confirm('Deactivate this tenant? All members will be suspended.')) return
+    if (!(await dialog.confirm({ message: 'Deactivate this tenant? All members will be suspended.', variant: 'danger', confirmText: 'Delete' }))) return
     try {
       await fetch(`/api/super-admin/tenants/${id}`, {
         method: 'PATCH',

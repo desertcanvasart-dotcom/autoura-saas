@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { Plus, Loader2, Trash2, Edit3, X, Save, Star, PenLine, Check } from 'lucide-react'
 import RichReplyEditor from '@/components/unified/RichReplyEditor'
+import { sanitizeEmailHtml } from '@/lib/sanitize-html'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Signature {
   id: string
@@ -18,6 +20,7 @@ export default function EmailSignaturesPage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Signature | null>(null)
   const [showNew, setShowNew] = useState(false)
+  const dialog = useConfirmDialog()
 
   const load = async () => {
     setLoading(true)
@@ -43,7 +46,7 @@ export default function EmailSignaturesPage() {
   }
 
   const remove = async (sig: Signature) => {
-    if (!confirm(`Delete signature "${sig.name}"?`)) return
+    if (!(await dialog.confirm({ message: `Delete signature "${sig.name}"?`, variant: 'danger', confirmText: 'Delete' }))) return
     await fetch(`/api/email/signatures/${sig.id}`, { method: 'DELETE' })
     setSignatures((prev) => prev.filter((s) => s.id !== sig.id))
   }
@@ -128,7 +131,7 @@ function SignatureCard({
           </div>
           <div
             className="text-sm text-gray-600 prose prose-sm max-w-none [&_p]:my-1 [&_*]:!text-sm"
-            dangerouslySetInnerHTML={{ __html: signature.content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(signature.content) }}
           />
         </div>
         <div className="flex flex-col gap-1 flex-shrink-0">

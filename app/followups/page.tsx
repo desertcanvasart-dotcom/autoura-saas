@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import {
   Calendar, Clock, AlertCircle, CheckCircle, Phone, Mail, 
   MessageSquare, Users, TrendingUp, Filter, X
 } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 const supabase = createClient()
 
@@ -33,6 +35,7 @@ export default function FollowupDashboard() {
   const [filter, setFilter] = useState<'all' | 'today' | 'week' | 'overdue'>('today')
   const [priorityFilter, setPriorityFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  const dialog = useConfirmDialog()
 
   useEffect(() => {
     loadFollowups()
@@ -79,11 +82,11 @@ export default function FollowupDashboard() {
       if (error) throw error
 
       // Show success message
-      alert('Follow-up marked as complete!')
+      showToast('success', 'Follow-up marked as complete!')
       loadFollowups()
     } catch (error) {
       console.error('Error completing follow-up:', error)
-      alert('Failed to complete follow-up')
+      showToast('error', 'Failed to complete follow-up')
     }
   }
 
@@ -102,16 +105,16 @@ export default function FollowupDashboard() {
       if (error) throw error
 
       // Show success message
-      alert(`Follow-up snoozed for ${days} day${days > 1 ? 's' : ''}!`)
+      showToast('success', `Follow-up snoozed for ${days} day${days > 1 ? 's' : ''}!`)
       loadFollowups()
     } catch (error) {
       console.error('Error snoozing follow-up:', error)
-      alert('Failed to snooze follow-up')
+      showToast('error', 'Failed to snooze follow-up')
     }
   }
 
   const deleteFollowup = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this follow-up?')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to delete this follow-up?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const { error } = await supabase
@@ -121,11 +124,11 @@ export default function FollowupDashboard() {
 
       if (error) throw error
 
-      alert('Follow-up deleted successfully!')
+      showToast('success', 'Follow-up deleted successfully!')
       loadFollowups()
     } catch (error) {
       console.error('Error deleting follow-up:', error)
-      alert('Failed to delete follow-up')
+      showToast('error', 'Failed to delete follow-up')
     }
   }
 
