@@ -1,10 +1,31 @@
 import { google } from 'googleapis'
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-)
+// A FRESH OAuth2 client per call — never a shared module-level singleton.
+// setCredentials() mutates the client, so a shared instance lets concurrent
+// requests for different users clobber each other's tokens between
+// setCredentials() and the actual API call (cross-user token leak).
+function createOAuthClient() {
+  return new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  )
+}
+
+/**
+ * HTML-escape untrusted text before embedding it in markup. Inbound email
+ * bodies are attacker-controlled and are later rendered with
+ * dangerouslySetInnerHTML, so a plain-text body containing e.g.
+ * `</pre><script>...` must not break out of its wrapper.
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 
 // Scopes for Gmail access
 export const GMAIL_SCOPES = [
@@ -16,7 +37,7 @@ export const GMAIL_SCOPES = [
 
 // Generate OAuth URL for user consent
 export function getAuthUrl(state?: string) {
-  return oauth2Client.generateAuthUrl({
+  return createOAuthClient().generateAuthUrl({
     access_type: 'offline',
     scope: GMAIL_SCOPES,
     prompt: 'consent',
@@ -26,30 +47,33 @@ export function getAuthUrl(state?: string) {
 
 // Exchange authorization code for tokens
 export async function getTokensFromCode(code: string) {
-  const { tokens } = await oauth2Client.getToken(code)
+  const { tokens } = await createOAuthClient().getToken(code)
   return tokens
 }
 
 // Refresh access token using refresh token
 export async function refreshAccessToken(refreshToken: string) {
-  oauth2Client.setCredentials({ refresh_token: refreshToken })
-  const { credentials } = await oauth2Client.refreshAccessToken()
+  const client = createOAuthClient()
+  client.setCredentials({ refresh_token: refreshToken })
+  const { credentials } = await client.refreshAccessToken()
   return credentials
 }
 
 // Get Gmail client with tokens
 export function getGmailClient(accessToken: string, refreshToken: string) {
-  oauth2Client.setCredentials({
+  const client = createOAuthClient()
+  client.setCredentials({
     access_token: accessToken,
     refresh_token: refreshToken,
   })
-  return google.gmail({ version: 'v1', auth: oauth2Client })
+  return google.gmail({ version: 'v1', auth: client })
 }
 
 // Get user's email address
 export async function getUserEmail(accessToken: string) {
-  oauth2Client.setCredentials({ access_token: accessToken })
-  const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client })
+  const client = createOAuthClient()
+  client.setCredentials({ access_token: accessToken })
+  const oauth2 = google.oauth2({ version: 'v2', auth: client })
   const { data } = await oauth2.userinfo.get()
   return data.email
 }
@@ -177,7 +201,7 @@ function parseEmailMessage(message: any) {
         return Buffer.from(payload.body.data, 'base64').toString('utf-8')
       }
       if (mimeType === 'text/plain') {
-        return `<pre style="white-space: pre-wrap; font-family: inherit;">${Buffer.from(payload.body.data, 'base64').toString('utf-8')}</pre>`
+        return `<pre style="white-space: pre-wrap; font-family: inherit;">${escapeHtml(Buffer.from(payload.body.data, 'base64').toString('utf-8'))}</pre>`
       }
     }
     

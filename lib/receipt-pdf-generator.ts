@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf'
+import { formatDateOnly } from '@/lib/date-utils'
 
 interface ReceiptData {
   receiptNumber: string
@@ -48,7 +49,7 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice): jsPD
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(100, 100, 100)
   doc.text(`Receipt #: ${receipt.receiptNumber}`, margin, y)
-  doc.text(`Date: ${new Date(receipt.paymentDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth - margin, y, { align: 'right' })
+  doc.text(`Date: ${formatDateOnly(receipt.paymentDate, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth - margin, y, { align: 'right' })
 
   y += 15
 

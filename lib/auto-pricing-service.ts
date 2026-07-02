@@ -28,6 +28,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
+import { parseDateOnly } from '@/lib/date-utils'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -666,13 +667,14 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
  * by month/day (the stored year is ignored). Defaults to 'low'.
  */
 export function detectCruiseSeason(cruise: any, startDate: string): 'low' | 'high' | 'peak' {
-  const d = new Date(startDate)
-  if (isNaN(d.getTime())) return 'low'
+  // parseDateOnly avoids the UTC off-by-one: a bare YYYY-MM-DD must yield the
+  // literal month/day, not the previous day in a negative-offset timezone.
+  const d = parseDateOnly(startDate)
+  if (!d) return 'low'
   const mmdd = (d.getMonth() + 1) * 100 + d.getDate()
   const toMmdd = (s: string | null | undefined): number | null => {
-    if (!s) return null
-    const x = new Date(s)
-    if (isNaN(x.getTime())) return null
+    const x = parseDateOnly(s)
+    if (!x) return null
     return (x.getMonth() + 1) * 100 + x.getDate()
   }
   const inRange = (start: number | null, end: number | null): boolean => {
@@ -782,13 +784,13 @@ export async function getCruiseRates(
  * Defaults to 'low' — mirrors detectCruiseSeason.
  */
 export function detectHotelSeason(hotel: any, startDate: string): 'low' | 'high' | 'peak' {
-  const d = new Date(startDate)
-  if (isNaN(d.getTime())) return 'low'
+  // parseDateOnly avoids the UTC off-by-one (see detectCruiseSeason).
+  const d = parseDateOnly(startDate)
+  if (!d) return 'low'
   const mmdd = (d.getMonth() + 1) * 100 + d.getDate()
   const toMmdd = (s: string | null | undefined): number | null => {
-    if (!s) return null
-    const x = new Date(s)
-    if (isNaN(x.getTime())) return null
+    const x = parseDateOnly(s)
+    if (!x) return null
     return (x.getMonth() + 1) * 100 + x.getDate()
   }
   const inRange = (start: number | null, end: number | null): boolean => {

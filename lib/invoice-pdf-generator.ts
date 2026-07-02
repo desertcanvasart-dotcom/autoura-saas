@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf'
+import { formatDateOnly } from '@/lib/date-utils'
 
 interface LineItem {
   description: string
@@ -64,7 +65,7 @@ const formatCurrency = (amount: number, currency: string): string => {
 }
 
 const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('en-GB', {
+  return formatDateOnly(dateString, 'en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric'

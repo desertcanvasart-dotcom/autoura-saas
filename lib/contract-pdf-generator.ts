@@ -3,6 +3,7 @@
 // ============================================
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { formatDateOnly } from '@/lib/date-utils'
 
 interface ContractData {
   contractNumber: string
@@ -41,7 +42,7 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
     x: 50, y, size: 11, font: helvetica, color: rgb(0.3, 0.3, 0.3)
   })
   y -= 15
-  page.drawText(`Date: ${new Date(data.contractDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, {
+  page.drawText(`Date: ${formatDateOnly(data.contractDate, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, {
     x: 50, y, size: 11, font: helvetica, color: rgb(0.3, 0.3, 0.3)
   })
   y -= 30
@@ -67,7 +68,7 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   y -= 20
   page.drawText(`Tour: ${data.tourName}`, { x: 50, y, size: 11, font: helvetica })
   y -= 15
-  page.drawText(`Dates: ${new Date(data.startDate).toLocaleDateString('en-GB')} - ${new Date(data.endDate).toLocaleDateString('en-GB')}`, { x: 50, y, size: 11, font: helvetica })
+  page.drawText(`Dates: ${formatDateOnly(data.startDate, 'en-GB')} - ${formatDateOnly(data.endDate, 'en-GB')}`, { x: 50, y, size: 11, font: helvetica })
   y -= 15
   page.drawText(`Destinations: ${data.destinations}`, { x: 50, y, size: 11, font: helvetica })
   y -= 35
