@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { checkRateLimit, getRateLimitIdentifier, rateLimitResponse } from '@/lib/rate-limit'
 
 // Role hierarchy for invitation gating. An inviter may only assign roles
 // strictly below their own rank, so no invitation can escalate privileges
@@ -85,6 +86,12 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Insufficient permissions' },
         { status: 403 }
       )
+    }
+
+    // Throttle invite creation per authenticated user (un-spoofable id).
+    const rl = checkRateLimit(getRateLimitIdentifier(request, authResult.user!.id), 'invitation')
+    if (!rl.success) {
+      return rateLimitResponse(rl)
     }
 
     const body = await request.json()
