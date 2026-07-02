@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // CAPACITY CHECK API (Public for AI Agent)
@@ -32,15 +32,19 @@ interface CapacityCheckResult {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { tenant_id, start_date, end_date, group_size = 1 } = body
-
-    if (!tenant_id) {
+    const authResult = await requireAuth()
+    if (authResult.error) {
       return NextResponse.json(
-        { success: false, error: 'tenant_id is required' },
-        { status: 400 }
+        { success: false, error: authResult.error },
+        { status: authResult.status }
       )
     }
+
+    const body = await request.json()
+    const { start_date, end_date, group_size = 1 } = body
+
+    // Tenant is derived from the authenticated session, never from the request body
+    const tenant_id = authResult.tenant_id
 
     if (!start_date) {
       return NextResponse.json(
@@ -59,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     const effectiveEndDate = end_date || start_date
 
-    // Use admin client since this is called by AI agent without user auth
+    // Admin client (bypasses RLS); all queries are scoped to the session tenant below
     const supabase = createAdminClient()
 
     // Get capacity entries for the date range

@@ -1,29 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const supabase = createAdminClient()
+
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const category = searchParams.get('category') // 'customer', 'partner', 'internal', or 'all'
 
-    // Fetch from message_templates (new templates)
-    let query = (getSupabase() as any)
+    // Fetch from message_templates (new templates), scoped to the tenant
+    let query = (supabase as any)
       .from('message_templates')
       .select('*')
+      .eq('tenant_id', authResult.tenant_id)
       .eq('is_active', true)
       .order('category')
       .order('subcategory')
@@ -43,7 +40,7 @@ export async function GET(request: NextRequest) {
     // Also fetch from email_templates (legacy templates) if table exists
     let legacyTemplates: any[] = []
     try {
-      const { data: legacy, error: legacyError } = await (getSupabase() as any)
+      const { data: legacy, error: legacyError } = await (supabase as any)
         .from('email_templates')
         .select('*')
         .order('name')
@@ -98,13 +95,22 @@ export async function GET(request: NextRequest) {
 // POST - Create new template (saves to message_templates)
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const supabase = createAdminClient()
+
     const body = await request.json()
     const { userId, name, subject, content, category } = body
 
     if (!name || !content) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Name and content are required' 
+      return NextResponse.json({
+        success: false,
+        error: 'Name and content are required'
       }, { status: 400 })
     }
 
@@ -112,9 +118,10 @@ export async function POST(request: NextRequest) {
     const placeholderMatches = content.match(/\{\{[^}]+\}\}/g) || []
     const placeholders = [...new Set(placeholderMatches)]
 
-    const { data, error } = await (getSupabase() as any)
+    const { data, error } = await (supabase as any)
       .from('message_templates')
       .insert({
+        tenant_id: authResult.tenant_id,
         name,
         subject,
         body: content,
@@ -122,7 +129,7 @@ export async function POST(request: NextRequest) {
         channel: 'email',
         placeholders,
         is_active: true,
-        created_by: userId,
+        created_by: authResult.user!.id,
       })
       .select()
       .single()

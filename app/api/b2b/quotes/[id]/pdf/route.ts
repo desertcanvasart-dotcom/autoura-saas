@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import puppeteer from 'puppeteer'
 
 // ============================================
@@ -7,17 +7,9 @@ import puppeteer from 'puppeteer'
 // File: app/api/b2b/quotes/[id]/pdf/route.ts
 // ============================================
 
-// Lazy-initialized Supabase admin client (avoids build-time errors)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
+// Service-role client (auth is enforced per-handler via requireAuth)
 function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
+  return createAdminClient()
 }
 
 // Format date helper
@@ -627,6 +619,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
 
     // Fetch quote with related data

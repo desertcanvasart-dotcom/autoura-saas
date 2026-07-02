@@ -6,18 +6,20 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabase()
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const tenant_id = authResult.tenant_id
+    const supabase = createAdminClient()
     const searchParams = request.nextUrl.searchParams
 
     // Parse query parameters
@@ -34,6 +36,7 @@ export async function GET(request: NextRequest) {
       .from('suppliers')
       .select('*')
       .eq('supplier_type', 'guide')
+      .eq('tenant_id', tenant_id)
       .order('name', { ascending: true })
 
     // Apply filters
@@ -81,6 +84,7 @@ export async function GET(request: NextRequest) {
       let bookingsQuery = supabase
         .from('itineraries')
         .select('assigned_guide_id')
+        .eq('tenant_id', tenant_id)
         .not('assigned_guide_id', 'is', null)
         .or(`and(start_date.lte.${availability_to},end_date.gte.${availability_from})`)
 
@@ -101,6 +105,7 @@ export async function GET(request: NextRequest) {
           const { data: bookings } = await supabase
             .from('itineraries')
             .select('id, start_date, end_date, total_cost')
+            .eq('tenant_id', tenant_id)
             .eq('assigned_guide_id', guide.id)
 
           const now = new Date()
@@ -140,7 +145,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase()
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const supabase = createAdminClient()
     const body = await request.json()
 
     if (!body.name) {
@@ -152,6 +165,7 @@ export async function POST(request: NextRequest) {
 
     // Create guide as a supplier with type='guide'
     const guideData = {
+      tenant_id: authResult.tenant_id,
       type: 'guide',
       name: body.name,
       contact_email: body.email || null,

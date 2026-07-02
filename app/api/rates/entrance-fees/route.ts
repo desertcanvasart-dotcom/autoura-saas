@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 
 // ============================================
@@ -10,21 +10,16 @@ import { validateRatePayload } from '@/lib/rate-validation'
 // in TourManagerContent.tsx
 // ============================================
 
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
-
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
     const city = searchParams.get('city')
     const category = searchParams.get('category')
@@ -33,9 +28,11 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit')
     const search = searchParams.get('search')
 
-    let query = (getSupabaseAdmin() as any)
+    let query = (createAdminClient() as any)
       .from('entrance_fees')
       .select('*')
+      // Tenant rows + shared/global catalog rows (tenant_id IS NULL)
+      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
       .order('city', { ascending: true })
       .order('attraction_name', { ascending: true })
 
@@ -68,6 +65,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const body = await request.json()
 
     const rateCheck = validateRatePayload(body)
@@ -79,6 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newFee = {
+      tenant_id: authResult.tenant_id,
       service_code: body.service_code || `ENT-${Date.now().toString(36).toUpperCase()}`,
       attraction_name: body.attraction_name,
       city: body.city || null,
@@ -99,7 +105,7 @@ export async function POST(request: NextRequest) {
       supplier_id: body.supplier_id || null
     }
 
-    const { data, error } = await (getSupabaseAdmin() as any)
+    const { data, error } = await (createAdminClient() as any)
       .from('entrance_fees')
       .insert(newFee)
       .select('*')

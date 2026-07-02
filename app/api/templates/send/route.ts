@@ -140,7 +140,10 @@ async function sendEmail(to: string, subject: string, body: string, supabase: an
       // Fallback: Try internal email API if exists
       const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/gmail/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-cron-secret': process.env.CRON_SECRET || '',
+        },
         body: JSON.stringify({
           to,
           subject,
@@ -162,7 +165,10 @@ async function sendEmail(to: string, subject: string, body: string, supabase: an
     // Use Gmail API
     const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/gmail/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-cron-secret': process.env.CRON_SECRET || '',
+      },
       body: JSON.stringify({
         to,
         subject,

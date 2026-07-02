@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // GET /api/email/links?userId=xxx&emailAddress=xxx
 // Returns linked client for an email address
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const supabase = createAdminClient()
+
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const emailAddress = searchParams.get('emailAddress')
@@ -28,14 +24,15 @@ export async function GET(request: NextRequest) {
     }
 
     // If messageId provided, get link for specific email
+    // (scoped to the session user — never trust the query-string userId)
     if (messageId) {
-      const { data, error } = await (getSupabase() as any)
+      const { data, error } = await (supabase as any)
         .from('email_client_links')
         .select(`
           *,
           client:clients(id, name, email, phone, status)
         `)
-        .eq('user_id', userId)
+        .eq('user_id', authResult.user!.id)
         .eq('message_id', messageId)
         .single()
 
@@ -46,12 +43,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ link: data || null })
     }
 
-    // If emailAddress provided, find client by email
+    // If emailAddress provided, find client by email (tenant-scoped)
     if (emailAddress) {
-      const { data: client, error } = await (getSupabase() as any)
+      const { data: client, error } = await (supabase as any)
         .from('clients')
         .select('id, name, email, phone, status')
-        .eq('user_id', userId)
+        .eq('tenant_id', authResult.tenant_id)
         .ilike('email', emailAddress)
         .single()
 
@@ -74,6 +71,16 @@ export async function GET(request: NextRequest) {
 // Link an email to a client
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const supabase = createAdminClient()
+    const sessionUserId = authResult.user!.id
+
     const body = await request.json()
     const { userId, messageId, clientId, emailAddress, threadId } = body
 
@@ -84,11 +91,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if link already exists
-    const { data: existingData } = await (getSupabase() as any)
+    // Check if link already exists (scoped to the session user)
+    const { data: existingData } = await (supabase as any)
       .from('email_client_links')
       .select('id')
-      .eq('user_id', userId)
+      .eq('user_id', sessionUserId)
       .eq('message_id', messageId)
       .single()
 
@@ -96,13 +103,14 @@ export async function POST(request: NextRequest) {
 
     if (existing) {
       // Update existing link
-      const { data, error } = await (getSupabase() as any)
+      const { data, error } = await (supabase as any)
         .from('email_client_links')
         .update({
           client_id: clientId,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)
+        .eq('user_id', sessionUserId)
         .select(`
           *,
           client:clients(id, name, email, phone, status)
@@ -114,10 +122,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Create new link
-    const { data, error } = await (getSupabase() as any)
+    const { data, error } = await (supabase as any)
       .from('email_client_links')
       .insert({
-        user_id: userId,
+        user_id: sessionUserId,
         message_id: messageId,
         thread_id: threadId || null,
         client_id: clientId,
@@ -143,6 +151,15 @@ export async function POST(request: NextRequest) {
 // Remove an email-client link
 export async function DELETE(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const supabase = createAdminClient()
+
     const body = await request.json()
     const { userId, messageId, linkId } = body
 
@@ -153,10 +170,11 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    let query = getSupabase()
+    // Always scope deletes to the session user (never trust the body userId)
+    let query = supabase
       .from('email_client_links')
       .delete()
-      .eq('user_id', userId)
+      .eq('user_id', authResult.user!.id)
 
     if (linkId) {
       query = query.eq('id', linkId)
@@ -180,6 +198,16 @@ export async function DELETE(request: NextRequest) {
 // Auto-link emails based on email address matching
 export async function PUT(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const supabase = createAdminClient()
+    const sessionUserId = authResult.user!.id
+
     const body = await request.json()
     const { userId, emails } = body // emails: Array<{ messageId, threadId, fromEmail, toEmails }>
 
@@ -190,11 +218,11 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Get all clients for this user
-    const { data: clientsData, error: clientError } = await (getSupabase() as any)
+    // Get all clients for this tenant
+    const { data: clientsData, error: clientError } = await (supabase as any)
       .from('clients')
       .select('id, email')
-      .eq('user_id', userId)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (clientError) throw clientError
 
@@ -210,10 +238,10 @@ export async function PUT(request: NextRequest) {
 
     // Get existing links to avoid duplicates
     const messageIds = emails.map(e => e.messageId)
-    const { data: linksData } = await (getSupabase() as any)
+    const { data: linksData } = await (supabase as any)
       .from('email_client_links')
       .select('message_id')
-      .eq('user_id', userId)
+      .eq('user_id', sessionUserId)
       .in('message_id', messageIds)
 
     const existingLinks = linksData as any[]
@@ -238,7 +266,7 @@ export async function PUT(request: NextRequest) {
 
       if (clientId) {
         linksToCreate.push({
-          user_id: userId,
+          user_id: sessionUserId,
           message_id: email.messageId,
           thread_id: email.threadId || null,
           client_id: clientId,
@@ -249,7 +277,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (linksToCreate.length > 0) {
-      const { data, error } = await (getSupabase() as any)
+      const { data, error } = await (supabase as any)
         .from('email_client_links')
         .insert(linksToCreate)
         .select()

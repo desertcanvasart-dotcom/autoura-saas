@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Map service types to document types
@@ -114,7 +114,15 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = createClient()
+  const authResult = await requireAuth()
+  if (authResult.error) {
+    return NextResponse.json(
+      { success: false, error: authResult.error },
+      { status: authResult.status }
+    )
+  }
+
+  const supabase = createAdminClient()
   const { id: itineraryId } = await params
 
   // Reset offsets for each request
@@ -132,6 +140,7 @@ export async function POST(
       .from('itineraries')
       .select('*')
       .eq('id', itineraryId)
+      .eq('tenant_id', authResult.tenant_id)
       .single()
 
     if (itinError) {
@@ -348,6 +357,7 @@ export async function POST(
       const isCruise = group.docType === 'cruise_voucher'
 
       documentsToCreate.push({
+        tenant_id: authResult.tenant_id,
         itinerary_id: itineraryId,
         supplier_id: supplierId,
         document_type: group.docType,
@@ -412,6 +422,7 @@ export async function POST(
       const supplierName = `${group.city} ${defaultName}`
 
       documentsToCreate.push({
+        tenant_id: authResult.tenant_id,
         itinerary_id: itineraryId,
         supplier_id: null, // No supplier assigned
         document_type: group.docType,

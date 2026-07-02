@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateAutoPricing, ServiceTier } from '@/lib/auto-pricing-service'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // B2B TOUR PRICE CALCULATOR - v6
@@ -22,17 +22,9 @@ import { calculateAutoPricing, ServiceTier } from '@/lib/auto-pricing-service'
 // - b2b_pricing_rules, b2b_transport_packages, b2b_partners, b2b_partner_pricing
 // ============================================
 
-// Lazy-initialized Supabase admin client (avoids build-time errors)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
+// Service-role client (auth is enforced per-handler via requireAuth)
 function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
+  return createAdminClient()
 }
 
 interface CalculatedService {
@@ -204,11 +196,12 @@ function selectVehicleFromPackage(pkg: any, numPax: number): { rate: number; veh
 }
 
 // Select appropriate vehicle from vehicles table based on pax count and tier
-async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standard'): Promise<{ rate: number; vehicle: string; id: string } | null> {
+async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standard', tenantId?: string): Promise<{ rate: number; vehicle: string; id: string } | null> {
   const { data: vehicles, error } = await (getSupabaseAdmin() as any)
     .from('vehicles')
     .select('id, vehicle_type, name, daily_rate, passenger_capacity, tier, is_preferred')
     .eq('is_active', true)
+    .eq('tenant_id', tenantId)
     .order('is_preferred', { ascending: false })
 
   if (error || !vehicles || vehicles.length === 0) return null
@@ -242,11 +235,12 @@ async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standar
 }
 
 // Select guide from guides table based on language and tier
-async function selectGuideFromB2CTable(language: string = 'English', tier: string = 'standard'): Promise<{ rate: number; name: string; id: string } | null> {
+async function selectGuideFromB2CTable(language: string = 'English', tier: string = 'standard', tenantId?: string): Promise<{ rate: number; name: string; id: string } | null> {
   const { data: guides, error } = await (getSupabaseAdmin() as any)
     .from('guides')
     .select('id, name, daily_rate, languages, tier, is_preferred')
     .eq('is_active', true)
+    .eq('tenant_id', tenantId)
     .contains('languages', [language])
     .order('is_preferred', { ascending: false })
 
@@ -256,6 +250,7 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
       .from('guides')
       .select('id, name, daily_rate, tier')
       .eq('is_active', true)
+      .eq('tenant_id', tenantId)
       .order('is_preferred', { ascending: false })
       .limit(1)
 
@@ -280,11 +275,13 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
 }
 
 // Get entrance fee from entrance_fees table
-async function getEntranceFee(attractionName: string, isEurPassport: boolean): Promise<{ rate: number; name: string; id: string } | null> {
+async function getEntranceFee(attractionName: string, isEurPassport: boolean, tenantId?: string): Promise<{ rate: number; name: string; id: string } | null> {
+  // entrance_fees supports intentional global fallback rows (tenant_id IS NULL — see migration 109)
   const { data: fees, error } = await (getSupabaseAdmin() as any)
     .from('entrance_fees')
     .select('id, attraction_name, eur_rate, non_eur_rate')
     .eq('is_active', true)
+    .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
     .ilike('attraction_name', `%${attractionName}%`)
     .limit(1)
 
@@ -303,11 +300,12 @@ async function getEntranceFee(attractionName: string, isEurPassport: boolean): P
 }
 
 // Get hotel rate from hotel_contacts table
-async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ rate: number; name: string; id: string } | null> {
+async function getHotelRate(city: string, tier: string = 'standard', tenantId?: string): Promise<{ rate: number; name: string; id: string } | null> {
   const { data: hotels, error } = await (getSupabaseAdmin() as any)
     .from('hotel_contacts')
     .select('id, name, rate_double_eur, city, tier, is_preferred')
     .eq('is_active', true)
+    .eq('tenant_id', tenantId)
     .ilike('city', `%${city}%`)
     .eq('tier', tier)
     .order('is_preferred', { ascending: false })
@@ -319,6 +317,7 @@ async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ 
       .from('hotel_contacts')
       .select('id, name, rate_double_eur')
       .eq('is_active', true)
+      .eq('tenant_id', tenantId)
       .ilike('city', `%${city}%`)
       .order('is_preferred', { ascending: false })
       .limit(1)
@@ -343,6 +342,15 @@ async function getHotelRate(city: string, tier: string = 'standard'): Promise<{ 
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const tenantId = authResult.tenant_id
+
     const body = await request.json()
     const {
       variation_id,
@@ -371,6 +379,7 @@ export async function POST(request: NextRequest) {
         tour_templates (id, template_name, template_code, duration_days, uses_day_builder, pricing_mode)
       `)
       .eq('id', variation_id)
+      .eq('tenant_id', tenantId)
       .single()
 
     if (varError || !variation) {
@@ -388,6 +397,7 @@ export async function POST(request: NextRequest) {
       .from('tour_variation_services')
       .select('*')
       .eq('variation_id', variation_id)
+      .eq('tenant_id', tenantId)
       .order('sequence_order')
 
     if (servError) {
@@ -410,6 +420,7 @@ export async function POST(request: NextRequest) {
           .from('b2b_partners')
           .select('default_margin_percent')
           .eq('id', partner_id)
+          .eq('tenant_id', tenantId)
           .single()
 
         if ((partner as any)?.default_margin_percent) {
@@ -517,6 +528,7 @@ export async function POST(request: NextRequest) {
         .from('b2b_partners')
         .select('default_margin_percent')
         .eq('id', partner_id)
+        .eq('tenant_id', tenantId)
         .single()
 
       if ((partner as any)?.default_margin_percent) {
@@ -607,7 +619,7 @@ export async function POST(request: NextRequest) {
 
         switch (rateType) {
           case 'transportation': {
-            const vehicle = await selectVehicleFromB2CTable(num_pax, effectiveTier)
+            const vehicle = await selectVehicleFromB2CTable(num_pax, effectiveTier, tenantId)
             if (vehicle) {
               unitCost = vehicle.rate
               lineTotal = vehicle.rate
@@ -620,7 +632,7 @@ export async function POST(request: NextRequest) {
           }
 
           case 'guide': {
-            const guide = await selectGuideFromB2CTable(language, effectiveTier)
+            const guide = await selectGuideFromB2CTable(language, effectiveTier, tenantId)
             if (guide) {
               unitCost = guide.rate
               lineTotal = guide.rate
@@ -635,7 +647,7 @@ export async function POST(request: NextRequest) {
           case 'activity':
           case 'entrance': {
             if (service.service_name) {
-              const fee = await getEntranceFee(service.service_name, is_eur_passport)
+              const fee = await getEntranceFee(service.service_name, is_eur_passport, tenantId)
               if (fee) {
                 unitCost = fee.rate
                 lineTotal = fee.rate * num_pax
@@ -649,7 +661,7 @@ export async function POST(request: NextRequest) {
           }
 
           case 'accommodation': {
-            const hotel = await getHotelRate(service.city || 'Cairo', effectiveTier)
+            const hotel = await getHotelRate(service.city || 'Cairo', effectiveTier, tenantId)
             if (hotel) {
               const roomsNeeded = Math.ceil(num_pax / 2)
               unitCost = hotel.rate
@@ -669,6 +681,7 @@ export async function POST(request: NextRequest) {
                 .from('nile_cruises')
                 .select('*')
                 .eq('id', service.rate_id)
+                .eq('tenant_id', tenantId)
                 .single()
 
               if (cruise) {
@@ -697,6 +710,7 @@ export async function POST(request: NextRequest) {
               .from('meal_rates')
               .select('*')
               .eq('is_active', true)
+              .eq('tenant_id', tenantId)
               .limit(1)
               .single()
 
@@ -829,6 +843,14 @@ export async function POST(request: NextRequest) {
 
 // GET endpoint for simple queries
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth()
+  if (authResult.error) {
+    return NextResponse.json(
+      { success: false, error: authResult.error },
+      { status: authResult.status }
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   const variation_id = searchParams.get('variation_id')
   const num_pax = parseInt(searchParams.get('num_pax') || '2')

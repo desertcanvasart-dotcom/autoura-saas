@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAuthenticatedClient, createAdminClient } from '@/lib/supabase-server'
 import { getTokensFromCode, getUserEmail } from '@/lib/gmail'
 
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
 function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
+  return createAdminClient()
 }
 
 export async function GET(request: NextRequest) {
@@ -30,6 +21,23 @@ export async function GET(request: NextRequest) {
   if (!code || !state) {
     return NextResponse.redirect(
       new URL('/settings/email?error=missing_params', request.url)
+    )
+  }
+
+  // Authenticate via the session cookies (this redirect runs in the user's own
+  // browser). The tokens are stored against the SESSION user, never the
+  // attacker-controllable `state` parameter.
+  const authClient = await createAuthenticatedClient()
+  const { data: { user }, error: userError } = await authClient.auth.getUser()
+
+  if (userError || !user) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Reject forged callbacks: state must match the logged-in user
+  if (state !== user.id) {
+    return NextResponse.redirect(
+      new URL('/settings/email?error=state_mismatch', request.url)
     )
   }
 
@@ -51,7 +59,7 @@ export async function GET(request: NextRequest) {
     const { error: dbError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .upsert({
-        user_id: state,
+        user_id: user.id,
         email,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,

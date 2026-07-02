@@ -1,22 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createElement } from 'react'
 import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
-
-// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 /**
  * GET /api/quotes/[type]/[id]/pdf
@@ -27,6 +14,14 @@ export async function GET(
   { params }: { params: Promise<{ type: string; id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { type, id } = await params
 
     if (type !== 'b2c' && type !== 'b2b') {
@@ -36,11 +31,13 @@ export async function GET(
       )
     }
 
+    const supabaseAdmin = createAdminClient()
+
     // Fetch quote data
     let quote: any = null
 
     if (type === 'b2c') {
-      const { data, error } = await (getSupabaseAdmin() as any)
+      const { data, error } = await (supabaseAdmin as any)
         .from('b2c_quotes')
         .select(`
           *,
@@ -59,12 +56,13 @@ export async function GET(
           )
         `)
         .eq('id', id)
-        .single()
+        .eq('tenant_id', authResult.tenant_id)
+        .maybeSingle()
 
       if (error) throw error
       quote = data
     } else {
-      const { data, error } = await (getSupabaseAdmin() as any)
+      const { data, error } = await (supabaseAdmin as any)
         .from('b2b_quotes')
         .select(`
           *,
@@ -83,7 +81,8 @@ export async function GET(
           )
         `)
         .eq('id', id)
-        .single()
+        .eq('tenant_id', authResult.tenant_id)
+        .maybeSingle()
 
       if (error) throw error
       quote = data

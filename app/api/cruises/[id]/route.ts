@@ -1,6 +1,6 @@
 // app/api/cruises/[id]/route.ts
 
-import { createClient } from '@/lib/supabase'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
@@ -8,17 +8,27 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
-    const supabase = createClient()
-    
+    const supabase = createAdminClient()
+
     const { data, error } = await supabase
       .from('nile_cruises')
       .select('*')
       .eq('id', id)
+      // Tenant rows plus legacy/global rows created before tenant scoping
+      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
       .single()
-    
+
     if (error) throw error
-    
+
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('Error fetching cruise:', error)
@@ -34,10 +44,18 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
-    const supabase = createClient()
+    const supabase = createAdminClient()
     const body = await request.json()
-    
+
     const { data, error } = await supabase
       .from('nile_cruises')
       .update({
@@ -45,11 +63,12 @@ export async function PUT(
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select()
       .single()
-    
+
     if (error) throw error
-    
+
     return NextResponse.json({ success: true, data })
   } catch (error) {
     console.error('Error updating cruise:', error)
@@ -65,16 +84,25 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
-    const supabase = createClient()
-    
+    const supabase = createAdminClient()
+
     const { error } = await supabase
       .from('nile_cruises')
       .delete()
       .eq('id', id)
-    
+      .eq('tenant_id', authResult.tenant_id)
+
     if (error) throw error
-    
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting cruise:', error)

@@ -1,22 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { refreshAccessToken } from '@/lib/gmail'
 import { google } from 'googleapis'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { indexEmailReply } from '@/lib/copilot-indexer'
-
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
-}
 
 // Lazy-initialized OAuth2 client
 let _oauth2Client: InstanceType<typeof google.auth.OAuth2> | null = null
@@ -40,13 +26,29 @@ interface Attachment {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user first
-    const authClient = await createAuthenticatedClient()
-    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    // Dual gating: accept EITHER a valid user session (browser callers) OR the
+    // server-to-server secret header (internal/cron callers). Fails closed:
+    // if CRON_SECRET is unset, the header path is always rejected.
+    const cronSecret = process.env.CRON_SECRET
+    const providedSecret = request.headers.get('x-cron-secret')
+    const isTrustedServerCall = Boolean(cronSecret && providedSecret === cronSecret)
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    let user: { id: string; email?: string | null } | null = null
+    let authClient: any = null
+
+    if (!isTrustedServerCall) {
+      const authResult = await requireAuth()
+      if (authResult.error) {
+        return NextResponse.json(
+          { success: false, error: authResult.error },
+          { status: authResult.status }
+        )
+      }
+      user = authResult.user
+      authClient = authResult.supabase
     }
+
+    const supabase = createAdminClient()
 
     const {
       userId, to, subject, body, body_text: bodyTextParam, threadId, attachments,
@@ -64,13 +66,14 @@ export async function POST(request: NextRequest) {
       ? bodyTextParam.trim()
       : stripHtmlServer(body).trim()
 
-    // Verify authenticated user matches requested userId
-    if (user.id !== userId) {
+    // Verify authenticated user matches requested userId (session path only —
+    // trusted server calls are authenticated via the x-cron-secret header)
+    if (user && user.id !== userId) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
     // Get user's tokens
-    const { data: tokenData, error: tokenError } = await (getSupabase() as any)
+    const { data: tokenData, error: tokenError } = await (supabase as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -87,7 +90,7 @@ export async function POST(request: NextRequest) {
       const newTokens = await refreshAccessToken(refresh_token)
       access_token = newTokens.access_token!
 
-      await (getSupabase() as any)
+      await (supabase as any)
         .from('gmail_tokens')
         .update({
           access_token: newTokens.access_token,
@@ -127,8 +130,10 @@ export async function POST(request: NextRequest) {
     // Persist outbound into email_messages + index + mark draft sent
     // Best-effort: never fail the send if post-processing errors.
     // conversationId is the unified_conversations.id (canonical).
+    // Session path only: server-to-server callers don't pass conversation_id
+    // and have no RLS session client to persist with.
     // ============================================
-    if (conversationId && response.data.id) {
+    if (conversationId && response.data.id && user && authClient) {
       try {
         // Look up tenant + conversation from unified_conversations
         const { data: conv } = await (authClient as any)

@@ -8,20 +8,29 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const supabase = createAdminClient()
     const { id } = await params
 
     const { data: guide, error } = await supabase
       .from('guides')
       .select('*')
       .eq('id', id)
+      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
       .single()
 
     if (error || !guide) {
@@ -36,6 +45,7 @@ export async function GET(
       .from('itineraries')
       .select('id, itinerary_code, client_name, start_date, end_date, total_cost')
       .eq('assigned_guide_id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .order('start_date', { ascending: true })
 
     return NextResponse.json({
@@ -60,7 +70,15 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const supabase = createAdminClient()
     const { id } = await params
     const body = await request.json()
 
@@ -98,6 +116,7 @@ export async function PUT(
       .from('guides')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select()
       .single()
 
@@ -146,7 +165,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = createClient()
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const supabase = createAdminClient()
     const { id } = await params
 
     // Check if guide has any assigned bookings
@@ -179,6 +206,7 @@ export async function DELETE(
       .from('guides')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('Error deleting guide:', error)
