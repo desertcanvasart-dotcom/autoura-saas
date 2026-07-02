@@ -13,6 +13,14 @@ function createOAuthClient() {
 }
 
 /**
+ * Remove CR/LF (and stray control chars) from a value destined for a MIME
+ * header. Prevents header/Bcc injection via a crafted recipient or subject.
+ */
+function sanitizeHeaderValue(value: string): string {
+  return String(value ?? '').replace(/[\r\n]+/g, ' ').trim()
+}
+
+/**
  * HTML-escape untrusted text before embedding it in markup. Inbound email
  * bodies are attacker-controlled and are later rendered with
  * dangerouslySetInnerHTML, so a plain-text body containing e.g.
@@ -138,10 +146,16 @@ export async function sendEmail(
 ) {
   const gmail = getGmailClient(accessToken, refreshToken)
 
+  // Strip CR/LF from header values — otherwise a recipient or subject
+  // containing "\r\nBcc: victim@x.com" injects arbitrary MIME headers
+  // (header/Bcc injection). Header values are single-line by definition.
+  const toHeader = sanitizeHeaderValue(to)
+  const subjectHeader = sanitizeHeaderValue(subject)
+
   // Create email in RFC 2822 format
   const emailLines = [
-    `To: ${to}`,
-    `Subject: ${subject}`,
+    `To: ${toHeader}`,
+    `Subject: ${subjectHeader}`,
     'Content-Type: text/html; charset=utf-8',
     'MIME-Version: 1.0',
     '',

@@ -244,10 +244,16 @@ function stripHtmlServer(html: string): string {
     .trim()
 }
 
+// Strip CR/LF from header values to prevent header/Bcc injection via a
+// crafted recipient or subject.
+function stripHeader(value: string): string {
+  return String(value ?? '').replace(/[\r\n]+/g, ' ').trim()
+}
+
 function buildSimpleEmail(to: string, subject: string, body: string): string {
   const emailLines = [
-    `To: ${to}`,
-    `Subject: ${subject}`,
+    `To: ${stripHeader(to)}`,
+    `Subject: ${stripHeader(subject)}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
     '',
@@ -270,8 +276,8 @@ function buildEmailWithAttachments(
   const boundary = `boundary_${Date.now()}`
   
   const emailParts = [
-    `To: ${to}`,
-    `Subject: ${subject}`,
+    `To: ${stripHeader(to)}`,
+    `Subject: ${stripHeader(subject)}`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',
