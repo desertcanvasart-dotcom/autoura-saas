@@ -1,8 +1,9 @@
 // ============================================
 // CURRENCY EXCHANGE SERVICE
 // ============================================
-// Uses Frankfurter API for real-time exchange rates
-// https://www.frankfurter.app/docs/
+// Uses ExchangeRate-API's open endpoint for real-time exchange rates
+// (https://open.er-api.com — free, no key). Chosen over Frankfurter/ECB
+// because ECB does not publish EGP, which this product needs.
 
 export interface ExchangeRates {
   base: string
@@ -32,8 +33,8 @@ let usingFallback = false
 export function isUsingFallbackRates(): boolean { return usingFallback }
 
 /**
- * Fetch latest exchange rates from Frankfurter API
- * Uses EUR as base currency (since all rates are stored in EUR)
+ * Fetch latest exchange rates from ExchangeRate-API's open endpoint.
+ * Unlike Frankfurter (ECB), this source carries EGP.
  */
 export async function fetchExchangeRates(baseCurrency: string = 'USD'): Promise<ExchangeRates> {
   // Check cache first
@@ -43,9 +44,9 @@ export async function fetchExchangeRates(baseCurrency: string = 'USD'): Promise<
   }
 
   try {
-    // Frankfurter API - free, no API key required
+    // ExchangeRate-API open endpoint - free, no API key required
     const response = await fetch(
-      `https://api.frankfurter.app/latest?from=${baseCurrency}`,
+      `https://open.er-api.com/v6/latest/${baseCurrency}`,
       { next: { revalidate: 3600 } } // Cache for 1 hour in Next.js
     )
 
@@ -55,12 +56,19 @@ export async function fetchExchangeRates(baseCurrency: string = 'USD'): Promise<
 
     const data = await response.json()
 
-    // Add base currency with rate 1 to the rates object
+    if (data.result !== 'success' || !data.rates) {
+      throw new Error(`Exchange rate API error: ${data['error-type'] || 'no rates in response'}`)
+    }
+
+    // Base currency is included with rate 1 in er-api responses; keep it
+    // explicit anyway for shape parity.
     const rates: ExchangeRates = {
-      base: data.base,
-      date: data.date,
+      base: data.base_code,
+      date: (data.time_last_update_utc
+        ? new Date(data.time_last_update_utc).toISOString()
+        : new Date().toISOString()).split('T')[0],
       rates: {
-        [data.base]: 1,
+        [data.base_code]: 1,
         ...data.rates
       }
     }
@@ -122,14 +130,19 @@ export function getFallbackRates(baseCurrency: string): ExchangeRates {
 }
 
 /**
- * Convert amount from one currency to another
+ * Convert amount from one currency to another.
+ *
+ * Returns null when no rate is available. NEVER returns the unconverted
+ * amount — rendering 1000 EGP as €1,000 is a ~53× error. Callers must
+ * handle null (show the original amount with its ORIGINAL currency symbol,
+ * or a placeholder).
  */
 export function convertCurrency(
   amount: number,
   fromCurrency: string,
   toCurrency: string,
   rates: ExchangeRates
-): number {
+): number | null {
   if (fromCurrency === toCurrency) {
     return amount
   }
@@ -160,9 +173,8 @@ export function convertCurrency(
     return amountInBase * toRate
   }
 
-  // Return original amount if conversion not possible
   console.warn(`Could not convert ${fromCurrency} to ${toCurrency}`)
-  return amount
+  return null
 }
 
 /**
