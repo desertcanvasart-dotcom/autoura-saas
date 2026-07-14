@@ -136,10 +136,18 @@ export function getTierLevel(tierSlug: string): number {
   return TIER_ORDER.indexOf(tierSlug as any)
 }
 
-export function compareTiers(currentTier: string, targetTier: string): 'upgrade' | 'downgrade' | 'current' {
+export function compareTiers(
+  currentTier: string,
+  targetTier: string
+): 'upgrade' | 'downgrade' | 'current' | 'unknown' {
   const currentLevel = getTierLevel(currentTier)
   const targetLevel = getTierLevel(targetTier)
 
+  // An invalid TARGET is not a plan change at all — 'bogus' used to classify
+  // as a legitimate downgrade (level -1) and could drive wrong billing UI.
+  if (targetLevel === -1) return 'unknown'
+  // An invalid/stale CURRENT tier with a valid target is deliberate: the
+  // tenant has no recognizable plan, so every real plan is an upgrade path.
   if (currentLevel === targetLevel) return 'current'
   if (targetLevel > currentLevel) return 'upgrade'
   return 'downgrade'

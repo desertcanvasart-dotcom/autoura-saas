@@ -142,11 +142,14 @@ describe('formatCurrency', () => {
     expect(formatCurrency(2_000_000, 'EUR', { compact: true })).toBe('€2M')
   })
 
-  it('compact falls back to full formatting below 1000', () => {
+  it('compact falls back to full formatting below 1000 in magnitude', () => {
     expect(formatCurrency(999.99, 'USD', { compact: true })).toBe('$999.99')
-    // NOTE: the >= 1000 guard means large NEGATIVE amounts are never
-    // compacted either — current behavior, locked as-is.
-    expect(formatCurrency(-1500, 'USD', { compact: true })).toBe('$-1,500.00')
+    expect(formatCurrency(-999.99, 'USD', { compact: true })).toBe('$-999.99')
+  })
+
+  it('compact applies to large negative amounts too (abs-value threshold)', () => {
+    expect(formatCurrency(-1500, 'USD', { compact: true })).toBe('$-1.5K')
+    expect(formatCurrency(-2_000_000, 'EUR', { compact: true })).toBe('€-2M')
   })
 
   it('formats zero and negative amounts', () => {
