@@ -6,10 +6,20 @@ import { requireAuth } from '@/lib/supabase-server'
 const BUCKET = 'supplier-invoices'
 const MAX = 20 * 1024 * 1024
 
-const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy service-role client: constructing at module scope crashes `next build`
+// ("Collecting page data" evaluates every route module) when env vars aren't
+// present at build time — this exact line broke the Railway deploy on
+// 2026-07-14. Matches lib/supabase-server's build-safe convention.
+let _admin: ReturnType<typeof createClient> | null = null
+function admin() {
+  if (!_admin) {
+    _admin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _admin
+}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,17 +39,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
     const filePath = `${tenant_id}/${id}/${Date.now()}-${safeName}`
 
-    let up = await admin.storage.from(BUCKET).upload(filePath, buffer, { contentType: file.type, upsert: true })
+    let up = await admin().storage.from(BUCKET).upload(filePath, buffer, { contentType: file.type, upsert: true })
     if (up.error?.message?.includes('Bucket not found')) {
-      await admin.storage.createBucket(BUCKET, { public: true })
-      up = await admin.storage.from(BUCKET).upload(filePath, buffer, { contentType: file.type, upsert: true })
+      await admin().storage.createBucket(BUCKET, { public: true })
+      up = await admin().storage.from(BUCKET).upload(filePath, buffer, { contentType: file.type, upsert: true })
     }
     if (up.error) {
       console.error('upload error:', up.error.message)
       return NextResponse.json({ success: false, error: 'Failed to upload document' }, { status: 500 })
     }
 
-    const { data: urlData } = admin.storage.from(BUCKET).getPublicUrl(filePath)
+    const { data: urlData } = admin().storage.from(BUCKET).getPublicUrl(filePath)
 
     const { data, error } = await supabase
       .from('supplier_invoices')

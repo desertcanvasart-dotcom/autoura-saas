@@ -44,3 +44,12 @@ jobs:
         # 2026-07-14: the scoped check structurally cannot catch app-code type
         # errors (proven there by a regression that merged with green CI).
         run: NODE_OPTIONS=--max-old-space-size=4096 npx tsc --noEmit
+
+      - name: Production build (env-less)
+        # Catches module-scope env crashes that only surface during `next
+        # build`'s page-data collection — this exact class broke the Railway
+        # deploy on 2026-07-14 (a route constructed its Supabase client at
+        # import with SUPABASE_SERVICE_ROLE_KEY!). The codebase's build-safe
+        # convention (lazy/mock clients) makes an env-less build possible;
+        # this step keeps it that way.
+        run: NODE_OPTIONS=--max-old-space-size=4096 npx next build

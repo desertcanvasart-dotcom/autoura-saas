@@ -20,7 +20,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import {
   verifyConciergeSignature,
   getConfiguredSecrets,
@@ -39,10 +39,18 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 // Service-role client — webhooks have no user session (bypasses RLS).
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Lazy: module-scope construction crashes `next build` when env vars aren't
+// present at build time (build-safe convention, see lib/supabase-server).
+let _supabase: SupabaseClient<any, any, any, any, any> | null = null
+function getSupabase(): SupabaseClient<any, any, any, any, any> {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
 function json(body: unknown, status: number) {
   return NextResponse.json(body, { status })
@@ -63,7 +71,7 @@ const STATUS_LABEL: Record<IngestOutcome, string> = {
 async function resolveTenantId(): Promise<string | null> {
   const configured = process.env.CONCIERGE_WEBHOOK_TENANT_ID
   if (configured) return configured
-  const { data } = await supabase.from('tenants').select('id').order('created_at', { ascending: true }).limit(1).maybeSingle()
+  const { data } = await getSupabase().from('tenants').select('id').order('created_at', { ascending: true }).limit(1).maybeSingle()
   return (data?.id as string) ?? null
 }
 
@@ -154,7 +162,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await ingestBrief(mapped, { requestId, rawPayload: validation.payload }, supabase, tenantId)
+    const result = await ingestBrief(mapped, { requestId, rawPayload: validation.payload }, getSupabase(), tenantId)
 
     // Promote the brief into a Copilot thread so operators see it in the inbox
     // alongside WhatsApp/email. Only on a new or updated brief (not a duplicate
@@ -163,7 +171,7 @@ export async function POST(request: NextRequest) {
     let threadId: string | null = null
     if (result.outcome === 'received' || result.outcome === 'updated') {
       try {
-        const promotion = await promoteBriefToThread(result.briefId, tenantId, supabase)
+        const promotion = await promoteBriefToThread(result.briefId, tenantId, getSupabase())
         threadId = promotion.threadId
       } catch (promoteErr: any) {
         console.warn('[concierge] promote-to-thread failed (non-fatal)', {
