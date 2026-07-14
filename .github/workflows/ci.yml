@@ -34,6 +34,13 @@ jobs:
       - name: Unit tests (Vitest)
         run: npm test
 
+      - name: Lint ratchet
+        # Standing debt is too large for a blocking gate (16,899 problems on
+        # 2026-07-14) — instead, fail only if error/warning counts GROW past
+        # scripts/lint-baseline.json. Pay debt down, then lock it in with
+        # `npm run lint:ratchet -- --update`.
+        run: npm run lint:ratchet
+
       - name: Generate Next route types
         # `next typegen` produces .next/types without a build (no env vars, no
         # prerender) — all the full type-check needs on a fresh checkout.
@@ -53,3 +60,10 @@ jobs:
         # convention (lazy/mock clients) makes an env-less build possible;
         # this step keeps it that way.
         run: NODE_OPTIONS=--max-old-space-size=4096 npx next build
+
+      - name: Bundle budget
+        # Gzipped client-JS ceilings (scripts/check-bundle-budget.mjs) —
+        # catches a heavy dependency landing in client chunks. On overage,
+        # `npm run analyze` shows what grew; budgets may only be raised
+        # deliberately, in the PR that justifies the growth.
+        run: npm run check:bundle
