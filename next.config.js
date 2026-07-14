@@ -31,4 +31,9 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+// `npm run analyze` — treemap of what's inside each client chunk. Kept out of
+// normal builds; the require is conditional so production doesn't need the dep.
+module.exports = process.env.ANALYZE === 'true'
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- next.config.js is CommonJS; conditional so prod installs don't need the dep
+    require('@next/bundle-analyzer')({ enabled: true })(nextConfig)
+  : nextConfig

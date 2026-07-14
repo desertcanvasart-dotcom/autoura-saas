@@ -8,11 +8,20 @@ import { NextResponse, type NextRequest } from 'next/server'
 // (HMAC for webhooks, OAuth state for callbacks, CRON_SECRET for cron jobs,
 // or are pre-session steps in an auth flow like signup verification).
 // Every other /api/* route MUST go through the session check below.
-const SELF_AUTH_API_PREFIXES = [
+//
+// Exported for app/api/__tests__/route-auth-sweep.test.ts, which (a) runs
+// every discovered route through this middleware anonymously and (b) checks
+// each allowlisted handler actually self-authenticates. Adding an entry here
+// fails that test until its self-auth mechanism is registered there too.
+export const SELF_AUTH_API_PREFIXES = [
   '/api/webhooks/',         // HMAC-verified inbound (e.g. concierge brief)
   '/api/auth/',             // login / signup / OAuth callbacks (no session yet)
   '/api/cron/',             // cron-job-only, verifies CRON_SECRET inside the handler
   '/api/version',           // deploy-verification probe: public by design, sha+uptime only
+  '/api/health',            // health probe: public by design, dependency status only
+  '/api/billing/webhook',   // Stripe → us; verifies stripe-signature inside the handler
+  '/api/whatsapp/webhook',  // Twilio → us; verifies X-Twilio-Signature inside the handler
+  '/api/whatsapp/status-callback', // Twilio delivery receipts; same signature check
 ]
 
 // Define route permissions - which roles can access which routes

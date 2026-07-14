@@ -17,7 +17,8 @@
 // Checks:
 //   1. GET /api/version    → 200 and sha === expected
 //   2. GET /login          → 200 (app serves pages)
-//   3. GET /api/itineraries→ 401 (auth gate is up — a 200 here means the
+//   3. GET /api/health     → 200 and ok:true (dependencies reachable)
+//   4. GET /api/itineraries→ 401 (auth gate is up — a 200 here means the
 //                            API is open to the anonymous internet)
 // Exit code 0 = all pass; 1 = any failure.
 
@@ -103,7 +104,28 @@ try {
   fail(`/login unreachable: ${e.message}`)
 }
 
-// ── 3. Auth gate is up ──────────────────────────────────────────────────────
+// ── 3. Dependency health ────────────────────────────────────────────────────
+try {
+  const res = await probe('/api/health')
+  if (res.status === 404) {
+    fail('/api/health → 404 — this deployment predates the health endpoint. Deploy current main first.')
+  } else {
+    const h = await res.json()
+    if (res.status === 200 && h.ok) {
+      ok(`/api/health → 200 (db ${h.checks.db.latencyMs}ms)`)
+    } else {
+      const failing = Object.entries(h.checks || {})
+        .filter(([, c]) => !c.ok)
+        .map(([name, c]) => `${name}: ${c.error || 'failed'}`)
+        .join(', ')
+      fail(`/api/health → ${res.status} — DEGRADED (${failing || 'no check detail'})`)
+    }
+  }
+} catch (e) {
+  fail(`/api/health unreachable: ${e.message}`)
+}
+
+// ── 4. Auth gate is up ──────────────────────────────────────────────────────
 try {
   const res = await probe('/api/itineraries')
   res.status === 401
