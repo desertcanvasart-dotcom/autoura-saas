@@ -68,7 +68,7 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
 
   const handleSave = async () => {
     if (services.length === 0) {
-      showToast('Please select at least one service', 'error')
+      showToast('error', 'Please select at least one service')
       return
     }
 
@@ -89,14 +89,14 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
       })
 
       if (response.ok) {
-        showToast('Business settings saved!', 'success')
+        showToast('success', 'Business settings saved!')
         onNext()
       } else {
-        showToast('Failed to save settings', 'error')
+        showToast('error', 'Failed to save settings')
       }
     } catch (error) {
       console.error('Error saving business config:', error)
-      showToast('An error occurred', 'error')
+      showToast('error', 'An error occurred')
     } finally {
       setSaving(false)
     }

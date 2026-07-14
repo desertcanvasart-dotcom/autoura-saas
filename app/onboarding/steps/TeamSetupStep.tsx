@@ -78,7 +78,7 @@ export default function TeamSetupStep({ onNext, onBack, onSkip, currentStep, ten
     const invalidEmails = filledMembers.filter(m => !emailRegex.test(m.email))
 
     if (invalidEmails.length > 0) {
-      showToast('Please enter valid email addresses', 'error')
+      showToast('error', 'Please enter valid email addresses')
       return false
     }
 
@@ -87,7 +87,7 @@ export default function TeamSetupStep({ onNext, onBack, onSkip, currentStep, ten
     const uniqueEmails = new Set(emails)
 
     if (emails.length !== uniqueEmails.size) {
-      showToast('Duplicate email addresses found', 'error')
+      showToast('error', 'Duplicate email addresses found')
       return false
     }
 
@@ -122,7 +122,7 @@ export default function TeamSetupStep({ onNext, onBack, onSkip, currentStep, ten
 
       if (response.ok) {
         const result = await response.json()
-        showToast(`Invitations sent to ${filledMembers.length} team member${filledMembers.length > 1 ? 's' : ''}!`, 'success')
+        showToast('success', `Invitations sent to ${filledMembers.length} team member${filledMembers.length > 1 ? 's' : ''}!`)
         onNext()
       } else {
         const errorData = await response.json().catch(() => ({}))
@@ -130,11 +130,11 @@ export default function TeamSetupStep({ onNext, onBack, onSkip, currentStep, ten
           status: response.status,
           error: errorData
         })
-        showToast(`Failed to send invitations: ${errorData.error || 'Unknown error'}`, 'error')
+        showToast('error', `Failed to send invitations: ${errorData.error || 'Unknown error'}`)
       }
     } catch (error: any) {
       console.error('❌ Error sending invites:', error)
-      showToast(`An error occurred: ${error?.message || 'Unknown error'}`, 'error')
+      showToast('error', `An error occurred: ${error?.message || 'Unknown error'}`)
     } finally {
       setSending(false)
     }
