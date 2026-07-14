@@ -200,7 +200,7 @@ export default function AirportStaffContent() {
     e.preventDefault()
 
     if (!canManagePartners) {
-      showToast('You don\'t have permission to manage airport staff', 'error')
+      showToast('error', 'You don\'t have permission to manage airport staff')
       return
     }
 
@@ -220,22 +220,22 @@ export default function AirportStaffContent() {
       const data = await response.json()
 
       if (data.success) {
-        showToast(editingStaff ? 'Staff member updated successfully' : 'Staff member added successfully', 'success')
+        showToast('success', editingStaff ? 'Staff member updated successfully' : 'Staff member added successfully')
         setShowModal(false)
         fetchStaff()
       } else {
-        showToast(data.error || 'Failed to save staff member', 'error')
+        showToast('error', data.error || 'Failed to save staff member')
       }
     } catch (error) {
       console.error('Error saving staff:', error)
-      showToast('Failed to save staff member', 'error')
+      showToast('error', 'Failed to save staff member')
     }
   }
 
   // Delete staff
   const handleDelete = async (id: string, name: string) => {
     if (!canManagePartners) {
-      showToast('You don\'t have permission to delete staff members', 'error')
+      showToast('error', 'You don\'t have permission to delete staff members')
       return
     }
 
@@ -254,14 +254,14 @@ export default function AirportStaffContent() {
       const data = await response.json()
 
       if (data.success) {
-        showToast('Staff member deleted successfully', 'success')
+        showToast('success', 'Staff member deleted successfully')
         fetchStaff()
       } else {
-        showToast(data.error || 'Failed to delete staff member', 'error')
+        showToast('error', data.error || 'Failed to delete staff member')
       }
     } catch (error) {
       console.error('Error deleting staff:', error)
-      showToast('Failed to delete staff member', 'error')
+      showToast('error', 'Failed to delete staff member')
     }
   }
   

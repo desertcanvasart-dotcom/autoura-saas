@@ -8,7 +8,6 @@ import {
   formatCurrency,
   getCurrencySymbol,
   createCurrencyConverter,
-  DEFAULT_RATES
 } from '@/lib/currency'
 
 interface UseCurrencyOptions {
@@ -149,7 +148,10 @@ export function useCurrency(options: UseCurrencyOptions = {}): UseCurrencyReturn
     const from = fromCurrency || baseCurrency
     if (from === userCurrency) return amount
 
-    return converter.convert(amount, userCurrency, from)
+    // convertCurrency returns null when no rate exists (de-fabrication: it no
+    // longer invents one). 0 is this hook's existing degenerate value — an
+    // obviously-wrong display beats a silently-invented conversion.
+    return converter.convert(amount, userCurrency, from) ?? 0
   }, [converter, userCurrency, baseCurrency])
 
   // Format amount in user's currency
@@ -210,7 +212,8 @@ export function useCurrencyConverter(
     if (!amount || isNaN(amount)) return 0
     const from = fromCurrency || baseCurrency
     if (from === userCurrency) return amount
-    return converter.convert(amount, userCurrency, from)
+    // Null-rate → 0, same rationale as the sibling callback above.
+    return converter.convert(amount, userCurrency, from) ?? 0
   }, [converter, userCurrency, baseCurrency])
 
   const format = useCallback((amount: number, fromCurrency?: string): string => {

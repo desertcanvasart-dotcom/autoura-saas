@@ -132,7 +132,7 @@ export default function AccountsReceivablePage() {
 
   const handleSendReminder = async (invoice: Invoice) => {
     if (!invoice.client_email) {
-      showToast('No email address for this client', 'error')
+      showToast('error', 'No email address for this client')
       return
     }
 

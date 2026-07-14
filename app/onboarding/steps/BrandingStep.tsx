@@ -48,13 +48,13 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      showToast('Please select an image file', 'error')
+      showToast('error', 'Please select an image file')
       return
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      showToast('Image must be less than 2MB', 'error')
+      showToast('error', 'Image must be less than 2MB')
       return
     }
 
@@ -121,7 +121,7 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
         statusCode: error?.statusCode,
         name: error?.name
       })
-      showToast(`Failed to upload logo: ${error?.message || 'Unknown error'}`, 'error')
+      showToast('error', `Failed to upload logo: ${error?.message || 'Unknown error'}`)
       return null
     } finally {
       setUploading(false)
@@ -138,7 +138,7 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
         logoUrl = await uploadLogo()
         if (!logoUrl && logoFile) {
           // Upload failed, but don't block onboarding
-          showToast('Logo upload failed, but continuing...', 'warning')
+          showToast('warning', 'Logo upload failed, but continuing...')
         }
       }
 
@@ -155,14 +155,14 @@ export default function BrandingStep({ onNext, onBack, onSkip, currentStep, tena
       })
 
       if (response.ok) {
-        showToast('Branding saved!', 'success')
+        showToast('success', 'Branding saved!')
         onNext()
       } else {
-        showToast('Failed to save branding', 'error')
+        showToast('error', 'Failed to save branding')
       }
     } catch (error) {
       console.error('Error saving branding:', error)
-      showToast('An error occurred', 'error')
+      showToast('error', 'An error occurred')
     } finally {
       setSaving(false)
     }
