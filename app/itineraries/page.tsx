@@ -110,7 +110,7 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
       }
     } catch (error) {
       console.error('Error deleting itinerary:', error)
-      alert('Failed to delete itinerary')
+      showToast('error', 'Failed to delete itinerary')
     }
   }
 

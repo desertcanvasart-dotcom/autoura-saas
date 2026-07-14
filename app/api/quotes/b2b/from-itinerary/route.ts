@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAuthenticatedClient, createAdminClient } from '@/lib/supabase-server';
+import { requireAuth, createAdminClient } from '@/lib/supabase-server';
 
 /**
  * POST /api/quotes/b2b/from-itinerary
@@ -10,6 +10,14 @@ import { createAuthenticatedClient, createAdminClient } from '@/lib/supabase-ser
  */
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const body = await request.json();
     const {
       itinerary_id,
@@ -31,10 +39,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use authenticated client - RLS will automatically filter by tenant
-    const supabase = await createAuthenticatedClient()
+    // Admin client with explicit tenant scoping (auth gate above is the security boundary)
+    const supabase = createAdminClient()
 
-    // 1. Fetch the itinerary with all services
+    // 1. Fetch the itinerary with all services (tenant-scoped)
     const { data: itinerary, error: itinError } = await supabase
       .from('itineraries')
       .select(`
@@ -43,7 +51,8 @@ export async function POST(request: NextRequest) {
         itinerary_services (*)
       `)
       .eq('id', itinerary_id)
-      .single();
+      .eq('tenant_id', authResult.tenant_id)
+      .maybeSingle();
 
     if (itinError || !itinerary) {
       return NextResponse.json(
@@ -173,8 +182,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Generate quote number (requires admin client for RPC)
-    const supabaseAdmin = createAdminClient()
-    const { data: quoteNumber, error: seqError } = await supabaseAdmin
+    const { data: quoteNumber, error: seqError } = await supabase
       .rpc('generate_b2b_quote_number');
 
     if (seqError) {
@@ -189,7 +197,7 @@ export async function POST(request: NextRequest) {
     const { data: quote, error: quoteError } = await supabase
       .from('b2b_quotes')
       .insert({
-        tenant_id: itinerary.tenant_id,
+        tenant_id: authResult.tenant_id,
         itinerary_id,
         partner_id,
         quote_number: quoteNumber,

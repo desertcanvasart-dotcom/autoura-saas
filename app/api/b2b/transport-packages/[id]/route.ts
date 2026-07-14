@@ -1,33 +1,28 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // B2B TRANSPORT PACKAGES API - Single Item
 // File: app/api/b2b/transport-packages/[id]/route.ts
 // ============================================
 
-// Lazy-initialized Supabase admin client (avoids build-time errors)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
-
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
     const body = await request.json()
 
-    const { data, error } = await (getSupabaseAdmin() as any)
+    const { data, error } = await (createAdminClient() as any)
       .from('b2b_transport_packages')
       .update({
         package_code: body.package_code,
@@ -53,6 +48,7 @@ export async function PUT(
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select()
       .single()
 
@@ -73,12 +69,21 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
 
-    const { error } = await getSupabaseAdmin()
+    const { error } = await createAdminClient()
       .from('b2b_transport_packages')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('Error deleting transport package:', error)

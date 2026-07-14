@@ -18,6 +18,7 @@ import {
   MapPin
 } from 'lucide-react'
 import { downloadReceiptPDF } from '@/lib/receipt-pdf-generator'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface UnifiedPayment {
   id: string
@@ -172,7 +173,7 @@ export default function ReceiptsPage() {
       })
     } catch (error) {
       console.error('Error downloading receipt:', error)
-      alert('Failed to download receipt')
+      showToast('error', 'Failed to download receipt')
     } finally {
       setDownloadingId(null)
     }
@@ -180,7 +181,7 @@ export default function ReceiptsPage() {
 
   const handleSendWhatsApp = async (payment: UnifiedPayment) => {
     if (!payment.client_phone) {
-      alert('No phone number available for this client')
+      showToast('error', 'No phone number available for this client')
       return
     }
 
@@ -211,11 +212,11 @@ export default function ReceiptsPage() {
           setSentIds(prev => prev.filter(id => id !== payment.id))
         }, 3000)
       } else {
-        alert(data.error || 'Failed to send receipt')
+        showToast('error', data.error || 'Failed to send receipt')
       }
     } catch (error) {
       console.error('Error sending receipt:', error)
-      alert('Failed to send receipt via WhatsApp')
+      showToast('error', 'Failed to send receipt via WhatsApp')
     } finally {
       setSendingId(null)
     }

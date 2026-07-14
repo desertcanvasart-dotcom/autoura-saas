@@ -37,6 +37,7 @@ import {
 } from 'lucide-react'
 import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
+import { showToast } from '@/app/contexts/ToastContext'
 
 // ============================================
 // TYPES
@@ -420,7 +421,7 @@ export default function ItineraryEditorPage() {
       setItinerary({ ...itinerary, status: newStatus })
     } catch (error) {
       console.error('Error updating status:', error)
-      alert('Failed to update status')
+      showToast('error', 'Failed to update status')
     } finally {
       setUpdatingStatus(false)
     }
@@ -707,7 +708,7 @@ export default function ItineraryEditorPage() {
 
     } catch (error: any) {
       console.error('❌ Error saving draft:', error)
-      alert(`Failed to save: ${error.message || 'Unknown error'}`)
+      showToast('error', `Failed to save: ${error.message || 'Unknown error'}`)
       return false
     } finally {
       setSaving(false)
@@ -725,7 +726,7 @@ export default function ItineraryEditorPage() {
       const saveSuccess = await saveDraft()
 
       if (!saveSuccess) {
-        alert('Failed to save draft. Please try again.')
+        showToast('error', 'Failed to save draft. Please try again.')
         setCalculating(false)
         return
       }
@@ -733,7 +734,7 @@ export default function ItineraryEditorPage() {
       router.push(`/pricing-grid?itinerary=${itineraryId}`)
     } catch (error: any) {
       console.error('❌ Error opening pricing grid:', error)
-      alert(`Failed to open pricing grid: ${error.message || 'Unknown error'}`)
+      showToast('error', `Failed to open pricing grid: ${error.message || 'Unknown error'}`)
     } finally {
       setCalculating(false)
     }

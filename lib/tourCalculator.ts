@@ -33,6 +33,10 @@ import {
     }
   
     const dailyBreakdown: DailyPricing[] = []
+    // Rate gaps found while pricing. A missing rate is NEVER replaced with a
+    // guessed number — it prices at 0 AND is recorded here so the result is
+    // flagged incomplete (pricing harness policy, see lib/pricing-types.ts).
+    const holes: string[] = []
     let totals: TourPricing = {
       tour_id: tour.id || '',
       pax,
@@ -49,7 +53,7 @@ import {
   
     // Calculate pricing for each day
     tour.days.forEach((day) => {
-      const dayPricing = calculateDayPricing(day, pax, isEuroPassport)
+      const dayPricing = calculateDayPricing(day, pax, isEuroPassport, holes)
       dailyBreakdown.push(dayPricing)
   
       // Add to totals
@@ -75,17 +79,35 @@ import {
     return {
       daily_breakdown: dailyBreakdown,
       totals,
-      per_person: totals.per_person_total
+      per_person: totals.per_person_total,
+      complete: holes.length === 0,
+      holes
     }
   }
   
   /**
    * Calculate pricing for a single day
    */
+  /** Rate for the requested passport class, or 0 + a recorded hole when the
+   *  rate row doesn't carry a usable number (never a guessed default). */
+  function rateOrHole(
+    rate: number | null | undefined,
+    holes: string[],
+    label: string
+  ): number {
+    const n = Number(rate)
+    if (rate === null || rate === undefined || isNaN(n) || n <= 0) {
+      holes.push(label)
+      return 0
+    }
+    return n
+  }
+
   function calculateDayPricing(
     day: TourDay,
     pax: number,
-    isEuroPassport: boolean
+    isEuroPassport: boolean,
+    holes: string[]
   ): DailyPricing {
     
     const pricing: DailyPricing = {
@@ -105,33 +127,43 @@ import {
     // Assumption: 2 people per double room
     if (day.accommodation) {
       const rooms = calculateRoomsNeeded(pax)
-      const ratePerRoom = isEuroPassport
-        ? day.accommodation.base_rate_eur
-        : day.accommodation.base_rate_non_eur
-      
+      const ratePerRoom = rateOrHole(
+        isEuroPassport
+          ? day.accommodation.base_rate_eur
+          : day.accommodation.base_rate_non_eur,
+        holes,
+        `day ${day.day_number}: accommodation has no ${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
+      )
+
       pricing.accommodation = rooms * ratePerRoom
     }
-  
+
     // 2. MEAL COSTS
     // Calculated per person
-    pricing.meals = calculateMealCosts(day, pax, isEuroPassport)
-  
+    pricing.meals = calculateMealCosts(day, pax, isEuroPassport, holes)
+
     // 3. GUIDE COST
     // Usually charged per day per group, not per person
     if (day.guide_required && day.guide) {
-      const guideRate = isEuroPassport
-        ? day.guide.base_rate_eur
-        : day.guide.base_rate_non_eur
-      
-      pricing.guide = guideRate
+      pricing.guide = rateOrHole(
+        isEuroPassport
+          ? day.guide.base_rate_eur
+          : day.guide.base_rate_non_eur,
+        holes,
+        `day ${day.day_number}: guide has no ${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
+      )
+    } else if (day.guide_required && !day.guide) {
+      holes.push(`day ${day.day_number}: guide required but none selected`)
     }
-  
+
     // 4. ACTIVITIES (Entrances + Transportation)
     if (day.activities && day.activities.length > 0) {
       const activityCosts = calculateActivityCosts(
         day.activities,
         pax,
-        isEuroPassport
+        isEuroPassport,
+        day.day_number,
+        holes
       )
       pricing.entrances = activityCosts.entrances
       pricing.transportation = activityCosts.transportation
@@ -142,7 +174,9 @@ import {
       pricing.additional_services = calculateAdditionalServicesCosts(
         (day as any).additional_services,
         pax,
-        isEuroPassport
+        isEuroPassport,
+        day.day_number,
+        holes
       )
     }
   
@@ -172,31 +206,40 @@ import {
   function calculateMealCosts(
     day: TourDay,
     pax: number,
-    isEuroPassport: boolean
+    isEuroPassport: boolean,
+    holes: string[]
   ): number {
     let mealCost = 0
-  
+
     // Breakfast (usually included in hotel, but can be separate)
     // We'll skip breakfast as it's typically included in board basis
-  
+
     // Lunch
     if (day.lunch_meal) {
-      const lunchRate = isEuroPassport
-        ? day.lunch_meal.base_rate_eur
-        : day.lunch_meal.base_rate_non_eur
-      
+      const lunchRate = rateOrHole(
+        isEuroPassport
+          ? day.lunch_meal.base_rate_eur
+          : day.lunch_meal.base_rate_non_eur,
+        holes,
+        `day ${day.day_number}: lunch has no ${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
+      )
+
       mealCost += pax * lunchRate
     }
-  
+
     // Dinner
     if (day.dinner_meal) {
-      const dinnerRate = isEuroPassport
-        ? day.dinner_meal.base_rate_eur
-        : day.dinner_meal.base_rate_non_eur
-      
+      const dinnerRate = rateOrHole(
+        isEuroPassport
+          ? day.dinner_meal.base_rate_eur
+          : day.dinner_meal.base_rate_non_eur,
+        holes,
+        `day ${day.day_number}: dinner has no ${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
+      )
+
       mealCost += pax * dinnerRate
     }
-  
+
     return mealCost
   }
   
@@ -206,34 +249,44 @@ import {
   function calculateActivityCosts(
     activities: TourDayActivity[],
     pax: number,
-    isEuroPassport: boolean
+    isEuroPassport: boolean,
+    dayNumber: number,
+    holes: string[]
   ): { entrances: number; transportation: number } {
-    
+
     let totalEntrances = 0
     let totalTransportation = 0
-  
+
     activities.forEach((activity) => {
       // Entrance fees (per person)
       if (activity.entrance) {
-        // ← FIXED: Use eur_rate and non_eur_rate instead of base_rate_eur/non_eur
+        // Rate columns vary by source table (eur_rate vs base_rate_eur)
         const entrance = activity.entrance as any
-       const entranceRate = isEuroPassport
-  ? (entrance.eur_rate || entrance.base_rate_eur || 0)
-  : (entrance.non_eur_rate || entrance.base_rate_non_eur || 0)
-        
+        const entranceRate = rateOrHole(
+          isEuroPassport
+            ? (entrance.eur_rate ?? entrance.base_rate_eur)
+            : (entrance.non_eur_rate ?? entrance.base_rate_non_eur),
+          holes,
+          `day ${dayNumber}: entrance "${entrance.attraction_name || entrance.name || 'unknown'}" has no ${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
+        )
+
         totalEntrances += pax * entranceRate
       }
-  
+
       // Transportation (per group, not per person)
       if (activity.transportation) {
-        const transportRate = isEuroPassport
-          ? activity.transportation.base_rate_eur
-          : activity.transportation.base_rate_non_eur
-        
+        const transportRate = rateOrHole(
+          isEuroPassport
+            ? activity.transportation.base_rate_eur
+            : activity.transportation.base_rate_non_eur,
+          holes,
+          `day ${dayNumber}: transportation has no ${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
+        )
+
         totalTransportation += transportRate
       }
     })
-  
+
     return {
       entrances: totalEntrances,
       transportation: totalTransportation
@@ -246,13 +299,19 @@ import {
   function calculateAdditionalServicesCosts(
     services: any[],
     pax: number,
-    isEuroPassport: boolean
+    isEuroPassport: boolean,
+    dayNumber: number,
+    holes: string[]
   ): number {
     let total = 0
 
     services.forEach(({ service, quantity }) => {
-      const rate = isEuroPassport ? service.base_rate_eur : service.base_rate_non_eur
-      
+      const rate = rateOrHole(
+        isEuroPassport ? service.base_rate_eur : service.base_rate_non_eur,
+        holes,
+        `day ${dayNumber}: service "${service.name || service.service_name || 'unknown'}" has no ${isEuroPassport ? 'EUR' : 'non-EUR'} rate`
+      )
+
       switch (service.rate_type) {
         case 'per_person':
           total += pax * rate

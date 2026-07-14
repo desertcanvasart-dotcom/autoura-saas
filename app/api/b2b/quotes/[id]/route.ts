@@ -1,22 +1,14 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // B2B QUOTES API - Single Quote Operations
 // File: app/api/b2b/quotes/[id]/route.ts
 // ============================================
 
-// Lazy-initialized Supabase admin client (avoids build-time errors)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
+// Service-role client (auth is enforced per-handler via requireAuth)
 function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
+  return createAdminClient()
 }
 
 // GET - Single quote by ID
@@ -25,6 +17,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
 
     const { data, error } = await (getSupabaseAdmin() as any)
@@ -42,6 +42,7 @@ export async function GET(
         b2b_partners (company_name, partner_code, contact_name, email)
       `)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .single()
 
     if (error) {
@@ -63,17 +64,26 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
     const body = await request.json()
 
-    // Remove id from body if present to avoid conflicts
-    const { id: _, ...updates } = body
+    // Remove id and tenant_id from body if present to avoid conflicts / reassignment
+    const { id: _, tenant_id: _ignoredTenantId, ...updates } = body
     updates.updated_at = new Date().toISOString()
 
     const { data, error } = await (getSupabaseAdmin() as any)
       .from('tour_quotes')
       .update(updates)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select()
       .single()
 
@@ -96,12 +106,21 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const { id } = await params
 
     const { error } = await getSupabaseAdmin()
       .from('tour_quotes')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('Error deleting quote:', error)

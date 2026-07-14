@@ -328,11 +328,15 @@ class ToolExecutor {
         return { success: false, error: 'Failed to search trips' }
       }
 
-      // Get quotes for this customer
-      const { data: quotes, error: quoteError } = await this.supabase
+      // Get quotes for this customer (tenant-scoped for defense in depth)
+      let quotesQuery = this.supabase
         .from('b2c_quotes')
         .select('id, quote_number, selling_price, price_per_person, currency, status, valid_until, tier, num_travelers')
         .eq('client_id', this.clientId)
+      if (this.tenantId) {
+        quotesQuery = quotesQuery.eq('tenant_id', this.tenantId)
+      }
+      const { data: quotes, error: quoteError } = await quotesQuery
         .order('created_at', { ascending: false })
         .limit(5)
 
@@ -358,6 +362,13 @@ class ToolExecutor {
   // ============================================
   private async getQuoteDetails(input: { quote_number: string }): Promise<ToolResult> {
     try {
+      // quote_number is guessable and this runs from the unauthenticated
+      // webhook — never query without a tenant scope, or one tenant's quotes
+      // leak to another's WhatsApp sender.
+      if (!this.tenantId) {
+        return { success: false, error: `Quote ${input.quote_number} not found` }
+      }
+
       const { data: quote, error } = await this.supabase
         .from('b2c_quotes')
         .select(`
@@ -367,7 +378,8 @@ class ToolExecutor {
           )
         `)
         .eq('quote_number', input.quote_number)
-        .single()
+        .eq('tenant_id', this.tenantId)
+        .maybeSingle()
 
       if (error || !quote) {
         return { success: false, error: `Quote ${input.quote_number} not found` }
@@ -561,6 +573,12 @@ class ToolExecutor {
   // ============================================
   private async sendQuoteToCustomer(input: { quote_id: string }): Promise<ToolResult> {
     try {
+      // Runs from the unauthenticated webhook — scope to the tenant so a quote
+      // id from another tenant can never be dispatched to this sender.
+      if (!this.tenantId) {
+        return { success: false, error: 'Quote not found' }
+      }
+
       // Get the quote with related data
       const { data: quote, error: quoteError } = await this.supabase
         .from('b2c_quotes')
@@ -571,7 +589,8 @@ class ToolExecutor {
           )
         `)
         .eq('id', input.quote_id)
-        .single()
+        .eq('tenant_id', this.tenantId)
+        .maybeSingle()
 
       if (quoteError || !quote) {
         return { success: false, error: 'Quote not found' }
@@ -1115,6 +1134,16 @@ YOUR ROLE:
 - Be warm, helpful, and professional
 - Keep responses concise (suitable for WhatsApp - max 2-3 short paragraphs)
 - Use appropriate emojis sparingly to be friendly
+
+PRICING RULES (ABSOLUTE — your replies are sent to customers without review):
+- NEVER state, estimate, or invent a price, rate, discount, or price range of any
+  kind. Not "around", not "typically", not "from €X". No exceptions.
+- The ONLY prices you may ever mention are ones that appear verbatim in the
+  PENDING QUOTES list below or in the output of your quote tools. Quote them
+  exactly (same number, same currency) and name the quote number.
+- If asked what something costs and no existing quote covers it, do NOT guess:
+  create a trip inquiry / quote request with your tools and tell the customer
+  the team will send an exact quote. If they push for a number, escalate_to_human.
 
 IMPORTANT GUIDELINES:
 1. If asked about specific pricing or availability, use your tools to check or create a quote request

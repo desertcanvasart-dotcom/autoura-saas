@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useRole } from '@/hooks/useRole'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 import Link from 'next/link'
 import {
   Users,
@@ -68,6 +69,7 @@ export default function UserManagementPage() {
   const { isAdmin, canManageTeam } = useRole()
   const { user } = useAuth()
   const { tenant } = useTenant()
+  const dialog = useConfirmDialog()
 
   const [activeTab, setActiveTab] = useState<'users' | 'invitations'>('users')
   const [members, setMembers] = useState<TeamMember[]>([])
@@ -153,7 +155,7 @@ export default function UserManagementPage() {
   }
 
   const cancelInvitation = async (id: string) => {
-    if (!confirm('Cancel this invitation?')) return
+    if (!(await dialog.confirm({ message: 'Cancel this invitation?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/invitations?id=${id}`, {

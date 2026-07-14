@@ -33,7 +33,20 @@ export async function getOrCreateStripeCustomer(
   tenantEmail: string | null,
   supabase: any
 ): Promise<string> {
-  // Check if customer already exists
+  // 1. Prefer the id stored on the tenant — it survives across abandoned
+  //    checkouts, so a retry never mints a duplicate customer.
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('stripe_customer_id')
+    .eq('id', tenantId)
+    .single()
+
+  if (tenant?.stripe_customer_id) {
+    return tenant.stripe_customer_id
+  }
+
+  // 2. Fall back to an existing subscription (already-subscribed tenants),
+  //    and backfill the tenant so future lookups hit step 1.
   const { data: existingSub } = await supabase
     .from('tenant_subscriptions')
     .select('stripe_customer_id')
@@ -41,10 +54,15 @@ export async function getOrCreateStripeCustomer(
     .single()
 
   if (existingSub?.stripe_customer_id) {
+    await supabase
+      .from('tenants')
+      .update({ stripe_customer_id: existingSub.stripe_customer_id })
+      .eq('id', tenantId)
     return existingSub.stripe_customer_id
   }
 
-  // Create new Stripe customer
+  // 3. Create the customer and persist it BEFORE returning, so a retry reuses
+  //    it instead of creating another.
   const customer = await stripe.customers.create({
     name: tenantName,
     email: tenantEmail || undefined,
@@ -52,6 +70,11 @@ export async function getOrCreateStripeCustomer(
       tenant_id: tenantId
     }
   })
+
+  await supabase
+    .from('tenants')
+    .update({ stripe_customer_id: customer.id })
+    .eq('id', tenantId)
 
   return customer.id
 }

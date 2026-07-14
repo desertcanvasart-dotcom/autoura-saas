@@ -28,6 +28,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
+import { parseDateOnly } from '@/lib/date-utils'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
 import { priceAcrossPax } from '@/lib/pricing/pax-range'
@@ -669,13 +670,14 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
  * by month/day (the stored year is ignored). Defaults to 'low'.
  */
 export function detectCruiseSeason(cruise: any, startDate: string): 'low' | 'high' | 'peak' {
-  const d = new Date(startDate)
-  if (isNaN(d.getTime())) return 'low'
+  // parseDateOnly avoids the UTC off-by-one: a bare YYYY-MM-DD must yield the
+  // literal month/day, not the previous day in a negative-offset timezone.
+  const d = parseDateOnly(startDate)
+  if (!d) return 'low'
   const mmdd = (d.getMonth() + 1) * 100 + d.getDate()
   const toMmdd = (s: string | null | undefined): number | null => {
-    if (!s) return null
-    const x = new Date(s)
-    if (isNaN(x.getTime())) return null
+    const x = parseDateOnly(s)
+    if (!x) return null
     return (x.getMonth() + 1) * 100 + x.getDate()
   }
   const inRange = (start: number | null, end: number | null): boolean => {
@@ -779,32 +781,78 @@ export async function getCruiseRates(
 }
 
 /**
- * Get hotel rates for a city and tier
- * Uses PPD model: ppd_eur (Per Person Double) + single_supplement_eur
- * Falls back to legacy calculation if PPD fields not available
+ * Detect the hotel season (peak | high | low) for a travel date from the
+ * accommodation row's season-boundary columns (migration 103). Seasons recur
+ * annually, so dates are compared by month/day (the stored year is ignored).
+ * Defaults to 'low' — mirrors detectCruiseSeason.
+ */
+export function detectHotelSeason(hotel: any, startDate: string): 'low' | 'high' | 'peak' {
+  // parseDateOnly avoids the UTC off-by-one (see detectCruiseSeason).
+  const d = parseDateOnly(startDate)
+  if (!d) return 'low'
+  const mmdd = (d.getMonth() + 1) * 100 + d.getDate()
+  const toMmdd = (s: string | null | undefined): number | null => {
+    const x = parseDateOnly(s)
+    if (!x) return null
+    return (x.getMonth() + 1) * 100 + x.getDate()
+  }
+  const inRange = (start: number | null, end: number | null): boolean => {
+    if (start == null || end == null) return false
+    return start <= end ? (mmdd >= start && mmdd <= end) : (mmdd >= start || mmdd <= end)
+  }
+  if (inRange(toMmdd(hotel.peak_season_from), toMmdd(hotel.peak_season_to))) return 'peak'
+  if (inRange(toMmdd(hotel.peak_season_2_from), toMmdd(hotel.peak_season_2_to))) return 'peak'
+  if (inRange(toMmdd(hotel.high_season_from), toMmdd(hotel.high_season_to))) return 'high'
+  return 'low'
+}
+
+/**
+ * Get hotel rates for a city and tier (season-aware PPD model, mirrors
+ * getCruiseRates). Picks the seasonal PPD for the travel date's season
+ * (low = ppd_eur, high = high_season_ppd_eur, peak = peak_season_ppd_eur)
+ * + matching single supplement + triple reduction. Falls back to the base
+ * (low) PPD when a seasonal column is unset, then to legacy rates.
+ * No travelDate => low season (prior behaviour).
  */
 export async function getHotelRates(
   city: string,
-  tier: ServiceTier
+  tier: ServiceTier,
+  travelDate?: string
 ): Promise<{
   hotelName: string
   ppdNight: number
   singleSuppNight: number
   tripleRedNight: number
+  season: 'low' | 'high' | 'peak'
   source: RateSource
 } | null> {
   const cityNorm = city.trim().toLowerCase()
 
   const mapRow = (hotel: any, source: RateSource) => {
-    // Use new PPD fields if available, otherwise derive from legacy fields
-    const ppd = hotel.ppd_eur ?? (hotel.double_rate_eur ? hotel.double_rate_eur / 2 : 0)
-    const singleSupp = hotel.single_supplement_eur ?? Math.max(0, (hotel.single_rate_eur || 0) - ppd)
-    const tripleRed = hotel.triple_reduction_eur ?? 0
+    const season = travelDate ? detectHotelSeason(hotel, travelDate) : 'low'
+
+    // Base (low season) PPD; legacy fields as last resort
+    const basePpd = hotel.ppd_eur ?? (hotel.double_rate_eur ? hotel.double_rate_eur / 2 : 0)
+    const baseSupp = hotel.single_supplement_eur ?? Math.max(0, (hotel.single_rate_eur || 0) - basePpd)
+    const baseRed = hotel.triple_reduction_eur ?? 0
+
+    // Seasonal columns; unset seasonal column falls back to the base rate
+    const ppd = (season === 'peak' ? hotel.peak_season_ppd_eur
+      : season === 'high' ? hotel.high_season_ppd_eur
+      : null) ?? basePpd
+    const singleSupp = (season === 'peak' ? hotel.peak_season_single_supplement_eur
+      : season === 'high' ? hotel.high_season_single_supplement_eur
+      : null) ?? baseSupp
+    const tripleRed = (season === 'peak' ? hotel.peak_season_triple_reduction_eur
+      : season === 'high' ? hotel.high_season_triple_reduction_eur
+      : null) ?? baseRed
+
     return {
       hotelName: hotel.property_name || hotel.name,
       ppdNight: ppd,
       singleSuppNight: Math.max(0, singleSupp),
       tripleRedNight: Math.max(0, tripleRed),
+      season,
       source,
     }
   }
@@ -1090,6 +1138,38 @@ export async function getTippingRate(tier: ServiceTier): Promise<number | null> 
  * Build transport cache from database
  * Key format: "service_type|city|duration|area|vehicle_type"
  */
+// The bulk importer (lib/bulk-rate-service.ts, migration 200) writes a WIDE
+// transportation_rates row: no per-row vehicle_type/base_rate_eur, but one rate
+// column per vehicle class (sedan_rate_eur ... bus_rate_eur, each with a
+// _non_eur and capacity_min/max). The engine matches per vehicle_type with a
+// single base_rate_eur, so a wide row is invisible / prices at €0. We expand
+// each wide row into one synthetic tall rate per vehicle class that actually
+// has a rate — reading only real columns (no fabricated defaults).
+const WIDE_VEHICLE_CLASSES: { name: VehicleType; prefix: string }[] = [
+  { name: 'Sedan', prefix: 'sedan' },
+  { name: 'Minivan', prefix: 'minivan' },
+  { name: 'Van', prefix: 'van' },
+  { name: 'Minibus', prefix: 'minibus' },
+  { name: 'Bus', prefix: 'bus' },
+]
+
+function expandWideTransportRow(row: any): any[] {
+  const out: any[] = []
+  for (const { name, prefix } of WIDE_VEHICLE_CLASSES) {
+    const rateEur = Number(row[`${prefix}_rate_eur`]) || 0
+    if (rateEur <= 0) continue // no rate for this class → not a usable option
+    out.push({
+      ...row,
+      vehicle_type: name,
+      base_rate_eur: rateEur,
+      base_rate_non_eur: Number(row[`${prefix}_rate_non_eur`]) || 0,
+      capacity_min: row[`${prefix}_capacity_min`] ?? VEHICLE_CAPACITY[name].min,
+      capacity_max: row[`${prefix}_capacity_max`] ?? VEHICLE_CAPACITY[name].max,
+    })
+  }
+  return out
+}
+
 export async function buildTransportCache(): Promise<Map<string, TransportRate>> {
   const { data: allRates } = await getSupabaseAdmin()
     .from('transportation_rates')
@@ -1100,7 +1180,16 @@ export async function buildTransportCache(): Promise<Map<string, TransportRate>>
 
   if (!allRates) return cache
 
-  for (const r of allRates) {
+  for (const row of allRates) {
+    const wideRow = row as any
+    // A wide bulk-imported row has no vehicle_type but carries per-class rate
+    // columns; expand it. Normal (tall) rows pass through unchanged.
+    const isWide = !wideRow.vehicle_type &&
+      (wideRow.sedan_rate_eur || wideRow.minivan_rate_eur || wideRow.van_rate_eur ||
+       wideRow.minibus_rate_eur || wideRow.bus_rate_eur)
+    const expandedRates = isWide ? expandWideTransportRow(wideRow) : [wideRow]
+
+    for (const r of expandedRates) {
     const rate = r as any
     // Build multiple keys for flexible lookup
     const baseKey = [
@@ -1135,6 +1224,7 @@ export async function buildTransportCache(): Promise<Map<string, TransportRate>>
         rate.vehicle_type || ''
       ].join('|')
       cache.set(intercityKey, rate)
+    }
     }
   }
 
@@ -1330,10 +1420,15 @@ export async function calculateDayBasedPricing(
     }
   }
 
+  // Fetch per-city hotel rates concurrently (deduped cities), then apply in
+  // deterministic order so results/holes match the previous serial version.
   const hotelCities = [...new Set(hotelDays.map(d => d.city))]
   const hotelRatesMap = new Map<string, NonNullable<Awaited<ReturnType<typeof getHotelRates>>>>()
-  for (const city of hotelCities) {
-    const rates = await getHotelRates(city, tier)
+  const hotelResults = await Promise.all(
+    hotelCities.map(city => getHotelRates(city, tier, travelDate))
+  )
+  hotelCities.forEach((city, i) => {
+    const rates = hotelResults[i]
     if (rates && rates.source === 'db') {
       hotelRatesMap.set(city, rates)
     } else {
@@ -1346,14 +1441,17 @@ export async function calculateDayBasedPricing(
         message: `No exact ${tier} hotel rate for ${city}. Add it in Rates → Hotels.`,
       })
     }
-  }
+  })
 
-  const guideRate = await getGuideRate(language, tier)
-  const mealRates = await getMealRates(tier)
-  const tippingRate = await getTippingRate(tier)
-  // Water cost is admin-configurable via Rates → Fixed Costs (fixed_daily_costs);
-  // falls back to €2 (the previous hardcoded value) if the table is empty.
-  const fixedDailyCosts = await getFixedDailyCosts()
+  // These four are independent — fetch concurrently. Water cost is
+  // admin-configurable via Rates → Fixed Costs (fixed_daily_costs); falls back
+  // to €2 (the previous hardcoded value) if the table is empty.
+  const [guideRate, mealRates, tippingRate, fixedDailyCosts] = await Promise.all([
+    getGuideRate(language, tier),
+    getMealRates(tier),
+    getTippingRate(tier),
+    getFixedDailyCosts(),
+  ])
   const waterCostPerPax = fixedDailyCosts.waterPerPersonPerDay
 
   // ============================================
@@ -1622,44 +1720,55 @@ export async function calculateDayBasedPricing(
   }
 
   // ----- Entrance Fees (per pax) -----
+  // Collect unique attractions in first-seen order, fetch all concurrently
+  // (was one serial round-trip per attraction — the main N+1), then apply in
+  // order so the accumulated fee, service list, and holes are unchanged.
   let entranceFeesPerPax = 0
   const processedAttractions = new Set<string>()
-
+  const entranceLookups: { attraction: string; day: any }[] = []
   for (const day of itinerary) {
     for (const attraction of day.attractions) {
-      if (processedAttractions.has(attraction.toLowerCase())) continue
-      processedAttractions.add(attraction.toLowerCase())
-
-      const fee = await getEntranceFee(attraction, isEurPassport)
-      if (fee && fee.source === 'db' && fee.rate > 0) {
-        entranceFeesPerPax += fee.rate
-        services.push({
-          id: `entrance-${fee.id}`,
-          dayNumber: day.day,
-          serviceType: 'entrance',
-          serviceName: fee.name,
-          quantity: 1,
-          quantityMode: 'per_pax',
-          unitCost: fee.rate,
-          lineTotal: fee.rate,
-          rateSource: 'entrance_fees',
-          isPerPax: true,
-          isOptional: false,
-          notes: isEurPassport ? 'EUR rate' : 'non-EUR rate'
-        })
-      } else {
-        addHole({
-          kind: 'entrance',
-          reason: fee ? 'fuzzy' : 'missing',
-          tier,
-          dayNumber: day.day,
-          attraction,
-          lookupAttempted: `entrance fee "${attraction}"`,
-          message: `No exact entrance fee for "${attraction}". Add it in Rates → Attractions.`,
-        })
-      }
+      const key = attraction.toLowerCase()
+      if (processedAttractions.has(key)) continue
+      processedAttractions.add(key)
+      entranceLookups.push({ attraction, day })
     }
   }
+
+  const entranceFees = await Promise.all(
+    entranceLookups.map(l => getEntranceFee(l.attraction, isEurPassport))
+  )
+
+  entranceLookups.forEach(({ attraction, day }, i) => {
+    const fee = entranceFees[i]
+    if (fee && fee.source === 'db' && fee.rate > 0) {
+      entranceFeesPerPax += fee.rate
+      services.push({
+        id: `entrance-${fee.id}`,
+        dayNumber: day.day,
+        serviceType: 'entrance',
+        serviceName: fee.name,
+        quantity: 1,
+        quantityMode: 'per_pax',
+        unitCost: fee.rate,
+        lineTotal: fee.rate,
+        rateSource: 'entrance_fees',
+        isPerPax: true,
+        isOptional: false,
+        notes: isEurPassport ? 'EUR rate' : 'non-EUR rate'
+      })
+    } else {
+      addHole({
+        kind: 'entrance',
+        reason: fee ? 'fuzzy' : 'missing',
+        tier,
+        dayNumber: day.day,
+        attraction,
+        lookupAttempted: `entrance fee "${attraction}"`,
+        message: `No exact entrance fee for "${attraction}". Add it in Rates → Attractions.`,
+      })
+    }
+  })
 
   // ----- External Meals (per pax) -----
   let externalMealsPerPax = 0

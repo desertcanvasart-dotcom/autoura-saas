@@ -68,6 +68,11 @@ export interface Tour {
     daily_breakdown: DailyPricing[]
     totals: TourPricing
     per_person: number
+    /** True only when every priced component had a real rate for the
+     *  requested passport class. When false, totals cover only the priced
+     *  components and `holes` lists the gaps (never guessed defaults). */
+    complete?: boolean
+    holes?: string[]
   }
   
   export interface DailyPricing {

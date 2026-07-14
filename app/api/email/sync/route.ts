@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
 
     // Get Gmail tokens
-    const { data: tokenRecord } = await supabase.from('gmail_tokens').select('access_token, refresh_token, email_address').eq('user_id', userId).single()
+    const { data: tokenRecord } = await supabase.from('gmail_tokens').select('access_token, refresh_token, email').eq('user_id', userId).single()
     if (!tokenRecord) return NextResponse.json({ error: 'Gmail not connected', success: false }, { status: 401 })
 
     let accessToken = tokenRecord.access_token
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     } catch {}
 
     const gmail = getGmailClient(accessToken, tokenRecord.refresh_token)
-    const userEmail = tokenRecord.email_address || ''
+    const userEmail = tokenRecord.email || ''
 
     // Update sync state
     await supabase.from('email_sync_state').upsert({ user_id: userId, sync_status: 'running', updated_at: new Date().toISOString() }, { onConflict: 'user_id' })

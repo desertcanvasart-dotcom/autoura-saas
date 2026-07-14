@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // CONSTANTS
@@ -869,14 +870,14 @@ export default function CruisesPage() {
     ]
 
     const rows = filteredCruises.map(c => [
-      c.cruise_code,
-      c.ship_name,
-      c.ship_category,
-      c.embark_city,
-      c.disembark_city,
-      Array.isArray(c.duration_nights) ? c.duration_nights.join(';') : c.duration_nights,
-      c.cabin_type,
-      c.tier || 'standard',
+      csvCell(c.cruise_code),
+      csvCell(c.ship_name),
+      csvCell(c.ship_category),
+      csvCell(c.embark_city),
+      csvCell(c.disembark_city),
+      csvCell(Array.isArray(c.duration_nights) ? c.duration_nights.join(';') : c.duration_nights),
+      csvCell(c.cabin_type),
+      csvCell(c.tier || 'standard'),
       c.is_preferred ? 'Yes' : 'No',
       c.is_active ? 'Yes' : 'No',
       c.ppd_eur || 0,
@@ -885,36 +886,36 @@ export default function CruisesPage() {
       c.single_supplement_non_eur || 0,
       c.triple_reduction_eur || 0,
       c.triple_reduction_non_eur || 0,
-      c.low_season_start || '',
-      c.low_season_end || '',
+      csvCell(c.low_season_start),
+      csvCell(c.low_season_end),
       c.high_season_ppd_eur || 0,
       c.high_season_ppd_non_eur || 0,
       c.high_season_single_supplement_eur || 0,
       c.high_season_single_supplement_non_eur || 0,
       c.high_season_triple_reduction_eur || 0,
       c.high_season_triple_reduction_non_eur || 0,
-      c.high_season_start || '',
-      c.high_season_end || '',
+      csvCell(c.high_season_start),
+      csvCell(c.high_season_end),
       c.peak_season_ppd_eur || 0,
       c.peak_season_ppd_non_eur || 0,
       c.peak_season_single_supplement_eur || 0,
       c.peak_season_single_supplement_non_eur || 0,
       c.peak_season_triple_reduction_eur || 0,
       c.peak_season_triple_reduction_non_eur || 0,
-      c.peak_season_1_start || '',
-      c.peak_season_1_end || '',
-      c.peak_season_2_start || '',
-      c.peak_season_2_end || '',
-      c.rate_valid_from || '',
-      c.rate_valid_to || '',
-      c.meals_included || 'full_board',
+      csvCell(c.peak_season_1_start),
+      csvCell(c.peak_season_1_end),
+      csvCell(c.peak_season_2_start),
+      csvCell(c.peak_season_2_end),
+      csvCell(c.rate_valid_from),
+      csvCell(c.rate_valid_to),
+      csvCell(c.meals_included || 'full_board'),
       c.sightseeing_included ? 'Yes' : 'No',
-      (c.notes || '').replace(/"/g, '""')
+      csvCell(c.notes)
     ])
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map(row => row.join(','))
     ].join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })

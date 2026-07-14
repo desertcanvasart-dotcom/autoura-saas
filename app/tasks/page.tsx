@@ -38,6 +38,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface TeamMember {
   id: string
@@ -120,6 +121,7 @@ const PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3 }
 const STATUS_ORDER = { todo: 0, in_progress: 1, done: 2 }
 
 export default function TasksPage() {
+  const dialog = useConfirmDialog()
   const [tasks, setTasks] = useState<Task[]>([])
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -346,7 +348,7 @@ export default function TasksPage() {
     const doneTasks = tasks.filter(t => t.status === 'done' && !t.archived)
     if (doneTasks.length === 0) return
     
-    if (!confirm(`Archive ${doneTasks.length} completed task${doneTasks.length > 1 ? 's' : ''}?`)) return
+    if (!(await dialog.confirm({ message: `Archive ${doneTasks.length} completed task${doneTasks.length > 1 ? 's' : ''}?` }))) return
 
     setArchiving('bulk')
     try {
@@ -384,7 +386,7 @@ export default function TasksPage() {
   }
 
   const handleDelete = async (task: Task) => {
-    if (!confirm(`Delete task "${task.title}"?`)) return
+    if (!(await dialog.confirm({ message: `Delete task "${task.title}"?`, variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {

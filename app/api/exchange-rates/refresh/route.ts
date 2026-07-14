@@ -1,18 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { fetchAllExchangeRates } from '@/lib/exchange-rate-api'
 
-// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
 function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
+  return createAdminClient()
+}
+
+/**
+ * Authorize either a logged-in user session OR a cron caller presenting
+ * the x-cron-secret header. Fails closed if CRON_SECRET is unset.
+ * Returns null when authorized, or an error response otherwise.
+ */
+async function authorizeSessionOrCron(request: NextRequest): Promise<NextResponse | null> {
+  const cronSecret = process.env.CRON_SECRET
+  const headerSecret = request.headers.get('x-cron-secret')
+  if (cronSecret && headerSecret === cronSecret) {
+    return null
+  }
+
+  const authResult = await requireAuth()
+  if (authResult.error) {
+    return NextResponse.json(
+      { success: false, error: authResult.error },
+      { status: authResult.status }
     )
   }
-  return _supabaseAdmin
+  return null
 }
 
 /**
@@ -29,6 +42,11 @@ function getSupabaseAdmin() {
  */
 export async function POST(request: NextRequest) {
   try {
+    const authError = await authorizeSessionOrCron(request)
+    if (authError) {
+      return authError
+    }
+
     const { searchParams } = new URL(request.url)
     const force = searchParams.get('force') === 'true'
 
@@ -145,8 +163,13 @@ export async function POST(request: NextRequest) {
  *
  * Check the status of exchange rates (when last fetched, etc.)
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const authError = await authorizeSessionOrCron(request)
+    if (authError) {
+      return authError
+    }
+
     const { data: rates, error } = await (getSupabaseAdmin() as any)
       .from('exchange_rates')
       .select('*')

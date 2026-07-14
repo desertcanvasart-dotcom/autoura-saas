@@ -3,6 +3,7 @@
 // Unified branding with Travel2Egypt / Autoura colors
 
 import jsPDF from 'jspdf'
+import { formatDateOnly, daysBetween } from '@/lib/date-utils'
 
 interface ServiceItem {
   date?: string
@@ -302,8 +303,8 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     pdf.setFontSize(10)
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
-    const checkInDate = doc.check_in ? new Date(doc.check_in).toLocaleDateString('en-US', { 
-      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' 
+    const checkInDate = doc.check_in ? formatDateOnly(doc.check_in, 'en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
     }) : '—'
     pdf.text(checkInDate, margin + 4, y + 14)
     
@@ -318,8 +319,8 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     pdf.setFontSize(10)
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
-    const checkOutDate = doc.check_out ? new Date(doc.check_out).toLocaleDateString('en-US', { 
-      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' 
+    const checkOutDate = doc.check_out ? formatDateOnly(doc.check_out, 'en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
     }) : '—'
     pdf.text(checkOutDate, margin + dateBoxWidth + 10, y + 14)
     
@@ -330,7 +331,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
 
     let nights = 0
     if (doc.check_in && doc.check_out) {
-      nights = Math.ceil((new Date(doc.check_out).getTime() - new Date(doc.check_in).getTime()) / (1000 * 60 * 60 * 24))
+      nights = daysBetween(doc.check_in, doc.check_out)
     }
 
     pdf.setFontSize(7)
@@ -361,8 +362,8 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     pdf.setFontSize(10)
     pdf.setFont('helvetica', 'bold')
     pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
-    const serviceDate = doc.service_date ? new Date(doc.service_date).toLocaleDateString('en-US', { 
-      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' 
+    const serviceDate = doc.service_date ? formatDateOnly(doc.service_date, 'en-US', {
+      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
     }) : '—'
     pdf.text(serviceDate, margin + 4, y + 14)
     

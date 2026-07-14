@@ -11,10 +11,11 @@ import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import { generateWhatsAppMessage, generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
 import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import ItineraryPL from '@/app/components/ItineraryPL'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@/app/supabase'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
 import PDFPreviewModal from '@/app/components/PDFPreviewModal'
 import ItineraryExpenses from '@/app/components/ItineraryExpenses'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface Itinerary {
   id: string
@@ -199,7 +200,7 @@ export default function ViewItineraryPage() {
       }
     } catch (error) {
       console.error('Error updating cost mode:', error)
-      alert('Failed to update cost mode')
+      showToast('error', 'Failed to update cost mode')
     } finally {
       setSavingCostMode(false)
     }
@@ -219,7 +220,7 @@ export default function ViewItineraryPage() {
   const handleSaveServiceCost = async (serviceId: string, dayId: string) => {
     const newCost = parseFloat(editedCost)
     if (isNaN(newCost) || newCost < 0) {
-      alert('Please enter a valid cost')
+      showToast('error', 'Please enter a valid cost')
       return
     }
 
@@ -270,7 +271,7 @@ export default function ViewItineraryPage() {
       setEditedCost('')
     } catch (error) {
       console.error('Error updating service cost:', error)
-      alert('Failed to update cost')
+      showToast('error', 'Failed to update cost')
     } finally {
       setSavingServiceCost(false)
     }
@@ -290,11 +291,11 @@ export default function ViewItineraryPage() {
         setCommissionResult(`✅ ${result.message}`)
         setTimeout(() => setCommissionResult(null), 5000)
       } else {
-        alert(result.error || 'Failed to generate commissions')
+        showToast('error', result.error || 'Failed to generate commissions')
       }
     } catch (error) {
       console.error('Error generating commissions:', error)
-      alert('Failed to generate commissions')
+      showToast('error', 'Failed to generate commissions')
     } finally {
       setGeneratingCommissions(false)
     }
@@ -398,11 +399,11 @@ export default function ViewItineraryPage() {
         router.push(`/invoices/${invoice.id}`)
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to create invoice')
+        showToast('error', error.error || 'Failed to create invoice')
       }
     } catch (error) {
       console.error('Error creating invoice:', error)
-      alert('Failed to create invoice')
+      showToast('error', 'Failed to create invoice')
     } finally {
       setGeneratingInvoice(false)
     }
@@ -420,7 +421,7 @@ export default function ViewItineraryPage() {
       setShowPdfPreview(true)
     } catch (error) {
       console.error('Error generating PDF:', error)
-      alert('Failed to generate PDF. Please try again.')
+      showToast('error', 'Failed to generate PDF. Please try again.')
     } finally {
       setGeneratingPDF(false)
     }
@@ -442,7 +443,7 @@ export default function ViewItineraryPage() {
     if (!itinerary) return
   
     if (!itinerary.client_phone) {
-      alert('Client phone number is required for WhatsApp. Please add it in edit mode.')
+      showToast('error', 'Client phone number is required for WhatsApp. Please add it in edit mode.')
       return
     }
   
@@ -471,7 +472,7 @@ export default function ViewItineraryPage() {
       setTimeout(() => setSendSuccess(null), 5000)
     } catch (error: any) {
       console.error('WhatsApp send error:', error)
-      alert(`Failed to send WhatsApp: ${error.message}`)
+      showToast('error', `Failed to send WhatsApp: ${error.message}`)
     } finally {
       setSendingEmail(false)
     }
@@ -481,7 +482,7 @@ export default function ViewItineraryPage() {
     if (!itinerary || days.length === 0) return
 
     if (!itinerary.client_email) {
-      alert('Client email is required. Please add it in edit mode.')
+      showToast('error', 'Client email is required. Please add it in edit mode.')
       return
     }
 
@@ -519,7 +520,7 @@ export default function ViewItineraryPage() {
       }
     } catch (error) {
       console.error('Error sending email:', error)
-      alert(`Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      showToast('error', `Failed to send email: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setSendingEmail(false)
     }

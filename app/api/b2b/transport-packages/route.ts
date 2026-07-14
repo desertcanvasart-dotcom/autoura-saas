@@ -1,29 +1,25 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // B2B TRANSPORT PACKAGES API
 // File: app/api/b2b/transport-packages/route.ts
 // ============================================
 
-// Lazy-initialized Supabase admin client (avoids build-time errors)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
-
 export async function GET() {
   try {
-    const { data, error } = await (getSupabaseAdmin() as any)
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
+    const { data, error } = await (createAdminClient() as any)
       .from('b2b_transport_packages')
       .select('*')
+      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
       .order('package_name')
 
     if (error) {
@@ -40,11 +36,20 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const body = await request.json()
 
-    const { data, error } = await (getSupabaseAdmin() as any)
+    const { data, error } = await (createAdminClient() as any)
       .from('b2b_transport_packages')
       .insert({
+        tenant_id: authResult.tenant_id,
         package_code: body.package_code || `PKG-${Date.now()}`,
         package_name: body.package_name,
         package_type: body.package_type || 'cruise_sightseeing',

@@ -6,6 +6,7 @@ import AccommodationSelector from './AccommodationSelector'
 import MealSelector from './MealSelector'
 import AdditionalServices from './AdditionalServices'
 import ActivityBuilder from './ActivityBuilder'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface DayPlannerProps {
   tour: Tour
@@ -25,6 +26,7 @@ export default function DayPlanner({
   onNext
 }: DayPlannerProps) {
   const [selectedDay, setSelectedDay] = useState(0)
+  const dialog = useConfirmDialog()
 
   if (!tour.days || tour.days.length === 0) {
     return <div>No days to plan</div>
@@ -232,8 +234,8 @@ export default function DayPlanner({
       {/* Quick Actions */}
       <div className="mt-6 flex gap-3">
         <button
-          onClick={() => {
-            if (confirm('Copy settings to all days?')) {
+          onClick={async () => {
+            if (await dialog.confirm({ message: 'Copy settings to all days?' })) {
               tour.days?.forEach((_, index) => {
                 if (index !== selectedDay) {
                   onDayUpdate(index, {
@@ -249,8 +251,8 @@ export default function DayPlanner({
           📋 Copy to All Days
         </button>
         <button
-          onClick={() => {
-            if (confirm('Clear all settings for this day?')) {
+          onClick={async () => {
+            if (await dialog.confirm({ message: 'Clear all settings for this day?', variant: 'danger', confirmText: 'Delete' })) {
               onDayUpdate(selectedDay, {
                 day_number: currentDay.day_number,
                 city: currentDay.city,

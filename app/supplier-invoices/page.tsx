@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Receipt, Plus, Search, Upload, Loader2, X, Sparkles } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
 
 const SYM: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
 const money = (n: number, c = 'EUR') => `${SYM[c] || c + ' '}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -83,7 +84,7 @@ export default function SupplierInvoicesPage() {
       })
       const data = await res.json()
       if (data.success) { setShowModal(false); setForm({ ...BLANK }); setParseNote(null); router.push(`/supplier-invoices/${data.data.id}`) }
-      else alert(data.error || 'Failed to create')
+      else showToast('error', data.error || 'Failed to create')
     } catch (e) { console.error(e) } finally { setSaving(false) }
   }
 

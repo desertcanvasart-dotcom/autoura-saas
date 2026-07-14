@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Loader2, Trash2, Edit3, X, Save, BookOpen, FileText, MapPin, HelpCircle, Sparkles, Power, Upload, Check } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 type SourceType = 'kb_faq' | 'kb_policy' | 'kb_tour' | 'kb_custom'
 
@@ -26,6 +27,7 @@ const TYPE_META: Record<SourceType, { label: string; icon: React.ComponentType<{
 type Tone = 'professional' | 'friendly' | 'formal'
 
 export default function CopilotKnowledgePage() {
+  const dialog = useConfirmDialog()
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<SourceType | 'all'>('all')
@@ -74,7 +76,7 @@ export default function CopilotKnowledgePage() {
   }
 
   const remove = async (entry: Entry) => {
-    if (!confirm(`Delete "${entry.title || entry.query_text.slice(0, 40)}"?`)) return
+    if (!(await dialog.confirm({ message: `Delete "${entry.title || entry.query_text.slice(0, 40)}"?`, variant: 'danger', confirmText: 'Delete' }))) return
     await fetch(`/api/copilot/knowledge/${entry.id}`, { method: 'DELETE' })
     setEntries((prev) => prev.filter((e) => e.id !== entry.id))
   }

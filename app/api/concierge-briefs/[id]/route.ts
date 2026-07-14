@@ -67,12 +67,17 @@ export async function PATCH(
       .from('concierge_briefs')
       .update({ review_status: reviewStatus })
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select('id, review_status')
-      .single()
+      .maybeSingle()
 
     if (error) {
       console.error('Error updating concierge brief:', error.message)
       return NextResponse.json({ success: false, error: 'Failed to update brief' }, { status: 500 })
+    }
+
+    if (!data) {
+      return NextResponse.json({ success: false, error: 'Brief not found' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true, data })

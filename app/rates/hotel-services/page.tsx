@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // CONSTANTS
@@ -322,12 +323,12 @@ export default function HotelServicesPage() {
     const csvContent = [
       headers.join(','),
       ...filteredRates.map(rate => [
-        `"${rate.service_code || ''}"`,
-        `"${rate.service_type}"`,
-        `"${rate.hotel_category}"`,
+        csvCell(rate.service_code),
+        csvCell(rate.service_type),
+        csvCell(rate.hotel_category),
         rate.rate_eur,
-        `"${(rate.description || '').replace(/"/g, '""')}"`,
-        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        csvCell(rate.description),
+        csvCell(rate.notes),
         rate.is_active
       ].join(','))
     ].join('\n')

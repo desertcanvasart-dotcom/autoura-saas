@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
 // DEPARTURE AVAILABILITY CHECK API
@@ -46,9 +46,16 @@ interface CheckResult {
  */
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const body = await request.json()
     const {
-      tenant_id,
       tour_name,
       template_id,
       start_date,
@@ -56,14 +63,10 @@ export async function POST(request: NextRequest) {
       num_travelers = 1
     } = body
 
-    if (!tenant_id) {
-      return NextResponse.json(
-        { success: false, error: 'tenant_id is required' },
-        { status: 400 }
-      )
-    }
+    // Tenant is derived from the authenticated session, never from the request body
+    const tenant_id = authResult.tenant_id
 
-    // Use admin client since this is called by AI agent
+    // Admin client (bypasses RLS); all queries are scoped to the session tenant below
     const supabase = createAdminClient()
 
     // Build query

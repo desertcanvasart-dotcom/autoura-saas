@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-// Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
     const city = searchParams.get('city')
     const serviceType = searchParams.get('serviceType')
@@ -23,12 +18,13 @@ export async function GET(request: NextRequest) {
     const supplierId = searchParams.get('supplier_id')
     const activeOnly = searchParams.get('activeOnly') === 'true'
 
-    let query = (getSupabaseAdmin() as any)
+    let query = (createAdminClient() as any)
       .from('transportation_rates')
       .select(`
         *,
         supplier:supplier_id (id, name, city, contact_phone, contact_email)
       `)
+      .eq('tenant_id', authResult.tenant_id)
       .order('city', { ascending: true })
       .order('service_type', { ascending: true })
       .order('vehicle_type', { ascending: true })
@@ -68,6 +64,14 @@ function getMinCapacityForVehicle(vehicleType: string): number {
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const body = await request.json()
 
     if (!body.city || !body.vehicle_type || !body.service_type) {
@@ -82,6 +86,7 @@ export async function POST(request: NextRequest) {
       `${body.city.toUpperCase().replace(/\s+/g, '-')}-${body.service_type.toUpperCase().replace(/_/g, '-')}-${body.vehicle_type.toUpperCase()}`
 
     const newRate = {
+      tenant_id: authResult.tenant_id,
       service_code: serviceCode,
       service_type: body.service_type,
       vehicle_type: body.vehicle_type,
@@ -100,7 +105,7 @@ export async function POST(request: NextRequest) {
       destination_city: body.destination_city || null
     }
 
-    const { data, error } = await (getSupabaseAdmin() as any)
+    const { data, error } = await (createAdminClient() as any)
       .from('transportation_rates')
       .insert([newRate])
       .select(`*, supplier:supplier_id (id, name, city)`)

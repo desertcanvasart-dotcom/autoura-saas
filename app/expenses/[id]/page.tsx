@@ -20,6 +20,8 @@ import {
   X,
   MapPin
 } from 'lucide-react'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Expense {
   id: string
@@ -110,6 +112,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
   const [itinerary, setItinerary] = useState<Itinerary | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const dialog = useConfirmDialog()
 
   useEffect(() => {
     fetchExpense()
@@ -167,11 +170,11 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
       if (response.ok) {
         fetchExpense()
       } else {
-        alert('Failed to update status')
+        showToast('error', 'Failed to update status')
       }
     } catch (error) {
       console.error('Error updating expense:', error)
-      alert('Failed to update status')
+      showToast('error', 'Failed to update status')
     } finally {
       setUpdating(false)
     }
@@ -179,18 +182,18 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
 
   const handleDelete = async () => {
     if (!expense) return
-    if (!confirm('Are you sure you want to delete this expense? This action cannot be undone.')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to delete this expense? This action cannot be undone.', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/expenses/${expense.id}`, { method: 'DELETE' })
       if (response.ok) {
         router.push('/expenses')
       } else {
-        alert('Failed to delete expense')
+        showToast('error', 'Failed to delete expense')
       }
     } catch (error) {
       console.error('Error deleting expense:', error)
-      alert('Failed to delete expense')
+      showToast('error', 'Failed to delete expense')
     }
   }
 

@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase-server'
 import { getTokensFromCode, getUserEmail } from '@/lib/gmail'
 import { verifyState } from '@/lib/oauth-state'
 
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
 function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
+  return createAdminClient()
 }
 
 export async function GET(request: NextRequest) {

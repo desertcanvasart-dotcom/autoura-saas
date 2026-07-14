@@ -35,6 +35,7 @@ import {
   Banknote
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // Egyptian cities
 const EGYPT_CITIES = [
@@ -462,24 +463,24 @@ export default function ActivityRatesContent() {
     const csvContent = [
       headers.join(','),
       ...filteredRates.map(rate => [
-        `"${rate.service_code || ''}"`,
-        `"${(rate.activity_name || '').replace(/"/g, '""')}"`,
-        `"${rate.activity_category || ''}"`,
-        `"${rate.activity_type || ''}"`,
-        `"${rate.duration || ''}"`,
-        `"${rate.city || ''}"`,
+        csvCell(rate.service_code),
+        csvCell(rate.activity_name),
+        csvCell(rate.activity_category),
+        csvCell(rate.activity_type),
+        csvCell(rate.duration),
+        csvCell(rate.city),
         rate.base_rate_eur || 0,
         rate.base_rate_non_eur || 0,
-        `"${rate.pricing_type || 'per_person'}"`,
-        `"${rate.unit_label || ''}"`,
+        csvCell(rate.pricing_type || 'per_person'),
+        csvCell(rate.unit_label),
         rate.min_capacity || 1,
         rate.max_capacity || 99,
-        `"${rate.season || ''}"`,
-        `"${rate.rate_valid_from || ''}"`,
-        `"${rate.rate_valid_to || ''}"`,
-        `"${rate.supplier_id || ''}"`,
-        `"${(rate.supplier_name || '').replace(/"/g, '""')}"`,
-        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        csvCell(rate.season),
+        csvCell(rate.rate_valid_from),
+        csvCell(rate.rate_valid_to),
+        csvCell(rate.supplier_id),
+        csvCell(rate.supplier_name),
+        csvCell(rate.notes),
         rate.is_active ? 'true' : 'false'
       ].join(','))
     ].join('\n')

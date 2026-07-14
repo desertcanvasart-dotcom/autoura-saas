@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAuthenticatedClient, createAdminClient } from '@/lib/supabase-server';
+import { requireAuth, createAdminClient } from '@/lib/supabase-server';
 
 /**
  * POST /api/quotes/b2c/from-itinerary
@@ -10,17 +10,16 @@ import { createAuthenticatedClient, createAdminClient } from '@/lib/supabase-ser
  */
 export async function POST(request: NextRequest) {
   try {
-    // Use authenticated client - RLS will automatically filter by tenant
-    const supabase = await createAuthenticatedClient()
-
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({
-        success: false,
-        error: 'Not authenticated'
-      }, { status: 401 })
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
     }
+
+    // Admin client with explicit tenant scoping (auth gate above is the security boundary)
+    const supabase = createAdminClient()
 
     const body = await request.json();
     const {
@@ -41,7 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Fetch the itinerary with all its services
+    // 1. Fetch the itinerary with all its services (tenant-scoped)
     const { data: itinerary, error: itinError } = await supabase
       .from('itineraries')
       .select(`
@@ -50,7 +49,8 @@ export async function POST(request: NextRequest) {
         itinerary_services (*)
       `)
       .eq('id', itinerary_id)
-      .single();
+      .eq('tenant_id', authResult.tenant_id)
+      .maybeSingle();
 
     if (itinError || !itinerary) {
       return NextResponse.json(
@@ -112,8 +112,7 @@ export async function POST(request: NextRequest) {
     const price_per_person = selling_price / num_travelers;
 
     // 3. Generate quote number (requires admin client for RPC)
-    const supabaseAdmin = createAdminClient()
-    const { data: quoteNumber, error: seqError } = await supabaseAdmin
+    const { data: quoteNumber, error: seqError } = await supabase
       .rpc('generate_b2c_quote_number');
 
     if (seqError) {
@@ -128,7 +127,7 @@ export async function POST(request: NextRequest) {
     const { data: quote, error: quoteError } = await supabase
       .from('b2c_quotes')
       .insert({
-        tenant_id: itinerary.tenant_id,
+        tenant_id: authResult.tenant_id,
         itinerary_id,
         client_id: client_id || itinerary.client_id,
         quote_number: quoteNumber,

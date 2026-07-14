@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // CONSTANTS
@@ -362,13 +363,13 @@ export default function AirportServicesPage() {
     const csvContent = [
       headers.join(','),
       ...filteredRates.map(rate => [
-        `"${rate.service_code || ''}"`,
-        `"${rate.airport_code}"`,
-        `"${rate.service_type}"`,
-        `"${rate.direction}"`,
+        csvCell(rate.service_code),
+        csvCell(rate.airport_code),
+        csvCell(rate.service_type),
+        csvCell(rate.direction),
         rate.rate_eur,
-        `"${(rate.description || '').replace(/"/g, '""')}"`,
-        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        csvCell(rate.description),
+        csvCell(rate.notes),
         rate.is_active
       ].join(','))
     ].join('\n')

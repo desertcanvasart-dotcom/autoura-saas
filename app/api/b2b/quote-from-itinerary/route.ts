@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
         // Try B2B pricing rules
         if (serviceType === 'entrance' || serviceType === 'entrance_fee' || serviceType === 'activity') {
-          const { data: rules } = await supabase.from('b2b_pricing_rules').select('*').eq('is_active', true).ilike('service_name', `%${serviceName.split(' ')[0]}%`).limit(1)
+          const { data: rules } = await supabase.from('b2b_pricing_rules').select('*').or(`tenant_id.eq.${tenant_id},tenant_id.is.null`).eq('is_active', true).ilike('service_name', `%${serviceName.split(' ')[0]}%`).limit(1)
           if (rules?.length) {
             const rule = rules[0]
             const rate = numPax <= (rule.tier1_max_pax || 999) ? rule.tier1_rate_eur : (rule.tier2_rate_eur || rule.tier1_rate_eur)

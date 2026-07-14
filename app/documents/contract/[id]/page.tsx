@@ -6,6 +6,7 @@ import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import Link from 'next/link'
 import { ArrowLeft, Download, Eye, Edit2, Plus, X, Loader2 } from 'lucide-react'
 import { generateContractPDF } from '@/lib/contract-pdf-generator'
+import { showToast } from '@/app/contexts/ToastContext'
 
 interface Itinerary {
   id: string
@@ -195,7 +196,7 @@ export default function ContractPage() {
       document.body.removeChild(a)
     } catch (error) {
       console.error('Error downloading PDF:', error)
-      alert('Failed to download contract')
+      showToast('error', 'Failed to download contract')
     } finally {
       setSaving(false)
     }
@@ -273,7 +274,7 @@ export default function ContractPage() {
                 clientPhone={itinerary.client_phone}
                 clientName={itinerary.client_name}
                 onSuccess={() => {
-                  alert('Contract sent via WhatsApp! ✅')
+                  showToast('success', 'Contract sent via WhatsApp! ✅')
                 }}
               />
             )}

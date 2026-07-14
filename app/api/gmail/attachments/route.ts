@@ -1,31 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import { createClient } from '@supabase/supabase-js'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
-
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // GET /api/gmail/attachments?userId=xxx&messageId=xxx&attachmentId=xxx&filename=xxx
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate user first
-    const authClient = await createAuthenticatedClient()
-    const { data: { user }, error: authError } = await authClient.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    // Authenticate user first (session + active tenant membership)
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
     }
+    const user = authResult.user!
+    const supabase = createAdminClient()
 
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -46,7 +35,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user's Gmail tokens
-    const { data: tokenData, error: tokenError } = await (getSupabase() as any)
+    const { data: tokenData, error: tokenError } = await (supabase as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -75,7 +64,7 @@ export async function GET(request: NextRequest) {
     if (new Date(tokenData.token_expiry) < new Date()) {
       const { credentials } = await oauth2Client.refreshAccessToken()
       
-      await (getSupabase() as any)
+      await (supabase as any)
         .from('gmail_tokens')
         .update({
           access_token: credentials.access_token,

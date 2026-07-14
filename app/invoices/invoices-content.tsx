@@ -16,6 +16,8 @@ import {
   Wallet
 } from 'lucide-react'
 import Link from 'next/link'
+import { showToast } from '@/app/contexts/ToastContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Invoice {
   id: string
@@ -130,6 +132,7 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; ic
 }
 
 export default function InvoicesContent() {
+  const dialog = useConfirmDialog()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [itineraries, setItineraries] = useState<Itinerary[]>([])
@@ -440,29 +443,29 @@ export default function InvoicesContent() {
         fetchInvoices()
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to create invoice')
+        showToast('error', error.error || 'Failed to create invoice')
       }
     } catch (error) {
       console.error('Error creating invoice:', error)
-      alert('Failed to create invoice')
+      showToast('error', 'Failed to create invoice')
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this invoice?')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to delete this invoice?', variant: 'danger', confirmText: 'Delete' }))) return
 
     try {
       const response = await fetch(`/api/invoices/${id}`, { method: 'DELETE' })
       if (response.ok) {
         fetchInvoices()
       } else {
-        alert('Failed to delete invoice')
+        showToast('error', 'Failed to delete invoice')
       }
     } catch (error) {
       console.error('Error deleting invoice:', error)
-      alert('Failed to delete invoice')
+      showToast('error', 'Failed to delete invoice')
     }
   }
 

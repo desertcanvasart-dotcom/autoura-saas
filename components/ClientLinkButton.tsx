@@ -12,6 +12,7 @@ import {
   ExternalLink
 } from 'lucide-react'
 import Link from 'next/link'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Client {
   id: string
@@ -46,6 +47,7 @@ export default function ClientLinkButton({
   onLinkChange,
   className = ''
 }: ClientLinkButtonProps) {
+  const dialog = useConfirmDialog()
   const [linkedClient, setLinkedClient] = useState<Client | null>(null)
   const [linkId, setLinkId] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -134,7 +136,7 @@ export default function ClientLinkButton({
   }
 
   const handleUnlink = async () => {
-    if (!confirm('Remove link to this client?')) return
+    if (!(await dialog.confirm({ message: 'Remove link to this client?', variant: 'danger', confirmText: 'Remove' }))) return
 
     setLinking(true)
     try {

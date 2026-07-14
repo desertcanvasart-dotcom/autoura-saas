@@ -2,11 +2,20 @@
 // Location: /app/api/tours/calculate/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/supabase-server'
 import { calculateTourPricing, validateTour } from '@/lib/tourCalculator'
 import { Tour, TourCalculationInput } from '@/app/tour-builder/types'
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+
     const body: TourCalculationInput = await request.json()
     
     const { tour, pax, is_euro_passport } = body

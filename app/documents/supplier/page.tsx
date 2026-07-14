@@ -7,6 +7,7 @@ import {
   Hotel, Car, Ship, MapPin, Users, CheckCircle,
   Clock, RotateCcw
 } from 'lucide-react'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface SupplierDocument {
   id: string
@@ -56,6 +57,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function SupplierDocumentsPage() {
+  const dialog = useConfirmDialog()
   const [documents, setDocuments] = useState<SupplierDocument[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -120,7 +122,7 @@ export default function SupplierDocumentsPage() {
   }
 
   const handleDelete = async (docId: string) => {
-    if (!confirm('Are you sure you want to delete this document?')) return
+    if (!(await dialog.confirm({ message: 'Are you sure you want to delete this document?', variant: 'danger', confirmText: 'Delete' }))) return
     
     try {
       const response = await fetch(`/api/supplier-documents/${docId}`, {

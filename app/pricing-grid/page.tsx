@@ -11,6 +11,7 @@ import ClientInfoBar from './components/ClientInfoBar'
 import InputPanel from './components/InputPanel'
 import DayRow from './components/DayRow'
 import GridSummary from './components/GridSummary'
+import { showToast } from '@/app/contexts/ToastContext'
 
 // ============================================
 // LOCAL STORAGE PERSISTENCE
@@ -477,11 +478,11 @@ function PricingGridContent() {
           ...(meta?.clientName && !prev.clientName && { clientName: meta.clientName }),
         }))
       } else {
-        alert(data.error || 'Failed to parse text')
+        showToast('error', data.error || 'Failed to parse text')
       }
     } catch (err) {
       console.error('Parse error:', err)
-      alert('Failed to parse text')
+      showToast('error', 'Failed to parse text')
     } finally {
       setIsParsing(false)
     }
@@ -495,7 +496,7 @@ function PricingGridContent() {
       const headerData = await headerRes.json()
 
       if (!headerData.success || !headerData.data) {
-        alert('Failed to load itinerary')
+        showToast('error', 'Failed to load itinerary')
         return
       }
 
@@ -557,7 +558,7 @@ function PricingGridContent() {
       }
     } catch (err) {
       console.error('Load error:', err)
-      alert('Failed to load itinerary')
+      showToast('error', 'Failed to load itinerary')
     }
   }
 
@@ -579,7 +580,7 @@ function PricingGridContent() {
   // --- Save to Database ---
   const handleSave = async () => {
     if (days.length === 0) {
-      alert('No days to save. Parse or add days first.')
+      showToast('error', 'No days to save. Parse or add days first.')
       return
     }
 
@@ -655,11 +656,11 @@ function PricingGridContent() {
           setSaveMessage(`Saved as ${data.itineraryCode}`)
         }
       } else {
-        alert(`Save failed: ${data.error}`)
+        showToast('error', `Save failed: ${data.error}`)
       }
     } catch (err: any) {
       console.error('Save error:', err)
-      alert(`Failed to save itinerary: ${err?.message || 'Network error'}`)
+      showToast('error', `Failed to save itinerary: ${err?.message || 'Network error'}`)
     } finally {
       setIsSaving(false)
     }

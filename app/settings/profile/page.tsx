@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { showToast } from '@/app/contexts/ToastContext'
 import { 
   User, 
   Mail, 
@@ -91,7 +92,7 @@ export default function ProfilePage() {
     e.preventDefault()
     setLoading(true)
     setTimeout(() => {
-      alert('Profile updated successfully!')
+      showToast('success', 'Profile updated successfully!')
       setLoading(false)
     }, 1000)
   }
@@ -99,16 +100,16 @@ export default function ProfilePage() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (passwordData.newPassword !== passwordData.confirmPassword) {
-      alert('New passwords do not match!')
+      showToast('error', 'New passwords do not match!')
       return
     }
     if (passwordData.newPassword.length < 8) {
-      alert('Password must be at least 8 characters long!')
+      showToast('error', 'Password must be at least 8 characters long!')
       return
     }
     setLoading(true)
     setTimeout(() => {
-      alert('Password changed successfully!')
+      showToast('success', 'Password changed successfully!')
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
       setLoading(false)
     }, 1000)

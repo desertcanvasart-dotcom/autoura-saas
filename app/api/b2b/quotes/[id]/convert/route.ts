@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
 // ============================================
@@ -7,17 +7,9 @@ import { checkAmountDeliverable } from '@/lib/pricing-guards'
 // File: app/api/b2b/quotes/[id]/convert/route.ts
 // ============================================
 
-// Lazy-initialized Supabase admin client (avoids build-time errors)
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null
-
+// Service-role client (auth is enforced per-handler via requireAuth)
 function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    _supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabaseAdmin
+  return createAdminClient()
 }
 
 export async function POST(
@@ -25,6 +17,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
+    }
+    const tenantId = authResult.tenant_id
+
     const { id } = await params
     const body = await request.json()
     const { user_id } = body
@@ -43,6 +44,7 @@ export async function POST(
         b2b_partners (company_name, partner_code)
       `)
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .single()
 
     if (quoteError || !quote) {
@@ -77,6 +79,7 @@ export async function POST(
       const { data: existingClient } = await (getSupabaseAdmin() as any)
         .from('clients')
         .select('id')
+        .eq('tenant_id', tenantId)
         .eq('email', q.client_email)
         .single()
 
@@ -87,6 +90,7 @@ export async function POST(
         const { data: newClient } = await (getSupabaseAdmin() as any)
           .from('clients')
           .insert({
+            tenant_id: tenantId,
             first_name: nameParts[0] || 'Unknown',
             last_name: nameParts.slice(1).join(' ') || '',
             email: q.client_email,
@@ -104,7 +108,7 @@ export async function POST(
 
     // Generate itinerary code
     const year = new Date().getFullYear().toString().slice(-2)
-    const { count } = await (getSupabaseAdmin() as any).from('itineraries').select('*', { count: 'exact', head: true })
+    const { count } = await (getSupabaseAdmin() as any).from('itineraries').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId)
     const itineraryNumber = ((count || 0) + 1).toString().padStart(3, '0')
     const itineraryCode = `ITN-${year}-${itineraryNumber}`
 
@@ -115,6 +119,7 @@ export async function POST(
     const { data: itinerary, error: itinError } = await (getSupabaseAdmin() as any)
       .from('itineraries')
       .insert({
+        tenant_id: tenantId,
         itinerary_code: itineraryCode,
         client_id: clientId,
         client_name: q.client_name || 'B2B Client',
@@ -158,6 +163,7 @@ export async function POST(
       const { data: itinDay } = await (getSupabaseAdmin() as any)
         .from('itinerary_days')
         .insert({
+          tenant_id: tenantId,
           itinerary_id: itin.id,
           day_number: dayNum,
           date: dayDate.toISOString().split('T')[0],
@@ -180,6 +186,7 @@ export async function POST(
         await (getSupabaseAdmin() as any)
           .from('itinerary_services')
           .insert({
+            tenant_id: tenantId,
             itinerary_day_id: (itinDay as any).id,
             service_type: service.service_category || 'other',
             service_name: service.service_name,
@@ -202,6 +209,7 @@ export async function POST(
         converted_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('tenant_id', tenantId)
 
     return NextResponse.json({
       success: true,

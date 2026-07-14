@@ -4,6 +4,7 @@
 // ============================================
 
 import { jsPDF } from 'jspdf'
+import { formatDateOnly } from '@/lib/date-utils'
 
 // ============================================
 // TYPES
@@ -105,17 +106,12 @@ function cleanDayTitle(title: string, dayNumber: number): string {
  */
 function formatDate(dateStr: string): string {
   if (!dateStr) return ''
-  try {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-GB', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    })
-  } catch {
-    return dateStr
-  }
+  return formatDateOnly(dateStr, 'en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
 }
 
 /**
@@ -123,15 +119,10 @@ function formatDate(dateStr: string): string {
  */
 function formatShortDate(dateStr: string): string {
   if (!dateStr) return ''
-  try {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short'
-    })
-  } catch {
-    return dateStr
-  }
+  return formatDateOnly(dateStr, 'en-GB', {
+    day: 'numeric',
+    month: 'short'
+  })
 }
 
 /**

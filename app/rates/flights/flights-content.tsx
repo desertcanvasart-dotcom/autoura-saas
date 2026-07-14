@@ -26,6 +26,7 @@ import {
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
 import { useCurrency } from '@/hooks/useCurrency'
+import { csvCell } from '@/lib/finance-export'
 
 interface FlightRate {
   id: string
@@ -504,25 +505,25 @@ export default function FlightsContent() {
 
     filteredRates.forEach(rate => {
       const row = [
-        `"${rate.service_code || ''}"`,
-        `"${rate.route_from || ''}"`,
-        `"${rate.route_to || ''}"`,
-        `"${rate.airline || ''}"`,
-        `"${rate.flight_number || ''}"`,
-        `"${rate.flight_type || ''}"`,
-        `"${rate.cabin_class || ''}"`,
+        csvCell(rate.service_code),
+        csvCell(rate.route_from),
+        csvCell(rate.route_to),
+        csvCell(rate.airline),
+        csvCell(rate.flight_number),
+        csvCell(rate.flight_type),
+        csvCell(rate.cabin_class),
         rate.base_rate_eur || 0,
         rate.base_rate_non_eur || 0,
         rate.baggage_kg || '',
-        `"${rate.departure_time || ''}"`,
-        `"${rate.arrival_time || ''}"`,
+        csvCell(rate.departure_time),
+        csvCell(rate.arrival_time),
         rate.duration_minutes || '',
-        `"${rate.frequency || ''}"`,
-        `"${rate.season || ''}"`,
-        `"${rate.rate_valid_from || ''}"`,
-        `"${rate.rate_valid_to || ''}"`,
-        `"${rate.supplier_name || rate.supplier?.name || ''}"`,
-        `"${(rate.notes || '').replace(/"/g, '""')}"`,
+        csvCell(rate.frequency),
+        csvCell(rate.season),
+        csvCell(rate.rate_valid_from),
+        csvCell(rate.rate_valid_to),
+        csvCell(rate.supplier_name || rate.supplier?.name),
+        csvCell(rate.notes),
         rate.is_active ? 'true' : 'false'
       ]
       csvRows.push(row.join(','))

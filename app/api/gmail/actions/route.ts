@@ -1,21 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { google } from 'googleapis'
 import { refreshAccessToken } from '@/lib/gmail'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
-
-// Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
-let _supabase: ReturnType<typeof createClient> | null = null
-
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-  }
-  return _supabase
-}
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // Lazy-initialized OAuth2 client
 let _oauth2Client: InstanceType<typeof google.auth.OAuth2> | null = null
@@ -33,13 +19,16 @@ function getOAuth2Client() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user first
-    const authClient = await createAuthenticatedClient()
-    const { data: { user }, error: authError } = await authClient.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    // Authenticate user first (session + active tenant membership)
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json(
+        { success: false, error: authResult.error },
+        { status: authResult.status }
+      )
     }
+    const user = authResult.user!
+    const supabase = createAdminClient()
 
     const { userId, messageIds, action, labelId } = await request.json()
 
@@ -52,7 +41,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized access to this user data' }, { status: 403 })
     }
 
-    const { data: tokenData, error: tokenError } = await (getSupabase() as any)
+    const { data: tokenData, error: tokenError } = await (supabase as any)
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -68,7 +57,7 @@ export async function POST(request: NextRequest) {
       const newTokens = await refreshAccessToken(refresh_token)
       access_token = newTokens.access_token!
 
-      await (getSupabase() as any)
+      await (supabase as any)
         .from('gmail_tokens')
         .update({
           access_token: newTokens.access_token,
