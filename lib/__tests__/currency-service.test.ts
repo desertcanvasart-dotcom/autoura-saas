@@ -144,17 +144,21 @@ describe('getFallbackRates', () => {
     expect(fb.rates.EGP).toBeCloseTo(56 / 1.1782, 10)
   })
 
-  it('unknown base returns EUR-magnitude rates relabeled as that base (current behavior)', () => {
-    // NOTE: suspected bug — for an unsupported base (no entry in the pinned
-    // EUR table) baseRateInEur silently defaults to 1, so the result claims
-    // base 'JPY' while carrying EUR-based magnitudes and no JPY entry at
-    // all. That is a fabricated rates table under the project's
-    // never-fabricate policy. Locking CURRENT behavior; do not "fix" this
-    // test without fixing lib/currency-service.ts:118 first.
+  it('LOCK: unknown base returns an identity-only table — never relabeled EUR magnitudes', () => {
+    // A base outside the pinned table cannot be re-based honestly, so the
+    // fallback is { JPY: 1 } only. Downstream conversions against it resolve
+    // to null (convertCurrency's no-rate contract) instead of a wrong number.
     const fb = getFallbackRates('JPY')
     expect(fb.base).toBe('JPY')
-    expect(fb.rates).toEqual({ EUR: 1, USD: 1.1782, GBP: 0.8737, EGP: 56.0 })
-    expect(fb.rates.JPY).toBeUndefined()
+    expect(fb.rates).toEqual({ JPY: 1 })
+  })
+
+  it('LOCK: converting against an identity-only fallback returns null, not a fabricated amount', () => {
+    const fb = getFallbackRates('JPY')
+    expect(convertCurrency(1000, 'JPY', 'EUR', fb)).toBeNull()
+    expect(convertCurrency(1000, 'EUR', 'JPY', fb)).toBeNull()
+    // Same-currency identity still holds.
+    expect(convertCurrency(1000, 'JPY', 'JPY', fb)).toBe(1000)
   })
 })
 
@@ -288,7 +292,7 @@ describe('persistExchangeRate', () => {
       base_currency: 'EUR',
       target_currency: 'USD',
       rate: 1.1782,
-      source: 'frankfurter',
+      source: 'er-api',
     })
   })
 
@@ -296,10 +300,10 @@ describe('persistExchangeRate', () => {
     const insert = vi.fn().mockResolvedValue({ error: null })
     const supabase = { from: () => ({ insert }) }
 
-    await persistExchangeRate(supabase, 'EUR', 'EGP', 56, 'er-api')
+    await persistExchangeRate(supabase, 'EUR', 'EGP', 56, 'manual-override')
 
     expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({ source: 'er-api' })
+      expect.objectContaining({ source: 'manual-override' })
     )
   })
 

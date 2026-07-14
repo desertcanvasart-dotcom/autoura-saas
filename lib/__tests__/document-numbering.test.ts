@@ -23,7 +23,6 @@ function mockSupabase(opts: MockOpts) {
     from: [] as string[],
     select: [] as string[],
     like: [] as { column: string; pattern: string }[],
-    order: [] as { column: string; options: unknown }[],
     limit: [] as number[],
   }
   const client = {
@@ -40,14 +39,9 @@ function mockSupabase(opts: MockOpts) {
             like: (column: string, pattern: string) => {
               calls.like.push({ column, pattern })
               return {
-                order: (column2: string, options: unknown) => {
-                  calls.order.push({ column: column2, options })
-                  return {
-                    limit: (n: number) => {
-                      calls.limit.push(n)
-                      return Promise.resolve({ data: opts.rows ?? [], error: opts.scanError ?? null })
-                    },
-                  }
+                limit: (n: number) => {
+                  calls.limit.push(n)
+                  return Promise.resolve({ data: opts.rows ?? [], error: opts.scanError ?? null })
                 },
               }
             },
@@ -124,8 +118,7 @@ describe('nextDocumentNumber — fallback scan path (sequence RPC fails)', () =>
     // Year-scoped LIKE needle — this is what isolates 2026 from 2027 and
     // INV from EXP in the fallback.
     expect(calls.like).toEqual([{ column: 'invoice_number', pattern: 'INV-2026-%' }])
-    expect(calls.order).toEqual([{ column: 'invoice_number', options: { ascending: false } }])
-    expect(calls.limit).toEqual([1])
+    expect(calls.limit).toEqual([10000])
   })
 
   it('increments past the highest existing number for the year', async () => {
@@ -151,36 +144,69 @@ describe('nextDocumentNumber — fallback scan path (sequence RPC fails)', () =>
     await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-001')
   })
 
-  // NOTE: observed behavior — when the highest existing value does not match
-  // the numeric-suffix regex at all (e.g. a lowercase suffix), the fallback
-  // silently restarts at 001, which can COLLIDE with an existing INV-2026-001.
-  // The UNIQUE constraint + insertWithUniqueRetry is the only safety net.
-  it('restarts at 001 when the last value is unparseable (collision risk absorbed by retry layer)', async () => {
-    const { client } = mockSupabase({ rpc: rpcFail, rows: [{ invoice_number: 'INV-2026-042-dep' }] })
+  it('takes the numeric max across unordered rows (not the first or last row)', async () => {
+    const { client } = mockSupabase({
+      rpc: rpcFail,
+      rows: [
+        { invoice_number: 'INV-2026-042' },
+        { invoice_number: 'INV-2026-007' },
+        { invoice_number: 'INV-2026-013' },
+      ],
+    })
+    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-043')
+  })
+
+  it('skips non-numeric legacy values instead of misparsing the year as the counter', async () => {
+    // The old loose suffix regex backtracked on 'INV-2026-LEGACY' and captured
+    // the YEAR as the counter (next: 'INV-2026-2027'). The anchored regex now
+    // skips it; with only unparseable values the counter restarts at 001
+    // (collision risk absorbed by the unique constraint + retry layer).
+    const { client } = mockSupabase({
+      rpc: rpcFail,
+      rows: [{ invoice_number: 'INV-2026-LEGACY' }, { invoice_number: 'INV-2026-042-dep' }],
+    })
     await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-001')
   })
 
-  // NOTE: observed behavior — when the trailing token is non-numeric (legacy
-  // free-form value 'INV-2026-LEGACY'), the /-(\d+)(?:-[A-Z]+)?$/ regex
-  // backtracks and captures the YEAR (2026) as the sequence counter, treating
-  // 'LEGACY' as the suffix. The next number becomes year+1, silently jumping
-  // the counter to 2027 for the rest of the year.
-  it('misparses the year as the counter for a non-numeric legacy value (documented gap)', async () => {
-    const { client } = mockSupabase({ rpc: rpcFail, rows: [{ invoice_number: 'INV-2026-LEGACY' }] })
-    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-2027')
+  it('skips legacy values but still honors parseable siblings in the same scan', async () => {
+    const { client } = mockSupabase({
+      rpc: rpcFail,
+      rows: [{ invoice_number: 'INV-2026-LEGACY' }, { invoice_number: 'INV-2026-042' }],
+    })
+    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-043')
   })
 
-  // NOTE: observed behavior — the fallback relies on LEXICOGRAPHIC ordering,
-  // and 'INV-2026-999' sorts ABOVE 'INV-2026-1000' as a string. Once a year
-  // passes 999 documents, a DB ordered scan returns '...-999' as the "max",
-  // and the module regenerates 'INV-2026-1000' — a duplicate of the existing
-  // row. Only the unique constraint + retry loop prevents a silent dup, and
-  // the retry regenerates the SAME number, so all 5 attempts fail.
-  it('regenerates an already-used number when lexicographic max lags the true max (>999 docs/year)', async () => {
-    // Simulate what Postgres ORDER BY ... DESC returns when both
-    // INV-2026-999 and INV-2026-1000 exist: '999' sorts first.
-    const { client } = mockSupabase({ rpc: rpcFail, rows: [{ invoice_number: 'INV-2026-999' }] })
-    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-1000')
+  it('survives 4-digit counters (>999 docs/year): 999 + 1000 present -> 1001', async () => {
+    // The old lexicographic ORDER BY DESC LIMIT 1 put '999' above '1000' and
+    // regenerated the already-used 'INV-2026-1000'. The numeric max fixes it.
+    const { client } = mockSupabase({
+      rpc: rpcFail,
+      rows: [{ invoice_number: 'INV-2026-999' }, { invoice_number: 'INV-2026-1000' }],
+    })
+    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-1001')
+  })
+
+  it('ignores rows from other prefixes/years that leak into the scan (anchored regex)', async () => {
+    const { client } = mockSupabase({
+      rpc: rpcFail,
+      rows: [
+        { invoice_number: 'EXP-2026-099' },
+        { invoice_number: 'INV-2025-500' },
+        { invoice_number: 'INV-2026-004' },
+      ],
+    })
+    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-005')
+  })
+
+  it('regex-escapes the prefix (a dotted prefix cannot wildcard-match other prefixes)', async () => {
+    const { client } = mockSupabase({
+      rpc: rpcFail,
+      rows: [{ invoice_number: 'INVX-2026-050' }],
+    })
+    // Prefix 'INV.' must not treat '.' as a regex wildcard matching 'INVX'.
+    await expect(
+      nextDocumentNumber({ ...baseOpts, supabase: client, prefix: 'INV.' }),
+    ).resolves.toBe('INV.-2026-001')
   })
 
   it('throws (never emits a guaranteed-duplicate default) when both paths fail', async () => {

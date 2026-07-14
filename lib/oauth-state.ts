@@ -18,34 +18,65 @@ import crypto from 'crypto'
  * Secret falls back to the service-role key (server-only, high entropy)
  * when a dedicated OAUTH_STATE_SECRET isn't configured.
  */
-const STATE_SECRET =
-  process.env.OAUTH_STATE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+/** OAuth round-trips complete in seconds; anything older is a replay. */
+export const STATE_MAX_AGE_MS = 10 * 60 * 1000
 
-function sign(payload: string): string {
-  return crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('base64url')
+// Resolved lazily (not at module scope): the env-less `next build` evaluates
+// every importer, and a missing secret must fail the actual OAuth call, not
+// the build. An empty HMAC key would make states forgeable by anyone.
+function stateSecret(): string {
+  const secret =
+    process.env.OAUTH_STATE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!secret) {
+    throw new Error(
+      'oauth-state: neither OAUTH_STATE_SECRET nor SUPABASE_SERVICE_ROLE_KEY is set'
+    )
+  }
+  return secret
 }
 
-/** Returns `${payload}.${signature}` for use as an OAuth `state` parameter. */
+function sign(payload: string): string {
+  return crypto.createHmac('sha256', stateSecret()).update(payload).digest('base64url')
+}
+
+/**
+ * Returns `${payload}.${issuedAtMs}.${signature}` for use as an OAuth `state`
+ * parameter. The timestamp is inside the signed material, so it cannot be
+ * extended after the fact.
+ */
 export function signState(payload: string): string {
-  return `${payload}.${sign(payload)}`
+  const issued = `${payload}.${Date.now()}`
+  return `${issued}.${sign(issued)}`
 }
 
 /**
  * Verifies a signed state and returns the original payload, or null if the
- * signature is missing or invalid. Use this to recover the user id at the callback.
+ * signature is missing/invalid or the state is older than `maxAgeMs`
+ * (default {@link STATE_MAX_AGE_MS}). Use this to recover the user id at the
+ * callback. States from the pre-timestamp envelope verify as null — callers
+ * just restart the OAuth flow.
  */
-export function verifyState(state: string | null | undefined): string | null {
+export function verifyState(
+  state: string | null | undefined,
+  maxAgeMs: number = STATE_MAX_AGE_MS
+): string | null {
   if (!state) return null
-  const idx = state.lastIndexOf('.')
-  if (idx <= 0) return null
-  const payload = state.slice(0, idx)
-  const sig = state.slice(idx + 1)
-  const expected = sign(payload)
+  const sigIdx = state.lastIndexOf('.')
+  if (sigIdx <= 0) return null
+  const issued = state.slice(0, sigIdx)
+  const sig = state.slice(sigIdx + 1)
+  const expected = sign(issued)
   if (sig.length !== expected.length) return null
   try {
     if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null
   } catch {
     return null
   }
-  return payload
+  const tsIdx = issued.lastIndexOf('.')
+  if (tsIdx <= 0) return null
+  const ts = Number(issued.slice(tsIdx + 1))
+  if (!Number.isFinite(ts)) return null
+  const age = Date.now() - ts
+  if (age < 0 || age > maxAgeMs) return null
+  return issued.slice(0, tsIdx)
 }

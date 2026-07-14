@@ -323,6 +323,14 @@ import {
         case 'per_vehicle':
           total += (quantity || 1) * rate
           break
+        default:
+          // An unrecognized rate_type must surface as a pricing hole, not
+          // silently contribute 0 while the breakdown claims completeness —
+          // that's an invisible underprice.
+          holes.push(
+            `day ${dayNumber}: service "${service.name || service.service_name || 'unknown'}" has unknown rate_type "${service.rate_type ?? ''}" — cost not counted`
+          )
+          break
       }
     })
 

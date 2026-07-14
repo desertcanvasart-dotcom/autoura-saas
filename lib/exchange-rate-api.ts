@@ -22,6 +22,8 @@ export interface ExchangeRateAPIResponse {
   time_next_update_utc?: string
   base_code?: string
   conversion_rates?: Record<string, number>
+  /** The keyless open.er-api.com endpoint keys its table `rates`, not `conversion_rates`. */
+  rates?: Record<string, number>
   'error-type'?: string
 }
 
@@ -67,7 +69,10 @@ export async function fetchExchangeRates(
       throw new Error(`API error: ${data['error-type'] || 'Unknown error'}`)
     }
 
-    if (!data.conversion_rates) {
+    // Keyed endpoint (v6.exchangerate-api.com) → conversion_rates;
+    // keyless endpoint (open.er-api.com) → rates. Same numbers, different key.
+    const conversionRates = data.conversion_rates ?? data.rates
+    if (!conversionRates) {
       throw new Error('No conversion rates in API response')
     }
 
@@ -78,7 +83,7 @@ export async function fetchExchangeRates(
     for (const currency of SUPPORTED_CURRENCIES) {
       if (currency === baseCurrency) continue // Skip base currency
 
-      const rate = data.conversion_rates[currency]
+      const rate = conversionRates[currency]
       if (rate !== undefined) {
         rates.push({
           base_currency: baseCurrency,

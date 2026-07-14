@@ -133,21 +133,19 @@ describe('compareTiers', () => {
     expect(compareTiers('professional', 'starter')).toBe('downgrade')
   })
 
-  // NOTE: SUSPECTED BUG — unknown slugs resolve to level -1 with no error, so
-  // compareTiers('bogus', 'starter') reads as 'upgrade' and
-  // compareTiers('starter', 'bogus') reads as 'downgrade'. A malformed tier
-  // slug (e.g. a stale value in a tenant row) silently classifies as a real
-  // plan change instead of surfacing as invalid. Locked as current behavior.
-  it('unknown current tier classifies as upgrade to any real tier (current behavior)', () => {
+  // DOCUMENTED intent: a tenant whose stored tier slug is stale/unrecognized
+  // has no recognizable plan, so every real plan is presented as an upgrade
+  // path (see the comment in compareTiers).
+  it('unknown current tier classifies as upgrade to any real tier (documented intent)', () => {
     expect(compareTiers('bogus', 'starter')).toBe('upgrade')
   })
 
-  it('unknown target tier classifies as downgrade from any real tier (current behavior)', () => {
-    expect(compareTiers('starter', 'bogus')).toBe('downgrade')
+  it('unknown target tier returns "unknown" — an invalid target is not a plan change', () => {
+    expect(compareTiers('starter', 'bogus')).toBe('unknown')
   })
 
-  it('two unknown tiers classify as current (both level -1) (current behavior)', () => {
-    expect(compareTiers('bogus', 'also-bogus')).toBe('current')
+  it('two unknown tiers return "unknown" (invalid target takes precedence)', () => {
+    expect(compareTiers('bogus', 'also-bogus')).toBe('unknown')
   })
 })
 

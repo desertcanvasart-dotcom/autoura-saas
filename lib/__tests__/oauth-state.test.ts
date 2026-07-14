@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import crypto from 'crypto'
 
 // lib/oauth-state.ts signs OAuth `state` params (CSRF / account-binding
-// protection for the Gmail OAuth callback). The module captures the secret
-// from env AT IMPORT TIME, so every case re-imports with a fresh module
-// registry (same vi.resetModules pattern as the health/version route tests).
+// protection for the Gmail OAuth callback). Envelope:
+// `${payload}.${issuedAtMs}.${signature}` — the timestamp sits inside the
+// signed material, and verifyState enforces a max age (STATE_MAX_AGE_MS by
+// default). The secret is resolved lazily from env; each case re-imports
+// with a fresh module registry (same vi.resetModules pattern as the
+// health/version route tests) so env changes take effect cleanly.
 
 const SECRET = 'test-oauth-state-secret-with-plenty-of-entropy'
 
@@ -16,6 +20,11 @@ async function loadModule(env: Record<string, string | undefined> = { OAUTH_STAT
     else process.env[key] = env[key]
   }
   return import('@/lib/oauth-state')
+}
+
+/** Test-side HMAC matching the module's algorithm, for forging malformed envelopes. */
+function hmac(material: string, secret = SECRET): string {
+  return crypto.createHmac('sha256', secret).update(material).digest('base64url')
 }
 
 const originalEnv = {
@@ -36,26 +45,35 @@ afterEach(() => {
 })
 
 describe('signState', () => {
-  it('produces `payload.signature` with a base64url signature', async () => {
+  it('produces `payload.issuedAtMs.signature` with a base64url signature', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-14T12:00:00Z'))
     const { signState } = await loadModule()
     const state = signState('user-123')
-    const idx = state.lastIndexOf('.')
-    expect(state.slice(0, idx)).toBe('user-123')
-    const sig = state.slice(idx + 1)
     // HMAC-SHA256 digest in base64url: 43 chars, no padding, no +/
-    expect(sig).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(state).toMatch(/^user-123\.\d{13}\.[A-Za-z0-9_-]{43}$/)
+    expect(Number(state.split('.')[1])).toBe(Date.now())
   })
 
-  it('is deterministic for the same payload and secret', async () => {
+  it('is deterministic for the same payload, secret, and instant', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-14T12:00:00Z'))
     const { signState } = await loadModule()
     expect(signState('user-123')).toBe(signState('user-123'))
   })
 
   it('produces different signatures for different payloads', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-14T12:00:00Z'))
     const { signState } = await loadModule()
     const sigA = signState('user-a').split('.').pop()
     const sigB = signState('user-b').split('.').pop()
     expect(sigA).not.toBe(sigB)
+  })
+
+  it('exports STATE_MAX_AGE_MS = 10 minutes', async () => {
+    const { STATE_MAX_AGE_MS } = await loadModule()
+    expect(STATE_MAX_AGE_MS).toBe(10 * 60 * 1000)
   })
 })
 
@@ -81,9 +99,14 @@ describe('verifyState — round-trip', () => {
 describe('verifyState — tampering rejected', () => {
   it('rejects a state whose payload was swapped (attacker substitutes victim user id)', async () => {
     const { signState, verifyState } = await loadModule()
-    const attacker = signState('attacker-id')
-    const sig = attacker.slice(attacker.lastIndexOf('.') + 1)
-    expect(verifyState(`victim-id.${sig}`)).toBeNull()
+    const [, ts, sig] = signState('attacker-id').split('.')
+    expect(verifyState(`victim-id.${ts}.${sig}`)).toBeNull()
+  })
+
+  it('rejects a state whose timestamp was extended after signing', async () => {
+    const { signState, verifyState } = await loadModule()
+    const [payload, ts, sig] = signState('user-123').split('.')
+    expect(verifyState(`${payload}.${Number(ts) + 60_000}.${sig}`)).toBeNull()
   })
 
   it('rejects a state with a single flipped signature character', async () => {
@@ -100,7 +123,7 @@ describe('verifyState — tampering rejected', () => {
     expect(verifyState(state.slice(0, -1))).toBeNull()
   })
 
-  it('rejects a payload-only state signed under a different secret', async () => {
+  it('rejects a state signed under a different secret', async () => {
     const modA = await loadModule({ OAUTH_STATE_SECRET: 'secret-A' })
     const forged = modA.signState('user-123')
     const modB = await loadModule({ OAUTH_STATE_SECRET: 'secret-B' })
@@ -126,7 +149,7 @@ describe('verifyState — missing/malformed input', () => {
     expect(verifyState('just-a-raw-user-id')).toBeNull()
   })
 
-  it('rejects a state that is only ".signature" (empty payload, idx 0)', async () => {
+  it('rejects a state that starts with the signature dot (empty issued part, idx 0)', async () => {
     const { signState, verifyState } = await loadModule()
     const sig = signState('x').split('.').pop()
     expect(verifyState(`.${sig}`)).toBeNull()
@@ -141,23 +164,78 @@ describe('verifyState — missing/malformed input', () => {
     const { verifyState } = await loadModule()
     expect(verifyState('victim.uuid')).toBeNull()
   })
+
+  it('rejects an old-envelope state (`payload.signature`, no timestamp) even with a valid signature', async () => {
+    const { verifyState } = await loadModule()
+    // Pre-timestamp envelope: HMAC over the payload alone, same secret. The
+    // signature check passes but there is no timestamp segment to parse.
+    expect(verifyState(`user-123.${hmac('user-123')}`)).toBeNull()
+  })
+
+  it('rejects a correctly signed envelope whose timestamp is not numeric', async () => {
+    const { verifyState } = await loadModule()
+    const issued = 'user-123.notanumber'
+    expect(verifyState(`${issued}.${hmac(issued)}`)).toBeNull()
+  })
+
+  it('rejects a correctly signed envelope with an empty payload segment', async () => {
+    const { verifyState } = await loadModule()
+    const issued = `.${Date.now()}`
+    expect(verifyState(`${issued}.${hmac(issued)}`)).toBeNull()
+  })
 })
 
-describe('verifyState — expiry', () => {
-  // NOTE: the module has NO expiry/TTL mechanism — a signed state remains
-  // valid forever. This locks the current behavior; a captured state can be
-  // replayed at any later time (replay window is unbounded).
-  it('still verifies a state signed 10 years ago (no TTL — documented gap)', async () => {
+describe('verifyState — expiry (fake timers, no real waits)', () => {
+  const T0 = new Date('2026-07-14T12:00:00Z')
+
+  it('accepts a state exactly at the max-age boundary', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(T0)
+    const { signState, verifyState, STATE_MAX_AGE_MS } = await loadModule()
+    const state = signState('user-123')
+    vi.setSystemTime(T0.getTime() + STATE_MAX_AGE_MS)
+    expect(verifyState(state)).toBe('user-123')
+  })
+
+  it('rejects a state 1ms past the max age', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(T0)
+    const { signState, verifyState, STATE_MAX_AGE_MS } = await loadModule()
+    const state = signState('user-123')
+    vi.setSystemTime(T0.getTime() + STATE_MAX_AGE_MS + 1)
+    expect(verifyState(state)).toBeNull()
+  })
+
+  it('rejects a 10-year-old state (replay window is bounded)', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2016-07-14T00:00:00Z'))
     const { signState, verifyState } = await loadModule()
     const old = signState('user-123')
     vi.setSystemTime(new Date('2026-07-14T00:00:00Z'))
-    expect(verifyState(old)).toBe('user-123')
+    expect(verifyState(old)).toBeNull()
+  })
+
+  it('rejects a state issued in the future (negative age)', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(T0)
+    const { signState, verifyState } = await loadModule()
+    const state = signState('user-123')
+    vi.setSystemTime(T0.getTime() - 1)
+    expect(verifyState(state)).toBeNull()
+  })
+
+  it('honors a caller-supplied maxAgeMs override', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(T0)
+    const { signState, verifyState } = await loadModule()
+    const state = signState('user-123')
+    vi.setSystemTime(T0.getTime() + 2_000)
+    expect(verifyState(state, 1_000)).toBeNull()
+    expect(verifyState(state, 5_000)).toBe('user-123')
   })
 })
 
-describe('secret fallback behavior', () => {
+describe('secret resolution (lazy)', () => {
   it('falls back to SUPABASE_SERVICE_ROLE_KEY when OAUTH_STATE_SECRET is unset', async () => {
     const modFallback = await loadModule({
       OAUTH_STATE_SECRET: undefined,
@@ -184,16 +262,32 @@ describe('secret fallback behavior', () => {
     expect(serviceOnly.verifyState(state)).toBeNull()
   })
 
-  // NOTE: with NEITHER env var set, STATE_SECRET is '' and the module still
-  // signs/verifies with an empty HMAC key — signatures are then computable
-  // by anyone (forgeable). It does not throw or refuse to operate. This
-  // locks the current (weak) behavior.
-  it('signs and verifies with an empty secret when no env is configured (forgeable — documented gap)', async () => {
+  it('signState throws when no secret is configured (never signs with an empty key)', async () => {
     const mod = await loadModule({
       OAUTH_STATE_SECRET: undefined,
       SUPABASE_SERVICE_ROLE_KEY: undefined,
     })
-    const state = mod.signState('user-123')
-    expect(mod.verifyState(state)).toBe('user-123')
+    expect(() => mod.signState('user-123')).toThrow(/OAUTH_STATE_SECRET/)
+  })
+
+  it('verifyState throws (not silently null) when no secret is configured and a signature must be checked', async () => {
+    const mod = await loadModule({
+      OAUTH_STATE_SECRET: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+    })
+    // The secret is resolved lazily inside sign(); only inputs that reach the
+    // signature computation hit it — shape-invalid inputs still return null.
+    expect(() => mod.verifyState('user-123.1234567890123.somesig')).toThrow(/OAUTH_STATE_SECRET/)
+    expect(mod.verifyState(null)).toBeNull()
+    expect(mod.verifyState('no-dot')).toBeNull()
+  })
+
+  it('resolves the secret lazily: import succeeds without env, signing works once env appears', async () => {
+    const mod = await loadModule({
+      OAUTH_STATE_SECRET: undefined,
+      SUPABASE_SERVICE_ROLE_KEY: undefined,
+    })
+    process.env.OAUTH_STATE_SECRET = SECRET
+    expect(mod.verifyState(mod.signState('user-123'))).toBe('user-123')
   })
 })

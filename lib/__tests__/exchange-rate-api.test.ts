@@ -90,7 +90,7 @@ describe('fetchExchangeRates — response handling', () => {
     await expect(fetchExchangeRates('key')).rejects.toThrow('API error: invalid-key')
   })
 
-  it('throws when a success response carries no conversion_rates', async () => {
+  it('throws when a success response carries neither conversion_rates nor rates', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ result: 'success' }),
@@ -98,22 +98,35 @@ describe('fetchExchangeRates — response handling', () => {
     await expect(fetchExchangeRates('key')).rejects.toThrow('No conversion rates in API response')
   })
 
-  it('throws on the open endpoint payload shape (`rates`, not `conversion_rates`)', async () => {
-    // NOTE: suspected bug — the keyless path calls open.er-api.com, whose
-    // real payload keys rates under `rates` (see lib/currency-service.ts:59,
-    // which reads data.rates for the SAME endpoint). This module only reads
-    // data.conversion_rates (lib/exchange-rate-api.ts:70), so every keyless
-    // call throws in production. Locking CURRENT behavior: at least it
-    // fails loudly instead of fabricating.
+  it('accepts the keyless open-endpoint payload shape (`rates` key)', async () => {
+    // open.er-api.com keys its table `rates`; the keyed v6 endpoint uses
+    // `conversion_rates`. Both shapes must parse.
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         result: 'success',
         base_code: 'EUR',
-        rates: { USD: 1.18, GBP: 0.87, EGP: 56.2 },
+        rates: { USD: 1.18, GBP: 0.87, EGP: 56.2, JPY: 160 },
       }),
     })
-    await expect(fetchExchangeRates()).rejects.toThrow('No conversion rates in API response')
+    const rates = await fetchExchangeRates()
+    expect(rates.map(r => r.target_currency).sort()).toEqual(['EGP', 'GBP', 'USD'])
+    expect(rates.find(r => r.target_currency === 'USD')!.rate).toBe(1.18)
+    expect(rates.every(r => r.base_currency === 'EUR')).toBe(true)
+  })
+
+  it('prefers conversion_rates when both keys are present', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        result: 'success',
+        conversion_rates: { USD: 1.18 },
+        rates: { USD: 9.99, GBP: 9.99 },
+      }),
+    })
+    const rates = await fetchExchangeRates('key')
+    expect(rates).toHaveLength(1)
+    expect(rates[0]).toMatchObject({ target_currency: 'USD', rate: 1.18 })
   })
 })
 

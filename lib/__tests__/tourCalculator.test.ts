@@ -352,21 +352,21 @@ describe('calculateTourPricing — additional services rate types', () => {
     expect(r.totals.total_additional_services).toBe(30) // 2 × (10 + 5)
   })
 
-  // NOTE: SUSPECTED BUG — a service with a VALID rate but an unrecognized (or
-  // missing) rate_type falls through the switch and contributes 0 WITHOUT
-  // recording a hole, so the result still claims complete=true. That is a
-  // silent under-price: a real cost vanishes from the total with no flag.
-  // Locked as current behavior per harness rules; see lib/tourCalculator.ts
-  // calculateAdditionalServicesCosts (switch on service.rate_type).
-  it('unknown rate_type silently contributes 0 and does NOT hole (current behavior)', () => {
+  // A service with a VALID rate but an unrecognized rate_type is still not
+  // counted (there is no defined way to multiply it), but it surfaces as a
+  // hole so the breakdown can never claim completeness while silently
+  // dropping a real cost.
+  it('unknown rate_type contributes 0 AND records a hole (never a silent under-price)', () => {
     const r = calculateTourPricing(
       tour([dayWithServices([{ service: { name: 'Mystery', rate_type: 'per_booking', base_rate_eur: 50, base_rate_non_eur: 50 } }])]),
       2,
       true
     )
     expect(r.totals.total_additional_services).toBe(0)
-    expect(r.complete).toBe(true) // no hole recorded despite the dropped cost
-    expect(r.holes).toEqual([])
+    expect(r.complete).toBe(false)
+    expect(r.holes).toEqual([
+      'day 1: service "Mystery" has unknown rate_type "per_booking" — cost not counted',
+    ])
   })
 })
 

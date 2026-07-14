@@ -114,8 +114,20 @@ export function getFallbackRates(baseCurrency: string): ExchangeRates {
     }
   }
 
+  // A base outside the pinned table can't be re-based honestly — substituting
+  // a rate of 1 would return EUR-magnitude numbers labeled as `baseCurrency`.
+  // Return an identity-only table instead: conversions against it resolve to
+  // null downstream (convertCurrency's no-rate contract), never a wrong number.
+  const baseRateInEur = eurRates[baseCurrency]
+  if (!baseRateInEur) {
+    return {
+      base: baseCurrency,
+      date: new Date().toISOString().split('T')[0],
+      rates: { [baseCurrency]: 1 }
+    }
+  }
+
   // Convert rates to different base
-  const baseRateInEur = eurRates[baseCurrency] || 1
   const convertedRates: Record<string, number> = {}
 
   for (const [currency, eurRate] of Object.entries(eurRates)) {
@@ -223,7 +235,7 @@ export async function persistExchangeRate(
   fromCurrency: string,
   toCurrency: string,
   rate: number,
-  source: string = 'frankfurter'
+  source: string = 'er-api'
 ): Promise<void> {
   try {
     await supabase.from('exchange_rate_snapshots').insert({

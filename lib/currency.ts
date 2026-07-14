@@ -111,7 +111,7 @@ export function formatCurrency(
 
   const symbol = showSymbol ? getCurrencySymbol(currency) : ''
 
-  if (compact && amount >= 1000) {
+  if (compact && Math.abs(amount) >= 1000) {
     const formatted = new Intl.NumberFormat('en-US', {
       notation: 'compact',
       maximumFractionDigits: 1

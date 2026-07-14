@@ -10,12 +10,12 @@
  *
  * This helper centralizes the safer pattern:
  *   1. Try `nextval` (sequence is the source of truth when healthy).
- *   2. On RPC failure, look at the highest existing document for the current
- *      year using lexicographic ordering — `SELECT … WHERE col LIKE 'PREFIX-YYYY-%'
- *      ORDER BY col DESC LIMIT 1`. This is year-scoped (the sequence was
- *      previously global, so 2027 kept climbing from 2026's count) and
- *      tolerates row deletions (count-based fallback regressed when rows
- *      were deleted).
+ *   2. On RPC failure, take the NUMERIC max over the current year's values
+ *      (`SELECT … WHERE col LIKE 'PREFIX-YYYY-%'`, counter parsed in code).
+ *      Year-scoped (the sequence was previously global, so 2027 kept climbing
+ *      from 2026's count), tolerates row deletions (count-based fallback
+ *      regressed when rows were deleted), and survives 4-digit counters
+ *      (lexicographic DESC put '999' above '1000').
  *   3. Use `seqData != null` so sequence value 0 is treated as legitimate.
  *
  * The matching DB migration (20260626_unique_document_numbers.sql) adds
@@ -59,30 +59,36 @@ export async function nextDocumentNumber(opts: NextDocumentNumberOpts): Promise<
     return `${opts.prefix}-${year}-${String(seqData).padStart(3, '0')}`
   }
 
-  // Fallback — year-scoped lexicographic MAX. The prior count-based fallback
+  // Fallback — year-scoped NUMERIC max. The prior count-based fallback
   // produced duplicates whenever a row was deleted OR two requests landed
-  // concurrently. Scoping by year additionally keeps each year's sequence
-  // starting at 1 (the global sequence used to climb forever).
+  // concurrently; a lexicographic `ORDER BY col DESC LIMIT 1` breaks at four
+  // digits ('999' sorts above '1000', regenerating a used number until the
+  // unique-retry loop deadlocks). So: scan the year's values and take the
+  // numeric max in code. Fallback-only path; the cap is far above any
+  // realistic yearly volume and prevents an unbounded read.
   const likeNeedle = `${opts.prefix}-${year}-%`
   const { data: rows, error: scanError } = await opts.supabase
     .from(opts.table)
     .select(opts.column)
     .like(opts.column, likeNeedle)
-    .order(opts.column, { ascending: false })
-    .limit(1)
+    .limit(10000)
   if (scanError) {
     throw new Error(`Failed to generate ${opts.prefix} number: sequence RPC failed (${seqError?.message || 'unknown'}) and fallback scan failed (${scanError.message})`)
   }
 
+  // Counter is read ONLY from well-formed values: anchored to this prefix and
+  // year, numeric counter, optional '-DEP'/'-FIN' style suffix. A loose
+  // suffix regex used to backtrack on legacy values like 'INV-2026-LEGACY'
+  // and capture the YEAR as the counter (next number: 'INV-2026-2027').
+  const counterRe = new RegExp(
+    `^${opts.prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-${year}-(\\d+)(?:-[A-Z]+)?$`
+  )
   let next = 1
-  if (rows && rows.length > 0) {
-    const last = (rows[0] as unknown as Record<string, unknown>)[opts.column] as string | undefined
-    if (last) {
-      // Accept suffixes like '-DEP' or '-FIN' that follow the numeric portion
-      // (used by the deposit/final invoice variants).
-      const m = last.match(/-(\d+)(?:-[A-Z]+)?$/)
-      if (m) next = parseInt(m[1], 10) + 1
-    }
+  for (const row of rows ?? []) {
+    const value = (row as unknown as Record<string, unknown>)[opts.column]
+    if (typeof value !== 'string') continue
+    const m = value.match(counterRe)
+    if (m) next = Math.max(next, parseInt(m[1], 10) + 1)
   }
   return `${opts.prefix}-${year}-${String(next).padStart(3, '0')}`
 }

@@ -11,6 +11,8 @@ import {
   InvoiceCreateSchema,
   InvitationCreateSchema,
   ExpenseCreateSchema,
+  DateStringSchema,
+  CurrencyCodeSchema,
   validateInput,
 } from '@/lib/validation'
 
@@ -69,6 +71,51 @@ describe('EmailSchema', () => {
   })
 })
 
+describe('DateStringSchema', () => {
+  it.each([
+    ['plain date', '2026-08-01'],
+    ['leap-year Feb 29', '2024-02-29'],
+    ['ISO datetime', '2026-08-01T10:30:00Z'],
+    ['ISO datetime with ms', '2026-08-01T10:30:00.000Z'],
+  ])('accepts %s', (_label, input) => {
+    expect(DateStringSchema.safeParse(input).success).toBe(true)
+  })
+
+  it.each([
+    ['month 13', '2026-13-01'],
+    ['day 99', '2026-01-99'],
+    ['non-leap-year Feb 29', '2026-02-29'],
+    ['month 00', '2026-00-15'],
+    ['day 00', '2026-01-00'],
+    ['June 31', '2026-06-31'],
+    ['slash date', '2026/08/01'],
+    ['empty string', ''],
+    ['plain text', 'tomorrow'],
+  ])('rejects %s (calendar round-trip check)', (_label, input) => {
+    expect(DateStringSchema.safeParse(input).success).toBe(false)
+  })
+})
+
+describe('CurrencyCodeSchema', () => {
+  it('normalizes case and whitespace ("  usd " -> "USD")', () => {
+    const r = CurrencyCodeSchema.safeParse('  usd ')
+    expect(r.success).toBe(true)
+    if (r.success) expect(r.data).toBe('USD')
+  })
+
+  it.each([
+    ['symbols', '$$$'],
+    ['digits', '123'],
+    ['2 letters', 'US'],
+    ['4 letters', 'USDX'],
+    ['empty', ''],
+    ['whitespace only', '   '],
+    ['unicode letters', 'ÉÜR'],
+  ])('rejects %s', (_label, input) => {
+    expect(CurrencyCodeSchema.safeParse(input).success).toBe(false)
+  })
+})
+
 describe('PaginationSchema', () => {
   it('applies defaults for an empty query', () => {
     const r = PaginationSchema.safeParse({})
@@ -115,18 +162,10 @@ describe('ClientCreateSchema', () => {
     if (r.success) expect(r.data.name).toBe('Alice')
   })
 
-  // NOTE: observed behavior — the schema is .min(1).max(255).trim(), so the
-  // min(1) check runs BEFORE trim. A whitespace-only name passes validation
-  // and is then trimmed to the empty string, so a client with name '' can be
-  // created. ('.trim().min(1)' would reject it.)
-  it('accepts a whitespace-only name and trims it to empty (documented gap)', () => {
-    const r = ClientCreateSchema.safeParse({ name: '   ' })
-    expect(r.success).toBe(true)
-    if (r.success) expect(r.data.name).toBe('')
-  })
-
   it.each([
     ['empty name', { name: '' }],
+    ['whitespace-only name (trim runs before min(1))', { name: '   ' }],
+    ['tab/newline-only name', { name: '\t\n ' }],
     ['missing name', {}],
     ['name over 255 chars', { name: 'x'.repeat(256) }],
     ['invalid email', { name: 'A', email: 'nope' }],
@@ -178,14 +217,10 @@ describe('ItineraryCreateSchema — dates, pax, status', () => {
     expect(r.success).toBe(true)
   })
 
-  // NOTE: observed behavior — the YYYY-MM-DD branch is a pure \d{4}-\d{2}-\d{2}
-  // regex with no calendar validation, so impossible dates like month 13 or
-  // day 99 pass validation and reach the DB.
-  it('accepts the impossible date 2026-13-99 (regex has no calendar check — documented gap)', () => {
-    expect(ItineraryCreateSchema.safeParse({ ...base, start_date: '2026-13-99' }).success).toBe(true)
-  })
-
   it.each([
+    ['impossible month/day', '2026-13-99'],
+    ['non-leap-year Feb 29', '2026-02-29'],
+    ['April 31', '2026-04-31'],
     ['slash date', '2026/08/01'],
     ['two-digit year', '26-08-01'],
     ['date with injection suffix', "2026-08-01'; DROP TABLE itineraries;--"],
@@ -291,15 +326,19 @@ describe('InvoiceCreateSchema', () => {
     ['2-char currency', 'US'],
     ['4-char currency', 'USDX'],
     ['empty currency', ''],
+    ['symbol currency', '$$$'],
+    ['digit currency', '123'],
   ])('rejects %s', (_label, currency) => {
     expect(InvoiceCreateSchema.safeParse({ ...invoice, currency }).success).toBe(false)
   })
 
-  // NOTE: observed behavior — currency is only length-checked (3 chars), not
-  // validated against ISO 4217, so 'usd', 'XXX', or '$$$' all pass.
-  it('accepts any 3-char currency string, including lowercase and symbols (documented gap)', () => {
-    expect(InvoiceCreateSchema.safeParse({ ...invoice, currency: 'usd' }).success).toBe(true)
-    expect(InvoiceCreateSchema.safeParse({ ...invoice, currency: '$$$' }).success).toBe(true)
+  it('normalizes lowercase/padded currency codes to uppercase', () => {
+    const lower = InvoiceCreateSchema.safeParse({ ...invoice, currency: 'usd' })
+    expect(lower.success).toBe(true)
+    if (lower.success) expect(lower.data.currency).toBe('USD')
+    const padded = InvoiceCreateSchema.safeParse({ ...invoice, currency: ' eur ' })
+    expect(padded.success).toBe(true)
+    if (padded.success) expect(padded.data.currency).toBe('EUR')
   })
 
   it.each([
@@ -358,16 +397,23 @@ describe('ExpenseCreateSchema', () => {
     expect(ExpenseCreateSchema.safeParse({ ...expense, ...patch }).success).toBe(false)
   })
 
-  // NOTE: observed behavior — receipt_url uses z.string().url(), which only
-  // checks URL-parseability, not the scheme. 'javascript:' and 'data:' URLs
-  // pass validation; if the stored value is ever rendered as an <a href>,
-  // that is a stored-XSS vector. Scheme allow-listing happens nowhere here.
-  it('accepts javascript: and data: receipt_url schemes (documented gap)', () => {
+  it('rejects javascript: and data: receipt_url schemes (http(s) only)', () => {
+    for (const receipt_url of [
+      'javascript:alert(1)',
+      'data:text/html,<script>1</script>',
+      'ftp://example.com/receipt.pdf',
+    ]) {
+      const r = ExpenseCreateSchema.safeParse({ ...expense, receipt_url })
+      expect(r.success).toBe(false)
+      if (!r.success) {
+        expect(r.error.issues.map(i => i.message)).toContain('Only http(s) URLs are allowed')
+      }
+    }
+  })
+
+  it('accepts http:// as well as https:// receipt URLs', () => {
     expect(
-      ExpenseCreateSchema.safeParse({ ...expense, receipt_url: 'javascript:alert(1)' }).success,
-    ).toBe(true)
-    expect(
-      ExpenseCreateSchema.safeParse({ ...expense, receipt_url: 'data:text/html,<script>1</script>' }).success,
+      ExpenseCreateSchema.safeParse({ ...expense, receipt_url: 'http://example.com/r.pdf' }).success,
     ).toBe(true)
   })
 
