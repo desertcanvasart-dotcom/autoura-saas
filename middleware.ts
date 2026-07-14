@@ -12,6 +12,7 @@ const SELF_AUTH_API_PREFIXES = [
   '/api/webhooks/',         // HMAC-verified inbound (e.g. concierge brief)
   '/api/auth/',             // login / signup / OAuth callbacks (no session yet)
   '/api/cron/',             // cron-job-only, verifies CRON_SECRET inside the handler
+  '/api/version',           // deploy-verification probe: public by design, sha+uptime only
 ]
 
 // Define route permissions - which roles can access which routes

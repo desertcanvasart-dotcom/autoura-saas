@@ -1,4 +1,5 @@
 import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient as createSharedBrowserClient } from '@/app/supabase'
 
 // Mock client for build time when env vars aren't available
 const createMockClient = () => ({
@@ -26,6 +27,21 @@ export const createClient = (): SupabaseClient => {
     return createMockClient()
   }
 
+  // In the browser, ALWAYS return the shared cookie-based @supabase/ssr client
+  // (app/supabase.ts) — the one the login flow authenticates. A plain
+  // supabase-js client here looks for its session in localStorage, finds
+  // nothing (login stores it in cookies), and silently runs every query as
+  // `anon`. In the travel-ops-pro sibling this exact split broke every direct
+  // browser read of an RLS-scoped table ("Itinerary not found" on edit) the
+  // moment RLS went live — fixed there 2026-07-14 (PR #40); same fix here.
+  if (typeof window !== 'undefined') {
+    return createSharedBrowserClient()
+  }
+
+  // Server-side (a handful of API routes import this): keep the historical
+  // anon client UNCHANGED for now. Migrating those routes to the service-role
+  // client with org scoping is the follow-up (travel-ops-pro did this as a
+  // separate step); do not silently change their role here.
   return createSupabaseClient(url, key)
 }
 
