@@ -39,6 +39,12 @@ const CURRENCIES = [
   { value: 'EGP', label: 'EGP (E£)', flag: '🇪🇬' }
 ]
 
+const LANGUAGES = [
+  { value: 'en', label: 'English', flag: '🇬🇧', note: null },
+  { value: 'fr', label: 'Français', flag: '🇫🇷', note: 'coming soon' },
+  { value: 'es', label: 'Español', flag: '🇪🇸', note: 'coming soon' }
+]
+
 const SERVICES = [
   { value: 'tours', label: 'Multi-Day Tours', icon: '🗺️' },
   { value: 'day-trips', label: 'Day Trips', icon: '🚌' },
@@ -51,6 +57,7 @@ const SERVICES = [
 export default function BusinessStep({ onNext, onBack, currentStep, tenant }: BusinessStepProps) {
   const [businessType, setBusinessType] = useState(tenant?.business_type || 'b2c_and_b2b')
   const [currency, setCurrency] = useState(tenant?.default_currency || 'EUR')
+  const [locale, setLocale] = useState(tenant?.locale || 'en')
   const [services, setServices] = useState<string[]>(
     tenant?.services_offered || ['tours', 'day-trips', 'packages']
   )
@@ -81,6 +88,7 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
         body: JSON.stringify({
           business_type: businessType,
           default_currency: currency,
+          locale,
           services_offered: services,
           company_phone: phone,
           company_website: website,
@@ -170,6 +178,35 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Language */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Preferred Language
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.value}
+                  onClick={() => setLocale(lang.value)}
+                  className={`p-3 rounded-lg border-2 transition-all ${
+                    locale === lang.value
+                      ? 'border-[#2d3b2d] bg-green-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">{lang.flag}</div>
+                  <div className="font-medium text-sm text-gray-900">{lang.label}</div>
+                  {lang.note && (
+                    <div className="text-xs text-gray-500 mt-0.5">{lang.note}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              The app is in English today. Choosing French or Spanish saves your preference — your workspace and documents will switch automatically when those languages launch.
+            </p>
           </div>
 
           {/* Services */}

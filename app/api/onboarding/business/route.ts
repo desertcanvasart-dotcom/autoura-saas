@@ -20,12 +20,21 @@ export async function POST(request: NextRequest) {
     }
     const body = await request.json()
 
+    const SUPPORTED_LOCALES = ['en', 'fr', 'es']
+    if (body.locale !== undefined && !SUPPORTED_LOCALES.includes(body.locale)) {
+      return NextResponse.json(
+        { success: false, error: `locale must be one of: ${SUPPORTED_LOCALES.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
     // Update tenant with business configuration
     const { error: tenantError } = await supabase
       .from('tenants')
       .update({
         business_type: body.business_type,
         default_currency: body.default_currency,
+        ...(body.locale !== undefined ? { locale: body.locale } : {}),
         services_offered: body.services_offered,
         company_phone: body.company_phone,
         company_website: body.company_website,
