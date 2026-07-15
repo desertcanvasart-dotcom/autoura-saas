@@ -7,14 +7,13 @@
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { isSuperAdmin } from '@/lib/super-admin-shared'
 
 const isBuildTime = !process.env.NEXT_PUBLIC_SUPABASE_URL
 
-export function isSuperAdmin(email: string): boolean {
-  const allowed = process.env.SUPER_ADMIN_EMAILS || ''
-  const emails = allowed.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-  return emails.includes(email.toLowerCase())
-}
+// Re-exported so existing imports keep working; the implementation lives in
+// lib/super-admin-shared.ts (dependency-free, safe for middleware).
+export { isSuperAdmin }
 
 export async function requireSuperAdmin() {
   if (isBuildTime) {
