@@ -16,6 +16,8 @@ export interface ConciergeBriefPayload {
   submitted_at?: string
   prompt_version?: string
   language?: string
+  /** Origin brand key; routes the brief to a tenant via concierge_brand_mappings. */
+  brand?: string
   brief_revision?: number
   is_update?: boolean
   visitor?: {
@@ -117,6 +119,19 @@ function nonEmpty(v: unknown): string | null {
 }
 
 // ---- validation ----
+export const BRAND_KEY_MAX_LENGTH = 64
+
+/**
+ * Canonical form of a brand key: lowercase, trimmed. Returns null when the
+ * value is absent, not a string, or empty after trimming — the routing layer
+ * treats null as "no brand" (legacy env/first-tenant resolution).
+ */
+export function normalizeBrandKey(brand: unknown): string | null {
+  if (typeof brand !== 'string') return null
+  const key = brand.trim().toLowerCase()
+  return key.length > 0 ? key : null
+}
+
 export interface ValidateOk { ok: true; payload: ConciergeBriefPayload }
 export interface ValidateErr { ok: false; errors: ValidationError[] }
 
@@ -145,6 +160,14 @@ export function validateBrief(body: unknown): ValidateOk | ValidateErr {
 
   if (p.is_update !== undefined && typeof p.is_update !== 'boolean') {
     errors.push({ field: 'is_update', message: 'is_update must be a boolean when present.' })
+  }
+
+  if (p.brand !== undefined) {
+    if (typeof p.brand !== 'string' || p.brand.trim().length === 0) {
+      errors.push({ field: 'brand', message: 'brand must be a non-empty string when present.' })
+    } else if (p.brand.trim().length > BRAND_KEY_MAX_LENGTH) {
+      errors.push({ field: 'brand', message: `brand must be at most ${BRAND_KEY_MAX_LENGTH} characters.` })
+    }
   }
 
   if (p.visitor !== undefined && (typeof p.visitor !== 'object' || p.visitor === null || Array.isArray(p.visitor))) {
@@ -222,6 +245,7 @@ export function mapBrief(p: ConciergeBriefPayload): MappedBrief {
     is_update: p.is_update ?? false,
     prompt_version: nonEmpty(p.prompt_version),
     language: nonEmpty(p.language),
+    brand: normalizeBrandKey(p.brand),
     submitted_at: nonEmpty(p.submitted_at),
 
     visitor_name: nonEmpty(visitor.name),

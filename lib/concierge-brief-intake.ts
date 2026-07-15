@@ -156,10 +156,13 @@ export async function ingestBrief(
   //    if the client write fails, so we never lose a lead.
   const clientId = await findOrCreateClient(mapped, supabase, tenantId)
 
-  // 2. Look up the current brief row for this conversation.
+  // 2. Look up the current brief row for this conversation — tenant-scoped:
+  //    with multi-brand routing several tenants receive briefs, and a
+  //    conversation_id must never match another tenant's row.
   const { data: current } = await supabase
     .from('concierge_briefs')
     .select('id, brief_revision')
+    .eq('tenant_id', tenantId)
     .eq('conversation_id', conversationId)
     .maybeSingle()
 
@@ -221,6 +224,7 @@ export async function ingestBrief(
     const { data: updated } = await supabase
       .from('concierge_briefs')
       .update(updateRow)
+      .eq('tenant_id', tenantId)
       .eq('conversation_id', conversationId)
       .lt('brief_revision', incomingRevision)
       .select('id, review_status')

@@ -96,6 +96,7 @@ export default function TenantDetailPage() {
     { key: 'email_integration', label: 'Email' },
     { key: 'pdf_generation', label: 'PDF Generation' },
     { key: 'analytics_enabled', label: 'Analytics' },
+    { key: 'concierge_enabled', label: 'AI Concierge' },
   ]
 
   return (

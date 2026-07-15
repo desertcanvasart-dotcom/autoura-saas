@@ -162,6 +162,26 @@ describe('validateBrief', () => {
     expect(validateBrief('nope').ok).toBe(false)
     expect(validateBrief([]).ok).toBe(false)
   })
+
+  it('accepts a brief with a brand key', () => {
+    const r = validateBrief({ conversation_id: 'abc', brand: 'Travel2Egypt' })
+    expect(r.ok).toBe(true)
+  })
+
+  it('rejects a non-string or empty brand', () => {
+    const r1 = validateBrief({ conversation_id: 'abc', brand: 42 })
+    expect(r1.ok).toBe(false)
+    if (!r1.ok) expect(r1.errors[0].field).toBe('brand')
+    const r2 = validateBrief({ conversation_id: 'abc', brand: '   ' })
+    expect(r2.ok).toBe(false)
+    if (!r2.ok) expect(r2.errors[0].field).toBe('brand')
+  })
+
+  it('rejects a brand longer than 64 characters', () => {
+    const r = validateBrief({ conversation_id: 'abc', brand: 'x'.repeat(65) })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.errors[0].field).toBe('brand')
+  })
 })
 
 // ============================================
@@ -220,5 +240,15 @@ describe('mapBrief', () => {
     expect(m.preferences.preferred_tier).toBe('luxury')
     expect(m.preferences.interests).toBe('history, food')
     expect(m.briefRevision).toBe(1)
+  })
+
+  it('stamps the normalized brand onto the brief row', () => {
+    const m = mapBrief({ conversation_id: 'abc', brand: '  Travel2Egypt ' })
+    expect(m.briefRow.brand).toBe('travel2egypt')
+  })
+
+  it('brand is null when absent', () => {
+    const m = mapBrief({ conversation_id: 'abc' })
+    expect(m.briefRow.brand).toBeNull()
   })
 })
