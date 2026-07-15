@@ -8,9 +8,12 @@
 // Idempotency: UNIQUE(conversation_id, brief_revision)             (see lib/concierge-brief-intake.ts)
 // Schema/map:  lib/concierge-brief-schema.ts
 //
-// Tenant: briefs are written tenant-scoped. The tenant is resolved from
-//         CONCIERGE_WEBHOOK_TENANT_ID, falling back to the first tenant
-//         (single-tenant deployments). (owner decision: default-tenant-via-env)
+// Tenant: briefs are written tenant-scoped. Routing (lib/concierge-brand-routing):
+//         payload `brand` -> concierge_brand_mappings (unmapped brand = 422);
+//         no brand -> CONCIERGE_WEBHOOK_TENANT_ID env, else the first tenant
+//         (legacy v1 path, owner decision: default-tenant-via-env). The
+//         resolved tenant must have tenant_features.concierge_enabled=true
+//         (403 otherwise) — the concierge is a per-tenant add-on.
 //
 // Dry-run: send header `X-Autoura-Dry-Run: true` (or ?dry_run=1) to verify
 //          signature + validate + preview the mapping WITHOUT writing.
@@ -32,6 +35,7 @@ import {
   DEFAULT_TOLERANCE_SECONDS,
 } from '@/lib/concierge-webhook-auth'
 import { validateBrief, mapBrief } from '@/lib/concierge-brief-schema'
+import { resolveConciergeTenant, isConciergeEnabled } from '@/lib/concierge-brand-routing'
 import { ingestBrief, type IngestOutcome } from '@/lib/concierge-brief-intake'
 import { promoteBriefToThread } from '@/lib/concierge/promote-brief-to-thread'
 
@@ -61,18 +65,6 @@ const STATUS_LABEL: Record<IngestOutcome, string> = {
   updated: 'updated',
   duplicate_ignored: 'duplicate_ignored',
   older_revision_filed: 'older_revision_filed',
-}
-
-/**
- * Resolve the tenant inbound briefs belong to. Prefers the explicit env var;
- * otherwise uses the first tenant (works cleanly for single-tenant installs).
- * Returns null if no tenant can be determined.
- */
-async function resolveTenantId(): Promise<string | null> {
-  const configured = process.env.CONCIERGE_WEBHOOK_TENANT_ID
-  if (configured) return configured
-  const { data } = await getSupabase().from('tenants').select('id').order('created_at', { ascending: true }).limit(1).maybeSingle()
-  return (data?.id as string) ?? null
 }
 
 export async function POST(request: NextRequest) {
@@ -118,11 +110,30 @@ export async function POST(request: NextRequest) {
     conversation_id: validation.payload.conversation_id,
     session_id: validation.payload.session_id,
     brief_revision: mapped.briefRevision,
+    brand: mapped.briefRow.brand ?? null,
     secret_used: verify.secretUsed,
     actionable: mapped.isActionable,
   })
 
-  // 5. Dry-run: stop here, no DB writes.
+  // 5. Route to a tenant (brand mapping, else env/first-tenant legacy path)
+  //    and enforce the per-tenant concierge switch. Runs before dry-run so a
+  //    dry-run previews the real outcome; reads only, no writes.
+  const routing = await resolveConciergeTenant(getSupabase(), validation.payload.brand)
+  if (!routing.ok) {
+    const status = routing.code === 'no_tenant' ? 500 : 422
+    console.warn('[concierge] routing rejected', { requestId, code: routing.code, brand: mapped.briefRow.brand ?? null })
+    return json({ success: false, error: routing.message, code: routing.code }, status)
+  }
+  if (!(await isConciergeEnabled(getSupabase(), routing.tenantId))) {
+    console.warn('[concierge] tenant has concierge disabled', { requestId, tenant_id: routing.tenantId, via: routing.via })
+    return json(
+      { success: false, error: 'The concierge feature is not enabled for the receiving tenant.', code: 'concierge_disabled' },
+      403
+    )
+  }
+  const tenantId = routing.tenantId
+
+  // 6. Dry-run: stop here, no DB writes.
   const dryRun =
     request.headers.get(DRY_RUN_HEADER) === 'true' ||
     new URL(request.url).searchParams.get('dry_run') === '1'
@@ -135,6 +146,12 @@ export async function POST(request: NextRequest) {
         dry_run: true,
         signature: { valid: true, secret_used: verify.secretUsed },
         validation: { ok: true },
+        routing: {
+          brand: routing.brand,
+          tenant_id: routing.tenantId,
+          via: routing.via,
+          concierge_enabled: true,
+        },
         would: {
           action: validation.payload.is_update ? 'update_or_file_revision' : 'create_or_replace_current',
           brief_revision: mapped.briefRevision,
@@ -154,13 +171,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 6. Resolve tenant, then ingest (idempotent upsert + revision history).
-  const tenantId = await resolveTenantId()
-  if (!tenantId) {
-    console.error('[concierge] no tenant resolved (set CONCIERGE_WEBHOOK_TENANT_ID)', { requestId })
-    return json({ success: false, error: 'No tenant configured to receive briefs.' }, 500)
-  }
-
+  // 7. Ingest (idempotent upsert + revision history).
   try {
     const result = await ingestBrief(mapped, { requestId, rawPayload: validation.payload }, getSupabase(), tenantId)
 
@@ -233,6 +244,14 @@ export async function GET(request: NextRequest) {
       },
       // Count only — never leaks secret values. 0 means env is not configured.
       secrets_configured: getConfiguredSecrets().length,
+      routing: {
+        brand_field:
+          'Optional payload field `brand` (string, <=64 chars, case-insensitive). Routes the brief to the tenant mapped in concierge_brand_mappings (super-admin managed). Unmapped or deactivated brand -> 422.',
+        fallback:
+          'No brand -> CONCIERGE_WEBHOOK_TENANT_ID env, else the oldest tenant (legacy single-tenant path).',
+        feature_gate:
+          'The resolved tenant must have the concierge feature enabled (tenant_features.concierge_enabled, toggled in super-admin) -> 403 `concierge_disabled` otherwise.',
+      },
       test_vector: {
         secret: TEST_SECRET,
         timestamp: TEST_TIMESTAMP,
