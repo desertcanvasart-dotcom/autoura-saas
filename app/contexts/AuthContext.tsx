@@ -19,6 +19,7 @@ interface AuthContextType {
   user: User | null
   profile: UserProfile | null
   loading: boolean
+  isSuperAdmin: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<void>
   signOut: () => Promise<void>
@@ -33,13 +34,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const router = useRouter()
+
+  // SUPER_ADMIN_EMAILS lives server-side; ask the server rather than guess.
+  const checkSuperAdmin = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/me')
+      const data = await res.json()
+      const flag = data?.isSuperAdmin === true
+      setIsSuperAdmin(flag)
+      return flag
+    } catch {
+      setIsSuperAdmin(false)
+      return false
+    }
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
       setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
+        checkSuperAdmin()
       } else {
         setLoading(false)
       }
@@ -51,8 +68,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
+        checkSuperAdmin()
       } else {
         setProfile(null)
+        setIsSuperAdmin(false)
         setLoading(false)
       }
     })
@@ -88,6 +107,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     if (error) throw error
+
+    // Platform owners land in the admin cockpit, not the agency app —
+    // they may not belong to any tenant at all.
+    if (await checkSuperAdmin()) {
+      router.push('/super-admin')
+      return
+    }
 
     // Check if user needs onboarding
     try {
@@ -148,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     profile,
     loading,
+    isSuperAdmin,
     signIn,
     signUp,
     signOut,
@@ -162,6 +189,7 @@ const noopAuthContext: AuthContextType = {
   user: null,
   profile: null,
   loading: true, // Treat as loading during SSR to prevent content flash
+  isSuperAdmin: false,
   signIn: async () => {},
   signUp: async () => {},
   signOut: async () => {},

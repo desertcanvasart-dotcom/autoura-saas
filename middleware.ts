@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isSuperAdmin } from '@/lib/super-admin-shared'
 
 // ============================================
 // API ROUTES THAT SELF-AUTHENTICATE
@@ -162,9 +163,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // If user is logged in and trying to access login/signup (but not homepage)
+  // If user is logged in and trying to access login/signup (but not homepage).
+  // Platform owners live in /super-admin, not the agency app.
   if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    const home = user.email && isSuperAdmin(user.email) ? '/super-admin' : '/dashboard'
+    return NextResponse.redirect(new URL(home, request.url))
   }
 
   // ============================================

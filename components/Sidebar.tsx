@@ -270,7 +270,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname()
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, isSuperAdmin } = useAuth()
   const { tenant, hasB2B, hasB2C } = useTenant()
   const { role, canAccess } = useRole()
 
@@ -477,6 +477,20 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
         {/* Tenant Switcher */}
         <TenantSwitcher isCollapsed={isCollapsed} />
+
+        {/* Platform owner shortcut — only rendered for SUPER_ADMIN_EMAILS accounts */}
+        {isSuperAdmin && (
+          <div className="px-2 pt-3">
+            <Link
+              href="/super-admin"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-purple-900/40 text-purple-300 hover:bg-purple-900/60 border border-purple-800/50"
+              title="Platform management"
+            >
+              <Shield className="w-4 h-4 shrink-0" />
+              {!isCollapsed && <span>Super Admin</span>}
+            </Link>
+          </div>
+        )}
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400">
