@@ -1,12 +1,13 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Search, User } from 'lucide-react'
+import { Search, User, Ban, CheckCircle2, Trash2 } from 'lucide-react'
 
 export default function UsersListPage() {
   const [users, setUsers] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const fetchUsers = useCallback(async () => {
     setLoading(true)
@@ -26,6 +27,37 @@ export default function UsersListPage() {
     const timer = setTimeout(fetchUsers, 300)
     return () => clearTimeout(timer)
   }, [fetchUsers])
+
+  const toggleActive = async (u: any) => {
+    const action = u.is_active ? 'disable' : 'enable'
+    if (u.is_active && !window.confirm(`Disable ${u.email}? They will be signed out and blocked from logging in.`)) return
+    setBusyId(u.id)
+    try {
+      const res = await fetch(`/api/super-admin/users/${u.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const data = await res.json()
+      if (!data.success) alert(data.error)
+      else await fetchUsers()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const deleteUser = async (u: any) => {
+    if (!window.confirm(`PERMANENTLY delete ${u.email}? Their profile and memberships are removed. This cannot be undone.`)) return
+    setBusyId(u.id)
+    try {
+      const res = await fetch(`/api/super-admin/users/${u.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!data.success) alert(data.error)
+      else await fetchUsers()
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   return (
     <div className="p-6">
@@ -60,6 +92,7 @@ export default function UsersListPage() {
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Role</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Status</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Joined</th>
+                <th className="text-right text-xs text-gray-400 font-medium px-5 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -87,10 +120,34 @@ export default function UsersListPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3 text-xs text-gray-500">{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => toggleActive(u)}
+                        disabled={busyId === u.id}
+                        title={u.is_active ? 'Disable user (blocks sign-in)' : 'Re-enable user'}
+                        className={`p-1.5 rounded-lg disabled:opacity-40 ${
+                          u.is_active
+                            ? 'text-amber-400 hover:bg-amber-900/30'
+                            : 'text-green-400 hover:bg-green-900/30'
+                        }`}
+                      >
+                        {u.is_active ? <Ban className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                      </button>
+                      <button
+                        onClick={() => deleteUser(u)}
+                        disabled={busyId === u.id}
+                        title="Permanently delete user"
+                        className="p-1.5 rounded-lg text-red-400 hover:bg-red-900/30 disabled:opacity-40"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {users.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-500">No users found</td></tr>
+                <tr><td colSpan={7} className="px-5 py-12 text-center text-gray-500">No users found</td></tr>
               )}
             </tbody>
           </table>
