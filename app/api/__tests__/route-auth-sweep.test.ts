@@ -47,6 +47,7 @@ const API_DIR = path.join(ROOT, 'app/api')
 // public/pre-session by design, nothing to prove.
 const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   '/api/webhooks/': ['verifyConciergeSignature'],
+  '/api/integrations/': ['SAWA_SYNC_SECRET'],
   '/api/auth/': null, // OAuth callbacks / pre-session by nature (state verified in-handler)
   '/api/cron/': ['CRON_SECRET'],
   '/api/version': null, // sha + uptime only, public by design
