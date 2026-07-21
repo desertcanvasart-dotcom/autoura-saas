@@ -166,9 +166,13 @@ export default function TenantDetailPage() {
             )}
           </div>
 
-          {/* Feature Flags */}
+          {/* Feature Flags — each tile is a live toggle (cursor/hover/tooltip
+              make that visible; they used to read as static status cards). */}
           <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-white mb-3">Feature Flags</h2>
+            <div className="flex items-baseline justify-between mb-3">
+              <h2 className="text-sm font-semibold text-white">Feature Flags</h2>
+              <span className="text-xs text-gray-500">Click a tile to toggle</span>
+            </div>
             <div className="grid grid-cols-3 gap-3">
               {featureToggles.map(ft => {
                 const enabled = features?.[ft.key] ?? false
@@ -177,10 +181,12 @@ export default function TenantDetailPage() {
                     key={ft.key}
                     onClick={() => handleToggleFeature(ft.key, enabled)}
                     disabled={saving === ft.key}
-                    className={`flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+                    aria-pressed={enabled}
+                    title={enabled ? `Disable ${ft.label}` : `Enable ${ft.label}`}
+                    className={`flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm transition-colors cursor-pointer disabled:cursor-wait ${
                       enabled
-                        ? 'bg-green-900/20 border-green-700/50 text-green-400'
-                        : 'bg-gray-800 border-gray-700 text-gray-500'
+                        ? 'bg-green-900/20 border-green-700/50 text-green-400 hover:bg-green-900/40 hover:border-green-500'
+                        : 'bg-gray-800 border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300 hover:bg-gray-700/40'
                     }`}
                   >
                     <span>{ft.label}</span>
