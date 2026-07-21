@@ -20,7 +20,9 @@ export async function GET() {
 
     const { data, error } = await auth.adminClient!
       .from('concierge_brand_mappings')
-      .select('id, brand_key, tenant_id, active, created_at, updated_at, tenants(name)')
+      // NB: the tenants column is company_name (tenants(name) does not exist —
+      // this join 500'd untouched until the UI page first exercised it).
+      .select('id, brand_key, tenant_id, active, created_at, updated_at, tenants(company_name)')
       .order('brand_key', { ascending: true })
     if (error) throw error
 
