@@ -1,27 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { loadFxContext, collectCurrencies, resolveReportingCurrency } from '@/lib/fx-report'
+import {
+  computeTripPnL,
+  buildPnlSummary,
+  type PnlCommission,
+  type PnlExpense,
+  type PnlInvoice,
+  type PnlItinerary,
+  type TripPnL,
+} from '@/lib/trip-pnl'
 
-interface TripPnL {
-  itinerary_id: string
-  itinerary_code: string
-  trip_name: string
-  client_name: string
-  start_date: string
-  end_date: string
-  status: string
-  currency: string
-  quoted_amount: number
-  total_revenue: number
-  total_paid: number
-  total_expenses: number
-  expenses_paid: number
-  expenses_pending: number
-  gross_profit: number
-  profit_margin: number
-  expense_breakdown: Record<string, number>
-  invoice_count: number
-  expense_count: number
-}
+// ============================================
+// GET /api/profit-loss
+// ============================================
+// Per-trip profit and loss.
+//
+// The arithmetic lives in lib/trip-pnl.ts (pure, unit-tested). This route
+// only gathers rows and hands them over. Two things it must fetch that the
+// earlier version did not:
+//
+//   - commissions, because a trip that pays an agent 15% has 15% less margin
+//   - exchange_rate_snapshots, so a cost paid in EGP against a EUR trip is
+//     converted at the rate on the day it was paid
+//
+// Costs that cannot be converted are excluded and reported as holes rather
+// than summed at face value; see lib/trip-pnl.ts for the policy.
+
+/**
+ * Above this many itinerary ids, an `.in()` filter makes the query string
+ * long enough to risk a PostgREST/proxy URL limit. Past it we fetch
+ * tenant-wide (RLS-scoped) and group in memory.
+ */
+const MAX_IN_FILTER_IDS = 300
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,33 +52,25 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       )
     }
+
     const searchParams = request.nextUrl.searchParams
     const itineraryId = searchParams.get('itineraryId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const status = searchParams.get('status')
+    // resolveReportingCurrency normalises this; empty means "infer it".
+    const requestedCurrency = searchParams.get('reportingCurrency')
 
-    // Fetch itineraries (RLS automatically filters by tenant_id)
+    // ---------- Itineraries (RLS filters by tenant) ----------
     let itineraryQuery = supabase
       .from('itineraries')
       .select('id, itinerary_code, trip_name, client_name, start_date, end_date, status, currency, total_cost')
       .order('start_date', { ascending: false })
 
-    if (itineraryId) {
-      itineraryQuery = itineraryQuery.eq('id', itineraryId)
-    }
-
-    if (status) {
-      itineraryQuery = itineraryQuery.eq('status', status)
-    }
-
-    if (startDate) {
-      itineraryQuery = itineraryQuery.gte('start_date', startDate)
-    }
-
-    if (endDate) {
-      itineraryQuery = itineraryQuery.lte('start_date', endDate)
-    }
+    if (itineraryId) itineraryQuery = itineraryQuery.eq('id', itineraryId)
+    if (status) itineraryQuery = itineraryQuery.eq('status', status)
+    if (startDate) itineraryQuery = itineraryQuery.gte('start_date', startDate)
+    if (endDate) itineraryQuery = itineraryQuery.lte('start_date', endDate)
 
     const { data: itineraries, error: itinError } = await itineraryQuery
 
@@ -80,94 +83,112 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([])
     }
 
-    // Fetch all invoices (RLS automatically filters by tenant_id)
-    const { data: invoices, error: invError } = await supabase
-      .from('invoices')
-      .select('itinerary_id, total_amount, amount_paid, status')
+    const itineraryIds = (itineraries as PnlItinerary[]).map(i => i.id)
 
-    if (invError) {
-      console.error('Error fetching invoices:', invError)
-    }
+    // ---------- Financial rows (RLS filters by tenant) ----------
+    // Narrow to the itineraries in view so a single-trip report does not pull
+    // the tenant's entire financial history. Past a few hundred ids the
+    // filter itself becomes a very long query string, so beyond that we fetch
+    // tenant-wide (RLS still scopes it) and group in memory instead.
+    const scopeToTrips = itineraryIds.length <= MAX_IN_FILTER_IDS
+    const scoped = <T>(query: T): T =>
+      scopeToTrips
+        ? ((query as { in: (col: string, vals: string[]) => T }).in('itinerary_id', itineraryIds))
+        : query
 
-    // Fetch all expenses (RLS automatically filters by tenant_id)
-    const { data: expenses, error: expError } = await supabase
-      .from('expenses')
-      .select('itinerary_id, amount, category, status')
+    const [invoiceResult, expenseResult, commissionResult] = await Promise.all([
+      scoped(
+        supabase
+          .from('invoices')
+          .select('itinerary_id, invoice_number, total_amount, amount_paid, currency, status, issue_date, paid_at')
+      ),
+      scoped(
+        supabase
+          .from('expenses')
+          .select('itinerary_id, expense_number, amount, currency, category, status, expense_date, payment_date')
+      ),
+      scoped(
+        supabase
+          .from('commissions')
+          .select('itinerary_id, description, source_name, commission_amount, currency, commission_type, category, status, transaction_date, paid_date, due_date')
+      ),
+    ])
 
-    if (expError) {
-      console.error('Error fetching expenses:', expError)
-    }
+    if (invoiceResult.error) console.error('Error fetching invoices:', invoiceResult.error)
+    if (expenseResult.error) console.error('Error fetching expenses:', expenseResult.error)
+    // Commissions are new to this report. A tenant whose commissions table is
+    // unreadable still gets a P&L — but it must not silently look complete,
+    // so the failure is surfaced on the response.
+    if (commissionResult.error) console.error('Error fetching commissions:', commissionResult.error)
 
-    // Build P&L for each itinerary
-    const pnlData: TripPnL[] = itineraries.map((itinerary: any) => {
-      // Get invoices for this itinerary
-      const itinInvoices = (invoices || []).filter(inv => inv.itinerary_id === itinerary.id)
-      const totalRevenue = itinInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0)
-      const totalPaid = itinInvoices.reduce((sum, inv) => sum + Number(inv.amount_paid || 0), 0)
+    const invoices = (invoiceResult.data || []) as PnlInvoice[]
+    const expenses = (expenseResult.data || []) as PnlExpense[]
+    const commissions = (commissionResult.data || []) as PnlCommission[]
 
-      // Get expenses for this itinerary
-      const itinExpenses = (expenses || []).filter(exp => exp.itinerary_id === itinerary.id)
-      const totalExpenses = itinExpenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
-      const expensesPaid = itinExpenses
-        .filter(exp => exp.status === 'paid')
-        .reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
-      const expensesPending = itinExpenses
-        .filter(exp => exp.status !== 'paid' && exp.status !== 'rejected')
-        .reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
-
-      // Calculate expense breakdown by category
-      const expenseBreakdown: Record<string, number> = {}
-      itinExpenses.forEach(exp => {
-        const cat = exp.category || 'other'
-        expenseBreakdown[cat] = (expenseBreakdown[cat] || 0) + Number(exp.amount || 0)
-      })
-
-      // Calculate profit
-      // Use totalRevenue if invoices exist, otherwise use quoted amount
-      const revenueForCalc = totalRevenue > 0 ? totalRevenue : Number(itinerary.total_cost || 0)
-      const grossProfit = revenueForCalc - totalExpenses
-      const profitMargin = revenueForCalc > 0 ? (grossProfit / revenueForCalc) * 100 : 0
-
-      return {
-        itinerary_id: itinerary.id,
-        itinerary_code: itinerary.itinerary_code,
-        trip_name: itinerary.trip_name,
-        client_name: itinerary.client_name,
-        start_date: itinerary.start_date,
-        end_date: itinerary.end_date,
-        status: itinerary.status,
-        currency: itinerary.currency || 'EUR',
-        quoted_amount: Number(itinerary.total_cost || 0),
-        total_revenue: totalRevenue,
-        total_paid: totalPaid,
-        total_expenses: totalExpenses,
-        expenses_paid: expensesPaid,
-        expenses_pending: expensesPending,
-        gross_profit: grossProfit,
-        profit_margin: profitMargin,
-        expense_breakdown: expenseBreakdown,
-        invoice_count: itinInvoices.length,
-        expense_count: itinExpenses.length
-      }
+    // ---------- Exchange rates (shared loader, see lib/fx-report.ts) ----------
+    const reportingCurrency = resolveReportingCurrency(
+      itineraries as PnlItinerary[],
+      requestedCurrency
+    )
+    const fxContext = await loadFxContext(supabase, {
+      currencies: collectCurrencies(
+        itineraries as PnlItinerary[], invoices, expenses, commissions
+      ),
+      reportingCurrency,
     })
+    const { fxIndex, liveRate } = fxContext
 
-    // Calculate summary stats
-    const summary = {
-      total_trips: pnlData.length,
-      total_revenue: pnlData.reduce((sum, p) => sum + (p.total_revenue || p.quoted_amount), 0),
-      total_expenses: pnlData.reduce((sum, p) => sum + p.total_expenses, 0),
-      total_profit: pnlData.reduce((sum, p) => sum + p.gross_profit, 0),
-      average_margin: pnlData.length > 0 
-        ? pnlData.reduce((sum, p) => sum + p.profit_margin, 0) / pnlData.length 
-        : 0,
-      profitable_trips: pnlData.filter(p => p.gross_profit > 0).length,
-      loss_trips: pnlData.filter(p => p.gross_profit < 0).length
+    // ---------- Group rows by trip ----------
+    const invoicesByTrip = new Map<string, PnlInvoice[]>()
+    const expensesByTrip = new Map<string, PnlExpense[]>()
+    const commissionsByTrip = new Map<string, PnlCommission[]>()
+
+    function pushInto<T extends { itinerary_id: string | null }>(
+      map: Map<string, T[]>,
+      rows: T[]
+    ): void {
+      for (const row of rows) {
+        if (!row.itinerary_id) continue
+        const bucket = map.get(row.itinerary_id)
+        if (bucket) bucket.push(row)
+        else map.set(row.itinerary_id, [row])
+      }
     }
+
+    pushInto(invoicesByTrip, invoices)
+    pushInto(expensesByTrip, expenses)
+    pushInto(commissionsByTrip, commissions)
+
+    // ---------- Compute ----------
+    const pnlData: TripPnL[] = (itineraries as PnlItinerary[]).map(itinerary =>
+      computeTripPnL({
+        itinerary,
+        invoices: invoicesByTrip.get(itinerary.id) || [],
+        expenses: expensesByTrip.get(itinerary.id) || [],
+        commissions: commissionsByTrip.get(itinerary.id) || [],
+        fxIndex,
+        liveRate,
+      })
+    )
+
+    const summary = buildPnlSummary({
+      trips: pnlData,
+      reportingCurrency,
+      fxIndex,
+      liveRate,
+    })
 
     return NextResponse.json({
       success: true,
       data: pnlData,
-      summary
+      summary,
+      meta: {
+        reporting_currency: reportingCurrency,
+        /** False when no snapshot history exists yet and everything used live rates. */
+        fx_history_available: fxContext.historyAvailable,
+        snapshot_count: fxContext.snapshotCount,
+        commissions_available: !commissionResult.error,
+      },
     })
   } catch (error) {
     console.error('Error in P&L GET:', error)

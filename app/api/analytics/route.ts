@@ -1,9 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import {
+  loadFxContext,
+  convertMoneyRows,
+  resolveReportingCurrency,
+  collectCurrencies,
+} from '@/lib/fx-report'
+import { mergeFxSummary, emptyFxSummary, type FxHole } from '@/lib/fx-conversion'
+
+// ============================================
+// GET /api/analytics
+// ============================================
+// Two defects fixed here, both of which made every revenue figure wrong:
+//
+//   1. The itinerary query selected `total_price` and `cities`. NEITHER
+//      COLUMN EXISTS (the columns are `total_cost` and `destinations`), so
+//      PostgREST rejected the whole query with 42703, `.data` came back null,
+//      and every downstream number — revenue, growth, forecast, average deal
+//      size, destination breakdown — silently computed to zero. Verified
+//      against the live schema on 2026-07-26.
+//
+//   2. Revenue was summed straight across currencies, so an EGP trip added
+//      its face value to a EUR total.
+//
+// Money is now restated into one reporting currency at each trip's own date;
+// anything that cannot be converted is excluded and reported rather than
+// added at face value.
+
+/** Trip statuses that count as booked revenue. */
+const REVENUE_STATUSES = ['confirmed', 'completed']
+
+interface AnalyticsItinerary {
+  id?: string
+  status?: string | null
+  total_cost?: number | string | null
+  currency?: string | null
+  start_date?: string | null
+  destinations?: string[] | null
+  created_at?: string | null
+  itinerary_code?: string | null
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const range = searchParams.get('range') || '30d'
+  const requestedCurrency = searchParams.get('reportingCurrency')
 
   try {
     // Require authentication
@@ -46,18 +87,24 @@ export async function GET(request: NextRequest) {
 
     const startDateStr = startDate.toISOString()
 
+    // Previous equal-length window, for the growth comparison.
+    const previousStartDate = new Date(startDate.getTime() - (now.getTime() - startDate.getTime()))
+
     // Fetch all data in parallel
     const [
       itinerariesResult,
       clientsResult,
       leadsResult,
       followUpsResult,
-      revenueByWeekResult
+      revenueByWeekResult,
+      previousItinerariesResult
     ] = await Promise.all([
-      // Itineraries (bookings) in date range
+      // Itineraries (bookings) in date range.
+      // Columns verified against the live schema — `total_cost`, not
+      // `total_price`; `destinations` (TEXT[]), not `cities`.
       supabase
         .from('itineraries')
-        .select('id, status, total_price, start_date, cities, created_at')
+        .select('id, itinerary_code, status, total_cost, currency, start_date, destinations, created_at')
         .gte('created_at', startDateStr),
       
       // All clients with status
@@ -81,17 +128,79 @@ export async function GET(request: NextRequest) {
       // Revenue by week for trend chart
       supabase
         .from('itineraries')
-        .select('total_price, created_at')
-        .in('status', ['confirmed', 'completed'])
+        .select('itinerary_code, total_cost, currency, created_at')
+        .in('status', REVENUE_STATUSES)
         .gte('created_at', startDateStr)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: true }),
+
+      // Previous period, for growth
+      supabase
+        .from('itineraries')
+        .select('itinerary_code, total_cost, currency, status, created_at')
+        .gte('created_at', previousStartDate.toISOString())
+        .lt('created_at', startDateStr)
+        .in('status', REVENUE_STATUSES)
     ])
 
-    const itineraries = itinerariesResult.data || []
+    // A failed itinerary query used to be indistinguishable from "no trips".
+    // Surface it instead of reporting zeros as though they were real.
+    if (itinerariesResult.error) {
+      console.error('Analytics: itineraries query failed:', itinerariesResult.error)
+      return NextResponse.json(
+        { success: false, error: 'Failed to load bookings data' },
+        { status: 500 }
+      )
+    }
+
+    const rawItineraries = (itinerariesResult.data || []) as AnalyticsItinerary[]
     const clients = clientsResult.data || []
     const leadsCount = leadsResult.count || 0
     const followUpsCount = followUpsResult.count || 0
-    const revenueData = revenueByWeekResult.data || []
+    const rawRevenueData = (revenueByWeekResult.data || []) as AnalyticsItinerary[]
+    const rawPreviousItineraries = (previousItinerariesResult.data || []) as AnalyticsItinerary[]
+
+    // ---------- Restate every amount into one currency ----------
+    // Trips are converted at their own creation date, which is the date the
+    // rest of this report buckets them by.
+    const reportingCurrency = resolveReportingCurrency(rawItineraries, requestedCurrency)
+    const fxContext = await loadFxContext(supabase, {
+      currencies: collectCurrencies(rawItineraries, rawRevenueData, rawPreviousItineraries),
+      reportingCurrency,
+    })
+
+    const convertSpec = {
+      currency: (row: AnalyticsItinerary) => row.currency,
+      date: (row: AnalyticsItinerary) => row.created_at,
+      fields: ['total_cost'],
+      kind: 'revenue' as FxHole['kind'],
+      reference: (row: AnalyticsItinerary) => row.itinerary_code || 'trip',
+    }
+
+    const convertedCurrent = convertMoneyRows(fxContext, rawItineraries, convertSpec)
+    const convertedRevenue = convertMoneyRows(fxContext, rawRevenueData, convertSpec)
+    const convertedPrevious = convertMoneyRows(fxContext, rawPreviousItineraries, convertSpec)
+
+    const fx = emptyFxSummary()
+    mergeFxSummary(fx, convertedCurrent.fx)
+    mergeFxSummary(fx, convertedRevenue.fx)
+    mergeFxSummary(fx, convertedPrevious.fx)
+    const holes: FxHole[] = [
+      ...convertedCurrent.holes,
+      ...convertedRevenue.holes,
+      ...convertedPrevious.holes,
+    ]
+
+    // Counts (bookings, conversion rate) use every trip, including any whose
+    // amount could not be converted — a trip still happened even if its money
+    // could not be restated.
+    const itineraries = rawItineraries
+    // Money totals use only the rows that converted.
+    const convertibleItineraries = convertedCurrent.rows
+
+    const amountOf = (row: AnalyticsItinerary): number => {
+      const value = Number(row.total_cost ?? 0)
+      return Number.isFinite(value) ? value : 0
+    }
 
     // Calculate booking stats
     const bookingStats = {
@@ -103,12 +212,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate revenue
-    const confirmedItineraries = itineraries.filter(i => 
-      i.status === 'confirmed' || i.status === 'completed'
+    const confirmedItineraries = convertibleItineraries.filter(i =>
+      REVENUE_STATUSES.includes(i.status || '')
     )
-    const totalRevenue = confirmedItineraries.reduce((sum, i) => 
-      sum + (parseFloat(i.total_price) || 0), 0
-    )
+    const totalRevenue = confirmedItineraries.reduce((sum, i) => sum + amountOf(i), 0)
 
     // Calculate client stats
     const totalClients = clients.length
@@ -116,8 +223,8 @@ export async function GET(request: NextRequest) {
     const returningClients = clients.filter(c => c.status === 'customer').length
 
     // Calculate conversion rate (confirmed / total inquiries)
-    const conversionRate = bookingStats.total > 0 
-      ? (bookingStats.confirmed / bookingStats.total) * 100 
+    const conversionRate = bookingStats.total > 0
+      ? (bookingStats.confirmed / bookingStats.total) * 100
       : 0
 
     // Calculate average deal size
@@ -126,21 +233,27 @@ export async function GET(request: NextRequest) {
       : 0
 
     // Group revenue by week for trend chart
-    const weeklyRevenue = groupByWeek(revenueData, range)
+    const weeklyRevenue = groupByWeek(convertedRevenue.rows, range)
 
-    // Calculate destination stats from itineraries
+    // Calculate destination stats from itineraries.
+    // `destinations` is TEXT[] on itineraries; revenue per destination uses
+    // the converted rows only.
+    const convertedById = new Map(
+      convertibleItineraries.map(row => [row.id, row])
+    )
     const destinationMap = new Map<string, { bookings: number; revenue: number }>()
     itineraries.forEach(itinerary => {
-      if (itinerary.cities && Array.isArray(itinerary.cities)) {
-        itinerary.cities.forEach((city: string) => {
-          const existing = destinationMap.get(city) || { bookings: 0, revenue: 0 }
-          existing.bookings += 1
-          if (itinerary.status === 'confirmed' || itinerary.status === 'completed') {
-            existing.revenue += parseFloat(itinerary.total_price) || 0
-          }
-          destinationMap.set(city, existing)
-        })
-      }
+      if (!Array.isArray(itinerary.destinations)) return
+      itinerary.destinations.forEach((city: string) => {
+        if (!city) return
+        const existing = destinationMap.get(city) || { bookings: 0, revenue: 0 }
+        existing.bookings += 1
+        if (REVENUE_STATUSES.includes(itinerary.status || '')) {
+          const converted = convertedById.get(itinerary.id)
+          if (converted) existing.revenue += amountOf(converted)
+        }
+        destinationMap.set(city, existing)
+      })
     })
 
     const destinations = Array.from(destinationMap.entries())
@@ -149,19 +262,9 @@ export async function GET(request: NextRequest) {
       .slice(0, 5)
 
     // Calculate growth (compare to previous period)
-    const previousStartDate = new Date(startDate.getTime() - (now.getTime() - startDate.getTime()))
-    const { data: previousItineraries } = await supabase
-      .from('itineraries')
-      .select('total_price, status')
-      .gte('created_at', previousStartDate.toISOString())
-      .lt('created_at', startDateStr)
-      .in('status', ['confirmed', 'completed'])
+    const previousRevenue = convertedPrevious.rows.reduce((sum, i) => sum + amountOf(i), 0)
 
-    const previousRevenue = (previousItineraries || []).reduce((sum, i) => 
-      sum + (parseFloat(i.total_price) || 0), 0
-    )
-    
-    const revenueGrowth = previousRevenue > 0 
+    const revenueGrowth = previousRevenue > 0
       ? ((totalRevenue - previousRevenue) / previousRevenue) * 100
       : totalRevenue > 0 ? 100 : 0
 
@@ -198,6 +301,15 @@ export async function GET(request: NextRequest) {
         cancelled: bookingStats.cancelled,
         confirmed: bookingStats.confirmed,
         completed: bookingStats.completed
+      },
+      // What currency the money above is in, and how exact it is.
+      currency: {
+        reporting_currency: reportingCurrency,
+        fx,
+        complete: holes.length === 0,
+        excluded_trips: holes.length,
+        holes,
+        fx_history_available: fxContext.historyAvailable,
       }
     }
 
@@ -211,8 +323,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Helper to group revenue by week
-function groupByWeek(data: any[], range: string): { month: string; revenue: number }[] {
+// Helper to group revenue by week.
+// Receives rows already restated into the reporting currency, so `total_cost`
+// here is a converted number — never a raw foreign amount.
+function groupByWeek(
+  data: Array<{ total_cost?: number | string | null; created_at?: string | null }>,
+  range: string
+): { month: string; revenue: number }[] {
   if (data.length === 0) {
     // Return empty weeks based on range
     const weeks = range === '7d' ? 1 : range === '30d' ? 4 : range === '90d' ? 12 : 52
@@ -225,12 +342,14 @@ function groupByWeek(data: any[], range: string): { month: string; revenue: numb
   const weekMap = new Map<string, number>()
   
   data.forEach(item => {
+    if (!item.created_at) return
     const date = new Date(item.created_at)
     const weekStart = getWeekStart(date)
     const weekKey = weekStart.toISOString().split('T')[0]
-    
+
+    const amount = Number(item.total_cost ?? 0)
     const existing = weekMap.get(weekKey) || 0
-    weekMap.set(weekKey, existing + (parseFloat(item.total_price) || 0))
+    weekMap.set(weekKey, existing + (Number.isFinite(amount) ? amount : 0))
   })
 
   // Convert to array and sort

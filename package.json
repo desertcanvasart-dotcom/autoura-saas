@@ -10,6 +10,7 @@
     "build": "NODE_OPTIONS=--max-old-space-size=4096 next build",
     "start": "next start",
     "cron:agent-memory": "node scripts/cron-agent-memory.mjs",
+    "cron:exchange-rates": "node scripts/cron-exchange-rates.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",

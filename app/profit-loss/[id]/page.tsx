@@ -14,7 +14,9 @@ import {
   User,
   MapPin,
   ExternalLink,
-  Plus
+  Plus,
+  Handshake,
+  AlertTriangle
 } from 'lucide-react'
 
 interface TripPnL {
@@ -32,11 +34,33 @@ interface TripPnL {
   total_expenses: number
   expenses_paid: number
   expenses_pending: number
+  commissions_receivable: number
+  commissions_payable: number
+  net_commission: number
+  commission_breakdown: Record<string, { receivable: number; payable: number }>
   gross_profit: number
   profit_margin: number
   expense_breakdown: Record<string, number>
   invoice_count: number
   expense_count: number
+  commission_count: number
+  fx: {
+    same_currency: number
+    historical: number
+    live: number
+    unconverted: number
+    all_historical: boolean
+  }
+  complete: boolean
+  holes: Array<{
+    kind: string
+    reference: string
+    amount: number
+    fromCurrency: string
+    toCurrency: string
+    date: string | null
+    message: string
+  }>
 }
 
 interface Invoice {
@@ -215,7 +239,7 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Main P&L Card */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
           {/* Revenue */}
           <div className="text-center p-4 bg-blue-50 rounded-lg">
             <div className="flex items-center justify-center gap-2 mb-2">
@@ -256,6 +280,37 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
             )}
           </div>
 
+          {/* Commission operator — sign follows the net direction, so the
+              equation on screen always reconciles with the profit figure. */}
+          <div className="flex items-center justify-center text-2xl text-gray-400">
+            {pnlData.net_commission >= 0 ? '+' : '−'}
+          </div>
+
+          {/* Commission */}
+          <div className="text-center p-4 bg-amber-50 rounded-lg">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <Handshake className="h-5 w-5 text-amber-600" />
+              <span className="text-sm font-medium text-amber-600">Commission</span>
+            </div>
+            <p className="text-2xl font-bold text-amber-700">
+              {getCurrencySymbol(pnlData.currency)}
+              {Math.abs(pnlData.net_commission).toLocaleString()}
+            </p>
+            {pnlData.commission_count > 0 ? (
+              <p className="text-xs text-amber-600 mt-1">
+                {pnlData.commissions_receivable > 0 && (
+                  <>in {getCurrencySymbol(pnlData.currency)}{pnlData.commissions_receivable.toLocaleString()}</>
+                )}
+                {pnlData.commissions_receivable > 0 && pnlData.commissions_payable > 0 && ' · '}
+                {pnlData.commissions_payable > 0 && (
+                  <>out {getCurrencySymbol(pnlData.currency)}{pnlData.commissions_payable.toLocaleString()}</>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs text-amber-500 mt-1">None recorded</p>
+            )}
+          </div>
+
           {/* Equals */}
           <div className="flex items-center justify-center text-2xl text-gray-400">
             =
@@ -282,6 +337,36 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </div>
+
+      {/* Provenance — how exact is the number above? */}
+      {(!pnlData.complete || pnlData.fx.live > 0) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-amber-900">
+              {!pnlData.complete ? (
+                <>
+                  <p className="font-medium mb-1">
+                    This margin is incomplete — {pnlData.holes.length} amount
+                    {pnlData.holes.length > 1 ? 's are' : ' is'} missing from it.
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5 text-xs text-amber-800">
+                    {pnlData.holes.map((hole, i) => (
+                      <li key={`${hole.reference}-${i}`}>{hole.message}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p>
+                  {pnlData.fx.live} amount{pnlData.fx.live > 1 ? 's were' : ' was'} converted at
+                  today&apos;s exchange rate because no rate was on file for the transaction date.
+                  The real margin may differ.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

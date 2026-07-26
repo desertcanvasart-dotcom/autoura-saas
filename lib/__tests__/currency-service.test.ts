@@ -7,6 +7,7 @@ import {
   getFallbackRates,
   persistExchangeRate,
   getHistoricalRate,
+  buildSnapshotRows,
   type ExchangeRates,
 } from '@/lib/currency-service'
 
@@ -363,5 +364,91 @@ describe('getHistoricalRate', () => {
   it('returns null when the client throws', async () => {
     const supabase = { from: () => { throw new Error('no client') } }
     expect(await getHistoricalRate(supabase, 'EUR', 'EGP')).toBeNull()
+  })
+})
+
+// The payload the daily refresh cron writes into exchange_rate_snapshots.
+// This history is what the P&L, analytics and financial reports convert
+// against, so a bad row here quietly corrupts margins for as long as it sits
+// in the table.
+describe('buildSnapshotRows', () => {
+  const AT = '2026-07-26T01:00:00.000Z'
+
+  const fetched = [
+    { base_currency: 'EUR', target_currency: 'USD', rate: 1.08 },
+    { base_currency: 'EUR', target_currency: 'EGP', rate: 53.5 },
+    { base_currency: 'USD', target_currency: 'EUR', rate: 0.926 },
+  ]
+
+  it('maps fetched rates onto snapshot rows', () => {
+    const rows = buildSnapshotRows(fetched, AT)
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toEqual({
+      base_currency: 'EUR',
+      target_currency: 'USD',
+      rate: 1.08,
+      source: 'er-api',
+      captured_at: AT,
+    })
+  })
+
+  it('stamps every row in a batch with the same instant', () => {
+    // The UNIQUE(base, target, captured_at) constraint is what makes a
+    // double-run idempotent — that only works if the batch shares a timestamp.
+    const rows = buildSnapshotRows(fetched, AT)
+    expect(new Set(rows.map(r => r.captured_at)).size).toBe(1)
+  })
+
+  it('drops rates that would poison the history', () => {
+    const rows = buildSnapshotRows(
+      [
+        { base_currency: 'EUR', target_currency: 'EGP', rate: 0 },
+        { base_currency: 'EUR', target_currency: 'USD', rate: -1 },
+        { base_currency: 'EUR', target_currency: 'GBP', rate: NaN },
+        { base_currency: 'EUR', target_currency: 'JPY', rate: Infinity },
+      ],
+      AT
+    )
+    expect(rows).toEqual([])
+  })
+
+  it('drops rows with a missing or self-referential pair', () => {
+    const rows = buildSnapshotRows(
+      [
+        { base_currency: '', target_currency: 'EGP', rate: 50 },
+        { base_currency: 'EUR', target_currency: '', rate: 50 },
+        { base_currency: 'EUR', target_currency: 'EUR', rate: 1 },
+      ],
+      AT
+    )
+    expect(rows).toEqual([])
+  })
+
+  it('keeps only the first of a duplicated pair, so the insert cannot self-collide', () => {
+    const rows = buildSnapshotRows(
+      [
+        { base_currency: 'EUR', target_currency: 'EGP', rate: 53.5 },
+        { base_currency: 'EUR', target_currency: 'EGP', rate: 54.0 },
+      ],
+      AT
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].rate).toBe(53.5)
+  })
+
+  it('normalises currency case', () => {
+    const rows = buildSnapshotRows([{ base_currency: 'eur', target_currency: 'egp', rate: 53.5 }], AT)
+    expect(rows[0].base_currency).toBe('EUR')
+    expect(rows[0].target_currency).toBe('EGP')
+  })
+
+  it('accepts an explicit source label', () => {
+    const rows = buildSnapshotRows(fetched, AT, 'manual')
+    expect(rows.every(r => r.source === 'manual')).toBe(true)
+  })
+
+  it('tolerates an empty or nullish batch', () => {
+    expect(buildSnapshotRows([], AT)).toEqual([])
+    expect(buildSnapshotRows(null as never, AT)).toEqual([])
   })
 })
