@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { gateStructural } from '@/lib/usage-enforcement'
 
 // ============================================
 // B2B PARTNERS API
@@ -69,6 +70,12 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
+    // Plan limit: B2B partners. Structural — a live count of what exists, and
+    // a hard block at 100%: adding a partner is a planned decision, not
+    // something done mid-quote, so blocking cannot strand anyone.
+    const gate = await gateStructural(supabase, tenant_id!, 'b2b_partners', 'B2B partners')
+    if (!gate.ok) return gate.response!
+
     const body = await request.json()
 
     if (!body.partner_code) {

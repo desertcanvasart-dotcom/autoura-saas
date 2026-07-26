@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { gateVolume, incrementVolumeUsage, loadUsageAnchor } from '@/lib/usage-enforcement'
 
 // Generate unique itinerary code
 function generateItineraryCode(): string {
@@ -76,6 +77,12 @@ export async function POST(request: NextRequest) {
         { status: 401 }
       )
     }
+    // Plan limit: itineraries per year. Warns at 80%, allows overage past
+    // 100%, stops at 125% — see lib/usage-grace.ts. Checked BEFORE creating so
+    // a blocked request never leaves a half-made record.
+    const gate = await gateVolume(supabase, tenant_id!, 'itineraries', 'itineraries this year')
+    if (!gate.ok) return gate.response!
+
     const body = await request.json()
 
     // Generate itinerary_code if not provided
@@ -118,9 +125,15 @@ export async function POST(request: NextRequest) {
       throw error
     }
 
+    // Count it only now that it exists — incrementing earlier would burn
+    // allowance on failed creates. Fire-and-forget: a lost increment
+    // under-counts, a thrown one would fail a create that already succeeded.
+    incrementVolumeUsage(supabase, tenant_id!, 'itineraries', await loadUsageAnchor(supabase, tenant_id!))
+
     return NextResponse.json({
       success: true,
-      data
+      data,
+      ...(gate.usage ? { usage: gate.usage } : {})
     })
   } catch (error: any) {
     console.error('API error:', error)
