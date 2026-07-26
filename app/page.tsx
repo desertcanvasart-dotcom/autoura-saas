@@ -182,12 +182,15 @@ function PlatformSlot() {
 
 // ── NEW DATA ARRAYS ──
 
+// Every figure here is verified against the code, and is one a DMC owner
+// actually weighs. Endpoint and module counts were removed: they are
+// engineer-facing, and they invited scrutiny we kept failing.
 const socialProofStats = [
-  { value: '222+', label: 'API Endpoints' },
-  { value: '53+', label: 'Operational Modules' },
   { value: '15', label: 'Rate Categories' },
-  { value: '4', label: 'Service Tiers' },
-  { value: '2', label: 'Messaging Platforms (more coming soon)' },
+  { value: '1\u201340', label: 'Pax Rate Sheets' },
+  { value: '29', label: 'Languages on Messaging' },
+  { value: '13', label: 'Commission Categories' },
+  { value: '8', label: 'Payment Methods' },
 ]
 
 const problemScenarios = [
@@ -233,7 +236,7 @@ const platformStages = [
   {
     step: 1,
     headline: 'Every Inquiry, One Inbox',
-    description: 'WhatsApp messages, emails, and walk-in inquiries land in a single unified inbox. AI extracts client name, dates, group size, nationality, and preferences from the conversation. Client profiles are created automatically.',
+    description: 'WhatsApp and Gmail conversations land in a single unified inbox. Paste a conversation into the parser and AI extracts client name, dates, group size, nationality and preferences, each with a confidence score, ready for you to review before anything is saved.',
     screenshotNote: 'Capture /whatsapp-inbox showing conversations with parsed metadata badges',
     mockupImage: '/mockups/inbox.png',
     icon: Inbox,
@@ -270,10 +273,10 @@ const capabilityClusters = [
     iconBg: 'bg-emerald-100 text-emerald-700',
     title: 'AI & Automation',
     bullets: [
-      'WhatsApp parsing with 200+ Egyptian abbreviation recognition',
+      'WhatsApp parsing with 74 Egyptian travel abbreviations decoded',
       'Auto-itinerary generation from unstructured conversations',
       'Confidence scoring on every extracted field',
-      'Multi-language document generation (EN, JP)',
+      'Client messaging in 29 languages (documents are English today)',
     ],
     badge: '5 AI modules',
   },
