@@ -81,50 +81,36 @@ export default function TeamSettingsPage() {
           <li><strong>Default Currency</strong> &mdash; Set your preferred currency (EUR, USD, etc.)</li>
           <li><strong>Default Tier</strong> &mdash; Set a default quality tier for new itineraries</li>
           <li><strong>Default Margin</strong> &mdash; Set a default markup percentage</li>
-          <li><strong>Language</strong> &mdash; Choose between English and Japanese for the interface</li>
         </ul>
         <DocScreenshot src="/docs/team-settings/settings-preferences.jpg" alt="Settings page showing preferences section with cost mode, currency, tier, and language options" />
       </section>
 
       {/* Multilingual */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Multilingual Support</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Working in Other Languages</h2>
         <p className="text-gray-600 mb-4">
-          Autoura supports creating content in multiple languages (currently English and Japanese).
+          Autoura handles client <strong>messaging</strong> in 29 languages. Client-facing
+          <strong> documents</strong> &mdash; quotes, invoices, receipts, vouchers &mdash; are
+          generated in English today; additional document languages are on the roadmap.
         </p>
 
-        <h3 className="text-lg font-medium text-gray-900 mb-3">Switching the Interface Language</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-3">Translating a Conversation</h3>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>Settings &gt; Preferences</strong></li>
-          <li>Change <strong>Language</strong> to your preferred language</li>
-          <li>The entire interface (menus, buttons, labels) switches to that language</li>
+          <li>Open a WhatsApp or email conversation</li>
+          <li>Open the <strong>translation panel</strong> on the message</li>
+          <li>The language is detected automatically; pick a different one if the detection is wrong</li>
+          <li>Use <strong>Re-translate</strong> if you want another pass</li>
         </ol>
 
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Creating Translated Itineraries</h3>
-        <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Open an itinerary</li>
-          <li>You see language tabs at the top: <strong>English</strong> and <strong>Japanese</strong></li>
-          <li>Click the <strong>Japanese</strong> tab</li>
-          <li>If no Japanese version exists, choose:
-            <ul className="list-disc list-inside ml-6 mt-2 space-y-1 text-gray-600">
-              <li><strong>Create from Scratch</strong> &mdash; Start with a blank Japanese version</li>
-              <li><strong>Copy &amp; Translate</strong> &mdash; Automatically translate the English content using AI</li>
-            </ul>
-          </li>
-          <li>All day titles, descriptions, service names, inclusions, and exclusions are translated</li>
-        </ol>
-        <ScreenshotPlaceholder caption="Itinerary page with language tabs showing English and Japanese, with Copy & Translate button" />
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Replying in the Client&apos;s Language</h3>
+        <p className="text-gray-600 mb-3">
+          The AI copilot drafts replies in whatever language the client wrote in. You review and
+          approve every draft before it is sent &mdash; nothing goes out automatically.
+        </p>
 
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Re-translating</h3>
-        <p className="text-gray-600 mb-3">If the translation needs to be redone:</p>
-        <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Switch to the Japanese tab</li>
-          <li>Click <strong>Re-translate from English</strong></li>
-          <li>Confirm in the dialog</li>
-          <li>The system creates a fresh translation</li>
-        </ol>
         <Tip>
-          When editing rates while in Japanese mode, translated names are saved separately &mdash; the English names are never overwritten.
+          The staff interface is English. Language settings affect how you communicate with
+          clients, not how the app is labelled.
         </Tip>
       </section>
 
