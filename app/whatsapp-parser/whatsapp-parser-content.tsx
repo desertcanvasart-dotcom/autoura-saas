@@ -1863,6 +1863,24 @@ function WhatsAppParserContent() {
                         </p>
                       </div>
                     </div>
+                    {/* Pricing was withheld because rate data is missing. The
+                        itinerary is still real and saved — only the price is
+                        absent — so this reads as "finish setup", not "failed". */}
+                    {generatedItinerary.pricing_complete === false && (
+                      <div className="mb-3 bg-amber-50 border border-amber-300 rounded-lg p-3">
+                        <p className="text-sm font-semibold text-amber-900">Not priced yet</p>
+                        <p className="text-xs text-amber-800 mt-1">
+                          {generatedItinerary.pricing_blocked_reason}
+                        </p>
+                        {Array.isArray(generatedItinerary.pricing_gaps) && (
+                          <ul className="mt-2 space-y-1">
+                            {generatedItinerary.pricing_gaps.map((gap: string, i: number) => (
+                              <li key={i} className="text-xs text-amber-800">• {gap}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <button
                         onClick={() => router.push(`/itineraries/${generatedItinerary.id}`)}
