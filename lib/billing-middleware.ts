@@ -33,6 +33,18 @@ export interface UsageTrackingResult {
 }
 
 /**
+ * @deprecated Superseded by lib/usage-limits.ts.
+ *
+ * This reads limits from `subscription_plans` columns and has no concept of
+ * grace bands, so it hard-blocks at 100% — which is wrong for volume metrics
+ * (blocking a DMC mid-season is a churn event) and it cannot express
+ * itineraries/year, B2B partners or brands at all.
+ *
+ * New code should use `checkStructuralLimit` / `checkVolumeLimit`, which read
+ * the canonical `lib/pricing-config.ts` and honour the computed usage window.
+ * Kept in place, unused by the create paths, so the enforcement rewrite can be
+ * reverted independently of removing it. Remove once the new path is proven.
+ *
  * Check if tenant has reached usage limit for a specific metric
  * Returns detailed information about the limit status
  */

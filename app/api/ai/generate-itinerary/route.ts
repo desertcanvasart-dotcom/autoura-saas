@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/supabase-server'
 import { getMemoriesForPrompt, logAgentRun } from '@/lib/agent-memory'
-import { checkLimit, trackUsage } from '@/lib/billing-middleware'
+import { gateVolume, incrementVolumeUsage, loadUsageAnchor } from '@/lib/usage-enforcement'
 import { applyDayRules } from '@/lib/ai/day-rules-engine'
 import type { ServiceTier, InputMode, ExtractedDay } from '@/lib/ai/parsing-utils'
 import {
@@ -369,32 +369,38 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     const userId = user?.id ?? null
 
-    // ── Quota check ──────────────────────────────────────────
-    const quotaCheck = await checkLimit(tenant_id, 'itinerary_runs', supabase)
-
-    if (!quotaCheck.allowed) {
-      // Log the rejected run for audit
+    // ── Plan limits ──────────────────────────────────────────
+    // This route consumes TWO metrics: it is an AI generation AND it creates
+    // an itinerary row. Checking only the AI meter would let the annual
+    // itinerary limit be bypassed entirely by always generating — the exact
+    // opposite of the intended incentive.
+    const aiGate = await gateVolume(supabase, tenant_id, 'ai_generations', 'AI generations this month')
+    if (!aiGate.ok) {
       await supabase.from('agent_runs').insert({
         tenant_id,
         agent_type: 'itinerary',
         triggered_by: userId,
         status: 'quota_exceeded',
-        input_summary: 'Blocked: monthly itinerary run limit reached',
+        input_summary: 'Blocked: AI generation limit reached',
       })
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Monthly itinerary generation limit reached',
-          limit_reached: true,
-          limit: quotaCheck.limit,
-          current: quotaCheck.current,
-          plan_name: quotaCheck.plan_name,
-          upgrade_url: '/settings/billing/plans',
-        },
-        { status: 402 }
-      )
+      return aiGate.response!
     }
+
+    const itineraryGate = await gateVolume(supabase, tenant_id, 'itineraries', 'itineraries this year')
+    if (!itineraryGate.ok) {
+      await supabase.from('agent_runs').insert({
+        tenant_id,
+        agent_type: 'itinerary',
+        triggered_by: userId,
+        status: 'quota_exceeded',
+        input_summary: 'Blocked: annual itinerary limit reached',
+      })
+      return itineraryGate.response!
+    }
+
+    // Warning/overage from either metric rides along on the success response.
+    const usageNotice = aiGate.usage ?? itineraryGate.usage
+
     // ─────────────────────────────────────────────────────────
 
     const runStartTime = Date.now()
@@ -754,11 +760,16 @@ export async function POST(request: NextRequest) {
           status: 'success',
         }).catch(console.error)
 
-        trackUsage(tenant_id, 'itinerary_runs', 1, supabase).catch(console.error)
+        void (async () => {
+          const anchor = await loadUsageAnchor(supabase, tenant_id)
+          incrementVolumeUsage(supabase, tenant_id, 'ai_generations', anchor)
+          incrementVolumeUsage(supabase, tenant_id, 'itineraries', anchor)
+        })()
         // ─────────────────────────────────────────────────────
 
         return NextResponse.json({
           success: true,
+          ...(usageNotice ? { usage: usageNotice } : {}),
           data: {
             id: itinerary.id,
             itinerary_id: itinerary.id,
@@ -1051,11 +1062,16 @@ export async function POST(request: NextRequest) {
       status: 'success',
     }).catch(console.error)
 
-    trackUsage(tenant_id, 'itinerary_runs', 1, supabase).catch(console.error)
+    void (async () => {
+      const anchor = await loadUsageAnchor(supabase, tenant_id)
+      incrementVolumeUsage(supabase, tenant_id, 'ai_generations', anchor)
+      incrementVolumeUsage(supabase, tenant_id, 'itineraries', anchor)
+    })()
     // ─────────────────────────────────────────────────────
 
     return NextResponse.json({
       success: true,
+      ...(usageNotice ? { usage: usageNotice } : {}),
       data: {
         id: itinerary.id,
         itinerary_id: itinerary.id,

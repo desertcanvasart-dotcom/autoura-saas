@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { logActivity, checkLimit } from '@/lib/billing-middleware'
+import { logActivity } from '@/lib/billing-middleware'
+import { gateStructural } from '@/lib/usage-enforcement'
 import crypto from 'crypto'
 
 /**
@@ -72,17 +73,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Check team members limit
-    const limitCheck = await checkLimit(tenant_id, 'team_members', supabase)
-    if (!limitCheck.allowed) {
-      return NextResponse.json({
-        success: false,
-        error: 'Team members limit reached',
-        limit_reached: true,
-        limit: limitCheck.limit,
-        current: limitCheck.current,
-        upgrade_url: '/admin/billing/plans'
-      }, { status: 403 })
-    }
+    // Seats are counted live from tenant_members (active + invited): an
+    // invited member holds a seat, or a tenant could invite without bound and
+    // only pay once people accept. Returns 402 with a `usage` block, matching
+    // every other plan limit; the old path returned 403 with an
+    // /admin/billing/plans URL that no longer exists.
+    const gate = await gateStructural(supabase, tenant_id, 'seats', 'team members')
+    if (!gate.ok) return gate.response!
 
     // Note: We skip the existing member check since we can't easily query auth.users
     // The invitation will be created and the user can accept it when they sign up
