@@ -20,6 +20,14 @@
 // can look at, rather than the silent state that hid the 402 outage.
 
 import { PRICING_TIERS, type PricingTier } from './pricing-config'
+import {
+  computeUsageWindow,
+  resolveUsageAnchor,
+  windowKeys,
+  type UsageWindow,
+  type WindowKind,
+} from './usage-window'
+import { classifyUsage, type BandAssessment } from './usage-grace'
 
 /**
  * Limits counted by looking at what exists.
@@ -52,6 +60,40 @@ const STRUCTURAL_SOURCES: Record<StructuralMetric, {
 const STRUCTURAL_LIMIT_KEY: Record<StructuralMetric, keyof PricingTier['limits']> = {
   seats: 'users',
   b2b_partners: 'b2bPartners',
+}
+
+/**
+ * Limits measured by counting events in a window, because past events leave
+ * no countable trace. Windows are COMPUTED (lib/usage-window.ts), not stored:
+ * `current_period_start` only advances via the Stripe webhook, so a tenant
+ * without a Stripe subscription would otherwise never roll over.
+ *
+ * NOT INCLUDED: `pricing_runs`. The pricing engine calls no LLM — verified
+ * across auto-pricing-service, tourCalculator, pax-range, rate-resolution and
+ * both calculate routes — and recalculation happens constantly as pax, tier
+ * and dates change. Metering it would charge for the core loop. It stays
+ * cost-bearing telemetry, never gated.
+ */
+export type VolumeMetric = 'ai_generations' | 'itineraries'
+
+const VOLUME_SOURCES: Record<VolumeMetric, {
+  column: string
+  window: WindowKind
+  limitKey: keyof PricingTier['limits']
+  label: string
+}> = {
+  ai_generations: {
+    column: 'itinerary_runs',
+    window: 'monthly',
+    limitKey: 'aiGenerationsPerMonth',
+    label: 'AI generations this month',
+  },
+  itineraries: {
+    column: 'itineraries_created',
+    window: 'annual',
+    limitKey: 'itinerariesPerYear',
+    label: 'itineraries this year',
+  },
 }
 
 export interface ResolvedPlan {
@@ -95,11 +137,11 @@ type Client = any
 export async function resolveTenantPlan(
   supabase: Client,
   tenantId: string
-): Promise<{ plan: ResolvedPlan | null; reason?: FailOpenReason }> {
+): Promise<{ plan: ResolvedPlan | null; anchor?: Date | null; reason?: FailOpenReason }> {
   try {
     const { data, error } = await supabase
       .from('tenant_subscriptions')
-      .select('status, plan:subscription_plans(slug, name)')
+      .select('status, current_period_start, plan:subscription_plans(slug, name)')
       .eq('tenant_id', tenantId)
       .in('status', ['trialing', 'active'])
       .limit(1)
@@ -111,9 +153,34 @@ export async function resolveTenantPlan(
     const tier = PRICING_TIERS[data.plan.slug]
     if (!tier) return { plan: null, reason: 'unknown_plan' }
 
-    return { plan: { slug: tier.slug, name: tier.name, limits: tier.limits } }
+    return {
+      plan: { slug: tier.slug, name: tier.name, limits: tier.limits },
+      anchor: resolveUsageAnchor({ subscriptionPeriodStart: data.current_period_start }),
+    }
   } catch {
     return { plan: null, reason: 'client_error' }
+  }
+}
+
+/**
+ * Anchor for a tenant's usage windows, falling back to tenant creation so a
+ * pre-billing tenant still gets real rolling windows rather than a frozen one.
+ */
+async function resolveAnchorWithFallback(
+  supabase: Client,
+  tenantId: string,
+  fromSubscription: Date | null | undefined
+): Promise<Date | null> {
+  if (fromSubscription) return fromSubscription
+  try {
+    const { data } = await supabase
+      .from('tenants')
+      .select('created_at')
+      .eq('id', tenantId)
+      .maybeSingle()
+    return resolveUsageAnchor({ tenantCreatedAt: data?.created_at ?? null })
+  } catch {
+    return null
   }
 }
 
@@ -222,5 +289,131 @@ export function recordFailOpen(
     }
   } catch (err) {
     console.error('fail-open telemetry could not be recorded:', err)
+  }
+}
+
+// ============================================
+// VOLUME LIMITS — metered, with grace bands
+// ============================================
+
+export interface VolumeDecision extends BandAssessment {
+  metric: VolumeMetric
+  current: number
+  /** null = unlimited. */
+  limit: number | null
+  planSlug: string | null
+  /** The computed window this count belongs to. */
+  window: UsageWindow | null
+  /** Set when allowed WITHOUT verifying entitlement. */
+  failOpenReason?: FailOpenReason
+  /** Present once the operator is at or past their plan. */
+  upgradeUrl?: string
+  /** Operator-facing label for the metric, for message building. */
+  label: string
+}
+
+/** Usage recorded in `window` for this metric. */
+export async function countVolume(
+  supabase: Client,
+  tenantId: string,
+  metric: VolumeMetric,
+  window: UsageWindow
+): Promise<{ count: number | null; reason?: FailOpenReason }> {
+  const source = VOLUME_SOURCES[metric]
+  const keys = windowKeys(window)
+  try {
+    const { data, error } = await supabase
+      .from('tenant_usage')
+      .select(source.column)
+      .eq('tenant_id', tenantId)
+      .eq('period_start', keys.period_start)
+      .maybeSingle()
+
+    if (error) return { count: null, reason: 'query_error' }
+    // No row for this window simply means nothing has been used in it yet —
+    // that is zero, not an error.
+    return { count: Number(data?.[source.column] ?? 0) }
+  } catch {
+    return { count: null, reason: 'client_error' }
+  }
+}
+
+/**
+ * May this tenant create one more of `metric`?
+ *
+ * Unlike structural limits, volume limits do NOT hard-block at 100%: they
+ * warn at 80%, allow overage past 100%, and only stop at 125%. Blocking a DMC
+ * mid-season is a churn event, and an overage is a sales conversation rather
+ * than an error page.
+ */
+export async function checkVolumeLimit(
+  supabase: Client,
+  tenantId: string,
+  metric: VolumeMetric
+): Promise<VolumeDecision> {
+  const source = VOLUME_SOURCES[metric]
+  const base = {
+    metric,
+    label: source.label,
+    planSlug: null as string | null,
+    window: null as UsageWindow | null,
+  }
+
+  const { plan, anchor: subAnchor, reason: planReason } = await resolveTenantPlan(supabase, tenantId)
+
+  if (!plan) {
+    return {
+      ...base,
+      ...classifyUsage(0, null),
+      current: 0,
+      limit: null,
+      failOpenReason: planReason ?? 'no_subscription',
+    }
+  }
+
+  const limit = plan.limits[source.limitKey]
+  if (limit === null) {
+    return { ...base, ...classifyUsage(0, null), current: 0, limit: null, planSlug: plan.slug }
+  }
+
+  const anchor = await resolveAnchorWithFallback(supabase, tenantId, subAnchor)
+  if (!anchor) {
+    // No anchor means no window, which means no defensible count — allow.
+    return {
+      ...base,
+      ...classifyUsage(0, null),
+      current: 0,
+      limit,
+      planSlug: plan.slug,
+      failOpenReason: 'no_subscription',
+    }
+  }
+
+  const window = computeUsageWindow(anchor, source.window)
+  const { count, reason: countReason } = await countVolume(supabase, tenantId, metric, window)
+
+  if (count === null) {
+    return {
+      ...base,
+      ...classifyUsage(0, null),
+      current: 0,
+      limit,
+      planSlug: plan.slug,
+      window,
+      failOpenReason: countReason ?? 'query_error',
+    }
+  }
+
+  const assessment = classifyUsage(count, limit)
+  return {
+    ...base,
+    ...assessment,
+    current: count,
+    limit,
+    planSlug: plan.slug,
+    window,
+    // Surfaced from 100% onward: at overage it accompanies a notice, at the
+    // stop it is the way out. A limit must never be a dead end.
+    ...(assessment.inOverage ? { upgradeUrl: UPGRADE_URL } : {}),
   }
 }
