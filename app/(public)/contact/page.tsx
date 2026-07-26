@@ -235,6 +235,9 @@ export default function ContactPage() {
               <Link href="/about" className="text-gray-400 hover:text-white text-sm transition-colors">
                 About
               </Link>
+              <Link href="/pricing" className="text-gray-400 hover:text-white text-sm transition-colors">
+                Pricing
+              </Link>
               <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Privacy
               </Link>

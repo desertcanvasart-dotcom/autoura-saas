@@ -26,6 +26,22 @@ import { Zap, Sparkles, Crown, Building2, LucideIcon } from 'lucide-react'
 // capabilities that actually exist today. Capabilities that do not exist are
 // not modelled here — see ROADMAP_CAPABILITIES.
 
+/**
+ * Free trial length, in days. Single source: the Stripe checkout session and
+ * the public pricing page both read this, so the number a prospect is shown
+ * cannot drift from the number they actually get.
+ */
+export const TRIAL_DAYS = 30
+
+/**
+ * One-time onboarding / rate-sheet setup fee, in USD.
+ *
+ * null = no fee is advertised and none is charged. Deliberately unset until a
+ * figure is agreed: the public page omits the line entirely rather than
+ * printing a placeholder, because a price shown is a price promised.
+ */
+export const ONBOARDING_FEE_USD: number | null = null
+
 /** null means unlimited, everywhere in this file. */
 export type Limit = number | null
 

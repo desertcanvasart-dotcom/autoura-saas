@@ -131,7 +131,7 @@ export async function middleware(request: NextRequest) {
   // grant public access automatically; the middleware has to know.
   const publicRoutes = [
     '/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept',
-    '/about', '/contact', '/docs', '/integrations', '/privacy', '/terms',
+    '/about', '/contact', '/docs', '/integrations', '/pricing', '/privacy', '/terms',
   ]
   // Exact match or a true sub-path ('/contact/foo'), never a shared prefix
   // ('/contacts' must NOT match public '/contact').
