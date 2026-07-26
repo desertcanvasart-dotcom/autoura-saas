@@ -1,0 +1,98 @@
+[
+  {
+    "name": "Business",
+    "slug": "business",
+    "description": "For DMCs and tour operators focused on B2B wholesale",
+    "price_monthly": 349,
+    "price_yearly": 3490,
+    "currency": "USD",
+    "max_team_members": 25,
+    "max_quotes_per_month": 1500,
+    "max_itinerary_runs_per_month": 500,
+    "max_pricing_runs_per_month": null,
+    "features": {
+      "b2c": false,
+      "b2b": true,
+      "whatsapp": true,
+      "email": true,
+      "pdf": true,
+      "analytics": true,
+      "customBranding": true,
+      "apiAccess": true,
+      "prioritySupport": true
+    },
+    "is_active": true
+  },
+  {
+    "name": "Enterprise",
+    "slug": "enterprise",
+    "description": "Custom solutions for large organizations with unlimited needs",
+    "price_monthly": 999,
+    "price_yearly": 9990,
+    "currency": "USD",
+    "max_team_members": null,
+    "max_quotes_per_month": null,
+    "max_itinerary_runs_per_month": null,
+    "max_pricing_runs_per_month": null,
+    "features": {
+      "b2c": true,
+      "b2b": true,
+      "whatsapp": true,
+      "email": true,
+      "pdf": true,
+      "analytics": true,
+      "customBranding": true,
+      "apiAccess": true,
+      "prioritySupport": true
+    },
+    "is_active": true
+  },
+  {
+    "name": "Professional",
+    "slug": "professional",
+    "description": "For growing agencies managing both B2C and B2B clients",
+    "price_monthly": 149,
+    "price_yearly": 1490,
+    "currency": "USD",
+    "max_team_members": 10,
+    "max_quotes_per_month": 500,
+    "max_itinerary_runs_per_month": 200,
+    "max_pricing_runs_per_month": null,
+    "features": {
+      "b2c": true,
+      "b2b": true,
+      "whatsapp": true,
+      "email": true,
+      "pdf": true,
+      "analytics": true,
+      "customBranding": true,
+      "apiAccess": false,
+      "prioritySupport": false
+    },
+    "is_active": true
+  },
+  {
+    "name": "Starter",
+    "slug": "starter",
+    "description": "Perfect for small travel agencies just getting started",
+    "price_monthly": 49,
+    "price_yearly": 490,
+    "currency": "USD",
+    "max_team_members": 3,
+    "max_quotes_per_month": 100,
+    "max_itinerary_runs_per_month": 50,
+    "max_pricing_runs_per_month": null,
+    "features": {
+      "b2c": true,
+      "b2b": false,
+      "whatsapp": true,
+      "email": true,
+      "pdf": true,
+      "analytics": false,
+      "customBranding": false,
+      "apiAccess": false,
+      "prioritySupport": false
+    },
+    "is_active": true
+  }
+]
