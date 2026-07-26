@@ -3,6 +3,7 @@ import {
   resolveTenantPlan,
   countStructural,
   checkStructuralLimit,
+  checkVolumeLimit,
   recordFailOpen,
 } from '@/lib/usage-limits'
 
@@ -27,6 +28,8 @@ function makeSupabase(opts: {
   throwOn?: string[]
   onInsert?: (table: string, row: Record<string, unknown>) => void
   insertResult?: { error?: unknown } | Promise<{ error?: unknown }>
+  tenantCreatedAt?: string
+  usageRow?: Record<string, unknown> | null
 }) {
   return {
     from(table: string) {
@@ -35,6 +38,10 @@ function makeSupabase(opts: {
       const terminal =
         table === 'tenant_subscriptions'
           ? { data: opts.subscription ?? null, error: opts.subscriptionError ?? null }
+          : table === 'tenants'
+          ? { data: opts.tenantCreatedAt ? { created_at: opts.tenantCreatedAt } : null, error: null }
+          : table === 'tenant_usage'
+          ? { data: opts.usageRow ?? null, error: opts.countError?.includes('tenant_usage') ? { message: 'query failed' } : null }
           : {
               count: opts.counts?.[table] ?? 0,
               error: opts.countError?.includes(table) ? { message: 'query failed' } : null,
@@ -243,5 +250,136 @@ describe('the five live tenants, against their assigned plans', () => {
       expect(d.allowed, slug).toBe(true)
       expect(d.limit, slug).toBe(limit)
     }
+  })
+})
+
+
+// ============================================================================
+// Volume limits: metered against a COMPUTED window, with grace bands.
+// ============================================================================
+
+const WITH_PERIOD = (slug: string) => ({
+  status: 'active',
+  current_period_start: '2026-07-21T00:00:00Z',
+  plan: { slug, name: slug },
+})
+
+describe('checkVolumeLimit', () => {
+  it('reads the meter for the computed window and classifies it', async () => {
+    const supabase = makeSupabase({
+      subscription: WITH_PERIOD('solo'),
+      usageRow: { itinerary_runs: 10 },
+    })
+    const d = await checkVolumeLimit(supabase, TENANT, 'ai_generations')
+    expect(d.current).toBe(10)
+    expect(d.limit).toBe(50) // Solo
+    expect(d.band).toBe('ok')
+    expect(d.allowed).toBe(true)
+    expect(d.window).not.toBeNull()
+  })
+
+  it('warns at 80% without blocking', async () => {
+    const supabase = makeSupabase({
+      subscription: WITH_PERIOD('solo'),
+      usageRow: { itinerary_runs: 40 }, // 40/50
+    })
+    const d = await checkVolumeLimit(supabase, TENANT, 'ai_generations')
+    expect(d.band).toBe('warning')
+    expect(d.allowed).toBe(true)
+    expect(d.upgradeUrl).toBeUndefined()
+  })
+
+  it('ALLOWS overage past 100%, surfacing an upgrade path', async () => {
+    const supabase = makeSupabase({
+      subscription: WITH_PERIOD('solo'),
+      usageRow: { itinerary_runs: 55 }, // 110% of 50
+    })
+    const d = await checkVolumeLimit(supabase, TENANT, 'ai_generations')
+    expect(d.band).toBe('overage')
+    expect(d.allowed).toBe(true)
+    expect(d.inOverage).toBe(true)
+    expect(d.upgradeUrl).toBeTruthy()
+  })
+
+  it('stops at 125%', async () => {
+    const supabase = makeSupabase({
+      subscription: WITH_PERIOD('solo'),
+      usageRow: { itinerary_runs: 63 }, // >125% of 50
+    })
+    const d = await checkVolumeLimit(supabase, TENANT, 'ai_generations')
+    expect(d.band).toBe('blocked')
+    expect(d.allowed).toBe(false)
+    expect(d.upgradeUrl).toBeTruthy()
+  })
+
+  it('uses the ANNUAL column and limit for itineraries', async () => {
+    const supabase = makeSupabase({
+      subscription: WITH_PERIOD('studio'),
+      usageRow: { itineraries_created: 400, itinerary_runs: 9999 },
+    })
+    const d = await checkVolumeLimit(supabase, TENANT, 'itineraries')
+    expect(d.current).toBe(400)
+    expect(d.limit).toBe(500) // Studio itinerariesPerYear
+    expect(d.window?.kind).toBe('annual')
+  })
+
+  it('an absent usage row is zero, not an error', async () => {
+    const supabase = makeSupabase({ subscription: WITH_PERIOD('solo'), usageRow: null })
+    const d = await checkVolumeLimit(supabase, TENANT, 'ai_generations')
+    expect(d.current).toBe(0)
+    expect(d.allowed).toBe(true)
+    expect(d.failOpenReason).toBeUndefined()
+  })
+
+  it('Enterprise is unlimited and never counts', async () => {
+    const supabase = makeSupabase({
+      subscription: WITH_PERIOD('enterprise'),
+      usageRow: { itinerary_runs: 999999 },
+    })
+    const d = await checkVolumeLimit(supabase, TENANT, 'ai_generations')
+    expect(d.allowed).toBe(true)
+    expect(d.limit).toBeNull()
+  })
+
+  it('falls back to tenant creation when the subscription has no period start', async () => {
+    const supabase = makeSupabase({
+      subscription: { status: 'active', plan: { slug: 'solo', name: 'Solo' } },
+      tenantCreatedAt: '2026-07-15T00:00:00Z',
+      usageRow: { itinerary_runs: 1 },
+    })
+    const d = await checkVolumeLimit(supabase, TENANT, 'ai_generations')
+    expect(d.window).not.toBeNull()
+    expect(d.failOpenReason).toBeUndefined()
+  })
+
+  it('fails OPEN when the meter cannot be read', async () => {
+    const supabase = makeSupabase({
+      subscription: WITH_PERIOD('solo'),
+      countError: ['tenant_usage'],
+    })
+    const d = await checkVolumeLimit(supabase, TENANT, 'ai_generations')
+    expect(d.allowed).toBe(true)
+    expect(d.failOpenReason).toBe('query_error')
+  })
+
+  it('fails OPEN with no subscription at all', async () => {
+    const supabase = makeSupabase({ subscription: null })
+    const d = await checkVolumeLimit(supabase, TENANT, 'itineraries')
+    expect(d.allowed).toBe(true)
+    expect(d.failOpenReason).toBe('no_subscription')
+  })
+
+  it('downgrade-while-over-limit blocks creation only', async () => {
+    // Studio(500/yr) -> Solo(120/yr) holding 400 itineraries: 333% of Solo.
+    const supabase = makeSupabase({
+      subscription: WITH_PERIOD('solo'),
+      usageRow: { itineraries_created: 400 },
+    })
+    const d = await checkVolumeLimit(supabase, TENANT, 'itineraries')
+    expect(d.allowed).toBe(false)
+    expect(d.current).toBe(400)
+    expect(d.limit).toBe(120)
+    // Nothing in the decision implies deleting the 400 that already exist.
+    expect(d.upgradeUrl).toBeTruthy()
   })
 })
