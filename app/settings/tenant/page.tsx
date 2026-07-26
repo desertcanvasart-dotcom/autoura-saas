@@ -30,20 +30,13 @@ export default function TenantSettingsPage() {
   // Tenant basic info state
   const [companyName, setCompanyName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
-  const [businessType, setBusinessType] = useState<'b2c_only' | 'b2b_only' | 'b2c_and_b2b'>('b2c_and_b2b')
+  const [workspaceMode, setWorkspaceMode] = useState<'b2c' | 'b2b' | 'both'>('both')
 
   // Feature toggles state
-  const [b2cEnabled, setB2cEnabled] = useState(true)
-  const [b2bEnabled, setB2bEnabled] = useState(true)
   const [whatsappIntegration, setWhatsappIntegration] = useState(true)
   const [emailIntegration, setEmailIntegration] = useState(true)
   const [pdfGeneration, setPdfGeneration] = useState(true)
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true)
-
-  // Limits state
-  const [maxUsers, setMaxUsers] = useState(10)
-  const [maxQuotesPerMonth, setMaxQuotesPerMonth] = useState(1000)
-  const [maxPartners, setMaxPartners] = useState(100)
 
   // Branding state
   const [primaryColor, setPrimaryColor] = useState('#647C47')
@@ -65,29 +58,19 @@ export default function TenantSettingsPage() {
       setContactEmail(tenant.contact_email || '')
       setLogoUrl(tenant.logo_url || null)
       setLogoPreview(tenant.logo_url || null)
+      // Workspace visibility is a tenant preference, free on every tier —
+      // no longer derived from feature flags, which read like entitlements.
+      setWorkspaceMode(tenant.workspace_mode ?? 'both')
     }
 
     if (features) {
-      setB2cEnabled(features.b2c_enabled)
-      setB2bEnabled(features.b2b_enabled)
       setWhatsappIntegration(features.whatsapp_integration)
       setEmailIntegration(features.email_integration)
       setPdfGeneration(features.pdf_generation)
       setAnalyticsEnabled(features.analytics_enabled)
-      setMaxUsers(features.max_users)
-      setMaxQuotesPerMonth(features.max_quotes_per_month)
-      setMaxPartners(features.max_partners)
       setPrimaryColor(features.primary_color)
       setSecondaryColor(features.secondary_color)
 
-      // Derive business type from feature flags (controlled by pricing tier)
-      if (features.b2c_enabled && features.b2b_enabled) {
-        setBusinessType('b2c_and_b2b')
-      } else if (features.b2c_enabled && !features.b2b_enabled) {
-        setBusinessType('b2c_only')
-      } else if (!features.b2c_enabled && features.b2b_enabled) {
-        setBusinessType('b2b_only')
-      }
 
     }
   }, [tenant, features])
@@ -178,6 +161,7 @@ export default function TenantSettingsPage() {
           company_name: companyName,
           contact_email: contactEmail,
           logo_url: finalLogoUrl,
+          workspace_mode: workspaceMode,
         })
         .eq('id', tenant.id)
 
@@ -356,18 +340,23 @@ export default function TenantSettingsPage() {
 
           <div className="mt-3">
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              Business Type
-              <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Set by pricing tier)</span>
+              Workspaces
+              <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Your choice &mdash; included on every plan)</span>
             </label>
             <select
-              value={businessType}
-              disabled
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+              value={workspaceMode}
+              onChange={(e) => setWorkspaceMode(e.target.value as 'b2c' | 'b2b' | 'both')}
+              disabled={!isAdmin}
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
             >
-              <option value="b2c_only">B2C Only</option>
-              <option value="b2b_only">B2B Only</option>
-              <option value="b2c_and_b2b">B2C and B2B</option>
+              <option value="both">Direct clients and partners (B2C + B2B)</option>
+              <option value="b2c">Direct clients only (B2C)</option>
+              <option value="b2b">Partners only (B2B)</option>
             </select>
+            <p className="mt-1.5 text-[11px] text-gray-500">
+              Hiding a workspace only tidies the sidebar. Every record stays reachable by link,
+              in search and in reports.
+            </p>
           </div>
         </div>
 
@@ -384,26 +373,6 @@ export default function TenantSettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
-                <input
-                  type="checkbox"
-                  checked={b2cEnabled}
-                  disabled
-                  className="w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded cursor-not-allowed"
-                />
-                <span className="text-xs text-gray-700">B2C Quotes</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
-                <input
-                  type="checkbox"
-                  checked={b2bEnabled}
-                  disabled
-                  className="w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded cursor-not-allowed"
-                />
-                <span className="text-xs text-gray-700">B2B Quotes</span>
-              </label>
-
               <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
                 <input
                   type="checkbox"
@@ -456,20 +425,17 @@ export default function TenantSettingsPage() {
               <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Plan controlled</span>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-xs text-gray-600">Max Users</span>
-                <span className="text-xs font-medium text-gray-900">{maxUsers >= 9999 ? 'Unlimited' : maxUsers}</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-xs text-gray-600">Quotes/Month</span>
-                <span className="text-xs font-medium text-gray-900">{maxQuotesPerMonth >= 9999 ? 'Unlimited' : maxQuotesPerMonth.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between py-2">
-                <span className="text-xs text-gray-600">Max Partners</span>
-                <span className="text-xs font-medium text-gray-900">{maxPartners >= 9999 ? 'Unlimited' : maxPartners}</span>
-              </div>
-            </div>
+            <p className="text-xs text-gray-600">
+              Your seat, quote and partner limits come from your plan, alongside
+              how much of each you have used this period.
+            </p>
+            <Link
+              href="/settings/billing/usage"
+              className="mt-3 inline-flex items-center gap-1 text-xs text-[#647C47] hover:text-[#4f613a] font-medium"
+            >
+              <FileText className="w-3 h-3" />
+              View limits and usage
+            </Link>
 
             <Link
               href="/settings/billing/plans"

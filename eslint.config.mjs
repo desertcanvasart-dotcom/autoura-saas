@@ -18,6 +18,11 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // Agent worktrees hold whole copies of the repo plus their own .next
+      // output. They are untracked, so CI never saw them — but a local
+      // `npm run lint:ratchet` counted them and reported a regression that
+      // did not exist, which is exactly how a ratchet gets ignored.
+      ".claude/**",
     ],
   },
 ];

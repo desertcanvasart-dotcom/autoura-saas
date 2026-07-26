@@ -14,8 +14,6 @@ interface Tenant {
    * stay reachable (see lib/workspace-visibility.ts).
    */
   workspace_mode: 'b2c' | 'b2b' | 'both'
-  /** @deprecated Superseded by workspace_mode. Dropped in the cutover migration. */
-  business_type: 'b2c_only' | 'b2b_only' | 'b2c_and_b2b'
   logo_url: string | null
   created_at: string
   updated_at: string
@@ -37,17 +35,10 @@ interface TenantMember {
 interface TenantFeatures {
   id: string
   tenant_id: string
-  /** @deprecated Moved to tenants.workspace_mode — this is a preference, not an entitlement. */
-  b2c_enabled: boolean
-  /** @deprecated Moved to tenants.workspace_mode. */
-  b2b_enabled: boolean
   whatsapp_integration: boolean
   email_integration: boolean
   pdf_generation: boolean
   analytics_enabled: boolean
-  max_users: number
-  max_quotes_per_month: number
-  max_partners: number
   logo_url: string | null
   primary_color: string
   secondary_color: string
@@ -185,16 +176,12 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const canManagePartners = isManager
 
   // Workspace visibility — a PREFERENCE, read from tenants.workspace_mode.
-  // During the additive-then-cutover rename the old sources are still written,
-  // so fall back to them if workspace_mode has not been backfilled yet. The
-  // fallback is the permissive union, matching migration 239's conflict rule.
-  const workspaceMode = tenant?.workspace_mode
-  const showsB2cWorkspace = workspaceMode
-    ? workspaceMode === 'b2c' || workspaceMode === 'both'
-    : (features?.b2c_enabled ?? true)
-  const showsB2bWorkspace = workspaceMode
-    ? workspaceMode === 'b2b' || workspaceMode === 'both'
-    : (features?.b2b_enabled ?? true)
+  // Defaults to showing everything while the tenant is still loading, so a
+  // slow context never briefly hides half the product.
+  const workspaceMode = tenant?.workspace_mode ?? 'both'
+  const showsB2cWorkspace = workspaceMode === 'b2c' || workspaceMode === 'both'
+  const showsB2bWorkspace = workspaceMode === 'b2b' || workspaceMode === 'both'
+
   const hasWhatsApp = features?.whatsapp_integration ?? false
   const hasEmail = features?.email_integration ?? false
   const hasPDF = features?.pdf_generation ?? false

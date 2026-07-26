@@ -109,7 +109,7 @@ export default function TenantsListPage() {
                     </div>
                   </td>
                   <td className="px-5 py-3 text-sm text-gray-400">{t.contact_email || '-'}</td>
-                  <td className="px-5 py-3 text-xs text-gray-400 capitalize">{t.business_type?.replace(/_/g, ' ') || '-'}</td>
+                  <td className="px-5 py-3 text-xs text-gray-400 capitalize">{t.workspace_mode || '-'}</td>
                   <td className="px-5 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                       t.subscription?.status === 'active' ? 'bg-green-900/50 text-green-400' :

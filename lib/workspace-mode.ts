@@ -2,10 +2,14 @@
 // WORKSPACE MODE — cutover helpers
 // ============================================
 // Migration 239 introduced `tenants.workspace_mode` as the single source for
-// which workspaces a tenant sees. The old `tenants.business_type` and
-// `tenant_features.b2c_enabled/b2b_enabled` are still written during the
-// additive-then-cutover rename, so a deploy running old code keeps working.
-// Migration B drops them; these helpers go with them.
+// which workspaces a tenant sees. Migration 240 dropped the three columns that
+// used to mirror it (`tenants.business_type`,
+// `tenant_features.b2c_enabled/b2b_enabled`) — three copies of one fact that
+// were written by different code paths and could disagree.
+//
+// `workspaceModeFromBusinessType` survives the drop because it parses a REQUEST
+// BODY, not a column: a browser holding a cached bundle can still POST
+// `business_type` to /api/onboarding/business during a deploy.
 
 export type WorkspaceMode = 'b2c' | 'b2b' | 'both'
 export type LegacyBusinessType = 'b2c_only' | 'b2b_only' | 'b2c_and_b2b'
@@ -32,18 +36,4 @@ export function showsB2c(mode: WorkspaceMode): boolean {
 
 export function showsB2b(mode: WorkspaceMode): boolean {
   return mode === 'b2b' || mode === 'both'
-}
-
-/** Legacy columns to write alongside workspace_mode until the cutover. */
-export function legacyWorkspaceFields(mode: WorkspaceMode): {
-  business_type: LegacyBusinessType
-  b2c_enabled: boolean
-  b2b_enabled: boolean
-} {
-  return {
-    business_type:
-      mode === 'both' ? 'b2c_and_b2b' : mode === 'b2c' ? 'b2c_only' : 'b2b_only',
-    b2c_enabled: showsB2c(mode),
-    b2b_enabled: showsB2b(mode),
-  }
 }

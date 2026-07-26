@@ -10,16 +10,8 @@ interface TenantSwitcherProps {
 }
 
 export default function TenantSwitcher({ isCollapsed }: TenantSwitcherProps) {
-  const { tenant, tenantMember, loading, isAdmin, showsB2cWorkspace, showsB2bWorkspace } = useTenant()
+  const { tenant, tenantMember, loading, isAdmin } = useTenant()
   const router = useRouter()
-
-  // Derive business type from feature flags (more reliable than tenant.business_type)
-  const getBusinessTypeDisplay = () => {
-    if (showsB2cWorkspace && showsB2bWorkspace) return 'B2C & B2B'
-    if (showsB2cWorkspace && !showsB2bWorkspace) return 'B2C Only'
-    if (!showsB2cWorkspace && showsB2bWorkspace) return 'B2B Only'
-    return null
-  }
 
   if (loading) {
     return (

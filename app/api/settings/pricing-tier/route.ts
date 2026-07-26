@@ -78,7 +78,6 @@ export async function POST(request: NextRequest) {
     }
 
     const adminClient = createAdminClient()
-    const selectedTier = PRICING_TIERS[tier]
 
 
 
@@ -98,21 +97,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Business model is NOT derived from the tier any more.
+    // Business model is NOT derived from the tier any more. Which workspaces a
+    // tenant sees is a free per-tenant preference (tenants.workspace_mode), so a
+    // plan change must not silently rewrite it.
     //
-    // b2c_enabled / b2b_enabled / business_type are a free per-tenant workspace
-    // preference — every tier gets both — so a plan change must not silently
-    // rewrite which workspaces a tenant sees. They are deliberately absent from
-    // updateData below; changing tier no longer touches them.
+    // Limits are NOT copied onto tenant_features either. They used to be
+    // mirrored here, which meant the enforced number could drift from the plan
+    // the tenant is actually on. lib/usage-limits.ts reads the plan directly.
     //
     // Capabilities that do not exist yet (multi-brand branding, API access,
     // white-label, SSO) are not written either: a flag with no mechanism behind
     // it is worse than no flag.
     const updateData = {
       current_pricing_tier: tier,
-      // null = unlimited, matching the column convention.
-      max_users: selectedTier.limits.users,
-      max_partners: selectedTier.limits.b2bPartners,
       // Always-on capabilities, kept true so existing gates do not regress.
       whatsapp_integration: true,
       email_integration: true,
@@ -154,13 +151,6 @@ export async function POST(request: NextRequest) {
     }
 
 
-
-    // `tenants.business_type` is deliberately NOT touched here.
-    //
-    // It used to be recomputed from the tier's b2c/b2b feature flags, so
-    // changing plan could silently flip a DMC from "b2c_and_b2b" to
-    // "b2b_only" and hide half their workspace. Business model is now a free
-    // per-tenant preference on every tier, owned by Settings → Organization.
 
     return NextResponse.json({
       success: true,

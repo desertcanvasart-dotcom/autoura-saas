@@ -11,21 +11,24 @@ interface BusinessStepProps {
   tenant: any
 }
 
-const BUSINESS_TYPES = [
+// A workspace preference, not an entitlement — every tier gets both, and this
+// only decides which sections appear in the sidebar. Changeable later in
+// Settings → Organization.
+const WORKSPACE_MODES = [
   {
-    value: 'b2c_and_b2b',
+    value: 'both',
     label: 'B2C & B2B',
     description: 'Serve both direct clients and partner agencies',
     icon: '🌐'
   },
   {
-    value: 'b2c_only',
+    value: 'b2c',
     label: 'B2C Only',
     description: 'Focus on direct client bookings',
     icon: '👥'
   },
   {
-    value: 'b2b_only',
+    value: 'b2b',
     label: 'B2B Only',
     description: 'Work exclusively with travel agencies',
     icon: '🤝'
@@ -55,7 +58,7 @@ const SERVICES = [
 ]
 
 export default function BusinessStep({ onNext, onBack, currentStep, tenant }: BusinessStepProps) {
-  const [businessType, setBusinessType] = useState(tenant?.business_type || 'b2c_and_b2b')
+  const [workspaceMode, setWorkspaceMode] = useState(tenant?.workspace_mode || 'both')
   const [currency, setCurrency] = useState(tenant?.default_currency || 'EUR')
   const [locale, setLocale] = useState(tenant?.locale || 'en')
   const [services, setServices] = useState<string[]>(
@@ -86,7 +89,7 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          business_type: businessType,
+          workspace_mode: workspaceMode,
           default_currency: currency,
           locale,
           services_offered: services,
@@ -133,12 +136,12 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
               What type of business do you operate?
             </label>
             <div className="grid md:grid-cols-3 gap-3">
-              {BUSINESS_TYPES.map((type) => (
+              {WORKSPACE_MODES.map((type) => (
                 <button
                   key={type.value}
-                  onClick={() => setBusinessType(type.value)}
+                  onClick={() => setWorkspaceMode(type.value)}
                   className={`p-4 rounded-lg border-2 transition-all text-left ${
-                    businessType === type.value
+                    workspaceMode === type.value
                       ? 'border-[#2d3b2d] bg-green-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}

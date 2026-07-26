@@ -90,8 +90,6 @@ export default function TenantDetailPage() {
   const { tenant, members, features, subscription, recentActivity, usage } = data
 
   const featureToggles = [
-    { key: 'b2c_enabled', label: 'B2C Quotes' },
-    { key: 'b2b_enabled', label: 'B2B Quotes' },
     { key: 'whatsapp_integration', label: 'WhatsApp' },
     { key: 'email_integration', label: 'Email' },
     { key: 'pdf_generation', label: 'PDF Generation' },
@@ -109,7 +107,7 @@ export default function TenantDetailPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-white">{tenant.company_name || 'Unnamed Tenant'}</h1>
-            <p className="text-sm text-gray-400">{tenant.contact_email} | {tenant.business_type?.replace(/_/g, ' ')}</p>
+            <p className="text-sm text-gray-400">{tenant.contact_email} | {tenant.workspace_mode}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -202,20 +200,9 @@ export default function TenantDetailPage() {
               })}
             </div>
             {features && (
-              <div className="grid grid-cols-3 gap-3 mt-3 pt-3 border-t border-gray-700">
-                <div className="text-sm">
-                  <span className="text-xs text-gray-400 block">Max Users</span>
-                  <span className="text-white">{features.max_users || 'Unlimited'}</span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-xs text-gray-400 block">Max Quotes/Month</span>
-                  <span className="text-white">{features.max_quotes_per_month || 'Unlimited'}</span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-xs text-gray-400 block">Max Partners</span>
-                  <span className="text-white">{features.max_partners || 'Unlimited'}</span>
-                </div>
-              </div>
+              {/* Limits are no longer mirrored onto tenant_features — they come
+                  from the tenant's plan, so read them there rather than from a
+                  stale per-tenant copy. */}
             )}
           </div>
 

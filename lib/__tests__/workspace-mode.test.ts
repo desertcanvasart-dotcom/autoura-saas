@@ -4,7 +4,6 @@ import {
   workspaceModeFromBusinessType,
   showsB2c,
   showsB2b,
-  legacyWorkspaceFields,
   type WorkspaceMode,
 } from '@/lib/workspace-mode'
 
@@ -13,10 +12,11 @@ import {
 // tenant_features.b2c_enabled/b2b_enabled — written by different code paths
 // with nothing reconciling them.
 //
-// Migration 239 makes `tenants.workspace_mode` the single source. These
-// helpers keep the legacy columns in sync during the additive-then-cutover
-// rename, and are the reason the two can no longer drift: every writer now
-// derives the mirrors from one value instead of computing them separately.
+// Migration 239 made `tenants.workspace_mode` the single source; migration 240
+// dropped the mirrors, so there is no longer a second copy to drift from.
+// What is left here is the parser for legacy REQUEST BODIES (a cached browser
+// bundle can still POST `business_type` mid-deploy) and the two read helpers
+// the UI uses to decide what to show.
 // ============================================================================
 
 const ALL: WorkspaceMode[] = ['b2c', 'b2b', 'both']
@@ -71,43 +71,21 @@ describe('showsB2c / showsB2b', () => {
   })
 })
 
-describe('legacyWorkspaceFields — the mirrors cannot drift', () => {
-  it('produces all three legacy values from one mode', () => {
-    expect(legacyWorkspaceFields('both')).toEqual({
-      business_type: 'b2c_and_b2b', b2c_enabled: true, b2b_enabled: true,
-    })
-    expect(legacyWorkspaceFields('b2c')).toEqual({
-      business_type: 'b2c_only', b2c_enabled: true, b2b_enabled: false,
-    })
-    expect(legacyWorkspaceFields('b2b')).toEqual({
-      business_type: 'b2b_only', b2c_enabled: false, b2b_enabled: true,
-    })
+describe('legacy request bodies still parse', () => {
+  // The columns are gone (migration 240) but the wire format is not: a browser
+  // holding a cached bundle can still POST `business_type` to
+  // /api/onboarding/business during a deploy. That request must not be
+  // misread as 'both' when the user actually picked one workspace.
+  it('maps every legacy value to the mode it meant', () => {
+    expect(workspaceModeFromBusinessType('b2c_only')).toBe('b2c')
+    expect(workspaceModeFromBusinessType('b2b_only')).toBe('b2b')
+    expect(workspaceModeFromBusinessType('b2c_and_b2b')).toBe('both')
   })
 
-  it('the enum and the booleans always agree — the original bug', () => {
-    for (const m of ALL) {
-      const legacy = legacyWorkspaceFields(m)
-      expect(legacy.b2c_enabled, m).toBe(workspaceModeFromBusinessType(legacy.business_type) !== 'b2b')
-      expect(legacy.b2b_enabled, m).toBe(workspaceModeFromBusinessType(legacy.business_type) !== 'b2c')
-    }
-  })
-})
-
-describe('round-trips', () => {
-  it('mode -> legacy -> mode is lossless', () => {
-    for (const m of ALL) {
-      const legacy = legacyWorkspaceFields(m)
-      expect(workspaceModeFromBusinessType(legacy.business_type), m).toBe(m)
-      expect(workspaceModeFromFlags(legacy.b2c_enabled, legacy.b2b_enabled), m).toBe(m)
-    }
-  })
-
-  it('the two legacy sources always round-trip to the SAME mode', () => {
-    // If these ever disagreed, the drift would be back.
-    for (const m of ALL) {
-      const legacy = legacyWorkspaceFields(m)
-      expect(workspaceModeFromBusinessType(legacy.business_type))
-        .toBe(workspaceModeFromFlags(legacy.b2c_enabled, legacy.b2b_enabled))
+  it('falls back to both — never to an empty app — on junk', () => {
+    for (const junk of [null, undefined, '', 'nonsense', 'B2C_ONLY']) {
+      const mode = workspaceModeFromBusinessType(junk as string)
+      expect(showsB2c(mode) || showsB2b(mode), String(junk)).toBe(true)
     }
   })
 })
