@@ -5,17 +5,28 @@
 [deploy]
 startCommand = "npm run start"
 
-# NOTE: Railway has no `[[cron]]` table — cron is configured per-service in the
-# dashboard (Settings → Cron Schedule), and it runs that service's START
-# COMMAND (which must exit when done). Scheduled jobs therefore each live in a
-# SEPARATE Railway service pointed at this same repo. Full setup + verification
-# steps: docs/CRON-JOBS.md
+# THIS FILE APPLIES TO THE WEB SERVICE (autoura-saas / getautoura.net).
 #
-#   1. Agent memory      Start: npm run cron:agent-memory     Cron: 0 2 * * *
-#   2. Exchange rates    Start: npm run cron:exchange-rates   Cron: 0 1 * * *
+# ⚠️ Every service built from this repo reads THIS file by default, and a
+# startCommand set here OVERRIDES the dashboard — the field shows greyed out
+# with "The value is set in /railway.toml". A cron service created from this
+# repo therefore inherits `npm run start` and boots a Next.js server that
+# never exits: the run hangs in "Running", the job never fires, and Railway
+# bills for another web server.
 #
-#   Env on each cron service: APP_URL, CRON_SECRET
-#   (CRON_SECRET must match the web service's value, or the endpoint 401s.)
+# Each cron service must be pointed at its OWN config file via
+# Settings → Config-as-code → Railway Config File:
+#
+#   Service              Config file                          Cron (UTC)
+#   -------------------  -----------------------------------  ----------
+#   Exchange rates       railway.cron-exchange-rates.toml      0 1 * * *
+#   Agent memory         railway.cron-agent-memory.toml        0 2 * * *
+#
+# Railway has no `[[cron]]` table — the schedule is set per-service in the
+# dashboard and runs that service's START COMMAND, which must exit when done.
+# Env on each cron service: APP_URL, CRON_SECRET (CRON_SECRET must match this
+# service's value, or the endpoint 401s). Full setup + verification:
+# docs/CRON-JOBS.md
 #
 # The old inert `[[cron]]` block was removed (wrong syntax + it single-quoted
 # $CRON_SECRET so the secret never expanded).
