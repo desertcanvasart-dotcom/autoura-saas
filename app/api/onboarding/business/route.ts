@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { workspaceModeFromBusinessType, legacyWorkspaceFields, type WorkspaceMode } from '@/lib/workspace-mode'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,11 +29,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Both workspaces default ON: onboarding OFFERS the choice rather than
+    // assuming one, so a tenant who skips the question keeps the whole product.
+    const onboardingMode: WorkspaceMode = body.workspace_mode
+      ?? workspaceModeFromBusinessType(body.business_type)
+
     // Update tenant with business configuration
     const { error: tenantError } = await supabase
       .from('tenants')
       .update({
-        business_type: body.business_type,
+        // workspace_mode is the source of truth; business_type is written
+        // alongside it until the cutover migration drops it.
+        workspace_mode: onboardingMode,
+        business_type: legacyWorkspaceFields(onboardingMode).business_type,
         default_currency: body.default_currency,
         ...(body.locale !== undefined ? { locale: body.locale } : {}),
         services_offered: body.services_offered,
@@ -50,9 +59,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update tenant features (B2C/B2B enabled based on business type)
-    const b2cEnabled = ['b2c_only', 'b2c_and_b2b'].includes(body.business_type)
-    const b2bEnabled = ['b2b_only', 'b2c_and_b2b'].includes(body.business_type)
+    // Legacy mirror, derived from the same value rather than recomputed.
+    const { b2c_enabled: b2cEnabled, b2b_enabled: b2bEnabled } = legacyWorkspaceFields(onboardingMode)
 
     const { error: featuresError } = await supabase
       .from('tenant_features')

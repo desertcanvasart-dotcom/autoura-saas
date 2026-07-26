@@ -62,7 +62,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function BookingsPage() {
   const router = useRouter()
-  const { hasB2C, hasB2B } = useTenant()
+  const { showsB2cWorkspace, showsB2bWorkspace } = useTenant()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +70,7 @@ export default function BookingsPage() {
   const [searchQuery, setSearchQuery] = useState('')
 
   // Determine default booking type based on tenant mode
-  const defaultBookingType = hasB2C && hasB2B ? 'all' : hasB2C ? 'b2c' : 'b2b'
+  const defaultBookingType = showsB2cWorkspace && showsB2bWorkspace ? 'all' : showsB2cWorkspace ? 'b2c' : 'b2b'
   const [bookingType, setBookingType] = useState<'all' | 'b2c' | 'b2b'>(defaultBookingType)
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export default function BookingsPage() {
   }
 
   // Show tabs only if tenant has both B2C and B2B
-  const showBookingTypeTabs = hasB2C && hasB2B
+  const showBookingTypeTabs = showsB2cWorkspace && showsB2bWorkspace
 
   return (
     <div className="min-h-screen bg-gray-50">

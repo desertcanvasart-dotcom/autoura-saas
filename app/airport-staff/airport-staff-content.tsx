@@ -65,7 +65,7 @@ export default function AirportStaffContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
-  const { tenant, loading: tenantLoading, isManager, canManagePartners, hasB2C, hasB2B } = useTenant()
+  const { tenant, loading: tenantLoading, isManager, canManagePartners, showsB2cWorkspace, showsB2bWorkspace } = useTenant()
   const modal = useModal()
 
   const [staff, setStaff] = useState<AirportStaff[]>([])
@@ -357,9 +357,9 @@ export default function AirportStaffContent() {
                     {tenant.company_name}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {hasB2C && !hasB2B && '(B2C Only)'}
-                    {!hasB2C && hasB2B && '(B2B Only)'}
-                    {hasB2C && hasB2B && '(B2C + B2B)'}
+                    {showsB2cWorkspace && !showsB2bWorkspace && '(B2C Only)'}
+                    {!showsB2cWorkspace && showsB2bWorkspace && '(B2B Only)'}
+                    {showsB2cWorkspace && showsB2bWorkspace && '(B2C + B2B)'}
                   </span>
                 </div>
               )}

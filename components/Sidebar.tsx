@@ -271,7 +271,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname()
   const { profile, signOut, isSuperAdmin } = useAuth()
-  const { tenant, hasB2B, hasB2C } = useTenant()
+  const { tenant, showsB2bWorkspace, showsB2cWorkspace } = useTenant()
   const { role, canAccess } = useRole()
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -285,7 +285,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
     if (section.roles && !canAccess(section.roles)) return false
 
     // Filter by feature flags
-    if (section.key === 'b2b' && !hasB2B) return false
+    if (section.key === 'b2b' && !showsB2bWorkspace) return false
 
     return true
   }).map(section => ({
@@ -298,11 +298,11 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       if (item.businessTypes) {
         // Determine current business type from feature flags
         let currentBusinessType: string
-        if (hasB2C && hasB2B) {
+        if (showsB2cWorkspace && showsB2bWorkspace) {
           currentBusinessType = 'b2c_and_b2b'
-        } else if (hasB2C && !hasB2B) {
+        } else if (showsB2cWorkspace && !showsB2bWorkspace) {
           currentBusinessType = 'b2c_only'
-        } else if (!hasB2C && hasB2B) {
+        } else if (!showsB2cWorkspace && showsB2bWorkspace) {
           currentBusinessType = 'b2b_only'
         } else {
           return false // No features enabled

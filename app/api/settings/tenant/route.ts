@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { workspaceModeFromBusinessType, legacyWorkspaceFields, type WorkspaceMode } from '@/lib/workspace-mode'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -28,6 +29,7 @@ export async function PATCH(request: NextRequest) {
       company_name,
       contact_email,
       business_type,
+      workspace_mode,
       logo_url,
       // Features
       b2c_enabled,
@@ -47,7 +49,21 @@ export async function PATCH(request: NextRequest) {
     const tenantUpdates: any = {}
     if (company_name !== undefined) tenantUpdates.company_name = company_name
     if (contact_email !== undefined) tenantUpdates.contact_email = contact_email
-    if (business_type !== undefined) tenantUpdates.business_type = business_type
+    // Workspace visibility. `workspace_mode` is the source of truth
+    // (migration 239); the legacy columns are written alongside it until the
+    // cutover migration drops them, so a deploy running older code still sees
+    // a consistent answer.
+    const resolvedMode: WorkspaceMode | undefined =
+      workspace_mode !== undefined
+        ? (workspace_mode as WorkspaceMode)
+        : business_type !== undefined
+          ? workspaceModeFromBusinessType(business_type)
+          : undefined
+
+    if (resolvedMode !== undefined) {
+      tenantUpdates.workspace_mode = resolvedMode
+      tenantUpdates.business_type = legacyWorkspaceFields(resolvedMode).business_type
+    }
     if (logo_url !== undefined) tenantUpdates.logo_url = logo_url
     tenantUpdates.updated_at = new Date().toISOString()
 
@@ -66,8 +82,16 @@ export async function PATCH(request: NextRequest) {
 
     // Update tenant features
     const featureUpdates: any = {}
-    if (b2c_enabled !== undefined) featureUpdates.b2c_enabled = b2c_enabled
-    if (b2b_enabled !== undefined) featureUpdates.b2b_enabled = b2b_enabled
+    // Legacy mirror of workspace_mode — kept in sync rather than written
+    // independently, which is how the two sources drifted in the first place.
+    if (resolvedMode !== undefined) {
+      const legacy = legacyWorkspaceFields(resolvedMode)
+      featureUpdates.b2c_enabled = legacy.b2c_enabled
+      featureUpdates.b2b_enabled = legacy.b2b_enabled
+    } else {
+      if (b2c_enabled !== undefined) featureUpdates.b2c_enabled = b2c_enabled
+      if (b2b_enabled !== undefined) featureUpdates.b2b_enabled = b2b_enabled
+    }
     if (whatsapp_integration !== undefined) featureUpdates.whatsapp_integration = whatsapp_integration
     if (email_integration !== undefined) featureUpdates.email_integration = email_integration
     if (pdf_generation !== undefined) featureUpdates.pdf_generation = pdf_generation

@@ -38,7 +38,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { hasB2B, hasB2C } = useTenant()
+  const { showsB2bWorkspace, showsB2cWorkspace } = useTenant()
   const [stats, setStats] = useState<DashboardStats>({
     totalClients: 0,
     activeClients: 0,
@@ -386,7 +386,7 @@ export default function DashboardPage() {
         <h3 className="text-base font-semibold text-gray-900 mb-3">
           Quick Actions
         </h3>
-        <div className={`grid grid-cols-1 md:grid-cols-2 ${hasB2B ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${showsB2bWorkspace ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
           <QuickActionButton
             icon={MessageSquare}
             label="Parse WhatsApp"
@@ -397,8 +397,8 @@ export default function DashboardPage() {
           <QuickActionButton
             icon={Sparkles}
             label="New Quote"
-            href={hasB2C ? "/itineraries/new" : "/tours/manage"}
-            description={hasB2C ? "Create itinerary from scratch" : "Create B2B package"}
+            href={showsB2cWorkspace ? "/itineraries/new" : "/tours/manage"}
+            description={showsB2cWorkspace ? "Create itinerary from scratch" : "Create B2B package"}
             color="bg-purple-500"
           />
           <QuickActionButton
@@ -408,7 +408,7 @@ export default function DashboardPage() {
             description="Manage hotels, guides & services"
             color="bg-primary-600"
           />
-          {hasB2B && (
+          {showsB2bWorkspace && (
             <QuickActionButton
               icon={Package}
               label="B2B Packages"
@@ -552,7 +552,7 @@ export default function DashboardPage() {
                   <span className="text-xs font-medium text-gray-700">Online</span>
                 </div>
               </div>
-              {hasB2B && (
+              {showsB2bWorkspace && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-600">B2B Packages</span>
                   <div className="flex items-center gap-1.5">
