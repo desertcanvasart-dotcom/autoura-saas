@@ -168,15 +168,21 @@ export async function GET(request: NextRequest) {
 
       case 'service':
       case 'service_fee':
-        // Keep service_fees table if it exists
+        // `service_fees` does not exist. The comment said "keep it if it
+        // exists", but the error was assigned anyway, so asking for this rate
+        // type failed the whole request instead of returning nothing. Treat an
+        // absent table as an empty list — every other optional source here
+        // already does.
         const serviceQuery = supabase
           .from('service_fees')
           .select('*')
           .eq('is_active', true)
-        
+
         const serviceResult = await serviceQuery
         data = serviceResult.data || []
-        error = serviceResult.error
+        error = serviceResult.error?.code === 'PGRST205' || serviceResult.error?.code === '42P01'
+          ? null
+          : serviceResult.error
         break
 
       // ============================================
