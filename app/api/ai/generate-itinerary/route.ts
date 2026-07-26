@@ -10,6 +10,11 @@ import {
   describeHoles,
   unpricedSummary,
 } from '@/lib/ai/generation-holes'
+import {
+  resolveAirportRates,
+  resolveHotelServiceRate,
+  AIRPORT_SERVICE_BY_TIER,
+} from '@/lib/ai/staff-rate-resolution'
 import type { ServiceTier, InputMode, ExtractedDay } from '@/lib/ai/parsing-utils'
 import {
   isValidDate, toNumber, normalizeTier, calculateExpectedDays,
@@ -883,33 +888,59 @@ export async function POST(request: NextRequest) {
     let lunchRate = haveMealRates ? Math.round(toNumber(mealRates?.[0]?.lunch_rate_eur, 0) * tierMealMultiplier[tier]) : 0
     let dinnerRate = haveMealRates ? Math.round(toNumber(mealRates?.[0]?.dinner_rate_eur, 0) * tierMealMultiplier[tier]) : 0
 
-    // Airport and hotel services.
+    // Airport and hotel staff services.
     //
-    // These query `airport_services` / `hotel_services`, which DO NOT EXIST.
-    // The populated tables are `airport_staff_rates` and `hotel_staff_rates`.
-    // Pointing at them is Phase 2 — it needs per-occurrence selection (an
-    // itinerary can use an airport several times), not the blind sum over all
-    // active rows this code does. Until then the gap is recorded honestly
-    // rather than papered over with 25 and 15.
-    const { data: airportServicesData, error: airportServicesError } = await supabase.from('airport_services').select('*').eq('is_active', true)
-    const haveAirportServices = requireRates(rateHoles, {
-      kind: 'airport_service', tier, table: 'airport_services', error: airportServicesError, rows: airportServicesData,
-      lookupAttempted: 'airport_services where is_active',
-      message: 'Airport service rates are not available, so meet-and-greet cannot be priced.',
+    // The rate is SELECTED, never summed. The previous code added every active
+    // row together — across all airports, both directions and every service
+    // level — which against the real table is €559 for one airport touch.
+    //
+    // Multiplicity is handled in service-creation, which adds one occurrence
+    // per qualifying day, so an itinerary returning to the same city is charged
+    // each time. See lib/ai/staff-rate-resolution.ts for the tier mapping.
+    const { data: airportStaffRates, error: airportStaffRatesError } = await supabase.from('airport_staff_rates').select('*').eq('is_active', true)
+    const haveAirportRows = requireRates(rateHoles, {
+      kind: 'airport_service', tier, table: 'airport_staff_rates', error: airportStaffRatesError, rows: airportStaffRates,
+      lookupAttempted: 'airport_staff_rates where is_active',
+      message: 'No active airport staff rates are set up. Add them in Rates → Airport Services.',
     })
-    const airportServiceRate = haveAirportServices
-      ? airportServicesData!.reduce((sum: number, s: any) => sum + toNumber(s.rate_eur, 0), 0)
-      : 0
 
-    const { data: hotelServicesData, error: hotelServicesError } = await supabase.from('hotel_services').select('*').eq('is_active', true)
-    const haveHotelServices = requireRates(rateHoles, {
-      kind: 'hotel_service', tier, table: 'hotel_services', error: hotelServicesError, rows: hotelServicesData,
-      lookupAttempted: 'hotel_services where is_active',
-      message: 'Hotel service rates are not available, so porterage cannot be priced.',
+    let airportServiceRates = { arrival: 0, departure: 0 }
+    if (haveAirportRows) {
+      const resolved = resolveAirportRates(airportStaffRates, { tier, city: effectiveCity })
+      if (resolved.ok) {
+        airportServiceRates = { arrival: resolved.rates.arrival, departure: resolved.rates.departure }
+      } else {
+        const wanted = AIRPORT_SERVICE_BY_TIER[tier]
+        addHole({
+          kind: 'airport_service', tier, reason: 'missing',
+          lookupAttempted: `airport_staff_rates for '${effectiveCity}' service_type '${wanted}'`,
+          message: resolved.reason === 'unknown_city'
+            ? `${resolved.detail}, so airport assistance cannot be priced. Add the city's airport mapping, or use a city that has rates.`
+            : `${resolved.detail}. Add a ${wanted} rate for both arrival and departure in Rates → Airport Services.`,
+        })
+      }
+    }
+
+    const { data: hotelStaffRates, error: hotelStaffRatesError } = await supabase.from('hotel_staff_rates').select('*').eq('is_active', true)
+    const haveHotelRows = requireRates(rateHoles, {
+      kind: 'hotel_service', tier, table: 'hotel_staff_rates', error: hotelStaffRatesError, rows: hotelStaffRates,
+      lookupAttempted: 'hotel_staff_rates where is_active',
+      message: 'No active hotel staff rates are set up. Add them in Rates → Hotel Services.',
     })
-    const hotelServiceRate = haveHotelServices
-      ? hotelServicesData!.reduce((sum: number, s: any) => sum + toNumber(s.rate_eur, 0), 0)
-      : 0
+
+    let hotelServiceRate = 0
+    if (haveHotelRows) {
+      const resolved = resolveHotelServiceRate(hotelStaffRates)
+      if (resolved.ok) {
+        hotelServiceRate = resolved.rate
+      } else {
+        addHole({
+          kind: 'hotel_service', tier, reason: 'missing',
+          lookupAttempted: 'hotel_staff_rates porter / all',
+          message: `${resolved.detail}. Add it in Rates → Hotel Services.`,
+        })
+      }
+    }
 
     let hotelRate = 0
     let hotelName_final = hotel_name || 'Standard Hotel'
@@ -1081,7 +1112,7 @@ export async function POST(request: NextRequest) {
       includeLunch: include_lunch, includeDinner: include_dinner, includeAccommodationFinal,
       vehiclePerDay, guidePerDay, selectedVehicle, selectedGuide,
       selectedHotel, hotelRate, hotelName_final, roomsNeeded,
-      airportServiceRate, hotelServiceRate, lunchRate, dinnerRate,
+      airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
       dailyTips, allEntranceFees,
     })
 
