@@ -122,6 +122,30 @@ while the history write fails; in that case the endpoint returns
 `snapshotError`, the script logs it and **exits 1**, so the scheduler records
 a failure rather than a misleading green run.
 
+### Both runners report the work, not the HTTP status
+
+This is deliberate and worth preserving. Each endpoint answers **200 with a
+summary**, and that summary can describe a night where the real work failed:
+
+| Job | 200 that is actually a failure | Runner exits |
+|---|---|---|
+| Exchange rates | `snapshotError` set / `snapshotsWritten: 0` — rate history not written | `1` |
+| Agent memory | `runs_failed > 0` — runs found but none could be processed | `1` |
+
+Exiting `0` on any 200 would make those nights indistinguishable from healthy
+ones, and Railway would show a green run while accuracy quietly degraded.
+`scripts/__tests__/cron-runners.test.ts` spawns both scripts against a stub
+server and asserts these exit codes, so the behaviour cannot regress.
+
+A run that found nothing to do (`found=0`) exits `0` — a quiet night is not a
+failure.
+
+Agent-memory success looks like:
+
+```
+cron-agent-memory: ok — found=3 processed=3 failed=0 written=7 purged=2 in 412ms
+```
+
 Then confirm the history actually grew:
 
 ```sql
