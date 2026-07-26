@@ -17,6 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "verify:deploy": "node scripts/verify-deploy.mjs",
     "lint:ratchet": "node scripts/check-lint-ratchet.mjs",
+    "stripe:plans": "node scripts/setup-stripe-plans.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "analyze": "ANALYZE=true npm run build",
     "plans:check": "node scripts/sync-plans.mjs --check",
