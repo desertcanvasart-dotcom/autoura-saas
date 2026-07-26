@@ -13,10 +13,36 @@ service's **start command**, which must exit when finished.
 So each job is its own Railway service, pointed at this same repo, with a
 start command that runs once and exits. They do not serve traffic.
 
-| Job | Service start command | Schedule (UTC) | Endpoint |
+| Job | Config file (sets the start command) | Schedule (UTC) | Endpoint |
 |---|---|---|---|
-| Agent memory | `npm run cron:agent-memory` | `0 2 * * *` | `POST /api/cron/process-agent-memory` |
-| Exchange rates | `npm run cron:exchange-rates` | `0 1 * * *` | `POST /api/cron/refresh-exchange-rates` |
+| Agent memory | `railway.cron-agent-memory.toml` | `0 2 * * *` | `POST /api/cron/process-agent-memory` |
+| Exchange rates | `railway.cron-exchange-rates.toml` | `0 1 * * *` | `POST /api/cron/refresh-exchange-rates` |
+
+### ⚠️ The start command comes from a config file, NOT the dashboard
+
+This is the single easiest thing to get wrong, and it fails silently.
+
+`railway.toml` sets `startCommand = "npm run start"`, and **every service built
+from this repo reads it by default**. Config-as-code overrides the dashboard,
+so on a cron service the Custom Start Command field is **greyed out**, showing
+*"The value is set in /railway.toml"*.
+
+The result: the cron service inherits the web service's start command, boots a
+Next.js server that never exits, sits in **"Running"** forever, never fires the
+job — and Railway bills for an extra web server. Nothing errors.
+
+So each cron service must be pointed at its own config file:
+
+**Service → Settings → Config-as-code → Railway Config File → + Add File Path**
+
+- Exchange rates service → `railway.cron-exchange-rates.toml`
+- Agent memory service → `railway.cron-agent-memory.toml`
+
+Only `startCommand` is pinned in those files. The **cron schedule** and
+**restart policy** stay editable in the dashboard.
+
+**A cron service stuck on "Running" for more than a few seconds is this bug.**
+A correct run finishes in about a second and exits.
 
 ### Why cron jobs must use an `/api/cron/` endpoint
 
