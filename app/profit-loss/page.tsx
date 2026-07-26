@@ -17,8 +17,27 @@ import {
   Eye,
   BarChart3,
   PieChart,
-  Calendar
+  Calendar,
+  AlertTriangle
 } from 'lucide-react'
+
+interface FxSummary {
+  same_currency: number
+  historical: number
+  live: number
+  unconverted: number
+  all_historical: boolean
+}
+
+interface FxHole {
+  kind: string
+  reference: string
+  amount: number
+  fromCurrency: string
+  toCurrency: string
+  date: string | null
+  message: string
+}
 
 interface TripPnL {
   itinerary_id: string
@@ -35,21 +54,42 @@ interface TripPnL {
   total_expenses: number
   expenses_paid: number
   expenses_pending: number
+  commissions_receivable: number
+  commissions_payable: number
+  net_commission: number
+  commission_breakdown: Record<string, { receivable: number; payable: number }>
   gross_profit: number
   profit_margin: number
   expense_breakdown: Record<string, number>
   invoice_count: number
   expense_count: number
+  commission_count: number
+  fx: FxSummary
+  complete: boolean
+  holes: FxHole[]
 }
 
 interface Summary {
   total_trips: number
+  reporting_currency: string
   total_revenue: number
   total_expenses: number
+  total_commissions_receivable: number
+  total_commissions_payable: number
   total_profit: number
   average_margin: number
   profitable_trips: number
   loss_trips: number
+  incomplete_trips: number
+  untranslated_trips: number
+  fx: FxSummary
+}
+
+interface PnlMeta {
+  reporting_currency: string
+  fx_history_available: boolean
+  snapshot_count: number
+  commissions_available: boolean
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -83,6 +123,7 @@ const ITEMS_PER_PAGE = 15
 export default function ProfitLossPage() {
   const [data, setData] = useState<TripPnL[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
+  const [meta, setMeta] = useState<PnlMeta | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -107,6 +148,7 @@ export default function ProfitLossPage() {
         if (result.success) {
           setData(result.data)
           setSummary(result.summary)
+          setMeta(result.meta || null)
         }
       }
     } catch (error) {
@@ -190,6 +232,20 @@ export default function ProfitLossPage() {
 
   const hasActiveFilters = statusFilter || startDate || endDate
 
+  // Summary figures are stated in one reporting currency; per-trip figures
+  // stay in the trip's own currency.
+  const reportingSymbol = getCurrencySymbol(summary?.reporting_currency || 'EUR')
+  const netCommissionTotal = summary
+    ? summary.total_commissions_receivable - summary.total_commissions_payable
+    : 0
+  const hasFxCaveat = Boolean(
+    summary &&
+    (summary.fx.live > 0 ||
+      summary.fx.unconverted > 0 ||
+      summary.untranslated_trips > 0 ||
+      (meta && !meta.commissions_available))
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -215,72 +271,135 @@ export default function ProfitLossPage() {
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">🎯</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-gray-500"></span>
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">🎯</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-500"></span>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">Total Trips</p>
+              <p className="text-2xl font-semibold text-gray-900">{summary.total_trips}</p>
             </div>
-            <p className="text-xs text-gray-500 mb-1">Total Trips</p>
-            <p className="text-2xl font-semibold text-gray-900">{summary.total_trips}</p>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">💰</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">Total Revenue</p>
+              <p className="text-2xl font-semibold text-blue-600">
+                {reportingSymbol}{summary.total_revenue.toLocaleString()}
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">💸</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
+              <p className="text-2xl font-semibold text-red-600">
+                {reportingSymbol}{summary.total_expenses.toLocaleString()}
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">🤝</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">Net Commission</p>
+              <p className={`text-2xl font-semibold ${getProfitColor(netCommissionTotal)}`}>
+                {netCommissionTotal >= 0 ? '+' : '−'}{reportingSymbol}
+                {Math.abs(netCommissionTotal).toLocaleString()}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                in {reportingSymbol}{summary.total_commissions_receivable.toLocaleString()} · out{' '}
+                {reportingSymbol}{summary.total_commissions_payable.toLocaleString()}
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">📈</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">Gross Profit</p>
+              <p className={`text-2xl font-semibold ${getProfitColor(summary.total_profit)}`}>
+                {reportingSymbol}{summary.total_profit.toLocaleString()}
+              </p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">📊</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">Avg Margin</p>
+              <p className="text-2xl font-semibold text-purple-600">{summary.average_margin.toFixed(1)}%</p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">✅</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">Profitable</p>
+              <p className="text-2xl font-semibold text-emerald-600">{summary.profitable_trips}</p>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">⚠️</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+              </div>
+              <p className="text-xs text-gray-500 mb-1">Loss-Making</p>
+              <p className="text-2xl font-semibold text-orange-600">{summary.loss_trips}</p>
+            </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">💰</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+          {/* Provenance: say plainly which figures are exact and which are not */}
+          {(hasFxCaveat || summary.incomplete_trips > 0) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-amber-900 space-y-1">
+                  <p className="font-medium">
+                    These totals are shown in {summary.reporting_currency} and are not fully exact.
+                  </p>
+                  <ul className="list-disc list-inside space-y-0.5 text-amber-800 text-xs">
+                    {summary.fx.live > 0 && (
+                      <li>
+                        {summary.fx.live} amount{summary.fx.live > 1 ? 's were' : ' was'} converted at
+                        today&apos;s rate because no exchange rate was on file for the transaction date.
+                        {meta && !meta.fx_history_available &&
+                          ' Rate history starts building from the next exchange-rate refresh.'}
+                      </li>
+                    )}
+                    {summary.fx.unconverted > 0 && (
+                      <li>
+                        {summary.fx.unconverted} amount{summary.fx.unconverted > 1 ? 's are' : ' is'} missing
+                        from these totals entirely — no exchange rate is available for them, so the
+                        margin shown is <strong>better than reality</strong>.
+                      </li>
+                    )}
+                    {summary.untranslated_trips > 0 && (
+                      <li>
+                        {summary.untranslated_trips} trip{summary.untranslated_trips > 1 ? 's' : ''} could not
+                        be expressed in {summary.reporting_currency} and {summary.untranslated_trips > 1 ? 'are' : 'is'} excluded
+                        from the totals above.
+                      </li>
+                    )}
+                    {meta && !meta.commissions_available && (
+                      <li>Commissions could not be read, so they are not reflected in these margins.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mb-1">Total Revenue</p>
-            <p className="text-2xl font-semibold text-blue-600">€{summary.total_revenue.toLocaleString()}</p>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">💸</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-            </div>
-            <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
-            <p className="text-2xl font-semibold text-red-600">€{summary.total_expenses.toLocaleString()}</p>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">📈</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-            </div>
-            <p className="text-xs text-gray-500 mb-1">Gross Profit</p>
-            <p className={`text-2xl font-semibold ${getProfitColor(summary.total_profit)}`}>
-              €{summary.total_profit.toLocaleString()}
-            </p>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">📊</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-            </div>
-            <p className="text-xs text-gray-500 mb-1">Avg Margin</p>
-            <p className="text-2xl font-semibold text-purple-600">{summary.average_margin.toFixed(1)}%</p>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">✅</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            </div>
-            <p className="text-xs text-gray-500 mb-1">Profitable</p>
-            <p className="text-2xl font-semibold text-emerald-600">{summary.profitable_trips}</p>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⚠️</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
-            </div>
-            <p className="text-xs text-gray-500 mb-1">Loss-Making</p>
-            <p className="text-2xl font-semibold text-orange-600">{summary.loss_trips}</p>
-          </div>
-        </div>
+          )}
+        </>
       )}
 
       {/* Filters */}
@@ -386,6 +505,7 @@ export default function ProfitLossPage() {
               <th className="text-left text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Date</th>
               <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Revenue</th>
               <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Expenses</th>
+              <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Commission</th>
               <th className="text-right text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Profit</th>
               <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Margin</th>
               <th className="text-center text-xs font-semibold text-gray-600 uppercase tracking-wide px-4 py-3">Status</th>
@@ -395,7 +515,7 @@ export default function ProfitLossPage() {
           <tbody className="divide-y divide-gray-100">
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
                   No trips found
                 </td>
               </tr>
@@ -448,9 +568,46 @@ export default function ProfitLossPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
+                      {trip.commission_count === 0 ? (
+                        <span className="text-sm text-gray-300">—</span>
+                      ) : (
+                        <>
+                          <div
+                            className={`text-sm font-medium ${
+                              trip.net_commission >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}
+                          >
+                            {trip.net_commission >= 0 ? '+' : '−'}
+                            {getCurrencySymbol(trip.currency)}
+                            {Math.abs(trip.net_commission).toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {trip.commission_count} record{trip.commission_count > 1 ? 's' : ''}
+                          </div>
+                        </>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
                       <div className={`text-sm font-semibold ${getProfitColor(trip.gross_profit)}`}>
                         {trip.gross_profit >= 0 ? '+' : ''}{getCurrencySymbol(trip.currency)}{trip.gross_profit.toLocaleString()}
                       </div>
+                      {!trip.complete && (
+                        <div
+                          className="inline-flex items-center gap-1 text-xs text-amber-700 mt-0.5"
+                          title={trip.holes.map(h => h.message).join('\n')}
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          {trip.holes.length} cost{trip.holes.length > 1 ? 's' : ''} not converted
+                        </div>
+                      )}
+                      {trip.complete && trip.fx.live > 0 && (
+                        <div
+                          className="text-xs text-gray-400 mt-0.5"
+                          title="No exchange rate was on file for the transaction date, so today's rate was used."
+                        >
+                          today&apos;s FX rate
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getMarginColor(trip.profit_margin)}`}>
