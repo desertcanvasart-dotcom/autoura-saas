@@ -16,7 +16,8 @@ import {
   Users,
   FileText,
   Building,
-  Percent
+  Percent,
+  AlertTriangle
 } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 
@@ -88,6 +89,21 @@ interface CommissionSummary {
   recipients: CommissionRecipient[]
 }
 
+interface CurrencyMeta {
+  reporting_currency: string
+  fx: {
+    same_currency: number
+    historical: number
+    live: number
+    unconverted: number
+    all_historical: boolean
+  }
+  complete: boolean
+  excluded_records: number
+  holes: Array<{ reference: string; message: string }>
+  fx_history_available: boolean
+}
+
 interface Summary {
   year: number
   total_revenue: number
@@ -142,6 +158,7 @@ export default function FinancialReportsPage() {
   const [commissionSummary, setCommissionSummary] = useState<CommissionSummary | null>(null)
   const [yearOverYear, setYearOverYear] = useState<YearOverYear | null>(null)
   const [availableYears, setAvailableYears] = useState<number[]>([])
+  const [currencyMeta, setCurrencyMeta] = useState<CurrencyMeta | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [activeTab, setActiveTab] = useState<'overview' | 'revenue' | 'cashflow' | 'tax' | 'commission'>('overview')
@@ -149,9 +166,16 @@ export default function FinancialReportsPage() {
   // Currency conversion hook
   const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
+  // The API now states every figure in ONE currency and tells us which
+  // (`currency.reporting_currency`). Passing it to convert() is what stops a
+  // double conversion: convert() assumes EUR unless told otherwise, so an
+  // EGP-denominated report would otherwise be treated as euros and inflated
+  // ~56x on the way to the user's display currency.
+  const reportingCurrency = currencyMeta?.reporting_currency || 'EUR'
+
   // Helper to format currency with conversion
   const formatAmount = (amount: number) => {
-    const converted = convert(amount)
+    const converted = convert(amount, reportingCurrency)
     return `${symbol}${converted.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   }
 
@@ -170,6 +194,7 @@ export default function FinancialReportsPage() {
           setCommissionSummary(result.commissionSummary)
           setYearOverYear(result.yearOverYear)
           setAvailableYears(result.availableYears)
+          setCurrencyMeta(result.currency || null)
         }
       }
     } catch (error) {
@@ -247,6 +272,36 @@ export default function FinancialReportsPage() {
           </select>
         </div>
       </div>
+
+      {/* Provenance — which figures are exact, and which are not */}
+      {currencyMeta && (currencyMeta.fx.live > 0 || !currencyMeta.complete) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-amber-900 space-y-1">
+              <p className="font-medium">
+                Figures are consolidated from {currencyMeta.reporting_currency} and are not fully exact.
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-xs text-amber-800">
+                {currencyMeta.fx.live > 0 && (
+                  <li>
+                    {currencyMeta.fx.live} record{currencyMeta.fx.live > 1 ? 's were' : ' was'} converted at
+                    today&apos;s exchange rate — no rate was on file for their transaction date.
+                    {!currencyMeta.fx_history_available &&
+                      ' Rate history starts building from the next exchange-rate refresh.'}
+                  </li>
+                )}
+                {currencyMeta.excluded_records > 0 && (
+                  <li>
+                    {currencyMeta.excluded_records} record{currencyMeta.excluded_records > 1 ? 's are' : ' is'} excluded
+                    entirely — no exchange rate is available for them.
+                  </li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg w-fit">

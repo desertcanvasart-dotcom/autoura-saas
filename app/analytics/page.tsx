@@ -70,6 +70,21 @@ interface AnalyticsData {
   }[]
   conversionRate: number
   avgDealSize: number
+  /** What currency the money above is in, and how exact the conversion was. */
+  currency?: {
+    reporting_currency: string
+    fx: {
+      same_currency: number
+      historical: number
+      live: number
+      unconverted: number
+      all_historical: boolean
+    }
+    complete: boolean
+    excluded_trips: number
+    holes: Array<{ reference: string; message: string }>
+    fx_history_available: boolean
+  }
   pipeline?: {
     leads: number
     followups: number
@@ -85,8 +100,13 @@ const formatNumber = (num: number, decimals: number = 2): string => {
   return Number(num).toFixed(decimals)
 }
 
-const formatCurrency = (num: number): string => {
-  return `€${Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
+
+// The symbol must follow the currency the API actually reported in. Printing
+// an EGP total behind a € sign is a wrong number that looks plausible.
+const formatMoney = (num: number, currency: string): string => {
+  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `
+  return `${symbol}${Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 const formatPercent = (num: number): string => {
@@ -169,6 +189,12 @@ export default function AnalyticsPage() {
 
   // Use analytics data or empty data (never mock data)
   const displayData = analytics || emptyData
+
+  // Every money figure below is stated in the currency the API consolidated
+  // into, so the symbol comes from the same place as the numbers.
+  const reportingCurrency = displayData.currency?.reporting_currency || 'EUR'
+  const formatCurrency = (num: number): string => formatMoney(num, reportingCurrency)
+  const fxNotice = displayData.currency
 
   // Color system
   const COLORS = {
@@ -304,6 +330,34 @@ export default function AnalyticsPage() {
           ))}
         </div>
       </div>
+
+      {/* Provenance — which figures are exact, and which are not */}
+      {fxNotice && (fxNotice.fx.live > 0 || !fxNotice.complete) && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-900">
+            <p className="font-medium">
+              Revenue is consolidated in {fxNotice.reporting_currency} and is not fully exact.
+            </p>
+            <ul className="list-disc list-inside space-y-0.5 text-xs text-amber-800 mt-1">
+              {fxNotice.fx.live > 0 && (
+                <li>
+                  {fxNotice.fx.live} trip{fxNotice.fx.live > 1 ? 's were' : ' was'} converted at today&apos;s
+                  exchange rate — no rate was on file for their date.
+                  {!fxNotice.fx_history_available &&
+                    ' Rate history starts building from the next exchange-rate refresh.'}
+                </li>
+              )}
+              {fxNotice.excluded_trips > 0 && (
+                <li>
+                  {fxNotice.excluded_trips} trip{fxNotice.excluded_trips > 1 ? 's are' : ' is'} excluded from
+                  revenue — no exchange rate is available for them.
+                </li>
+              )}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Empty State Banner - shown when no data */}
       {!hasAnyData && (
