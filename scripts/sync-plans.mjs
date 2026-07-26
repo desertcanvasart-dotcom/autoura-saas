@@ -87,6 +87,10 @@ try {
     }
   }
 
+  const wantedCheck = new Set(rows.map(r => r.slug))
+  const retiredCheck = (existing || []).filter(r => !wantedCheck.has(r.slug)).map(r => r.slug)
+  for (const slug of retiredCheck) drifted.push(`${slug}: no longer in the catalogue (would be deactivated)`)
+
   if (CHECK_ONLY) {
     if (drifted.length === 0) {
       console.log(`sync-plans: in sync — ${rows.length} plan(s) match the artifact`)
@@ -97,20 +101,43 @@ try {
     process.exit(1)
   }
 
-  if (drifted.length === 0) {
+  // Slugs the catalogue no longer defines (e.g. after a tier rename).
+  //
+  // DEACTIVATE, NEVER DELETE. A tenant_subscriptions row may still reference
+  // one by foreign key, and deleting it would either fail or orphan a paying
+  // tenant's plan. is_active=false keeps history intact while removing it from
+  // anything that lists sellable plans.
+  const wanted = new Set(rows.map(r => r.slug))
+  const retired = (existing || []).filter(r => !wanted.has(r.slug)).map(r => r.slug)
+
+  if (drifted.length === 0 && retired.length === 0) {
     console.log(`sync-plans: no changes — ${rows.length} plan(s) already match`)
     process.exit(0)
   }
 
-  // slug is UNIQUE — the conflict target.
-  const { error: writeError } = await supabase
-    .from('subscription_plans')
-    .upsert(rows, { onConflict: 'slug' })
+  if (drifted.length > 0) {
+    // slug is UNIQUE — the conflict target.
+    const { error: writeError } = await supabase
+      .from('subscription_plans')
+      .upsert(rows, { onConflict: 'slug' })
 
-  if (writeError) giveUp(`upsert failed: ${writeError.message}`)
+    if (writeError) giveUp(`upsert failed: ${writeError.message}`)
+  }
+
+  if (retired.length > 0) {
+    const { error: retireError } = await supabase
+      .from('subscription_plans')
+      .update({ is_active: false })
+      .in('slug', retired)
+
+    if (retireError) giveUp(`retiring old plans failed: ${retireError.message}`)
+  }
 
   console.log(`sync-plans: applied ${rows.length} plan(s); ${drifted.length} field(s) updated`)
   for (const d of drifted) console.log(`   ${d}`)
+  if (retired.length > 0) {
+    console.log(`sync-plans: retired ${retired.length} plan(s) (is_active=false, not deleted): ${retired.join(', ')}`)
+  }
   process.exit(0)
 } catch (err) {
   giveUp(`unexpected error: ${err?.message || err}`)

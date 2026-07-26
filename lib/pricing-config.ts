@@ -1,107 +1,162 @@
 import { Zap, Sparkles, Crown, Building2, LucideIcon } from 'lucide-react'
 
+// ============================================
+// PLAN CATALOGUE — the single source of truth
+// ============================================
+// This file is canonical. `subscription_plans` (which check_usage_limit reads)
+// is DERIVED from it: lib/plans-sync.ts renders supabase/generated/plans.json,
+// a vitest file snapshot fails the build on drift, and scripts/sync-plans.mjs
+// applies it on every deploy. Editing the database directly no longer sticks.
+//
+// BUSINESS MODEL IS NOT A FEATURE. B2C and B2B are available on every tier —
+// a DMC doing both wholesale and direct is the core customer, so gating either
+// had no tier that fit them. `b2c`/`b2b` are gone from this file entirely.
+// Whether a workspace SHOWS each is a free per-tenant preference, not an
+// entitlement (tenant_features, unchanged by this file).
+//
+// NEVER GATED, on any tier:
+//   - B2C and B2B workflows
+//   - the pricing integrity system (missing-rate detection, incomplete-quote
+//     marking, the send-path output gate)
+//   - core finance: invoices, payments, receipts, AR aging, per-trip P&L
+//   - all 29 messaging languages
+//   - the full 15-category rate engine
+//
+// Tiers differ on THROUGHPUT (the five limits below) and a small set of
+// capabilities that actually exist today. Capabilities that do not exist are
+// not modelled here — see ROADMAP_CAPABILITIES.
+
+/** null means unlimited, everywhere in this file. */
+export type Limit = number | null
+
 export interface PricingTier {
-  slug: 'starter' | 'professional' | 'business' | 'enterprise'
+  slug: 'solo' | 'studio' | 'agency' | 'enterprise'
   name: string
   icon: LucideIcon
   color: 'blue' | 'green' | 'purple' | 'orange'
-  monthlyPrice: number
-  annualPrice: number
+
+  /** USD. null = no list price; contact sales. */
+  monthlyPrice: number | null
+  annualPrice: number | null
+  /**
+   * Whether the public pricing page shows a price and offers self-serve
+   * checkout. Agency flips to true when multi-brand branding and API access
+   * ship — until then it has a defined price for sales, not a published one.
+   */
+  publiclyPriced: boolean
+
+  /** Positioning line, shown on the pricing page. */
   description: string
   popular?: boolean
 
-  // Limits
-  maxUsers: number
-  maxItinerariesPerMonth: number
-  maxQuotesPerMonth: number
-  maxPartners: number
+  /** The six metered dimensions. null = unlimited. */
+  limits: {
+    users: Limit
+    itinerariesPerYear: Limit
+    aiGenerationsPerMonth: Limit
+    b2bPartners: Limit
+    brands: Limit
+  }
 
-  // Features
-  features: {
-    b2c: boolean
-    b2b: boolean
-    whatsapp: boolean
-    email: boolean
-    pdf: boolean
-    analytics: boolean
-    customBranding: boolean
-    apiAccess: boolean
-    prioritySupport: boolean
+  /**
+   * Capabilities that EXIST and are tier-differentiated. Anything always-on is
+   * absent by design rather than set true everywhere.
+   */
+  capabilities: {
+    /** Studio+: departments, task dispatch, resource conflicts, copilot analytics. */
+    opsTeam: boolean
+    /** Agency+: inbound concierge brief webhook. */
+    conciergeWebhook: boolean
+    /** Agency+: named onboarding contact (commercial, not enforced in code). */
+    namedOnboarding: boolean
+    /** Enterprise: multiple tenants under one super-admin console. */
+    multiTenantConsole: boolean
   }
 }
 
+/**
+ * Sold as roadmap, never as a gate. Each has NO implementation as of
+ * 2026-07-26 — verified against the codebase — so modelling them as tier
+ * flags would advertise a switch that controls nothing.
+ */
+export const ROADMAP_CAPABILITIES = [
+  'multi-brand document branding',
+  'API access',
+  'white-label',
+  'SSO',
+] as const
+
 export const PRICING_TIERS: Record<string, PricingTier> = {
-  starter: {
-    slug: 'starter',
-    name: 'Starter',
+  solo: {
+    slug: 'solo',
+    name: 'Solo',
     icon: Zap,
     color: 'blue',
-    monthlyPrice: 49,
-    annualPrice: 490,
-    description: 'Perfect for small travel agencies just getting started',
-    maxUsers: 3,
-    maxItinerariesPerMonth: 50,
-    maxQuotesPerMonth: 100,
-    maxPartners: 10,
-    features: {
-      b2c: true,
-      b2b: false,
-      whatsapp: true,
-      email: true,
-      pdf: true,
-      analytics: false,
-      customBranding: false,
-      apiAccess: false,
-      prioritySupport: false,
+    monthlyPrice: 69,
+    annualPrice: 690,
+    publiclyPriced: true,
+    description: 'For the operator who is still the whole operation.',
+    limits: {
+      users: 3,
+      itinerariesPerYear: 120,
+      aiGenerationsPerMonth: 50,
+      b2bPartners: 3,
+      brands: 1,
+    },
+    capabilities: {
+      opsTeam: false,
+      conciergeWebhook: false,
+      namedOnboarding: false,
+      multiTenantConsole: false,
     },
   },
-  professional: {
-    slug: 'professional',
-    name: 'Professional',
+  studio: {
+    slug: 'studio',
+    name: 'Studio',
     icon: Sparkles,
     color: 'green',
-    monthlyPrice: 149,
-    annualPrice: 1490,
-    description: 'For growing agencies managing both B2C and B2B clients',
+    monthlyPrice: 189,
+    annualPrice: 1890,
+    publiclyPriced: true,
     popular: true,
-    maxUsers: 10,
-    maxItinerariesPerMonth: 200,
-    maxQuotesPerMonth: 500,
-    maxPartners: 50,
-    features: {
-      b2c: true,
-      b2b: true,
-      whatsapp: true,
-      email: true,
-      pdf: true,
-      analytics: true,
-      customBranding: true,
-      apiAccess: false,
-      prioritySupport: false,
+    description: 'For a growing DMC with a real ops team.',
+    limits: {
+      users: 12,
+      itinerariesPerYear: 500,
+      aiGenerationsPerMonth: 300,
+      b2bPartners: 15,
+      brands: 1,
+    },
+    capabilities: {
+      opsTeam: true,
+      conciergeWebhook: false,
+      namedOnboarding: false,
+      multiTenantConsole: false,
     },
   },
-  business: {
-    slug: 'business',
-    name: 'Business',
+  agency: {
+    slug: 'agency',
+    name: 'Agency',
     icon: Crown,
     color: 'purple',
-    monthlyPrice: 349,
-    annualPrice: 3490,
-    description: 'For DMCs and tour operators focused on B2B wholesale',
-    maxUsers: 25,
-    maxItinerariesPerMonth: 500,
-    maxQuotesPerMonth: 1500,
-    maxPartners: 150,
-    features: {
-      b2c: false,
-      b2b: true,
-      whatsapp: true,
-      email: true,
-      pdf: true,
-      analytics: true,
-      customBranding: true,
-      apiAccess: true,
-      prioritySupport: true,
+    // Defined for sales; not published until multi-brand branding and API
+    // access exist, since higher limits alone do not justify the step up.
+    monthlyPrice: 449,
+    annualPrice: 4490,
+    publiclyPriced: false,
+    description: 'For operators running serious B2B volume or more than one brand.',
+    limits: {
+      users: 30,
+      itinerariesPerYear: 2000,
+      aiGenerationsPerMonth: 1000,
+      b2bPartners: null,
+      brands: 3,
+    },
+    capabilities: {
+      opsTeam: true,
+      conciergeWebhook: true,
+      namedOnboarding: true,
+      multiTenantConsole: false,
     },
   },
   enterprise: {
@@ -109,28 +164,27 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
     name: 'Enterprise',
     icon: Building2,
     color: 'orange',
-    monthlyPrice: 999,
-    annualPrice: 9990,
-    description: 'Custom solutions for large organizations with unlimited needs',
-    maxUsers: 999, // Unlimited
-    maxItinerariesPerMonth: 9999,
-    maxQuotesPerMonth: 9999,
-    maxPartners: 9999,
-    features: {
-      b2c: true,
-      b2b: true,
-      whatsapp: true,
-      email: true,
-      pdf: true,
-      analytics: true,
-      customBranding: true,
-      apiAccess: true,
-      prioritySupport: true,
+    monthlyPrice: null,
+    annualPrice: null,
+    publiclyPriced: false,
+    description: 'For groups running multiple companies on one system.',
+    limits: {
+      users: null,
+      itinerariesPerYear: null,
+      aiGenerationsPerMonth: null,
+      b2bPartners: null,
+      brands: null,
+    },
+    capabilities: {
+      opsTeam: true,
+      conciergeWebhook: true,
+      namedOnboarding: true,
+      multiTenantConsole: true,
     },
   },
 }
 
-export const TIER_ORDER: Array<keyof typeof PRICING_TIERS> = ['starter', 'professional', 'business', 'enterprise']
+export const TIER_ORDER: Array<keyof typeof PRICING_TIERS> = ['solo', 'studio', 'agency', 'enterprise']
 
 export function getTierLevel(tierSlug: string): number {
   return TIER_ORDER.indexOf(tierSlug as any)
