@@ -7,10 +7,15 @@ startCommand = "npm run start"
 
 # NOTE: Railway has no `[[cron]]` table — cron is configured per-service in the
 # dashboard (Settings → Cron Schedule), and it runs that service's START
-# COMMAND (which must exit when done). The nightly agent-memory job therefore
-# lives in a SEPARATE Railway service:
-#   Start Command: npm run cron:agent-memory   (scripts/cron-agent-memory.mjs)
-#   Cron Schedule: 0 2 * * *
-#   Env:           APP_URL, CRON_SECRET
+# COMMAND (which must exit when done). Scheduled jobs therefore each live in a
+# SEPARATE Railway service pointed at this same repo. Full setup + verification
+# steps: docs/CRON-JOBS.md
+#
+#   1. Agent memory      Start: npm run cron:agent-memory     Cron: 0 2 * * *
+#   2. Exchange rates    Start: npm run cron:exchange-rates   Cron: 0 1 * * *
+#
+#   Env on each cron service: APP_URL, CRON_SECRET
+#   (CRON_SECRET must match the web service's value, or the endpoint 401s.)
+#
 # The old inert `[[cron]]` block was removed (wrong syntax + it single-quoted
 # $CRON_SECRET so the secret never expanded).

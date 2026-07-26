@@ -249,6 +249,54 @@ export async function persistExchangeRate(
   }
 }
 
+/** A row destined for the append-only `exchange_rate_snapshots` history. */
+export interface ExchangeRateSnapshotRow {
+  base_currency: string
+  target_currency: string
+  rate: number
+  source: string
+  captured_at: string
+}
+
+/**
+ * Turn a batch of freshly fetched rates into snapshot rows.
+ *
+ * Pure, so the refresh job's write payload is testable without a database.
+ * Rows that could poison the history are dropped rather than stored:
+ * a non-positive or non-finite rate would divide badly for the rest of the
+ * table's life, and the P&L would silently convert against it.
+ *
+ * All rows in one batch share `capturedAt` so the UNIQUE
+ * (base, target, captured_at) constraint makes a double-run idempotent.
+ */
+export function buildSnapshotRows(
+  rates: Array<{ base_currency: string; target_currency: string; rate: number }>,
+  capturedAt: string,
+  source: string = 'er-api'
+): ExchangeRateSnapshotRow[] {
+  const seen = new Set<string>()
+  const rows: ExchangeRateSnapshotRow[] = []
+
+  for (const entry of rates || []) {
+    const base = String(entry?.base_currency || '').trim().toUpperCase()
+    const target = String(entry?.target_currency || '').trim().toUpperCase()
+    const rate = Number(entry?.rate)
+
+    if (!base || !target || base === target) continue
+    if (!Number.isFinite(rate) || rate <= 0) continue
+
+    // The insert carries a UNIQUE(base, target, captured_at); two rows for the
+    // same pair in one batch would collide and fail the whole statement.
+    const key = `${base}>${target}`
+    if (seen.has(key)) continue
+    seen.add(key)
+
+    rows.push({ base_currency: base, target_currency: target, rate, source, captured_at: capturedAt })
+  }
+
+  return rows
+}
+
 /**
  * Get the most recent historical exchange rate for a currency pair.
  * Useful for auditing and reports — looks up saved snapshots.

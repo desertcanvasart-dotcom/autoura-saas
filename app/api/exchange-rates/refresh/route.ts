@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
-import { fetchAllExchangeRates } from '@/lib/exchange-rate-api'
+import { refreshExchangeRates } from '@/lib/exchange-rate-refresh'
 
 function getSupabaseAdmin() {
   return createAdminClient()
@@ -50,104 +50,29 @@ export async function POST(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const force = searchParams.get('force') === 'true'
 
-    // Check if we need to refresh (unless forced)
-    if (!force) {
-      const { data: existingRates } = await (getSupabaseAdmin() as any)
-        .from('exchange_rates')
-        .select('api_fetched_at')
-        .is('tenant_id', null)
-        .order('api_fetched_at', { ascending: false })
-        .limit(1)
-        .single()
+    // Shared job body — see lib/exchange-rate-refresh.ts. The scheduled
+    // counterpart is POST /api/cron/refresh-exchange-rates, which runs the
+    // same function behind CRON_SECRET (this route sits behind the session
+    // gate in middleware.ts and is not reachable by a cron caller).
+    const result = await refreshExchangeRates(getSupabaseAdmin(), {
+      force,
+      apiKey: process.env.EXCHANGE_RATE_API_KEY,
+    })
 
-      if (existingRates?.api_fetched_at) {
-        const lastFetch = new Date(existingRates.api_fetched_at)
-        const hoursSinceLastFetch = (Date.now() - lastFetch.getTime()) / (1000 * 60 * 60)
-
-        // Don't refresh if less than 1 hour old (to stay within free tier limits)
-        if (hoursSinceLastFetch < 1) {
-          return NextResponse.json({
-            success: true,
-            message: 'Rates are fresh, no refresh needed',
-            lastFetched: lastFetch.toISOString(),
-            hoursSinceLastFetch: hoursSinceLastFetch.toFixed(2)
-          })
-        }
-      }
-    }
-
-    // Fetch rates from API
-
-    const apiKey = process.env.EXCHANGE_RATE_API_KEY // Optional
-    const fetchedRates = await fetchAllExchangeRates(apiKey)
-
-    if (fetchedRates.length === 0) {
+    if (!result.success) {
       return NextResponse.json(
-        { success: false, error: 'No rates fetched from API' },
+        { success: false, error: result.error || result.message },
         { status: 500 }
       )
     }
 
-    const now = new Date().toISOString()
-
-    // Upsert system-level rates
-    const upsertPromises = fetchedRates.map(async (rate) => {
-      // First try to update existing
-      const { data: existing } = await (getSupabaseAdmin() as any)
-        .from('exchange_rates')
-        .select('id')
-        .is('tenant_id', null)
-        .eq('base_currency', rate.base_currency)
-        .eq('target_currency', rate.target_currency)
-        .single()
-
-      if (existing) {
-        // Update existing
-        return (getSupabaseAdmin() as any)
-          .from('exchange_rates')
-          .update({
-            rate: rate.rate,
-            source: 'api',
-            api_fetched_at: now,
-            last_updated_at: now
-          })
-          .eq('id', existing.id)
-      } else {
-        // Insert new
-        return (getSupabaseAdmin() as any)
-          .from('exchange_rates')
-          .insert({
-            tenant_id: null,
-            base_currency: rate.base_currency,
-            target_currency: rate.target_currency,
-            rate: rate.rate,
-            source: 'api',
-            api_fetched_at: now,
-            is_active: true
-          })
-      }
-    })
-
-    await Promise.all(upsertPromises)
-
-    // Fetch updated rates to return
-    const { data: updatedRates, error } = await (getSupabaseAdmin() as any)
-      .from('exchange_rates')
-      .select('*')
-      .is('tenant_id', null)
-      .eq('is_active', true)
-      .order('base_currency')
-      .order('target_currency')
-
-    if (error) {
-      throw error
-    }
-
     return NextResponse.json({
       success: true,
-      message: `Successfully refreshed ${fetchedRates.length} exchange rates`,
-      fetchedAt: now,
-      rates: updatedRates
+      message: result.message,
+      fetchedAt: result.fetchedAt,
+      snapshotsWritten: result.snapshotsWritten,
+      ...(result.snapshotError ? { snapshotError: result.snapshotError } : {}),
+      rates: result.rates,
     })
   } catch (error: any) {
     console.error('Error refreshing exchange rates:', error)
