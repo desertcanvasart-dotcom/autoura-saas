@@ -96,7 +96,10 @@ export default function BillingPlansPage() {
   }
 
   const formatPrice = (price: number) => `$${price.toLocaleString()}`
-  const formatLimit = (limit: number) => limit >= 9999 ? 'Unlimited' : limit.toLocaleString()
+  // null means unlimited — the sentinel numbers (999 / 9999) are gone, so a
+  // large real cap can no longer be mistaken for "no cap".
+  const formatLimit = (limit: number | null) =>
+    limit === null ? 'Unlimited' : limit.toLocaleString()
 
   if (loading) {
     return (
@@ -180,9 +183,11 @@ export default function BillingPlansPage() {
             const isCurrentPlan = comparison === 'current'
             const isUpgrade = comparison === 'upgrade'
 
+            // Agency and Enterprise have no published price — contact sales.
             const monthlyEquivalent = billingCycle === 'yearly'
-              ? Math.round(tier.annualPrice / 12)
+              ? (tier.annualPrice === null ? null : Math.round(tier.annualPrice / 12))
               : tier.monthlyPrice
+            const showsPrice = tier.publiclyPriced && monthlyEquivalent !== null
 
             return (
               <div
@@ -226,16 +231,24 @@ export default function BillingPlansPage() {
 
                   {/* Price */}
                   <div className="mb-4">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold text-gray-900">
-                        {formatPrice(monthlyEquivalent)}
-                      </span>
-                      <span className="text-xs text-gray-500">/mo</span>
-                    </div>
-                    {billingCycle === 'yearly' && (
-                      <p className="text-[10px] text-gray-400">
-                        Billed {formatPrice(tier.annualPrice)}/year
-                      </p>
+                    {showsPrice ? (
+                      <>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-bold text-gray-900">
+                            {formatPrice(monthlyEquivalent as number)}
+                          </span>
+                          <span className="text-xs text-gray-500">/mo</span>
+                        </div>
+                        {billingCycle === 'yearly' && tier.annualPrice !== null && (
+                          <p className="text-[10px] text-gray-400">
+                            Billed {formatPrice(tier.annualPrice)}/year
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl font-bold text-gray-900">Talk to us</span>
+                      </div>
                     )}
                   </div>
 
@@ -245,19 +258,23 @@ export default function BillingPlansPage() {
                     <ul className="space-y-1.5">
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
                         <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                        <span className="font-medium">{formatLimit(tier.maxUsers)}</span> users
+                        <span className="font-medium">{formatLimit(tier.limits.users)}</span> users
                       </li>
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
                         <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                        <span className="font-medium">{formatLimit(tier.maxItinerariesPerMonth)}</span> itineraries/mo
+                        <span className="font-medium">{formatLimit(tier.limits.itinerariesPerYear)}</span> itineraries/yr
                       </li>
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
                         <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                        <span className="font-medium">{formatLimit(tier.maxQuotesPerMonth)}</span> quotes/mo
+                        <span className="font-medium">{formatLimit(tier.limits.aiGenerationsPerMonth)}</span> AI generations/mo
                       </li>
                       <li className="flex items-center gap-1.5 text-xs text-gray-700">
                         <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                        <span className="font-medium">{formatLimit(tier.maxPartners)}</span> B2B partners
+                        <span className="font-medium">{formatLimit(tier.limits.b2bPartners)}</span> B2B partners
+                      </li>
+                      <li className="flex items-center gap-1.5 text-xs text-gray-700">
+                        <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
+                        <span className="font-medium">{formatLimit(tier.limits.brands)}</span> brand{tier.limits.brands === 1 ? '' : 's'}
                       </li>
                     </ul>
                   </div>
@@ -266,40 +283,29 @@ export default function BillingPlansPage() {
                   <div className="mb-4">
                     <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Features</p>
                     <ul className="space-y-1.5">
-                      {tier.features.b2c && (
+                      {/* B2C and B2B are on every tier — never a differentiator. */}
+                      {tier.capabilities.opsTeam && (
                         <li className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          B2C Quotes
+                          Departments, task dispatch &amp; copilot analytics
                         </li>
                       )}
-                      {tier.features.b2b && (
+                      {tier.capabilities.conciergeWebhook && (
                         <li className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          B2B Quotes
+                          Concierge brief webhook
                         </li>
                       )}
-                      {tier.features.customBranding && (
+                      {tier.capabilities.namedOnboarding && (
                         <li className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          Custom branding
+                          Named onboarding contact
                         </li>
                       )}
-                      {tier.features.analytics && (
+                      {tier.capabilities.multiTenantConsole && (
                         <li className="flex items-center gap-1.5 text-xs text-gray-600">
                           <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          Analytics
-                        </li>
-                      )}
-                      {tier.features.apiAccess && (
-                        <li className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          API access
-                        </li>
-                      )}
-                      {tier.features.prioritySupport && (
-                        <li className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          Priority support
+                          Multiple companies, one console
                         </li>
                       )}
                     </ul>

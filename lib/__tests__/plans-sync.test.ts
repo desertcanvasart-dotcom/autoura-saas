@@ -4,7 +4,6 @@ import {
   buildPlanRows,
   renderPlansArtifact,
   toDbLimit,
-  UNLIMITED_SENTINELS,
   PLAN_CURRENCY,
   type PlanRow,
 } from '@/lib/plans-sync'
@@ -75,16 +74,16 @@ describe('toDbLimit — sentinel to NULL bridge', () => {
     expect(toDbLimit(120)).toBe(120)
   })
 
-  it('maps the exact unlimited sentinels to NULL', () => {
-    for (const sentinel of UNLIMITED_SENTINELS) {
-      expect(toDbLimit(sentinel)).toBeNull()
-    }
+  it('passes an explicit null through as unlimited', () => {
+    // Unlimited is now null in pricing-config, matching the column directly —
+    // no sentinel bridging, so no way for a real cap to be mistaken for one.
+    expect(toDbLimit(null)).toBeNull()
   })
 
   it('REGRESSION: a large but REAL cap survives — 1500 is not unlimited', () => {
-    // Business genuinely allows 1500 quotes/month. A ">= 999" threshold turned
-    // that into NULL, i.e. a paid limit that would never enforce. Matching the
-    // sentinels exactly is the fix.
+    // A ">= 999 means unlimited" rule once turned a real 1500/month cap into
+    // NULL, i.e. a paid limit that would never enforce. Explicit nulls removed
+    // the whole class of bug; this pins it shut.
     expect(toDbLimit(1500)).toBe(1500)
     expect(toDbLimit(1000)).toBe(1000)
     expect(toDbLimit(2000)).toBe(2000)
@@ -106,7 +105,7 @@ describe('drift detection actually detects drift', () => {
   it('a changed limit changes the artifact', () => {
     const before = renderPlansArtifact()
     const mutated = JSON.parse(JSON.stringify(PRICING_TIERS)) as typeof PRICING_TIERS
-    mutated.starter.maxUsers = 99
+    mutated.solo.limits.users = 99
     const after = renderPlansArtifact(buildPlanRows(mutated))
     expect(after).not.toBe(before)
   })
@@ -114,14 +113,14 @@ describe('drift detection actually detects drift', () => {
   it('a changed price changes the artifact', () => {
     const before = renderPlansArtifact()
     const mutated = JSON.parse(JSON.stringify(PRICING_TIERS)) as typeof PRICING_TIERS
-    mutated.starter.monthlyPrice = 1
+    mutated.solo.monthlyPrice = 1
     expect(renderPlansArtifact(buildPlanRows(mutated))).not.toBe(before)
   })
 
   it('an added tier changes the artifact', () => {
     const before = buildPlanRows().length
     const mutated = JSON.parse(JSON.stringify(PRICING_TIERS)) as Record<string, unknown>
-    mutated.extra = { ...(mutated.starter as object), slug: 'extra', name: 'Extra' }
+    mutated.extra = { ...(mutated.solo as object), slug: 'extra', name: 'Extra' }
     expect(buildPlanRows(mutated as typeof PRICING_TIERS).length).toBe(before + 1)
   })
 })
@@ -134,6 +133,24 @@ describe('artifact shape is safe to upsert', () => {
     for (const row of rows) {
       expect(typeof row.slug).toBe('string')
       expect(row.slug.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('emits ONLY real subscription_plans columns', () => {
+    // The upsert sends the row object as-is: one key that is not a column
+    // fails the entire write at boot. A `limits` key slipped in during the
+    // tier restructure and would have broken the deploy sync.
+    const COLUMNS = new Set([
+      'name', 'slug', 'description', 'price_monthly', 'price_yearly', 'currency',
+      'stripe_price_id_monthly', 'stripe_price_id_yearly', 'stripe_product_id',
+      'max_quotes_per_month', 'max_team_members', 'max_whatsapp_messages',
+      'max_gmail_accounts', 'max_storage_mb', 'features', 'is_active',
+      'max_itinerary_runs_per_month', 'max_pricing_runs_per_month', 'agent_memory_days',
+    ])
+    for (const row of rows) {
+      for (const key of Object.keys(row)) {
+        expect(COLUMNS.has(key), `"${key}" is not a subscription_plans column`).toBe(true)
+      }
     }
   })
 

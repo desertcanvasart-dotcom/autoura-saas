@@ -98,26 +98,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Determine business type from features
-    let businessType: 'b2c_only' | 'b2b_only' | 'b2c_and_b2b'
-    if (selectedTier.features.b2c && selectedTier.features.b2b) {
-      businessType = 'b2c_and_b2b'
-    } else if (selectedTier.features.b2c && !selectedTier.features.b2b) {
-      businessType = 'b2c_only'
-    } else {
-      businessType = 'b2b_only'
-    }
-
+    // Business model is NOT derived from the tier any more.
+    //
+    // b2c_enabled / b2b_enabled / business_type are a free per-tenant workspace
+    // preference — every tier gets both — so a plan change must not silently
+    // rewrite which workspaces a tenant sees. They are deliberately absent from
+    // updateData below; changing tier no longer touches them.
+    //
+    // Capabilities that do not exist yet (multi-brand branding, API access,
+    // white-label, SSO) are not written either: a flag with no mechanism behind
+    // it is worse than no flag.
     const updateData = {
       current_pricing_tier: tier,
-      max_users: selectedTier.maxUsers,
-      max_quotes_per_month: selectedTier.maxQuotesPerMonth,
-      b2c_enabled: selectedTier.features.b2c,
-      b2b_enabled: selectedTier.features.b2b,
-      whatsapp_integration: selectedTier.features.whatsapp,
-      email_integration: selectedTier.features.email,
-      pdf_generation: selectedTier.features.pdf,
-      analytics_enabled: selectedTier.features.analytics,
+      // null = unlimited, matching the column convention.
+      max_users: selectedTier.limits.users,
+      max_partners: selectedTier.limits.b2bPartners,
+      // Always-on capabilities, kept true so existing gates do not regress.
+      whatsapp_integration: true,
+      email_integration: true,
+      pdf_generation: true,
+      analytics_enabled: true,
       updated_at: new Date().toISOString()
     }
 
@@ -155,19 +155,12 @@ export async function POST(request: NextRequest) {
 
 
 
-    // Also update the tenant's business_type to match
-    const { error: tenantUpdateError } = await adminClient
-      .from('tenants')
-      .update({
-        business_type: businessType,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', tenant_id)
-
-    if (tenantUpdateError) {
-      console.error('Error updating tenant business_type:', tenantUpdateError)
-      // Don't fail the request, just log the error
-    }
+    // `tenants.business_type` is deliberately NOT touched here.
+    //
+    // It used to be recomputed from the tier's b2c/b2b feature flags, so
+    // changing plan could silently flip a DMC from "b2c_and_b2b" to
+    // "b2b_only" and hide half their workspace. Business model is now a free
+    // per-tenant preference on every tier, owned by Settings → Organization.
 
     return NextResponse.json({
       success: true,

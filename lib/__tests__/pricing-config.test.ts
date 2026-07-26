@@ -14,78 +14,142 @@ import type { PricingTier } from '@/lib/pricing-config'
 // must come from this table, so a malformed entry (0 price, missing feature
 // flag, tier not in TIER_ORDER) is a data bug we want to catch at test time.
 
-const FEATURE_KEYS = [
-  'b2c',
-  'b2b',
-  'whatsapp',
-  'email',
-  'pdf',
-  'analytics',
-  'customBranding',
-  'apiAccess',
-  'prioritySupport',
+const CAPABILITY_KEYS = [
+  'opsTeam',
+  'conciergeWebhook',
+  'namedOnboarding',
+  'multiTenantConsole',
 ] as const
+
+const LIMIT_KEYS = [
+  'users',
+  'itinerariesPerYear',
+  'aiGenerationsPerMonth',
+  'b2bPartners',
+  'brands',
+] as const
+
+/** Tiers with a published, self-serve price. */
+const PRICED = ['solo', 'studio'] as const
 
 describe('PRICING_TIERS — catalog integrity', () => {
   it('contains exactly the four known tiers, keyed by their slug', () => {
     expect(Object.keys(PRICING_TIERS).sort()).toEqual(
-      ['business', 'enterprise', 'professional', 'starter']
+      ['agency', 'enterprise', 'solo', 'studio']
     )
     for (const [key, tier] of Object.entries(PRICING_TIERS)) {
       expect(tier.slug).toBe(key)
     }
   })
 
-  it('every tier has strictly positive prices — no free/zero tier can appear by accident', () => {
+  it('BUSINESS MODEL IS NEVER GATED — no b2c/b2b flag may reappear', () => {
+    // A DMC doing both wholesale and direct is the core customer. Gating
+    // either left them with no tier that fit. If someone re-adds these as
+    // capabilities, this fails.
     for (const tier of Object.values(PRICING_TIERS)) {
-      expect(tier.monthlyPrice).toBeGreaterThan(0)
-      expect(tier.annualPrice).toBeGreaterThan(0)
-      expect(Number.isFinite(tier.monthlyPrice)).toBe(true)
-      expect(Number.isFinite(tier.annualPrice)).toBe(true)
+      const keys = Object.keys(tier.capabilities)
+      expect(keys, `${tier.slug}`).not.toContain('b2c')
+      expect(keys, `${tier.slug}`).not.toContain('b2b')
+      // apiAccess had no mechanism behind it — a flag that gates nothing.
+      expect(keys, `${tier.slug}`).not.toContain('apiAccess')
     }
   })
 
-  it('annual price is exactly 10 × monthly for every tier (2 months free)', () => {
+  it('priced tiers have strictly positive prices; contact-sales tiers have null', () => {
     for (const tier of Object.values(PRICING_TIERS)) {
-      expect(tier.annualPrice).toBe(tier.monthlyPrice * 10)
-    }
-  })
-
-  it('every tier carries all limit fields as positive numbers', () => {
-    for (const tier of Object.values(PRICING_TIERS)) {
-      expect(tier.maxUsers).toBeGreaterThan(0)
-      expect(tier.maxItinerariesPerMonth).toBeGreaterThan(0)
-      expect(tier.maxQuotesPerMonth).toBeGreaterThan(0)
-      expect(tier.maxPartners).toBeGreaterThan(0)
-    }
-  })
-
-  it('every tier defines every feature flag as a boolean (no missing/undefined flags)', () => {
-    for (const tier of Object.values(PRICING_TIERS)) {
-      for (const key of FEATURE_KEYS) {
-        expect(typeof tier.features[key], `${tier.slug}.features.${key}`).toBe('boolean')
+      if (tier.publiclyPriced) {
+        expect(tier.monthlyPrice, tier.slug).toBeGreaterThan(0)
+        expect(tier.annualPrice, tier.slug).toBeGreaterThan(0)
       }
-      expect(Object.keys(tier.features).sort()).toEqual([...FEATURE_KEYS].sort())
+      // A price of 0 must never appear — that is a free tier by accident.
+      expect(tier.monthlyPrice, tier.slug).not.toBe(0)
+      expect(tier.annualPrice, tier.slug).not.toBe(0)
     }
   })
 
-  it('exactly one tier is flagged popular (professional)', () => {
+  it('annual price is exactly 10 × monthly wherever a price exists (2 months free)', () => {
+    for (const tier of Object.values(PRICING_TIERS)) {
+      if (tier.monthlyPrice === null) {
+        expect(tier.annualPrice, tier.slug).toBeNull()
+        continue
+      }
+      expect(tier.annualPrice, tier.slug).toBe(tier.monthlyPrice * 10)
+    }
+  })
+
+  it('only Solo and Studio are publicly priced', () => {
+    const priced = Object.values(PRICING_TIERS).filter(t => t.publiclyPriced).map(t => t.slug)
+    expect(priced.sort()).toEqual([...PRICED].sort())
+  })
+
+  it('Enterprise has no list price at all', () => {
+    expect(PRICING_TIERS.enterprise.monthlyPrice).toBeNull()
+    expect(PRICING_TIERS.enterprise.annualPrice).toBeNull()
+  })
+
+  it('Agency keeps a defined price for sales even though it is unpublished', () => {
+    // It flips to publiclyPriced when multi-brand branding and API access ship.
+    expect(PRICING_TIERS.agency.publiclyPriced).toBe(false)
+    expect(PRICING_TIERS.agency.monthlyPrice).toBe(449)
+  })
+
+  it('every tier carries all five limits; null means unlimited, never 0', () => {
+    for (const tier of Object.values(PRICING_TIERS)) {
+      for (const key of LIMIT_KEYS) {
+        const value = tier.limits[key]
+        expect(value === null || typeof value === 'number', `${tier.slug}.limits.${key}`).toBe(true)
+        if (value !== null) expect(value, `${tier.slug}.limits.${key}`).toBeGreaterThan(0)
+      }
+      expect(Object.keys(tier.limits).sort()).toEqual([...LIMIT_KEYS].sort())
+    }
+  })
+
+  it('every tier defines every capability as a boolean (no missing flags)', () => {
+    for (const tier of Object.values(PRICING_TIERS)) {
+      for (const key of CAPABILITY_KEYS) {
+        expect(typeof tier.capabilities[key], `${tier.slug}.capabilities.${key}`).toBe('boolean')
+      }
+      expect(Object.keys(tier.capabilities).sort()).toEqual([...CAPABILITY_KEYS].sort())
+    }
+  })
+
+  it('exactly one tier is flagged popular (studio)', () => {
     const popular = Object.values(PRICING_TIERS).filter((t) => t.popular)
-    expect(popular.map((t) => t.slug)).toEqual(['professional'])
+    expect(popular.map((t) => t.slug)).toEqual(['studio'])
   })
 
-  it('locks the current price points', () => {
-    expect(PRICING_TIERS.starter.monthlyPrice).toBe(49)
-    expect(PRICING_TIERS.professional.monthlyPrice).toBe(149)
-    expect(PRICING_TIERS.business.monthlyPrice).toBe(349)
-    expect(PRICING_TIERS.enterprise.monthlyPrice).toBe(999)
+  it('locks the agreed price points', () => {
+    expect(PRICING_TIERS.solo.monthlyPrice).toBe(69)
+    expect(PRICING_TIERS.studio.monthlyPrice).toBe(189)
+    expect(PRICING_TIERS.agency.monthlyPrice).toBe(449)
+    expect(PRICING_TIERS.enterprise.monthlyPrice).toBeNull()
   })
 
-  it('locks the B2C/B2B feature split (business is B2B-only)', () => {
-    expect(PRICING_TIERS.starter.features).toMatchObject({ b2c: true, b2b: false })
-    expect(PRICING_TIERS.professional.features).toMatchObject({ b2c: true, b2b: true })
-    expect(PRICING_TIERS.business.features).toMatchObject({ b2c: false, b2b: true })
-    expect(PRICING_TIERS.enterprise.features).toMatchObject({ b2c: true, b2b: true })
+  it('locks the agreed limits', () => {
+    expect(PRICING_TIERS.solo.limits).toEqual({
+      users: 3, itinerariesPerYear: 120, aiGenerationsPerMonth: 50, b2bPartners: 3, brands: 1,
+    })
+    expect(PRICING_TIERS.studio.limits).toEqual({
+      users: 12, itinerariesPerYear: 500, aiGenerationsPerMonth: 300, b2bPartners: 15, brands: 1,
+    })
+    expect(PRICING_TIERS.agency.limits).toEqual({
+      users: 30, itinerariesPerYear: 2000, aiGenerationsPerMonth: 1000, b2bPartners: null, brands: 3,
+    })
+    expect(PRICING_TIERS.enterprise.limits).toEqual({
+      users: null, itinerariesPerYear: null, aiGenerationsPerMonth: null, b2bPartners: null, brands: null,
+    })
+  })
+
+  it('capabilities only ever accumulate up the ladder', () => {
+    for (let i = 1; i < TIER_ORDER.length; i++) {
+      const prev = PRICING_TIERS[TIER_ORDER[i - 1]]
+      const next = PRICING_TIERS[TIER_ORDER[i]]
+      for (const key of CAPABILITY_KEYS) {
+        if (prev.capabilities[key]) {
+          expect(next.capabilities[key], `${next.slug} lost ${key}`).toBe(true)
+        }
+      }
+    }
   })
 })
 
@@ -99,49 +163,57 @@ describe('TIER_ORDER — ordering defaults', () => {
     for (let i = 1; i < TIER_ORDER.length; i++) {
       const prev = PRICING_TIERS[TIER_ORDER[i - 1]]
       const next = PRICING_TIERS[TIER_ORDER[i]]
-      expect(next.monthlyPrice).toBeGreaterThan(prev.monthlyPrice)
-      expect(next.maxUsers).toBeGreaterThanOrEqual(prev.maxUsers)
-      expect(next.maxItinerariesPerMonth).toBeGreaterThanOrEqual(prev.maxItinerariesPerMonth)
-      expect(next.maxQuotesPerMonth).toBeGreaterThanOrEqual(prev.maxQuotesPerMonth)
-      expect(next.maxPartners).toBeGreaterThanOrEqual(prev.maxPartners)
+
+      if (prev.monthlyPrice !== null && next.monthlyPrice !== null) {
+        expect(next.monthlyPrice, `${next.slug} vs ${prev.slug}`).toBeGreaterThan(prev.monthlyPrice)
+      }
+
+      for (const key of LIMIT_KEYS) {
+        const a = prev.limits[key]
+        const b = next.limits[key]
+        // null = unlimited, so it can never be a downgrade.
+        if (b === null) continue
+        expect(a, `${next.slug}.${key} shrank vs ${prev.slug}`).not.toBeNull()
+        expect(b, `${next.slug}.${key}`).toBeGreaterThanOrEqual(a as number)
+      }
     }
   })
 })
 
 describe('getTierLevel', () => {
   it('maps known tiers to their position in TIER_ORDER', () => {
-    expect(getTierLevel('starter')).toBe(0)
-    expect(getTierLevel('professional')).toBe(1)
-    expect(getTierLevel('business')).toBe(2)
+    expect(getTierLevel('solo')).toBe(0)
+    expect(getTierLevel('studio')).toBe(1)
+    expect(getTierLevel('agency')).toBe(2)
     expect(getTierLevel('enterprise')).toBe(3)
   })
 
   it('returns -1 for unknown slugs — never invents a level', () => {
     expect(getTierLevel('platinum')).toBe(-1)
     expect(getTierLevel('')).toBe(-1)
-    expect(getTierLevel('STARTER')).toBe(-1) // case-sensitive: slugs are lowercase
+    expect(getTierLevel('SOLO')).toBe(-1) // case-sensitive: slugs are lowercase
   })
 })
 
 describe('compareTiers', () => {
   it('classifies moves between known tiers', () => {
-    expect(compareTiers('starter', 'business')).toBe('upgrade')
-    expect(compareTiers('enterprise', 'professional')).toBe('downgrade')
-    expect(compareTiers('professional', 'professional')).toBe('current')
+    expect(compareTiers('solo', 'agency')).toBe('upgrade')
+    expect(compareTiers('enterprise', 'studio')).toBe('downgrade')
+    expect(compareTiers('studio', 'studio')).toBe('current')
     // adjacent boundaries
-    expect(compareTiers('starter', 'professional')).toBe('upgrade')
-    expect(compareTiers('professional', 'starter')).toBe('downgrade')
+    expect(compareTiers('solo', 'studio')).toBe('upgrade')
+    expect(compareTiers('studio', 'solo')).toBe('downgrade')
   })
 
   // DOCUMENTED intent: a tenant whose stored tier slug is stale/unrecognized
   // has no recognizable plan, so every real plan is presented as an upgrade
   // path (see the comment in compareTiers).
   it('unknown current tier classifies as upgrade to any real tier (documented intent)', () => {
-    expect(compareTiers('bogus', 'starter')).toBe('upgrade')
+    expect(compareTiers('bogus', 'solo')).toBe('upgrade')
   })
 
   it('unknown target tier returns "unknown" — an invalid target is not a plan change', () => {
-    expect(compareTiers('starter', 'bogus')).toBe('unknown')
+    expect(compareTiers('solo', 'bogus')).toBe('unknown')
   })
 
   it('two unknown tiers return "unknown" (invalid target takes precedence)', () => {
