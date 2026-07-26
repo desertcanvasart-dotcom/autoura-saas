@@ -130,6 +130,9 @@ export default function AboutPage() {
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-gray-400 text-sm">© 2026 Autoura. All rights reserved.</p>
             <div className="flex items-center gap-6">
+              <Link href="/pricing" className="text-gray-400 hover:text-white text-sm transition-colors">
+                Pricing
+              </Link>
               <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Privacy
               </Link>

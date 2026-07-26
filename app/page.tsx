@@ -462,6 +462,7 @@ export default function AutouraHomepage() {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Features</a>
             <a href="#how-it-works" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">How It Works</a>
+            <Link href="/pricing" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Pricing</Link>
             <Link href="/integrations" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Integrations</Link>
             <Link href="/docs" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Docs</Link>
             <Link href="/about" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">About</Link>
@@ -490,6 +491,7 @@ export default function AutouraHomepage() {
           <div className="md:hidden px-6 pt-4 pb-2 border-t border-[#D6D2CA] space-y-3">
             <a href="#features" className="block text-sm text-[#555] hover:text-[#111710] py-2">Features</a>
             <a href="#how-it-works" className="block text-sm text-[#555] hover:text-[#111710] py-2">How It Works</a>
+            <Link href="/pricing" className="block text-sm text-[#555] hover:text-[#111710] py-2">Pricing</Link>
             <Link href="/integrations" className="block text-sm text-[#555] hover:text-[#111710] py-2">Integrations</Link>
             <Link href="/docs" className="block text-sm text-[#555] hover:text-[#111710] py-2">Docs</Link>
             <Link href="/about" className="block text-sm text-[#555] hover:text-[#111710] py-2">About</Link>
@@ -984,6 +986,7 @@ export default function AutouraHomepage() {
               <img src="/autoura-logo.png" alt="Autoura" className="w-14 h-14 object-contain" />
             </div>
             <div className="flex items-center gap-6 sm:gap-8 text-sm text-stone-500">
+              <Link href="/pricing" className="hover:text-stone-700 transition-colors">Pricing</Link>
               <Link href="/about" className="hover:text-stone-700 transition-colors">About</Link>
               <Link href="/docs" className="hover:text-stone-700 transition-colors">Docs</Link>
               <Link href="/integrations" className="hover:text-stone-700 transition-colors">Integrations</Link>

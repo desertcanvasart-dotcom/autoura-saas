@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import { TRIAL_DAYS } from './pricing-config'
 
 // Lazy-initialized Stripe client (avoids build-time errors when env vars unavailable)
 let _stripe: Stripe | null = null
@@ -105,7 +106,7 @@ export async function createCheckoutSession(
       metadata: {
         tenant_id: tenantId
       },
-      trial_period_days: 14 // 14-day free trial
+      trial_period_days: TRIAL_DAYS // stated on the public pricing page
     },
     allow_promotion_codes: true,
     metadata: {

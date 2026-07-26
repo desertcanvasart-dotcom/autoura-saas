@@ -242,6 +242,9 @@ export default function TermsPage() {
               <Link href="/contact" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Contact
               </Link>
+              <Link href="/pricing" className="text-gray-400 hover:text-white text-sm transition-colors">
+                Pricing
+              </Link>
               <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Privacy
               </Link>
