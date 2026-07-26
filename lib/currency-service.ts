@@ -298,45 +298,6 @@ export function buildSnapshotRows(
 }
 
 /**
- * Get the most recent historical exchange rate for a currency pair.
- * Useful for auditing and reports — looks up saved snapshots.
- */
-export async function getHistoricalRate(
-  supabase: any,
-  fromCurrency: string,
-  toCurrency: string,
-  date?: Date
-): Promise<{ rate: number; capturedAt: string; source: string } | null> {
-  try {
-    let query = supabase
-      .from('exchange_rate_snapshots')
-      .select('rate, captured_at, source')
-      .eq('base_currency', fromCurrency)
-      .eq('target_currency', toCurrency)
-      .order('captured_at', { ascending: false })
-      .limit(1)
-
-    if (date) {
-      // Find the closest snapshot on or before the given date
-      query = query.lte('captured_at', date.toISOString())
-    }
-
-    const { data, error } = await query
-
-    if (error || !data?.length) return null
-
-    return {
-      rate: data[0].rate,
-      capturedAt: data[0].captured_at,
-      source: data[0].source,
-    }
-  } catch (error) {
-    console.warn('⚠️ Failed to fetch historical exchange rate:', error)
-    return null
-  }
-}
-
-/**
  * Get exchange rate between two currencies.
  * Convenience function for getting a single rate value.
  */

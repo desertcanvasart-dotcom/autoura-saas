@@ -169,12 +169,65 @@ describe('commissions belong in the margin', () => {
     expect(result.gross_profit).toBe(4800)
   })
 
-  it('counts a disputed commission — unresolved is not the same as void', () => {
+  // Disputed is handled ASYMMETRICALLY by direction, on prudence. A disputed
+  // payable will probably still be paid; a disputed receivable may never
+  // arrive, and counting it would inflate margin on exactly the trips where
+  // something already went wrong.
+  it('counts a disputed PAYABLE — you will probably still pay it', () => {
     const result = compute({
       invoices: [invoice()],
       commissions: [commission({ status: 'disputed', commission_amount: 720 })],
     })
     expect(result.commissions_payable).toBe(720)
+    expect(result.gross_profit).toBe(4080)
+    expect(result.disputed_receivable).toBe(0)
+  })
+
+  it('EXCLUDES a disputed RECEIVABLE from margin, surfacing it separately', () => {
+    const result = compute({
+      invoices: [invoice()],
+      commissions: [
+        commission({ status: 'disputed', commission_type: 'receivable', commission_amount: 500, category: 'hotel' }),
+      ],
+    })
+    expect(result.commissions_receivable).toBe(0)
+    expect(result.disputed_receivable).toBe(500)
+    // Margin must NOT assume the disputed money arrives.
+    expect(result.gross_profit).toBe(4800)
+    expect(result.net_commission).toBe(0)
+  })
+
+  it('keeps a disputed receivable out of the category breakdown too', () => {
+    const result = compute({
+      commissions: [
+        commission({ status: 'disputed', commission_type: 'receivable', commission_amount: 500, category: 'hotel' }),
+        commission({ status: 'pending', commission_type: 'receivable', commission_amount: 100, category: 'hotel' }),
+      ],
+    })
+    expect(result.commission_breakdown.hotel).toEqual({ receivable: 100, payable: 0 })
+    expect(result.disputed_receivable).toBe(500)
+  })
+
+  it('converts a disputed receivable at its own date like any other line', () => {
+    const result = compute({
+      commissions: [
+        commission({
+          status: 'disputed', commission_type: 'receivable',
+          commission_amount: 55000, currency: 'EGP',
+          transaction_date: '2026-01-05', paid_date: '2026-02-20',
+        }),
+      ],
+    })
+    // 55,000 EGP at the 15 Feb rate of 55 -> EUR 1,000
+    expect(result.disputed_receivable).toBe(1000)
+    expect(result.commissions_receivable).toBe(0)
+  })
+
+  it('still counts a disputed commission toward commission_count', () => {
+    const result = compute({
+      commissions: [commission({ status: 'disputed', commission_type: 'receivable', commission_amount: 500 })],
+    })
+    expect(result.commission_count).toBe(1)
   })
 
   it('breaks commissions down by category for the drill-down', () => {
@@ -504,6 +557,23 @@ describe('buildPnlSummary — one currency, or none', () => {
     })
     expect(summary.profitable_trips).toBe(1)
     expect(summary.loss_trips).toBe(1)
+  })
+
+  it('rolls disputed receivable up separately, out of total_profit', () => {
+    const disputed = compute({
+      itinerary: trip({ id: 'f', currency: 'EUR', total_cost: 1000 }),
+      commissions: [
+        commission({ itinerary_id: 'f', status: 'disputed', commission_type: 'receivable', commission_amount: 250 }),
+      ],
+    })
+    const summary = buildPnlSummary({
+      trips: [disputed],
+      reportingCurrency: 'EUR',
+      fxIndex: RATES,
+    })
+    expect(summary.total_disputed_receivable).toBe(250)
+    expect(summary.total_profit).toBe(1000)
+    expect(summary.total_commissions_receivable).toBe(0)
   })
 
   it('needs no rates at all when everything is already in one currency', () => {

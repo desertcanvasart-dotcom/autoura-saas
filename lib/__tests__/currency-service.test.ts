@@ -6,7 +6,6 @@ import {
   getExchangeRate,
   getFallbackRates,
   persistExchangeRate,
-  getHistoricalRate,
   buildSnapshotRows,
   type ExchangeRates,
 } from '@/lib/currency-service'
@@ -312,58 +311,6 @@ describe('persistExchangeRate', () => {
     const supabase = { from: () => ({ insert: () => Promise.reject(new Error('db down')) }) }
     await expect(persistExchangeRate(supabase, 'EUR', 'USD', 1.1)).resolves.toBeUndefined()
     expect(console.warn).toHaveBeenCalled()
-  })
-})
-
-describe('getHistoricalRate', () => {
-  function makeQuery(result: { data: unknown; error: unknown }) {
-    const builder: Record<string, unknown> = {}
-    const chain = vi.fn(() => builder)
-    Object.assign(builder, {
-      select: chain,
-      eq: chain,
-      order: chain,
-      limit: chain,
-      lte: vi.fn(() => builder),
-      then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
-        Promise.resolve(result).then(resolve, reject),
-    })
-    return { supabase: { from: vi.fn(() => builder) }, builder }
-  }
-
-  it('returns the most recent snapshot mapped to {rate, capturedAt, source}', async () => {
-    const { supabase } = makeQuery({
-      data: [{ rate: 56.2, captured_at: '2026-07-01T00:00:00Z', source: 'er-api' }],
-      error: null,
-    })
-    const result = await getHistoricalRate(supabase, 'EUR', 'EGP')
-    expect(result).toEqual({ rate: 56.2, capturedAt: '2026-07-01T00:00:00Z', source: 'er-api' })
-  })
-
-  it('applies an lte bound when a date is given, and not otherwise', async () => {
-    const withDate = makeQuery({ data: [{ rate: 1, captured_at: 'x', source: 's' }], error: null })
-    const asOf = new Date('2026-06-01T00:00:00Z')
-    await getHistoricalRate(withDate.supabase, 'EUR', 'USD', asOf)
-    expect(withDate.builder.lte).toHaveBeenCalledWith('captured_at', asOf.toISOString())
-
-    const noDate = makeQuery({ data: [{ rate: 1, captured_at: 'x', source: 's' }], error: null })
-    await getHistoricalRate(noDate.supabase, 'EUR', 'USD')
-    expect(noDate.builder.lte).not.toHaveBeenCalled()
-  })
-
-  it('returns null on query error — never a fabricated rate', async () => {
-    const { supabase } = makeQuery({ data: null, error: { message: 'boom' } })
-    expect(await getHistoricalRate(supabase, 'EUR', 'EGP')).toBeNull()
-  })
-
-  it('returns null when no snapshot exists', async () => {
-    const { supabase } = makeQuery({ data: [], error: null })
-    expect(await getHistoricalRate(supabase, 'EUR', 'EGP')).toBeNull()
-  })
-
-  it('returns null when the client throws', async () => {
-    const supabase = { from: () => { throw new Error('no client') } }
-    expect(await getHistoricalRate(supabase, 'EUR', 'EGP')).toBeNull()
   })
 })
 

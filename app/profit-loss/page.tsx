@@ -57,6 +57,7 @@ interface TripPnL {
   commissions_receivable: number
   commissions_payable: number
   net_commission: number
+  disputed_receivable: number
   commission_breakdown: Record<string, { receivable: number; payable: number }>
   gross_profit: number
   profit_margin: number
@@ -76,6 +77,7 @@ interface Summary {
   total_expenses: number
   total_commissions_receivable: number
   total_commissions_payable: number
+  total_disputed_receivable: number
   total_profit: number
   average_margin: number
   profitable_trips: number
@@ -318,6 +320,15 @@ export default function ProfitLossPage() {
                 in {reportingSymbol}{summary.total_commissions_receivable.toLocaleString()} · out{' '}
                 {reportingSymbol}{summary.total_commissions_payable.toLocaleString()}
               </p>
+              {summary.total_disputed_receivable > 0 && (
+                <p
+                  className="text-[11px] text-amber-600 mt-0.5"
+                  title="Disputed receivable commission may never be collected, so it is deliberately left out of margin."
+                >
+                  {reportingSymbol}{summary.total_disputed_receivable.toLocaleString()} disputed,
+                  not in margin
+                </p>
+              )}
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-4">
