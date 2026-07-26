@@ -14,8 +14,8 @@ import {
   Package,
   Users,
   FileText,
-  Mail,
-  MessageSquare,
+  Handshake,
+  Sparkles,
   ArrowRight,
   Loader2,
   Crown,
@@ -32,18 +32,31 @@ interface Subscription {
   days_until_renewal: number
 }
 
+interface UsageMetric {
+  key: string
+  label: string
+  used: number
+  /** null = unlimited. */
+  limit: number | null
+  percentage: number | null
+  band: 'ok' | 'warning' | 'overage' | 'blocked'
+  message: string | null
+  undetermined: boolean
+}
+
 interface Usage {
-  period_start: string
-  period_end: string
-  metrics: {
-    quotes_created: { used: number; limit: number }
-    team_members: { used: number; limit: number }
-    whatsapp_messages: { used: number; limit: number }
-    gmail_emails: { used: number; limit: number }
-    pdfs_generated: { used: number; limit: number }
-  }
+  plan: { slug: string; name: string } | null
+  metrics: UsageMetric[]
   warnings: string[]
   needs_upgrade: boolean
+  upgrade_url: string
+}
+
+const USAGE_ICONS: Record<string, typeof Users> = {
+  seats: Users,
+  b2b_partners: Handshake,
+  ai_generations: Sparkles,
+  itineraries: FileText,
 }
 
 export default function BillingPage() {
@@ -77,7 +90,7 @@ export default function BillingPage() {
       if (usageResponse.ok) {
         const usageData = await usageResponse.json()
         if (usageData.success) {
-          setUsage(usageData.usage)
+          setUsage(usageData)
         }
       }
     } catch (err: any) {
@@ -147,8 +160,9 @@ export default function BillingPage() {
     )
   }
 
-  const getUsagePercentage = (used: number, limit: number) => {
-    if (limit === -1) return 0
+  // null limit = unlimited, so there is no bar to fill.
+  const getUsagePercentage = (used: number, limit: number | null) => {
+    if (limit === null || limit <= 0) return 0
     return Math.round((used / limit) * 100)
   }
 
@@ -324,7 +338,7 @@ export default function BillingPage() {
               <div>
                 <h2 className="text-sm font-semibold text-gray-900">Current Usage</h2>
                 <p className="text-xs text-gray-500">
-                  {formatDate(usage.period_start)} - {formatDate(usage.period_end)}
+                  {usage.plan ? `${usage.plan.name} plan` : 'No active plan'}
                 </p>
               </div>
               <Link
@@ -335,29 +349,24 @@ export default function BillingPage() {
               </Link>
             </div>
 
-            <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {[
-                { label: 'Quotes', metric: usage.metrics.quotes_created, icon: FileText, color: 'blue' },
-                { label: 'Team', metric: usage.metrics.team_members, icon: Users, color: 'purple' },
-                { label: 'WhatsApp', metric: usage.metrics.whatsapp_messages, icon: MessageSquare, color: 'green' },
-                { label: 'Emails', metric: usage.metrics.gmail_emails, icon: Mail, color: 'red' },
-                { label: 'PDFs', metric: usage.metrics.pdfs_generated, icon: FileText, color: 'orange' },
-              ].map((item) => {
-                const Icon = item.icon
-                const percentage = getUsagePercentage(item.metric.used, item.metric.limit)
+            <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {usage.metrics.map((m) => {
+                const Icon = USAGE_ICONS[m.key] ?? FileText
+                const percentage = getUsagePercentage(m.used, m.limit)
+                const bounded = !m.undetermined && m.limit !== null
                 return (
-                  <div key={item.label} className="bg-gray-50 rounded-lg p-3">
+                  <div key={m.key} className="bg-gray-50 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-2">
                       <Icon className="w-3.5 h-3.5 text-gray-400" />
-                      <span className="text-xs font-medium text-gray-600">{item.label}</span>
+                      <span className="text-xs font-medium text-gray-600">{m.label}</span>
                     </div>
                     <p className="text-lg font-semibold text-gray-900">
-                      {item.metric.used}
-                      {item.metric.limit !== -1 && (
-                        <span className="text-xs font-normal text-gray-400 ml-1">/ {item.metric.limit}</span>
+                      {m.undetermined ? '—' : m.used.toLocaleString()}
+                      {bounded && (
+                        <span className="text-xs font-normal text-gray-400 ml-1">/ {m.limit}</span>
                       )}
                     </p>
-                    {item.metric.limit !== -1 && (
+                    {bounded && (
                       <div className="mt-1.5 w-full bg-gray-200 rounded-full h-1">
                         <div
                           className={`h-1 rounded-full ${getUsageColor(percentage)}`}

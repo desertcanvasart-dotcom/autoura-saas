@@ -5,11 +5,16 @@
 //
 //   lib/pricing-config.ts   4 tiers, $49/$149/$349/$999
 //   subscription_plans      3 rows,  $49/$149/$399, different limits
-//   check_usage_limit RPC   the actual gate — reads subscription_plans
+//   check_usage_limit RPC   the gate at the time — read subscription_plans
 //
 // So `PRICING_TIERS` was decorative: editing it changed the billing UI and
 // nothing a tenant could actually do. This module makes it canonical by
 // deriving the database rows from it.
+//
+// Migration 241 finished the job: the RPC is gone and the limit columns with
+// it, so the catalogue now carries identity and price only. Limits are read
+// from pricing-config.ts by lib/usage-limits.ts and never mirrored — a mirror
+// is a second number that can be wrong.
 //
 // Pipeline:
 //   1. buildPlanRows()             pure, here
@@ -47,9 +52,9 @@ export const PLAN_CURRENCY = 'USD'
  * the tier restructure and would have broken the deploy sync; a test now
  * pins the key set.
  *
- * Note what the table CANNOT express: itineraries/year, B2B partners and
- * brands have no columns, so they live only in pricing-config.ts until the
- * enforcement work adds a `limits` JSONB column alongside their meters.
+ * Limits are deliberately ABSENT. The table could only express two of the five
+ * in pricing-config.ts, so the mirror was always partial — and a partial mirror
+ * invites reading the wrong number. Enforcement reads the config directly.
  */
 export interface PlanRow {
   name: string
@@ -58,24 +63,8 @@ export interface PlanRow {
   price_monthly: number | null
   price_yearly: number | null
   currency: string
-  max_team_members: number | null
-  max_quotes_per_month: number | null
-  max_itinerary_runs_per_month: number | null
-  /**
-   * Never gated. The pricing engine is deterministic — no LLM anywhere in
-   * auto-pricing-service / tourCalculator / pax-range — so metering
-   * recalculation would charge for the core loop. NULL = unlimited.
-   */
-  max_pricing_runs_per_month: null
   features: Record<string, boolean>
   is_active: boolean
-}
-
-/** Map a config limit onto the database's NULL-means-unlimited convention. */
-export function toDbLimit(value: number | null | undefined): number | null {
-  if (value === null || value === undefined) return null
-  if (!Number.isFinite(value)) return null
-  return value
 }
 
 /** One database row per configured tier, ordered by slug for a stable artifact. */
@@ -92,16 +81,8 @@ export function buildPlanRows(
       price_monthly: tier.monthlyPrice,
       price_yearly: tier.annualPrice,
       currency: PLAN_CURRENCY,
-      max_team_members: toDbLimit(tier.limits.users),
-      // Quotes are recorded, not gated — the column stays for the legacy RPC.
-      max_quotes_per_month: null,
-      // AI generations is the gated meter; itineraries are annual and enforced
-      // in application code, not by this monthly column.
-      max_itinerary_runs_per_month: toDbLimit(tier.limits.aiGenerationsPerMonth),
-      max_pricing_runs_per_month: null,
-      // Stored so the plan catalogue is self-describing; `check_usage_limit`
-      // does not read this column. Carries the real limits and the
-      // capabilities that exist, for anything reading the DB directly.
+      // Capabilities only — no limits. Anything needing a limit reads
+      // PRICING_TIERS, which is the one place they are defined.
       features: {
         ...tier.capabilities,
         publiclyPriced: tier.publiclyPriced,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { logActivity, checkLimit } from '@/lib/billing-middleware'
+import { logActivity } from '@/lib/billing-middleware'
 
 /**
  * GET /api/admin/tenant/members
