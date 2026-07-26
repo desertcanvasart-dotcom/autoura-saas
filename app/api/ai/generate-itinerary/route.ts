@@ -4,6 +4,12 @@ import { requireAuth } from '@/lib/supabase-server'
 import { getMemoriesForPrompt, logAgentRun } from '@/lib/agent-memory'
 import { gateVolume, incrementVolumeUsage, loadUsageAnchor } from '@/lib/usage-enforcement'
 import { applyDayRules } from '@/lib/ai/day-rules-engine'
+import {
+  createHoleCollector,
+  requireRates,
+  describeHoles,
+  unpricedSummary,
+} from '@/lib/ai/generation-holes'
 import type { ServiceTier, InputMode, ExtractedDay } from '@/lib/ai/parsing-utils'
 import {
   isValidDate, toNumber, normalizeTier, calculateExpectedDays,
@@ -822,44 +828,122 @@ export async function POST(request: NextRequest) {
       includeAccommodationFinal = false
     }
 
-    // Fetch rates
-    const { data: vehicles } = await supabase.from('vehicles').select('*').eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false })
-    let selectedVehicle = (vehicles?.find((v: any) => totalPax >= toNumber(v.capacity_min, 1) && totalPax <= toNumber(v.capacity_max, 99)) || vehicles?.[vehicles.length - 1]) as any
+    // ============================================
+    // Fetch rates — harness Layer 1: record gaps, never substitute constants.
+    //
+    // Every lookup below now captures its `error`. A missing TABLE and an empty
+    // table are different problems (one is a code fix, one is data entry) and
+    // the operator-facing message has to say which. If anything is missing we
+    // do not price at all — see `pricingBlocked` further down.
+    // ============================================
+    const { holes, addHole } = createHoleCollector()
+    const rateHoles = { holes, addHole }
 
-    const { data: guides } = await supabase.from('guides').select('*').eq('is_active', true).eq('tier', tier).contains('languages', [finalLanguage]).limit(5)
+    const { data: vehicles, error: vehiclesError } = await supabase.from('vehicles').select('*').eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false })
+    requireRates(rateHoles, {
+      kind: 'transport', tier, table: 'vehicles', error: vehiclesError, rows: vehicles,
+      lookupAttempted: `vehicles where is_active and tier = '${tier}'`,
+      message: `No active ${tier} vehicles are set up. Add them in Rates → Vehicles, with a daily rate and passenger capacity.`,
+    })
+    let selectedVehicle = (vehicles?.find((v: any) => totalPax >= toNumber(v.capacity_min, 1) && totalPax <= toNumber(v.capacity_max, 99)) || vehicles?.[vehicles.length - 1]) as any
+    // A vehicle list that exists but has nothing wide enough for the party is
+    // its own gap: falling back to the last row would price the wrong vehicle.
+    if (vehicles?.length && !selectedVehicle) {
+      addHole({
+        kind: 'transport', tier, reason: 'missing',
+        lookupAttempted: `vehicles covering ${totalPax} pax at tier '${tier}'`,
+        message: `No ${tier} vehicle covers ${totalPax} passengers. Add one in Rates → Vehicles with a matching capacity range.`,
+      })
+    }
+
+    const { data: guides, error: guidesError } = await supabase.from('guides').select('*').eq('is_active', true).eq('tier', tier).contains('languages', [finalLanguage]).limit(5)
+    requireRates(rateHoles, {
+      kind: 'guide', tier, table: 'guides', error: guidesError, rows: guides,
+      lookupAttempted: `guides where is_active, tier = '${tier}', speaks '${finalLanguage}'`,
+      message: `No active ${tier} guide speaking ${finalLanguage} is set up. Add one in Rates → Guides with a daily rate.`,
+    })
     let selectedGuide = guides?.[0] as any
 
-    const { data: allEntranceFees } = await supabase.from('entrance_fees').select('*').eq('is_active', true)
+    const { data: allEntranceFees, error: entranceFeesError } = await supabase.from('entrance_fees').select('*').eq('is_active', true)
+    requireRates(rateHoles, {
+      kind: 'entrance', tier, table: 'entrance_fees', error: entranceFeesError, rows: allEntranceFees,
+      lookupAttempted: 'entrance_fees where is_active',
+      message: 'No active entrance fees are set up. Add them in Rates → Entrance Fees.',
+    })
 
-    const { data: mealRates } = await supabase.from('meal_rates').select('*').eq('is_active', true).limit(1)
+    const { data: mealRates, error: mealRatesError } = await supabase.from('meal_rates').select('*').eq('is_active', true).limit(1)
+    const haveMealRates = requireRates(rateHoles, {
+      kind: 'meal', tier, table: 'meal_rates', error: mealRatesError, rows: mealRates,
+      lookupAttempted: 'meal_rates where is_active',
+      message: 'No active meal rates are set up. Add lunch and dinner rates in Rates → Meals.',
+    })
     const tierMealMultiplier: Record<ServiceTier, number> = { 'budget': 0.8, 'standard': 1.0, 'deluxe': 1.3, 'luxury': 1.6 }
-    let lunchRate = Math.round(toNumber(mealRates?.[0]?.lunch_rate_eur, 12) * tierMealMultiplier[tier])
-    let dinnerRate = Math.round(toNumber(mealRates?.[0]?.dinner_rate_eur, 18) * tierMealMultiplier[tier])
+    // Zero when absent, and pricing is blocked in that case — the old code used
+    // 12 and 18, which quietly became the client's meal price.
+    let lunchRate = haveMealRates ? Math.round(toNumber(mealRates?.[0]?.lunch_rate_eur, 0) * tierMealMultiplier[tier]) : 0
+    let dinnerRate = haveMealRates ? Math.round(toNumber(mealRates?.[0]?.dinner_rate_eur, 0) * tierMealMultiplier[tier]) : 0
 
-    // Fetch airport services rates
-    const { data: airportServicesData } = await supabase.from('airport_services').select('*').eq('is_active', true)
-    const airportServiceRate = airportServicesData?.reduce((sum: number, s: any) => sum + toNumber(s.rate_eur, 0), 0) || 25
+    // Airport and hotel services.
+    //
+    // These query `airport_services` / `hotel_services`, which DO NOT EXIST.
+    // The populated tables are `airport_staff_rates` and `hotel_staff_rates`.
+    // Pointing at them is Phase 2 — it needs per-occurrence selection (an
+    // itinerary can use an airport several times), not the blind sum over all
+    // active rows this code does. Until then the gap is recorded honestly
+    // rather than papered over with 25 and 15.
+    const { data: airportServicesData, error: airportServicesError } = await supabase.from('airport_services').select('*').eq('is_active', true)
+    const haveAirportServices = requireRates(rateHoles, {
+      kind: 'airport_service', tier, table: 'airport_services', error: airportServicesError, rows: airportServicesData,
+      lookupAttempted: 'airport_services where is_active',
+      message: 'Airport service rates are not available, so meet-and-greet cannot be priced.',
+    })
+    const airportServiceRate = haveAirportServices
+      ? airportServicesData!.reduce((sum: number, s: any) => sum + toNumber(s.rate_eur, 0), 0)
+      : 0
 
-    // Fetch hotel services rates
-    const { data: hotelServicesData } = await supabase.from('hotel_services').select('*').eq('is_active', true)
-    const hotelServiceRate = hotelServicesData?.reduce((sum: number, s: any) => sum + toNumber(s.rate_eur, 0), 0) || 15
+    const { data: hotelServicesData, error: hotelServicesError } = await supabase.from('hotel_services').select('*').eq('is_active', true)
+    const haveHotelServices = requireRates(rateHoles, {
+      kind: 'hotel_service', tier, table: 'hotel_services', error: hotelServicesError, rows: hotelServicesData,
+      lookupAttempted: 'hotel_services where is_active',
+      message: 'Hotel service rates are not available, so porterage cannot be priced.',
+    })
+    const hotelServiceRate = haveHotelServices
+      ? hotelServicesData!.reduce((sum: number, s: any) => sum + toNumber(s.rate_eur, 0), 0)
+      : 0
 
     let hotelRate = 0
     let hotelName_final = hotel_name || 'Standard Hotel'
     let selectedHotel = null
 
     if (includeAccommodationFinal) {
-      const { data: hotels } = await supabase.from('hotel_contacts').select('*').ilike('city', effectiveCity).eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false }).limit(5)
-      if (hotels?.length) {
-        selectedHotel = hotels[0] as any
+      const { data: hotels, error: hotelsError } = await supabase.from('hotel_contacts').select('*').ilike('city', effectiveCity).eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false }).limit(5)
+      const haveHotels = requireRates(rateHoles, {
+        kind: 'hotel', tier, table: 'hotel_contacts', error: hotelsError, rows: hotels,
+        lookupAttempted: `hotel_contacts in '${effectiveCity}' where is_active and tier = '${tier}'`,
+        message: `No active ${tier} hotel is set up for ${effectiveCity}. Add one in Rates → Hotels with a double-room rate.`,
+      })
+      if (haveHotels) {
+        selectedHotel = hotels![0] as any
         hotelRate = toNumber(selectedHotel.rate_double_eur, 0)
         hotelName_final = selectedHotel.name
+        // A hotel row with no rate prices accommodation at zero, which reads as
+        // "included" on a quote. That is a gap, not a free room.
+        if (hotelRate <= 0) {
+          addHole({
+            kind: 'hotel', tier, reason: 'missing',
+            lookupAttempted: `rate_double_eur for '${selectedHotel.name}'`,
+            message: `${selectedHotel.name} has no double-room rate. Add one in Rates → Hotels.`,
+          })
+        }
       }
-      // Harness: no fabricated default hotel rate. A miss leaves hotelRate 0
-      // (unpriced) — pricing is done against real rates later in the grid.
     }
 
-    const { data: tippingRates } = await supabase.from('tipping_rates').select('*').eq('is_active', true)
+    const { data: tippingRates, error: tippingRatesError } = await supabase.from('tipping_rates').select('*').eq('is_active', true)
+    requireRates(rateHoles, {
+      kind: 'tipping', tier, table: 'tipping_rates', error: tippingRatesError, rows: tippingRates,
+      lookupAttempted: 'tipping_rates where is_active',
+      message: 'No active tipping rates are set up. Add them in Rates → Tipping.',
+    })
     let dailyTips = tippingRates?.reduce((sum: number, t: any) => t.rate_unit === 'per_day' ? sum + toNumber(t.rate_eur, 0) : sum, 0) || 0
     const tierTipsMultiplier: Record<ServiceTier, number> = { 'budget': 0.8, 'standard': 1.0, 'deluxe': 1.2, 'luxury': 1.5 }
     dailyTips = Math.round(dailyTips * tierTipsMultiplier[tier])
@@ -867,6 +951,25 @@ export async function POST(request: NextRequest) {
     const vehiclePerDay = selectedVehicle ? toNumber(selectedVehicle.daily_rate_eur, 0) : 0
     const guidePerDay = selectedGuide ? toNumber(selectedGuide.daily_rate_eur, 0) : 0
     const roomsNeeded = Math.ceil(totalPax / 2)
+
+    // ============================================
+    // THE GATE: an itinerary with any rate gap is NOT priced.
+    //
+    // It is still generated and saved — the operator keeps the day-by-day work
+    // — but it stays a draft with no total, so nothing fabricated can be
+    // quoted, PDF'd or sent. The send-path guard cannot catch this for us:
+    // checkAmountDeliverable validates arithmetic, not provenance, so an
+    // invented-but-plausible total passes it.
+    // ============================================
+    const pricingBlocked = holes.length > 0
+    const effectiveSkipPricing = skip_pricing || pricingBlocked
+
+    if (pricingBlocked && !skip_pricing) {
+      console.warn(
+        `[generate-itinerary] pricing withheld — ${holes.length} rate gap(s):`,
+        holes.map(h => `${h.kind}: ${h.lookupAttempted}`).join(' | ')
+      )
+    }
 
     // ============================================
     // GENERATE ITINERARY CONTENT
@@ -952,7 +1055,7 @@ export async function POST(request: NextRequest) {
         total_cost: 0,
         total_revenue: 0,
         margin_percent,
-        status: skip_pricing ? 'draft' : 'quoted',
+        status: effectiveSkipPricing ? 'draft' : 'quoted',
         tier,
         package_type: effectivePackageType,
         cost_mode,
@@ -974,7 +1077,7 @@ export async function POST(request: NextRequest) {
     const { totalSupplierCost, totalClientPrice } = await createLandItineraryServices(supabase, {
       days: itineraryData.days || [], itineraryId: itinerary.id, startDateObj,
       durationDays: duration_days, effectiveCity, totalPax, isEuroPassport,
-      skipPricing: skip_pricing, withMargin, tier, finalLanguage,
+      skipPricing: effectiveSkipPricing, withMargin, tier, finalLanguage,
       includeLunch: include_lunch, includeDinner: include_dinner, includeAccommodationFinal,
       vehiclePerDay, guidePerDay, selectedVehicle, selectedGuide,
       selectedHotel, hotelRate, hotelName_final, roomsNeeded,
@@ -982,8 +1085,8 @@ export async function POST(request: NextRequest) {
       dailyTips, allEntranceFees,
     })
 
-    // Update totals
-    if (!skip_pricing) {
+    // Update totals — only when every rate behind them is real.
+    if (!effectiveSkipPricing) {
       await supabase.from('itineraries').update({
         total_cost: totalClientPrice,
         total_revenue: totalClientPrice,
@@ -1030,7 +1133,10 @@ export async function POST(request: NextRequest) {
 
     // Create quotes if requested and not in draft mode
     let quotesCreated = { b2c_quote: null, b2b_quote: null }
-    if (!skip_pricing && quote_type !== 'none') {
+    // No quote for an unpriced itinerary. A quote is precisely the artefact
+    // that gets PDF'd and sent, so creating one here would route the gap
+    // straight to a client.
+    if (!effectiveSkipPricing && quote_type !== 'none') {
 
       quotesCreated = await createQuotesForItinerary({
         itinerary_id: itinerary.id,
@@ -1081,16 +1187,25 @@ export async function POST(request: NextRequest) {
         package_type: effectivePackageType,
         is_cruise: cruiseDetection.isCruise,
         generation_mode: inputMode,
-        mode: skip_pricing ? 'draft' : 'quoted',
-        redirect_to: skip_pricing ? `/itineraries/${itinerary.id}/edit` : `/itineraries/${itinerary.id}`,
+        mode: effectiveSkipPricing ? 'draft' : 'quoted',
+        redirect_to: effectiveSkipPricing ? `/itineraries/${itinerary.id}/edit` : `/itineraries/${itinerary.id}`,
         currency,
         total_days: duration_days,
-        ...(skip_pricing ? {} : {
+        ...(effectiveSkipPricing ? {} : {
           supplier_cost: totalSupplierCost,
           total_cost: totalClientPrice,
           margin: totalClientPrice - totalSupplierCost,
           per_person_cost: Math.round(totalClientPrice / totalPax * 100) / 100
         }),
+        // Pricing was withheld because rates are missing — say which, so the
+        // operator can fix it rather than wonder where the total went. Absent
+        // entirely when pricing succeeded.
+        ...(pricingBlocked ? {
+          pricing_complete: false,
+          pricing_blocked_reason: unpricedSummary(holes),
+          pricing_gaps: describeHoles(holes),
+          pricing_holes: holes,
+        } : {}),
         // Include quote information if created
         ...(quotesCreated.b2c_quote ? { b2c_quote: quotesCreated.b2c_quote } : {}),
         ...(quotesCreated.b2b_quote ? { b2b_quote: quotesCreated.b2b_quote } : {})
