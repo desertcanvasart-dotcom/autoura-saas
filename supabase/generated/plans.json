@@ -6,10 +6,6 @@
     "price_monthly": 449,
     "price_yearly": 4490,
     "currency": "USD",
-    "max_team_members": 30,
-    "max_quotes_per_month": null,
-    "max_itinerary_runs_per_month": 1000,
-    "max_pricing_runs_per_month": null,
     "features": {
       "opsTeam": true,
       "conciergeWebhook": true,
@@ -26,10 +22,6 @@
     "price_monthly": null,
     "price_yearly": null,
     "currency": "USD",
-    "max_team_members": null,
-    "max_quotes_per_month": null,
-    "max_itinerary_runs_per_month": null,
-    "max_pricing_runs_per_month": null,
     "features": {
       "opsTeam": true,
       "conciergeWebhook": true,
@@ -46,10 +38,6 @@
     "price_monthly": 69,
     "price_yearly": 690,
     "currency": "USD",
-    "max_team_members": 3,
-    "max_quotes_per_month": null,
-    "max_itinerary_runs_per_month": 50,
-    "max_pricing_runs_per_month": null,
     "features": {
       "opsTeam": false,
       "conciergeWebhook": false,
@@ -66,10 +54,6 @@
     "price_monthly": 189,
     "price_yearly": 1890,
     "currency": "USD",
-    "max_team_members": 12,
-    "max_quotes_per_month": null,
-    "max_itinerary_runs_per_month": 300,
-    "max_pricing_runs_per_month": null,
     "features": {
       "opsTeam": true,
       "conciergeWebhook": false,

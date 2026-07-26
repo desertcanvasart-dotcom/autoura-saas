@@ -3,7 +3,6 @@ import { PRICING_TIERS } from '@/lib/pricing-config'
 import {
   buildPlanRows,
   renderPlansArtifact,
-  toDbLimit,
   PLAN_CURRENCY,
   type PlanRow,
 } from '@/lib/plans-sync'
@@ -59,55 +58,30 @@ describe('buildPlanRows', () => {
     for (const row of rows) expect(row.currency).toBe(PLAN_CURRENCY)
   })
 
-  it('never gates pricing runs — the pricing engine calls no LLM', () => {
-    for (const row of rows) expect(row.max_pricing_runs_per_month).toBeNull()
-  })
-
   it('marks every generated plan active', () => {
     for (const row of rows) expect(row.is_active).toBe(true)
   })
 })
 
-describe('toDbLimit — sentinel to NULL bridge', () => {
-  it('passes a real cap through unchanged', () => {
-    expect(toDbLimit(3)).toBe(3)
-    expect(toDbLimit(120)).toBe(120)
-  })
-
-  it('passes an explicit null through as unlimited', () => {
-    // Unlimited is now null in pricing-config, matching the column directly —
-    // no sentinel bridging, so no way for a real cap to be mistaken for one.
-    expect(toDbLimit(null)).toBeNull()
-  })
-
-  it('REGRESSION: a large but REAL cap survives — 1500 is not unlimited', () => {
-    // A ">= 999 means unlimited" rule once turned a real 1500/month cap into
-    // NULL, i.e. a paid limit that would never enforce. Explicit nulls removed
-    // the whole class of bug; this pins it shut.
-    expect(toDbLimit(1500)).toBe(1500)
-    expect(toDbLimit(1000)).toBe(1000)
-    expect(toDbLimit(2000)).toBe(2000)
-  })
-
-  it('treats absent or non-finite as unlimited rather than zero', () => {
-    expect(toDbLimit(null)).toBeNull()
-    expect(toDbLimit(undefined)).toBeNull()
-    expect(toDbLimit(NaN)).toBeNull()
-    expect(toDbLimit(Infinity)).toBeNull()
-  })
-
-  it('does not treat 0 as unlimited — zero is a real (blocking) cap', () => {
-    expect(toDbLimit(0)).toBe(0)
-  })
-})
-
 describe('drift detection actually detects drift', () => {
-  it('a changed limit changes the artifact', () => {
+  it('a changed LIMIT does NOT change the artifact — limits are not mirrored', () => {
+    // This inverted at migration 241. Limits used to be copied into
+    // subscription_plans, so editing one had to regenerate the artifact.
+    // They are no longer mirrored anywhere: lib/usage-limits.ts reads
+    // PRICING_TIERS directly, so there is no second copy to keep in step.
+    // If this ever starts failing, a limit has crept back into the catalogue
+    // and there are two numbers again.
     const before = renderPlansArtifact()
     const mutated = JSON.parse(JSON.stringify(PRICING_TIERS)) as typeof PRICING_TIERS
     mutated.solo.limits.users = 99
-    const after = renderPlansArtifact(buildPlanRows(mutated))
-    expect(after).not.toBe(before)
+    expect(renderPlansArtifact(buildPlanRows(mutated))).toBe(before)
+  })
+
+  it('a changed CAPABILITY changes the artifact', () => {
+    const before = renderPlansArtifact()
+    const mutated = JSON.parse(JSON.stringify(PRICING_TIERS)) as typeof PRICING_TIERS
+    mutated.solo.capabilities.opsTeam = !mutated.solo.capabilities.opsTeam
+    expect(renderPlansArtifact(buildPlanRows(mutated))).not.toBe(before)
   })
 
   it('a changed price changes the artifact', () => {
@@ -140,12 +114,12 @@ describe('artifact shape is safe to upsert', () => {
     // The upsert sends the row object as-is: one key that is not a column
     // fails the entire write at boot. A `limits` key slipped in during the
     // tier restructure and would have broken the deploy sync.
+    // Migration 241 dropped every limit column, so this set is now identity,
+    // price and capabilities only.
     const COLUMNS = new Set([
       'name', 'slug', 'description', 'price_monthly', 'price_yearly', 'currency',
       'stripe_price_id_monthly', 'stripe_price_id_yearly', 'stripe_product_id',
-      'max_quotes_per_month', 'max_team_members', 'max_whatsapp_messages',
-      'max_gmail_accounts', 'max_storage_mb', 'features', 'is_active',
-      'max_itinerary_runs_per_month', 'max_pricing_runs_per_month', 'agent_memory_days',
+      'features', 'is_active',
     ])
     for (const row of rows) {
       for (const key of Object.keys(row)) {

@@ -65,7 +65,7 @@ try {
 
   const { data: existing, error: readError } = await supabase
     .from('subscription_plans')
-    .select('slug, name, price_monthly, price_yearly, max_team_members, max_quotes_per_month, max_itinerary_runs_per_month, is_active')
+    .select('slug, name, price_monthly, price_yearly, is_active')
 
   if (readError) giveUp(`cannot read subscription_plans: ${readError.message}`)
 
