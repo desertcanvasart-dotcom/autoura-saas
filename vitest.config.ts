@@ -6,7 +6,13 @@ import path from 'node:path'
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['lib/**/*.test.ts', 'app/**/__tests__/**/*.test.ts'],
+    include: [
+      'lib/**/*.test.ts',
+      'app/**/__tests__/**/*.test.ts',
+      // Cron entrypoints: spawned as real processes so their EXIT CODES are
+      // asserted — that is the only signal Railway records.
+      'scripts/**/__tests__/**/*.test.ts',
+    ],
     // Determinism is part of what we assert; keep timers/dates real but stable.
     clearMocks: true,
   },

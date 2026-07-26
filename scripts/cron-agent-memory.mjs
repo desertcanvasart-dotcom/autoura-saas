@@ -44,7 +44,53 @@ try {
     process.exit(1)
   }
 
-  console.log(`cron-agent-memory: ok — ${body}`)
+  // Report the WORK, not just the HTTP status.
+  //
+  // The endpoint processes each agent run independently and answers 200 with
+  // a summary even when every one of them failed — `runs_failed` is the only
+  // place that shows up. Exiting 0 on any 200 meant a night where nothing was
+  // learned looked identical to a night where everything was, and the
+  // scheduler recorded a green run either way. Same reasoning as
+  // scripts/cron-exchange-rates.mjs, which fails on a lost history write.
+  let summary = null
+  try {
+    summary = JSON.parse(body)
+  } catch {
+    // Non-JSON body from a 200 is not something this script can vouch for.
+    console.error(`cron-agent-memory: unparseable response — ${body}`)
+    process.exit(1)
+  }
+
+  const {
+    runs_found = 0,
+    runs_processed = 0,
+    runs_failed = 0,
+    memories_written = 0,
+    memories_purged = 0,
+    duration_ms = null,
+  } = summary
+
+  const detail =
+    `found=${runs_found} processed=${runs_processed} failed=${runs_failed} ` +
+    `written=${memories_written} purged=${memories_purged}` +
+    (duration_ms !== null ? ` in ${duration_ms}ms` : '')
+
+  // The route sets success:false only for a hard fetch error; treat a missing
+  // flag as failure rather than assuming the good case.
+  if (summary.success === false) {
+    console.error(`cron-agent-memory: run reported failure — ${summary.error || detail}`)
+    process.exit(1)
+  }
+
+  if (runs_failed > 0) {
+    console.error(
+      `cron-agent-memory: ${runs_failed} of ${runs_found} run(s) FAILED to process — ${detail}`
+    )
+    process.exit(1)
+  }
+
+  // Nothing to do is a legitimate outcome: no agent runs in the window.
+  console.log(`cron-agent-memory: ok — ${detail}`)
   process.exit(0)
 } catch (err) {
   console.error('cron-agent-memory: request failed:', err)
