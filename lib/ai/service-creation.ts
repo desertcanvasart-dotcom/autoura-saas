@@ -11,7 +11,7 @@ export async function createLandItineraryServices(
     includeLunch: boolean; includeDinner: boolean; includeAccommodationFinal: boolean;
     vehiclePerDay: number; guidePerDay: number; selectedVehicle: any; selectedGuide: any;
     selectedHotel: any; hotelRate: number; hotelName_final: string; roomsNeeded: number;
-    airportServiceRate: number; hotelServiceRate: number; lunchRate: number; dinnerRate: number;
+    airportServiceRates: { arrival: number; departure: number }; hotelServiceRate: number; lunchRate: number; dinnerRate: number;
     dailyTips: number; allEntranceFees: any[] | null | undefined;
   }
 ): Promise<{ totalSupplierCost: number; totalClientPrice: number }> {
@@ -22,7 +22,7 @@ export async function createLandItineraryServices(
     includeLunch, includeDinner, includeAccommodationFinal,
     vehiclePerDay, guidePerDay, selectedVehicle, selectedGuide,
     selectedHotel, hotelRate, hotelName_final, roomsNeeded,
-    airportServiceRate, hotelServiceRate, lunchRate, dinnerRate,
+    airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
     dailyTips, allEntranceFees,
   } = params
 
@@ -117,23 +117,35 @@ export async function createLandItineraryServices(
     const services: any[] = []
 
     // Airport Services (for arrivals/departures/domestic flights)
+    //
+    // One occurrence per qualifying day — an itinerary that leaves a city and
+    // comes back is charged each time, which is why this sits inside the day
+    // loop rather than being applied once per trip.
     if (dayData.needs_airport_service || dayData.is_arrival || dayData.is_departure || dayData.flight_info) {
       const isInternational = dayData.is_arrival || dayData.is_departure
       const serviceDesc = isInternational ? 'Airport Meet & Assist (International)' : 'Airport Meet & Assist (Domestic)'
+
+      // Arrival days use the arrival rate; everything else is a departure from
+      // this airport. Domestic legs are priced at the itinerary's airport —
+      // per-leg airport resolution is not modelled, so a multi-city routing
+      // uses the primary airport's rate for its internal flights.
+      const dayRate = dayData.is_arrival
+        ? airportServiceRates.arrival
+        : airportServiceRates.departure
 
       services.push({
         service_type: 'airport_service',
         service_code: 'AIRPORT',
         service_name: serviceDesc,
         quantity: 1,
-        rate_eur: airportServiceRate,
-        rate_non_eur: airportServiceRate,
-        total_cost: airportServiceRate,
-        client_price: withMargin(airportServiceRate),
+        rate_eur: dayRate,
+        rate_non_eur: dayRate,
+        total_cost: dayRate,
+        client_price: withMargin(dayRate),
         notes: dayData.flight_info ? `Flight: ${dayData.flight_info}` : 'Airport assistance'
       })
-      totalSupplierCost += airportServiceRate
-      totalClientPrice += withMargin(airportServiceRate)
+      totalSupplierCost += dayRate
+      totalClientPrice += withMargin(dayRate)
     }
 
     // Hotel Services (for check-in/check-out including cruise)

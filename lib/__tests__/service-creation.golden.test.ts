@@ -44,7 +44,9 @@ function baseParams(over: Partial<Parameters<typeof createLandItineraryServices>
     hotelRate: 120,
     hotelName_final: 'Nile Ritz',
     roomsNeeded: 1,
-    airportServiceRate: 30,
+    // Both directions equal, so this still pins the pre-Phase-2 behaviour:
+    // the rate used to be one flat number for every airport touch.
+    airportServiceRates: { arrival: 30, departure: 30 },
     hotelServiceRate: 15,
     lunchRate: 18,
     dinnerRate: 25,
@@ -253,5 +255,46 @@ describe('createLandItineraryServices — characterization', () => {
         "totalSupplierCost": 701,
       }
     `)
+  })
+})
+
+// ============================================================================
+// Phase 2: the airport rate is directional and charged PER OCCURRENCE. An
+// itinerary that leaves a city and returns pays each time — the old code
+// applied one flat number to every touch, and before that a constant €25.
+// ============================================================================
+describe('airport services — directional and per-occurrence', () => {
+  interface ServiceRow { service_type: string; rate_eur: number }
+
+  const MULTI_LEG = [
+    { day_number: 1, title: 'Arrival Cairo', city: 'Cairo', is_arrival: true, needs_airport_service: true, attractions: [] },
+    { day_number: 2, title: 'Fly to Luxor', city: 'Luxor', flight_info: 'MS123', attractions: [] },
+    { day_number: 3, title: 'Fly back to Cairo', city: 'Cairo', flight_info: 'MS124', attractions: [] },
+    { day_number: 4, title: 'Departure', city: 'Cairo', is_departure: true, attractions: [] },
+  ]
+
+  async function airportRows(): Promise<ServiceRow[]> {
+    const sb = makeWriteMockSupabase()
+    await createLandItineraryServices(sb as any, baseParams({
+      days: MULTI_LEG,
+      durationDays: 4,
+      airportServiceRates: { arrival: 15, departure: 10 },
+    }))
+    return (sb.store.itinerary_services as unknown as ServiceRow[])
+      .filter((r) => r.service_type === 'airport_service')
+  }
+
+  it('charges every qualifying day, not once per trip', async () => {
+    // Four airport touches: arrive, two internal flights, depart.
+    expect(await airportRows()).toHaveLength(4)
+  })
+
+  it('uses the arrival rate only on the arrival day', async () => {
+    expect((await airportRows()).map((r) => r.rate_eur)).toEqual([15, 10, 10, 10])
+  })
+
+  it('totals the occurrences rather than applying one rate', async () => {
+    const total = (await airportRows()).reduce((sum, r) => sum + r.rate_eur, 0)
+    expect(total).toBe(45) // 15 + 10 + 10 + 10
   })
 })
