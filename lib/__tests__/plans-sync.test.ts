@@ -154,6 +154,25 @@ describe('artifact shape is safe to upsert', () => {
     }
   })
 
+  it('a null price only ever appears on a contact-sales tier', () => {
+    // The upsert once failed on every boot because Enterprise had a null
+    // price against a NOT NULL column (migration 236). A null must always be
+    // deliberate — "no published price" — never an accidentally missing
+    // number on a tier we actually sell self-serve.
+    for (const row of rows) {
+      if (row.price_monthly === null || row.price_yearly === null) {
+        expect(row.features.publiclyPriced, `${row.slug} has a null price but is publicly priced`).toBe(false)
+      }
+    }
+  })
+
+  it('never emits a zero price — that would read as a free tier', () => {
+    for (const row of rows) {
+      expect(row.price_monthly, row.slug).not.toBe(0)
+      expect(row.price_yearly, row.slug).not.toBe(0)
+    }
+  })
+
   it('has no undefined values, which upsert would silently drop', () => {
     for (const row of rows) {
       for (const [key, value] of Object.entries(row)) {
