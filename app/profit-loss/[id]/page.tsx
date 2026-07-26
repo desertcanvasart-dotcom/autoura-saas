@@ -37,6 +37,7 @@ interface TripPnL {
   commissions_receivable: number
   commissions_payable: number
   net_commission: number
+  disputed_receivable: number
   commission_breakdown: Record<string, { receivable: number; payable: number }>
   gross_profit: number
   profit_margin: number
@@ -308,6 +309,13 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
               </p>
             ) : (
               <p className="text-xs text-amber-500 mt-1">None recorded</p>
+            )}
+            {pnlData.disputed_receivable > 0 && (
+              <p className="text-xs text-amber-700 mt-1 font-medium">
+                {getCurrencySymbol(pnlData.currency)}
+                {pnlData.disputed_receivable.toLocaleString()} disputed receivable, not
+                included in net margin
+              </p>
             )}
           </div>
 

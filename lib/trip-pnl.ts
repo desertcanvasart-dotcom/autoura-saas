@@ -120,6 +120,12 @@ export interface TripPnL {
   commissions_payable: number
   /** receivable - payable. Negative when the trip pays out more than it earns. */
   net_commission: number
+  /**
+   * Receivable commission in dispute. NOT part of net_commission or
+   * gross_profit — surfaced so the operator sees the potential upside without
+   * the margin depending on it.
+   */
+  disputed_receivable: number
   commission_breakdown: Record<string, { receivable: number; payable: number }>
 
   gross_profit: number
@@ -143,6 +149,8 @@ export interface PnlSummary {
   total_expenses: number
   total_commissions_receivable: number
   total_commissions_payable: number
+  /** Receivable commission in dispute — excluded from total_profit. */
+  total_disputed_receivable: number
   total_profit: number
   average_margin: number
   profitable_trips: number
@@ -162,6 +170,13 @@ const EXCLUDED_INVOICE_STATUSES = new Set(['cancelled'])
 /** A rejected expense is not a cost. The old code summed it as one. */
 const EXCLUDED_EXPENSE_STATUSES = new Set(['rejected'])
 const EXCLUDED_COMMISSION_STATUSES = new Set(['cancelled'])
+/**
+ * Disputed commissions are treated ASYMMETRICALLY by direction, on prudence:
+ * a disputed payable will probably still be paid (include it as a cost), a
+ * disputed receivable may never arrive (exclude it, and surface it separately
+ * so the operator sees the upside without the margin assuming it).
+ */
+const DISPUTED_STATUS = 'disputed'
 
 function num(value: unknown): number {
   const n = Number(value ?? 0)
@@ -286,6 +301,7 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
   // ---------- Commissions ----------
   let commissionsReceivable = 0
   let commissionsPayable = 0
+  let disputedReceivable = 0
   let commissionCount = 0
   const commissionBreakdown: Record<string, { receivable: number; payable: number }> = {}
 
@@ -321,10 +337,19 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
     }
 
     if (isPayable) {
+      // A disputed payable is money you will most likely still pay. Leaving it
+      // out would understate the cost of the trip, so prudence includes it.
       commissionsPayable += converted.amount
       commissionBreakdown[category].payable = roundMoney(
         commissionBreakdown[category].payable + converted.amount
       )
+    } else if (status === DISPUTED_STATUS) {
+      // A disputed RECEIVABLE is money you may never see. Counting it would
+      // inflate margin on precisely the trips where something went wrong — the
+      // asymmetry with payables is deliberate, not an oversight. It is tracked
+      // separately so the operator still sees the upside, without the P&L
+      // assuming it.
+      disputedReceivable += converted.amount
     } else {
       commissionsReceivable += converted.amount
       commissionBreakdown[category].receivable = roundMoney(
@@ -366,6 +391,7 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
     commissions_receivable: roundMoney(commissionsReceivable),
     commissions_payable: roundMoney(commissionsPayable),
     net_commission: roundMoney(commissionsReceivable - commissionsPayable),
+    disputed_receivable: roundMoney(disputedReceivable),
     commission_breakdown: commissionBreakdown,
 
     gross_profit: grossProfit,
@@ -413,6 +439,7 @@ export function buildPnlSummary(input: BuildSummaryInput): PnlSummary {
   let totalExpenses = 0
   let totalReceivable = 0
   let totalPayable = 0
+  let totalDisputedReceivable = 0
   let totalProfit = 0
   let marginSum = 0
   let marginCount = 0
@@ -445,6 +472,7 @@ export function buildPnlSummary(input: BuildSummaryInput): PnlSummary {
     totalExpenses += roundMoney(trip.total_expenses * rate)
     totalReceivable += roundMoney(trip.commissions_receivable * rate)
     totalPayable += roundMoney(trip.commissions_payable * rate)
+    totalDisputedReceivable += roundMoney(trip.disputed_receivable * rate)
     totalProfit += roundMoney(trip.gross_profit * rate)
 
     // Margin is a ratio — currency-independent, so it averages directly.
@@ -459,6 +487,7 @@ export function buildPnlSummary(input: BuildSummaryInput): PnlSummary {
     total_expenses: roundMoney(totalExpenses),
     total_commissions_receivable: roundMoney(totalReceivable),
     total_commissions_payable: roundMoney(totalPayable),
+    total_disputed_receivable: roundMoney(totalDisputedReceivable),
     total_profit: roundMoney(totalProfit),
     average_margin: marginCount > 0 ? marginSum / marginCount : 0,
     profitable_trips: trips.filter(t => t.gross_profit > 0).length,
