@@ -65,7 +65,7 @@ try {
 
   const { data: existing, error: readError } = await supabase
     .from('subscription_plans')
-    .select('slug, name, price_monthly, price_yearly, max_team_members, max_quotes_per_month, max_itinerary_runs_per_month')
+    .select('slug, name, price_monthly, price_yearly, max_team_members, max_quotes_per_month, max_itinerary_runs_per_month, is_active')
 
   if (readError) giveUp(`cannot read subscription_plans: ${readError.message}`)
 
@@ -79,6 +79,7 @@ try {
     }
     for (const key of Object.keys(row)) {
       if (!(key in current)) continue
+      if (key === 'features') continue // JSONB — compared by the artifact gate, not here
       // Numeric columns come back as strings from DECIMAL — compare loosely.
       const a = current[key]
       const b = row[key]
@@ -87,8 +88,13 @@ try {
     }
   }
 
+  // Only plans that are STILL ACTIVE and absent from the catalogue are drift.
+  // An already-retired plan is the desired end state, not an outstanding
+  // change — reporting it forever would train everyone to ignore this check.
   const wantedCheck = new Set(rows.map(r => r.slug))
-  const retiredCheck = (existing || []).filter(r => !wantedCheck.has(r.slug)).map(r => r.slug)
+  const retiredCheck = (existing || [])
+    .filter(r => !wantedCheck.has(r.slug) && r.is_active !== false)
+    .map(r => r.slug)
   for (const slug of retiredCheck) drifted.push(`${slug}: no longer in the catalogue (would be deactivated)`)
 
   if (CHECK_ONLY) {
@@ -108,7 +114,9 @@ try {
   // tenant's plan. is_active=false keeps history intact while removing it from
   // anything that lists sellable plans.
   const wanted = new Set(rows.map(r => r.slug))
-  const retired = (existing || []).filter(r => !wanted.has(r.slug)).map(r => r.slug)
+  const retired = (existing || [])
+    .filter(r => !wanted.has(r.slug) && r.is_active !== false)
+    .map(r => r.slug)
 
   if (drifted.length === 0 && retired.length === 0) {
     console.log(`sync-plans: no changes — ${rows.length} plan(s) already match`)
