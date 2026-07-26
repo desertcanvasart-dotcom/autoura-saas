@@ -44,12 +44,12 @@ export default function RequireFeature({
   fallback,
 }: RequireFeatureProps) {
   const router = useRouter()
-  const { hasB2B, hasB2C, hasAnalytics, hasWhatsApp, hasEmail, hasPDF, loading, features } = useTenant()
+  const { showsB2bWorkspace, showsB2cWorkspace, hasAnalytics, hasWhatsApp, hasEmail, hasPDF, loading, features } = useTenant()
   const [noticeDismissed, setNoticeDismissed] = useState(false)
 
   const featureMap: Record<GatedFeature, boolean> = {
-    b2b: hasB2B,
-    b2c: hasB2C,
+    b2b: showsB2bWorkspace,
+    b2c: showsB2cWorkspace,
     analytics: hasAnalytics,
     whatsapp: hasWhatsApp,
     email: hasEmail,

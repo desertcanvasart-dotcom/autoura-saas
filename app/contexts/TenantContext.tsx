@@ -8,6 +8,13 @@ interface Tenant {
   id: string
   company_name: string
   contact_email: string | null
+  /**
+   * Which workspaces this tenant chooses to see. A free preference on every
+   * tier — never an entitlement. Hiding one hides NAVIGATION only; records
+   * stay reachable (see lib/workspace-visibility.ts).
+   */
+  workspace_mode: 'b2c' | 'b2b' | 'both'
+  /** @deprecated Superseded by workspace_mode. Dropped in the cutover migration. */
   business_type: 'b2c_only' | 'b2b_only' | 'b2c_and_b2b'
   logo_url: string | null
   created_at: string
@@ -30,7 +37,9 @@ interface TenantMember {
 interface TenantFeatures {
   id: string
   tenant_id: string
+  /** @deprecated Moved to tenants.workspace_mode — this is a preference, not an entitlement. */
   b2c_enabled: boolean
+  /** @deprecated Moved to tenants.workspace_mode. */
   b2b_enabled: boolean
   whatsapp_integration: boolean
   email_integration: boolean
@@ -63,8 +72,10 @@ interface TenantContextType {
   canManagePartners: boolean
 
   // Feature checks
-  hasB2C: boolean
-  hasB2B: boolean
+  /** Tenant chooses to see the direct-client workspace. Never a paywall. */
+  showsB2cWorkspace: boolean
+  /** Tenant chooses to see the partner workspace. Never a paywall. */
+  showsB2bWorkspace: boolean
   hasWhatsApp: boolean
   hasEmail: boolean
   hasPDF: boolean
@@ -173,9 +184,17 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const canDeleteQuotes = isManager
   const canManagePartners = isManager
 
-  // Feature checks
-  const hasB2C = features?.b2c_enabled ?? false
-  const hasB2B = features?.b2b_enabled ?? false
+  // Workspace visibility — a PREFERENCE, read from tenants.workspace_mode.
+  // During the additive-then-cutover rename the old sources are still written,
+  // so fall back to them if workspace_mode has not been backfilled yet. The
+  // fallback is the permissive union, matching migration 239's conflict rule.
+  const workspaceMode = tenant?.workspace_mode
+  const showsB2cWorkspace = workspaceMode
+    ? workspaceMode === 'b2c' || workspaceMode === 'both'
+    : (features?.b2c_enabled ?? true)
+  const showsB2bWorkspace = workspaceMode
+    ? workspaceMode === 'b2b' || workspaceMode === 'both'
+    : (features?.b2b_enabled ?? true)
   const hasWhatsApp = features?.whatsapp_integration ?? false
   const hasEmail = features?.email_integration ?? false
   const hasPDF = features?.pdf_generation ?? false
@@ -196,9 +215,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     canDeleteQuotes,
     canManagePartners,
 
-    // Features
-    hasB2C,
-    hasB2B,
+    // Workspace preferences
+    showsB2cWorkspace,
+    showsB2bWorkspace,
     hasWhatsApp,
     hasEmail,
     hasPDF,
@@ -225,8 +244,8 @@ const noopTenantContext: TenantContextType = {
   canManagePartners: false,
 
   // Features (default to false during SSR)
-  hasB2C: false,
-  hasB2B: false,
+  showsB2cWorkspace: true,
+  showsB2bWorkspace: true,
   hasWhatsApp: false,
   hasEmail: false,
   hasPDF: false,

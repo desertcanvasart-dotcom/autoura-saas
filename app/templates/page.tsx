@@ -158,7 +158,7 @@ const SUBCATEGORY_TO_SUPPLIER_TYPE: Record<string, string> = {
 // ============================================
 
 export default function TemplatesPage() {
-  const { hasB2B } = useTenant()
+  const { showsB2bWorkspace } = useTenant()
   const dialog = useConfirmDialog()
   const [templates, setTemplates] = useState<Template[]>([])
   const [placeholders, setPlaceholders] = useState<Placeholder[]>([])
@@ -169,7 +169,7 @@ export default function TemplatesPage() {
 
   // Filter categories based on tenant business type
   const CATEGORIES = ALL_CATEGORIES.filter(cat =>
-    !cat.requiresB2B || hasB2B
+    !cat.requiresB2B || showsB2bWorkspace
   )
   
   // Modal states
@@ -842,7 +842,7 @@ export default function TemplatesPage() {
                   >
                     <option value="customer">Customer (B2C Travelers)</option>
                     <option value="supplier">Supplier (Hotels, Cruises, Guides)</option>
-                    {hasB2B && <option value="partner">B2B Partner (Tour Operators)</option>}
+                    {showsB2bWorkspace && <option value="partner">B2B Partner (Tour Operators)</option>}
                     <option value="internal">Internal (Team)</option>
                   </select>
                 </div>
