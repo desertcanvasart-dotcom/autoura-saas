@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { workspaceModeFromBusinessType, legacyWorkspaceFields, type WorkspaceMode } from '@/lib/workspace-mode'
+import { workspaceModeFromBusinessType, type WorkspaceMode } from '@/lib/workspace-mode'
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,17 +31,27 @@ export async function POST(request: NextRequest) {
 
     // Both workspaces default ON: onboarding OFFERS the choice rather than
     // assuming one, so a tenant who skips the question keeps the whole product.
+    //
+    // `business_type` is still accepted as a fallback. The column is gone
+    // (migration 240) but the wire format outlives it — a browser holding a
+    // cached bundle can still POST the old field mid-deploy.
     const onboardingMode: WorkspaceMode = body.workspace_mode
       ?? workspaceModeFromBusinessType(body.business_type)
+
+    // Reject bad input here rather than letting migration 239's CHECK turn it
+    // into a 500.
+    if (!['b2c', 'b2b', 'both'].includes(onboardingMode)) {
+      return NextResponse.json(
+        { success: false, error: 'workspace_mode must be one of: b2c, b2b, both' },
+        { status: 400 }
+      )
+    }
 
     // Update tenant with business configuration
     const { error: tenantError } = await supabase
       .from('tenants')
       .update({
-        // workspace_mode is the source of truth; business_type is written
-        // alongside it until the cutover migration drops it.
         workspace_mode: onboardingMode,
-        business_type: legacyWorkspaceFields(onboardingMode).business_type,
         default_currency: body.default_currency,
         ...(body.locale !== undefined ? { locale: body.locale } : {}),
         services_offered: body.services_offered,
@@ -59,14 +69,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Legacy mirror, derived from the same value rather than recomputed.
-    const { b2c_enabled: b2cEnabled, b2b_enabled: b2bEnabled } = legacyWorkspaceFields(onboardingMode)
 
     const { error: featuresError } = await supabase
       .from('tenant_features')
       .update({
-        b2c_enabled: b2cEnabled,
-        b2b_enabled: b2bEnabled,
         onboarding_step: Math.max(1, body.current_step || 1),
         updated_at: new Date().toISOString()
       })

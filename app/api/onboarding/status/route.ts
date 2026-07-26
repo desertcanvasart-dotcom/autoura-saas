@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     // Get tenant info
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
-      .select('company_name, business_type, default_currency, services_offered, company_website, company_phone, tagline')
+      .select('company_name, workspace_mode, default_currency, services_offered, company_website, company_phone, tagline')
       .eq('id', tenant_id)
       .single()
 

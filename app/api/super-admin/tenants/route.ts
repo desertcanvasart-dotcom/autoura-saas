@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch features
-    const { data: features } = await admin.from('tenant_features').select('tenant_id, b2c_enabled, b2b_enabled, max_users')
+    const { data: features } = await admin.from('tenant_features').select('tenant_id, concierge_enabled')
     const featureMap: Record<string, any> = {}
     for (const f of features || []) {
       featureMap[f.tenant_id] = f

@@ -10,9 +10,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json()
 
     const allowedFields = [
-      'b2c_enabled', 'b2b_enabled', 'whatsapp_integration', 'email_integration',
-      'pdf_generation', 'analytics_enabled', 'concierge_enabled', 'max_users',
-      'max_quotes_per_month', 'max_partners', 'primary_color', 'secondary_color', 'logo_url',
+      'whatsapp_integration', 'email_integration',
+      'pdf_generation', 'analytics_enabled', 'concierge_enabled', 'primary_color', 'secondary_color', 'logo_url',
     ]
     const updates: Record<string, any> = {}
     for (const key of allowedFields) {

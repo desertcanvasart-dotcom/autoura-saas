@@ -34,7 +34,7 @@ async function verifyDatabase() {
 
     if (data && data.length > 0) {
       console.log('✅ Tenants table exists');
-      console.log(`   └─ Default tenant: ${data[0].company_name} (${data[0].business_type})`);
+      console.log(`   └─ Default tenant: ${data[0].company_name} (${data[0].workspace_mode})`);
       checks.push({ name: 'tenants', status: 'ok', data: data[0] });
     } else {
       console.log('⚠️  Tenants table exists but is empty');
