@@ -105,6 +105,16 @@ export async function createCheckoutSession(
     // operator must add a payment method — which is exactly what the Terms now
     // say.
     payment_method_collection: 'if_required',
+    // NOTE — the one-time onboarding fee (PricingTier.onboardingFeeUsd, $500 /
+    // $1,000 / $1,500) is DISPLAYED on both pricing surfaces but is NOT charged
+    // here, deliberately.
+    //
+    // Adding it as a line item would create an amount due at checkout, and
+    // Stripe then requires a payment method regardless of
+    // payment_method_collection — which would break the "no card required to
+    // start" promise at the exact moment it is tested. Charging it on
+    // conversion instead (an invoice item when the trial ends and a card is
+    // added) is billing behaviour that needs to be decided, not assumed.
     line_items: [
       {
         price: priceId,

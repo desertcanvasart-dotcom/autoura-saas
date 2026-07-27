@@ -33,15 +33,6 @@ import { Zap, Sparkles, Crown, Building2, LucideIcon } from 'lucide-react'
  */
 export const TRIAL_DAYS = 14
 
-/**
- * One-time onboarding / rate-sheet setup fee, in USD.
- *
- * null = no fee is advertised and none is charged. Deliberately unset until a
- * figure is agreed: the public page omits the line entirely rather than
- * printing a placeholder, because a price shown is a price promised.
- */
-export const ONBOARDING_FEE_USD: number | null = null
-
 /** null means unlimited, everywhere in this file. */
 export type Limit = number | null
 
@@ -54,10 +45,23 @@ export interface PricingTier {
   /** USD. null = no list price; contact sales. */
   monthlyPrice: number | null
   annualPrice: number | null
+
   /**
-   * Whether the public pricing page shows a price and offers self-serve
+   * One-time onboarding / rate-sheet setup fee, USD. Set 2026-07-27.
+   * null = not advertised and not charged, which is Enterprise: its onboarding
+   * is scoped in the sales conversation like its subscription. A figure shown
+   * is a figure promised, so null prints nothing rather than a placeholder.
+   */
+  onboardingFeeUsd: number | null
+  /**
+   * Whether the PUBLIC pricing page shows a price and offers self-serve
    * checkout. Agency flips to true when multi-brand branding and API access
    * ship — until then it has a defined price for sales, not a published one.
+   *
+   * This does NOT govern the in-app billing page. A signed-in operator sees a
+   * real price and can buy any tier that HAS one (monthlyPrice !== null);
+   * gating that on publiclyPriced meant Agency showed "Talk to us" to someone
+   * already inside the product, with no way to upgrade themselves.
    */
   publiclyPriced: boolean
 
@@ -110,6 +114,7 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
     color: 'blue',
     monthlyPrice: 69,
     annualPrice: 690,
+    onboardingFeeUsd: 500,
     publiclyPriced: true,
     description: 'For the operator who is still the whole operation.',
     limits: {
@@ -133,6 +138,7 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
     color: 'green',
     monthlyPrice: 189,
     annualPrice: 1890,
+    onboardingFeeUsd: 1000,
     publiclyPriced: true,
     popular: true,
     description: 'For a growing DMC with a real ops team.',
@@ -159,6 +165,7 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
     // access exist, since higher limits alone do not justify the step up.
     monthlyPrice: 449,
     annualPrice: 4490,
+    onboardingFeeUsd: 1500,
     publiclyPriced: false,
     description: 'For operators running serious B2B volume or more than one brand.',
     limits: {
@@ -182,6 +189,7 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
     color: 'orange',
     monthlyPrice: null,
     annualPrice: null,
+    onboardingFeeUsd: null,
     publiclyPriced: false,
     description: 'For groups running multiple companies on one system.',
     limits: {
