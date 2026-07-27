@@ -144,13 +144,16 @@ export default function ClientProfilePage() {
       if (clientError) throw clientError
       setClient(clientData)
 
-      // Fetch communications
-      const { data: commData } = await supabase
+      // Fetch communications. The error used to be discarded, so when the
+      // table did not exist this panel showed "no communications" on every
+      // client rather than a failure — which is why nobody noticed for months.
+      const { data: commData, error: commError } = await supabase
         .from('communication_history')
         .select('*')
         .eq('client_id', clientId)
         .order('communication_date', { ascending: false })
         .limit(10)
+      if (commError) console.error('Failed to load communications:', commError)
       setCommunications(commData || [])
 
       // Fetch follow-ups

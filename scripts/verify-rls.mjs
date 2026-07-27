@@ -47,6 +47,9 @@ const GUARDED = [
   // Core business data — protected already, kept here so a future migration
   // cannot quietly open them without this failing.
   'itineraries', 'clients', 'invoices', 'payments', 'b2c_quotes',
+  // Client communications log (migration 244) — created with TO authenticated
+  // policies from the start; listed so it stays that way.
+  'communication_history',
 ]
 
 let failures = 0

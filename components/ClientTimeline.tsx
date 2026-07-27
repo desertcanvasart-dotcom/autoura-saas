@@ -44,12 +44,14 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
         .eq('id', clientId)
         .single()
 
-      // Fetch communications
-      const { data: communications } = await supabase
+      // Fetch communications (error captured — a silent empty timeline is
+      // indistinguishable from a client nobody has spoken to).
+      const { data: communications, error: commError } = await supabase
         .from('communication_history')
         .select('*')
         .eq('client_id', clientId)
         .order('communication_date', { ascending: false })
+      if (commError) console.error('Failed to load communications:', commError)
 
       // Fetch bookings/itineraries
       const { data: bookings } = await supabase
