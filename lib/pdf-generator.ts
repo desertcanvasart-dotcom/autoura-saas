@@ -5,7 +5,7 @@
 
 import { jsPDF } from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
-import { identityFooterLine, type CompanyIdentity } from './company-identity'
+import { identityFooterLine, brandColorRgb, tint, type CompanyIdentity } from './company-identity'
 
 // ============================================
 // TYPES
@@ -156,14 +156,16 @@ function drawTable(
   headers: string[],
   rows: string[][],
   colWidths: number[],
-  margin: number
+  margin: number,
+  brand: [number, number, number],
+  brandTintLight: [number, number, number]
 ): number {
   const rowHeight = 8
   const headerHeight = 10
   let y = startY
 
   // Draw header background
-  doc.setFillColor(100, 124, 71)
+  doc.setFillColor(...brand)
   doc.rect(margin, y, colWidths.reduce((a, b) => a + b, 0), headerHeight, 'F')
 
   // Draw header text
@@ -186,7 +188,7 @@ function drawTable(
   rows.forEach((row, rowIndex) => {
     // Alternate row background
     if (rowIndex % 2 === 0) {
-      doc.setFillColor(248, 250, 245)
+      doc.setFillColor(...brandTintLight)
       doc.rect(margin, y, colWidths.reduce((a, b) => a + b, 0), rowHeight, 'F')
     }
 
@@ -233,6 +235,12 @@ export function generateItineraryPDF(
 
   const opts = { ...DEFAULT_OPTIONS, ...options }
 
+  // Tenant brand when set; the existing olive otherwise, with the light panel
+  // tints derived from whatever the brand is so panels always match.
+  const brand = brandColorRgb(company, [100, 124, 71])
+  const brandTintLight = tint(brand, 0.93)   // was 248,250,245
+  const brandTintPanel = tint(brand, 0.9)    // was 245,247,241
+
   try {
     if (!itinerary) {
       throw new Error('Itinerary data is required')
@@ -262,8 +270,15 @@ export function generateItineraryPDF(
 
     doc.setFontSize(24)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(100, 124, 71)
-    if (company.name) doc.text(company.name, margin, yPos + 8)
+    doc.setTextColor(...brand)
+    let headerNameX = margin
+    if (company.logoDataUrl) {
+      try {
+        doc.addImage(company.logoDataUrl, margin, yPos - 2, 14, 14)
+        headerNameX = margin + 17
+      } catch { /* bad image data — text-only header */ }
+    }
+    if (company.name) doc.text(company.name, headerNameX, yPos + 8)
 
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
@@ -324,7 +339,7 @@ export function generateItineraryPDF(
     if (days.length > 0) {
       doc.setFontSize(14)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(100, 124, 71)
+      doc.setTextColor(...brand)
       doc.text('ITINERARY OVERVIEW', margin, yPos)
 
       yPos += 8
@@ -337,7 +352,7 @@ export function generateItineraryPDF(
         day.overnight_city || ''
       ])
 
-      yPos = drawTable(doc, yPos, ['Day', 'Date', 'Activities', 'Overnight'], daysData, [20, 25, 90, 45], margin)
+      yPos = drawTable(doc, yPos, ['Day', 'Date', 'Activities', 'Overnight'], daysData, [20, 25, 90, 45], margin, brand, brandTintLight)
 
       yPos += 5
     }
@@ -353,7 +368,7 @@ export function generateItineraryPDF(
       }
 
       // Day header box
-      doc.setFillColor(245, 247, 241)
+      doc.setFillColor(...brandTintPanel)
       doc.rect(margin, yPos - 3, contentWidth, 10, 'F')
 
       doc.setFontSize(11)
@@ -396,7 +411,7 @@ export function generateItineraryPDF(
 
     doc.setFontSize(14)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(100, 124, 71)
+    doc.setTextColor(...brand)
     doc.text('PRICING SUMMARY', margin, yPos)
 
     yPos += 8
@@ -441,7 +456,7 @@ export function generateItineraryPDF(
       ])
 
       if (serviceRows.length > 0) {
-        yPos = drawTable(doc, yPos, ['Service', 'Qty', 'Rate', 'Total'], serviceRows, [85, 20, 35, 40], margin)
+        yPos = drawTable(doc, yPos, ['Service', 'Qty', 'Rate', 'Total'], serviceRows, [85, 20, 35, 40], margin, brand, brandTintLight)
       } else {
         doc.setFontSize(10)
         doc.setFont('helvetica', 'italic')
@@ -466,7 +481,7 @@ export function generateItineraryPDF(
     const totalPrice = itinerary.total_cost || 0
     const totalPax = (itinerary.num_adults || 0) + (itinerary.num_children || 0)
 
-    doc.setFillColor(100, 124, 71)
+    doc.setFillColor(...brand)
     doc.roundedRect(pageWidth - margin - 80, yPos, 80, 22, 2, 2, 'F')
 
     doc.setFontSize(9)
@@ -501,7 +516,7 @@ export function generateItineraryPDF(
 
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(100, 124, 71)
+    doc.setTextColor(...brand)
     doc.text('INCLUSIONS', margin, yPos)
     yPos += 6
 
@@ -530,7 +545,7 @@ export function generateItineraryPDF(
 
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(100, 124, 71)
+    doc.setTextColor(...brand)
     doc.text('EXCLUSIONS', margin, yPos)
     yPos += 6
 
@@ -563,7 +578,7 @@ export function generateItineraryPDF(
 
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(100, 124, 71)
+    doc.setTextColor(...brand)
     doc.text('PAYMENT TERMS', margin, yPos)
     yPos += 6
 

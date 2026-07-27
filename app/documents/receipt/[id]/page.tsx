@@ -1,6 +1,6 @@
 'use client'
 
-import { identityFromTenant } from '@/lib/company-identity'
+import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -70,7 +70,7 @@ export default function ReceiptPage() {
     }
   }
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!payment) return
     
     setDownloading(true)
@@ -92,7 +92,7 @@ export default function ReceiptPage() {
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
-      }, identityFromTenant(tenant))
+      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
     } catch (error) {
       console.error('Error downloading PDF:', error)
       showToast('error', 'Failed to download receipt')

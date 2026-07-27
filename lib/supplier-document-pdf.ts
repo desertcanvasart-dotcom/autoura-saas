@@ -3,6 +3,7 @@
 // Unified branding with Travel2Egypt / Autoura colors
 
 import jsPDF from 'jspdf'
+import { brandColorRgb, tint } from './company-identity'
 import { formatDateOnly, daysBetween } from '@/lib/date-utils'
 
 interface ServiceItem {
@@ -18,7 +19,7 @@ interface ServiceItem {
 interface SupplierDocument {
   /** The operator authorising the document. Previously hardcoded Travel2Egypt
    *  with a placeholder phone ("+20 100 XXX XXXX") in the footer. */
-  company?: { name: string; email?: string | null; phone?: string | null; website?: string | null }
+  company?: { name: string; email?: string | null; phone?: string | null; website?: string | null; primaryColor?: string; logoDataUrl?: string }
   id: string
   document_type: string
   document_number: string
@@ -94,6 +95,9 @@ interface SupplierDocument {
 }
 
 // Brand colors - lighter, more professional palette
+// Defaults (the original olive). ACTIVE is what everything reads; it is
+// re-derived from the tenant's brand color at the top of every generate call.
+// Safe because generation is fully synchronous — no interleaving is possible.
 const BRAND = {
   primary: { r: 100, g: 124, b: 71 },      // Olive green #647C47
   primaryDark: { r: 80, g: 100, b: 57 },   // Darker olive
@@ -106,6 +110,21 @@ const BRAND = {
   borderLight: { r: 230, g: 230, b: 230 },  // Very light border
   white: { r: 255, g: 255, b: 255 },
   background: { r: 252, g: 252, b: 250 }
+}
+
+let ACTIVE = BRAND
+function derivePalette(company?: { primaryColor?: string }): typeof BRAND {
+  const [r, g, b] = brandColorRgb(company, [BRAND.primary.r, BRAND.primary.g, BRAND.primary.b])
+  if (r === BRAND.primary.r && g === BRAND.primary.g && b === BRAND.primary.b) return BRAND
+  const T = (f: number) => { const [tr, tg, tb] = tint([r, g, b], f); return { r: tr, g: tg, b: tb } }
+  return {
+    ...BRAND,
+    primary: { r, g, b },
+    primaryDark: { r: Math.round(r * 0.8), g: Math.round(g * 0.8), b: Math.round(b * 0.8) },
+    primaryLight: T(0.94),
+    primaryMedium: T(0.82),
+    border: T(0.7),
+  }
 }
 
 const DOCUMENT_TITLES: Record<string, string> = {
@@ -129,6 +148,7 @@ const DOCUMENT_ICONS: Record<string, string> = {
 }
 
 export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
+  ACTIVE = derivePalette(doc.company ?? undefined)
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -147,33 +167,33 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   // ==================== HEADER SECTION ====================
 
   // Top accent bar (thin)
-  pdf.setFillColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setFillColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
   pdf.rect(0, 0, pageWidth, 4, 'F')
   
   y = 15
   
   // Company Logo Area (Left side)
-  pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
+  pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
   pdf.roundedRect(margin, y, 55, 20, 3, 3, 'F')
   
   pdf.setFontSize(16)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
   pdf.text('TRAVEL2EGYPT', margin + 5, y + 9)
   
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
   pdf.text('Your Gateway to Egypt', margin + 5, y + 15)
   
   // Document Type & Number (Right side)
   const rightBoxX = pageWidth - margin - 65
-  pdf.setFillColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setFillColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
   pdf.roundedRect(rightBoxX, y, 65, 20, 3, 3, 'F')
   
   pdf.setFontSize(10)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.white.r, BRAND.white.g, BRAND.white.b)
+  pdf.setTextColor(ACTIVE.white.r, ACTIVE.white.g, ACTIVE.white.b)
   pdf.text(title, rightBoxX + 32.5, y + 8, { align: 'center' })
   
   pdf.setFontSize(9)
@@ -185,7 +205,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   // Issue date line
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
   const issueDate = new Date().toLocaleDateString('en-US', { 
     weekday: 'long',
     month: 'long', 
@@ -202,24 +222,24 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   const colWidth = (contentWidth - 6) / 2
   
   // Supplier Box (Left)
-  pdf.setFillColor(BRAND.background.r, BRAND.background.g, BRAND.background.b)
-  pdf.setDrawColor(BRAND.border.r, BRAND.border.g, BRAND.border.b)
+  pdf.setFillColor(ACTIVE.background.r, ACTIVE.background.g, ACTIVE.background.b)
+  pdf.setDrawColor(ACTIVE.border.r, ACTIVE.border.g, ACTIVE.border.b)
   pdf.setLineWidth(0.3)
   pdf.roundedRect(margin, y, colWidth, 38, 3, 3, 'FD')
   
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
   pdf.text('SUPPLIER', margin + 4, y + 5)
   
   pdf.setFontSize(11)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+  pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
   pdf.text(doc.supplier_name || 'N/A', margin + 4, y + 12)
   
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
   
   let supplierY = y + 18
   if (doc.supplier_address) {
@@ -241,23 +261,23 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   
   // Guest Box (Right)
   const guestBoxX = margin + colWidth + 6
-  pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
-  pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
+  pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
   pdf.roundedRect(guestBoxX, y, colWidth, 38, 3, 3, 'FD')
   
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
   pdf.text('GUEST INFORMATION', guestBoxX + 4, y + 5)
   
   pdf.setFontSize(11)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+  pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
   pdf.text(doc.client_name || 'N/A', guestBoxX + 4, y + 12)
   
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
   
   if (doc.client_nationality) {
     pdf.text(`Nationality: ${doc.client_nationality}`, guestBoxX + 4, y + 18)
@@ -267,12 +287,12 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   const totalPax = doc.num_adults + (doc.num_children || 0)
   pdf.setFontSize(20)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
   pdf.text(totalPax.toString(), guestBoxX + colWidth - 15, y + 18)
   
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
   pdf.text('PAX', guestBoxX + colWidth - 15, y + 23)
   
   let paxDetail = `${doc.num_adults} Adult${doc.num_adults !== 1 ? 's' : ''}`
@@ -294,18 +314,18 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     const dateBoxWidth = (contentWidth - 12) / 3
     
     // Check-in
-    pdf.setFillColor(BRAND.white.r, BRAND.white.g, BRAND.white.b)
-    pdf.setDrawColor(BRAND.border.r, BRAND.border.g, BRAND.border.b)
+    pdf.setFillColor(ACTIVE.white.r, ACTIVE.white.g, ACTIVE.white.b)
+    pdf.setDrawColor(ACTIVE.border.r, ACTIVE.border.g, ACTIVE.border.b)
     pdf.roundedRect(margin, y, dateBoxWidth, 22, 3, 3, 'FD')
     
     pdf.setFontSize(7)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.text('CHECK-IN', margin + 4, y + 5)
     
     pdf.setFontSize(10)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+    pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
     const checkInDate = doc.check_in ? formatDateOnly(doc.check_in, 'en-US', {
       weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
     }) : '—'
@@ -316,20 +336,20 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     
     pdf.setFontSize(7)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.text('CHECK-OUT', margin + dateBoxWidth + 10, y + 5)
     
     pdf.setFontSize(10)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+    pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
     const checkOutDate = doc.check_out ? formatDateOnly(doc.check_out, 'en-US', {
       weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
     }) : '—'
     pdf.text(checkOutDate, margin + dateBoxWidth + 10, y + 14)
     
     // Nights
-    pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
-    pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
+    pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.roundedRect(margin + (dateBoxWidth + 6) * 2, y, dateBoxWidth, 22, 3, 3, 'FD')
 
     let nights = 0
@@ -339,11 +359,11 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
 
     pdf.setFontSize(7)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.text('DURATION', margin + (dateBoxWidth + 6) * 2 + 4, y + 5)
 
     pdf.setFontSize(14)
-    pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+    pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
     pdf.text(`${nights} NIGHT${nights !== 1 ? 'S' : ''}`, margin + (dateBoxWidth + 6) * 2 + dateBoxWidth / 2, y + 15, { align: 'center' })
     
     y += 28
@@ -353,63 +373,63 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     const dateBoxWidth = (contentWidth - 6) / 2
     
     // Service Date
-    pdf.setFillColor(BRAND.white.r, BRAND.white.g, BRAND.white.b)
-    pdf.setDrawColor(BRAND.border.r, BRAND.border.g, BRAND.border.b)
+    pdf.setFillColor(ACTIVE.white.r, ACTIVE.white.g, ACTIVE.white.b)
+    pdf.setDrawColor(ACTIVE.border.r, ACTIVE.border.g, ACTIVE.border.b)
     pdf.roundedRect(margin, y, dateBoxWidth, 22, 3, 3, 'FD')
     
     pdf.setFontSize(7)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.text('SERVICE DATE', margin + 4, y + 5)
     
     pdf.setFontSize(10)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+    pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
     const serviceDate = doc.service_date ? formatDateOnly(doc.service_date, 'en-US', {
       weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
     }) : '—'
     pdf.text(serviceDate, margin + 4, y + 14)
     
     // Pickup Time
-    pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
-    pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
+    pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.roundedRect(margin + dateBoxWidth + 6, y, dateBoxWidth, 22, 3, 3, 'FD')
 
     pdf.setFontSize(7)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.text('PICKUP TIME', margin + dateBoxWidth + 10, y + 5)
 
     pdf.setFontSize(14)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+    pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
     pdf.text(doc.pickup_time || '—', margin + dateBoxWidth + 10, y + 15)
     
     y += 28
     
     // Pickup/Dropoff for transport (only show single-route box when no selected_routes)
     if (doc.document_type === 'transport_voucher' && !doc.selected_routes?.length && (doc.pickup_location || doc.dropoff_location)) {
-      pdf.setFillColor(BRAND.background.r, BRAND.background.g, BRAND.background.b)
+      pdf.setFillColor(ACTIVE.background.r, ACTIVE.background.g, ACTIVE.background.b)
       pdf.roundedRect(margin, y, contentWidth, 18, 3, 3, 'F')
 
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'normal')
-      pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+      pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
 
       if (doc.pickup_location) {
         pdf.setFont('helvetica', 'bold')
         pdf.text('FROM:', margin + 4, y + 7)
         pdf.setFont('helvetica', 'normal')
-        pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+        pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
         pdf.text(doc.pickup_location, margin + 20, y + 7)
       }
 
       if (doc.dropoff_location) {
-        pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+        pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
         pdf.setFont('helvetica', 'bold')
         pdf.text('TO:', margin + 4, y + 13)
         pdf.setFont('helvetica', 'normal')
-        pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+        pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
         pdf.text(doc.dropoff_location, margin + 20, y + 13)
       }
 
@@ -432,34 +452,34 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
       const halfWidth = (contentWidth - 6) / 2
 
       // Vehicle Type Box
-      pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
-      pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+      pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
+      pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
       pdf.roundedRect(margin, y, halfWidth, 18, 3, 3, 'FD')
 
       pdf.setFontSize(7)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+      pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
       pdf.text('VEHICLE TYPE', margin + 4, y + 5)
 
       pdf.setFontSize(10)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+      pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
       const vehicleLabel = doc.vehicle_type ? (vehicleTypeLabels[doc.vehicle_type] || doc.vehicle_type) : '—'
       pdf.text(vehicleLabel, margin + 4, y + 13)
 
       // Driver Name Box
-      pdf.setFillColor(BRAND.background.r, BRAND.background.g, BRAND.background.b)
-      pdf.setDrawColor(BRAND.border.r, BRAND.border.g, BRAND.border.b)
+      pdf.setFillColor(ACTIVE.background.r, ACTIVE.background.g, ACTIVE.background.b)
+      pdf.setDrawColor(ACTIVE.border.r, ACTIVE.border.g, ACTIVE.border.b)
       pdf.roundedRect(margin + halfWidth + 6, y, halfWidth, 18, 3, 3, 'FD')
 
       pdf.setFontSize(7)
       pdf.setFont('helvetica', 'bold')
-      pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+      pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
       pdf.text('DRIVER', margin + halfWidth + 10, y + 5)
 
       pdf.setFontSize(10)
       pdf.setFont('helvetica', 'normal')
-      pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+      pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
       pdf.text(doc.driver_name || 'To be assigned', margin + halfWidth + 10, y + 13)
 
       y += 24
@@ -473,19 +493,19 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   if (hasServices) {
     pdf.setFontSize(9)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+    pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
     pdf.text('SERVICES / ITEMS', margin, y + 5)
     y += 10
     
     // Table header
-    pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
-    pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
+    pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.setLineWidth(0.5)
     pdf.roundedRect(margin, y, contentWidth, 10, 2, 2, 'FD')
 
     pdf.setFontSize(8)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.text('Description', margin + 4, y + 6.5)
     pdf.text('Qty', pageWidth - margin - 40, y + 6.5, { align: 'center' })
     pdf.text('Amount', pageWidth - margin - 4, y + 6.5, { align: 'right' })
@@ -498,13 +518,13 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
     items.forEach((item: any, idx: number) => {
       const isOdd = idx % 2 === 0
       if (isOdd) {
-        pdf.setFillColor(BRAND.background.r, BRAND.background.g, BRAND.background.b)
+        pdf.setFillColor(ACTIVE.background.r, ACTIVE.background.g, ACTIVE.background.b)
         pdf.rect(margin, y, contentWidth, 10, 'F')
       }
       
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'normal')
-      pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+      pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
       
       // Get item name
       const itemName = item.route_name || item.restaurant_name || (item.guide_language ? `${item.guide_language} ${(item.guide_type || '').replace(/_/g, ' ')} - ${(item.tour_duration || '').replace(/_/g, ' ')}` : null) || item.attraction_name || item.service_name || item.service_type || 'Service'
@@ -531,7 +551,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
         y = margin
 
         // Re-add header bar on new page (thin)
-        pdf.setFillColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+        pdf.setFillColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
         pdf.rect(0, 0, pageWidth, 4, 'F')
         y = 15
       }
@@ -544,18 +564,18 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   
   if (doc.special_requests) {
     pdf.setFillColor(255, 250, 240)
-    pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.setLineWidth(0.5)
     pdf.roundedRect(margin, y, contentWidth, 22, 3, 3, 'FD')
     
     pdf.setFontSize(7)
     pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+    pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
     pdf.text('SPECIAL REQUESTS', margin + 4, y + 5)
     
     pdf.setFontSize(9)
     pdf.setFont('helvetica', 'normal')
-    pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+    pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
     const requestLines = pdf.splitTextToSize(doc.special_requests, contentWidth - 8)
     pdf.text(requestLines.slice(0, 3), margin + 4, y + 12)
     
@@ -566,17 +586,17 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   
   // Payment terms (left)
   const paymentBoxWidth = contentWidth * 0.55
-  pdf.setFillColor(BRAND.background.r, BRAND.background.g, BRAND.background.b)
+  pdf.setFillColor(ACTIVE.background.r, ACTIVE.background.g, ACTIVE.background.b)
   pdf.roundedRect(margin, y, paymentBoxWidth, 18, 3, 3, 'F')
   
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
   pdf.text('PAYMENT TERMS', margin + 4, y + 5)
   
   pdf.setFontSize(10)
   pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+  pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
   const paymentTermsDisplay: Record<string, string> = {
     'prepaid': 'PREPAID',
     'credit': 'CREDIT TERMS',
@@ -589,19 +609,19 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   // Total (right)
   const totalBoxWidth = contentWidth * 0.4
   const totalBoxX = pageWidth - margin - totalBoxWidth
-  pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
-  pdf.setDrawColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
+  pdf.setDrawColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
   pdf.setLineWidth(0.8)
   pdf.roundedRect(totalBoxX, y, totalBoxWidth, 18, 3, 3, 'FD')
 
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.primary.r, BRAND.primary.g, BRAND.primary.b)
+  pdf.setTextColor(ACTIVE.primary.r, ACTIVE.primary.g, ACTIVE.primary.b)
   pdf.text('TOTAL AMOUNT', totalBoxX + 4, y + 5)
 
   pdf.setFontSize(14)
   pdf.setFont('helvetica', 'bold')
-  pdf.setTextColor(BRAND.text.r, BRAND.text.g, BRAND.text.b)
+  pdf.setTextColor(ACTIVE.text.r, ACTIVE.text.g, ACTIVE.text.b)
   pdf.text(`${doc.currency} ${doc.total_cost.toFixed(2)}`, totalBoxX + totalBoxWidth - 4, y + 14, { align: 'right' })
   
   y += 28
@@ -611,13 +631,13 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   const sigWidth = (contentWidth - 20) / 2
   
   // Our signature
-  pdf.setDrawColor(BRAND.border.r, BRAND.border.g, BRAND.border.b)
+  pdf.setDrawColor(ACTIVE.border.r, ACTIVE.border.g, ACTIVE.border.b)
   pdf.setLineWidth(0.3)
   pdf.line(margin, y + 12, margin + sigWidth, y + 12)
   
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
   pdf.text(doc.company?.name ? `Authorized by ${doc.company.name}` : 'Authorized signature', margin, y + 18)
   
   // Supplier signature
@@ -629,17 +649,17 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   const footerY = pageHeight - 12
   
   // Footer bar
-  pdf.setFillColor(BRAND.primaryLight.r, BRAND.primaryLight.g, BRAND.primaryLight.b)
+  pdf.setFillColor(ACTIVE.primaryLight.r, ACTIVE.primaryLight.g, ACTIVE.primaryLight.b)
   pdf.rect(0, footerY - 8, pageWidth, 20, 'F')
   
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'normal')
-  pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
+  pdf.setTextColor(ACTIVE.textMuted.r, ACTIVE.textMuted.g, ACTIVE.textMuted.b)
   const footerLine = [doc.company?.name, doc.company?.website, doc.company?.email, doc.company?.phone].filter(Boolean).join(' | ')
   if (footerLine) pdf.text(footerLine, pageWidth / 2, footerY, { align: 'center' })
   
   pdf.setFontSize(6)
-  pdf.setTextColor(BRAND.textLight.r, BRAND.textLight.g, BRAND.textLight.b)
+  pdf.setTextColor(ACTIVE.textLight.r, ACTIVE.textLight.g, ACTIVE.textLight.b)
   pdf.text(`Document generated on ${new Date().toLocaleString()} | ${doc.document_number}`, pageWidth / 2, footerY + 5, { align: 'center' })
 
   return pdf
