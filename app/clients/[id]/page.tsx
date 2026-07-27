@@ -41,6 +41,17 @@ interface Client {
   tags?: string[]
 }
 
+interface LinkedEmail {
+  id: string
+  message_id: string
+  email_address: string | null
+  subject: string | null
+  snippet: string | null
+  sent_at: string | null
+  auto_linked: boolean
+  created_at: string
+}
+
 interface Communication {
   id: string
   communication_type: string
@@ -80,6 +91,10 @@ export default function ClientProfilePage() {
 
   const [client, setClient] = useState<Client | null>(null)
   const [communications, setCommunications] = useState<Communication[]>([])
+  // Emails linked to this client from the inbox (email_client_links). Rendered
+  // from the snapshot stored on the link — message ids are per-mailbox, so
+  // fetching from Gmail here would only work for whoever synced the mailbox.
+  const [linkedEmails, setLinkedEmails] = useState<LinkedEmail[]>([])
   const [followups, setFollowups] = useState<Followup[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [bookings, setBookings] = useState<any[]>([])
@@ -155,6 +170,16 @@ export default function ClientProfilePage() {
         .limit(10)
       if (commError) console.error('Failed to load communications:', commError)
       setCommunications(commData || [])
+
+      // Linked emails go through the API: the table is service-role-only, so a
+      // browser read would silently return nothing (the gmail_tokens lesson).
+      try {
+        const linksRes = await fetch(`/api/email/links?clientId=${clientId}`)
+        const linksJson = await linksRes.json()
+        setLinkedEmails(linksJson.links || [])
+      } catch (err) {
+        console.error('Failed to load linked emails:', err)
+      }
 
       // Fetch follow-ups
       const { data: followupData } = await supabase
@@ -546,6 +571,49 @@ export default function ClientProfilePage() {
         {/* Communications Tab */}
         {activeTab === 'communications' && (
           <div>
+            {/* Emails linked from the inbox. Shown from the stored snapshot;
+                a link made before migration 251 has no snapshot and renders
+                its address and link date instead — relink to backfill. */}
+            <div className="mb-6">
+              <h2 className="text-xl font-bold mb-4">Emails</h2>
+              {linkedEmails.length === 0 ? (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+                  <Mail className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600">
+                    No emails linked yet. In the Inbox, open an email and use
+                    &ldquo;Link to Client&rdquo;.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {linkedEmails.map((em) => (
+                    <div key={em.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {em.subject || '(no subject captured — relink this email to refresh)'}
+                          </p>
+                          {em.snippet && (
+                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">{em.snippet}</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            {em.email_address || 'unknown sender'}
+                            {' · '}
+                            {new Date(em.sent_at || em.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        {em.auto_linked && (
+                          <span className="shrink-0 text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                            auto-linked
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Communication History</h2>
               <button 

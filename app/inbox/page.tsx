@@ -1350,6 +1350,9 @@ ${bodyText}`
                           messageId={selectedEmail.id}
                           threadId={selectedEmail.threadId}
                           fromEmail={extractEmailAddress(selectedEmail.from)}
+                          subject={selectedEmail.subject}
+                          snippet={selectedEmail.snippet}
+                          sentAt={selectedEmail.date}
                         />
                       </div>
                       <p className="text-xs text-gray-500">{extractEmailAddress(selectedEmail.from)}</p>
@@ -1425,6 +1428,9 @@ ${bodyText}`
                   messageId={selectedEmail.id}
                   threadId={selectedEmail.threadId}
                   fromEmail={extractEmailAddress(selectedEmail.from)}
+                  subject={selectedEmail.subject}
+                  snippet={selectedEmail.snippet}
+                  sentAt={selectedEmail.date}
                 />
               )}
             </div>
