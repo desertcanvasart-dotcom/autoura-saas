@@ -94,6 +94,17 @@ export async function createCheckoutSession(
     customer: customerId,
     mode: 'subscription',
     payment_method_types: ['card'],
+    // The pricing page, the billing page and the Terms all promise a trial with
+    // no card required. Stripe Checkout collects a payment method by DEFAULT
+    // even when a trial is present, so without this the promise breaks at the
+    // one moment it is tested. 'if_required' skips collection while a trial
+    // covers the first invoice.
+    //
+    // Consequence, and it is deliberate: with no card on file nothing is
+    // charged when the trial ends. The subscription does not auto-convert — the
+    // operator must add a payment method — which is exactly what the Terms now
+    // say.
+    payment_method_collection: 'if_required',
     line_items: [
       {
         price: priceId,
@@ -106,7 +117,7 @@ export async function createCheckoutSession(
       metadata: {
         tenant_id: tenantId
       },
-      trial_period_days: TRIAL_DAYS // stated on the public pricing page
+      trial_period_days: TRIAL_DAYS // single source: lib/pricing-config.ts
     },
     allow_promotion_codes: true,
     metadata: {

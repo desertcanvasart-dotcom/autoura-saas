@@ -11,7 +11,7 @@ import {
   ArrowUp,
   ArrowDown,
 } from 'lucide-react'
-import { PRICING_TIERS, TIER_ORDER, compareTiers, getColorClasses } from '@/lib/pricing-config'
+import { PRICING_TIERS, TIER_ORDER, TRIAL_DAYS, compareTiers, getColorClasses } from '@/lib/pricing-config'
 
 interface Subscription {
   plan_name: string
@@ -355,7 +355,7 @@ export default function BillingPlansPage() {
         <div className="mt-6 bg-[#647C47]/5 border border-[#647C47]/20 rounded-lg p-3 flex items-center justify-center gap-2">
           <Check className="w-4 h-4 text-[#647C47]" />
           <p className="text-xs font-medium text-gray-700">
-            All plans include a 14-day free trial. No credit card required.
+            All plans include a {TRIAL_DAYS}-day free trial. No credit card required.
           </p>
         </div>
 
@@ -371,19 +371,32 @@ export default function BillingPlansPage() {
               </ul>
             </div>
             <div>
+              {/* Checkout is created with payment_method_types: ['card']
+                  (lib/stripe.ts), so card is the only method a subscription can
+                  actually be paid with. Bank transfer and PayPal were listed
+                  here but are not enabled on the Stripe session — the bank
+                  transfer option elsewhere in the app records a CLIENT paying
+                  the operator, which is a different thing entirely. */}
               <p className="font-semibold text-gray-900 mb-1.5">Payment Methods</p>
               <ul className="space-y-0.5 text-gray-600">
                 <li>• Credit/Debit Cards</li>
-                <li>• Bank Transfer</li>
-                <li>• PayPal</li>
               </ul>
             </div>
             <div>
+              {/* This said "Chat support (Business+)". There is no Business
+                  tier — the plans are Solo, Studio, Agency and Enterprise — so
+                  it named a plan nobody could buy. Named onboarding is a real
+                  capability in pricing-config, so it is derived rather than
+                  asserted. */}
               <p className="font-semibold text-gray-900 mb-1.5">Support</p>
               <ul className="space-y-0.5 text-gray-600">
                 <li>• Email support (all plans)</li>
-                <li>• Chat support (Business+)</li>
-                <li>• Phone support (Enterprise)</li>
+                <li>
+                  • Named onboarding contact ({TIER_ORDER
+                    .filter((k) => PRICING_TIERS[k].capabilities.namedOnboarding)
+                    .map((k) => PRICING_TIERS[k].name)
+                    .join(' and ')})
+                </li>
               </ul>
             </div>
           </div>

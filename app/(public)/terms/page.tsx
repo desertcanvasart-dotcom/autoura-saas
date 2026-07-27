@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { TRIAL_DAYS } from '@/lib/pricing-config'
 import Image from 'next/image'
 import { ArrowLeft } from 'lucide-react'
 
@@ -99,7 +100,10 @@ export default function TermsPage() {
 
               <h3 className="text-lg font-semibold text-gray-900 mb-3">4.3 Free Trial</h3>
               <p className="text-gray-600">
-                New accounts may be eligible for a 14-day free trial. At the end of the trial period, your account will be automatically converted to a paid subscription unless cancelled.
+                New accounts may be eligible for a {TRIAL_DAYS}-day free trial. No payment
+                details are required to start a trial. Your account is not charged automatically
+                at the end of the trial period: to continue on a paid plan you must add a payment
+                method yourself. If you do not, paid features simply become unavailable.
               </p>
             </section>
 
