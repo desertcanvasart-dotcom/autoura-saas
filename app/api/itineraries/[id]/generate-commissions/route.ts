@@ -47,8 +47,13 @@ export async function POST(
 
     const dayIds = days.map(d => d.id)
 
+    // `itinerary_day_services` does not exist — the table is `itinerary_services`,
+    // and it carries every column this route reads: day_id, supplier_id,
+    // commission_status, commission_rate, commission_percent, commission_amount.
+    // The wrong name made this route return 500 on every call, so commission
+    // generation has never worked.
     const { data: services, error: servicesError } = await supabase
-      .from('itinerary_day_services')
+      .from('itinerary_services')
       .select(`
         *,
         supplier:suppliers(*)
@@ -137,7 +142,7 @@ export async function POST(
 
     if (serviceIds.length > 0) {
       await supabase
-        .from('itinerary_day_services')
+        .from('itinerary_services')
         .update({ commission_status: 'generated' })
         .in('id', serviceIds)
     }
