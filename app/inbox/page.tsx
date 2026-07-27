@@ -1274,6 +1274,20 @@ ${bodyText}`
                     </div>
                   )}
 
+                  {/* Reply / Forward — this action already existed but only at
+                      the very BOTTOM of the message, below the full body and
+                      attachments. On any long email it sat under the fold, so
+                      the most common thing to do with an email looked missing.
+                      Same handler; the bottom button stays for people who read
+                      to the end. */}
+                  <button
+                    onClick={() => setShowCompose(true)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title={folder === 'sent' || isFromMe(selectedEmail) ? 'Forward' : 'Reply'}
+                  >
+                    <Send className="w-4 h-4 text-primary-600" />
+                  </button>
+
                   {/* Parse Email Button */}
                   <button
                     onClick={handleParseEmail}
