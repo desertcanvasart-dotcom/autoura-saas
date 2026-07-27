@@ -113,3 +113,32 @@ export function checkGoogleRedirect(
 
   return { ok: true, redirectUri: uri }
 }
+
+/**
+ * Base URL for redirecting a browser back into the app after OAuth.
+ *
+ * NOT `request.url`. Railway terminates TLS at its proxy and forwards to the
+ * container on PORT (8080), so inside the handler `request.url` is
+ * `http://localhost:8080/...` — an address the operator's browser cannot reach.
+ * Redirecting off it sent a real customer to ERR_CONNECTION_REFUSED *after* a
+ * successful Google sign-in, with the tokens already saved, which reads exactly
+ * like the OAuth failure it is not.
+ *
+ * NEXT_PUBLIC_APP_URL is trusted configuration. The forwarded-host headers are
+ * deliberately not used: they are attacker-controllable, and this value decides
+ * where a browser carrying a fresh session lands.
+ */
+export function appRedirectBase(
+  appUrl: string | null | undefined,
+  requestUrl: string
+): string {
+  const configured = (appUrl ?? '').trim()
+  if (!configured) return requestUrl
+  try {
+    // Must parse, or a typo would throw inside new URL() and 500 the callback.
+    new URL(configured)
+    return configured
+  } catch {
+    return requestUrl
+  }
+}

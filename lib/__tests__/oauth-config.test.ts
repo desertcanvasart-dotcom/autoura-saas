@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { checkGoogleRedirect } from '@/lib/oauth-config'
+import { checkGoogleRedirect, appRedirectBase } from '@/lib/oauth-config'
 
 // ============================================================================
 // A wrong GOOGLE_REDIRECT_URI surfaced only AFTER the operator had gone through
@@ -99,5 +99,50 @@ describe('other misconfigurations', () => {
       const r = checkGoogleRedirect(v, PROD)
       if (!r.ok) expect(r.error).toBeTruthy()
     }
+  })
+})
+
+// ============================================================================
+// appRedirectBase — the second bug in the same flow.
+//
+// With GOOGLE_REDIRECT_URI finally correct, Google DID redirect to production
+// and the callback DID run and save the tokens. Then the callback redirected
+// the browser using `request.url`, which on Railway is the container's internal
+// address (http://localhost:8080) because the proxy forwards to PORT. The
+// operator landed on ERR_CONNECTION_REFUSED after a SUCCESSFUL sign-in, which
+// reads exactly like the OAuth failure it is not.
+// ============================================================================
+describe('appRedirectBase', () => {
+  const CONTAINER = 'http://localhost:8080/api/auth/google/callback?code=x'
+
+  it('redirects off the public app URL, never the container address', () => {
+    expect(appRedirectBase('https://getautoura.net', CONTAINER)).toBe('https://getautoura.net')
+  })
+
+  it('produces a URL the browser can actually reach', () => {
+    const base = appRedirectBase('https://getautoura.net', CONTAINER)
+    expect(new URL('/settings/email?success=true', base).toString())
+      .toBe('https://getautoura.net/settings/email?success=true')
+  })
+
+  it('would have produced the broken URL without it', () => {
+    // Documents the exact regression: this is what the operator saw.
+    expect(new URL('/settings/email', CONTAINER).toString())
+      .toBe('http://localhost:8080/settings/email')
+  })
+
+  it('falls back to the request URL when nothing is configured', () => {
+    for (const v of ['', '   ', null, undefined]) {
+      expect(appRedirectBase(v as string, CONTAINER), String(v)).toBe(CONTAINER)
+    }
+  })
+
+  it('falls back rather than throwing on a malformed app URL', () => {
+    // A typo here must not 500 the callback AFTER tokens were saved.
+    expect(appRedirectBase('getautoura.net', CONTAINER)).toBe(CONTAINER)
+  })
+
+  it('tolerates surrounding whitespace in the configured value', () => {
+    expect(appRedirectBase('  https://getautoura.net  ', CONTAINER)).toBe('https://getautoura.net')
   })
 })
