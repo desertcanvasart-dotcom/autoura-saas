@@ -183,11 +183,15 @@ export default function BillingPlansPage() {
             const isCurrentPlan = comparison === 'current'
             const isUpgrade = comparison === 'upgrade'
 
-            // Agency and Enterprise have no published price — contact sales.
+            // In-app, ANY tier with a real price is purchasable. `publiclyPriced`
+            // governs the public marketing page only — gating this on it meant
+            // Agency showed "Talk to us" to an operator already inside the
+            // product, with no way to upgrade themselves. Enterprise still has
+            // no price, so it remains a conversation.
             const monthlyEquivalent = billingCycle === 'yearly'
               ? (tier.annualPrice === null ? null : Math.round(tier.annualPrice / 12))
               : tier.monthlyPrice
-            const showsPrice = tier.publiclyPriced && monthlyEquivalent !== null
+            const showsPrice = monthlyEquivalent !== null
 
             return (
               <div
@@ -242,6 +246,11 @@ export default function BillingPlansPage() {
                         {billingCycle === 'yearly' && tier.annualPrice !== null && (
                           <p className="text-[10px] text-gray-400">
                             Billed {formatPrice(tier.annualPrice)}/year
+                          </p>
+                        )}
+                        {tier.onboardingFeeUsd !== null && (
+                          <p className="text-[11px] text-gray-500 mt-1.5">
+                            + {formatPrice(tier.onboardingFeeUsd)} one-time onboarding
                           </p>
                         )}
                       </>

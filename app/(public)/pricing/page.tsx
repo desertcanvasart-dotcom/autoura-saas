@@ -8,7 +8,6 @@ import {
   PRICING_TIERS,
   TIER_ORDER,
   TRIAL_DAYS,
-  ONBOARDING_FEE_USD,
   ROADMAP_CAPABILITIES,
   type PricingTier,
   type Limit,
@@ -192,6 +191,13 @@ export default function PricingPage() {
                           {formatMoney(tier.annualPrice)} billed yearly
                         </p>
                       )}
+                      {/* Per-plan, not a single global figure: onboarding scales
+                          with the size of the rate sheet being set up. */}
+                      {tier.onboardingFeeUsd !== null && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          + {formatMoney(tier.onboardingFeeUsd)} one-time onboarding
+                        </p>
+                      )}
                     </>
                   ) : (
                     <div className="text-3xl font-bold text-gray-900">Talk to us</div>
@@ -220,11 +226,9 @@ export default function PricingPage() {
           })}
         </div>
 
-        {ONBOARDING_FEE_USD !== null && (
-          <p className="max-w-6xl mx-auto text-center text-sm text-gray-500 mt-6">
-            One-time onboarding from {formatMoney(ONBOARDING_FEE_USD)}, covering rate-sheet setup.
-          </p>
-        )}
+        <p className="max-w-6xl mx-auto text-center text-sm text-gray-500 mt-6">
+          Onboarding covers rate-sheet setup and is charged once, at the start.
+        </p>
       </section>
 
       {/* Always included */}
