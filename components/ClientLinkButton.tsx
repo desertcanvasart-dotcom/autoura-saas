@@ -33,6 +33,11 @@ interface ClientLinkButtonProps {
   messageId: string
   threadId?: string
   fromEmail?: string
+  /** Display snapshot, stored on the link so the client page can render the
+   *  email without Gmail access — message ids are per-mailbox. */
+  subject?: string
+  snippet?: string
+  sentAt?: string
   toEmails?: string[]
   onLinkChange?: (link: EmailLink | null) => void
   className?: string
@@ -43,6 +48,9 @@ export default function ClientLinkButton({
   messageId,
   threadId,
   fromEmail,
+  subject,
+  snippet,
+  sentAt,
   toEmails,
   onLinkChange,
   className = ''
@@ -116,6 +124,9 @@ export default function ClientLinkButton({
           threadId,
           clientId: client.id,
           emailAddress: fromEmail,
+          subject,
+          snippet,
+          sentAt,
         }),
       })
 

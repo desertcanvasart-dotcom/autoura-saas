@@ -18,6 +18,35 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId')
     const emailAddress = searchParams.get('emailAddress')
     const messageId = searchParams.get('messageId')
+    const clientId = searchParams.get('clientId')
+
+    // Client-page view: every email linked to this client, newest first.
+    // Tenant-checked, NOT user-checked: the CRM view is shared, and the links
+    // were made by whichever staff member synced the mailbox. The admin client
+    // bypasses RLS, so the tenant check here is the authorisation.
+    if (clientId) {
+      const { data: owned, error: ownErr } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('id', clientId)
+        .eq('tenant_id', authResult.tenant_id)
+        .maybeSingle()
+
+      if (ownErr) throw ownErr
+      if (!owned) {
+        return NextResponse.json({ error: 'Client not found' }, { status: 404 })
+      }
+
+      const { data, error } = await supabase
+        .from('email_client_links')
+        .select('id, message_id, email_address, subject, snippet, sent_at, auto_linked, created_at')
+        .eq('client_id', clientId)
+        .order('sent_at', { ascending: false, nullsFirst: false })
+        .limit(50)
+
+      if (error) throw error
+      return NextResponse.json({ links: data || [] })
+    }
 
     if (!userId) {
       return NextResponse.json({ error: 'Missing userId' }, { status: 400 })
@@ -86,7 +115,7 @@ export async function POST(request: NextRequest) {
     const sessionUserId = authResult.user!.id
 
     const body = await request.json()
-    const { userId, messageId, clientId, emailAddress, threadId } = body
+    const { userId, messageId, clientId, emailAddress, threadId, subject, snippet, sentAt } = body
 
     if (!userId || !messageId || !clientId) {
       return NextResponse.json(
@@ -111,6 +140,11 @@ export async function POST(request: NextRequest) {
         .from('email_client_links')
         .update({
           client_id: clientId,
+          // Relinking refreshes the snapshot — this is also the documented way
+          // to backfill links created before migration 251.
+          subject: subject || null,
+          snippet: snippet || null,
+          sent_at: sentAt || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)
@@ -134,6 +168,11 @@ export async function POST(request: NextRequest) {
         thread_id: threadId || null,
         client_id: clientId,
         email_address: emailAddress || null,
+        // Display snapshot for the client page — message ids are per-mailbox,
+        // so a colleague viewing the client cannot fetch these from Gmail.
+        subject: subject || null,
+        snippet: snippet || null,
+        sent_at: sentAt || null,
       })
       .select(`
         *,
