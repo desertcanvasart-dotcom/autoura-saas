@@ -50,6 +50,9 @@ const GUARDED = [
   // Client communications log (migration 244) — created with TO authenticated
   // policies from the start; listed so it stays that way.
   'communication_history',
+  // Holds Gmail refresh tokens (migration 249 added own-row policies). A leak
+  // here is a mailbox takeover, so it must never answer the anonymous key.
+  'gmail_tokens',
 ]
 
 let failures = 0
