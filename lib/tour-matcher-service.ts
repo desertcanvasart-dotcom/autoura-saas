@@ -367,30 +367,53 @@ export async function getTemplateWithPricing(
       .eq('is_active', true)
 
     // Get days with activities
-    const { data: days } = await supabase
+    // This query used to embed five related tables and FAILED ENTIRELY on all
+    // of them — PGRST200, "could not find a relationship". `tour_days` carries
+    // accommodation_id / lunch_meal_id / dinner_meal_id / guide_id and
+    // `tour_day_activities` carries entrance_id / transportation_id, but none
+    // are declared as FOREIGN KEYS, so PostgREST cannot resolve an embed. The
+    // column names were wrong too (`lunch_rate_eur` for `rate_lunch_eur`,
+    // `daily_rate_eur` for `daily_rate`), and `attractions` is not a table at
+    // all. The error was discarded, so `days` came back null and every caller
+    // saw an empty day list — build-quote has always reported days_count: 0.
+    //
+    // The embeds are dropped rather than repaired: nothing reads their inner
+    // fields, and making them work would mean adding six FK constraints, one of
+    // which (entrance_id) has no unambiguous target now that `attractions` does
+    // not exist. `tour_day_activities` embeds correctly because it has a real
+    // FK to tour_days, so it stays.
+    const { data: days, error: daysError } = await supabase
       .from('tour_days')
       .select(`
         *,
-        activities:tour_day_activities(
-          *,
-          entrance:attractions(id, name, entrance_fee_eur, entrance_fee_non_eur),
-          transportation:transportation_rates(id, vehicle_type, rate_per_day)
-        ),
-        accommodation:hotel_contacts(id, name, rate_double_eur),
-        lunch_meal:restaurant_contacts!lunch_meal_id(id, name, lunch_rate_eur),
-        dinner_meal:restaurant_contacts!dinner_meal_id(id, name, dinner_rate_eur),
-        guide:guides(id, name, daily_rate_eur)
+        activities:tour_day_activities(*)
       `)
-      .eq('tour_id', templateId)
+      // `tour_days.tour_id` does not exist — the column is `template_id`, which
+      // is what tour_variations above already filters on. This filter alone
+      // would have failed the query (42703) even with the embeds repaired.
+      .eq('template_id', templateId)
       .order('day_number', { ascending: true })
 
-    // Get pricing for this pax and passport type
-    const { data: pricing } = await supabase
+    if (daysError) {
+      // Previously discarded, which is how a totally broken query stayed
+      // invisible: an empty template is indistinguishable from a real one with
+      // no days.
+      console.error('getTemplateWithPricing: failed to load tour days:', daysError)
+    }
+
+    // Get pricing for this pax and passport type.
+    // `tour_pricing` genuinely uses `tour_id` — verified against the live
+    // schema — so this filter is correct and is deliberately left alone.
+    const { data: pricing, error: pricingError } = await supabase
       .from('tour_pricing')
       .select('*')
       .eq('tour_id', templateId)
       .eq('pax', pax)
       .eq('is_euro_passport', isEuroPassport)
+
+    if (pricingError) {
+      console.error('getTemplateWithPricing: failed to load tour pricing:', pricingError)
+    }
 
     return {
       template,
