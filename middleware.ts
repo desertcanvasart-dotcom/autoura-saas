@@ -132,6 +132,10 @@ export async function middleware(request: NextRequest) {
   const publicRoutes = [
     '/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept',
     '/about', '/contact', '/docs', '/integrations', '/pricing', '/privacy', '/terms',
+    // Token-gated public itinerary pages. The middleware only opens the path;
+    // the page itself 404s any token that does not resolve to an unrevoked
+    // share (app/share/[token]/page.tsx, service-role lookup).
+    '/share',
   ]
   // Exact match or a true sub-path ('/contact/foo'), never a shared prefix
   // ('/contacts' must NOT match public '/contact').

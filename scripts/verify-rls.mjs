@@ -58,6 +58,8 @@ const GUARDED = [
   // Migration 252. rate_audit_log carries rate-row snapshots — the cost base
   // again — so it matters as much as the rate tables themselves.
   'prompt_templates', 'rate_audit_log', 'content_usage_log',
+  // Share tokens (migration 253): a leak here hands out every live share URL.
+  'itinerary_shares',
 ]
 
 let failures = 0

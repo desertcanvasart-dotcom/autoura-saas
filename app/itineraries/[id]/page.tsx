@@ -5,7 +5,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake } from 'lucide-react'
+import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake } from 'lucide-react'
 import { generateItineraryPDF } from '@/lib/pdf-generator'
 import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
 import ResourceSummaryCard from '@/app/components/ResourceSummaryCard'
@@ -412,6 +412,44 @@ export default function ViewItineraryPage() {
     }
   }
 
+  const [sharing, setSharing] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+
+  // A share link IS a send path: the API refuses drafts and non-deliverable
+  // prices with the same gate as email/WhatsApp. Idempotent — clicking again
+  // re-copies the one existing link.
+  const handleShare = async () => {
+    if (!itinerary) return
+    setSharing(true)
+    try {
+      const res = await fetch(`/api/itineraries/${itinerary.id}/share`, { method: 'POST' })
+      const data = await res.json()
+      if (!data.success) {
+        showToast('error', data.error || 'Could not create the share link')
+        return
+      }
+      setShareUrl(data.url)
+      await navigator.clipboard.writeText(data.url)
+      showToast('success', 'Share link copied — send it to your client')
+    } catch {
+      showToast('error', 'Could not create the share link')
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const handleRevokeShare = async () => {
+    if (!itinerary) return
+    const res = await fetch(`/api/itineraries/${itinerary.id}/share`, { method: 'DELETE' })
+    const data = await res.json()
+    if (data.success) {
+      setShareUrl(null)
+      showToast('success', 'Share link revoked — the old URL no longer works')
+    } else {
+      showToast('error', data.error || 'Could not revoke the link')
+    }
+  }
+
   const handleDownloadPDF = async () => {
     if (!itinerary || days.length === 0) return
 
@@ -729,6 +767,24 @@ export default function ViewItineraryPage() {
                 <FileText className="w-4 h-4" />
                 Contract
               </Link>
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                className="px-3 py-1.5 bg-[#647C47] text-white rounded-md hover:bg-[#4f613a] text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
+                title="Create a client-facing link to this itinerary"
+              >
+                <Share2 className="w-4 h-4" />
+                {sharing ? 'Sharing…' : shareUrl ? 'Copy link' : 'Share link'}
+              </button>
+              {shareUrl && (
+                <button
+                  onClick={handleRevokeShare}
+                  className="px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-md"
+                  title="Kill the shared URL"
+                >
+                  Revoke
+                </button>
+              )}
               <button
                 onClick={handleDownloadPDF}
                 disabled={generatingPDF}
