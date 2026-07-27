@@ -31,7 +31,7 @@ import { Zap, Sparkles, Crown, Building2, LucideIcon } from 'lucide-react'
  * the public pricing page both read this, so the number a prospect is shown
  * cannot drift from the number they actually get.
  */
-export const TRIAL_DAYS = 30
+export const TRIAL_DAYS = 14
 
 /**
  * One-time onboarding / rate-sheet setup fee, in USD.
