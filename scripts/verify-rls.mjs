@@ -55,6 +55,9 @@ const GUARDED = [
   'gmail_tokens',
   // Email-to-client links (migration 250): service-role only by design.
   'email_client_links',
+  // Migration 252. rate_audit_log carries rate-row snapshots — the cost base
+  // again — so it matters as much as the rate tables themselves.
+  'prompt_templates', 'rate_audit_log', 'content_usage_log',
 ]
 
 let failures = 0
