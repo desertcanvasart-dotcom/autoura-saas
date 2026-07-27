@@ -1011,29 +1011,41 @@ export async function getMealRates(
   tier: ServiceTier
 ): Promise<{ lunch: number; dinner: number; source: RateSource } | null> {
   try {
-    const { data: mealRate } = await getSupabaseAdmin()
+    // meal_rates holds one row per meal_type AND tier, with the rate in
+    // `base_rate_eur`. This selected `lunch_rate_eur, dinner_rate_eur`, which
+    // do not exist on the table — PostgREST returns them as absent, the null
+    // check below caught it, and this function has therefore returned null for
+    // every call it has ever served. It failed SAFE (the caller records a hole
+    // rather than fabricating) but meals could never be priced.
+    const { data: mealRows } = await getSupabaseAdmin()
       .from('meal_rates')
-      .select('lunch_rate_eur, dinner_rate_eur')
+      .select('meal_type, base_rate_eur')
       .eq('is_active', true)
-      .limit(1)
-      .single()
+      .eq('tier', tier)
 
-    const m = mealRate as any
-    if (!m || m.lunch_rate_eur == null || m.dinner_rate_eur == null) {
+    const rows = (mealRows ?? []) as Array<{
+      meal_type?: string | null
+      base_rate_eur?: number | string | null
+    }>
+
+    const pick = (kind: 'lunch' | 'dinner'): number | null => {
+      const row = rows.find((r) => String(r.meal_type ?? '').toLowerCase().includes(kind))
+      const n = Number(row?.base_rate_eur)
+      // Zero is bad data, not a free meal.
+      return Number.isFinite(n) && n > 0 ? n : null
+    }
+
+    const lunch = pick('lunch')
+    const dinner = pick('dinner')
+    if (lunch === null || dinner === null) {
       return null
     }
 
-    const multipliers: Record<ServiceTier, number> = {
-      budget: 0.8,
-      standard: 1.0,
-      deluxe: 1.3,
-      luxury: 1.6
-    }
-
-    // Tier multiplier is a transform of a REAL stored rate, so still 'db'.
+    // No tier multiplier: the query is already tier-scoped, so applying one
+    // would charge the tier uplift twice.
     return {
-      lunch: Math.round(m.lunch_rate_eur * multipliers[tier]),
-      dinner: Math.round(m.dinner_rate_eur * multipliers[tier]),
+      lunch: Math.round(lunch),
+      dinner: Math.round(dinner),
       source: 'db',
     }
   } catch (err) {
