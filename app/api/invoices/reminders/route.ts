@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
+import { resolveSender } from '@/lib/tenant-email-domain'
 
 // Sends a reminder email directly via the shared mail helper.
 async function sendReminderEmail(params: {
@@ -9,14 +10,14 @@ async function sendReminderEmail(params: {
   html: string
   invoiceNumber: string
   /** The operator this invoice belongs to — replies must reach them, not the platform. */
-  fromName?: string
+  from?: string
   replyTo?: string
 }): Promise<{ success: boolean; error?: string }> {
   const result = await sendMail({
     to: params.to,
     subject: params.subject,
     html: params.html,
-    ...(params.fromName ? { fromName: params.fromName } : {}),
+    ...(params.from ? { from: params.from } : {}),
     ...(params.replyTo ? { replyTo: params.replyTo } : {}),
   })
   return { success: result.success, error: result.error }
@@ -240,7 +241,7 @@ export async function GET(request: NextRequest) {
       .from('invoices')
       // Tenant joined so the reminder is sent as the operator with replies
       // routed to them, rather than to the platform's verified domain.
-      .select('*, tenant:tenants(company_name, contact_email)')
+      .select('*, tenant:tenants(company_name, contact_email, email_domain, email_from_local, email_domain_status)')
       .not('status', 'in', '("paid","cancelled")')
       .gt('balance_due', 0)
       .eq('reminder_paused', false)
@@ -322,7 +323,7 @@ export async function POST(request: NextRequest) {
       .from('invoices')
       // Tenant joined so the reminder is sent as the operator with replies
       // routed to them, rather than to the platform's verified domain.
-      .select('*, tenant:tenants(company_name, contact_email)')
+      .select('*, tenant:tenants(company_name, contact_email, email_domain, email_from_local, email_domain_status)')
       .not('status', 'in', '("paid","cancelled")')
       .gt('balance_due', 0)
       .eq('reminder_paused', false)
@@ -379,7 +380,7 @@ export async function POST(request: NextRequest) {
         subject,
         html,
         invoiceNumber: invoice.invoice_number,
-        fromName: invoice.tenant?.company_name,
+        from: resolveSender(invoice.tenant, process.env.RESEND_FROM_EMAIL || '').from,
         replyTo: invoice.tenant?.contact_email,
       })
 
