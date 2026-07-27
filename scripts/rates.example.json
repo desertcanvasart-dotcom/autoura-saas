@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "Template for scripts/seed-rates.mjs. Copy to rates.json and replace EVERY number",
+    "with your real rates — these are placeholders chosen to be obviously wrong, not",
+    "suggestions. Anything here becomes a client's quoted price.",
+    "",
+    "Column names are the real ones: meal_rates uses meal_type + base_rate_eur (one row",
+    "per meal per tier), vehicles uses daily_rate + passenger_capacity, guides uses",
+    "daily_rate + languages. The generator filters by tier, so a tier with no rows simply",
+    "stays unpriced rather than being guessed.",
+    "",
+    "Omit a section entirely to leave that table untouched.",
+    "Add \"tenant_id\": \"<uuid>\" at the top level to load one tenant only; by default",
+    "the same rates are written to every tenant."
+  ],
+
+  "meal_rates": [
+    { "meal_type": "lunch",  "tier": "budget",   "base_rate_eur": 0 },
+    { "meal_type": "dinner", "tier": "budget",   "base_rate_eur": 0 },
+    { "meal_type": "lunch",  "tier": "standard", "base_rate_eur": 0 },
+    { "meal_type": "dinner", "tier": "standard", "base_rate_eur": 0 },
+    { "meal_type": "lunch",  "tier": "deluxe",   "base_rate_eur": 0 },
+    { "meal_type": "dinner", "tier": "deluxe",   "base_rate_eur": 0 },
+    { "meal_type": "lunch",  "tier": "luxury",   "base_rate_eur": 0 },
+    { "meal_type": "dinner", "tier": "luxury",   "base_rate_eur": 0 }
+  ],
+
+  "vehicles": [
+    { "vehicle_type": "Sedan",   "tier": "standard", "passenger_capacity": 3,  "daily_rate": 0 },
+    { "vehicle_type": "Minivan", "tier": "standard", "passenger_capacity": 7,  "daily_rate": 0 },
+    { "vehicle_type": "Minibus", "tier": "standard", "passenger_capacity": 16, "daily_rate": 0 },
+    { "vehicle_type": "Coach",   "tier": "standard", "passenger_capacity": 45, "daily_rate": 0 }
+  ],
+
+  "guides": [
+    { "full_name": "REPLACE ME", "tier": "standard", "languages": ["English"], "daily_rate": 0 }
+  ]
+}

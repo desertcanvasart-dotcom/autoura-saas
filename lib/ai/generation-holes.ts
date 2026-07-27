@@ -114,6 +114,38 @@ export function requireRates(collector: HoleCollector, req: RateRequirement): bo
 }
 
 /**
+ * A rate that resolved to a usable number, or null with a hole recorded.
+ *
+ * `requireRates` only proves ROWS came back. That is not the same as a rate:
+ * the generator read `daily_rate_eur`, `capacity_min`, `capacity_max`,
+ * `lunch_rate_eur` and `dinner_rate_eur`, none of which exist on those tables
+ * (they are `daily_rate`, `passenger_capacity`, `meal_type` + `base_rate_eur`).
+ * With rows present and the column absent, `toNumber(undefined, 0)` produced 0
+ * and no hole fired — so seeding the tables would have turned honest unpriced
+ * drafts into confident €0 quotes.
+ *
+ * Zero is rejected deliberately. A supplier rate of nothing is bad data, not a
+ * free service — the same rule resolveAirportRates applies.
+ */
+export function requireUsableRate(
+  collector: HoleCollector,
+  value: unknown,
+  req: Omit<RateRequirement, 'error' | 'rows'>
+): number | null {
+  const n = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : NaN
+  if (Number.isFinite(n) && n > 0) return n
+
+  collector.addHole({
+    kind: req.kind,
+    tier: req.tier,
+    reason: 'missing',
+    lookupAttempted: req.lookupAttempted,
+    message: req.message,
+  })
+  return null
+}
+
+/**
  * One line per gap, for the generation response. Deliberately plain: the
  * operator needs to know what to add, not what the code did.
  */

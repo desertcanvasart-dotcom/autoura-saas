@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   createHoleCollector,
   requireRates,
+  requireUsableRate,
   describeHoles,
   unpricedSummary,
 } from '@/lib/ai/generation-holes'
@@ -155,5 +156,79 @@ describe('the contract the route depends on', () => {
     expect(c.holes.length > 0).toBe(false)
     requireRates(c, req({ rows: [] }))
     expect(c.holes.length > 0).toBe(true)
+  })
+})
+
+// ============================================================================
+// requireUsableRate — rows existing is NOT the same as a rate existing.
+//
+// The generator read daily_rate_eur, capacity_min, capacity_max,
+// lunch_rate_eur and dinner_rate_eur. None exist: the columns are daily_rate,
+// passenger_capacity, and meal_type + base_rate_eur. With rows present and the
+// column absent, toNumber(undefined, 0) produced 0 and requireRates saw rows,
+// so NO hole fired — seeding the tables would have turned honest unpriced
+// drafts into confident €0 quotes.
+// ============================================================================
+describe('requireUsableRate', () => {
+  const spec = {
+    kind: 'transport' as const,
+    tier: TIER,
+    table: 'vehicles',
+    lookupAttempted: 'daily_rate for vehicle X',
+    message: 'The selected vehicle has no daily rate.',
+  }
+
+  it('returns a positive rate and records nothing', () => {
+    const c = createHoleCollector()
+    expect(requireUsableRate(c, 80, spec)).toBe(80)
+    expect(c.holes).toEqual([])
+  })
+
+  it('accepts a numeric string — DECIMAL columns arrive as strings', () => {
+    const c = createHoleCollector()
+    expect(requireUsableRate(c, '80.50', spec)).toBe(80.5)
+    expect(c.holes).toEqual([])
+  })
+
+  it('records a hole for undefined — the wrong-column-name case', () => {
+    const c = createHoleCollector()
+    const row: Record<string, unknown> = { daily_rate: 80 }
+    expect(requireUsableRate(c, row.daily_rate_eur, spec)).toBeNull()
+    expect(c.holes).toHaveLength(1)
+    expect(c.holes[0].message).toBe(spec.message)
+  })
+
+  it('rejects zero — a supplier rate of nothing is bad data, not a free service', () => {
+    const c = createHoleCollector()
+    expect(requireUsableRate(c, 0, spec)).toBeNull()
+    expect(c.holes).toHaveLength(1)
+  })
+
+  it('rejects negative, null, NaN and non-numeric text', () => {
+    for (const bad of [-5, null, undefined, NaN, 'abc', {}, []]) {
+      const c = createHoleCollector()
+      expect(requireUsableRate(c, bad, spec), String(bad)).toBeNull()
+      expect(c.holes, String(bad)).toHaveLength(1)
+    }
+  })
+
+  it('dedups with requireRates holes on the same key', () => {
+    const c = createHoleCollector()
+    requireUsableRate(c, undefined, spec)
+    requireUsableRate(c, undefined, spec)
+    expect(c.holes).toHaveLength(1)
+  })
+
+  it('REGRESSION: a populated table with the wrong column still blocks pricing', () => {
+    // Rows exist, so requireRates passes — this is exactly the gap that made
+    // seeding dangerous. requireUsableRate must catch it.
+    const c = createHoleCollector()
+    const rows = [{ daily_rate: 80, passenger_capacity: 7 }]
+    expect(requireRates(c, { kind: 'transport', tier: TIER, table: 'vehicles',
+      lookupAttempted: 'vehicles where is_active', message: 'none set up', rows })).toBe(true)
+    expect(c.holes).toHaveLength(0)
+
+    expect(requireUsableRate(c, (rows[0] as Record<string, unknown>).daily_rate_eur, spec)).toBeNull()
+    expect(c.holes).toHaveLength(1)
   })
 })
