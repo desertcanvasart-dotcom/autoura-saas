@@ -7,6 +7,7 @@ import { applyDayRules } from '@/lib/ai/day-rules-engine'
 import {
   createHoleCollector,
   requireRates,
+  requireUsableRate,
   describeHoles,
   unpricedSummary,
 } from '@/lib/ai/generation-holes'
@@ -850,14 +851,25 @@ export async function POST(request: NextRequest) {
       lookupAttempted: `vehicles where is_active and tier = '${tier}'`,
       message: `No active ${tier} vehicles are set up. Add them in Rates → Vehicles, with a daily rate and passenger capacity.`,
     })
-    let selectedVehicle = (vehicles?.find((v: any) => totalPax >= toNumber(v.capacity_min, 1) && totalPax <= toNumber(v.capacity_max, 99)) || vehicles?.[vehicles.length - 1]) as any
-    // A vehicle list that exists but has nothing wide enough for the party is
-    // its own gap: falling back to the last row would price the wrong vehicle.
+    // The column is `passenger_capacity` — a single seat count. `capacity_min`
+    // and `capacity_max` were read here and do not exist, so the comparison was
+    // `totalPax >= undefined` (false) on every row and selection always fell
+    // through to the LAST vehicle in the list, whatever that happened to be.
+    // app/api/b2b/calculate-price reads the real columns; this now matches it.
+    //
+    // Smallest vehicle that actually seats the party, so a group of 2 is not
+    // priced in a coach. `is_preferred` already ordered the query, so a
+    // preferred vehicle wins among equal capacities.
+    const seating = (vehicles ?? [])
+      .filter((v: any) => toNumber(v.passenger_capacity, 0) >= totalPax)
+      .sort((a: any, b: any) => toNumber(a.passenger_capacity, 0) - toNumber(b.passenger_capacity, 0))
+    const selectedVehicle = seating[0] as any
+
     if (vehicles?.length && !selectedVehicle) {
       addHole({
         kind: 'transport', tier, reason: 'missing',
-        lookupAttempted: `vehicles covering ${totalPax} pax at tier '${tier}'`,
-        message: `No ${tier} vehicle covers ${totalPax} passengers. Add one in Rates → Vehicles with a matching capacity range.`,
+        lookupAttempted: `vehicles seating ${totalPax} pax at tier '${tier}'`,
+        message: `No ${tier} vehicle seats ${totalPax} passengers. Add one in Rates → Vehicles with a large enough passenger capacity.`,
       })
     }
 
@@ -867,7 +879,7 @@ export async function POST(request: NextRequest) {
       lookupAttempted: `guides where is_active, tier = '${tier}', speaks '${finalLanguage}'`,
       message: `No active ${tier} guide speaking ${finalLanguage} is set up. Add one in Rates → Guides with a daily rate.`,
     })
-    let selectedGuide = guides?.[0] as any
+    const selectedGuide = guides?.[0] as any
 
     const { data: allEntranceFees, error: entranceFeesError } = await supabase.from('entrance_fees').select('*').eq('is_active', true)
     requireRates(rateHoles, {
@@ -876,17 +888,43 @@ export async function POST(request: NextRequest) {
       message: 'No active entrance fees are set up. Add them in Rates → Entrance Fees.',
     })
 
-    const { data: mealRates, error: mealRatesError } = await supabase.from('meal_rates').select('*').eq('is_active', true).limit(1)
+    // meal_rates holds ONE ROW PER meal_type AND tier — not one row carrying a
+    // lunch column and a dinner column. `lunch_rate_eur` / `dinner_rate_eur`
+    // were read here and do not exist; the rate column is `base_rate_eur`.
+    //
+    // Because the table is already tier-scoped, the old `tierMealMultiplier`
+    // is gone: multiplying a deluxe rate by a deluxe factor charges the
+    // uplift twice.
+    const { data: mealRates, error: mealRatesError } = await supabase
+      .from('meal_rates').select('*').eq('is_active', true).eq('tier', tier)
     const haveMealRates = requireRates(rateHoles, {
       kind: 'meal', tier, table: 'meal_rates', error: mealRatesError, rows: mealRates,
-      lookupAttempted: 'meal_rates where is_active',
-      message: 'No active meal rates are set up. Add lunch and dinner rates in Rates → Meals.',
+      lookupAttempted: `meal_rates where is_active and tier = '${tier}'`,
+      message: `No active ${tier} meal rates are set up. Add lunch and dinner rates in Rates → Meals.`,
     })
-    const tierMealMultiplier: Record<ServiceTier, number> = { 'budget': 0.8, 'standard': 1.0, 'deluxe': 1.3, 'luxury': 1.6 }
-    // Zero when absent, and pricing is blocked in that case — the old code used
-    // 12 and 18, which quietly became the client's meal price.
-    let lunchRate = haveMealRates ? Math.round(toNumber(mealRates?.[0]?.lunch_rate_eur, 0) * tierMealMultiplier[tier]) : 0
-    let dinnerRate = haveMealRates ? Math.round(toNumber(mealRates?.[0]?.dinner_rate_eur, 0) * tierMealMultiplier[tier]) : 0
+
+    const mealRateFor = (kind: 'lunch' | 'dinner') =>
+      (mealRates ?? []).find((m: any) => String(m.meal_type ?? '').toLowerCase().includes(kind))?.base_rate_eur
+
+    // Only the meals this itinerary actually includes are required. Blocking a
+    // lunch-only trip because no dinner rate exists would be a gap the operator
+    // cannot act on.
+    let lunchRate = 0
+    let dinnerRate = 0
+    if (haveMealRates && include_lunch) {
+      lunchRate = requireUsableRate(rateHoles, mealRateFor('lunch'), {
+        kind: 'meal', tier, table: 'meal_rates',
+        lookupAttempted: `meal_rates base_rate_eur for lunch at tier '${tier}'`,
+        message: `No ${tier} lunch rate is set up. Add one in Rates → Meals.`,
+      }) ?? 0
+    }
+    if (haveMealRates && include_dinner) {
+      dinnerRate = requireUsableRate(rateHoles, mealRateFor('dinner'), {
+        kind: 'meal', tier, table: 'meal_rates',
+        lookupAttempted: `meal_rates base_rate_eur for dinner at tier '${tier}'`,
+        message: `No ${tier} dinner rate is set up. Add one in Rates → Meals.`,
+      }) ?? 0
+    }
 
     // Airport and hotel staff services.
     //
@@ -979,8 +1017,23 @@ export async function POST(request: NextRequest) {
     const tierTipsMultiplier: Record<ServiceTier, number> = { 'budget': 0.8, 'standard': 1.0, 'deluxe': 1.2, 'luxury': 1.5 }
     dailyTips = Math.round(dailyTips * tierTipsMultiplier[tier])
 
-    const vehiclePerDay = selectedVehicle ? toNumber(selectedVehicle.daily_rate_eur, 0) : 0
-    const guidePerDay = selectedGuide ? toNumber(selectedGuide.daily_rate_eur, 0) : 0
+    // `daily_rate`, not `daily_rate_eur` — the latter does not exist on either
+    // table, so both of these were silently 0 and every quote said transport
+    // and guiding were free.
+    const vehiclePerDay = selectedVehicle
+      ? (requireUsableRate(rateHoles, selectedVehicle.daily_rate, {
+          kind: 'transport', tier, table: 'vehicles',
+          lookupAttempted: `daily_rate for vehicle '${selectedVehicle.vehicle_type ?? selectedVehicle.name ?? selectedVehicle.id}'`,
+          message: `The selected ${tier} vehicle has no daily rate. Add one in Rates → Vehicles.`,
+        }) ?? 0)
+      : 0
+    const guidePerDay = selectedGuide
+      ? (requireUsableRate(rateHoles, selectedGuide.daily_rate, {
+          kind: 'guide', tier, table: 'guides',
+          lookupAttempted: `daily_rate for guide '${selectedGuide.full_name ?? selectedGuide.name ?? selectedGuide.id}'`,
+          message: `The selected ${tier} guide has no daily rate. Add one in Rates → Guides.`,
+        }) ?? 0)
+      : 0
     const roomsNeeded = Math.ceil(totalPax / 2)
 
     // ============================================
