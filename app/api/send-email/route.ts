@@ -13,6 +13,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 
+    // Who the client should see, and where their reply should land. This route
+    // hardcoded one operator's name and BCC'd a single Gmail mailbox, which is
+    // wrong in a multi-tenant product: every tenant's clients saw the same
+    // sender. Resend sends from a verified platform domain, so replyTo is what
+    // actually routes a client's reply back to the operator.
+    const { data: tenant } = await auth.supabase!
+      .from('tenants')
+      .select('company_name, contact_email')
+      .eq('id', auth.tenant_id!)
+      .maybeSingle()
+
     const {
       itineraryId,
       clientName,
@@ -52,8 +63,10 @@ export async function POST(request: Request) {
 
     const result = await sendMail({
       to: clientEmail,
-      bcc: process.env.GMAIL_USER || 'info@travel2egypt.org', // BCC to yourself
-      fromName: 'Islam Mohamed - Travel2Egypt.org',
+      ...(tenant?.contact_email
+        ? { bcc: tenant.contact_email, replyTo: tenant.contact_email }
+        : {}),
+      ...(tenant?.company_name ? { fromName: tenant.company_name } : {}),
       subject: `Your Egypt Tour Itinerary - ${tripName} (${itineraryCode})`,
       html: emailHtml,
       attachments: pdfBase64 ? [{
@@ -68,8 +81,9 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             success: false,
-            error: 'Email authentication failed. Please configure Gmail App Password.',
-            details: 'Go to Gmail Settings → Security → App Passwords to generate one.'
+            error: 'Email is not configured.',
+            details:
+              'Set RESEND_API_KEY and RESEND_FROM_EMAIL, and verify the sending domain in Resend.'
           },
           { status: 401 }
         )

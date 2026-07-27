@@ -8,11 +8,16 @@ async function sendReminderEmail(params: {
   subject: string
   html: string
   invoiceNumber: string
+  /** The operator this invoice belongs to — replies must reach them, not the platform. */
+  fromName?: string
+  replyTo?: string
 }): Promise<{ success: boolean; error?: string }> {
   const result = await sendMail({
     to: params.to,
     subject: params.subject,
     html: params.html,
+    ...(params.fromName ? { fromName: params.fromName } : {}),
+    ...(params.replyTo ? { replyTo: params.replyTo } : {}),
   })
   return { success: result.success, error: result.error }
 }
@@ -233,7 +238,9 @@ export async function GET(request: NextRequest) {
 
     const { data: invoices, error } = await supabase
       .from('invoices')
-      .select('*')
+      // Tenant joined so the reminder is sent as the operator with replies
+      // routed to them, rather than to the platform's verified domain.
+      .select('*, tenant:tenants(company_name, contact_email)')
       .not('status', 'in', '("paid","cancelled")')
       .gt('balance_due', 0)
       .eq('reminder_paused', false)
@@ -313,7 +320,9 @@ export async function POST(request: NextRequest) {
     // Get invoices to process - RLS automatically filters by tenant
     let query = supabase
       .from('invoices')
-      .select('*')
+      // Tenant joined so the reminder is sent as the operator with replies
+      // routed to them, rather than to the platform's verified domain.
+      .select('*, tenant:tenants(company_name, contact_email)')
       .not('status', 'in', '("paid","cancelled")')
       .gt('balance_due', 0)
       .eq('reminder_paused', false)
@@ -369,7 +378,9 @@ export async function POST(request: NextRequest) {
         to: invoice.client_email,
         subject,
         html,
-        invoiceNumber: invoice.invoice_number
+        invoiceNumber: invoice.invoice_number,
+        fromName: invoice.tenant?.company_name,
+        replyTo: invoice.tenant?.contact_email,
       })
 
       if (emailResult.success) {

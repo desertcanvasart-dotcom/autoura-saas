@@ -10,11 +10,16 @@ async function sendReminderEmail(params: {
   to: string
   subject: string
   html: string
+  /** The operator this invoice belongs to — replies must reach them, not the platform. */
+  fromName?: string
+  replyTo?: string
 }): Promise<{ success: boolean; error?: string }> {
   const result = await sendMail({
     to: params.to,
     subject: params.subject,
     html: params.html,
+    ...(params.fromName ? { fromName: params.fromName } : {}),
+    ...(params.replyTo ? { replyTo: params.replyTo } : {}),
   })
   return { success: result.success, error: result.error }
 }
@@ -103,7 +108,10 @@ export async function GET(request: NextRequest) {
     // Get invoices due for reminders today
     const { data: invoices, error } = await supabase
       .from('invoices')
-      .select('*')
+      // The tenant is joined so each reminder can be sent AS that operator with
+      // replies routed to them. This cron spans every tenant, so a single
+      // platform reply-to would send every client's answer to the wrong place.
+      .select('*, tenant:tenants(company_name, contact_email)')
       .not('status', 'in', '("paid","cancelled")')
       .gt('balance_due', 0)
       .eq('reminder_paused', false)
@@ -141,7 +149,9 @@ export async function GET(request: NextRequest) {
       const result = await sendReminderEmail({
         to: invoice.client_email,
         subject,
-        html
+        html,
+        fromName: invoice.tenant?.company_name,
+        replyTo: invoice.tenant?.contact_email,
       })
 
       if (result.success) {
