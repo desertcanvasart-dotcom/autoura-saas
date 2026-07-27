@@ -53,6 +53,8 @@ const GUARDED = [
   // Holds Gmail refresh tokens (migration 249 added own-row policies). A leak
   // here is a mailbox takeover, so it must never answer the anonymous key.
   'gmail_tokens',
+  // Email-to-client links (migration 250): service-role only by design.
+  'email_client_links',
 ]
 
 let failures = 0

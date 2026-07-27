@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
         .from('email_client_links')
         .select(`
           *,
-          client:clients(id, name, email, phone, status)
+          client:clients(id, name:full_name, email, phone, status)
         `)
         .eq('user_id', authResult.user!.id)
         .eq('message_id', messageId)
@@ -45,9 +45,13 @@ export async function GET(request: NextRequest) {
 
     // If emailAddress provided, find client by email (tenant-scoped)
     if (emailAddress) {
+      // `clients` has no `name` column — it is `full_name`. Aliased here so
+      // ClientLinkButton (which renders client.name) needs no change. This was
+      // invisible while the table was missing: the route failed one step
+      // earlier, so the bad column list was never reached.
       const { data: client, error } = await (supabase as any)
         .from('clients')
-        .select('id, name, email, phone, status')
+        .select('id, name:full_name, email, phone, status')
         .eq('tenant_id', authResult.tenant_id)
         .ilike('email', emailAddress)
         .single()
@@ -113,7 +117,7 @@ export async function POST(request: NextRequest) {
         .eq('user_id', sessionUserId)
         .select(`
           *,
-          client:clients(id, name, email, phone, status)
+          client:clients(id, name:full_name, email, phone, status)
         `)
         .single()
 
@@ -133,7 +137,7 @@ export async function POST(request: NextRequest) {
       })
       .select(`
         *,
-        client:clients(id, name, email, phone, status)
+        client:clients(id, name:full_name, email, phone, status)
       `)
       .single()
 
