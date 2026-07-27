@@ -41,8 +41,17 @@ export interface SendMailInput {
   /** Optional BCC (e.g. a copy to the company mailbox). */
   bcc?: string
   attachments?: MailAttachment[]
-  /** Display name on the From header. */
+  /** Display name on the From header. Ignored when `from` is supplied. */
   fromName?: string
+  /**
+   * Fully-resolved From header, e.g. `Sawa Tours <invoices@sawatours.org>`.
+   *
+   * Callers get this from resolveSender() in lib/tenant-email-domain.ts, which
+   * returns the tenant's own verified domain or falls back to the platform
+   * sender. Passing an address on an UNVERIFIED domain makes Resend reject the
+   * send outright, so that decision is made in one place, not here.
+   */
+  from?: string
   /**
    * Where replies go. Resend sends from a verified domain rather than the
    * operator's mailbox, so without this a client's reply reaches the platform
@@ -89,11 +98,14 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     return { success: false, error, authError: true }
   }
 
-  // fromName overrides only the DISPLAY name; the address must stay one Resend
-  // has verified, or the send is rejected.
-  const from = input.fromName
-    ? `${input.fromName} <${bareAddress(configuredFrom)}>`
-    : configuredFrom
+  // A caller-resolved From wins: it already encodes whether the tenant's own
+  // domain is verified. Otherwise fromName may change only the DISPLAY name —
+  // the address must stay one Resend has verified, or the send is rejected.
+  const from = input.from
+    ? input.from
+    : input.fromName
+      ? `${input.fromName} <${bareAddress(configuredFrom)}>`
+      : configuredFrom
 
   try {
     const resend = new Resend(apiKey)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/app/supabase'
 import { sendMail } from '@/lib/email-send'
+import { resolveSender } from '@/lib/tenant-email-domain'
 
 // Verify cron secret for security
 const CRON_SECRET = process.env.CRON_SECRET
@@ -11,14 +12,14 @@ async function sendReminderEmail(params: {
   subject: string
   html: string
   /** The operator this invoice belongs to — replies must reach them, not the platform. */
-  fromName?: string
+  from?: string
   replyTo?: string
 }): Promise<{ success: boolean; error?: string }> {
   const result = await sendMail({
     to: params.to,
     subject: params.subject,
     html: params.html,
-    ...(params.fromName ? { fromName: params.fromName } : {}),
+    ...(params.from ? { from: params.from } : {}),
     ...(params.replyTo ? { replyTo: params.replyTo } : {}),
   })
   return { success: result.success, error: result.error }
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
       // The tenant is joined so each reminder can be sent AS that operator with
       // replies routed to them. This cron spans every tenant, so a single
       // platform reply-to would send every client's answer to the wrong place.
-      .select('*, tenant:tenants(company_name, contact_email)')
+      .select('*, tenant:tenants(company_name, contact_email, email_domain, email_from_local, email_domain_status)')
       .not('status', 'in', '("paid","cancelled")')
       .gt('balance_due', 0)
       .eq('reminder_paused', false)
@@ -150,7 +151,9 @@ export async function GET(request: NextRequest) {
         to: invoice.client_email,
         subject,
         html,
-        fromName: invoice.tenant?.company_name,
+        // Sent as the operator's own verified domain when they have one;
+        // resolveSender falls back to the platform sender otherwise.
+        from: resolveSender(invoice.tenant, process.env.RESEND_FROM_EMAIL || '').from,
         replyTo: invoice.tenant?.contact_email,
       })
 

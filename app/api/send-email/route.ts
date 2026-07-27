@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { generateEmailTemplate } from '@/lib/communication-utils'
 import { requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
+import { resolveSender } from '@/lib/tenant-email-domain'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
 export async function POST(request: Request) {
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     // actually routes a client's reply back to the operator.
     const { data: tenant } = await auth.supabase!
       .from('tenants')
-      .select('company_name, contact_email')
+      .select('company_name, contact_email, email_domain, email_from_local, email_domain_status')
       .eq('id', auth.tenant_id!)
       .maybeSingle()
 
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
       ...(tenant?.contact_email
         ? { bcc: tenant.contact_email, replyTo: tenant.contact_email }
         : {}),
-      ...(tenant?.company_name ? { fromName: tenant.company_name } : {}),
+      from: resolveSender(tenant, process.env.RESEND_FROM_EMAIL || '').from,
       subject: `Your Egypt Tour Itinerary - ${tripName} (${itineraryCode})`,
       html: emailHtml,
       attachments: pdfBase64 ? [{

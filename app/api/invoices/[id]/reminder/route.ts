@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
+import { resolveSender } from '@/lib/tenant-email-domain'
 
 // Reuse the email generation from the main route
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
@@ -157,7 +158,7 @@ export async function POST(
       .from('invoices')
       // Tenant joined so the reminder is sent as the operator with replies
       // routed to them, rather than to the platform's verified domain.
-      .select('*, tenant:tenants(company_name, contact_email)')
+      .select('*, tenant:tenants(company_name, contact_email, email_domain, email_from_local, email_domain_status)')
       .eq('id', id)
       .single()
 
@@ -189,7 +190,7 @@ export async function POST(
       to: invoice.client_email,
       subject,
       html,
-      ...(invoice.tenant?.company_name ? { fromName: invoice.tenant.company_name } : {}),
+      from: resolveSender(invoice.tenant, process.env.RESEND_FROM_EMAIL || '').from,
       ...(invoice.tenant?.contact_email ? { replyTo: invoice.tenant.contact_email } : {}),
     })
 
