@@ -22,7 +22,15 @@ export default function RootLayout({
   
   // Pages that should NOT show the sidebar (public pages)
   const publicPages = ['/', '/login', '/signup', '/forgot-password', '/reset-password', '/terms', '/privacy', '/contact', '/integrations', '/about']
-  const isPublicPage = publicPages.includes(pathname) || pathname.startsWith('/docs')
+  // Customer-facing pages get no app chrome. /share is a traveller's itinerary
+  // link — rendering the operator's sidebar ("Dashboard", "Sign out") around a
+  // client's trip is both confusing and a claim they have an account here.
+  // NOTE: this list is separate from middleware.ts's publicRoutes (that one
+  // decides ACCESS, this one decides CHROME) — a route usually needs both.
+  const isPublicPage =
+    publicPages.includes(pathname) ||
+    pathname.startsWith('/docs') ||
+    pathname.startsWith('/share/')
   const isSuperAdminPage = pathname.startsWith('/super-admin')
 
   return (
