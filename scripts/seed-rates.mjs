@@ -24,7 +24,6 @@
 // ============================================================================
 
 import fs from 'fs'
-import path from 'path'
 import { createClient } from '@supabase/supabase-js'
 
 const TIERS = ['budget', 'standard', 'deluxe', 'luxury']
