@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     // actually routes a client's reply back to the operator.
     const { data: tenant } = await auth.supabase!
       .from('tenants')
-      .select('company_name, contact_email, email_domain, email_from_local, email_domain_status')
+      .select('company_name, contact_email, company_phone, company_website, email_domain, email_from_local, email_domain_status')
       .eq('id', auth.tenant_id!)
       .maybeSingle()
 
@@ -59,7 +59,13 @@ export async function POST(request: Request) {
       itineraryCode,
       tripName,
       totalCost,
-      currency
+      currency,
+      {
+        company: tenant?.company_name || '',
+        email: tenant?.contact_email || '',
+        phone: tenant?.company_phone || '',
+        website: tenant?.company_website || '',
+      }
     )
 
     const result = await sendMail({

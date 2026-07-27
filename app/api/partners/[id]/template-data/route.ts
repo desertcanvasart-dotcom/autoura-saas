@@ -144,11 +144,20 @@ export async function GET(
         return NextResponse.json({ error: 'Invalid partner type' }, { status: 400 })
     }
 
-    // Add company defaults
-    placeholderData.company_name = 'Travel2Egypt'
-    placeholderData.agent_name = 'Islam'
-    placeholderData.company_email = 'info@travel2egypt.com'
-    placeholderData.company_phone = '+20 115 801 1600'
+    // Template identity comes from the TENANT and the LOGGED-IN AGENT — these
+    // were hardcoded to one operator and one named person, so every tenant's
+    // composed emails signed off as "Islam at Travel2Egypt". Blank when unset;
+    // a template rendering an empty {{company_name}} is visibly incomplete,
+    // which is the correct signal to finish Settings → Organization.
+    const { data: senderTenant } = await adminClient
+      .from('tenants')
+      .select('company_name, contact_email, company_phone')
+      .eq('id', authResult.tenant_id!)
+      .maybeSingle()
+    placeholderData.company_name = senderTenant?.company_name || ''
+    placeholderData.agent_name = (authResult.user?.user_metadata?.full_name as string) || ''
+    placeholderData.company_email = senderTenant?.contact_email || ''
+    placeholderData.company_phone = senderTenant?.company_phone || ''
     placeholderData.today = formatDate(new Date())
 
     return NextResponse.json({

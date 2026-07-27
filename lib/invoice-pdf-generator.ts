@@ -33,27 +33,26 @@ interface Invoice {
   payment_instructions: string | null
 }
 
-interface CompanyInfo {
+export interface CompanyInfo {
   name: string
-  address: string
-  city: string
-  country: string
-  email: string
-  phone: string
+  // All optional: lines render only when present. They were required when the
+  // default was a hardcoded company with a fictional address.
+  address?: string
+  city?: string
+  country?: string
+  email?: string
+  phone?: string
   website?: string
   taxId?: string
 }
 
-// Default company info - customize this for Travel2Egypt
-const DEFAULT_COMPANY: CompanyInfo = {
-  name: 'Travel2Egypt',
-  address: '123 Pyramids Road',
-  city: 'Cairo',
-  country: 'Egypt',
-  email: 'info@travel2egypt.com',
-  phone: '+20 123 456 7890',
-  website: 'www.travel2egypt.com'
-}
+// The identity bug this replaced: the default here was Travel2Egypt with a
+// FICTIONAL address ("123 Pyramids Road") and phone — so every tenant that did
+// not pass a company printed another operator's name and made-up contact
+// details on its invoices. The default is now blank: generators skip empty
+// lines, and no line beats a wrong company. Callers pass the tenant's
+// identity (lib/company-identity.ts).
+const DEFAULT_COMPANY: CompanyInfo = { name: '' }
 
 const getCurrencySymbol = (currency: string): string => {
   const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
@@ -138,13 +137,13 @@ export function generateInvoicePDF(
   doc.setFontSize(9)
   doc.setTextColor(...mediumGray)
   doc.setFont('helvetica', 'normal')
-  doc.text(company.address, margin, y)
+  if (company.address) doc.text(company.address, margin, y)
   y += 4
-  doc.text(`${company.city}, ${company.country}`, margin, y)
+  if (company.city || company.country) doc.text([company.city, company.country].filter(Boolean).join(', '), margin, y)
   y += 4
-  doc.text(company.email, margin, y)
+  if (company.email) doc.text(company.email, margin, y)
   y += 4
-  doc.text(company.phone, margin, y)
+  if (company.phone) doc.text(company.phone, margin, y)
   if (company.website) {
     y += 4
     doc.text(company.website, margin, y)
@@ -548,7 +547,7 @@ export function generateInvoicePDF(
   doc.setFontSize(8)
   doc.setTextColor(...mediumGray)
   doc.setFont('helvetica', 'normal')
-  doc.text('Thank you for choosing Travel2Egypt!', pageWidth / 2, footerY, { align: 'center' })
+  doc.text(company.name ? `Thank you for choosing ${company.name}!` : 'Thank you for your business!', pageWidth / 2, footerY, { align: 'center' })
   doc.text(
     `Generated on ${formatDate(new Date().toISOString())}`,
     pageWidth / 2,

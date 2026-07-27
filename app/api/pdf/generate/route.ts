@@ -80,7 +80,11 @@ function formatDate(dateStr: string, format: 'long' | 'short' = 'long'): string 
 }
 
 // Generate HTML template
-function generateHTML(itinerary: Itinerary, days: Day[]): string {
+function generateHTML(
+  itinerary: Itinerary,
+  days: Day[],
+  company: { name: string; email?: string | null; website?: string | null } = { name: '' }
+): string {
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   
@@ -489,7 +493,7 @@ function generateHTML(itinerary: Itinerary, days: Day[]): string {
       <div class="logo-section">
         <div class="logo-circle">T2E</div>
         <div class="company-info">
-          <h1>TRAVEL TO EGYPT</h1>
+          <h1>${company.name || ''}</h1>
           <p>Professional Itinerary & Quote</p>
         </div>
       </div>
@@ -606,9 +610,8 @@ function generateHTML(itinerary: Itinerary, days: Day[]): string {
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-card">
-        <h3>TRAVEL TO EGYPT</h3>
-        <p>info@travel2egypt.org • www.travel2egypt.org</p>
-        <p class="tagline">Crafted with care by local Egypt travel experts</p>
+        <h3>${company.name || ''}</h3>
+        <p>${[company.email, company.website].filter(Boolean).join(' • ')}</p>
       </div>
     </footer>
   </div>
@@ -619,7 +622,10 @@ function generateHTML(itinerary: Itinerary, days: Day[]): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const { itinerary, days } = await request.json()
+    // `company` is the caller's tenant identity (name/email/website), supplied
+    // the same way the itinerary is: this route has no in-handler session (the
+    // middleware gates it), so it cannot look the tenant up itself.
+    const { itinerary, days, company } = await request.json()
     
     if (!itinerary) {
       return NextResponse.json({ error: 'Itinerary data required' }, { status: 400 })
@@ -636,7 +642,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate HTML
-    const html = generateHTML(itinerary, days || [])
+    const html = generateHTML(itinerary, days || [], company || { name: '' })
 
     // Launch Puppeteer
     const browser = await puppeteer.launch({

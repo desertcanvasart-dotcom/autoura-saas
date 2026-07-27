@@ -610,7 +610,7 @@ class ToolExecutor {
       }
 
       // Build message
-      const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
+      const businessName = process.env.BUSINESS_NAME || ''
       const message = `🌟 *${businessName}* 🌟\n\n` +
         `Here's your quote for ${quote.itineraries?.trip_name}!\n\n` +
         `📋 *Quote ${quote.quote_number}*\n` +
@@ -1007,8 +1007,8 @@ export class WhatsAppAIAgent {
     }
 
     this.anthropic = new Anthropic({ apiKey })
-    this.businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    this.businessEmail = process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'
+    this.businessName = process.env.BUSINESS_NAME || ''
+    this.businessEmail = process.env.BUSINESS_EMAIL || ''
     this.modelId = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
     this.toolsEnabled = process.env.WHATSAPP_AI_TOOLS_ENABLED === 'true'
     this.maxToolIterations = 3 // Prevent infinite loops

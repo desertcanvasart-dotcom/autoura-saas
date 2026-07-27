@@ -95,7 +95,18 @@ export async function GET(
       .limit(10)
 
     // Build the placeholder data
-    const placeholderData = buildPlaceholderData(clientWithName, latestItinerary)
+    const { data: senderTenant } = await supabase
+      .from('tenants')
+      .select('company_name, contact_email, company_phone')
+      .eq('id', authResult.tenant_id!)
+      .maybeSingle()
+
+    const placeholderData = buildPlaceholderData(clientWithName, latestItinerary, {
+      company_name: senderTenant?.company_name || '',
+      agent_name: (authResult.user?.user_metadata?.full_name as string) || '',
+      company_email: senderTenant?.contact_email || '',
+      company_phone: senderTenant?.company_phone || '',
+    })
 
     return NextResponse.json({
       client: clientWithName,
@@ -114,6 +125,8 @@ export async function GET(
 function buildPlaceholderData(
   client: { name: string; email: string; phone?: string | null },
   itinerary?: any
+,
+  identity: { company_name?: string; agent_name?: string; company_email?: string; company_phone?: string } = {}
 ): Record<string, string> {
   const data: Record<string, string> = {}
   const currency = itinerary?.currency || 'EUR'
@@ -181,11 +194,13 @@ function buildPlaceholderData(
     }
   }
 
-  // Company defaults (you can customize these)
-  data.company_name = 'Travel2Egypt'
-  data.agent_name = 'Islam'
-  data.company_email = 'info@travel2egypt.com'
-  data.company_phone = '+20 123 456 7890'
+  // Identity comes in as a parameter: this helper is synchronous and the
+  // caller (GET) holds the session. It used to hardcode Travel2Egypt + a named
+  // agent, signing every tenant's composed emails as someone else.
+  data.company_name = identity.company_name || ''
+  data.agent_name = identity.agent_name || ''
+  data.company_email = identity.company_email || ''
+  data.company_phone = identity.company_phone || ''
 
   // Dynamic dates
   data.today = formatDate(new Date())

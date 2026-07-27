@@ -5,6 +5,7 @@
 
 import { jsPDF } from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
+import { identityFooterLine, type CompanyIdentity } from './company-identity'
 
 // ============================================
 // TYPES
@@ -222,7 +223,11 @@ function drawTable(
 export function generateItineraryPDF(
   itinerary: Itinerary, 
   days: DayWithServices[],
-  options: PDFOptions = DEFAULT_OPTIONS
+  options: PDFOptions = DEFAULT_OPTIONS,
+  // The operator whose document this is. Blank = no line, never a default
+  // brand — this generator used to print Travel2Egypt on every tenant's
+  // itineraries (lib/company-identity.ts has the story).
+  company: CompanyIdentity = { name: '' }
 ): jsPDF {
 
 
@@ -258,7 +263,7 @@ export function generateItineraryPDF(
     doc.setFontSize(24)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(100, 124, 71)
-    doc.text('Travel2Egypt', margin, yPos + 8)
+    if (company.name) doc.text(company.name, margin, yPos + 8)
 
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
@@ -592,7 +597,8 @@ export function generateItineraryPDF(
 
       doc.setFontSize(8)
       doc.setTextColor(150, 150, 150)
-      doc.text('Travel2Egypt | www.travel2egypt.org | info@travel2egypt.org', pageWidth / 2, footerY, { align: 'center' })
+      const footerLine = identityFooterLine(company)
+      if (footerLine) doc.text(footerLine, pageWidth / 2, footerY, { align: 'center' })
       doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, footerY, { align: 'right' })
     }
 

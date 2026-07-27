@@ -1,5 +1,7 @@
 'use client'
 
+import { identityFromTenant } from '@/lib/company-identity'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -136,6 +138,7 @@ const REMINDER_TYPE_LABELS: Record<string, string> = {
   manual: 'Manual'
 }
 export default function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { tenant } = useTenant()
   const resolvedParams = use(params)
   const router = useRouter()
   const dialog = useConfirmDialog()
@@ -284,7 +287,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     
     setGeneratingPDF(true)
     try {
-      downloadInvoicePDF(invoice)
+      downloadInvoicePDF(invoice, identityFromTenant(tenant))
     } catch (error) {
       console.error('Error generating PDF:', error)
       showToast('error', 'Failed to generate PDF. Please try again.')
@@ -336,7 +339,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       notes: payment.notes
     }
     
-    downloadReceiptPDF(receiptData, invoice)
+    downloadReceiptPDF(receiptData, invoice, identityFromTenant(tenant))
   }
 
   const handleDeletePayment = async (paymentId: string) => {

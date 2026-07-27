@@ -55,7 +55,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
+    const { data: senderTenant } = await supabase
+      .from('tenants')
+      .select('company_name')
+      .eq('id', authResult.tenant_id!)
+      .maybeSingle()
+    const businessName = senderTenant?.company_name || ''
     const reviewUrl = process.env.REVIEW_URL || 'https://g.page/r/travel2egypt/review'
 
     const formatDate = (dateStr: string) => {

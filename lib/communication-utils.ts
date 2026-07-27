@@ -1,12 +1,14 @@
 // Email and WhatsApp integration utilities
 
-export const COMPANY_INFO = {
-  name: 'Islam Mohamed',
-  title: 'Travel Consultant',
-  company: 'Travel2Egypt.org',
-  email: 'info@travel2egypt.org',
-  phone: '+20 115 801 1600',
-  website: 'www.travel2egypt.org'
+// The signer of client emails. Was a hardcoded person at one company —
+// every tenant's itinerary emails were signed "Islam Mohamed, Travel2Egypt".
+// Callers pass the tenant's identity; blanks render nothing.
+export interface EmailSignerInfo {
+  name?: string
+  company?: string
+  email?: string
+  phone?: string
+  website?: string
 }
 
 export function generateEmailTemplate(
@@ -14,7 +16,8 @@ export function generateEmailTemplate(
   itineraryCode: string,
   tripName: string,
   totalCost: string,
-  currency: string
+  currency: string,
+  signer: EmailSignerInfo = {}
 ): string {
   return `
 <html>
@@ -90,11 +93,11 @@ export function generateEmailTemplate(
     <p>To confirm your booking, simply reply to this email or contact us directly via WhatsApp or phone. A 30% deposit secures your adventure!</p>
     
     <div class="signature">
-      <p style="margin: 5px 0;"><strong>${COMPANY_INFO.name}</strong></p>
-      <p style="margin: 5px 0; color: #6b7280;">${COMPANY_INFO.title} | ${COMPANY_INFO.company}</p>
-      <p style="margin: 5px 0;">✉️ ${COMPANY_INFO.email}</p>
-      <p style="margin: 5px 0;">📞 ${COMPANY_INFO.phone}</p>
-      <p style="margin: 5px 0;">🌍 ${COMPANY_INFO.website}</p>
+      ${signer.company ? `<p style="margin: 5px 0;"><strong>${signer.company}</strong></p>` : ''}
+      
+      ${signer.email ? `<p style="margin: 5px 0;">✉️ ${signer.email}</p>` : ''}
+      ${signer.phone ? `<p style="margin: 5px 0;">📞 ${signer.phone}</p>` : ''}
+      ${signer.website ? `<p style="margin: 5px 0;">🌍 ${signer.website}</p>` : ''}
     </div>
   </div>
   
@@ -112,6 +115,7 @@ export function generateEmailTemplate(
 }
 
 export function generateWhatsAppMessage(
+  signer: EmailSignerInfo,
   clientName: string,
   tripName: string,
   totalCost: string,
@@ -134,14 +138,12 @@ I've prepared a complete itinerary for you with all the details, pricing, and in
 
 The complete itinerary PDF has been sent to your email with day-by-day breakdown!
 
-Ready to confirm? Just reply here or call me at ${COMPANY_INFO.phone} 📞
+Ready to confirm? Just reply here${signer.phone ? ` or call me at ${signer.phone} 📞` : ''}
 
 Looking forward to making your Egypt adventure unforgettable! 🇪🇬✨
 
 Best regards,
-${COMPANY_INFO.name}
-${COMPANY_INFO.title}
-${COMPANY_INFO.company}`
+${signer.company || ''}`
 }
 
 export function generateWhatsAppLink(phoneNumber: string, message: string): string {

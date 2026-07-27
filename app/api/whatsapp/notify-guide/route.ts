@@ -70,7 +70,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
+    const { data: senderTenant } = await supabase
+      .from('tenants').select('company_name').eq('id', authResult.tenant_id!).maybeSingle()
+    const businessName = senderTenant?.company_name || ''
 
     const message = `🎯 *${businessName} - New Assignment* 🎯\n\n` +
       `Hi ${guide.name},\n\n` +

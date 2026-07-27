@@ -1,5 +1,7 @@
 'use client'
 
+import { identityFromTenant } from '@/lib/company-identity'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
@@ -53,6 +55,7 @@ interface ContractData {
 }
 
 export default function ContractPage() {
+  const { tenant } = useTenant()
   const params = useParams()
   const [itinerary, setItinerary] = useState<Itinerary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -62,7 +65,7 @@ export default function ContractPage() {
   const [contractData, setContractData] = useState<ContractData>({
     contractNumber: '',
     contractDate: new Date().toISOString().split('T')[0],
-    serviceProvider: 'Travel2Egypt',
+    serviceProvider: tenant?.company_name || '',
     providerWebsite: 'https://travel2egypt.org/',
     providerLocation: 'Cairo, Egypt',
     clientName: '',
@@ -171,6 +174,7 @@ export default function ContractPage() {
     try {
       // Use client-side PDF generation
       const pdfBytes = await generateContractPDF({
+        company: identityFromTenant(tenant),
         contractNumber: contractData.contractNumber,
         contractDate: contractData.contractDate,
         clientName: contractData.clientName,

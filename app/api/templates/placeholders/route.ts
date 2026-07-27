@@ -76,6 +76,6 @@ function getDefaultPlaceholders() {
     { placeholder: '{{OpsManagerName}}', display_name: 'Ops Manager', category: 'ops', example_value: 'Sara Ahmed' },
     { placeholder: '{{OpsManagerPhone}}', display_name: 'Ops Phone', category: 'ops', example_value: '+20 100 999 8888' },
     { placeholder: '{{AgentName}}', display_name: 'Agent Name', category: 'ops', example_value: 'Islam Hussein' },
-    { placeholder: '{{CompanyName}}', display_name: 'Company Name', category: 'ops', example_value: 'Travel2Egypt' },
+    { placeholder: '{{CompanyName}}', display_name: 'Company Name', category: 'ops', example_value: 'Your Company' },
   ]
 }

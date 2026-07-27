@@ -66,9 +66,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    const businessEmail = process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'
-    const businessWebsite = process.env.BUSINESS_WEBSITE || 'travel2egypt.org'
+    // Identity comes from the TENANT, not env vars: BUSINESS_NAME was one
+    // global value defaulting to Travel2Egypt, so every other tenant's quote
+    // messages carried the wrong company. Blank fields are omitted downstream.
+    const { data: senderTenant } = await supabase
+      .from('tenants')
+      .select('company_name, contact_email, company_website')
+      .eq('id', authResult.tenant_id!)
+      .maybeSingle()
+    const businessName = senderTenant?.company_name || ''
+    const businessEmail = senderTenant?.contact_email || ''
+    const businessWebsite = senderTenant?.company_website || ''
 
     // Format dates
     const startDate = new Date(itinerary.start_date).toLocaleDateString('en-GB', {
@@ -79,7 +87,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Build message
-    const message = `🌟 *${businessName}* 🌟\n\n` +
+    const message = (businessName ? `🌟 *${businessName}* 🌟\n\n` : '') +
       `Dear ${clientName || itinerary.client_name},\n\n` +
       `Thank you for your interest in exploring Egypt with us! 🇪🇬\n\n` +
       `📋 *Your Tour Quote*\n` +
@@ -97,10 +105,10 @@ export async function POST(request: NextRequest) {
       `✅ Hotel pickups\n\n` +
       `💳 *Ready to Book?*\n` +
       `Reply to this message or contact us:\n` +
-      `📧 ${businessEmail}\n` +
-      `🌐 ${businessWebsite}\n\n` +
+      (businessEmail ? `📧 ${businessEmail}\n` : '') +
+      (businessWebsite ? `🌐 ${businessWebsite}\n` : '') + '\n' +
       `We look forward to creating unforgettable memories with you! 🐪✨\n\n` +
-      `Best regards,\n${businessName} Team`
+      `Best regards,\n${businessName ? businessName + ' Team' : 'Your travel team'}`
 
 
 

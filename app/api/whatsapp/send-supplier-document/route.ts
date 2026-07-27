@@ -39,7 +39,9 @@ export async function POST(request: NextRequest) {
     const pdfUrl = urlData.publicUrl
 
     // Build WhatsApp message
-    const businessName = process.env.BUSINESS_NAME || 'AUTOURA'
+    const { data: senderTenant } = await adminClient
+      .from('tenants').select('company_name').eq('id', authResult.tenant_id!).maybeSingle()
+    const businessName = senderTenant?.company_name || ''
 
     const message =
       `*${businessName}*\n\n` +
