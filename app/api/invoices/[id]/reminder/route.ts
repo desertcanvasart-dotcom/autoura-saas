@@ -155,7 +155,9 @@ export async function POST(
     // Get invoice - RLS automatically filters by tenant
     const { data: invoice, error } = await supabase
       .from('invoices')
-      .select('*')
+      // Tenant joined so the reminder is sent as the operator with replies
+      // routed to them, rather than to the platform's verified domain.
+      .select('*, tenant:tenants(company_name, contact_email)')
       .eq('id', id)
       .single()
 
@@ -187,6 +189,8 @@ export async function POST(
       to: invoice.client_email,
       subject,
       html,
+      ...(invoice.tenant?.company_name ? { fromName: invoice.tenant.company_name } : {}),
+      ...(invoice.tenant?.contact_email ? { replyTo: invoice.tenant.contact_email } : {}),
     })
 
     if (!emailResult.success) {
