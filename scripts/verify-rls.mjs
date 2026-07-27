@@ -60,6 +60,8 @@ const GUARDED = [
   'prompt_templates', 'rate_audit_log', 'content_usage_log',
   // Share tokens (migration 253): a leak here hands out every live share URL.
   'itinerary_shares',
+  // Platform billing infrastructure (254): service-role only.
+  'stripe_webhook_events',
 ]
 
 let failures = 0
