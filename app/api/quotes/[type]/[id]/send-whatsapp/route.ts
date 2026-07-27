@@ -27,7 +27,7 @@ export async function POST(
     }
 
     // Authenticate user
-    const { supabase, user } = await requireAuth()
+    const { supabase, user, tenant_id } = await requireAuth()
 
     if (!supabase || !user) {
       return NextResponse.json(
@@ -218,7 +218,9 @@ export async function POST(
     }
 
     // Build WhatsApp message
-    const businessName = process.env.BUSINESS_NAME || 'Autoura'
+    const { data: senderTenant } = await supabase!
+      .from('tenants').select('company_name').eq('id', tenant_id!).maybeSingle()
+    const businessName = senderTenant?.company_name || ''
     const businessEmail = process.env.BUSINESS_EMAIL || 'info@autoura.com'
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 

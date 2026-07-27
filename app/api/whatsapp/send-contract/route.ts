@@ -55,7 +55,21 @@ export async function POST(request: NextRequest) {
 
     // Generate contract PDF
 
+    // The contract names the operator as the legal Service Provider party —
+    // it must be the tenant, never a hardcoded company.
+    const { data: senderTenant } = await supabase
+      .from('tenants')
+      .select('company_name, contact_email, company_phone, company_website')
+      .eq('id', authResult.tenant_id!)
+      .maybeSingle()
+
     const contractData = {
+      company: {
+        name: senderTenant?.company_name || '',
+        email: senderTenant?.contact_email || null,
+        phone: senderTenant?.company_phone || null,
+        website: senderTenant?.company_website || null,
+      },
       contractNumber: `TC-2025-${itineraryId.slice(0, 8).toUpperCase()}`,
       contractDate: new Date().toISOString(),
       clientName: itinerary.client_name || 'Valued Guest',
@@ -96,9 +110,9 @@ export async function POST(request: NextRequest) {
 
 
     // Build message
-    const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
+    const businessName = senderTenant?.company_name || ''
 
-    const message = `📄 *${businessName}* 📄\n\n` +
+    const message = (businessName ? `📄 *${businessName}* 📄\n\n` : '') +
       `Dear ${itinerary.client_name || 'Valued Guest'},\n\n` +
       `Your tour contract is ready! 🎉\n\n` +
       `📋 *Contract Details:*\n` +
@@ -115,10 +129,10 @@ export async function POST(request: NextRequest) {
       `3. Return signed copy to us\n` +
       `4. Complete payment\n\n` +
       `If you have any questions, please don't hesitate to reach out!\n\n` +
-      `📧 ${process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'}\n` +
-      `🌐 ${process.env.BUSINESS_WEBSITE || 'travel2egypt.org'}\n\n` +
+      (senderTenant?.contact_email ? `📧 ${senderTenant.contact_email}\n` : '') +
+      (senderTenant?.company_website ? `🌐 ${senderTenant.company_website}\n` : '') + '\n' +
       `Looking forward to your adventure! 🐪✨\n\n` +
-      `Best regards,\n${businessName} Team`
+      `Best regards,\n${businessName ? businessName + ' Team' : 'Your travel team'}`
 
     // Send via WhatsApp WITH PDF attachment
     const result = await sendWhatsAppMessage({

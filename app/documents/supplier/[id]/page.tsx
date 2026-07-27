@@ -1,5 +1,7 @@
 'use client'
 
+import { identityFromTenant } from '@/lib/company-identity'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -52,6 +54,7 @@ const DOCUMENT_TITLES: Record<string, string> = {
 }
 
 export default function SupplierDocumentViewPage() {
+  const { tenant } = useTenant()
   const params = useParams()
   const router = useRouter()
   const [document, setDocument] = useState<SupplierDocument | null>(null)
@@ -86,7 +89,7 @@ export default function SupplierDocumentViewPage() {
   const handleDownload = () => {
     if (!document) return
     
-    const pdf = generateSupplierDocumentPDF(document)
+    const pdf = generateSupplierDocumentPDF({ ...document, company: identityFromTenant(tenant) })
     const filename = `${document.document_number}_${document.supplier_name.replace(/\s+/g, '_')}.pdf`
     pdf.save(filename)
   }
@@ -94,7 +97,7 @@ export default function SupplierDocumentViewPage() {
   const handlePrint = () => {
     if (!document) return
     
-    const pdf = generateSupplierDocumentPDF(document)
+    const pdf = generateSupplierDocumentPDF({ ...document, company: identityFromTenant(tenant) })
     const pdfBlob = pdf.output('blob')
     const pdfUrl = URL.createObjectURL(pdfBlob)
     
@@ -114,7 +117,7 @@ export default function SupplierDocumentViewPage() {
     
     setActionLoading('email')
     try {
-      const pdf = generateSupplierDocumentPDF(document)
+      const pdf = generateSupplierDocumentPDF({ ...document, company: identityFromTenant(tenant) })
       const pdfBase64 = pdf.output('datauristring').split(',')[1]
       
       const response = await fetch('/api/send-supplier-document', {

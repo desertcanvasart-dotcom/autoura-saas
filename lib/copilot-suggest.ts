@@ -12,7 +12,6 @@ import Anthropic from '@anthropic-ai/sdk'
 import { retrieveKnowledge, formatRetrievalContext, type RetrievedItem } from './copilot-retrieval'
 
 const MODEL = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
-const BUSINESS_NAME = process.env.BUSINESS_NAME || 'Travel2Egypt'
 
 let _anthropic: Anthropic | null = null
 function getAnthropic() {
@@ -106,6 +105,12 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
     instruction = null,
     skipIfPendingExists = false,
   } = args
+
+  // The agency the AI speaks AS. Was a global BUSINESS_NAME env defaulting to
+  // Travel2Egypt — every tenant's copilot drafted replies as another company.
+  const { data: draftTenant } = await supabase
+    .from('tenants').select('company_name').eq('id', tenantId).maybeSingle()
+  const businessName = (draftTenant as { company_name?: string } | null)?.company_name || 'the travel agency'
   const unifiedConversationId = args.unifiedConversationId ?? args.emailConversationId
 
   if (channel === 'whatsapp' && !whatsappConversationId) {
@@ -167,6 +172,7 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
 
   // Build prompts
   const { systemPrompt, userPromptParts } = buildPrompt({
+    businessName,
     channel, tone, ctx, retrievalContext, count, parentDraftId, instruction,
   })
 
@@ -523,6 +529,7 @@ async function loadEmailContext(
 // Prompt builder
 // ============================================
 function buildPrompt(args: {
+  businessName: string
   channel: Channel
   tone: Tone
   ctx: LoadedContext & { ok: true }
@@ -531,10 +538,10 @@ function buildPrompt(args: {
   parentDraftId: string | null
   instruction: string | null
 }): { systemPrompt: string; userPromptParts: string[] } {
-  const { channel, tone, ctx, retrievalContext, count, parentDraftId, instruction } = args
+  const { businessName, channel, tone, ctx, retrievalContext, count, parentDraftId, instruction } = args
 
   if (channel === 'whatsapp') {
-    const systemPrompt = `You are an AI reply assistant for a travel agency named "${BUSINESS_NAME}". You help a human agent draft WhatsApp replies to customers.
+    const systemPrompt = `You are an AI reply assistant for a travel agency named "${businessName}". You help a human agent draft WhatsApp replies to customers.
 
 TONE: ${tone}
 ${toneInstructions(tone, 'whatsapp')}
@@ -572,7 +579,7 @@ Generate exactly ${count} distinct draft reply option${count === 1 ? '' : 's'}. 
     ? ctx.latestInboundSubject
     : `Re: ${ctx.latestInboundSubject || ctx.threadSubject || ''}`.trim()
 
-  const systemPrompt = `You are an AI reply assistant for a travel agency named "${BUSINESS_NAME}". You help a human agent draft email replies to customers.
+  const systemPrompt = `You are an AI reply assistant for a travel agency named "${businessName}". You help a human agent draft email replies to customers.
 
 TONE: ${tone}
 ${toneInstructions(tone, 'email')}

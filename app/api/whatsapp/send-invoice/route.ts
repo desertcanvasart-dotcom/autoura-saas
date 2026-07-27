@@ -6,7 +6,10 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
 // Generate Invoice PDF
-async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
+async function generateInvoicePDF(
+  invoice: any,
+  company: { name: string; email?: string | null; website?: string | null } = { name: '' }
+): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
   const page = pdfDoc.addPage([595, 842]) // A4
 
@@ -20,9 +23,11 @@ async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
   const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
 
   // Header
-  page.drawText('Travel2Egypt', {
-    x: margin, y, size: 24, font: helveticaBold, color: rgb(0.39, 0.49, 0.28)
-  })
+  if (company.name) {
+    page.drawText(company.name, {
+      x: margin, y, size: 24, font: helveticaBold, color: rgb(0.39, 0.49, 0.28)
+    })
+  }
 
   page.drawText('INVOICE', {
     x: width - margin - 80, y, size: 20, font: helveticaBold, color: rgb(0.2, 0.2, 0.2)
@@ -163,9 +168,12 @@ async function generateInvoicePDF(invoice: any): Promise<Uint8Array> {
   }
 
   // Footer
-  page.drawText('Travel2Egypt | www.travel2egypt.org | info@travel2egypt.org', {
-    x: width / 2 - 100, y: 30, size: 8, font: helvetica, color: rgb(0.5, 0.5, 0.5)
-  })
+  const footerLine = [company.name, company.website, company.email].filter(Boolean).join(' | ')
+  if (footerLine) {
+    page.drawText(footerLine, {
+      x: width / 2 - 100, y: 30, size: 8, font: helvetica, color: rgb(0.5, 0.5, 0.5)
+    })
+  }
 
   return await pdfDoc.save()
 }
@@ -259,7 +267,17 @@ export async function POST(request: NextRequest) {
 
     // Generate PDF
 
-    const pdfBytes = await generateInvoicePDF(invoice)
+    const { data: senderTenant } = await supabase
+      .from('tenants')
+      .select('company_name, contact_email, company_website')
+      .eq('id', authResult.tenant_id!)
+      .maybeSingle()
+
+    const pdfBytes = await generateInvoicePDF(invoice, {
+      name: senderTenant?.company_name || '',
+      email: senderTenant?.contact_email || null,
+      website: senderTenant?.company_website || null,
+    })
 
     // Upload to Supabase Storage (use admin client for storage)
 
@@ -285,8 +303,8 @@ export async function POST(request: NextRequest) {
     const pdfUrl = urlData.publicUrl
 
 
-    const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    const businessEmail = process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'
+    const businessName = senderTenant?.company_name || ''
+    const businessEmail = senderTenant?.contact_email || ''
     const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
 
     const issueDate = new Date(invoice.issue_date).toLocaleDateString('en-GB', {
@@ -304,7 +322,7 @@ export async function POST(request: NextRequest) {
         ? 'Final Balance Invoice'
         : 'Invoice'
 
-    const message = `📄 *${businessName}* 📄\n\n` +
+    const message = (businessName ? `📄 *${businessName}* 📄\n\n` : '') +
       `Dear ${invoice.client_name},\n\n` +
       `Please find your invoice attached.\n\n` +
       `🧾 *${typeLabel}*\n` +
@@ -314,8 +332,8 @@ export async function POST(request: NextRequest) {
       `⏰ *Due Date:* ${dueDate}\n\n` +
       `💰 *Balance Due: ${currencySymbol}${Number(invoice.balance_due).toFixed(2)}*\n\n` +
       `For questions, contact us:\n` +
-      `📧 ${businessEmail}\n\n` +
-      `Thank you! 🙏\n${businessName} Team`
+      (businessEmail ? `📧 ${businessEmail}\n\n` : '') +
+      `Thank you! 🙏\n${businessName ? businessName + ' Team' : 'Your travel team'}`
 
 
 

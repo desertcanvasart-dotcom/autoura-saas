@@ -150,7 +150,7 @@ export default function AccountsReceivablePage() {
       `Balance due: €${Number(invoice.balance_due).toFixed(2)}\n` +
       `Due date: ${new Date(invoice.due_date).toLocaleDateString()}\n\n` +
       `Please arrange payment at your earliest convenience.\n\n` +
-      `Best regards,\nTravel2Egypt`
+      `Best regards,\n${tenant?.company_name || ''}`
     )
     
     window.open(`mailto:${invoice.client_email}?subject=${subject}&body=${body}`, '_blank')

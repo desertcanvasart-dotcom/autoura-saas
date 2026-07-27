@@ -5,12 +5,12 @@ import { requireAuth } from '@/lib/supabase-server'
 type BookingStatus = 'confirmed' | 'cancelled' | 'pending_payment' | 'paid' | 'completed'
 
 function getStatusMessage(
+  businessName: string,
   clientName: string,
   tourName: string,
   status: BookingStatus,
   notes?: string
 ): string {
-  const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
   const emoji = {
     confirmed: '✅',
     cancelled: '❌',
@@ -19,7 +19,7 @@ function getStatusMessage(
     completed: '🎉'
   }[status]
 
-  let message = `${emoji} *${businessName}* ${emoji}\n\n`
+  let message = businessName ? `${emoji} *${businessName}* ${emoji}\n\n` : ''
   message += `Dear ${clientName},\n\n`
 
   switch (status) {
@@ -50,14 +50,14 @@ function getStatusMessage(
       break
 
     case 'completed':
-      message += `Thank you for choosing ${businessName} for your *${tourName}*! 🎉\n\n`
+      message += `Thank you for choosing ${businessName || 'us'} for your *${tourName}*! 🎉\n\n`
       message += `We hope you had an incredible experience exploring Egypt! 🇪🇬\n\n`
       message += `We'd love to hear your feedback. If you enjoyed your tour, please consider leaving us a review!\n\n`
       message += `We hope to see you again soon! 🌟`
       break
   }
 
-  message += `\n\nBest regards,\n${businessName} Team`
+  message += `\n\nBest regards,\n${businessName ? businessName + ' Team' : 'Your travel team'}`
   return message
 }
 
@@ -130,7 +130,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Build message
+    const { data: senderTenant } = await supabase
+      .from('tenants')
+      .select('company_name')
+      .eq('id', authResult.tenant_id!)
+      .maybeSingle()
+
     const message = getStatusMessage(
+      senderTenant?.company_name || '',
       itinerary.client_name || 'Valued Client',
       itinerary.trip_name || itinerary.tour_name || 'Egypt Tour',
       status as BookingStatus,

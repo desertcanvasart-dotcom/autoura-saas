@@ -16,6 +16,9 @@ interface ServiceItem {
 }
 
 interface SupplierDocument {
+  /** The operator authorising the document. Previously hardcoded Travel2Egypt
+   *  with a placeholder phone ("+20 100 XXX XXXX") in the footer. */
+  company?: { name: string; email?: string | null; phone?: string | null; website?: string | null }
   id: string
   document_type: string
   document_number: string
@@ -615,7 +618,7 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   pdf.setFontSize(8)
   pdf.setFont('helvetica', 'normal')
   pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
-  pdf.text('Authorized by Travel2Egypt', margin, y + 18)
+  pdf.text(doc.company?.name ? `Authorized by ${doc.company.name}` : 'Authorized signature', margin, y + 18)
   
   // Supplier signature
   pdf.line(pageWidth - margin - sigWidth, y + 12, pageWidth - margin, y + 12)
@@ -632,7 +635,8 @@ export function generateSupplierDocumentPDF(doc: SupplierDocument): jsPDF {
   pdf.setFontSize(7)
   pdf.setFont('helvetica', 'normal')
   pdf.setTextColor(BRAND.textMuted.r, BRAND.textMuted.g, BRAND.textMuted.b)
-  pdf.text('Travel2Egypt | www.travel2egypt.com | reservations@travel2egypt.com | +20 100 XXX XXXX', pageWidth / 2, footerY, { align: 'center' })
+  const footerLine = [doc.company?.name, doc.company?.website, doc.company?.email, doc.company?.phone].filter(Boolean).join(' | ')
+  if (footerLine) pdf.text(footerLine, pageWidth / 2, footerY, { align: 'center' })
   
   pdf.setFontSize(6)
   pdf.setTextColor(BRAND.textLight.r, BRAND.textLight.g, BRAND.textLight.b)

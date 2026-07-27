@@ -1,3 +1,4 @@
+import { identityFooterLine, type CompanyIdentity } from './company-identity'
 import { jsPDF } from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
 
@@ -21,7 +22,7 @@ interface Invoice {
   currency: string
 }
 
-export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice): jsPDF {
+export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }): jsPDF {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -36,7 +37,7 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice): jsPD
   doc.setFontSize(24)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(100, 124, 71)
-  doc.text('Travel2Egypt', margin, y + 8)
+  if (company.name) doc.text(company.name, margin, y + 8)
 
   doc.setFontSize(20)
   doc.setTextColor(40, 40, 40)
@@ -148,12 +149,13 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice): jsPD
   doc.setFontSize(8)
   doc.setTextColor(150, 150, 150)
   doc.setFont('helvetica', 'normal')
-  doc.text('Travel2Egypt | www.travel2egypt.org | info@travel2egypt.org', pageWidth / 2, footerY, { align: 'center' })
+  const footerLine = identityFooterLine(company)
+  if (footerLine) doc.text(footerLine, pageWidth / 2, footerY, { align: 'center' })
 
   return doc
 }
 
-export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice) {
-  const doc = generateReceiptPDF(receipt, invoice)
+export function downloadReceiptPDF(receipt: ReceiptData, invoice: Invoice, company: CompanyIdentity = { name: '' }) {
+  const doc = generateReceiptPDF(receipt, invoice, company)
   doc.save(`Receipt-${receipt.receiptNumber}.pdf`)
 }

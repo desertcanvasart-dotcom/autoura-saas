@@ -6,6 +6,10 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { formatDateOnly } from '@/lib/date-utils'
 
 interface ContractData {
+  /** The operator issuing the contract — the "Service Provider" party. This
+   *  generator hardcoded Travel2Egypt there, i.e. named the wrong LEGAL PARTY
+   *  on other tenants' contracts. Omitted fields omit their lines. */
+  company?: { name: string; email?: string | null; phone?: string | null; website?: string | null }
   contractNumber: string
   contractDate: string
   clientName: string
@@ -50,10 +54,13 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   // Parties
   page.drawText('PARTIES', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
   y -= 20
-  page.drawText('Service Provider: Travel2Egypt', { x: 50, y, size: 11, font: helvetica })
+  page.drawText(`Service Provider: ${data.company?.name || '(operator not specified)'}`, { x: 50, y, size: 11, font: helvetica })
   y -= 15
-  page.drawText('Website: https://travel2egypt.org', { x: 50, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-  y -= 25
+  if (data.company?.website) {
+    page.drawText(`Website: ${data.company.website}`, { x: 50, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
+    y -= 15
+  }
+  y -= 10
   page.drawText(`Client: ${data.clientName}`, { x: 50, y, size: 11, font: helvetica })
   y -= 15
   if (data.clientEmail) {
@@ -143,7 +150,7 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   page.drawText('Client: _________________________  Date: __________', { x: 50, y, size: 10, font: helvetica })
 
   // Footer
-  page.drawText('Travel2Egypt | www.travel2egypt.org | info@travel2egypt.org', {
+  page.drawText([data.company?.name, data.company?.website, data.company?.email].filter(Boolean).join(' | ') || ' ', {
     x: 150, y: 30, size: 9, font: helvetica, color: rgb(0.5, 0.5, 0.5)
   })
 

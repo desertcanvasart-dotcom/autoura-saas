@@ -125,9 +125,23 @@ export async function GET(
       has_dynamic_pricing: variationServices && variationServices.length > 0
     }
 
+    // The operator's PUBLIC contact details, for the page's "Need Help?" card.
+    // This page is public and previously hardcoded one operator's email/phone —
+    // on every tenant's tours. Name/email/phone/website only; nothing sensitive.
+    let operator = null
+    if (variation.tenant_id) {
+      const { data: t } = await supabase
+        .from('tenants')
+        .select('company_name, contact_email, company_phone, company_website')
+        .eq('id', variation.tenant_id)
+        .maybeSingle()
+      if (t) operator = t
+    }
+
     return NextResponse.json({
       success: true,
-      data: tourDetail
+      data: tourDetail,
+      operator
     })
 
   } catch (error) {

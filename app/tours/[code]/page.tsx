@@ -102,6 +102,7 @@ interface PricingResult {
 export default function TourDetailPage() {
   const params = useParams()
   const [tour, setTour] = useState<TourDetail | null>(null)
+  const [operator, setOperator] = useState<{ company_name?: string; contact_email?: string; company_phone?: string; company_website?: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedDays, setExpandedDays] = useState<number[]>([1])
@@ -139,6 +140,7 @@ export default function TourDetailPage() {
 
       if (data.success) {
         setTour(data.data)
+        setOperator(data.operator || null)
       } else {
         setError('Tour not found')
       }
@@ -696,19 +698,30 @@ export default function TourDetailPage() {
             <p className="text-xs text-gray-500 mb-4">
               Contact us for custom arrangements or questions
             </p>
+            {/* The OPERATOR who owns this tour — this block hardcoded one
+                company's contact details on every tenant's public tour pages. */}
             <div className="space-y-2 text-sm">
-              <a href="mailto:info@travel2egypt.org" className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
-                <Mail className="h-4 w-4" />
-                info@travel2egypt.org
-              </a>
-              <a href="tel:+201158011600" className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
-                <Phone className="h-4 w-4" />
-                +20 115 801 1600
-              </a>
-              <a href="https://travel2egypt.org" target="_blank" className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
-                <ExternalLink className="h-4 w-4" />
-                travel2egypt.org
-              </a>
+              {operator?.contact_email && (
+                <a href={`mailto:${operator.contact_email}`} className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
+                  <Mail className="h-4 w-4" />
+                  {operator.contact_email}
+                </a>
+              )}
+              {operator?.company_phone && (
+                <a href={`tel:${operator.company_phone.replace(/\s+/g, '')}`} className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
+                  <Phone className="h-4 w-4" />
+                  {operator.company_phone}
+                </a>
+              )}
+              {operator?.company_website && (
+                <a href={operator.company_website.startsWith('http') ? operator.company_website : `https://${operator.company_website}`} target="_blank" className="flex items-center gap-2 text-gray-600 hover:text-[#647C47]">
+                  <ExternalLink className="h-4 w-4" />
+                  {operator.company_website}
+                </a>
+              )}
+              {!operator?.contact_email && !operator?.company_phone && !operator?.company_website && (
+                <p className="text-xs text-gray-400">Contact details coming soon.</p>
+              )}
             </div>
           </div>
         </div>

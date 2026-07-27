@@ -41,7 +41,11 @@ export async function GET(
       .eq('itinerary_id', itineraryId)
       .order('day_number', { ascending: true })
 
-    const placeholderData = buildPlaceholderData(itinerary, days || [])
+    const placeholderData = (await (async () => {
+      const { data: senderTenant } = await supabase
+        .from('tenants').select('company_name').eq('id', authResult.tenant_id!).maybeSingle()
+      return buildPlaceholderData(itinerary, days || [], senderTenant?.company_name || '')
+    })())
 
     return NextResponse.json({
       success: true,
@@ -55,7 +59,8 @@ export async function GET(
   }
 }
 
-function buildPlaceholderData(itinerary: any, days: any[]): Record<string, string> {
+function buildPlaceholderData(itinerary: any, days: any[], companyName: string = ''
+): Record<string, string> {
   const data: Record<string, string> = {}
   const currency = itinerary?.currency || 'EUR'
 
@@ -124,7 +129,7 @@ function buildPlaceholderData(itinerary: any, days: any[]): Record<string, strin
   if (itinerary.tier) data.Tier = itinerary.tier.charAt(0).toUpperCase() + itinerary.tier.slice(1)
 
   data.Today = fmtDate(new Date())
-  data.CompanyName = process.env.BUSINESS_NAME || 'AUTOURA'
+  data.CompanyName = companyName
 
   return data
 }

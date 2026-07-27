@@ -62,9 +62,14 @@ export async function POST(request: NextRequest) {
       year: 'numeric'
     })
 
-    const businessName = process.env.BUSINESS_NAME || 'Travel2Egypt'
-    const businessEmail = process.env.BUSINESS_EMAIL || 'info@travel2egypt.com'
-    const businessWebsite = process.env.BUSINESS_WEBSITE || 'travel2egypt.org'
+    const { data: senderTenant } = await supabase
+      .from('tenants')
+      .select('company_name, contact_email, company_website')
+      .eq('id', authResult.tenant_id!)
+      .maybeSingle()
+    const businessName = senderTenant?.company_name || ''
+    const businessEmail = senderTenant?.contact_email || ''
+    const businessWebsite = senderTenant?.company_website || ''
 
     // Build message
     const message = `🧾 *PAYMENT RECEIPT*\n\n` +
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
       `This receipt confirms your payment has been received and processed.\n\n` +
       `For any questions, please contact us:\n` +
       `📧 ${businessEmail}\n` +
-      `🌐 ${businessWebsite}\n\n` +
+      (businessWebsite ? `🌐 ${businessWebsite}\n\n` : '') +
       `Best regards,\n*${businessName} Team*`
 
 

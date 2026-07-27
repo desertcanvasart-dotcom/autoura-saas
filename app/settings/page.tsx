@@ -652,7 +652,7 @@ function SettingsContent() {
             value={profile?.company_name || ''}
             onChange={(e) => setProfile(prev => prev ? { ...prev, company_name: e.target.value } : null)}
             className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-            placeholder="Travel2Egypt"
+            placeholder="Your company name"
           />
         </div>
       </div>
@@ -725,7 +725,7 @@ function SettingsContent() {
           onChange={(e) => setEmailSettings(prev => prev ? { ...prev, signature: e.target.value } : null)}
           rows={5}
           className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-          placeholder="Best regards,&#10;Islam Hussein&#10;Travel2Egypt"
+          placeholder="Best regards,&#10;Your name&#10;Your company"
         />
         <p className="text-xs text-gray-500 mt-1">This signature will be added to all outgoing emails.</p>
       </div>

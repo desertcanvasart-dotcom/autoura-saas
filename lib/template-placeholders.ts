@@ -202,6 +202,6 @@ export const PLACEHOLDER_REFERENCE = [
   { key: 'total', label: 'Total Cost', example: '€3,500' },
   { key: 'deposit', label: 'Deposit Amount', example: '€1,050' },
   { key: 'balance', label: 'Balance Due', example: '€2,450' },
-  { key: 'company_name', label: 'Company Name', example: 'Travel2Egypt' },
+  { key: 'company_name', label: 'Company Name', example: 'Your Company' },
   { key: 'agent_name', label: 'Agent Name', example: 'Islam' },
 ]

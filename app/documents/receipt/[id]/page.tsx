@@ -1,5 +1,7 @@
 'use client'
 
+import { identityFromTenant } from '@/lib/company-identity'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -38,6 +40,7 @@ interface Payment {
 }
 
 export default function ReceiptPage() {
+  const { tenant } = useTenant()
   const params = useParams()
   const router = useRouter()
   const [payment, setPayment] = useState<Payment | null>(null)
@@ -89,7 +92,7 @@ export default function ReceiptPage() {
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
-      })
+      }, identityFromTenant(tenant))
     } catch (error) {
       console.error('Error downloading PDF:', error)
       showToast('error', 'Failed to download receipt')
@@ -348,7 +351,7 @@ export default function ReceiptPage() {
                 This receipt confirms your payment has been received and processed.
               </p>
               <p className="text-xs text-gray-500 mt-3">
-                Questions? Contact us at info@travel2egypt.com
+                {tenant?.contact_email ? `Questions? Contact us at ${tenant.contact_email}` : ''}
               </p>
             </div>
           </div>

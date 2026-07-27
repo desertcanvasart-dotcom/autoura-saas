@@ -1,5 +1,7 @@
 'use client'
 
+import { identityFromTenant } from '@/lib/company-identity'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -38,6 +40,7 @@ interface UnifiedPayment {
 }
 
 export default function ReceiptsPage() {
+  const { tenant } = useTenant()
   const router = useRouter()
   const [payments, setPayments] = useState<UnifiedPayment[]>([])
   const [loading, setLoading] = useState(true)
@@ -170,7 +173,7 @@ export default function ReceiptsPage() {
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
-      })
+      }, identityFromTenant(tenant))
     } catch (error) {
       console.error('Error downloading receipt:', error)
       showToast('error', 'Failed to download receipt')

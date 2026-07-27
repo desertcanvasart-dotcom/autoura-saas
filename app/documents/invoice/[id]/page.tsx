@@ -1,5 +1,7 @@
 'use client'
 
+import { identityFromTenant } from '@/lib/company-identity'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -26,6 +28,7 @@ interface Payment {
 }
 
 export default function InvoicePage() {
+  const { tenant } = useTenant()
   const params = useParams()
   const [payment, setPayment] = useState<Payment | null>(null)
   const [loading, setLoading] = useState(true)
@@ -93,7 +96,7 @@ export default function InvoicePage() {
         payment_instructions: 'Payment accepted via bank transfer or credit card.'
       }
       
-      downloadInvoicePDF(invoiceData)
+      downloadInvoicePDF(invoiceData, identityFromTenant(tenant))
     } catch (error) {
       console.error('Error downloading PDF:', error)
       showToast('error', 'Failed to download invoice')
@@ -178,7 +181,7 @@ export default function InvoicePage() {
             <div className="text-right">
               <p className="text-lg font-bold text-gray-900">Travel2Egypt</p>
               <p className="text-xs text-gray-500">Cairo, Egypt</p>
-              <p className="text-xs text-gray-500">info@travel2egypt.com</p>
+              <p className="text-xs text-gray-500">{tenant?.contact_email || ''}</p>
             </div>
           </div>
 
@@ -288,7 +291,7 @@ export default function InvoicePage() {
               Thank you for your business!
             </p>
             <p className="text-xs text-gray-500">
-              For questions, contact us at info@travel2egypt.com
+              {tenant?.contact_email ? `For questions, contact us at ${tenant.contact_email}` : ''}
             </p>
           </div>
         </div>

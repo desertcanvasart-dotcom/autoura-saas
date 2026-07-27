@@ -24,7 +24,10 @@ function formatDate(dateStr: string, format: 'long' | 'short' = 'long'): string 
 }
 
 // Generate HTML template
-function generateQuoteHTML(quote: any): string {
+function generateQuoteHTML(
+  quote: any,
+  company: { name?: string; email?: string | null; phone?: string | null; website?: string | null } = {}
+): string {
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   const template = quote.tour_variations?.tour_templates
   const variation = quote.tour_variations
@@ -432,7 +435,7 @@ function generateQuoteHTML(quote: any): string {
       <div class="logo-section">
         <div class="logo-circle">T2E</div>
         <div class="company-info">
-          <h1>TRAVEL TO EGYPT</h1>
+          <h1>${company.name || ''}</h1>
           <p>B2B Partner Quote</p>
         </div>
       </div>
@@ -604,9 +607,8 @@ function generateQuoteHTML(quote: any): string {
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-card">
-        <h3>TRAVEL TO EGYPT</h3>
-        <p>info@travel2egypt.org • +20 115 801 1600 • www.travel2egypt.org</p>
-        <p class="tagline">Your trusted partner for authentic Egyptian experiences</p>
+        <h3>${company.name || ''}</h3>
+        <p>${[company.email, company.phone, company.website].filter(Boolean).join(' • ')}</p>
       </div>
     </footer>
   </div>
@@ -666,7 +668,21 @@ export async function GET(
     }
 
     // Generate HTML
-    const html = generateQuoteHTML(q)
+    const { data: senderTenant } = await getSupabaseAdmin()
+      .from('tenants')
+      .select('company_name, contact_email, company_phone, company_website')
+      .eq('id', authResult.tenant_id!)
+      .maybeSingle()
+
+    const tenantIdentity = (senderTenant ?? {}) as {
+      company_name?: string; contact_email?: string; company_phone?: string; company_website?: string
+    }
+    const html = generateQuoteHTML(q, {
+      name: tenantIdentity.company_name,
+      email: tenantIdentity.contact_email,
+      phone: tenantIdentity.company_phone,
+      website: tenantIdentity.company_website,
+    })
 
     // Launch Puppeteer
     const browser = await puppeteer.launch({

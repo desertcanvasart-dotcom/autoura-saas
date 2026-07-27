@@ -16,7 +16,9 @@ export async function POST(request: Request) {
     if (!supplierEmail) return NextResponse.json({ success: false, error: 'Supplier email is required' }, { status: 400 })
     if (!pdfBase64) return NextResponse.json({ success: false, error: 'PDF attachment is required' }, { status: 400 })
 
-    const businessName = process.env.BUSINESS_NAME || 'AUTOURA'
+    const { data: senderTenant } = await supabase
+      .from('tenants').select('company_name').eq('id', authResult.tenant_id!).maybeSingle()
+    const businessName = senderTenant?.company_name || ''
     const businessEmail = process.env.BUSINESS_EMAIL || process.env.GMAIL_USER || ''
 
     const emailSubject = `${documentType || 'Document'} - ${documentNumber || 'N/A'} | Guest: ${clientName || 'N/A'} | ${businessName}`
@@ -76,7 +78,7 @@ export async function POST(request: Request) {
 
     // Build MIME email with PDF attachment
     const filename = `${(documentNumber || 'doc').replace(/\s+/g, '_')}_${(supplierName || 'supplier').replace(/\s+/g, '_')}.pdf`
-    const rawEmail = buildEmailWithAttachment(supplierEmail, emailSubject, emailBody, filename, pdfBase64)
+    const rawEmail = buildEmailWithAttachment(supplierEmail, emailSubject, emailBody, filename, pdfBase64, businessName)
 
     const response = await gmail.users.messages.send({
       userId: 'me',
@@ -94,9 +96,9 @@ export async function POST(request: Request) {
   }
 }
 
-function buildEmailWithAttachment(to: string, subject: string, body: string, filename: string, attachmentBase64: string): string {
+function buildEmailWithAttachment(to: string, subject: string, body: string, filename: string, attachmentBase64: string, senderName: string = ''): string {
   const fromAddress = process.env.GMAIL_USER || process.env.BUSINESS_EMAIL || ''
-  const fromName = process.env.BUSINESS_NAME || 'AUTOURA'
+  const fromName = senderName
   const boundary = `boundary_${Date.now()}`
 
   // Strip CR/LF from header values to prevent header/Bcc injection.

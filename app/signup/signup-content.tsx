@@ -77,7 +77,7 @@ export default function SignupContent() {
             T2E
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
-          <p className="text-gray-600">Join Travel2Egypt Operations Platform</p>
+          <p className="text-gray-600">Join the Autoura operations platform</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -180,7 +180,7 @@ export default function SignupContent() {
         </div>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          © 2025 Travel2Egypt. All rights reserved.
+          © 2026 Autoura. All rights reserved.
         </p>
       </div>
     </div>
