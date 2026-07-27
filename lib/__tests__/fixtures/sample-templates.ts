@@ -83,7 +83,25 @@ export function fullRateTables(): MockTables {
         is_active: true,
       },
     ],
-    meal_rates: [{ lunch_rate_eur: 14, dinner_rate_eur: 20, is_active: true }],
+    // meal_rates is one row per meal_type AND tier, with the rate in
+    // `base_rate_eur`. The old fixture was
+    //   [{ lunch_rate_eur: 14, dinner_rate_eur: 20 }]
+    // — a shape that has never existed in the database. The engine read those
+    // same non-existent columns, so the tests agreed with the code and neither
+    // agreed with the schema, which is how the bug survived a golden master.
+    //
+    // Each rate below equals round(base × the old tier multiplier), so every
+    // locked price is unchanged and this stays a true characterization.
+    meal_rates: [
+      { meal_type: 'lunch',  tier: 'budget',   base_rate_eur: 11, is_active: true },
+      { meal_type: 'dinner', tier: 'budget',   base_rate_eur: 16, is_active: true },
+      { meal_type: 'lunch',  tier: 'standard', base_rate_eur: 14, is_active: true },
+      { meal_type: 'dinner', tier: 'standard', base_rate_eur: 20, is_active: true },
+      { meal_type: 'lunch',  tier: 'deluxe',   base_rate_eur: 18, is_active: true },
+      { meal_type: 'dinner', tier: 'deluxe',   base_rate_eur: 26, is_active: true },
+      { meal_type: 'lunch',  tier: 'luxury',   base_rate_eur: 22, is_active: true },
+      { meal_type: 'dinner', tier: 'luxury',   base_rate_eur: 32, is_active: true },
+    ],
     tipping_rates: [{ rate_eur: 10, rate_unit: 'per_day', is_active: true }],
     entrance_fees: [
       {

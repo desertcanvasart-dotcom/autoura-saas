@@ -709,26 +709,36 @@ export async function POST(request: NextRequest) {
           }
 
           case 'meal': {
-            const { data: mealRate } = await (getSupabaseAdmin() as any)
+            // meal_rates is one row per meal_type AND tier; the columns are
+            // `meal_type` + `base_rate_eur`. This read `lunch_rate_eur` /
+            // `dinner_rate_eur`, which do not exist — so `|| 0` made every meal
+            // cost ZERO while still claiming rateSource 'meal_rates', which
+            // also skipped the stored cost_per_unit fallback below.
+            const mealType = service.service_name?.toLowerCase().includes('dinner')
+              ? 'dinner'
+              : 'lunch'
+
+            const { data: mealRows } = await (getSupabaseAdmin() as any)
               .from('meal_rates')
-              .select('*')
+              .select('meal_type, base_rate_eur')
               .eq('is_active', true)
               .eq('tenant_id', tenantId)
-              .limit(1)
-              .single()
+              .eq('tier', tier)
 
-            if (mealRate) {
-              const m = mealRate as any
-              if (service.service_name?.toLowerCase().includes('dinner')) {
-                unitCost = m.dinner_rate_eur || 0
-              } else {
-                unitCost = m.lunch_rate_eur || 0
-              }
+            const match = (mealRows ?? []).find(
+              (r: any) => String(r.meal_type ?? '').toLowerCase().includes(mealType)
+            )
+            const mealRate = Number(match?.base_rate_eur)
+
+            // Only claim a db-sourced rate when one actually resolved. A zero
+            // here is bad data, not a free meal, and leaving rateSource alone
+            // lets the stored cost_per_unit fallback do its job.
+            if (Number.isFinite(mealRate) && mealRate > 0) {
+              unitCost = mealRate
               lineTotal = unitCost * num_pax
               effectiveQuantityMode = 'per_pax'
               pricingNote = `€${unitCost}/pax`
               rateSource = 'meal_rates'
-
             }
             break
           }
