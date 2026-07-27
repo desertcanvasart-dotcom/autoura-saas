@@ -1,6 +1,6 @@
 'use client'
 
-import { identityFromTenant } from '@/lib/company-identity'
+import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -55,7 +55,7 @@ export default function InvoicePage() {
     }
   }
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!payment) return
     
     setDownloading(true)
@@ -96,7 +96,7 @@ export default function InvoicePage() {
         payment_instructions: 'Payment accepted via bank transfer or credit card.'
       }
       
-      downloadInvoicePDF(invoiceData, identityFromTenant(tenant))
+      downloadInvoicePDF(invoiceData, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
     } catch (error) {
       console.error('Error downloading PDF:', error)
       showToast('error', 'Failed to download invoice')

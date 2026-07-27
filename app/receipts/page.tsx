@@ -1,6 +1,6 @@
 'use client'
 
-import { identityFromTenant } from '@/lib/company-identity'
+import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -173,7 +173,7 @@ export default function ReceiptsPage() {
         client_name: payment.client_name,
         total_amount: payment.amount,
         currency: payment.currency
-      }, identityFromTenant(tenant))
+      }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
     } catch (error) {
       console.error('Error downloading receipt:', error)
       showToast('error', 'Failed to download receipt')

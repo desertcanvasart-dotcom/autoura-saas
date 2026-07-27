@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf'
+import { brandColorRgb } from './company-identity'
 import { formatDateOnly } from '@/lib/date-utils'
 
 interface LineItem {
@@ -35,6 +36,10 @@ interface Invoice {
 
 export interface CompanyInfo {
   name: string
+  /** Hex brand color; unset keeps the default olive palette. */
+  primaryColor?: string
+  /** data: URL logo for the letterhead; unset = text-only header. */
+  logoDataUrl?: string
   // All optional: lines render only when present. They were required when the
   // default was a hardcoded company with a fictional address.
   address?: string
@@ -93,7 +98,9 @@ export function generateInvoicePDF(
   let y = margin
 
   // Colors
-  const primaryColor: [number, number, number] = [100, 124, 71] // #647C47 - Olive green
+  // Tenant brand when set; the olive default otherwise (visual no-op for
+  // unbranded tenants).
+  const primaryColor: [number, number, number] = brandColorRgb(company, [100, 124, 71])
   const darkGray: [number, number, number] = [55, 65, 81]
   const mediumGray: [number, number, number] = [107, 114, 128]
   const lightGray: [number, number, number] = [243, 244, 246]
@@ -112,7 +119,15 @@ export function generateInvoicePDF(
   doc.setFontSize(24)
   doc.setTextColor(...primaryColor)
   doc.setFont('helvetica', 'bold')
-  doc.text(company.name, margin, y)
+  // Letterhead: logo left of the name when the tenant uploaded one.
+  let nameX = margin
+  if (company.logoDataUrl) {
+    try {
+      doc.addImage(company.logoDataUrl, margin, y - 8, 12, 12)
+      nameX = margin + 15
+    } catch { /* bad image data — text-only header */ }
+  }
+  doc.text(company.name, nameX, y)
 
   // INVOICE label with type (right)
   doc.setFontSize(24)

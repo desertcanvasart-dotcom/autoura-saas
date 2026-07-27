@@ -83,8 +83,9 @@ function formatDate(dateStr: string, format: 'long' | 'short' = 'long'): string 
 function generateHTML(
   itinerary: Itinerary,
   days: Day[],
-  company: { name: string; email?: string | null; website?: string | null } = { name: '' }
+  company: { name: string; email?: string | null; website?: string | null; primaryColor?: string | null; logoUrl?: string | null } = { name: '' }
 ): string {
+  const brandHex = /^#[0-9a-fA-F]{6}$/.test(company.primaryColor || '') ? company.primaryColor : '#2962ff'
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   
@@ -165,7 +166,7 @@ function generateHTML(
     .logo-circle {
       width: 45px;
       height: 45px;
-      background: linear-gradient(135deg, #2962ff, #1e88e5);
+      background: ${brandHex};
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -199,7 +200,7 @@ function generateHTML(
     .quote-number {
       font-size: 11pt;
       font-weight: 700;
-      color: #2962ff;
+      color: ${brandHex};
     }
     
     .quote-dates {
@@ -252,7 +253,7 @@ function generateHTML(
     
     /* Tour Banner */
     .tour-banner {
-      background: linear-gradient(135deg, #2962ff, #1e88e5);
+      background: ${brandHex};
       color: white;
       border-radius: 8px;
       padding: 15px 20px;
@@ -289,7 +290,7 @@ function generateHTML(
     }
     
     .day-badge {
-      background: linear-gradient(135deg, #2962ff, #1e88e5);
+      background: ${brandHex};
       color: white;
       padding: 4px 10px;
       border-radius: 4px;
@@ -334,7 +335,7 @@ function generateHTML(
     }
     
     .pricing-table th {
-      background: linear-gradient(135deg, #2962ff, #1e88e5);
+      background: ${brandHex};
       color: white;
       padding: 10px 12px;
       text-align: left;
@@ -372,7 +373,7 @@ function generateHTML(
     }
     
     .total-box {
-      background: linear-gradient(135deg, #2962ff, #1e88e5);
+      background: ${brandHex};
       color: white;
       border-radius: 8px;
       padding: 12px 25px;
@@ -429,7 +430,7 @@ function generateHTML(
       content: "•";
       position: absolute;
       left: 0;
-      color: #2962ff;
+      color: ${brandHex};
     }
     
     /* Footer */
@@ -449,7 +450,7 @@ function generateHTML(
     .footer h3 {
       font-size: 11pt;
       font-weight: 700;
-      color: #2962ff;
+      color: ${brandHex};
     }
     
     .footer p {
@@ -493,6 +494,7 @@ function generateHTML(
       <div class="logo-section">
         <div class="logo-circle">T2E</div>
         <div class="company-info">
+          ${company.logoUrl ? `<img src="${company.logoUrl}" alt="" style="height:48px;margin-bottom:10px" />` : ''}
           <h1>${company.name || ''}</h1>
           <p>Professional Itinerary & Quote</p>
         </div>

@@ -26,8 +26,11 @@ function formatDate(dateStr: string, format: 'long' | 'short' = 'long'): string 
 // Generate HTML template
 function generateQuoteHTML(
   quote: any,
-  company: { name?: string; email?: string | null; phone?: string | null; website?: string | null } = {}
+  company: { name?: string; email?: string | null; phone?: string | null; website?: string | null; primaryColor?: string | null; logoUrl?: string | null } = {}
 ): string {
+  // Tenant brand color; the olive default otherwise. Injected into the CSS so
+  // headers/accents follow the operator's palette.
+  const brandHex = /^#[0-9a-fA-F]{6}$/.test(company.primaryColor || '') ? company.primaryColor : '#647C47'
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   const template = quote.tour_variations?.tour_templates
   const variation = quote.tour_variations
@@ -86,7 +89,7 @@ function generateQuoteHTML(
     .logo-circle {
       width: 45px;
       height: 45px;
-      background: linear-gradient(135deg, #647C47, #4a5c35);
+      background: ${brandHex};
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -120,7 +123,7 @@ function generateQuoteHTML(
     .quote-number {
       font-size: 12pt;
       font-weight: 700;
-      color: #647C47;
+      color: ${brandHex};
     }
     
     .quote-dates {
@@ -177,7 +180,7 @@ function generateQuoteHTML(
     
     /* Tour Banner */
     .tour-banner {
-      background: linear-gradient(135deg, #647C47, #4a5c35);
+      background: ${brandHex};
       color: white;
       border-radius: 8px;
       padding: 18px 20px;
@@ -220,7 +223,7 @@ function generateQuoteHTML(
     }
     
     .pricing-table th {
-      background: linear-gradient(135deg, #647C47, #4a5c35);
+      background: ${brandHex};
       color: white;
       padding: 10px 12px;
       text-align: left;
@@ -264,7 +267,7 @@ function generateQuoteHTML(
     }
     
     .totals-row.highlight {
-      background: linear-gradient(135deg, #647C47, #4a5c35);
+      background: ${brandHex};
       color: white;
       padding: 12px 15px;
       border-radius: 6px;
@@ -365,7 +368,7 @@ function generateQuoteHTML(
       content: "•";
       position: absolute;
       left: 0;
-      color: #647C47;
+      color: ${brandHex};
     }
     
     /* Notes */
@@ -406,7 +409,7 @@ function generateQuoteHTML(
     .footer h3 {
       font-size: 11pt;
       font-weight: 700;
-      color: #647C47;
+      color: ${brandHex};
     }
     
     .footer p {
@@ -435,6 +438,7 @@ function generateQuoteHTML(
       <div class="logo-section">
         <div class="logo-circle">T2E</div>
         <div class="company-info">
+          ${company.logoUrl ? `<img src="${company.logoUrl}" alt="" style="height:44px;margin-bottom:8px" />` : ''}
           <h1>${company.name || ''}</h1>
           <p>B2B Partner Quote</p>
         </div>
@@ -670,18 +674,21 @@ export async function GET(
     // Generate HTML
     const { data: senderTenant } = await getSupabaseAdmin()
       .from('tenants')
-      .select('company_name, contact_email, company_phone, company_website')
+      .select('company_name, contact_email, company_phone, company_website, primary_color, logo_url')
       .eq('id', authResult.tenant_id!)
       .maybeSingle()
 
     const tenantIdentity = (senderTenant ?? {}) as {
       company_name?: string; contact_email?: string; company_phone?: string; company_website?: string
+      primary_color?: string; logo_url?: string
     }
     const html = generateQuoteHTML(q, {
       name: tenantIdentity.company_name,
       email: tenantIdentity.contact_email,
       phone: tenantIdentity.company_phone,
       website: tenantIdentity.company_website,
+      primaryColor: tenantIdentity.primary_color,
+      logoUrl: tenantIdentity.logo_url,
     })
 
     // Launch Puppeteer

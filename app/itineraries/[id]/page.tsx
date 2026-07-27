@@ -1,6 +1,6 @@
 'use client'
 
-import { identityFromTenant } from '@/lib/company-identity'
+import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -419,7 +419,7 @@ export default function ViewItineraryPage() {
     try {
       // Open a preview first; the modal exposes Download / Print / Email and a
       // breakdown toggle. The current breakdown choice is preserved.
-      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown }, identityFromTenant(tenant))
+      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
       setPdfPreviewBlob(pdf.output('blob'))
       setShowPdfPreview(true)
     } catch (error) {
@@ -435,7 +435,7 @@ export default function ViewItineraryPage() {
     setPdfShowBreakdown(show)
     if (!itinerary || days.length === 0) return
     try {
-      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: show }, identityFromTenant(tenant))
+      const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: show }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
       setPdfPreviewBlob(pdf.output('blob'))
     } catch (error) {
       console.error('Error regenerating PDF preview:', error)

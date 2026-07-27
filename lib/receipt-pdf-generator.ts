@@ -1,4 +1,4 @@
-import { identityFooterLine, type CompanyIdentity } from './company-identity'
+import { identityFooterLine, brandColorRgb, type CompanyIdentity } from './company-identity'
 import { jsPDF } from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
 
@@ -36,8 +36,15 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   // Header
   doc.setFontSize(24)
   doc.setFont('helvetica', 'bold')
-  doc.setTextColor(100, 124, 71)
-  if (company.name) doc.text(company.name, margin, y + 8)
+  doc.setTextColor(...brandColorRgb(company, [100, 124, 71]))
+  let receiptNameX = margin
+  if (company.logoDataUrl) {
+    try {
+      doc.addImage(company.logoDataUrl, margin, y - 2, 12, 12)
+      receiptNameX = margin + 15
+    } catch { /* text-only header */ }
+  }
+  if (company.name) doc.text(company.name, receiptNameX, y + 8)
 
   doc.setFontSize(20)
   doc.setTextColor(40, 40, 40)

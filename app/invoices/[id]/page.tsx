@@ -1,6 +1,6 @@
 'use client'
 
-import { identityFromTenant } from '@/lib/company-identity'
+import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
@@ -282,12 +282,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!invoice) return
     
     setGeneratingPDF(true)
     try {
-      downloadInvoicePDF(invoice, identityFromTenant(tenant))
+      downloadInvoicePDF(invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
     } catch (error) {
       console.error('Error generating PDF:', error)
       showToast('error', 'Failed to generate PDF. Please try again.')
@@ -323,7 +323,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  const handleGenerateReceipt = (payment: Payment) => {
+  const handleGenerateReceipt = async (payment: Payment) => {
     if (!invoice) return
     
     const receiptData = {
@@ -339,7 +339,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
       notes: payment.notes
     }
     
-    downloadReceiptPDF(receiptData, invoice, identityFromTenant(tenant))
+    downloadReceiptPDF(receiptData, invoice, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
   }
 
   const handleDeletePayment = async (paymentId: string) => {
