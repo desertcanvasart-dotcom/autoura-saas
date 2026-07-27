@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getTokensFromCode, getUserEmail } from '@/lib/gmail'
 import { verifyState } from '@/lib/oauth-state'
+import { appRedirectBase } from '@/lib/oauth-config'
 
 function getSupabase() {
   return createAdminClient()
 }
 
 export async function GET(request: NextRequest) {
+  // Railway forwards to the container on PORT (8080), so `request.url` here is
+  // http://localhost:8080/... — unreachable from the operator's browser. Every
+  // redirect below goes through the public app URL instead.
+  const base = appRedirectBase(process.env.NEXT_PUBLIC_APP_URL, request.url)
   const searchParams = request.nextUrl.searchParams
   const code = searchParams.get('code')
   const state = searchParams.get('state') // Contains user_id
@@ -15,13 +20,13 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/settings/email?error=${error}`, request.url)
+      new URL(`/settings/email?error=${error}`, base)
     )
   }
 
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL('/settings/email?error=missing_params', request.url)
+      new URL('/settings/email?error=missing_params', base)
     )
   }
 
@@ -32,7 +37,7 @@ export async function GET(request: NextRequest) {
   const userId = verifyState(state)
   if (!userId) {
     return NextResponse.redirect(
-      new URL('/settings/email?error=invalid_state', request.url)
+      new URL('/settings/email?error=invalid_state', base)
     )
   }
 
@@ -70,12 +75,12 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.redirect(
-      new URL('/settings/email?success=true', request.url)
+      new URL('/settings/email?success=true', base)
     )
   } catch (err: any) {
     console.error('OAuth callback error:', err)
     return NextResponse.redirect(
-      new URL(`/settings/email?error=${encodeURIComponent(err.message)}`, request.url)
+      new URL(`/settings/email?error=${encodeURIComponent(err.message)}`, base)
     )
   }
 }
