@@ -116,3 +116,22 @@ export function pendingInvoiceItemToCancel(
   const id = metadata?.[INVOICE_ITEM_KEY]
   return typeof id === 'string' && id.length > 0 ? id : null
 }
+
+/**
+ * Clear the charged markers after a fee was WITHDRAWN un-invoiced.
+ *
+ * Without this the flags outlive the charge: the tenant abandons the trial, the
+ * Stripe item is deleted, but `onboarding_fee_charged_at` stays set. If they
+ * subscribe again months later, decideOnboardingFee() short-circuits on
+ * `already_charged` and the fee is never collected — while the log line reads
+ * "skipped (already_charged)", which looks like correct behaviour. Revenue
+ * quietly lost, with a reassuring message.
+ */
+export function clearedMetadata(
+  metadata: Record<string, unknown> | null | undefined
+): Record<string, unknown> {
+  const next = { ...(metadata ?? {}) }
+  delete next[CHARGED_AT_KEY]
+  delete next[INVOICE_ITEM_KEY]
+  return next
+}

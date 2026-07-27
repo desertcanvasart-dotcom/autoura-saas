@@ -7,8 +7,16 @@ import { stripe } from '@/lib/stripe'
 import {
   decideOnboardingFee,
   chargedMetadata,
+  clearedMetadata,
   pendingInvoiceItemToCancel,
 } from '@/lib/onboarding-fee'
+import {
+  subscriptionPeriod,
+  invoiceSubscriptionId,
+  invoicePaymentIntentId,
+  invoiceTaxCents,
+  unixToIso,
+} from '@/lib/stripe-webhook-fields'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -29,6 +37,8 @@ function getSupabaseAdmin() {
  * This endpoint is called by Stripe to sync subscription and payment events
  */
 export async function POST(request: NextRequest) {
+  // Declared outside the try so the catch can close out a claimed event.
+  let eventId: string | null = null
   try {
     const body = await request.text()
     const headersList = await headers()
@@ -65,6 +75,29 @@ export async function POST(request: NextRequest) {
 
 
 
+    eventId = event.id
+
+    // Claim the event before doing anything with money. The INSERT is the
+    // claim: the PK makes a concurrent duplicate lose with 23505 rather than
+    // both deliveries proceeding. Stripe retries for ~3 days, well past the
+    // 24h life of a Stripe idempotency key, so this is what actually prevents
+    // a replayed trial_will_end from raising the onboarding fee twice.
+    const { error: claimError } = await (getSupabaseAdmin() as any)
+      .from('stripe_webhook_events')
+      .insert({ event_id: event.id, event_type: event.type })
+
+    if (claimError) {
+      if (claimError.code === '23505') {
+        console.log(`billing webhook: duplicate delivery of ${event.id} (${event.type}), skipping`)
+        return NextResponse.json({ received: true, duplicate: true })
+      }
+      // Could not claim for some other reason. Refuse the event rather than
+      // processing it unguarded — Stripe will retry, and an unprocessed event
+      // is recoverable in a way that a double charge is not.
+      console.error('billing webhook: could not claim event', event.id, claimError)
+      return NextResponse.json({ error: 'Could not claim event' }, { status: 500 })
+    }
+
     // Handle different event types
     switch (event.type) {
       case 'checkout.session.completed':
@@ -96,13 +129,32 @@ export async function POST(request: NextRequest) {
 
     }
 
+    await markEventProcessed(event.id, null)
     return NextResponse.json({ received: true })
   } catch (error: any) {
     console.error('Webhook error:', error)
+    // Record why, then let Stripe retry. The claim row stays, so the retry is
+    // skipped as a duplicate — deliberate: a handler that failed halfway must
+    // be inspected (processed_at IS NULL finds it), not silently re-run over
+    // money. The message is preserved for exactly that triage.
+    await markEventProcessed(eventId, error?.message ?? String(error))
     return NextResponse.json(
       { error: error.message },
       { status: 500 }
     )
+  }
+}
+
+/** Close out a claimed event. Best-effort: never mask the real outcome. */
+async function markEventProcessed(eventId: string | null, error: string | null) {
+  if (!eventId) return
+  try {
+    await (getSupabaseAdmin() as any)
+      .from('stripe_webhook_events')
+      .update({ processed_at: new Date().toISOString(), error })
+      .eq('event_id', eventId)
+  } catch (err) {
+    console.error('billing webhook: could not mark event processed', eventId, err)
   }
 }
 
@@ -137,7 +189,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
  * Handle subscription created or updated
  */
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
-  // Cast to any for accessing properties that may not be in TypeScript types
   const sub = subscription as any
   const tenantId = subscription.metadata?.tenant_id
   const customerId = subscription.customer as string
@@ -165,6 +216,20 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
 
   const billingCycle = subscription.items.data[0]?.price.recurring?.interval === 'year' ? 'yearly' : 'monthly'
 
+  // The period Stripe moved onto subscription ITEMS. Reading the old location
+  // produced NaN and threw here, before the upsert — which is why no
+  // subscription was ever recorded. Both columns are NOT NULL, so an
+  // unresolvable period must abort loudly rather than write a bad date.
+  const period = subscriptionPeriod(subscription)
+  if (!period) {
+    console.error(
+      `billing webhook: cannot resolve the billing period for ${subscription.id} ` +
+      `(tenant ${tenantId}). Subscription NOT recorded — this blocks onboarding ` +
+      `fees and the customer portal. Payload items: ${subscription.items?.data?.length ?? 0}`
+    )
+    throw new Error(`Unresolvable billing period for subscription ${subscription.id}`)
+  }
+
   // Upsert subscription
   const { error } = await (getSupabaseAdmin() as any)
     .from('tenant_subscriptions')
@@ -175,11 +240,11 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
       stripe_subscription_id: subscription.id,
       status: subscription.status,
       billing_cycle: billingCycle,
-      current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-      trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
-      canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
-      ends_at: sub.cancel_at ? new Date(sub.cancel_at * 1000).toISOString() : null,
+      current_period_start: period.startIso,
+      current_period_end: period.endIso,
+      trial_ends_at: unixToIso(sub.trial_end),
+      canceled_at: unixToIso(sub.canceled_at),
+      ends_at: unixToIso(sub.cancel_at),
       updated_at: new Date().toISOString()
     }, {
       onConflict: 'tenant_id'
@@ -203,8 +268,8 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
       .upsert({
         tenant_id: tenantId,
         subscription_id: subscriptionRecord.id,
-        period_start: new Date(sub.current_period_start * 1000).toISOString(),
-        period_end: new Date(sub.current_period_end * 1000).toISOString(),
+        period_start: period.startIso,
+        period_end: period.endIso,
         quotes_created: 0,
         whatsapp_messages_sent: 0,
         gmail_emails_fetched: 0,
@@ -265,7 +330,14 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const inv = invoice as any
-  const subscriptionId = inv.subscription as string
+  // Moved under parent.subscription_details. Reading the old field gave
+  // undefined, and `.eq(col, undefined)` matches nothing — so this handler
+  // silently early-returned on every invoice and billing_invoices stayed empty.
+  const subscriptionId = invoiceSubscriptionId(invoice)
+  if (!subscriptionId) {
+    console.log(`billing webhook: invoice ${invoice.id} has no subscription (one-off) — nothing to record`)
+    return
+  }
 
   // Get tenant from subscription
   const { data: subscription } = await (getSupabaseAdmin() as any)
@@ -288,17 +360,17 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
       tenant_id: subscription.tenant_id,
       subscription_id: subscription.id,
       stripe_invoice_id: invoice.id,
-      stripe_payment_intent_id: inv.payment_intent as string,
+      stripe_payment_intent_id: invoicePaymentIntentId(invoice),
       invoice_number: invoice.number || null,
       amount_due: invoice.amount_due / 100,
       amount_paid: invoice.amount_paid / 100,
       currency: invoice.currency,
-      tax: (inv.tax || 0) / 100,
+      tax: invoiceTaxCents(invoice) / 100,
       total: invoice.total / 100,
       status: invoice.status || 'paid',
-      invoice_date: new Date(invoice.created * 1000).toISOString(),
-      due_date: invoice.due_date ? new Date(invoice.due_date * 1000).toISOString() : null,
-      paid_at: invoice.status_transitions?.paid_at ? new Date(invoice.status_transitions.paid_at * 1000).toISOString() : null,
+      invoice_date: unixToIso(invoice.created) ?? new Date().toISOString(),
+      due_date: unixToIso(invoice.due_date),
+      paid_at: unixToIso(invoice.status_transitions?.paid_at),
       invoice_pdf_url: invoice.invoice_pdf || null,
       hosted_invoice_url: invoice.hosted_invoice_url || null,
       line_items: invoice.lines?.data || null,
@@ -324,8 +396,13 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
  * Handle failed payment
  */
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  const inv = invoice as any
-  const subscriptionId = inv.subscription as string
+  // Same moved field. While this was undefined a failed card never flipped the
+  // tenant to past_due, so they kept full paid access indefinitely.
+  const subscriptionId = invoiceSubscriptionId(invoice)
+  if (!subscriptionId) {
+    console.log(`billing webhook: failed invoice ${invoice.id} has no subscription — nothing to mark past_due`)
+    return
+  }
 
   // Get tenant from subscription
   const { data: subscription } = await (getSupabaseAdmin() as any)
@@ -385,7 +462,7 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
     p_user_id: null,
     p_action_type: 'billing.trial_ending_soon',
     p_details: {
-      trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null
+      trial_end: unixToIso(sub.trial_end)
     }
   })
 
@@ -436,13 +513,22 @@ async function raiseOnboardingFee(tenantId: string, subscription: Stripe.Subscri
       return
     }
 
-    const item = await stripe.invoiceItems.create({
-      customer: subscription.customer as string,
-      amount: decision.amountCents as number,
-      currency: 'usd',
-      description: decision.description as string,
-      metadata: { tenant_id: tenantId, autoura_onboarding_fee: 'true' },
-    })
+    // The metadata check above is a read-then-write across three round trips,
+    // so two concurrent deliveries of the same event can both reach this line.
+    // A DETERMINISTIC idempotency key makes that harmless: Stripe returns the
+    // SAME invoice item to both callers instead of creating a second $500-$1,500
+    // charge. It is derived from the subscription, because the fee is once-ever
+    // per subscription — a random key would defeat the entire purpose.
+    const item = await stripe.invoiceItems.create(
+      {
+        customer: subscription.customer as string,
+        amount: decision.amountCents as number,
+        currency: 'usd',
+        description: decision.description as string,
+        metadata: { tenant_id: tenantId, autoura_onboarding_fee: 'true' },
+      },
+      { idempotencyKey: `autoura-onboarding-fee-${subscription.id}` }
+    )
 
     // Written immediately after creation. If this write fails the item exists
     // without a record, so the log below is the trail for reconciling it by
@@ -491,7 +577,27 @@ async function withdrawUninvoicedOnboardingFee(subscription: Stripe.Subscription
     if (!itemId) return
 
     await stripe.invoiceItems.del(itemId)
-    console.log(`onboarding fee: withdrew uninvoiced item ${itemId}`)
+
+    // Clear the markers too. Leaving them set means a returning customer is
+    // treated as already-charged forever and the fee is never collected.
+    const { error: clearError } = await admin()
+      .from('tenant_subscriptions')
+      .update({
+        metadata: clearedMetadata(row?.metadata as Record<string, unknown> | null),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('stripe_subscription_id', subscription.id)
+
+    if (clearError) {
+      console.error(
+        `onboarding fee: withdrew ${itemId} but could not clear the charged markers — ` +
+        `if this tenant subscribes again the fee will be skipped as already_charged.`,
+        clearError
+      )
+      return
+    }
+
+    console.log(`onboarding fee: withdrew uninvoiced item ${itemId} and cleared its markers`)
   } catch (err) {
     // Already invoiced, or already gone. Neither is an error worth failing on.
     console.log('onboarding fee: nothing to withdraw', err instanceof Error ? err.message : err)
