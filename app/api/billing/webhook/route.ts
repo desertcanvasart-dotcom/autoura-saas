@@ -3,6 +3,12 @@ import { headers } from 'next/headers'
 import { verifyWebhookSignature } from '@/lib/stripe'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
+import { stripe } from '@/lib/stripe'
+import {
+  decideOnboardingFee,
+  chargedMetadata,
+  pendingInvoiceItemToCancel,
+} from '@/lib/onboarding-fee'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors when env vars unavailable)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -226,6 +232,8 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
 
 
+  await withdrawUninvoicedOnboardingFee(subscription)
+
   // Update subscription status
   const { error } = await (getSupabaseAdmin() as any)
     .from('tenant_subscriptions')
@@ -381,5 +389,111 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription) {
     }
   })
 
+  await raiseOnboardingFee(tenantId, subscription)
+
   // TODO: Send email notification to tenant owner about trial ending
+}
+
+/*
+ * The shared admin client is untyped in this file — every query above casts it
+ * inline. One scoped accessor for the onboarding-fee helpers instead, so the
+ * escape hatch is declared once with a reason rather than repeated.
+ */
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped supabase client; row shapes are asserted at each use */
+const admin = () => getSupabaseAdmin() as any
+
+/**
+ * Raise the one-time onboarding fee as a PENDING invoice item, so it lands on
+ * the first real invoice rather than at signup.
+ *
+ * Charged on conversion by operator decision: putting it in the Checkout
+ * session would create an amount due immediately, and Stripe would then demand
+ * a card despite payment_method_collection: 'if_required' — breaking the "no
+ * card required to start" promise.
+ *
+ * Idempotency is durable, in tenant_subscriptions.metadata, NOT a Stripe
+ * idempotency key: those expire after 24 hours, which cannot protect a
+ * once-ever charge of $500-$1,500. Failures are swallowed deliberately — a
+ * fee that cannot be raised must never take the whole webhook down with it,
+ * because the same event also keeps subscription state in sync.
+ */
+async function raiseOnboardingFee(tenantId: string, subscription: Stripe.Subscription) {
+  try {
+    const { data: row } = await admin()
+      .from('tenant_subscriptions')
+      .select('id, metadata, plan:subscription_plans(slug)')
+      .eq('stripe_subscription_id', subscription.id)
+      .maybeSingle()
+
+    if (!row) {
+      console.error('onboarding fee: no subscription row for', subscription.id)
+      return
+    }
+
+    const decision = decideOnboardingFee(row.plan?.slug, row.metadata)
+    if (!decision.charge) {
+      console.log(`onboarding fee: skipped (${decision.reason}) for tenant ${tenantId}`)
+      return
+    }
+
+    const item = await stripe.invoiceItems.create({
+      customer: subscription.customer as string,
+      amount: decision.amountCents as number,
+      currency: 'usd',
+      description: decision.description as string,
+      metadata: { tenant_id: tenantId, autoura_onboarding_fee: 'true' },
+    })
+
+    // Written immediately after creation. If this write fails the item exists
+    // without a record, so the log below is the trail for reconciling it by
+    // hand — far better than risking a second charge by writing first.
+    const { error: metaError } = await admin()
+      .from('tenant_subscriptions')
+      .update({
+        metadata: chargedMetadata(row.metadata, item.id, new Date().toISOString()),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', row.id)
+
+    if (metaError) {
+      console.error(
+        `onboarding fee: RAISED ${item.id} for tenant ${tenantId} but failed to record it — ` +
+        `a retry could double-charge. Reconcile manually.`, metaError
+      )
+      return
+    }
+
+    console.log(`onboarding fee: raised $${decision.amountUsd} (${item.id}) for tenant ${tenantId}`)
+  } catch (err) {
+    console.error('onboarding fee: could not raise for tenant', tenantId, err)
+  }
+}
+
+
+/**
+ * Withdraw the onboarding fee if the trial was abandoned before it was invoiced.
+ *
+ * The item is raised three days before trial end, so a cancellation inside that
+ * window would otherwise leave a charge sitting on the Stripe customer — ready
+ * to attach to any future invoice, including one raised months later if they
+ * came back. Stripe refuses to delete an item that has already been invoiced,
+ * which is exactly the behaviour wanted: a fee on a paid bill stays paid.
+ */
+async function withdrawUninvoicedOnboardingFee(subscription: Stripe.Subscription) {
+  try {
+    const { data: row } = await admin()
+      .from('tenant_subscriptions')
+      .select('metadata')
+      .eq('stripe_subscription_id', subscription.id)
+      .maybeSingle()
+
+    const itemId = pendingInvoiceItemToCancel(row?.metadata)
+    if (!itemId) return
+
+    await stripe.invoiceItems.del(itemId)
+    console.log(`onboarding fee: withdrew uninvoiced item ${itemId}`)
+  } catch (err) {
+    // Already invoiced, or already gone. Neither is an error worth failing on.
+    console.log('onboarding fee: nothing to withdraw', err instanceof Error ? err.message : err)
+  }
 }
