@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth } from '@/lib/supabase-server'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 
@@ -16,8 +17,7 @@ export async function POST(request: Request) {
     if (!supplierEmail) return NextResponse.json({ success: false, error: 'Supplier email is required' }, { status: 400 })
     if (!pdfBase64) return NextResponse.json({ success: false, error: 'PDF attachment is required' }, { status: 400 })
 
-    const { data: senderTenant } = await supabase
-      .from('tenants').select('company_name').eq('id', authResult.tenant_id!).maybeSingle()
+    const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const businessName = senderTenant?.company_name || ''
     const businessEmail = process.env.BUSINESS_EMAIL || process.env.GMAIL_USER || ''
 

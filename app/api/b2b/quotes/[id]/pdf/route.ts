@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 import { escapeHtml, safeUrl } from '@/lib/html-escape'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import puppeteer from 'puppeteer'
@@ -673,12 +674,7 @@ export async function GET(
     }
 
     // Generate HTML
-    const { data: senderTenant } = await getSupabaseAdmin()
-      .from('tenants')
-      .select('company_name, contact_email, company_phone, company_website, primary_color, logo_url')
-      .eq('id', authResult.tenant_id!)
-      .maybeSingle()
-
+    const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const tenantIdentity = (senderTenant ?? {}) as {
       company_name?: string; contact_email?: string; company_phone?: string; company_website?: string
       primary_color?: string; logo_url?: string

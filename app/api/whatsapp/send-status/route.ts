@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
 
@@ -130,12 +131,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build message
-    const { data: senderTenant } = await supabase
-      .from('tenants')
-      .select('company_name')
-      .eq('id', authResult.tenant_id!)
-      .maybeSingle()
-
+    const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const message = getStatusMessage(
       senderTenant?.company_name || '',
       itinerary.client_name || 'Valued Client',

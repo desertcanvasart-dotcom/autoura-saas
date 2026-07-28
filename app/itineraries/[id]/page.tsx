@@ -531,7 +531,13 @@ export default function ViewItineraryPage() {
     setShowSendModal(false)
     
     try {
-      const pdf = generateItineraryPDF(itinerary, days)
+      // Same identity + logo as the Download and preview paths. This call
+      // omitted them, so the ONE PDF a client actually receives was the only
+      // unbranded one: blank header name, no logo, empty footer.
+      const pdf = generateItineraryPDF(itinerary, days, undefined, {
+        ...identityFromTenant(tenant),
+        logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url),
+      })
       const pdfBlob = pdf.output('blob')
       const pdfBase64 = await blobToBase64(pdfBlob)
 

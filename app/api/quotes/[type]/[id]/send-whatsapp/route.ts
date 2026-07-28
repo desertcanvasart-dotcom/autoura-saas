@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createElement } from 'react'
@@ -218,8 +219,7 @@ export async function POST(
     }
 
     // Build WhatsApp message
-    const { data: senderTenant } = await supabase!
-      .from('tenants').select('company_name').eq('id', tenant_id!).maybeSingle()
+    const senderTenant = await loadSenderTenant(tenant_id)
     const businessName = senderTenant?.company_name || ''
     const businessEmail = process.env.BUSINESS_EMAIL || 'info@autoura.com'
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
