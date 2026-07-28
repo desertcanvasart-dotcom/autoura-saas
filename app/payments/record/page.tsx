@@ -46,7 +46,10 @@ export default function RecordPaymentPage() {
       // Auto-calculate deposit amount based on percentage
       if (itinerary && formData.payment_type.startsWith('deposit_')) {
         const percentage = parseInt(formData.payment_type.split('_')[1])
-        const depositAmount = Math.round(itinerary.total_cost * (percentage / 100))
+        // Round to CENTS, not whole units: Math.round() alone turned a 15%
+        // deposit on €1,111.11 into €167 instead of €166.67, so the balance
+        // never reached zero and the invoice stuck in 'partial' forever.
+        const depositAmount = Math.round((itinerary.total_cost ?? 0) * (percentage / 100) * 100) / 100
         setFormData(prev => ({ ...prev, amount: depositAmount.toString() }))
       } else if (itinerary && formData.payment_type === 'full') {
         setFormData(prev => ({ ...prev, amount: itinerary.total_cost.toString() }))
@@ -155,7 +158,7 @@ export default function RecordPaymentPage() {
               <option value="">Choose an itinerary...</option>
               {itineraries.map((itinerary) => (
                 <option key={itinerary.id} value={itinerary.id}>
-                  {itinerary.itinerary_code} - {itinerary.client_name} (€{itinerary.total_cost.toFixed(2)})
+                  {itinerary.itinerary_code} - {itinerary.client_name} ({itinerary.total_cost != null ? `€${itinerary.total_cost.toFixed(2)}` : 'not priced yet'})
                 </option>
               ))}
             </select>
@@ -168,7 +171,7 @@ export default function RecordPaymentPage() {
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <span className="text-gray-600">Total Cost:</span>
-                  <p className="font-bold text-gray-900">€{selectedItinerary.total_cost.toFixed(2)}</p>
+                  <p className="font-bold text-gray-900">{selectedItinerary.total_cost != null ? `€${selectedItinerary.total_cost.toFixed(2)}` : '—'}</p>
                 </div>
                 <div>
                   <span className="text-gray-600">Already Paid:</span>

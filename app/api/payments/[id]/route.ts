@@ -8,6 +8,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { parsePaymentInput } from '@/lib/payment-input'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 export async function GET(
@@ -75,9 +76,21 @@ export async function PUT(
 
 
 
+    // Same allowlist as POST. `update(body)` had the identical two problems:
+    // any column was client-settable, and any field that is not a column made
+    // the whole update fail — /payments/[id]/edit sends `...formData`, so
+    // editing a payment was broken for exactly the same reason as creating one.
+    const parsed = parsePaymentInput(body)
+    if (!parsed.ok) {
+      return NextResponse.json(
+        { success: false, error: parsed.errors[0].message, errors: parsed.errors },
+        { status: 400 }
+      )
+    }
+
     const { data, error } = await supabase
       .from('payments')
-      .update(body)
+      .update({ ...parsed.value, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single()

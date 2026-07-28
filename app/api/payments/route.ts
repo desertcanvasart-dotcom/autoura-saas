@@ -8,6 +8,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { parsePaymentInput } from '@/lib/payment-input'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 /**
@@ -97,20 +98,23 @@ export async function POST(request: NextRequest) {
 
 
 
-    // Validate required fields
-    if (!body.amount || !body.payment_method || !body.payment_date) {
+    // Allowlist + validate. Replaces a spread of the raw body, which both let
+    // a client set any column AND made the insert fail outright on any field
+    // that is not one (that is how payment_status kept this broken).
+    const parsed = parsePaymentInput(body)
+    if (!parsed.ok) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields: amount, payment_method, payment_date' },
+        { success: false, error: parsed.errors[0].message, errors: parsed.errors },
         { status: 400 }
       )
     }
 
     // If itinerary_id provided, verify it belongs to this tenant
-    if (body.itinerary_id) {
+    if (parsed.value.itinerary_id) {
       const { data: itinerary, error: itineraryError } = await supabase
         .from('itineraries')
         .select('id, tenant_id')
-        .eq('id', body.itinerary_id)
+        .eq('id', parsed.value.itinerary_id)
         .single()
 
       if (itineraryError || !itinerary) {
@@ -128,13 +132,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert with explicit tenant_id
+    // tenant_id last is deliberate: it cannot be overridden by the payload,
+    // because the payload no longer contains anything but the allowlist.
     const { data, error } = await supabase
       .from('payments')
-      .insert([{
-        tenant_id,
-        ...body
-      }])
+      .insert([{ ...parsed.value, tenant_id }])
       .select()
       .single()
 
