@@ -1,4 +1,5 @@
 import { google } from 'googleapis'
+import { escapeHtml } from './html-escape'
 
 // A FRESH OAuth2 client per call — never a shared module-level singleton.
 // setCredentials() mutates the client, so a shared instance lets concurrent
@@ -26,14 +27,6 @@ function sanitizeHeaderValue(value: string): string {
  * dangerouslySetInnerHTML, so a plain-text body containing e.g.
  * `</pre><script>...` must not break out of its wrapper.
  */
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
 
 // Scopes for Gmail access
 export const GMAIL_SCOPES = [

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { escapeHtml, safeUrl } from '@/lib/html-escape'
 import puppeteer from 'puppeteer'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
@@ -120,7 +121,7 @@ function generateHTML(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${itinerary.itinerary_code} - Itinerary</title>
+  <title>${escapeHtml(itinerary.itinerary_code)} - Itinerary</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -494,13 +495,13 @@ function generateHTML(
       <div class="logo-section">
         <div class="logo-circle">T2E</div>
         <div class="company-info">
-          ${company.logoUrl ? `<img src="${company.logoUrl}" alt="" style="height:48px;margin-bottom:10px" />` : ''}
-          <h1>${company.name || ''}</h1>
+          ${safeUrl(company.logoUrl) ? `<img src="${safeUrl(company.logoUrl)}" alt="" style="height:48px;margin-bottom:10px" />` : ''}
+          <h1>${escapeHtml(company.name || '')}</h1>
           <p>Professional Itinerary & Quote</p>
         </div>
       </div>
       <div class="quote-box">
-        <div class="quote-number">${itinerary.itinerary_code}</div>
+        <div class="quote-number">${escapeHtml(itinerary.itinerary_code)}</div>
         <div class="quote-dates">
           Issued: ${today}<br>
           Valid until: ${validUntil}
@@ -512,9 +513,9 @@ function generateHTML(
     <div class="section-header">Client Information</div>
     <div class="client-card">
       <div class="client-info">
-        <h3>${itinerary.client_name}</h3>
-        <p>${itinerary.client_email}</p>
-        ${itinerary.client_phone ? `<p>${itinerary.client_phone}</p>` : ''}
+        <h3>${escapeHtml(itinerary.client_name)}</h3>
+        <p>${escapeHtml(itinerary.client_email)}</p>
+        ${itinerary.client_phone ? `<p>${escapeHtml(itinerary.client_phone)}</p>` : ''}
       </div>
       <div class="travel-info">
         <p><strong>Travel Date:</strong> ${formatDate(itinerary.start_date)}</p>
@@ -525,7 +526,7 @@ function generateHTML(
     
     <!-- Tour Banner -->
     <div class="tour-banner">
-      <h2>${itinerary.trip_name.toUpperCase()}</h2>
+      <h2>${escapeHtml(itinerary.trip_name?.toUpperCase())}</h2>
     </div>
     
     <!-- Detailed Itinerary -->
@@ -534,11 +535,11 @@ function generateHTML(
       <div class="day-card">
         <div class="day-header">
           <span class="day-badge">DAY ${day.day_number}</span>
-          <span class="day-title">${cleanDayTitle(day.title, day.day_number, day.city)}</span>
-          ${day.city ? `<span class="day-city">${day.city}</span>` : ''}
+          <span class="day-title">${escapeHtml(cleanDayTitle(day.title, day.day_number, day.city))}</span>
+          ${day.city ? `<span class="day-city">${escapeHtml(day.city)}</span>` : ''}
         </div>
-        ${day.description ? `<div class="day-description">${day.description}</div>` : ''}
-        ${day.overnight_city ? `<div class="overnight">Overnight: ${day.overnight_city}</div>` : ''}
+        ${day.description ? `<div class="day-description">${escapeHtml(day.description)}</div>` : ''}
+        ${day.overnight_city ? `<div class="overnight">Overnight: ${escapeHtml(day.overnight_city)}</div>` : ''}
       </div>
     `).join('')}
     
@@ -557,10 +558,10 @@ function generateHTML(
         <tbody>
           ${allServices.map(service => `
             <tr>
-              <td>${service.name}</td>
+              <td>${escapeHtml(service.name)}</td>
               <td>${service.quantity}</td>
-              <td>${itinerary.currency} ${service.rate.toFixed(2)}</td>
-              <td><strong>${itinerary.currency} ${service.total.toFixed(2)}</strong></td>
+              <td>${escapeHtml(itinerary.currency)} ${service.rate.toFixed(2)}</td>
+              <td><strong>${escapeHtml(itinerary.currency)} ${service.total.toFixed(2)}</strong></td>
             </tr>
           `).join('')}
         </tbody>
@@ -570,10 +571,10 @@ function generateHTML(
     <div class="total-section">
       <div class="total-box">
         <div class="total-label">TOTAL PRICE</div>
-        <div class="total-amount">${itinerary.currency} ${itinerary.total_cost.toFixed(2)}</div>
+        <div class="total-amount">${escapeHtml(itinerary.currency)} ${itinerary.total_cost.toFixed(2)}</div>
       </div>
     </div>
-    <div class="per-person">Per person: ${itinerary.currency} ${perPerson.toFixed(2)}</div>
+    <div class="per-person">Per person: ${escapeHtml(itinerary.currency)} ${perPerson.toFixed(2)}</div>
     
     <!-- Payment & Cancellation -->
     <div class="section-header">Payment & Cancellation</div>
@@ -612,7 +613,7 @@ function generateHTML(
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-card">
-        <h3>${company.name || ''}</h3>
+        <h3>${escapeHtml(company.name || '')}</h3>
         <p>${[company.email, company.website].filter(Boolean).join(' • ')}</p>
       </div>
     </footer>
@@ -692,7 +693,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(Buffer.from(pdf), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${itinerary.itinerary_code}.pdf"`,
+        'Content-Disposition': `attachment; filename="${escapeHtml(itinerary.itinerary_code)}.pdf"`,
       },
     })
   } catch (error: any) {
