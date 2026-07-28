@@ -8,6 +8,8 @@ vi.mock('@supabase/supabase-js', async () => {
 
 import { buildTransportCache, findTransportRate } from '@/lib/auto-pricing-service'
 
+const TEST_SCOPE = { tenantId: 'test-tenant', useGlobalCatalog: true }
+
 beforeAll(() => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://localhost')
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key')
@@ -30,7 +32,7 @@ describe('buildTransportCache — wide bulk-imported transportation rows', () =>
         // no van/minibus/bus rates
       }],
     })
-    const cache = await buildTransportCache()
+    const cache = await buildTransportCache(TEST_SCOPE)
 
     const base = { serviceType: 'day_tour' as const, city: 'Cairo', duration: 'full_day' as const, area: null }
 
@@ -55,7 +57,7 @@ describe('buildTransportCache — wide bulk-imported transportation rows', () =>
         base_rate_eur: 60, base_rate_non_eur: 70, capacity_min: 1, capacity_max: 2,
       }],
     })
-    const cache = await buildTransportCache()
+    const cache = await buildTransportCache(TEST_SCOPE)
     const sedan = findTransportRate(cache, {
       serviceType: 'day_tour', city: 'Luxor', duration: 'full_day', area: null, vehicleType: 'Sedan',
     })

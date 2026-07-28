@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       .from('tour_templates')
       .select(`
         id,
+        tenant_id,
         template_name,
         template_code,
         tour_type,
@@ -119,7 +120,7 @@ export async function GET(request: NextRequest) {
 
         // If template uses day builder, use auto-pricing
         if (template.uses_day_builder || template.pricing_mode === 'auto') {
-          const priceRange = await getTemplatePriceRange(template.id)
+          const priceRange = await getTemplatePriceRange(template.id, template.tenant_id)
           if (priceRange) {
             startingFromPrice = priceRange.minPrice
             startingFromTier = priceRange.tier

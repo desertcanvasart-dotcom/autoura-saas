@@ -19,14 +19,19 @@ export function setMockTables(tables: MockTables): void {
 }
 
 // Parse a PostgREST `.or()` expression like "direction.eq.arrival,direction.eq.both"
-// and keep rows matching ANY clause (only the `eq` operator is used by the engine).
+// or "tenant_id.eq.X,tenant_id.is.null" and keep rows matching ANY clause.
+// `is.null` matches null AND absent columns — fixture rows carry no tenant_id,
+// which mirrors prod's global catalog rows (tenant_id IS NULL).
 function applyOr(rows: Row[], expr: string): Row[] {
   const clauses = expr.split(',').map((c) => {
     const [col, op, ...rest] = c.split('.')
     return { col, op, val: rest.join('.') }
   })
   return rows.filter((r) =>
-    clauses.some((cl) => cl.op === 'eq' && String(r[cl.col]) === cl.val)
+    clauses.some((cl) =>
+      (cl.op === 'eq' && String(r[cl.col]) === cl.val) ||
+      (cl.op === 'is' && cl.val === 'null' && r[cl.col] == null)
+    )
   )
 }
 

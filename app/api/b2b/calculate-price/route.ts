@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateAutoPricing, ServiceTier } from '@/lib/auto-pricing-service'
+import { getCatalogScope, catalogOrExpr } from '@/lib/catalog-scope'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
@@ -278,12 +279,15 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
 
 // Get entrance fee from entrance_fees table
 async function getEntranceFee(attractionName: string, isEurPassport: boolean, tenantId?: string): Promise<{ rate: number; name: string; id: string } | null> {
-  // entrance_fees supports intentional global fallback rows (tenant_id IS NULL — see migration 109)
+  // entrance_fees supports intentional global fallback rows (tenant_id IS NULL —
+  // see migration 109), visible only while the tenant's use_global_catalog
+  // flag is on (migration 260 / lib/catalog-scope.ts).
+  const scope = await getCatalogScope(getSupabaseAdmin(), tenantId ?? '')
   const { data: fees, error } = await (getSupabaseAdmin() as any)
     .from('entrance_fees')
     .select('id, attraction_name, eur_rate, non_eur_rate')
     .eq('is_active', true)
-    .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+    .or(catalogOrExpr(scope))
     .ilike('attraction_name', `%${attractionName}%`)
     .limit(1)
 
@@ -433,6 +437,7 @@ export async function POST(request: NextRequest) {
       // Call auto-pricing service with tour leader parameter
       const autoPriceResult = await calculateAutoPricing({
         templateId,
+        tenantId,
         tier: effectiveTier,
         numPax: num_pax,
         isEurPassport: is_eur_passport,

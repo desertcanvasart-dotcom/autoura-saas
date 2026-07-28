@@ -18,6 +18,7 @@ import { calculateDayBasedPricing } from '@/lib/auto-pricing-service'
 
 const BASE_PARAMS = {
   templateId: TEMPLATE_ID,
+  tenantId: 'test-tenant',
   tier: 'standard' as const,
   isEurPassport: true,
   language: 'English',

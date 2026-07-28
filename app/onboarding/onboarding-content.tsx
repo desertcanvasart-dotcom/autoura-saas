@@ -8,6 +8,7 @@ import { Check } from 'lucide-react'
 import WelcomeStep from './steps/WelcomeStep'
 import BusinessStep from './steps/BusinessStep'
 import BrandingStep from './steps/BrandingStep'
+import CatalogStep from './steps/CatalogStep'
 import TeamSetupStep from './steps/TeamSetupStep'
 import QuickTourStep from './steps/QuickTourStep'
 import CompleteStep from './steps/CompleteStep'
@@ -16,9 +17,10 @@ const STEPS = [
   { id: 0, name: 'Welcome', component: WelcomeStep },
   { id: 1, name: 'Business', component: BusinessStep },
   { id: 2, name: 'Branding', component: BrandingStep },
-  { id: 3, name: 'Team', component: TeamSetupStep },
-  { id: 4, name: 'Tour', component: QuickTourStep },
-  { id: 5, name: 'Complete', component: CompleteStep },
+  { id: 3, name: 'Catalog', component: CatalogStep },
+  { id: 4, name: 'Team', component: TeamSetupStep },
+  { id: 5, name: 'Tour', component: QuickTourStep },
+  { id: 6, name: 'Complete', component: CompleteStep },
 ]
 
 export default function OnboardingContent() {
