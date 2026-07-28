@@ -44,6 +44,8 @@ interface Itinerary {
   pickup_time: string
   cost_mode?: 'auto' | 'manual'
   tier?: string
+  /** Nullable in the DB. 0 is legitimate (an at-cost trip) — do not `|| 25`. */
+  margin_percent?: number | null
 }
 
 interface ItineraryDay {
@@ -86,25 +88,43 @@ export default function ViewItineraryPage() {
   const [itinerary, setItinerary] = useState<Itinerary | null>(null)
   const [days, setDays] = useState<DayWithServices[]>([])
 
+  // The itinerary's OWN margin, not a constant. This was hardcoded to 25 while
+  // the very same file already read margin_percent when persisting total_cost
+  // (see handleSaveServiceCost below) — so an itinerary configured at 40% was
+  // displayed, emailed and INVOICED at 25%: €10,000 of supplier cost quoted at
+  // €12,500 instead of €14,000, losing €1,500 silently on every trip.
+  //
+  // `Number.isFinite` rather than `|| 25`: margin_percent is nullable, but 0 is
+  // a legitimate value (an at-cost trip), and `0 || 25` would quietly resell it
+  // at 25%.
+  const marginPercent = useMemo(() => {
+    // null/undefined/'' must be caught BEFORE Number(), because Number(null)
+    // is 0 and Number.isFinite(0) is true — which would resolve a missing
+    // margin to 0% and sell the trip AT COST. Caught by the unit test.
+    const v = itinerary?.margin_percent
+    if (v === null || v === undefined || (v as unknown) === '') return 25
+    const raw = Number(v)
+    return Number.isFinite(raw) ? raw : 25
+  }, [itinerary])
+
   // The stored itinerary.total_cost is a denormalized cache that can be 0/stale
   // (an itinerary priced via its services without the header being re-synced —
   // which is why the header read EUR 0.00 while Profit & Loss showed a price).
   // The services are the source of truth, so derive the client total from them,
   // mirroring the Profit & Loss card, and use that whenever services exist.
   const computedClientTotal = useMemo(() => {
-    const margin = 25 // matches the Profit & Loss card below
     let total = 0
     for (const day of days) {
       for (const s of (day.services || [])) {
         const supplier = Number(s.total_cost) || 0
         const clientPrice = (s as any).client_price != null
           ? Number((s as any).client_price)
-          : supplier * (1 + margin / 100)
+          : supplier * (1 + marginPercent / 100)
         total += clientPrice
       }
     }
     return Math.round(total * 100) / 100
-  }, [days])
+  }, [days, marginPercent])
 
   const effectiveTotalCost = computedClientTotal > 0
     ? computedClientTotal
@@ -258,8 +278,9 @@ export default function ViewItineraryPage() {
           supplierSum += s.id === serviceId ? newCost : s.total_cost
         })
       })
-      const margin = Number((itinerary as any)?.margin_percent) || 25
-      const newTotalCost = Math.round(supplierSum * (1 + margin / 100) * 100) / 100
+      // Same source as the display, so the header and the stored cache can
+      // never disagree about the margin.
+      const newTotalCost = Math.round(supplierSum * (1 + marginPercent / 100) * 100) / 100
 
       await supabase
         .from('itineraries')
@@ -1007,7 +1028,7 @@ export default function ViewItineraryPage() {
         </div>
 
         {/* PROFIT & LOSS */}
-        {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={effectiveTotalCost} currency={itinerary.currency} marginPercent={25} days={days} />}
+        {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={effectiveTotalCost} currency={itinerary.currency} marginPercent={marginPercent} days={days} />}
 
         {/* EXTRA EXPENSES */}
         <ItineraryExpenses
