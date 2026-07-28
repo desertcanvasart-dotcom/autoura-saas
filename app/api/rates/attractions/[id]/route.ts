@@ -155,6 +155,7 @@ export async function PUT(
       .from('entrance_fees')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select()
       .single()
     
@@ -228,6 +229,7 @@ export async function DELETE(
       .from('entrance_fees')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
     
     if (error) {
       console.error('[Attraction API] Error deleting:', error)

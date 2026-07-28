@@ -143,6 +143,7 @@ export async function PUT(
       .from('nile_cruises')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select(`*, supplier:supplier_id (id, name)`)
       .single()
 
@@ -185,6 +186,7 @@ export async function DELETE(
       .from('nile_cruises')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('DELETE nile_cruises error:', error)

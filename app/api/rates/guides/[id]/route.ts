@@ -86,6 +86,7 @@ export async function PUT(
       .from('guide_rates')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select('*')
       .single()
 
@@ -128,6 +129,7 @@ export async function DELETE(
       .from('guide_rates')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('DELETE guide_rate error:', error)

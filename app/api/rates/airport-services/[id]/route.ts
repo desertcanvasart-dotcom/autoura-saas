@@ -31,6 +31,7 @@ export async function PUT(
       .from('airport_staff_rates')
       .update(body)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select()
       .single()
 
@@ -70,6 +71,7 @@ export async function DELETE(
       .from('airport_staff_rates')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) throw error
 

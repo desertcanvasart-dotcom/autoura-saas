@@ -93,6 +93,7 @@ export async function PUT(
       .from('meal_rates')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select('*')
       .single()
 
@@ -135,6 +136,7 @@ export async function DELETE(
       .from('meal_rates')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('DELETE meal_rate error:', error)

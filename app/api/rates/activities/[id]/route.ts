@@ -99,6 +99,7 @@ export async function PUT(
       .from('activity_rates')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select('*')
       .single()
 
@@ -141,6 +142,7 @@ export async function DELETE(
       .from('activity_rates')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('DELETE activity_rates error:', error)

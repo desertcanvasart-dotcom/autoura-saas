@@ -122,6 +122,7 @@ export async function PUT(
       .from('flight_rates')
       .update(updates)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select('*')
       .single()
 
@@ -165,6 +166,7 @@ export async function DELETE(
       .from('flight_rates')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('DELETE flight_rates/[id] error:', error)
