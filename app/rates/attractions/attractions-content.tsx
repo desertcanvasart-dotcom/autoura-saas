@@ -5,15 +5,10 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import {
-  Search, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles,
-  Copy, Download, Upload
-} from 'lucide-react'
+import { Search, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
 import { useCurrency } from '@/hooks/useCurrency'
-import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // CONSTANTS
@@ -489,147 +484,7 @@ export default function AttractionsContent() {
   }
 
   // Export to CSV
-  const handleExportCSV = () => {
-    const headers = [
-      'service_code', 'attraction_name', 'city', 'fee_type', 'eur_rate', 'non_eur_rate',
-      'egyptian_rate', 'student_discount_percentage', 'child_discount_percent', 'season',
-      'rate_valid_from', 'rate_valid_to', 'category', 'notes', 'is_active', 'is_addon', 'addon_note', 'supplier_id'
-    ]
-
-    const csvRows = [headers.join(',')]
-
-    filteredAttractions.forEach(rate => {
-      const row = [
-        csvCell(rate.service_code),
-        csvCell(rate.attraction_name),
-        csvCell(rate.city),
-        csvCell(rate.fee_type),
-        rate.eur_rate || 0,
-        rate.non_eur_rate || 0,
-        rate.egyptian_rate || 0,
-        rate.student_discount_percentage || 0,
-        rate.child_discount_percent || 0,
-        csvCell(rate.season),
-        csvCell(rate.rate_valid_from),
-        csvCell(rate.rate_valid_to),
-        csvCell(rate.category),
-        csvCell(rate.notes),
-        rate.is_active ? 'true' : 'false',
-        rate.is_addon ? 'true' : 'false',
-        csvCell(rate.addon_note),
-        csvCell(rate.supplier_id)
-      ]
-      csvRows.push(row.join(','))
-    })
-
-    const csvContent = csvRows.join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `attractions_export_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    showToast('success', `Exported ${filteredAttractions.length} attractions to CSV`)
-  }
-
   // Import from CSV
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result as string
-        const lines = text.split('\n').filter(line => line.trim())
-
-        if (lines.length < 2) {
-          showToast('error', 'CSV file is empty or has no data rows')
-          return
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-        let successCount = 0
-        let errorCount = 0
-
-        for (let i = 1; i < lines.length; i++) {
-          const values: string[] = []
-          let current = ''
-          let inQuotes = false
-
-          for (const char of lines[i]) {
-            if (char === '"') {
-              inQuotes = !inQuotes
-            } else if (char === ',' && !inQuotes) {
-              values.push(current.trim())
-              current = ''
-            } else {
-              current += char
-            }
-          }
-          values.push(current.trim())
-
-          const record: Record<string, string | number | boolean | null> = {}
-          headers.forEach((header, index) => {
-            let value: string | number | boolean | null = values[index] || ''
-
-            // Handle empty dates as null
-            if ((header === 'rate_valid_from' || header === 'rate_valid_to') && !value) {
-              value = null
-            }
-            // Handle numeric fields
-            else if (['eur_rate', 'non_eur_rate', 'egyptian_rate', 'student_discount_percentage', 'child_discount_percent'].includes(header)) {
-              value = parseFloat(value as string) || 0
-            }
-            // Handle boolean fields
-            else if (['is_active', 'is_addon'].includes(header)) {
-              value = value === 'true' || value === '1' || value === 'yes'
-            }
-
-            record[header] = value
-          })
-
-          // Generate service code if not provided
-          if (!record.service_code) {
-            record.service_code = generateServiceCode()
-          }
-
-          // Set default dates if null
-          if (!record.rate_valid_from) {
-            record.rate_valid_from = today
-          }
-          if (!record.rate_valid_to) {
-            record.rate_valid_to = nextYear
-          }
-
-          try {
-            const response = await fetch('/api/rates/attractions', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(record)
-            })
-
-            if (response.ok) {
-              successCount++
-            } else {
-              errorCount++
-            }
-          } catch {
-            errorCount++
-          }
-        }
-
-        fetchAttractions()
-        showToast('success', `Imported ${successCount} attractions${errorCount > 0 ? `, ${errorCount} failed` : ''}`)
-      } catch (error) {
-        console.error('Error importing CSV:', error)
-        showToast('error', 'Failed to parse CSV file')
-      }
-    }
-
-    reader.readAsText(file)
-    event.target.value = ''
-  }
-
   // Get supplier name by ID
   const getSupplierName = (supplierId?: string) => {
     if (!supplierId) return null
@@ -734,18 +589,6 @@ export default function AttractionsContent() {
                 <Plus className="w-4 h-4" />
                 Add Attraction
               </button>
-              <button
-                onClick={handleExportCSV}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 font-medium"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 font-medium cursor-pointer">
-                <Upload className="w-4 h-4" />
-                Import
-                <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
-              </label>
               <Link
                 href="/rates"
                 className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"

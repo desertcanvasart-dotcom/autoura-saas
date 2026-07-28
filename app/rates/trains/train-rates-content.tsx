@@ -4,32 +4,8 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import {
-  Train,
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  X,
-  Check,
-  Download,
-  Upload,
-  Copy,
-  MapPin,
-  Clock,
-  ChevronLeft,
-  ChevronRight,
-  LayoutGrid,
-  List,
-  Table2,
-  ArrowRight,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Info
-} from 'lucide-react'
+import { Train, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
-import { csvCell } from '@/lib/finance-export'
 
 // Egyptian cities with train stations
 const TRAIN_CITIES = [
@@ -310,148 +286,7 @@ export default function TrainRatesContent() {
   }
 
   // Export filtered rates to CSV
-  const handleExportCSV = () => {
-    if (filteredRates.length === 0) {
-      showNotification('warning', 'No Data', 'No rates to export. Adjust your filters and try again.')
-      return
-    }
-
-    const headers = [
-      'service_code',
-      'origin_city',
-      'destination_city',
-      'class_type',
-      'rate_eur',
-      'duration_hours',
-      'rate_valid_from',
-      'rate_valid_to',
-      'operator_name',
-      'departure_times',
-      'description',
-      'notes',
-      'is_active'
-    ]
-
-    const csvRows = [
-      headers.join(','),
-      ...filteredRates.map(rate => {
-        return headers.map(header => {
-          const value = rate[header as keyof TrainRate]
-          if (value === null || value === undefined) return ''
-          if (typeof value === 'string') {
-            return csvCell(value)
-          }
-          return value
-        }).join(',')
-      })
-    ]
-
-    const csvContent = csvRows.join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `train-rates-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    showNotification('success', 'Export Complete', `Exported ${filteredRates.length} train rates to CSV.`)
-  }
-
   // Import rates from CSV
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result as string
-        const lines = text.split('\n').filter(line => line.trim())
-
-        if (lines.length < 2) {
-          showNotification('error', 'Invalid File', 'CSV file must have a header row and at least one data row.')
-          return
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-        const requiredFields = ['origin_city', 'destination_city', 'class_type', 'rate_eur']
-        const missingFields = requiredFields.filter(f => !headers.includes(f))
-
-        if (missingFields.length > 0) {
-          showNotification('error', 'Missing Fields', `CSV is missing required fields: ${missingFields.join(', ')}`)
-          return
-        }
-
-        let successCount = 0
-        let errorCount = 0
-
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''))
-          const record: Record<string, any> = {}
-
-          headers.forEach((header, index) => {
-            record[header] = values[index] || ''
-          })
-
-          // Prepare the data for API
-          const rateData = {
-            service_code: record.service_code || generateServiceCode(),
-            origin_city: record.origin_city,
-            destination_city: record.destination_city,
-            class_type: record.class_type,
-            rate_eur: parseFloat(record.rate_eur) || 0,
-            duration_hours: record.duration_hours ? parseFloat(record.duration_hours) : null,
-            rate_valid_from: record.rate_valid_from || today,
-            rate_valid_to: record.rate_valid_to || nextYear,
-            operator_name: record.operator_name || '',
-            departure_times: record.departure_times || '',
-            description: record.description || '',
-            notes: record.notes || '',
-            is_active: record.is_active === 'false' ? false : true
-          }
-
-          try {
-            const response = await fetch('/api/rates/trains', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(rateData)
-            })
-
-            if (response.ok) {
-              successCount++
-            } else {
-              errorCount++
-            }
-          } catch {
-            errorCount++
-          }
-        }
-
-        // Reset file input
-        event.target.value = ''
-
-        if (successCount > 0) {
-          fetchRates()
-          showNotification(
-            errorCount > 0 ? 'warning' : 'success',
-            'Import Complete',
-            `Successfully imported ${successCount} rates.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`
-          )
-        } else {
-          showNotification('error', 'Import Failed', 'No rates were imported. Please check your CSV format.')
-        }
-      } catch (error) {
-        console.error('Error importing CSV:', error)
-        showNotification('error', 'Import Error', 'Failed to parse CSV file. Please check the format.')
-      }
-    }
-
-    reader.readAsText(file)
-  }
-
   // Filter rates
   const filteredRates = rates.filter(rate => {
     const matchesSearch = searchTerm === '' ||
@@ -604,23 +439,6 @@ export default function TrainRatesContent() {
         </div>
         <div className="flex items-center gap-2">
           <BulkRateImportExport tableName="train_rates" onImportComplete={fetchRates} />
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-          <label className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer">
-            <Upload className="w-4 h-4" />
-            Import
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleImportCSV}
-              className="hidden"
-            />
-          </label>
           <button
             onClick={handleAddNew}
             className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"

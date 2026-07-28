@@ -3,30 +3,10 @@
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useState, useEffect, useCallback } from 'react'
-import {
-  Search,
-  Plus,
-  Edit2,
-  Trash2,
-  X,
-  Plane,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Building2,
-  Clock,
-  Luggage,
-  ArrowRight,
-  Copy,
-  Download,
-  Upload
-} from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, X, Plane, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Clock, Luggage, ArrowRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
 import { useCurrency } from '@/hooks/useCurrency'
-import { csvCell } from '@/lib/finance-export'
 
 interface FlightRate {
   id: string
@@ -472,188 +452,6 @@ export default function FlightsContent() {
     setIsModalOpen(true)
   }
 
-  const handleExportCSV = () => {
-    if (filteredRates.length === 0) {
-      dialog.alert('No Data', 'No flight rates to export.', 'warning')
-      return
-    }
-
-    const headers = [
-      'service_code',
-      'route_from',
-      'route_to',
-      'airline',
-      'flight_number',
-      'flight_type',
-      'cabin_class',
-      'base_rate_eur',
-      'base_rate_non_eur',
-      'baggage_kg',
-      'departure_time',
-      'arrival_time',
-      'duration_minutes',
-      'frequency',
-      'season',
-      'rate_valid_from',
-      'rate_valid_to',
-      'supplier_name',
-      'notes',
-      'is_active'
-    ]
-
-    const csvRows = [headers.join(',')]
-
-    filteredRates.forEach(rate => {
-      const row = [
-        csvCell(rate.service_code),
-        csvCell(rate.route_from),
-        csvCell(rate.route_to),
-        csvCell(rate.airline),
-        csvCell(rate.flight_number),
-        csvCell(rate.flight_type),
-        csvCell(rate.cabin_class),
-        rate.base_rate_eur || 0,
-        rate.base_rate_non_eur || 0,
-        rate.baggage_kg || '',
-        csvCell(rate.departure_time),
-        csvCell(rate.arrival_time),
-        rate.duration_minutes || '',
-        csvCell(rate.frequency),
-        csvCell(rate.season),
-        csvCell(rate.rate_valid_from),
-        csvCell(rate.rate_valid_to),
-        csvCell(rate.supplier_name || rate.supplier?.name),
-        csvCell(rate.notes),
-        rate.is_active ? 'true' : 'false'
-      ]
-      csvRows.push(row.join(','))
-    })
-
-    const csvContent = csvRows.join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `flight-rates-${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  }
-
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result as string
-        const lines = text.split('\n').filter(line => line.trim())
-
-        if (lines.length < 2) {
-          await dialog.alert('Error', 'CSV file is empty or has no data rows.', 'warning')
-          return
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
-        const records: Partial<FormData>[] = []
-
-        for (let i = 1; i < lines.length; i++) {
-          const values: string[] = []
-          let current = ''
-          let inQuotes = false
-
-          for (const char of lines[i]) {
-            if (char === '"') {
-              inQuotes = !inQuotes
-            } else if (char === ',' && !inQuotes) {
-              values.push(current.trim())
-              current = ''
-            } else {
-              current += char
-            }
-          }
-          values.push(current.trim())
-
-          const record: Record<string, string | number | boolean> = {}
-          headers.forEach((header, idx) => {
-            let value = values[idx] || ''
-            value = value.replace(/^"|"$/g, '').replace(/""/g, '"')
-            record[header] = value
-          })
-
-          records.push({
-            service_code: String(record.service_code || ''),
-            route_from: String(record.route_from || ''),
-            route_to: String(record.route_to || ''),
-            airline: String(record.airline || 'EgyptAir'),
-            flight_number: String(record.flight_number || ''),
-            flight_type: (record.flight_type === 'international' ? 'international' : 'domestic') as 'domestic' | 'international',
-            cabin_class: (['economy', 'business', 'first'].includes(String(record.cabin_class)) ? record.cabin_class : 'economy') as 'economy' | 'business' | 'first',
-            base_rate_eur: parseFloat(String(record.base_rate_eur)) || 0,
-            base_rate_non_eur: parseFloat(String(record.base_rate_non_eur)) || 0,
-            baggage_kg: parseInt(String(record.baggage_kg)) || 23,
-            departure_time: String(record.departure_time || ''),
-            arrival_time: String(record.arrival_time || ''),
-            duration_minutes: parseInt(String(record.duration_minutes)) || 0,
-            frequency: String(record.frequency || 'daily'),
-            season: String(record.season || ''),
-            rate_valid_from: String(record.rate_valid_from || new Date().toISOString().split('T')[0]),
-            rate_valid_to: String(record.rate_valid_to || '2099-12-31'),
-            supplier_name: String(record.supplier_name || ''),
-            notes: String(record.notes || ''),
-            is_active: record.is_active === 'true' || record.is_active === '1' || record.is_active === true
-          })
-        }
-
-        let successCount = 0
-        let errorCount = 0
-
-        for (const record of records) {
-          try {
-            const response = await fetch('/api/rates/flights', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                ...record,
-                supplier_id: null,
-                flight_number: record.flight_number || null,
-                departure_time: record.departure_time || null,
-                arrival_time: record.arrival_time || null,
-                duration_minutes: record.duration_minutes || null,
-                baggage_kg: record.baggage_kg || null,
-                season: record.season || null,
-                notes: record.notes || null
-              })
-            })
-
-            if (response.ok) {
-              successCount++
-            } else {
-              errorCount++
-            }
-          } catch {
-            errorCount++
-          }
-        }
-
-        fetchRates()
-        await dialog.alert(
-          'Import Complete',
-          `Successfully imported ${successCount} flight rates.${errorCount > 0 ? ` ${errorCount} records failed.` : ''}`,
-          successCount > 0 ? 'success' : 'warning'
-        )
-      } catch (err) {
-        console.error('Error parsing CSV:', err)
-        await dialog.alert('Error', 'Failed to parse CSV file. Please check the format.', 'warning')
-      }
-    }
-
-    reader.readAsText(file)
-    event.target.value = ''
-  }
-
   // Filter rates
   const filteredRates = rates.filter(rate => {
     const search = searchTerm.toLowerCase()
@@ -719,24 +517,6 @@ export default function FlightsContent() {
         </div>
         <div className="flex items-center gap-2">
           <BulkRateImportExport tableName="flight_rates" onImportComplete={fetchRates} />
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-md hover:bg-gray-50 transition-colors"
-            title="Export to CSV"
-          >
-            <Download className="h-4 w-4" />
-            Export
-          </button>
-          <label className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-md hover:bg-gray-50 transition-colors cursor-pointer">
-            <Upload className="h-4 w-4" />
-            Import
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleImportCSV}
-              className="hidden"
-            />
-          </label>
           <button
             onClick={openAddModal}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-sm rounded-md hover:bg-[#4f6238] transition-colors"

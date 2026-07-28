@@ -5,35 +5,8 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import {
-  Users,
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  X,
-  Check,
-  Download,
-  Upload,
-  Copy,
-  Filter,
-  Globe,
-  MapPin,
-  Clock,
-  Calendar,
-  Star,
-  ChevronLeft,
-  ChevronRight,
-  LayoutGrid,
-  List,
-  Table2,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Info
-} from 'lucide-react'
+import { Users, Plus, Search, Edit, Trash2, X, Check, Copy, Filter, Globe, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
-import { csvCell } from '@/lib/finance-export'
 
 // Egyptian cities
 const EGYPT_CITIES = [
@@ -294,177 +267,7 @@ export default function GuideRatesContent() {
   }
 
   // Export filtered rates to CSV
-  const handleExportCSV = () => {
-    if (filteredRates.length === 0) {
-      showNotification('warning', 'No Data', 'No rates to export. Adjust your filters and try again.')
-      return
-    }
-
-    const headers = [
-      'Service Code',
-      'Language',
-      'Guide Type',
-      'City',
-      'Tour Duration',
-      'EUR Rate',
-      'Non-EUR Rate',
-      'Season',
-      'Valid From',
-      'Valid To',
-      'Supplier ID',
-      'Notes',
-      'Active'
-    ]
-
-    const rows = filteredRates.map(rate => [
-      csvCell(rate.service_code),
-      csvCell(rate.guide_language),
-      csvCell(rate.guide_type),
-      csvCell(rate.city),
-      csvCell(rate.tour_duration),
-      rate.base_rate_eur?.toString() || '0',
-      rate.base_rate_non_eur?.toString() || '0',
-      csvCell(rate.season),
-      csvCell(rate.rate_valid_from),
-      csvCell(rate.rate_valid_to),
-      csvCell(rate.supplier_id),
-      csvCell(rate.notes),
-      rate.is_active ? 'true' : 'false'
-    ])
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `guide-rates-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    showNotification('success', 'Export Complete', `Exported ${filteredRates.length} guide rates to CSV.`)
-  }
-
   // Import rates from CSV file
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result as string
-        const lines = text.split('\n').filter(line => line.trim())
-
-        if (lines.length < 2) {
-          showNotification('error', 'Invalid File', 'CSV file must have a header row and at least one data row.')
-          return
-        }
-
-        // Parse header to get column indices
-        const headerLine = lines[0]
-        const headers = headerLine.split(',').map(h => h.replace(/"/g, '').trim().toLowerCase())
-
-        const getIndex = (name: string) => headers.findIndex(h => h.includes(name))
-        const serviceCodeIdx = getIndex('service code')
-        const languageIdx = getIndex('language')
-        const guideTypeIdx = getIndex('guide type')
-        const cityIdx = getIndex('city')
-        const durationIdx = getIndex('duration')
-        const eurRateIdx = getIndex('eur rate')
-        const nonEurRateIdx = getIndex('non-eur')
-        const seasonIdx = getIndex('season')
-        const validFromIdx = getIndex('valid from')
-        const validToIdx = getIndex('valid to')
-        const supplierIdIdx = getIndex('supplier')
-        const notesIdx = getIndex('notes')
-        const activeIdx = getIndex('active')
-
-        let successCount = 0
-        let errorCount = 0
-
-        // Process each data row
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim()
-          if (!line) continue
-
-          // Parse CSV line (handle quoted values with commas)
-          const values: string[] = []
-          let current = ''
-          let inQuotes = false
-          for (const char of line) {
-            if (char === '"') {
-              inQuotes = !inQuotes
-            } else if (char === ',' && !inQuotes) {
-              values.push(current.trim())
-              current = ''
-            } else {
-              current += char
-            }
-          }
-          values.push(current.trim())
-
-          const getValue = (idx: number) => idx >= 0 && idx < values.length ? values[idx].replace(/"/g, '') : ''
-
-          const rateData = {
-            service_code: getValue(serviceCodeIdx) || generateServiceCode(),
-            guide_language: getValue(languageIdx) || 'English',
-            guide_type: getValue(guideTypeIdx) || 'licensed',
-            city: getValue(cityIdx) || '',
-            tour_duration: getValue(durationIdx) || 'full_day',
-            base_rate_eur: parseFloat(getValue(eurRateIdx)) || 0,
-            base_rate_non_eur: parseFloat(getValue(nonEurRateIdx)) || 0,
-            season: getValue(seasonIdx) || '',
-            rate_valid_from: getValue(validFromIdx) || today,
-            rate_valid_to: getValue(validToIdx) || nextYear,
-            supplier_id: getValue(supplierIdIdx) || '',
-            notes: getValue(notesIdx) || '',
-            is_active: getValue(activeIdx).toLowerCase() !== 'false'
-          }
-
-          try {
-            const response = await fetch('/api/rates/guides', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(rateData)
-            })
-
-            if (response.ok) {
-              successCount++
-            } else {
-              errorCount++
-            }
-          } catch {
-            errorCount++
-          }
-        }
-
-        // Reset file input
-        event.target.value = ''
-
-        // Refresh the rates list
-        fetchRates()
-
-        if (errorCount === 0) {
-          showNotification('success', 'Import Complete', `Successfully imported ${successCount} guide rates.`)
-        } else {
-          showNotification('warning', 'Import Partial', `Imported ${successCount} rates. ${errorCount} failed.`)
-        }
-      } catch (error) {
-        console.error('Error parsing CSV:', error)
-        showNotification('error', 'Import Failed', 'Failed to parse CSV file. Please check the format.')
-        event.target.value = ''
-      }
-    }
-
-    reader.readAsText(file)
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -694,23 +497,6 @@ export default function GuideRatesContent() {
         </div>
         <div className="flex items-center gap-2">
           <BulkRateImportExport tableName="guide_rates" onImportComplete={fetchRates} />
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-          <label className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer">
-            <Upload className="w-4 h-4" />
-            Import
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleImportCSV}
-              className="hidden"
-            />
-          </label>
           <button
             onClick={handleAddNew}
             className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"

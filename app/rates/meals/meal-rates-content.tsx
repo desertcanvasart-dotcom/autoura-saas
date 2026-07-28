@@ -5,31 +5,8 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import {
-  Utensils,
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  X,
-  Check,
-  Download,
-  Upload,
-  Copy,
-  MapPin,
-  Users,
-  ChevronLeft,
-  ChevronRight,
-  LayoutGrid,
-  List,
-  Table2,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Info
-} from 'lucide-react'
+import { Utensils, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Users, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
-import { csvCell } from '@/lib/finance-export'
 
 // Egyptian cities
 const EGYPT_CITIES = [
@@ -363,171 +340,6 @@ export default function MealRatesContent() {
     setShowModal(true)
   }
 
-  const handleExportCSV = () => {
-    const headers = [
-      'service_code',
-      'restaurant_name',
-      'meal_type',
-      'cuisine_type',
-      'restaurant_type',
-      'city',
-      'base_rate_eur',
-      'base_rate_non_eur',
-      'season',
-      'rate_valid_from',
-      'rate_valid_to',
-      'supplier_id',
-      'supplier_name',
-      'tier',
-      'meal_category',
-      'dietary_options',
-      'per_person_rate',
-      'minimum_pax',
-      'notes',
-      'is_active'
-    ]
-
-    const csvRows = [
-      headers.join(','),
-      ...filteredRates.map(rate => [
-        csvCell(rate.service_code),
-        csvCell(rate.restaurant_name),
-        csvCell(rate.meal_type),
-        csvCell(rate.cuisine_type),
-        csvCell(rate.restaurant_type),
-        csvCell(rate.city),
-        rate.base_rate_eur || 0,
-        rate.base_rate_non_eur || 0,
-        csvCell(rate.season),
-        csvCell(rate.rate_valid_from),
-        csvCell(rate.rate_valid_to),
-        csvCell(rate.supplier_id),
-        csvCell(rate.supplier_name),
-        csvCell(rate.tier),
-        csvCell(rate.meal_category),
-        csvCell((rate.dietary_options || []).join(';')),
-        rate.per_person_rate ? 'true' : 'false',
-        rate.minimum_pax || 1,
-        csvCell(rate.notes),
-        rate.is_active ? 'true' : 'false'
-      ].join(','))
-    ]
-
-    const csvContent = csvRows.join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `meal-rates-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    showNotification('success', 'Export Complete', `Exported ${filteredRates.length} meal rates to CSV`)
-  }
-
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result as string
-        const lines = text.split('\n').filter(line => line.trim())
-
-        if (lines.length < 2) {
-          showNotification('error', 'Import Failed', 'CSV file is empty or has no data rows')
-          return
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
-        let successCount = 0
-        let errorCount = 0
-
-        for (let i = 1; i < lines.length; i++) {
-          const values: string[] = []
-          let current = ''
-          let inQuotes = false
-
-          for (const char of lines[i]) {
-            if (char === '"') {
-              inQuotes = !inQuotes
-            } else if (char === ',' && !inQuotes) {
-              values.push(current.trim())
-              current = ''
-            } else {
-              current += char
-            }
-          }
-          values.push(current.trim())
-
-          const row: Record<string, string> = {}
-          headers.forEach((header, index) => {
-            row[header] = values[index] || ''
-          })
-
-          const rateData = {
-            service_code: row.service_code || generateServiceCode(),
-            restaurant_name: row.restaurant_name || '',
-            meal_type: row.meal_type || '',
-            cuisine_type: row.cuisine_type || '',
-            restaurant_type: row.restaurant_type || '',
-            city: row.city || '',
-            base_rate_eur: parseFloat(row.base_rate_eur) || 0,
-            base_rate_non_eur: parseFloat(row.base_rate_non_eur) || 0,
-            season: row.season || '',
-            rate_valid_from: row.rate_valid_from || today,
-            rate_valid_to: row.rate_valid_to || nextYear,
-            supplier_id: row.supplier_id || '',
-            supplier_name: row.supplier_name || '',
-            tier: row.tier || 'standard',
-            meal_category: row.meal_category || '',
-            dietary_options: row.dietary_options ? row.dietary_options.split(';').filter(Boolean) : [],
-            per_person_rate: row.per_person_rate !== 'false',
-            minimum_pax: parseInt(row.minimum_pax) || 1,
-            notes: row.notes || '',
-            is_active: row.is_active !== 'false'
-          }
-
-          if (!rateData.restaurant_name) {
-            errorCount++
-            continue
-          }
-
-          try {
-            const response = await fetch('/api/rates/meals', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(rateData)
-            })
-
-            if (response.ok) {
-              successCount++
-            } else {
-              errorCount++
-            }
-          } catch {
-            errorCount++
-          }
-        }
-
-        fetchRates()
-        showNotification(
-          errorCount === 0 ? 'success' : 'warning',
-          'Import Complete',
-          `Successfully imported ${successCount} rates${errorCount > 0 ? `, ${errorCount} failed` : ''}`
-        )
-      } catch (error) {
-        console.error('Import error:', error)
-        showNotification('error', 'Import Failed', 'Failed to parse CSV file')
-      }
-    }
-
-    reader.readAsText(file)
-    event.target.value = ''
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -757,23 +569,6 @@ export default function MealRatesContent() {
         </div>
         <div className="flex items-center gap-2">
           <BulkRateImportExport tableName="meal_rates" onImportComplete={fetchRates} />
-          <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-          <label className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 cursor-pointer">
-            <Upload className="w-4 h-4" />
-            Import
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleImportCSV}
-              className="hidden"
-            />
-          </label>
           <button
             onClick={handleAddNew}
             className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium"
