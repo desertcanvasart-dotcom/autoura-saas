@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     // Create portal session
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
-    const returnUrl = `${appUrl}/admin/billing`
+    const returnUrl = `${appUrl}/settings/billing`
 
     const session = await createPortalSession(
       subscription.stripe_customer_id,

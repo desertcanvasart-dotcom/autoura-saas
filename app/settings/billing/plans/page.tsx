@@ -68,29 +68,39 @@ export default function BillingPlansPage() {
       setError('Only owners can change the subscription')
       return
     }
+    if (planSlug === 'enterprise') {
+      // Contact-sales by design — there is deliberately no Stripe price.
+      setError('Enterprise is set up personally — message us via the support chat and we will get you started.')
+      return
+    }
 
     setCheckoutLoading(planSlug)
     setError(null)
 
     try {
-      const response = await fetch('/api/settings/pricing-tier', {
+      // Subscriptions are created by Stripe Checkout (14-day trial, no card
+      // required) and recorded by the billing webhook — never by writing a
+      // tier label locally. The old handler here POSTed to
+      // /api/settings/pricing-tier, which meant no trial, no subscription,
+      // and no Stripe anything.
+      const response = await fetch('/api/billing/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: planSlug }),
+        body: JSON.stringify({ plan_slug: planSlug, billing_cycle: billingCycle }),
       })
 
       const data = await response.json()
 
-      if (data.success) {
-        setCurrentTier(planSlug as any)
-        window.location.reload()
+      if (data.success && data.checkout_url) {
+        // Keep the spinner on while the browser navigates to Stripe.
+        window.location.href = data.checkout_url
       } else {
-        setError(data.error || 'Failed to update plan')
+        setError(data.error || 'Could not start checkout')
+        setCheckoutLoading(null)
       }
     } catch (err) {
-      console.error('Error updating plan:', err)
-      setError('Failed to update plan')
-    } finally {
+      console.error('Error starting checkout:', err)
+      setError('Could not start checkout')
       setCheckoutLoading(null)
     }
   }
