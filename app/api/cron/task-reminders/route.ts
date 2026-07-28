@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sendMail } from '@/lib/email-send'
 import { createClient } from '@supabase/supabase-js'
 
 // Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
@@ -284,24 +285,22 @@ async function sendReminderEmail(
     </html>
   `
 
-  const response = await fetch(`${baseUrl}/api/gmail/send`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-cron-secret': process.env.CRON_SECRET || '',
-    },
-    body: JSON.stringify({
-      to: toEmail,
-      subject: `[Autoura] ${subject}`,
-      html: htmlContent
-    })
+  // Resend directly: /api/gmail/send routes through a specific user's
+  // connected Gmail mailbox (needs userId + gmail_tokens), which is the wrong
+  // transport for a platform reminder — and it was unreachable from here
+  // anyway (not in the middleware allowlist → 401) and called with the wrong
+  // body shape. No task reminder has ever been delivered.
+  const result = await sendMail({
+    to: toEmail,
+    subject: `[Autoura] ${subject}`,
+    html: htmlContent,
   })
 
-  if (!response.ok) {
-    throw new Error('Failed to send email')
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to send task reminder')
   }
 
-  return response.json()
+  return result
 }
 
 // Format date helper

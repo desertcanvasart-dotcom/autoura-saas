@@ -109,11 +109,17 @@ function AcceptInvitationContent() {
       }
 
       // Mark invitation as accepted
-      await fetch('/api/invitations', {
-        method: 'PUT',
+      const acceptRes = await fetch('/api/invitations/accept', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token })
       })
+      // Checked, not fire-and-forget: if this fails the account exists with no
+      // tenant membership, and silently redirecting to /dashboard strands them
+      // in an app that shows nothing.
+      if (!acceptRes.ok) {
+        throw new Error('Your account was created, but the invitation could not be completed. Please contact whoever invited you.')
+      }
 
       setSuccess(true)
       

@@ -24,6 +24,12 @@ export const SELF_AUTH_API_PREFIXES = [
   '/api/billing/webhook',   // Stripe → us; verifies stripe-signature inside the handler
   '/api/whatsapp/webhook',  // Twilio → us; verifies X-Twilio-Signature inside the handler
   '/api/whatsapp/status-callback', // Twilio delivery receipts; same signature check
+  // Invite acceptance: the invitee has no session yet (that is the point).
+  // Both verify the secret invitation_token inside the handler, which is the
+  // credential. Without these the invite flow 401'd and every invitee landed
+  // on the dashboard with no tenant membership.
+  '/api/invitations/verify',
+  '/api/invitations/accept',
 ]
 
 // Define route permissions - which roles can access which routes

@@ -165,10 +165,17 @@ export async function POST(request: NextRequest) {
         sent_at: new Date().toISOString()
       })
 
-    if (msgError) {
-      console.error('❌ Error storing message:', msgError)
-    } else {
+    // 23505 = unique violation on message_sid, i.e. Twilio re-delivered a
+    // webhook it already sent (timeout, 5xx, or its normal retry policy).
+    // This is THE duplicate signal, and it must gate the auto-reply below:
+    // previously the violation was logged and execution continued, so a retry
+    // generated and SENT a second WhatsApp message to the customer.
+    const isDuplicateDelivery = msgError?.code === '23505'
 
+    if (msgError && !isDuplicateDelivery) {
+      console.error('❌ Error storing message:', msgError)
+    } else if (isDuplicateDelivery) {
+      console.warn(`⚠️ Duplicate delivery of ${messageSid} — not replying again`)
     }
 
     // ============================================
@@ -255,7 +262,7 @@ export async function POST(request: NextRequest) {
     // STEP 4: AI-Powered Auto-Response
     // ============================================
     // Only process if AI is globally enabled and we have a message body
-    if (process.env.WHATSAPP_AI_ENABLED === 'true' && body && conversationId) {
+    if (process.env.WHATSAPP_AI_ENABLED === 'true' && body && conversationId && !isDuplicateDelivery) {
       try {
         // Check tenant-specific AI setting
         let tenantAiEnabled = false

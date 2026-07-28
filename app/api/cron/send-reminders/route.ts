@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/app/supabase'
+import { daysOverdueOrNull } from '@/lib/invoice-dates'
+import { createAdminClient } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 
@@ -101,7 +102,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = createClient()
+    // Service role, deliberately: this sweep spans EVERY tenant, and the
+    // route authenticates by CRON_SECRET above rather than by session.
+    // It previously used the browser (anon-key) client, so `invoices` RLS —
+    // tenant_id = get_user_tenant_id(), NULL without a JWT — matched nothing.
+    // Every run reported "No reminders to send" and no dunning email has
+    // ever gone out.
+    const supabase = createAdminClient()
     const today = new Date().toISOString().split('T')[0]
 
 
@@ -135,9 +142,18 @@ export async function GET(request: NextRequest) {
 
     let sent = 0
     let failed = 0
+    let skipped = 0
 
     for (const invoice of invoices) {
-      const daysOverdue = Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
+      // due_date is nullable. new Date(null).getTime() is NaN, every
+      // comparison below is false, and the ladder falls through to the
+      // harshest rung — the client receives "Final Notice ... now NaN days
+      // overdue". Skip instead: no due date means nothing is owed *yet*.
+      const daysOverdue = daysOverdueOrNull(invoice.due_date)
+      if (daysOverdue === null) {
+        skipped++
+        continue
+      }
 
       let reminderType = 'reminder'
       if (daysOverdue <= -7) reminderType = 'before_due_7'
@@ -206,6 +222,7 @@ export async function GET(request: NextRequest) {
       message: `Processed ${invoices.length} reminders`,
       sent,
       failed,
+      skipped,
       timestamp: new Date().toISOString()
     })
 
