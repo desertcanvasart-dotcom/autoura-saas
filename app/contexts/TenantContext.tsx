@@ -15,6 +15,14 @@ interface Tenant {
    */
   workspace_mode: 'b2c' | 'b2b' | 'both'
   logo_url: string | null
+  // Branding — on TENANTS, the single source of truth since migration 255.
+  // These were undeclared here while existing at runtime (select('*')),
+  // which is how code reading the wrong table type-checked for two days.
+  primary_color: string | null
+  secondary_color: string | null
+  company_phone: string | null
+  company_website: string | null
+  tagline: string | null
   created_at: string
   updated_at: string
 }
@@ -39,6 +47,7 @@ interface TenantFeatures {
   email_integration: boolean
   pdf_generation: boolean
   analytics_enabled: boolean
+  /** DEPRECATED (mig 255): branding lives on Tenant. Never read these. */
   logo_url: string | null
   primary_color: string
   secondary_color: string

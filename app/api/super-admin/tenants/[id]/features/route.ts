@@ -9,9 +9,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params
     const body = await request.json()
 
+    // Branding fields removed (mig 255): they live on tenants now, and a
+    // write here would land in deprecated columns nothing reads — the exact
+    // silent divergence that made every PDF render the wrong color.
     const allowedFields = [
       'whatsapp_integration', 'email_integration',
-      'pdf_generation', 'analytics_enabled', 'concierge_enabled', 'primary_color', 'secondary_color', 'logo_url',
+      'pdf_generation', 'analytics_enabled', 'concierge_enabled',
     ]
     const updates: Record<string, any> = {}
     for (const key of allowedFields) {

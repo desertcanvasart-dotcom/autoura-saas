@@ -54,6 +54,9 @@ export async function PATCH(request: NextRequest) {
       tenantUpdates.workspace_mode = resolvedMode
     }
     if (logo_url !== undefined) tenantUpdates.logo_url = logo_url
+    // Branding is tenant identity — tenants table, same as the logo (mig 255).
+    if (primary_color !== undefined) tenantUpdates.primary_color = primary_color
+    if (secondary_color !== undefined) tenantUpdates.secondary_color = secondary_color
     tenantUpdates.updated_at = new Date().toISOString()
 
     const { error: tenantError } = await adminClient
@@ -78,8 +81,7 @@ export async function PATCH(request: NextRequest) {
     // Plan limits are NOT stored per tenant any more. They live in
     // lib/pricing-config.ts, are enforced from subscription_plans, and were
     // only ever decorative here — a fourth copy that nothing read.
-    if (primary_color !== undefined) featureUpdates.primary_color = primary_color
-    if (secondary_color !== undefined) featureUpdates.secondary_color = secondary_color
+
     featureUpdates.updated_at = new Date().toISOString()
 
     if (Object.keys(featureUpdates).length > 1) { // More than just updated_at
