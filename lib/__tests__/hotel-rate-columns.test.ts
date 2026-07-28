@@ -9,6 +9,8 @@ vi.mock('@supabase/supabase-js', async () => {
 
 import { getHotelRates } from '@/lib/auto-pricing-service'
 
+const TEST_SCOPE = { tenantId: 'test-tenant', useGlobalCatalog: true }
+
 beforeAll(() => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://localhost')
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key')
@@ -29,7 +31,7 @@ describe('getHotelRates — accommodation column reconciliation', () => {
         is_active: true, ppd_eur: 120, single_supplement_eur: 40, triple_reduction_eur: 20,
       }],
     })
-    const r = await getHotelRates('Cairo', 'standard')
+    const r = await getHotelRates(TEST_SCOPE, 'Cairo', 'standard')
     expect(r?.source).toBe('db')
     expect(r?.ppdNight).toBe(120)
     expect(r?.singleSuppNight).toBe(40)
@@ -42,7 +44,7 @@ describe('getHotelRates — accommodation column reconciliation', () => {
         is_active: true, pp_double_eur: 150, ppd_eur: 0,
       }],
     })
-    const r = await getHotelRates('Cairo', 'standard')
+    const r = await getHotelRates(TEST_SCOPE, 'Cairo', 'standard')
     // The engine ignores pp_double_eur, so without the migration's mirror the
     // rate is invisible (€0). After migration 220 runs, ppd_eur = 150 and this
     // same row prices correctly.
@@ -56,7 +58,7 @@ describe('getHotelRates — accommodation column reconciliation', () => {
         is_active: true, pp_double_eur: 150, ppd_eur: 150,
       }],
     })
-    const r = await getHotelRates('Cairo', 'standard')
+    const r = await getHotelRates(TEST_SCOPE, 'Cairo', 'standard')
     expect(r?.ppdNight).toBe(150)
   })
 })

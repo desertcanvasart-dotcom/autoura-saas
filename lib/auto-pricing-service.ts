@@ -27,6 +27,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import type { RateSource, PricingHole } from './pricing-types'
+import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
@@ -110,6 +111,10 @@ export interface ItineraryDay {
 // Pricing parameters
 export interface DayPricingParams {
   templateId: string
+  /** Whose rates to price from. Scopes every rate lookup to this tenant's
+   * rows (merged with the global catalog when the tenant's
+   * use_global_catalog flag is on — see lib/catalog-scope.ts). */
+  tenantId: string
   tier: ServiceTier
   isEurPassport: boolean
   language?: string
@@ -698,6 +703,7 @@ export function detectCruiseSeason(cruise: any, startDate: string): 'low' | 'hig
  * unset, then to legacy rates. No travelDate => low season (prior behaviour).
  */
 export async function getCruiseRates(
+  scope: CatalogScope,
   tier: ServiceTier,
   embarkCity?: string,
   travelDate?: string
@@ -714,6 +720,7 @@ export async function getCruiseRates(
     let query = getSupabaseAdmin()
       .from('nile_cruises')
       .select('*')
+      .or(catalogOrExpr(scope))
       .eq('tier', tier)
       .eq('is_active', true)
 
@@ -815,6 +822,7 @@ export function detectHotelSeason(hotel: any, startDate: string): 'low' | 'high'
  * No travelDate => low season (prior behaviour).
  */
 export async function getHotelRates(
+  scope: CatalogScope,
   city: string,
   tier: ServiceTier,
   travelDate?: string
@@ -862,6 +870,7 @@ export async function getHotelRates(
     const { data: hotels, error } = await getSupabaseAdmin()
       .from('accommodation_rates')
       .select('*')
+      .or(catalogOrExpr(scope))
       .eq('tier', tier)
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
@@ -880,6 +889,7 @@ export async function getHotelRates(
     const { data: anyHotel } = await getSupabaseAdmin()
       .from('accommodation_rates')
       .select('*')
+      .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
       .limit(1)
@@ -900,6 +910,7 @@ export async function getHotelRates(
  * Get entrance fee for an attraction
  */
 export async function getEntranceFee(
+  scope: CatalogScope,
   attractionName: string,
   isEurPassport: boolean
 ): Promise<{ id: string; name: string; rate: number; source: RateSource } | null> {
@@ -907,6 +918,7 @@ export async function getEntranceFee(
     let { data: fees, error } = await getSupabaseAdmin()
       .from('entrance_fees')
       .select('id, attraction_name, eur_rate, non_eur_rate')
+      .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .ilike('attraction_name', `%${attractionName}%`)
       .limit(1)
@@ -922,6 +934,7 @@ export async function getEntranceFee(
         const { data: keywordFees } = await getSupabaseAdmin()
           .from('entrance_fees')
           .select('id, attraction_name, eur_rate, non_eur_rate')
+          .or(catalogOrExpr(scope))
           .eq('is_active', true)
           .ilike('attraction_name', `%${keyword}%`)
           .limit(1)
@@ -958,6 +971,7 @@ export async function getEntranceFee(
  * Get guide rate
  */
 export async function getGuideRate(
+  scope: CatalogScope,
   language: string,
   tier: ServiceTier
 ): Promise<{ id: string; name: string; dailyRate: number; source: RateSource } | null> {
@@ -965,6 +979,7 @@ export async function getGuideRate(
     const { data: guides, error } = await getSupabaseAdmin()
       .from('guides')
       .select('id, name, daily_rate, languages, tier')
+      .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .contains('languages', [language])
       .order('is_preferred', { ascending: false })
@@ -987,6 +1002,7 @@ export async function getGuideRate(
     const { data: anyGuide } = await getSupabaseAdmin()
       .from('guides')
       .select('id, name, daily_rate')
+      .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .order('is_preferred', { ascending: false })
       .limit(1)
@@ -1008,6 +1024,7 @@ export async function getGuideRate(
  * Get meal rates
  */
 export async function getMealRates(
+  scope: CatalogScope,
   tier: ServiceTier
 ): Promise<{ lunch: number; dinner: number; source: RateSource } | null> {
   try {
@@ -1020,6 +1037,7 @@ export async function getMealRates(
     const { data: mealRows } = await getSupabaseAdmin()
       .from('meal_rates')
       .select('meal_type, base_rate_eur')
+      .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('tier', tier)
 
@@ -1057,6 +1075,7 @@ export async function getMealRates(
  * Get airport service rate
  */
 export async function getAirportServiceRate(
+  scope: CatalogScope,
   airportCode: string,
   direction: 'arrival' | 'departure',
   tier: ServiceTier
@@ -1065,6 +1084,7 @@ export async function getAirportServiceRate(
     const { data: rates } = await getSupabaseAdmin()
       .from('airport_staff_rates')
       .select('rate_eur')
+      .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('airport_code', airportCode)
       .or(`direction.eq.${direction},direction.eq.both`)
@@ -1085,6 +1105,7 @@ export async function getAirportServiceRate(
  * Get hotel service rate
  */
 export async function getHotelServiceRate(
+  scope: CatalogScope,
   serviceType: 'checkin_assist' | 'porter' | 'full_service',
   tier: ServiceTier
 ): Promise<number | null> {
@@ -1094,6 +1115,7 @@ export async function getHotelServiceRate(
     const { data: rates } = await getSupabaseAdmin()
       .from('hotel_staff_rates')
       .select('rate_eur')
+      .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('service_type', serviceType)
       .or(`hotel_category.eq.${category},hotel_category.eq.all`)
@@ -1113,11 +1135,12 @@ export async function getHotelServiceRate(
 /**
  * Get tipping rate per day
  */
-export async function getTippingRate(tier: ServiceTier): Promise<number | null> {
+export async function getTippingRate(scope: CatalogScope, tier: ServiceTier): Promise<number | null> {
   try {
     const { data: rates } = await getSupabaseAdmin()
       .from('tipping_rates')
       .select('rate_eur, rate_unit')
+      .or(catalogOrExpr(scope))
       .eq('is_active', true)
 
     if (!rates || rates.length === 0) {
@@ -1182,10 +1205,11 @@ function expandWideTransportRow(row: any): any[] {
   return out
 }
 
-export async function buildTransportCache(): Promise<Map<string, TransportRate>> {
+export async function buildTransportCache(scope: CatalogScope): Promise<Map<string, TransportRate>> {
   const { data: allRates } = await getSupabaseAdmin()
     .from('transportation_rates')
     .select('*')
+    .or(catalogOrExpr(scope))
     .eq('is_active', true)
 
   const cache = new Map<string, TransportRate>()
@@ -1315,6 +1339,7 @@ export async function calculateDayBasedPricing(
 ): Promise<DayPricingResult> {
   const {
     templateId,
+    tenantId,
     tier,
     isEurPassport,
     language = 'English',
@@ -1322,7 +1347,8 @@ export async function calculateDayBasedPricing(
     marginPercent = 25
   } = params
 
-
+  // Resolved once per calculation; every rate lookup below is scoped by it.
+  const catalogScope = await getCatalogScope(getSupabaseAdmin(), tenantId)
 
   const warnings: string[] = []
   const services: PricedService[] = []
@@ -1408,7 +1434,7 @@ export async function calculateDayBasedPricing(
   // STEP 3: Build transport cache
   // ============================================
 
-  const transportCache = await buildTransportCache()
+  const transportCache = await buildTransportCache(catalogScope)
 
   // ============================================
   // STEP 4: Fetch all required rates
@@ -1417,7 +1443,7 @@ export async function calculateDayBasedPricing(
   let cruiseRates: NonNullable<Awaited<ReturnType<typeof getCruiseRates>>> | null = null
   if (cruiseNights > 0) {
     const firstCruiseDay = cruiseDays[0]
-    const cr = await getCruiseRates(tier, firstCruiseDay?.city, travelDate)
+    const cr = await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate)
     if (cr && cr.source === 'db') {
       cruiseRates = cr
     } else {
@@ -1437,7 +1463,7 @@ export async function calculateDayBasedPricing(
   const hotelCities = [...new Set(hotelDays.map(d => d.city))]
   const hotelRatesMap = new Map<string, NonNullable<Awaited<ReturnType<typeof getHotelRates>>>>()
   const hotelResults = await Promise.all(
-    hotelCities.map(city => getHotelRates(city, tier, travelDate))
+    hotelCities.map(city => getHotelRates(catalogScope, city, tier, travelDate))
   )
   hotelCities.forEach((city, i) => {
     const rates = hotelResults[i]
@@ -1459,9 +1485,9 @@ export async function calculateDayBasedPricing(
   // admin-configurable via Rates → Fixed Costs (fixed_daily_costs); falls back
   // to €2 (the previous hardcoded value) if the table is empty.
   const [guideRate, mealRates, tippingRate, fixedDailyCosts] = await Promise.all([
-    getGuideRate(language, tier),
-    getMealRates(tier),
-    getTippingRate(tier),
+    getGuideRate(catalogScope, language, tier),
+    getMealRates(catalogScope, tier),
+    getTippingRate(catalogScope, tier),
     getFixedDailyCosts(),
   ])
   const waterCostPerPax = fixedDailyCosts.waterPerPersonPerDay
@@ -1561,7 +1587,7 @@ export async function calculateDayBasedPricing(
     // ----- AIRPORT SERVICES (fixed per service) -----
     if (day.services.airport_arrival) {
       const airportCode = getAirportCode(day.city)
-      const rate = await getAirportServiceRate(airportCode, 'arrival', tier)
+      const rate = await getAirportServiceRate(catalogScope, airportCode, 'arrival', tier)
       if (rate != null) {
         fixedCosts += rate
         services.push({
@@ -1592,7 +1618,7 @@ export async function calculateDayBasedPricing(
 
     if (day.services.airport_departure) {
       const airportCode = getAirportCode(day.city)
-      const rate = await getAirportServiceRate(airportCode, 'departure', tier)
+      const rate = await getAirportServiceRate(catalogScope, airportCode, 'departure', tier)
       if (rate != null) {
         fixedCosts += rate
         services.push({
@@ -1623,7 +1649,7 @@ export async function calculateDayBasedPricing(
 
     // ----- HOTEL SERVICES (fixed per service) -----
     if (day.services.hotel_checkin) {
-      const rate = await getHotelServiceRate('checkin_assist', tier)
+      const rate = await getHotelServiceRate(catalogScope, 'checkin_assist', tier)
       if (rate != null) {
         fixedCosts += rate
         services.push({
@@ -1653,7 +1679,7 @@ export async function calculateDayBasedPricing(
     }
 
     if (day.services.hotel_checkout) {
-      const rate = await getHotelServiceRate('porter', tier)
+      const rate = await getHotelServiceRate(catalogScope, 'porter', tier)
       if (rate != null) {
         fixedCosts += rate
         services.push({
@@ -1748,7 +1774,7 @@ export async function calculateDayBasedPricing(
   }
 
   const entranceFees = await Promise.all(
-    entranceLookups.map(l => getEntranceFee(l.attraction, isEurPassport))
+    entranceLookups.map(l => getEntranceFee(catalogScope, l.attraction, isEurPassport))
   )
 
   entranceLookups.forEach(({ attraction, day }, i) => {
@@ -2178,6 +2204,8 @@ export function formatPricingTable(result: DayPricingResult): string[][] {
 
 export interface PricingParams {
   templateId: string
+  /** Whose rates to price from — see DayPricingParams.tenantId. */
+  tenantId: string
   tier: ServiceTier
   numPax: number
   numAdults?: number
@@ -2246,6 +2274,7 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
 
   const dayResult = await calculateDayBasedPricing({
     templateId,
+    tenantId: params.tenantId,
     tier,
     isEurPassport,
     language,
@@ -2377,6 +2406,7 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
  */
 export async function calculateMultiTierPricing(
   templateId: string,
+  tenantId: string,
   tiers: ServiceTier[],
   numPax: number,
   isEurPassport: boolean,
@@ -2387,6 +2417,7 @@ export async function calculateMultiTierPricing(
   for (const tier of tiers) {
     const result = await calculateAutoPricing({
       templateId,
+      tenantId,
       tier,
       numPax,
       isEurPassport,
@@ -2403,12 +2434,14 @@ export async function calculateMultiTierPricing(
  */
 export async function getTemplatePriceRange(
   templateId: string,
+  tenantId: string,
   isEurPassport: boolean = true
 ): Promise<{ minPrice: number; maxPrice: number; tier: ServiceTier } | null> {
   const tiers: ServiceTier[] = ['budget', 'standard', 'deluxe', 'luxury']
 
   const results = await calculateMultiTierPricing(
     templateId,
+    tenantId,
     tiers,
     2,
     isEurPassport

@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     // Fetch templates to recalculate
     let query = supabaseAdmin
       .from('tour_templates')
-      .select('id, template_name, duration_days, uses_day_builder, pricing_mode')
+      .select('id, tenant_id, template_name, duration_days, uses_day_builder, pricing_mode')
       .eq('is_active', true)
 
     if (tenantId) {
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
         // Only calculate auto-pricing for templates that use it
         if (template.uses_day_builder || template.pricing_mode === 'auto') {
-          const priceRange = await getTemplatePriceRange(template.id)
+          const priceRange = await getTemplatePriceRange(template.id, template.tenant_id)
           if (priceRange) {
             startingPrice = Math.round(priceRange.minPrice)
             startingTier = priceRange.tier

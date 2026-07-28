@@ -84,6 +84,7 @@ export async function POST(
       
       const results = await calculateMultiTierPricing(
         templateId,
+        auth.tenant_id!,
         selectedTiers,
         num_pax,
         is_eur_passport,
@@ -122,6 +123,7 @@ export async function POST(
     // Single tier pricing
     const result = await calculateAutoPricing({
       templateId,
+      tenantId: auth.tenant_id!,
       tier: tier as ServiceTier,
       numPax: num_pax,
       numAdults: num_adults || num_pax,
@@ -162,8 +164,12 @@ export async function GET(
 ) {
   try {
     const { id: templateId } = await params
+    const auth = await requireAuth()
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
     const { searchParams } = new URL(request.url)
-    
+
     const isEurPassport = searchParams.get('is_eur') !== 'false'
     const numPax = parseInt(searchParams.get('num_pax') || '2')
     const tier = (searchParams.get('tier') || 'standard') as ServiceTier
@@ -171,6 +177,7 @@ export async function GET(
     // Quick pricing with defaults
     const result = await calculateAutoPricing({
       templateId,
+      tenantId: auth.tenant_id!,
       tier,
       numPax,
       isEurPassport

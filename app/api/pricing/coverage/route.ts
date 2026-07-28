@@ -11,7 +11,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { requireAuth } from '@/lib/supabase-server'
 import { calculateDayBasedPricing, type ServiceTier } from '@/lib/auto-pricing-service'
 import { computeCoverage } from '@/lib/pricing-coverage'
 
@@ -20,10 +20,12 @@ const MAX_TEMPLATES = 25 // bound the work for a single diagnostic request
 
 export async function GET(request: NextRequest) {
   try {
-    let supabase
-    try {
-      supabase = await createAuthenticatedClient()
-    } catch {
+    const authResult = await requireAuth()
+    if (authResult.error) {
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    }
+    const { supabase, tenant_id } = authResult
+    if (!supabase || !tenant_id) {
       return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 })
     }
 
@@ -61,7 +63,7 @@ export async function GET(request: NextRequest) {
       templates,
       tiers,
       isEurPassport,
-      calc: (args) => calculateDayBasedPricing(args),
+      calc: (args) => calculateDayBasedPricing({ ...args, tenantId: tenant_id }),
     })
 
     return NextResponse.json({

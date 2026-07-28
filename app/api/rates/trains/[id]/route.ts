@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { getCatalogScope, catalogOrExpr } from '@/lib/catalog-scope'
 
 export async function GET(
   request: NextRequest,
@@ -20,8 +21,9 @@ export async function GET(
       .from('train_rates')
       .select('*')
       .eq('id', id)
-      // Tenant rows + shared/global catalog rows (tenant_id IS NULL)
-      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
+      // Tenant rows, merged with the global catalog when the tenant's
+      // use_global_catalog flag is on (see lib/catalog-scope.ts).
+      .or(catalogOrExpr(await getCatalogScope(createAdminClient(), authResult.tenant_id)))
       .single()
 
     if (error) {
