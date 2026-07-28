@@ -199,11 +199,9 @@ export default function TenantDetailPage() {
                 )
               })}
             </div>
-            {features && (
-              {/* Limits are no longer mirrored onto tenant_features — they come
-                  from the tenant's plan, so read them there rather than from a
-                  stale per-tenant copy. */}
-            )}
+            {/* Limits are no longer mirrored onto tenant_features — they come
+                from the tenant's plan, so read them there rather than from a
+                stale per-tenant copy. */}
           </div>
 
           {/* Members */}
