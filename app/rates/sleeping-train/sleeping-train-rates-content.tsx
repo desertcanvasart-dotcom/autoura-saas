@@ -1,6 +1,7 @@
 'use client'
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -209,36 +210,37 @@ export default function SleepingTrainRatesContent() {
     setShowModal(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { submitting, guard } = useSubmitGuard()
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    guard(async () => {  try {
+        const url = editingRate
+          ? `/api/rates/sleeping-trains/${editingRate.id}`
+          : '/api/rates/sleeping-trains'
 
-    try {
-      const url = editingRate
-        ? `/api/rates/sleeping-trains/${editingRate.id}`
-        : '/api/rates/sleeping-trains'
+        const method = editingRate ? 'PUT' : 'POST'
 
-      const method = editingRate ? 'PUT' : 'POST'
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        })
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
+        const data = await response.json()
 
-      const data = await response.json()
+        if (!response.ok || !data.success) {
+          showNotification('error', 'Error', data.error || 'Failed to save rate')
+          return
+        }
 
-      if (!response.ok || !data.success) {
-        showNotification('error', 'Error', data.error || 'Failed to save rate')
-        return
+        showNotification('success', 'Success', editingRate ? 'Sleeping train rate updated successfully!' : 'Sleeping train rate created successfully!')
+        setShowModal(false)
+        fetchRates()
+      } catch (error) {
+        console.error('Error saving rate:', error)
+        showNotification('error', 'Error', 'Failed to save rate. Please try again.')
       }
-
-      showNotification('success', 'Success', editingRate ? 'Sleeping train rate updated successfully!' : 'Sleeping train rate created successfully!')
-      setShowModal(false)
-      fetchRates()
-    } catch (error) {
-      console.error('Error saving rate:', error)
-      showNotification('error', 'Error', 'Failed to save rate. Please try again.')
-    }
+  })
   }
 
   // Clone a rate
@@ -1147,7 +1149,7 @@ export default function SleepingTrainRatesContent() {
               >
                 Cancel
               </button>
-              <button
+              <button disabled={submitting}
                 onClick={handleSubmit}
                 className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
               >

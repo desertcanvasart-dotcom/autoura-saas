@@ -1,6 +1,7 @@
 'use client'
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -259,29 +260,31 @@ export default function TippingPage() {
     setShowModal(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { submitting, guard } = useSubmitGuard()
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const submitData = { ...formData, service_code: formData.service_code || generateCode() }
+    guard(async () => {  const submitData = { ...formData, service_code: formData.service_code || generateCode() }
 
-    try {
-      const url = editingRate ? `/api/rates/tipping/${editingRate.id}` : '/api/rates/tipping'
-      const response = await fetch(url, {
-        method: editingRate ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submitData)
-      })
-      const data = await response.json()
+      try {
+        const url = editingRate ? `/api/rates/tipping/${editingRate.id}` : '/api/rates/tipping'
+        const response = await fetch(url, {
+          method: editingRate ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitData)
+        })
+        const data = await response.json()
       
-      if (data.success) {
-        showToast('success', editingRate ? 'Rate updated!' : 'Rate created!')
-        setShowModal(false)
-        fetchRates()
-      } else {
-        showToast('error', data.error || 'Failed to save')
+        if (data.success) {
+          showToast('success', editingRate ? 'Rate updated!' : 'Rate created!')
+          setShowModal(false)
+          fetchRates()
+        } else {
+          showToast('error', data.error || 'Failed to save')
+        }
+      } catch (error) {
+        showToast('error', 'Failed to save rate')
       }
-    } catch (error) {
-      showToast('error', 'Failed to save rate')
-    }
+  })
   }
 
   const handleDelete = async (rate: TippingRate) => {
@@ -691,7 +694,7 @@ export default function TippingPage() {
                   Cancel
                 </button>
                 <button 
-                  type="submit" 
+                  type="submit" disabled={submitting} 
                   className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center justify-center gap-2"
                 >
                   <Check className="w-4 h-4" />

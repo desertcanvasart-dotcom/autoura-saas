@@ -232,6 +232,9 @@ export default function B2BQuotesPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
+    // See b2c: a selection made under one filter must not carry into another,
+    // or a bulk action hits invisible, stale rows.
+    setSelectedQuotes(new Set())
   }, [statusFilter, tierFilter, currencyFilter, tourLeaderFilter, createdFrom, createdTo, validFrom, validTo, searchQuery])
 
   const goToPage = (page: number) => {
