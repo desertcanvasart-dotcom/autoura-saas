@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { daysOverdueOrNull } from '@/lib/invoice-dates'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
@@ -27,11 +28,15 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
   const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
   const balanceDue = `${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`
   const totalAmount = `${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`
-  const dueDate = new Date(invoice.due_date).toLocaleDateString('en-GB', { 
-    day: 'numeric', month: 'long', year: 'numeric' 
-  })
-  
-  const daysOverdue = Math.floor((Date.now() - new Date(invoice.due_date).getTime()) / (1000 * 60 * 60 * 24))
+  // Callers skip invoices with no due date, but this renderer must not be the
+  // thing that trusts it: "Invalid Date" and "NaN days overdue" in a payment
+  // demand is worse than any missing line.
+  const parsedDue = invoice.due_date ? new Date(invoice.due_date) : null
+  const dueDate = parsedDue && Number.isFinite(parsedDue.getTime())
+    ? parsedDue.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    : 'on receipt'
+
+  const daysOverdue = daysOverdueOrNull(invoice.due_date) ?? 0
   
   let subject: string
   let urgencyMessage: string
@@ -357,13 +362,20 @@ export async function POST(request: NextRequest) {
     const results = {
       sent: 0,
       failed: 0,
+      skipped: 0,
       details: [] as any[]
     }
 
     for (const invoice of invoices) {
-      const dueDate = new Date(invoice.due_date)
-      const daysUntilDue = Math.floor((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      
+      // No due date => NaN => every branch below false => 'overdue_30',
+      // i.e. a Final Notice for an invoice that was never even due.
+      const overdue = daysOverdueOrNull(invoice.due_date)
+      if (overdue === null) {
+        results.skipped++
+        continue
+      }
+      const daysUntilDue = -overdue
+
       let reminderType: string
       if (daysUntilDue > 5) reminderType = 'before_due_7'
       else if (daysUntilDue > 1) reminderType = 'before_due_3'

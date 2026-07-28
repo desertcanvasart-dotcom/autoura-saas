@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sendMail } from '@/lib/email-send'
 import crypto from 'crypto'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { checkRateLimit, getRateLimitIdentifier, rateLimitResponse } from '@/lib/rate-limit'
@@ -182,16 +183,24 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
     const inviteUrl = `${baseUrl}/invite/accept?token=${token}`
 
+    let emailSent = true
+    let emailError: string | null = null
     try {
       await sendInvitationEmail(email, role, inviteUrl)
-    } catch (emailError) {
-      console.error('Failed to send invitation email:', emailError)
-      // Don't fail the request, invitation is still created
+    } catch (err: any) {
+      console.error('Failed to send invitation email:', err)
+      emailSent = false
+      emailError = err?.message || 'Email could not be sent'
+      // The invitation row is still valid and inviteUrl is returned, so the
+      // inviter can share the link manually — but they are TOLD, rather than
+      // believing an email went out that never did.
     }
 
     return NextResponse.json({
       success: true,
       data: invitation,
+      emailSent,
+      emailError,
       inviteUrl // Return URL in case email fails
     })
   } catch (error) {
@@ -203,52 +212,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Mark invitation as accepted (token-gated: the secret token IS the
-// credential here, since the accepting user has no session yet)
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { token } = body
-
-    if (!token) {
-      return NextResponse.json(
-        { success: false, error: 'Token is required' },
-        { status: 400 }
-      )
-    }
-
-    // Only a pending, unexpired invitation can be accepted
-    const { data, error } = await (createAdminClient() as any)
-      .from('tenant_invitations')
-      .update({
-        status: 'accepted',
-        accepted_at: new Date().toISOString()
-      })
-      .eq('invitation_token', token)
-      .is('accepted_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .select()
-      .single()
-
-    if (error || !data) {
-      return NextResponse.json(
-        { success: false, error: 'Invitation not found, expired, or already used' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({
-      success: true,
-      data
-    })
-  } catch (error) {
-    console.error('Error updating invitation:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to update invitation' },
-      { status: 500 }
-    )
-  }
-}
+// NOTE: the accept handler moved to POST /api/invitations/accept (its own
+// path so the middleware — which allowlists by PATH, not method — can let an
+// unauthenticated invitee reach it without exposing the session-gated
+// handlers here).
 
 // DELETE - Cancel/delete invitation (manager+, own tenant only)
 export async function DELETE(request: NextRequest) {
@@ -362,22 +329,22 @@ async function sendInvitationEmail(
     </html>
   `
 
-  const response = await fetch(`${baseUrl}/api/gmail/send`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-cron-secret': process.env.CRON_SECRET || '',
-    },
-    body: JSON.stringify({
-      to: toEmail,
-      subject: `You're invited to join Autoura`,
-      html: htmlContent
-    })
+  // Sent directly through Resend, not via an HTTP hop to /api/gmail/send.
+  // That route sends through a specific USER'S connected Gmail mailbox
+  // (it requires userId and reads gmail_tokens) — wrong transport for
+  // platform mail. It was also unreachable from here (not in the middleware
+  // allowlist, so 401) and was being called with {to,subject,html} while it
+  // requires {userId,to,subject,body}. Two failures stacked, both swallowed
+  // by the caller's try/catch: no invitation email has ever been sent.
+  const result = await sendMail({
+    to: toEmail,
+    subject: `You're invited to join Autoura`,
+    html: htmlContent,
   })
 
-  if (!response.ok) {
-    throw new Error('Failed to send invitation email')
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to send invitation email')
   }
 
-  return response.json()
+  return result
 }

@@ -55,6 +55,10 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   '/api/billing/webhook': ['verifyWebhookSignature', 'stripe-signature'],
   '/api/whatsapp/webhook': ['validateRequest'],
   '/api/whatsapp/status-callback': ['validateRequest'],
+  // The invitee has no session yet — the secret invitation_token IS the
+  // credential, and both handlers look the row up by it.
+  '/api/invitations/verify': ['invitation_token'],
+  '/api/invitations/accept': ['invitation_token'],
 }
 
 /** All route.ts files under app/api, as URL paths with dummy dynamic params. */
