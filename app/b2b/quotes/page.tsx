@@ -212,7 +212,7 @@ export default function QuotesListPage() {
           <button onClick={fetchQuotes} className="p-2 border rounded-lg hover:bg-gray-50" title="Refresh">
             <RefreshCw className="w-4 h-4 text-gray-600" />
           </button>
-          <Link href="/tours/manager" className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium text-sm">
+          <Link href="/tours/manage" className="flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium text-sm">
             <Plus className="w-4 h-4" />New Quote
           </Link>
         </div>

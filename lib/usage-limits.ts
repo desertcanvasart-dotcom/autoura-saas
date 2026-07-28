@@ -69,8 +69,8 @@ const STRUCTURAL_LIMIT_KEY: Record<StructuralMetric, keyof PricingTier['limits']
  * without a Stripe subscription would otherwise never roll over.
  *
  * NOT INCLUDED: `pricing_runs`. The pricing engine calls no LLM — verified
- * across auto-pricing-service, tourCalculator, pax-range, rate-resolution and
- * both calculate routes — and recalculation happens constantly as pax, tier
+ * across auto-pricing-service, pax-range, rate-resolution and the b2b
+ * calculate route — and recalculation happens constantly as pax, tier
  * and dates change. Metering it would charge for the core loop. It stays
  * cost-bearing telemetry, never gated.
  */
