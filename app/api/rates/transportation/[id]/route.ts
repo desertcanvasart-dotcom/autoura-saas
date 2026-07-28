@@ -99,6 +99,7 @@ export async function PUT(
       .from('transportation_rates')
       .update(updates)
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
       .select('*')
       .single()
 
@@ -142,6 +143,7 @@ export async function DELETE(
       .from('transportation_rates')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', authResult.tenant_id)
 
     if (error) {
       console.error('DELETE transportation_rates/[id] error:', error)

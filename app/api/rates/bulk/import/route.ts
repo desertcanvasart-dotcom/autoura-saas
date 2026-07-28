@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       for (const record of toUpdate) {
         const keyVal = record[uniqueKeyColumn]
         const updateData = { ...record }; delete updateData[uniqueKeyColumn]; delete updateData.tenant_id
-        const { error } = await supabase.from(table).update(updateData).eq(uniqueKeyColumn, keyVal)
+        const { error } = await supabase.from(table).update(updateData).eq(uniqueKeyColumn, keyVal).eq('tenant_id', tenant_id)
         if (error) importErrors.push({ row: `${uniqueKeyColumn}=${keyVal}`, message: error.message })
         else updated++
       }
