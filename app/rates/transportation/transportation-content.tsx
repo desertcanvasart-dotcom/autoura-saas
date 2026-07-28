@@ -3,26 +3,9 @@
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useState, useEffect, useCallback } from 'react'
-import {
-  Search,
-  Plus,
-  Edit2,
-  Trash2,
-  X,
-  Car,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Building2,
-  Copy,
-  Download,
-  Upload
-} from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
-import { csvCell } from '@/lib/finance-export'
 
 interface TransportationRate {
   id: string
@@ -408,161 +391,7 @@ export default function TransportationContent() {
   }
 
   // Export filtered rates to CSV
-  const handleExportCSV = () => {
-    if (filteredRates.length === 0) {
-      dialog.alert('No Data', 'No rates to export.', 'warning')
-      return
-    }
-
-    const headers = [
-      'service_code',
-      'service_type',
-      'vehicle_type',
-      'capacity_min',
-      'capacity_max',
-      'city',
-      'destination_city',
-      'base_rate_eur',
-      'base_rate_non',
-      'season',
-      'rate_valid_from',
-      'rate_valid_to',
-      'supplier_id',
-      'supplier_name',
-      'notes',
-      'is_active'
-    ]
-
-    const csvRows = [
-      headers.join(','),
-      ...filteredRates.map(rate => {
-        const values = [
-          csvCell(rate.service_code),
-          csvCell(rate.service_type),
-          csvCell(rate.vehicle_type),
-          rate.capacity_min || 1,
-          rate.capacity_max || 2,
-          csvCell(rate.city),
-          csvCell(rate.destination_city),
-          rate.base_rate_eur || 0,
-          rate.base_rate_non || rate.base_rate_non_eur || 0,
-          csvCell(rate.season),
-          csvCell(rate.rate_valid_from),
-          csvCell(rate.rate_valid_to),
-          csvCell(rate.supplier_id),
-          csvCell(rate.supplier_name || rate.suppliers?.name),
-          csvCell(rate.notes),
-          rate.is_active ? 'true' : 'false'
-        ]
-        return values.join(',')
-      })
-    ]
-
-    const csvContent = csvRows.join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', `transportation-rates-${new Date().toISOString().split('T')[0]}.csv`)
-    link.style.visibility = 'hidden'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
   // Import rates from CSV file
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result as string
-        const lines = text.split('\n').filter(line => line.trim())
-
-        if (lines.length < 2) {
-          await dialog.alert('Invalid File', 'CSV file must have a header row and at least one data row.', 'warning')
-          return
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
-        const requiredHeaders = ['service_code', 'service_type', 'vehicle_type', 'city', 'base_rate_eur']
-        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
-
-        if (missingHeaders.length > 0) {
-          await dialog.alert('Missing Headers', `CSV is missing required headers: ${missingHeaders.join(', ')}`, 'warning')
-          return
-        }
-
-        let successCount = 0
-        let errorCount = 0
-
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].match(/("([^"]|"")*"|[^,]*)/g)?.map(v =>
-            v.trim().replace(/^"|"$/g, '').replace(/""/g, '"')
-          ) || []
-
-          if (values.length < headers.length) continue
-
-          const record: Record<string, string | number | boolean | null> = {}
-          headers.forEach((header, index) => {
-            record[header] = values[index] || ''
-          })
-
-          const rateData = {
-            service_code: record.service_code as string,
-            service_type: record.service_type as string,
-            vehicle_type: record.vehicle_type as string,
-            capacity_min: parseInt(record.capacity_min as string) || 1,
-            capacity_max: parseInt(record.capacity_max as string) || 2,
-            city: record.city as string,
-            destination_city: record.destination_city as string || null,
-            base_rate_eur: parseFloat(record.base_rate_eur as string) || 0,
-            base_rate_non: parseFloat(record.base_rate_non as string) || 0,
-            season: record.season as string || null,
-            rate_valid_from: record.rate_valid_from as string || new Date().toISOString().split('T')[0],
-            rate_valid_to: record.rate_valid_to as string || '2099-12-31',
-            supplier_id: record.supplier_id as string || null,
-            supplier_name: record.supplier_name as string || null,
-            notes: record.notes as string || null,
-            is_active: record.is_active === 'true' || record.is_active === '1'
-          }
-
-          try {
-            const response = await fetch('/api/resources/transportation', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(rateData)
-            })
-
-            if (response.ok) {
-              successCount++
-            } else {
-              errorCount++
-            }
-          } catch {
-            errorCount++
-          }
-        }
-
-        await dialog.alert(
-          'Import Complete',
-          `Successfully imported ${successCount} rates. ${errorCount > 0 ? `Failed: ${errorCount}` : ''}`,
-          successCount > 0 ? 'success' : 'warning'
-        )
-
-        fetchRates()
-      } catch (error) {
-        console.error('Error importing CSV:', error)
-        await dialog.alert('Import Error', 'Failed to parse CSV file. Please check the format.', 'warning')
-      }
-    }
-
-    reader.readAsText(file)
-    event.target.value = ''
-  }
-
   // Filter rates
   const filteredRates = rates.filter(rate => {
     const matchesSearch = 
@@ -618,19 +447,6 @@ export default function TransportationContent() {
         </div>
         <div className="flex items-center gap-2">
           <BulkRateImportExport tableName="transportation_rates" onImportComplete={fetchRates} />
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-300 text-green-700 rounded-lg hover:bg-green-50 font-medium"
-          >
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-          <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 font-medium cursor-pointer">
-            <Upload className="w-4 h-4" />
-            Import
-            <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
-          </label>
           <button
             onClick={openAddModal}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-sm rounded-md hover:bg-[#4f6238] transition-colors"

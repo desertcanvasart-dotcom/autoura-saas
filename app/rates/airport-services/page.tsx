@@ -4,13 +4,9 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import {
-  Plane, Plus, Search, Edit, Trash2, X, Check, AlertCircle, CheckCircle2,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy, Download, Upload
-} from 'lucide-react'
+import { Plane, Plus, Search, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
-import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // CONSTANTS
@@ -353,123 +349,6 @@ export default function AirportServicesPage() {
     showToast('success', 'Rate cloned - modify and save as new')
   }
 
-  const handleExportCSV = () => {
-    if (filteredRates.length === 0) {
-      showToast('error', 'No rates to export')
-      return
-    }
-
-    const headers = ['service_code', 'airport_code', 'service_type', 'direction', 'rate_eur', 'description', 'notes', 'is_active']
-    const csvContent = [
-      headers.join(','),
-      ...filteredRates.map(rate => [
-        csvCell(rate.service_code),
-        csvCell(rate.airport_code),
-        csvCell(rate.service_type),
-        csvCell(rate.direction),
-        rate.rate_eur,
-        csvCell(rate.description),
-        csvCell(rate.notes),
-        rate.is_active
-      ].join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `airport-services-rates-${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    URL.revokeObjectURL(link.href)
-    showToast('success', `Exported ${filteredRates.length} rates to CSV`)
-  }
-
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result as string
-        const lines = text.split('\n').filter(line => line.trim())
-
-        if (lines.length < 2) {
-          showToast('error', 'CSV file is empty or has no data rows')
-          return
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase())
-        const requiredHeaders = ['airport_code', 'service_type', 'direction', 'rate_eur']
-        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h))
-
-        if (missingHeaders.length > 0) {
-          showToast('error', `Missing required columns: ${missingHeaders.join(', ')}`)
-          return
-        }
-
-        let successCount = 0
-        let errorCount = 0
-
-        for (let i = 1; i < lines.length; i++) {
-          const values: string[] = []
-          let current = ''
-          let inQuotes = false
-
-          for (const char of lines[i]) {
-            if (char === '"') {
-              inQuotes = !inQuotes
-            } else if (char === ',' && !inQuotes) {
-              values.push(current.trim())
-              current = ''
-            } else {
-              current += char
-            }
-          }
-          values.push(current.trim())
-
-          const row: Record<string, string> = {}
-          headers.forEach((header, idx) => {
-            row[header] = (values[idx] || '').replace(/^"|"$/g, '')
-          })
-
-          const rateData = {
-            service_code: row.service_code || '',
-            airport_code: row.airport_code,
-            service_type: row.service_type,
-            direction: row.direction as 'arrival' | 'departure' | 'both',
-            rate_eur: parseFloat(row.rate_eur) || 0,
-            description: row.description || '',
-            notes: row.notes || '',
-            is_active: row.is_active === 'true' || row.is_active === '1' || row.is_active === 'TRUE'
-          }
-
-          try {
-            const response = await fetch('/api/rates/airport-services', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(rateData)
-            })
-            const data = await response.json()
-            if (data.success) {
-              successCount++
-            } else {
-              errorCount++
-            }
-          } catch {
-            errorCount++
-          }
-        }
-
-        fetchRates()
-        showToast('success', `Imported ${successCount} rates${errorCount > 0 ? `, ${errorCount} failed` : ''}`)
-      } catch {
-        showToast('error', 'Failed to parse CSV file')
-      }
-    }
-    reader.readAsText(file)
-    event.target.value = ''
-  }
-
   const filteredRates = rates.filter(rate => {
     const matchesSearch = searchTerm === '' || 
       rate.airport_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -537,13 +416,6 @@ export default function AirportServicesPage() {
           </div>
           <div className="flex items-center gap-2">
             <BulkRateImportExport tableName="airport_staff_rates" onImportComplete={fetchRates} />
-            <button onClick={handleExportCSV} className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium">
-              <Download className="w-4 h-4" /> Export
-            </button>
-            <label className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium cursor-pointer">
-              <Upload className="w-4 h-4" /> Import
-              <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
-            </label>
             <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-sky-600 text-white rounded-lg hover:bg-sky-700 font-medium">
               <Plus className="w-4 h-4" /> Add Rate
             </button>
