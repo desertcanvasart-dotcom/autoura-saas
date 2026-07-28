@@ -1,260 +1,121 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/app/supabase'
-import { useTenant } from '@/app/contexts/TenantContext'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import {
-  Users,
-  CheckSquare,
-  FileText,
-  Clock,
-  ArrowRight,
-  AlertCircle,
-  MessageSquare,
-  Activity,
-  Sparkles,
-  Mail,
-  CheckCircle,
-  Package,
-  CalendarDays,
-  Layers,
-  Route
+  Plane, Wallet, Inbox, Eye, FileText, Users, AlertCircle, Activity,
+  ArrowRight, Layers, Sparkles,
 } from 'lucide-react'
+import { createClient } from '@/app/supabase'
+import { useTenant } from '@/app/contexts/TenantContext'
+
+// ============================================
+// THE OPERATOR'S DAY
+// ============================================
+// This dashboard answers the questions an operator actually opens the app
+// with — what departs soon, who owes me money, what needs a reply, who has
+// read my proposal, which quotes are going cold — rather than "how big is my
+// database?".
+//
+// It replaced a version whose "Upcoming Trips" card was literally
+// `upcomingTrips: 0, // Legacy field`: hardcoded, querying nothing, and so
+// reading 0 forever even with trips departing tomorrow. `recentActivity` was
+// hardcoded 0 too, which is why "Recent Activity" was permanently empty.
+//
+// Every figure now comes from /api/dashboard, which reports per-card query
+// failures. A number we could not fetch is HIDDEN, never rendered as 0 —
+// because an operator acts on these.
+
+interface DashboardData {
+  windowDays: number
+  departures: {
+    count: number
+    items: { id: string; reference: string; tripName: string; startDate: string; status: string; balanceDue: number }[]
+  }
+  outstanding: {
+    total: number
+    count: number
+    overdueCount: number
+    overdueTotal: number
+    items: { id: string; reference: string; clientName: string; balanceDue: number; dueDate: string | null }[]
+  }
+  inbox: {
+    count: number
+    items: { id: string; threadId: string | null; sender: string; snippet: string; channel: string; receivedAt: string }[]
+  }
+  proposals: {
+    count: number
+    items: { id: string; itineraryId: string; tripName: string; clientName: string | null; viewCount: number; lastViewedAt: string | null }[]
+  }
+  quotes: { staleCount: number; expiredCount: number; awaitingCount: number }
+  clients: { total: number }
+  degraded: { card: string; reason: string }[]
+}
 
 const supabase = createClient()
 
-interface DashboardStats {
-  totalClients: number
-  activeClients: number
-  pendingFollowups: number
-  overdueFollowups: number
-  totalQuotes: number
-  quotesSent: number
-  quotesConfirmed: number
-  upcomingTrips: number
-  upcomingBookings: number
-  recentActivity: number
-}
-
 export default function DashboardPage() {
+  // Workspace mode is a free preference on every tier, not an entitlement:
+  // a B2C-only operator should not be offered B2B entry points. The previous
+  // dashboard gated these and dropping that would have been a quiet
+  // regression.
   const { showsB2bWorkspace, showsB2cWorkspace } = useTenant()
-  const [stats, setStats] = useState<DashboardStats>({
-    totalClients: 0,
-    activeClients: 0,
-    pendingFollowups: 0,
-    overdueFollowups: 0,
-    totalQuotes: 0,
-    quotesSent: 0,
-    quotesConfirmed: 0,
-    upcomingTrips: 0,
-    upcomingBookings: 0,
-    recentActivity: 0
-  })
-  const [recentClients, setRecentClients] = useState<any[]>([])
-  const [upcomingFollowups, setUpcomingFollowups] = useState<any[]>([])
-  const [recentQuotes, setRecentQuotes] = useState<any[]>([])
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [userName, setUserName] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [userName, setUserName] = useState<string>('')
+  const [error, setError] = useState('')
 
-  useEffect(() => {
-    loadUserProfile()
-    loadDashboardData()
-  }, [])
-
-  async function loadUserProfile() {
+  const load = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        // Try to get profile name first
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('full_name, first_name')
-          .eq('id', user.id)
-          .single()
-
-        if (profile?.full_name) {
-          // Get first name from full name
-          setUserName(profile.full_name.split(' ')[0])
-        } else if (profile?.first_name) {
-          setUserName(profile.first_name)
-        } else if (user.user_metadata?.full_name) {
-          setUserName(user.user_metadata.full_name.split(' ')[0])
-        } else if (user.email) {
-          // Fallback to email username
-          setUserName(user.email.split('@')[0])
-        }
-      }
-    } catch (error) {
-      console.error('Error loading user profile:', error)
-    }
-  }
-
-  async function loadDashboardData() {
-    try {
-      setError(null)
-      const today = new Date()
-      const thirtyDaysLater = new Date()
-      thirtyDaysLater.setDate(today.getDate() + 30)
-
-      // Run all queries in parallel. Totals use exact COUNT queries (head:true,
-      // no rows fetched) so they are accurate regardless of volume — the old
-      // code counted .length off capped .limit(100)/50 fetches, undercounting
-      // any tenant past those caps. RLS scopes every query to the tenant.
-      const [
-        clientsCountResult,
-        recentClientsResult,
-        activeClientsResult,
-        pendingFollowupsResult,
-        overdueFollowupsResult,
-        upcomingFollowupsResult,
-        totalQuotesResult,
-        sentQuotesResult,
-        acceptedQuotesResult,
-        recentQuotesResult,
-        bookingsRes
-      ] = await Promise.all([
-        // Total clients — exact count
-        supabase
-          .from('clients')
-          .select('id', { count: 'exact', head: true }),
-
-        // Recent 5 clients for the list
-        supabase
-          .from('clients')
-          .select('id, full_name, email, phone, status, created_at')
-          .order('created_at', { ascending: false })
-          .limit(5),
-
-        // Active clients count
-        supabase
-          .from('clients')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'active'),
-
-        // Pending followups count
-        supabase
-          .from('client_followups')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'pending'),
-
-        // Overdue followups count
-        supabase
-          .from('client_followups')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'pending')
-          .lt('due_date', today.toISOString()),
-
-        // Upcoming followups with client details
-        supabase
-          .from('client_followups')
-          .select(`
-            id, description, due_date, priority, client_id, status,
-            clients (id, full_name, email)
-          `)
-          .eq('status', 'pending')
-          .gte('due_date', today.toISOString())
-          .order('due_date', { ascending: true })
-          .limit(5),
-
-        // Total B2C quotes — exact count
-        supabase
-          .from('b2c_quotes')
-          .select('id', { count: 'exact', head: true }),
-
-        // Quotes sent (anything past draft)
-        supabase
-          .from('b2c_quotes')
-          .select('id', { count: 'exact', head: true })
-          .neq('status', 'draft'),
-
-        // Quotes accepted (b2c_quotes has no 'confirmed' status; 'accepted' is it)
-        supabase
-          .from('b2c_quotes')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'accepted'),
-
-        // Recent 5 quotes for the activity list (client name via join)
-        supabase
-          .from('b2c_quotes')
-          .select('id, quote_number, status, created_at, clients (full_name)')
-          .order('created_at', { ascending: false })
-          .limit(5),
-
-        // Bookings (upcoming in next 30 days) — still via API
-        fetch('/api/bookings?limit=50')
+      setError('')
+      const [profile, dashRes] = await Promise.all([
+        (async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) return null
+          const { data } = await supabase
+            .from('user_profiles')
+            .select('full_name, first_name')
+            .eq('id', user.id)
+            .maybeSingle()
+          return data
+        })(),
+        fetch('/api/dashboard').then((r) => r.json()),
       ])
 
-      // A failure on the core count query means the numbers are unreliable —
-      // surface it instead of rendering misleading zeros.
-      if (clientsCountResult.error) throw clientsCountResult.error
-
-      const totalClients = clientsCountResult.count || 0
-      const activeClients = activeClientsResult.count || 0
-      const pendingFollowups = pendingFollowupsResult.count || 0
-      const overdueFollowups = overdueFollowupsResult.count || 0
-      const totalQuotes = totalQuotesResult.count || 0
-      const quotesSent = sentQuotesResult.count || 0
-      const quotesConfirmed = acceptedQuotesResult.count || 0
-
-      // Bookings upcoming in next 30 days (optional API; failure is non-fatal)
-      let upcomingBookings = 0
-      try {
-        const bookingsData = await bookingsRes.json()
-        const bookings = bookingsData.data || bookingsData.bookings || []
-        upcomingBookings = bookings.filter((b: any) => {
-          if (!b.start_date && !b.travel_date) return false
-          const startDate = new Date(b.start_date || b.travel_date)
-          return startDate >= today && startDate <= thirtyDaysLater &&
-                 (b.status === 'confirmed' || b.status === 'active')
-        }).length
-      } catch (e) {
-        // bookings API is optional — leave upcomingBookings at 0
+      if (profile) {
+        const first = (profile.first_name as string) || ''
+        const full = (profile.full_name as string) || ''
+        setUserName(first || full.split(' ')[0] || '')
       }
-
-      const recentQuotes = (recentQuotesResult.data || []).map((q: any) => {
-        const client = Array.isArray(q.clients) ? q.clients[0] : q.clients
-        return {
-          id: q.id,
-          action: `Quote ${q.quote_number || q.id} for ${client?.full_name || 'Client'}`,
-          time: new Date(q.created_at).toLocaleString(),
-          status: q.status
-        }
-      })
-
-      setStats({
-        totalClients,
-        activeClients,
-        pendingFollowups,
-        overdueFollowups,
-        totalQuotes,
-        quotesSent,
-        quotesConfirmed,
-        upcomingTrips: 0, // Legacy field
-        upcomingBookings,
-        recentActivity: 0
-      })
-      setRecentClients(recentClientsResult.data || [])
-      setUpcomingFollowups(upcomingFollowupsResult.data || [])
-      setRecentQuotes(recentQuotes)
-    } catch (error) {
-      console.error('Error loading dashboard:', error)
-      setError('We couldn’t load your dashboard data. Please try again.')
+      if (!dashRes?.success) throw new Error(dashRes?.error || 'Could not load your dashboard')
+      setData(dashRes as DashboardData)
+    } catch (e) {
+      console.error('Dashboard load failed:', e)
+      setError(e instanceof Error ? e.message : 'We couldn’t load your dashboard data.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => { load() }, [load])
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+      <div className="p-4 lg:p-6 space-y-6">
+        <div className="h-8 w-64 bg-gray-100 rounded animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-[120px] bg-gray-100 rounded-lg animate-pulse" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[0, 1].map((i) => <div key={i} className="h-56 bg-gray-100 rounded-lg animate-pulse" />)}
+        </div>
       </div>
     )
   }
 
-  if (error) {
+  if (error || !data) {
     return (
       <div className="p-4 lg:p-6">
         <div className="max-w-md mx-auto mt-12 bg-white rounded-lg shadow-sm border border-danger/30 p-6 text-center">
@@ -262,7 +123,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-1">Couldn’t load your dashboard</h2>
           <p className="text-sm text-gray-600 mb-4">{error}</p>
           <button
-            onClick={() => { setLoading(true); loadDashboardData() }}
+            onClick={() => { setLoading(true); load() }}
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
           >
             <Activity className="w-4 h-4" />
@@ -273,440 +134,328 @@ export default function DashboardPage() {
     )
   }
 
+  const { departures, outstanding, inbox, proposals, quotes, clients, degraded } = data
+  const failed = (card: string) => degraded.some((d) => d.card === card)
+  const money = (n: number) =>
+    `€${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
   return (
     <div className="p-4 lg:p-6 space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
           Welcome Back{userName ? `, ${userName}` : ''}! 👋
         </h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Here's what's happening with your travel operations today.
-        </p>
+        <p className="text-sm text-gray-600 mt-1">Here’s what needs you today.</p>
       </div>
 
-      {/* Quick Stats - Row 1 */}
+      {degraded.length > 0 && (
+        <div className="flex items-start gap-2 bg-warning/10 border border-warning/30 rounded-lg p-3">
+          <AlertCircle className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+          <p className="text-xs text-gray-700">
+            Some figures couldn’t be loaded ({degraded.map((d) => d.card).join(', ')}), so they’re
+            shown as “—” rather than zero. Refresh to try again.
+          </p>
+        </div>
+      )}
+
+      {/* The four questions an operator opens the app with */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Total Clients */}
         <StatCard
-          title="Total Clients"
-          value={stats.totalClients}
-          icon={Users}
-          subtitle={stats.activeClients > 0 ? `${stats.activeClients} active` : undefined}
-          href="/clients"
-          color="primary"
-        />
-
-        {/* Pending Follow-ups */}
-        <StatCard
-          title="Pending Follow-ups"
-          value={stats.pendingFollowups}
-          icon={CheckSquare}
-          badge={stats.overdueFollowups > 0 ? `${stats.overdueFollowups} overdue` : undefined}
-          badgeColor="danger"
-          href="/followups"
-          color="warning"
-        />
-
-        {/* Client Quotes (B2C) */}
-        <StatCard
-          title="Client Quotes"
-          value={stats.totalQuotes}
-          icon={FileText}
-          subtitle={stats.quotesSent > 0 ? `${stats.quotesSent} sent` : undefined}
-          href="/quotes/b2c"
-          color="purple"
-        />
-
-        {/* Upcoming Bookings */}
-        <StatCard
-          title="Upcoming Trips"
-          value={stats.upcomingBookings}
-          icon={CalendarDays}
-          subtitle="Next 30 days"
+          title={`Departing in ${data.windowDays} days`}
+          value={failed('departures') ? '—' : departures.count}
+          icon={Plane}
           href="/bookings"
-          color="orange"
+          color="primary"
+          subtitle={
+            failed('departures') ? 'Unavailable'
+              : departures.items[0] ? `Next: ${fmtDate(departures.items[0].startDate)}`
+              : 'Nothing scheduled'
+          }
+        />
+        <StatCard
+          title="Outstanding"
+          value={failed('outstanding') ? '—' : money(outstanding.total)}
+          icon={Wallet}
+          href="/invoices"
+          color={outstanding.overdueCount > 0 ? 'orange' : 'primary'}
+          subtitle={
+            failed('outstanding') ? 'Unavailable'
+              : outstanding.overdueCount > 0
+                ? `${outstanding.overdueCount} overdue · ${money(outstanding.overdueTotal)}`
+                : outstanding.count > 0
+                  ? `${outstanding.count} open invoice${outstanding.count === 1 ? '' : 's'}`
+                  : 'All settled'
+          }
+        />
+        <StatCard
+          title="Needs a reply"
+          value={failed('inbox') ? '—' : inbox.count}
+          icon={Inbox}
+          href="/inbox"
+          color="purple"
+          subtitle={failed('inbox') ? 'Unavailable' : inbox.count === 0 ? 'Inbox clear' : 'Unanswered messages'}
+        />
+        <StatCard
+          title="Quotes awaiting client"
+          value={failed('quotes') ? '—' : quotes.awaitingCount}
+          icon={FileText}
+          href="/quotes/b2c"
+          color="warning"
+          subtitle={
+            failed('quotes') ? 'Unavailable'
+              : quotes.staleCount > 0 ? `${quotes.staleCount} with no reply in 5+ days`
+              : quotes.expiredCount > 0 ? `${quotes.expiredCount} expired`
+              : 'Nothing waiting'
+          }
         />
       </div>
 
-      {/* Quick Stats - Row 2 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {/* Quotes Sent */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs text-gray-600">Quotes Sent</h3>
-              <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
-            </div>
-            <Mail className="w-4 h-4 text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{stats.quotesSent}</p>
-          <p className="text-xs text-gray-500 mt-1">
-            {stats.totalQuotes > 0 
-              ? `${Math.round((stats.quotesSent / stats.totalQuotes) * 100)}% sent rate`
-              : '0% sent rate'
-            }
-          </p>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Panel
+          title="Departing soon"
+          icon={Plane}
+          href="/bookings"
+          empty={departures.items.length === 0}
+          emptyIcon={Plane}
+          emptyTitle={`No trips in the next ${data.windowDays} days`}
+          emptyHint="Confirmed bookings appear here as their departure approaches."
+        >
+          {departures.items.map((d) => {
+            const days = daysFromToday(d.startDate)
+            return (
+              <Link key={d.id} href={`/bookings/${d.id}`} className="flex items-center justify-between py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{d.tripName}</p>
+                  <p className="text-xs text-gray-500">
+                    {fmtDate(d.startDate)}
+                    {days !== null && ` · ${days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`}`}
+                  </p>
+                </div>
+                {d.balanceDue > 0 && (
+                  <span className="text-xs font-medium text-orange-700 bg-orange-50 px-2 py-1 rounded shrink-0 ml-3">
+                    {money(d.balanceDue)} due
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </Panel>
 
-        {/* Confirmed Bookings */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs text-gray-600">Confirmed</h3>
-              <div className="w-1.5 h-1.5 rounded-full bg-success" />
-            </div>
-            <CheckCircle className="w-4 h-4 text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{stats.quotesConfirmed}</p>
-          <p className="text-xs text-gray-500 mt-1">
-            {stats.quotesSent > 0
-              ? `${Math.round((stats.quotesConfirmed / stats.quotesSent) * 100)}% conversion`
-              : '0% conversion'
-            }
-          </p>
-        </div>
+        {/* The signal nothing else in the app surfaces: itinerary_shares
+            records view_count and last_viewed_at, and until now nothing read
+            them. Knowing a client opened their proposal three times tells a
+            salesperson exactly who to call. */}
+        <Panel
+          title="Clients reading their proposal"
+          icon={Eye}
+          href="/itineraries"
+          empty={proposals.items.length === 0}
+          emptyIcon={Eye}
+          emptyTitle="No proposals opened yet"
+          emptyHint="Share an itinerary link and you’ll see here when the client opens it."
+        >
+          {proposals.items.map((p) => (
+            <Link key={p.id} href={`/itineraries/${p.itineraryId}`} className="flex items-center justify-between py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{p.tripName}</p>
+                <p className="text-xs text-gray-500 truncate">
+                  {p.clientName ? `${p.clientName} · ` : ''}
+                  opened {p.viewCount}×{p.lastViewedAt ? ` · ${timeAgo(p.lastViewedAt)}` : ''}
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-gray-300 shrink-0 ml-3" />
+            </Link>
+          ))}
+        </Panel>
 
-        {/* Active Clients */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs text-gray-600">Active Clients</h3>
-              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
-            </div>
-            <Activity className="w-4 h-4 text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900">{stats.activeClients}</p>
-          <p className="text-xs text-gray-500 mt-1">Engaged customers</p>
-        </div>
+        <Panel
+          title="Largest balances owed"
+          icon={Wallet}
+          href="/invoices"
+          empty={outstanding.items.length === 0}
+          emptyIcon={Wallet}
+          emptyTitle="Nothing outstanding"
+          emptyHint="You’re all paid up — unpaid invoices will appear here."
+        >
+          {outstanding.items.map((i) => {
+            const d = i.dueDate ? daysFromToday(i.dueDate) : null
+            const overdue = d !== null && d < 0
+            return (
+              <Link key={i.id} href={`/invoices/${i.id}`} className="flex items-center justify-between py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{i.clientName || i.reference}</p>
+                  <p className="text-xs text-gray-500">{i.dueDate ? `Due ${fmtDate(i.dueDate)}` : 'No due date'}</p>
+                </div>
+                <span className={`text-xs font-medium px-2 py-1 rounded shrink-0 ml-3 ${overdue ? 'text-red-700 bg-red-50' : 'text-gray-700 bg-gray-100'}`}>
+                  {money(i.balanceDue)}
+                </span>
+              </Link>
+            )
+          })}
+        </Panel>
+
+        <Panel
+          title="Waiting on your reply"
+          icon={Inbox}
+          href="/inbox"
+          empty={inbox.items.length === 0}
+          emptyIcon={Inbox}
+          emptyTitle="Inbox clear"
+          emptyHint="New client messages land here across email and WhatsApp."
+        >
+          {inbox.items.map((m) => (
+            <Link key={m.id} href="/inbox" className="flex items-start justify-between py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{m.sender || 'Unknown sender'}</p>
+                <p className="text-xs text-gray-500 truncate">{m.snippet}</p>
+              </div>
+              <span className="text-[10px] uppercase tracking-wide text-gray-400 shrink-0 ml-3 mt-0.5">
+                {m.channel}
+              </span>
+            </Link>
+          ))}
+        </Panel>
       </div>
 
-      {/* Quick Actions */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h3 className="text-base font-semibold text-gray-900 mb-3">
-          Quick Actions
-        </h3>
-        <div className={`grid grid-cols-1 md:grid-cols-2 ${showsB2bWorkspace ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-3`}>
-          <QuickActionButton
-            icon={MessageSquare}
-            label="Parse WhatsApp"
-            href="/whatsapp-parser"
-            description="AI-powered conversation parser"
-            color="bg-success"
-          />
-          <QuickActionButton
+        <h2 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <QuickAction
+            href={showsB2cWorkspace ? '/itineraries/new' : '/tours/manage'}
             icon={Sparkles}
-            label="New Quote"
-            href={showsB2cWorkspace ? "/itineraries/new" : "/tours/manage"}
-            description={showsB2cWorkspace ? "Create itinerary from scratch" : "Create B2B package"}
-            color="bg-purple-500"
+            title="New Quote"
+            hint={showsB2cWorkspace ? 'Create an itinerary' : 'Create a B2B package'}
           />
-          <QuickActionButton
-            icon={Layers}
-            label="Rates Hub"
-            href="/rates"
-            description="Manage hotels, guides & services"
-            color="bg-primary-600"
-          />
+          <QuickAction href="/rates" icon={Layers} title="Rates Hub" hint="Hotels, guides & services" />
           {showsB2bWorkspace && (
-            <QuickActionButton
-              icon={Package}
-              label="B2B Packages"
-              href="/tours/manage"
-              description="Ready-made tour packages"
-              color="bg-warning"
-            />
+            <QuickAction href="/tours/manage" icon={FileText} title="B2B Packages" hint="Ready-made tours" />
           )}
-        </div>
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Recent Activity - 2 columns */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-gray-900">
-                Recent Activity
-              </h3>
-              <Link
-                href="/quotes/b2c"
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-              >
-                View all
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-
-            {recentQuotes.length === 0 ? (
-              <div className="text-center py-8">
-                <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-500 mb-3">No quotes yet</p>
-                <Link
-                  href="/whatsapp-parser"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Create Your First Quote
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {recentQuotes.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="p-1.5 bg-white rounded-lg border border-gray-200">
-                      <FileText className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                      <p className="text-xs text-gray-500">{activity.time}</p>
-                    </div>
-                    <Link
-                      href={`/quotes/b2c/${activity.id}`}
-                      className="text-primary-600 hover:text-primary-700 text-sm font-medium whitespace-nowrap"
-                    >
-                      View →
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Upcoming Follow-ups */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mt-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-gray-900">
-                Upcoming Follow-ups
-              </h3>
-              <Link
-                href="/followups"
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
-              >
-                View all
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-
-            {upcomingFollowups.length === 0 ? (
-              <div className="text-center py-6">
-                <CheckSquare className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No upcoming follow-ups</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {upcomingFollowups.map((followup) => (
-                  <FollowupCard key={followup.id} followup={followup} />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar - 1 column */}
-        <div className="space-y-4">
-          {/* Today's Summary */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <h3 className="text-base font-bold text-gray-900">Today's Summary</h3>
-              <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-600">Quotes Created</span>
-                <span className="font-bold text-lg text-gray-900">0</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-600">Quotes Sent</span>
-                <span className="font-bold text-lg text-gray-900">0</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-600">Bookings</span>
-                <span className="font-bold text-lg text-gray-900">0</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Tips */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <h3 className="text-base font-bold text-gray-900 mb-3">💡 Quick Tips</h3>
-            <div className="space-y-2 text-xs text-gray-700">
-              <p>• Use AI parser to extract client details from WhatsApp in seconds</p>
-              <p>• Check the Rates Hub for hotel and guide pricing</p>
-              <p>• Send quotes via WhatsApp or Email with one click</p>
-              <p>• Track your conversion rates in Analytics</p>
-            </div>
-          </div>
-
-          {/* System Status */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <h3 className="text-base font-bold text-gray-900 mb-3">System Status</h3>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600">AI Parser</span>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                  <span className="text-xs font-medium text-gray-700">Online</span>
-                </div>
-              </div>
-              {showsB2bWorkspace && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-600">B2B Packages</span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                    <span className="text-xs font-medium text-gray-700">Active</span>
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600">Email Service</span>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-success" />
-                  <span className="text-xs font-medium text-gray-700">Ready</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <QuickAction href="/clients" icon={Users} title="Clients" hint={`${clients.total} total`} />
         </div>
       </div>
     </div>
   )
 }
 
-// Stat Card Component with consistent height
-interface StatCardProps {
+// ============================================
+// Presentation helpers
+// ============================================
+
+function fmtDate(d: string | null): string {
+  if (!d) return '—'
+  const t = new Date(d).getTime()
+  if (!Number.isFinite(t)) return '—'
+  return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+/** Mirrors lib/dashboard-metrics.daysUntil: UTC-anchored, null-safe, no NaN. */
+function daysFromToday(d: string | null): number | null {
+  if (!d) return null
+  const t = new Date(d).getTime()
+  if (!Number.isFinite(t)) return null
+  const today = new Date(); today.setUTCHours(0, 0, 0, 0)
+  const target = new Date(t); target.setUTCHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000)
+}
+
+function timeAgo(iso: string): string {
+  const t = new Date(iso).getTime()
+  if (!Number.isFinite(t)) return ''
+  const mins = Math.floor((Date.now() - t) / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+function StatCard({
+  title, value, icon: Icon, href, color = 'primary', subtitle,
+}: {
   title: string
   value: string | number
   icon: React.ComponentType<{ className?: string }>
-  trend?: string
-  trendUp?: boolean
-  badge?: string
-  badgeColor?: 'primary' | 'danger'
   href: string
   color?: 'primary' | 'warning' | 'purple' | 'orange'
   subtitle?: string
-}
-
-function StatCard({ 
-  title, 
-  value, 
-  icon: Icon, 
-  trend, 
-  trendUp, 
-  badge, 
-  badgeColor = 'primary',
-  href,
-  color = 'primary',
-  subtitle
-}: StatCardProps) {
-
+}) {
   const dotColors = {
     primary: 'bg-primary-600',
     warning: 'bg-warning',
     purple: 'bg-purple-600',
-    orange: 'bg-orange-600'
+    orange: 'bg-orange-600',
   }
-
   return (
     <Link href={href} className="block group">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow h-full min-h-[120px] flex flex-col">
         <div className="flex items-start justify-between flex-1">
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <p className="text-xs text-gray-600">{title}</p>
               <div className={`w-1.5 h-1.5 rounded-full ${dotColors[color]}`} />
             </div>
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
-            {trend && (
-              <p className={`text-xs mt-1 ${trendUp ? 'text-success' : 'text-danger'}`}>
-                {trend} from last month
-              </p>
-            )}
-            {subtitle && (
-              <p className="text-xs text-gray-600 mt-1">{subtitle}</p>
-            )}
-            {badge && (
-              <span className={`
-                inline-flex items-center mt-2 px-2 py-0.5 rounded-full text-xs font-medium
-                ${badgeColor === 'danger' ? 'bg-danger/10 text-danger' : 'bg-primary-50 text-primary-700'}
-              `}>
-                <AlertCircle className="w-3 h-3 mr-1" />
-                {badge}
-              </span>
-            )}
+            <p className="text-2xl font-bold text-gray-900 truncate">{value}</p>
+            {subtitle && <p className="text-xs text-gray-600 mt-1 truncate">{subtitle}</p>}
           </div>
+          <Icon className="w-5 h-5 text-gray-300 group-hover:text-gray-400 transition-colors shrink-0 ml-2" />
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+function Panel({
+  title, icon: Icon, href, children, empty, emptyIcon: EmptyIcon, emptyTitle, emptyHint,
+}: {
+  title: string
+  icon: React.ComponentType<{ className?: string }>
+  href: string
+  children: React.ReactNode
+  empty: boolean
+  emptyIcon: React.ComponentType<{ className?: string }>
+  emptyTitle: string
+  emptyHint: string
+}) {
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
           <Icon className="w-4 h-4 text-gray-400" />
+          <h2 className="text-sm font-semibold text-gray-900">{title}</h2>
         </div>
+        <Link href={href} className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
+          View all <ArrowRight className="w-3 h-3" />
+        </Link>
       </div>
-    </Link>
+
+      {/* An empty state names what to do next. A tenant with no data yet should
+          learn the next step, not read a wall of zeros that looks broken. */}
+      {empty ? (
+        <div className="text-center py-8">
+          <EmptyIcon className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+          <p className="text-sm text-gray-600">{emptyTitle}</p>
+          <p className="text-xs text-gray-400 mt-1">{emptyHint}</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-100">{children}</div>
+      )}
+    </div>
   )
 }
 
-// Quick Action Button
-function QuickActionButton({ icon: Icon, label, href, description, color }: any) {
-  const dotColors: Record<string, string> = {
-    'bg-success': 'bg-success',
-    'bg-purple-500': 'bg-purple-600',
-    'bg-primary-600': 'bg-primary-600',
-    'bg-warning': 'bg-warning'
-  }
-
+function QuickAction({
+  href, icon: Icon, title, hint,
+}: {
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  hint: string
+}) {
   return (
-    <Link
-      href={href}
-      className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-all group"
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="w-4 h-4 text-gray-400" />
-        <div className={`w-1.5 h-1.5 rounded-full ${dotColors[color] || 'bg-gray-400'}`} />
-      </div>
-      <h3 className="text-base font-bold text-gray-900">{label}</h3>
-      <p className="text-xs text-gray-600 mt-1">{description}</p>
-      <p className="text-xs text-gray-500 mt-2 group-hover:text-primary-600">Start now →</p>
-    </Link>
-  )
-}
-
-// Followup Card
-function FollowupCard({ followup }: any) {
-  const daysUntil = Math.ceil(
-    (new Date(followup.due_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
-  )
-
-  return (
-    <Link
-      href={`/clients/${followup.client_id}`}
-      className="block p-3 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50/50 transition-all group"
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 group-hover:text-primary-700">
-            {followup.clients?.full_name}
-          </p>
-          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-            {followup.description}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 ml-4">
-          <div className="text-right">
-            <p className="text-xs text-gray-500">
-              {daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
-            </p>
-            <span className={`
-              inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium
-              ${followup.priority === 'high' ? 'bg-danger/10 text-danger' : ''}
-              ${followup.priority === 'medium' ? 'bg-warning/10 text-warning' : ''}
-              ${followup.priority === 'low' ? 'bg-gray-200 text-gray-700' : ''}
-            `}>
-              {followup.priority}
-            </span>
-          </div>
-          <Clock className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors" />
-        </div>
-      </div>
+    <Link href={href} className="border border-gray-200 rounded-lg p-3 hover:border-primary-300 hover:bg-gray-50 transition-colors group">
+      <Icon className="w-4 h-4 text-gray-400 group-hover:text-primary-600 transition-colors mb-2" />
+      <p className="text-sm font-medium text-gray-900">{title}</p>
+      <p className="text-xs text-gray-500">{hint}</p>
     </Link>
   )
 }
