@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
 import { generateContractPDF } from '@/lib/contract-pdf-generator'
@@ -57,12 +58,7 @@ export async function POST(request: NextRequest) {
 
     // The contract names the operator as the legal Service Provider party —
     // it must be the tenant, never a hardcoded company.
-    const { data: senderTenant } = await supabase
-      .from('tenants')
-      .select('company_name, contact_email, company_phone, company_website')
-      .eq('id', authResult.tenant_id!)
-      .maybeSingle()
-
+    const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const contractData = {
       company: {
         name: senderTenant?.company_name || '',

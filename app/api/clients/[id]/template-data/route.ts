@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth } from '@/lib/supabase-server'
 
 // GET /api/clients/[id]/template-data
@@ -95,12 +96,7 @@ export async function GET(
       .limit(10)
 
     // Build the placeholder data
-    const { data: senderTenant } = await supabase
-      .from('tenants')
-      .select('company_name, contact_email, company_phone')
-      .eq('id', authResult.tenant_id!)
-      .maybeSingle()
-
+    const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const placeholderData = buildPlaceholderData(clientWithName, latestItinerary, {
       company_name: senderTenant?.company_name || '',
       agent_name: (authResult.user?.user_metadata?.full_name as string) || '',

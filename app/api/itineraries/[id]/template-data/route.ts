@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth } from '@/lib/supabase-server'
 
 // GET /api/itineraries/[id]/template-data
@@ -42,8 +43,7 @@ export async function GET(
       .order('day_number', { ascending: true })
 
     const placeholderData = (await (async () => {
-      const { data: senderTenant } = await supabase
-        .from('tenants').select('company_name').eq('id', authResult.tenant_id!).maybeSingle()
+      const senderTenant = await loadSenderTenant(authResult.tenant_id)
       return buildPlaceholderData(itinerary, days || [], senderTenant?.company_name || '')
     })())
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
@@ -267,12 +268,7 @@ export async function POST(request: NextRequest) {
 
     // Generate PDF
 
-    const { data: senderTenant } = await supabase
-      .from('tenants')
-      .select('company_name, contact_email, company_website')
-      .eq('id', authResult.tenant_id!)
-      .maybeSingle()
-
+    const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const pdfBytes = await generateInvoicePDF(invoice, {
       name: senderTenant?.company_name || '',
       email: senderTenant?.contact_email || null,

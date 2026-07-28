@@ -19,6 +19,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { quote_id, quote_type, deposit_percent = 30 } = body
 
+    // Unvalidated, this reached `(total_amount * deposit_percent) / 100`
+    // straight from the request body: -50 produces a negative deposit, 500
+    // charges five times the trip.
+    if (typeof deposit_percent !== 'number' || !Number.isFinite(deposit_percent) ||
+        deposit_percent < 0 || deposit_percent > 100) {
+      return NextResponse.json(
+        { success: false, error: 'deposit_percent must be a number between 0 and 100' },
+        { status: 400 }
+      )
+    }
+
     if (!quote_id || !quote_type) {
       return NextResponse.json(
         { success: false, error: 'quote_id and quote_type are required' },
@@ -58,14 +69,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if booking already exists for this quote
-    const { data: existingBooking } = await adminClient
+    // Fast path only — this cannot be the guarantee. Two concurrent requests
+    // both see "no booking" and both insert; the unique index from migration
+    // 256 is what actually prevents two bookings (and two deposits) for one
+    // quote. The error is captured because a failed SELECT previously looked
+    // exactly like "no booking exists".
+    const { data: existingBooking, error: existingErr } = await adminClient
       .from('bookings')
       .select('id, booking_number')
       .eq('quote_id', quote_id)
       .eq('quote_type', quote_type)
       .eq('tenant_id', tenant_id)
       .single()
+
+    // PGRST116 = no rows, which is the normal path here.
+    if (existingErr && existingErr.code !== 'PGRST116') {
+      console.error('Error checking for an existing booking:', existingErr)
+      return NextResponse.json(
+        { success: false, error: 'Could not verify whether this quote is already booked' },
+        { status: 500 }
+      )
+    }
 
     if (existingBooking) {
       return NextResponse.json(
@@ -150,6 +174,31 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (bookingError) {
+      // 23505 on uq_bookings_one_per_quote: someone converted this quote
+      // between our check and our insert. Return THEIR booking — the caller
+      // wanted this quote booked, and it is.
+      if (bookingError.code === '23505') {
+        const { data: raced } = await adminClient
+          .from('bookings')
+          .select('id, booking_number')
+          .eq('quote_id', quote_id)
+          .eq('quote_type', quote_type)
+          .eq('tenant_id', tenant_id)
+          .maybeSingle()
+
+        if (raced) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Booking already exists for this quote',
+              booking_number: raced.booking_number,
+              booking_id: raced.id,
+            },
+            { status: 409 }
+          )
+        }
+      }
+
       console.error('Error creating booking:', bookingError)
       return NextResponse.json(
         { success: false, error: 'Failed to create booking', details: bookingError.message },

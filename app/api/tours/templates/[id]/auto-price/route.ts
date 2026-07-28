@@ -9,6 +9,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { 
   calculateAutoPricing, 
   calculateMultiTierPricing,
@@ -21,7 +22,35 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // This route had NO auth check and NO tenant check, while
+    // auto-pricing-service queries with the SERVICE ROLE and filters only by
+    // template id. Any authenticated user holding another tenant's template
+    // UUID got that tenant's full cost breakdown — supplier costs, margins,
+    // per-pax pricing across all four tiers.
+    const auth = await requireAuth()
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+
     const { id: templateId } = await params
+
+    // Ownership is checked here, not inside the pricing service: the service
+    // is also used by trusted internal callers, and a template that belongs
+    // to someone else must be indistinguishable from one that does not exist.
+    const { data: owned } = await createAdminClient()
+      .from('tour_templates')
+      .select('id')
+      .eq('id', templateId)
+      .eq('tenant_id', auth.tenant_id!)
+      .maybeSingle()
+
+    if (!owned) {
+      return NextResponse.json(
+        { success: false, error: 'Template not found' },
+        { status: 404 }
+      )
+    }
+
     const body = await request.json()
 
     const {

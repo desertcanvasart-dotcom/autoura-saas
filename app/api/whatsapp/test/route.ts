@@ -1,8 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { requireAuth } from '@/lib/supabase-server'
+
+const ROLE_RANK: Record<string, number> = {
+  viewer: 1, member: 2, agent: 2, manager: 3, admin: 4, owner: 5,
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // This route sends a real, billed Twilio message to any number in the
+    // body. It had no auth check, no role check and no rate limit, so any
+    // authenticated user — including a viewer — could use the platform's
+    // Twilio account to message arbitrary numbers, with nothing recorded.
+    // Restricted to admins: it exists to prove an integration works, which
+    // is a settings-level action.
+    const auth = await requireAuth()
+    if (auth.error) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+    if ((ROLE_RANK[auth.role || ''] || 0) < ROLE_RANK.admin) {
+      return NextResponse.json(
+        { success: false, error: 'Only an admin can send a test message' },
+        { status: 403 }
+      )
+    }
+
     const { phone } = await request.json()
 
     if (!phone) {

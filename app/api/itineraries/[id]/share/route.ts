@@ -68,7 +68,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       created_by: user!.id,
     })
     if (insErr) {
-      // 23505 = someone shared concurrently; return theirs rather than erroring.
+      // 23505 = someone shared concurrently; return theirs rather than
+      // erroring. ANY OTHER failure (RLS denial, FK violation, connection
+      // loss) means no row exists — and `token` still holds the string we
+      // just generated, so an early version fell through to success:true and
+      // handed the operator a URL that 404s. Clear it first, so only a token
+      // that came back from the database can be returned.
+      token = undefined
+
       if (insErr.code === '23505') {
         const { data: raced } = await supabase!
           .from('itinerary_shares')
@@ -78,6 +85,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           .maybeSingle()
         token = raced?.token
       }
+
       if (!token) {
         return NextResponse.json({ success: false, error: insErr.message }, { status: 500 })
       }

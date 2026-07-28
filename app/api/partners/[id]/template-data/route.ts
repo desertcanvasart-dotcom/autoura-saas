@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // GET /api/partners/[id]/template-data?type=hotel|guide|restaurant|airport_staff
@@ -149,11 +150,7 @@ export async function GET(
     // composed emails signed off as "Islam at Travel2Egypt". Blank when unset;
     // a template rendering an empty {{company_name}} is visibly incomplete,
     // which is the correct signal to finish Settings → Organization.
-    const { data: senderTenant } = await adminClient
-      .from('tenants')
-      .select('company_name, contact_email, company_phone')
-      .eq('id', authResult.tenant_id!)
-      .maybeSingle()
+    const senderTenant = await loadSenderTenant(authResult.tenant_id)
     placeholderData.company_name = senderTenant?.company_name || ''
     placeholderData.agent_name = (authResult.user?.user_metadata?.full_name as string) || ''
     placeholderData.company_email = senderTenant?.contact_email || ''
