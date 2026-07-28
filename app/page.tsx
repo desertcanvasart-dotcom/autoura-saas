@@ -244,8 +244,8 @@ const platformStages = [
   {
     step: 2,
     headline: 'Itineraries That Price Themselves',
-    description: 'Build day-by-day itineraries with the visual tour builder or let AI generate a draft. Every service auto-priced from your rate database. Switch tiers, adjust group size, or change dates — pricing recalculates instantly across all 14 service slots.',
-    screenshotNote: 'Capture /tour-builder with 3+ days and pricing sidebar showing totals',
+    description: 'Build day-by-day itineraries with the visual itinerary builder or let AI generate a draft. Every service auto-priced from your rate database. Switch tiers, adjust group size, or change dates — pricing recalculates instantly across all 14 service slots.',
+    screenshotNote: 'Capture /itineraries/new with 3+ days and pricing showing totals',
     mockupImage: '/mockups/tour-builder.png',
     icon: FileText,
   },
