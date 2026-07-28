@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { evaluateDeleteGuard } from '@/lib/delete-guard'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 /**
@@ -141,64 +142,69 @@ export async function DELETE(
     const supabase = await createAuthenticatedClient()
     const { id } = await params
 
+    // ────────────────────────────────────────────────────────────────────
+    // WHY THIS WAS REWRITTEN
+    // The old handler deleted itinerary_services, then itinerary_days, then
+    // the itinerary — as three separate statements with no transaction. But
+    // bookings.itinerary_id is ON DELETE RESTRICT, so if a booking existed
+    // the FINAL delete raised 23503 AFTER the days and services were already
+    // gone. The user saw a tidy "cannot delete" 409 while the itinerary
+    // survived, gutted of its content, with a live booking pointing at it.
+    // Reproduced against production before this fix.
+    //
+    // The database already deletes an itinerary correctly on its own:
+    //   days, services, resources, shares, draft quotes → ON DELETE CASCADE
+    //   bookings                                         → ON DELETE RESTRICT
+    //   invoices, payments, commissions, expenses        → ON DELETE SET NULL
+    //
+    // So: (1) block up front on anything that must not be silently lost —
+    // the RESTRICT relation (a raw 23503 is a poor message) AND the SET NULL
+    // money relations (a successful delete would silently ORPHAN them). Then
+    // (2) issue ONE delete and let the DB cascade the safe children in a
+    // single atomic statement. Nothing is destroyed unless everything can be.
+    // ────────────────────────────────────────────────────────────────────
 
+    const [bookings, invoices, payments, commissions, quotes] = await Promise.all([
+      supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
+      supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
+      supabase.from('payments').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
+      supabase.from('commissions').select('id', { count: 'exact', head: true }).eq('itinerary_id', id),
+      // Draft quotes cascade harmlessly; a quote the client has SEEN must not
+      // vanish silently.
+      supabase.from('b2c_quotes').select('id', { count: 'exact', head: true })
+        .eq('itinerary_id', id).neq('status', 'draft'),
+    ])
 
-    // Check if itinerary has invoices
-    const { data: invoices } = await supabase
-      .from('invoices')
-      .select('id, invoice_number')
-      .eq('itinerary_id', id)
-
-    if (invoices && invoices.length > 0) {
-      return NextResponse.json({
-        success: false,
-        error: `Cannot delete itinerary. It has ${invoices.length} invoice(s) linked. Please delete the invoices first or unlink them from this itinerary.`
-      }, { status: 409 })
+    const guard = evaluateDeleteGuard('itinerary', [
+      { label: `${bookings.count} booking(s)`, count: bookings.count, error: bookings.error },
+      { label: `${invoices.count} invoice(s)`, count: invoices.count, error: invoices.error },
+      { label: `${payments.count} payment(s)`, count: payments.count, error: payments.error },
+      { label: `${commissions.count} commission(s)`, count: commissions.count, error: commissions.error },
+      { label: `${quotes.count} sent quote(s)`, count: quotes.count, error: quotes.error },
+    ])
+    if (!guard.ok) {
+      if (guard.kind === 'error') console.error('❌ Itinerary delete pre-check failed:', guard.label)
+      return NextResponse.json(
+        { success: false, error: guard.message },
+        { status: guard.kind === 'error' ? 500 : 409 }
+      )
     }
 
-    // Get all days for this itinerary
-    const { data: days } = await supabase
-      .from('itinerary_days')
-      .select('id')
-      .eq('itinerary_id', id)
-
-    if (days && days.length > 0) {
-      const dayIds = days.map((d: any) => d.id)
-
-      // Delete services for these days
-      await supabase
-        .from('itinerary_services')
-        .delete()
-        .in('itinerary_day_id', dayIds)
-    }
-
-    // Delete days
-    await supabase
-      .from('itinerary_days')
-      .delete()
-      .eq('itinerary_id', id)
-
-    // Finally, delete the itinerary
-    const { error } = await supabase
-      .from('itineraries')
-      .delete()
-      .eq('id', id)
+    // ONE statement. The database cascades days, services, resources, shares
+    // and any draft quotes atomically; a RESTRICT that slipped in between the
+    // check and here rolls the whole thing back rather than half-deleting.
+    const { error } = await supabase.from('itineraries').delete().eq('id', id)
 
     if (error) {
       console.error('❌ Error deleting itinerary:', error)
-
-      // Check for foreign key constraint
       if (error.code === '23503') {
         return NextResponse.json({
           success: false,
-          error: 'Cannot delete itinerary. It has linked records (invoices, payments, etc.). Please remove those first.'
+          error: 'Cannot delete this itinerary — a linked record was created while deleting. Nothing was deleted; please try again.',
         }, { status: 409 })
       }
-
       throw error
     }
-
-
 
     return NextResponse.json({
       success: true,

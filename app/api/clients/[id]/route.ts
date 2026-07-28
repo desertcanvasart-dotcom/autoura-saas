@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { evaluateDeleteGuard } from '@/lib/delete-guard'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET single client
@@ -150,104 +151,60 @@ export async function DELETE(
     // Use authenticated client - RLS will automatically filter by tenant
     const supabase = await createAuthenticatedClient()
 
-    // First, check if client has any related records
-    // Check for itineraries
-    const { data: itineraries, error: itinError } = await supabase
-      .from('itineraries')
-      .select('id')
-      .eq('client_id', id)
-      .limit(1)
+    // ────────────────────────────────────────────────────────────────────
+    // WHY THIS WAS REWRITTEN
+    // The old handler manually deleted follow_ups, then whatsapp_messages and
+    // whatsapp_conversations, THEN deleted the client. But
+    // email_conversations.client_id has no ON DELETE action, so a client with
+    // email history failed the final delete with 23503 AFTER their WhatsApp
+    // thread was already gone — communication history destroyed, client still
+    // present, reported to the user as a safe "cannot delete".
+    //
+    // It also OVER-deleted: whatsapp_conversations is ON DELETE SET NULL, i.e.
+    // the schema wants the thread RETAINED and detached, not erased. The
+    // handler hard-deleted it anyway.
+    //
+    // The database handles this correctly by itself:
+    //   client_notes, client_preferences, client_followups, follow_ups,
+    //   communication_history, email_client_links        → CASCADE (removed)
+    //   whatsapp_conversations, communication_threads,
+    //   bookings, invoices, payments, commissions         → SET NULL (retained)
+    //   email_conversations                               → blocks (NO ACTION)
+    //
+    // So: block up front on the money/commitment relations that a successful
+    // delete would silently ORPHAN (SET NULL), and on the one relation that
+    // hard-blocks — then issue ONE delete and let the DB cascade the rest in a
+    // single atomic statement.
+    // ────────────────────────────────────────────────────────────────────
 
-    if (itinError) {
-      console.error('Error checking itineraries:', itinError)
-    }
+    const [itineraries, invoices, payments, commissions, bookings, emails] = await Promise.all([
+      supabase.from('itineraries').select('id', { count: 'exact', head: true }).eq('client_id', id),
+      supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('client_id', id),
+      supabase.from('payments').select('id', { count: 'exact', head: true }).eq('client_id', id),
+      supabase.from('commissions').select('id', { count: 'exact', head: true }).eq('client_id', id),
+      supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('client_id', id),
+      supabase.from('email_conversations').select('id', { count: 'exact', head: true }).eq('client_id', id),
+    ])
 
-    if (itineraries && itineraries.length > 0) {
+    const guard = evaluateDeleteGuard('client', [
+      { label: `${itineraries.count} itinerary(ies)`, count: itineraries.count, error: itineraries.error },
+      { label: `${invoices.count} invoice(s)`, count: invoices.count, error: invoices.error },
+      { label: `${payments.count} payment(s)`, count: payments.count, error: payments.error },
+      { label: `${commissions.count} commission(s)`, count: commissions.count, error: commissions.error },
+      { label: `${bookings.count} booking(s)`, count: bookings.count, error: bookings.error },
+      { label: `${emails.count} email conversation(s)`, count: emails.count, error: emails.error },
+    ])
+    if (!guard.ok) {
+      if (guard.kind === 'error') console.error('Client delete pre-check failed:', guard.label)
       return NextResponse.json(
-        { error: 'Cannot delete client with existing itineraries. Please delete or reassign itineraries first.' },
-        { status: 400 }
+        { error: guard.message },
+        { status: guard.kind === 'error' ? 500 : 409 }
       )
     }
 
-    // Check for invoices
-    const { data: invoices, error: invError } = await supabase
-      .from('invoices')
-      .select('id')
-      .eq('client_id', id)
-      .limit(1)
-
-    if (invError) {
-      console.error('Error checking invoices:', invError)
-      // Don't block if table doesn't exist
-    }
-
-    if (invoices && invoices.length > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete client with existing invoices. Please delete or reassign invoices first.' },
-        { status: 400 }
-      )
-    }
-
-    // Check for follow_ups
-    const { data: followUps, error: fuError } = await supabase
-      .from('follow_ups')
-      .select('id')
-      .eq('client_id', id)
-      .limit(1)
-
-    if (fuError) {
-      console.error('Error checking follow_ups:', fuError)
-      // Don't block if table doesn't exist
-    }
-
-    // If there are follow-ups, delete them first (they're not critical)
-    if (followUps && followUps.length > 0) {
-      const { error: deleteFollowUpsError } = await supabase
-        .from('follow_ups')
-        .delete()
-        .eq('client_id', id)
-
-      if (deleteFollowUpsError) {
-        console.error('Error deleting follow-ups:', deleteFollowUpsError)
-      }
-    }
-
-    // Check for WhatsApp conversations
-    const { data: conversations, error: convError } = await supabase
-      .from('whatsapp_conversations')
-      .select('id')
-      .eq('client_id', id)
-      .limit(1)
-
-    if (convError) {
-      console.error('Error checking conversations:', convError)
-      // Don't block if table doesn't exist
-    }
-
-    // Delete WhatsApp conversations if any
-    if (conversations && conversations.length > 0) {
-      // First delete messages
-      const { error: deleteMessagesError } = await supabase
-        .from('whatsapp_messages')
-        .delete()
-        .in('conversation_id', conversations.map(c => c.id))
-
-      if (deleteMessagesError) {
-        console.error('Error deleting messages:', deleteMessagesError)
-      }
-
-      // Then delete conversations
-      const { error: deleteConvError } = await supabase
-        .from('whatsapp_conversations')
-        .delete()
-        .eq('client_id', id)
-
-      if (deleteConvError) {
-        console.error('Error deleting conversations:', deleteConvError)
-      }
-    }
-
-    // Now delete the client
+    // ONE statement. The DB cascades notes/preferences/follow-ups/history and
+    // detaches (SET NULL) the WhatsApp thread — which the schema wants retained,
+    // not erased — atomically.
     const { error } = await supabase
       .from('clients')
       .delete()
@@ -255,15 +212,12 @@ export async function DELETE(
 
     if (error) {
       console.error('Error deleting client:', error)
-      
-      // Check if it's a foreign key constraint error
       if (error.code === '23503') {
         return NextResponse.json(
-          { error: 'Cannot delete client due to related records. Please remove all related data first.' },
-          { status: 400 }
+          { error: 'Cannot delete this client — a linked record was created while deleting. Nothing was deleted; please try again.' },
+          { status: 409 }
         )
       }
-      
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
