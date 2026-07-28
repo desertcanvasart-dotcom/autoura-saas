@@ -58,6 +58,8 @@ export default function TenantSettingsPage() {
       setContactEmail(tenant.contact_email || '')
       setLogoUrl(tenant.logo_url || null)
       setLogoPreview(tenant.logo_url || null)
+      setPrimaryColor(tenant.primary_color || '#647C47')
+      setSecondaryColor(tenant.secondary_color || '#2d3b2d')
       // Workspace visibility is a tenant preference, free on every tier —
       // no longer derived from feature flags, which read like entitlements.
       setWorkspaceMode(tenant.workspace_mode ?? 'both')
@@ -68,8 +70,7 @@ export default function TenantSettingsPage() {
       setEmailIntegration(features.email_integration)
       setPdfGeneration(features.pdf_generation)
       setAnalyticsEnabled(features.analytics_enabled)
-      setPrimaryColor(features.primary_color)
-      setSecondaryColor(features.secondary_color)
+
 
 
     }
@@ -154,7 +155,10 @@ export default function TenantSettingsPage() {
         finalLogoUrl = await uploadLogo()
       }
 
-      // Update tenant basic info
+      // Identity AND branding live on tenants — one table, one write.
+      // (Colors used to go to tenant_features while the PDF generators read
+      // tenants.primary_color, so every document rendered the default blue
+      // no matter what was picked here. Migration 255 consolidated this.)
       const { error: tenantError } = await supabase
         .from('tenants')
         .update({
@@ -162,21 +166,12 @@ export default function TenantSettingsPage() {
           contact_email: contactEmail,
           logo_url: finalLogoUrl,
           workspace_mode: workspaceMode,
+          primary_color: primaryColor,
+          secondary_color: secondaryColor,
         })
         .eq('id', tenant.id)
 
       if (tenantError) throw tenantError
-
-      // Update tenant branding only (features and limits are controlled by pricing tier)
-      const { error: featuresError } = await supabase
-        .from('tenant_features')
-        .update({
-          primary_color: primaryColor,
-          secondary_color: secondaryColor,
-        })
-        .eq('tenant_id', tenant.id)
-
-      if (featuresError) throw featuresError
 
       // Refetch tenant data
       await refetchTenant()
