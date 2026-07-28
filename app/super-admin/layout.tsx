@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Shield, Building2, Users, BarChart3, Waypoints, LogOut } from 'lucide-react'
+import { Shield, Building2, Users, BarChart3, Waypoints, MessageCircle, LogOut } from 'lucide-react'
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/super-admin', icon: BarChart3 },
   { label: 'Tenants', href: '/super-admin/tenants', icon: Building2 },
   { label: 'Users', href: '/super-admin/users', icon: Users },
+  { label: 'Support', href: '/super-admin/support', icon: MessageCircle },
   { label: 'Concierge Brands', href: '/super-admin/concierge-brands', icon: Waypoints },
   { label: 'Analytics', href: '/super-admin/analytics', icon: BarChart3 },
 ]

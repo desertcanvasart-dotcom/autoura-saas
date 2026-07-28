@@ -5,6 +5,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import Sidebar from "@/components/Sidebar"
 import ImpersonationBanner from "@/components/ImpersonationBanner"
+import SupportChatWidget from "@/components/SupportChatWidget"
 import { AuthProvider } from './contexts/AuthContext'
 import { TenantProvider } from './contexts/TenantContext'
 import { ConfirmDialogProvider } from '@/components/ConfirmDialog'
@@ -60,6 +61,7 @@ export default function RootLayout({
                   >
                     {children}
                   </main>
+                  <SupportChatWidget />
                 </div>
               )}
             </ConfirmDialogProvider>
