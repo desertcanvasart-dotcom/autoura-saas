@@ -4,13 +4,13 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { showToast } from '@/app/contexts/ToastContext'
+import { createClient } from '@/app/supabase'
 import { 
   User, 
   Mail, 
   Phone, 
   Building2, 
   MapPin, 
-  Globe, 
   Lock,
   Camera,
   Save,
@@ -27,10 +27,6 @@ interface UserProfile {
   phone: string
   company: string
   role: string
-  address: string
-  city: string
-  country: string
-  website: string
   avatar: string
 }
 
@@ -45,20 +41,20 @@ interface PasswordData {
 // ============================================
 
 export default function ProfilePage() {
-  const { profile } = useAuth()
+  const { user, profile } = useAuth()
+  const supabase = createClient()
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile')
   const [loading, setLoading] = useState(false)
   const [profileData, setProfileData] = useState<UserProfile>({
-    name: profile?.full_name || 'User',
+    // Only fields with a home in user_profiles. address/city/country/website
+    // were collected by the old form and silently discarded on save — the same
+    // "reports success, stores nothing" lie the whole page had, in miniature.
+    name: profile?.full_name || '',
     email: profile?.email || '',
     phone: profile?.phone || '',
     company: profile?.company_name || '',
     role: profile?.role || '',
-    address: '',
-    city: '',
-    country: '',
-    website: '',
-    avatar: ''
+    avatar: profile?.avatar_url || ''
   })
 
   const [passwordData, setPasswordData] = useState<PasswordData>({
@@ -66,6 +62,21 @@ export default function ProfilePage() {
     newPassword: '',
     confirmPassword: ''
   })
+
+  const fmtDate = (iso?: string | null) => {
+    if (!iso) return '—'
+    const t = new Date(iso).getTime()
+    return Number.isFinite(t)
+      ? new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : '—'
+  }
+  const fmtDateTime = (iso?: string | null) => {
+    if (!iso) return '—'
+    const t = new Date(iso).getTime()
+    return Number.isFinite(t)
+      ? new Date(t).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '—'
+  }
 
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -77,24 +88,66 @@ export default function ProfilePage() {
     setPasswordData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setProfileData(prev => ({ ...prev, avatar: reader.result as string }))
+    if (!file) return
+    if (!user?.id) {
+      showToast('error', 'You need to be signed in to change your photo.')
+      return
+    }
+
+    // Show the picked image immediately, but the ACTUAL save is the upload —
+    // the old code only read the file into local state and called it done, so
+    // the avatar vanished on the next page load.
+    const preview = URL.createObjectURL(file)
+    setProfileData(prev => ({ ...prev, avatar: preview }))
+
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('userId', user.id)
+      const res = await fetch('/api/avatar/upload', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Upload failed')
       }
-      reader.readAsDataURL(file)
+      setProfileData(prev => ({ ...prev, avatar: data.url }))
+      showToast('success', 'Profile photo updated.')
+    } catch (err) {
+      // Roll the preview back so the UI does not imply a save that failed.
+      setProfileData(prev => ({ ...prev, avatar: profile?.avatar_url || '' }))
+      showToast('error', err instanceof Error ? err.message : 'Could not upload your photo.')
+    } finally {
+      URL.revokeObjectURL(preview)
     }
   }
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setTimeout(() => {
-      showToast('success', 'Profile updated successfully!')
+    try {
+      // Persists via the existing PUT /api/profile (RLS-scoped to the caller).
+      // Only the three fields user_profiles actually stores are sent — email
+      // is auth-managed and role is admin-managed, so both are read-only here.
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: profileData.name.trim(),
+          phone: profileData.phone.trim() || null,
+          company_name: profileData.company.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Could not save your profile')
+      }
+      showToast('success', 'Profile updated.')
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not save your profile.')
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -107,12 +160,39 @@ export default function ProfilePage() {
       showToast('error', 'Password must be at least 8 characters long!')
       return
     }
+    if (!profileData.email) {
+      showToast('error', 'Your account email is missing — please reload and try again.')
+      return
+    }
     setLoading(true)
-    setTimeout(() => {
-      showToast('success', 'Password changed successfully!')
+    try {
+      // Re-authenticate with the CURRENT password first. Supabase's
+      // updateUser({ password }) trusts the existing session and would let
+      // anyone at an unlocked screen change the password without knowing the
+      // old one; verifying here restores that check.
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: profileData.email,
+        password: passwordData.currentPassword,
+      })
+      if (reauthError) {
+        showToast('error', 'Your current password is incorrect.')
+        return
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      })
+      if (updateError) {
+        throw new Error(updateError.message)
+      }
+
+      showToast('success', 'Password changed.')
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not change your password.')
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -232,12 +312,12 @@ export default function ProfilePage() {
                             type="email"
                             name="email"
                             value={profileData.email}
-                            onChange={handleProfileChange}
-                            required
-                            className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                            readOnly
+                            title="Your sign-in email is managed by your account and cannot be changed here."
+                            className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm bg-gray-50 text-gray-500 outline-none cursor-not-allowed"
                           />
                         </div>
-                        <div> npm run dev
+                        <div>
                           <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1">
                             <Phone className="w-3.5 h-3.5" />
                             Phone Number
@@ -256,8 +336,9 @@ export default function ProfilePage() {
                             type="text"
                             name="role"
                             value={profileData.role}
-                            onChange={handleProfileChange}
-                            className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                            readOnly
+                            title="Your role is set by an administrator."
+                            className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm bg-gray-50 text-gray-500 outline-none cursor-not-allowed capitalize"
                           />
                         </div>
                       </div>
@@ -276,52 +357,6 @@ export default function ProfilePage() {
                             type="text"
                             name="company"
                             value={profileData.company}
-                            onChange={handleProfileChange}
-                            className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1">
-                            <Globe className="w-3.5 h-3.5" />
-                            Website
-                          </label>
-                          <input
-                            type="url"
-                            name="website"
-                            value={profileData.website}
-                            onChange={handleProfileChange}
-                            className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                          />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
-                          <input
-                            type="text"
-                            name="address"
-                            value={profileData.address}
-                            onChange={handleProfileChange}
-                            className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1">
-                            <MapPin className="w-3.5 h-3.5" />
-                            City
-                          </label>
-                          <input
-                            type="text"
-                            name="city"
-                            value={profileData.city}
-                            onChange={handleProfileChange}
-                            className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Country</label>
-                          <input
-                            type="text"
-                            name="country"
-                            value={profileData.country}
                             onChange={handleProfileChange}
                             className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
                           />
@@ -412,25 +447,21 @@ export default function ProfilePage() {
 
           {/* BOTTOM CARDS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Account Activity */}
+            {/* Account Activity — real values only. This card previously showed
+                a hardcoded "Jan 15 2024 / Today 10:30 AM / 247 bookings / 12
+                tours" for every user; account created and last sign-in come
+                from the auth session, and the fabricated counts were removed
+                rather than shown as invented numbers. */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Account Activity</h3>
               <div className="space-y-2">
                 <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
                   <span className="text-xs text-gray-500">Account Created</span>
-                  <span className="text-xs font-medium text-gray-700">Jan 15, 2024</span>
-                </div>
-                <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
-                  <span className="text-xs text-gray-500">Last Login</span>
-                  <span className="text-xs font-medium text-gray-700">Today, 10:30 AM</span>
-                </div>
-                <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
-                  <span className="text-xs text-gray-500">Total Bookings</span>
-                  <span className="text-xs font-medium text-gray-700">247</span>
+                  <span className="text-xs font-medium text-gray-700">{fmtDate(user?.created_at)}</span>
                 </div>
                 <div className="flex items-center justify-between py-1.5">
-                  <span className="text-xs text-gray-500">Active Tours</span>
-                  <span className="text-xs font-medium text-gray-700">12</span>
+                  <span className="text-xs text-gray-500">Last Sign-In</span>
+                  <span className="text-xs font-medium text-gray-700">{fmtDateTime(user?.last_sign_in_at)}</span>
                 </div>
               </div>
             </div>

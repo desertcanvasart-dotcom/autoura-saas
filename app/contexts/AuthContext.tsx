@@ -13,6 +13,7 @@ interface UserProfile {
   phone: string | null
   is_active: boolean
   role?: string | null
+  avatar_url?: string | null
 }
 
 interface AuthContextType {
