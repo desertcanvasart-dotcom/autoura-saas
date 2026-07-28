@@ -55,7 +55,6 @@ function mockSupabase(opts: MockOpts) {
 
 const baseOpts = {
   prefix: 'INV',
-  sequenceName: 'invoice_number_seq',
   table: 'invoices',
   column: 'invoice_number',
   year: 2026,
@@ -65,49 +64,37 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('nextDocumentNumber — sequence (primary) path', () => {
-  it('formats PREFIX-YYYY-NNN with 3-digit zero padding', async () => {
-    const { client, calls } = mockSupabase({ rpc: { data: 7, error: null } })
-    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-007')
-    expect(calls.rpc).toEqual([{ fn: 'nextval', args: { seq_name: 'invoice_number_seq' } }])
-    // Sequence succeeded — the fallback scan must not run.
-    expect(calls.from).toHaveLength(0)
+// ============================================================================
+// The sequence path is GONE (migration 258), and its tests with it.
+//
+// They passed for months while the feature was broken, because they mocked
+// rpc('nextval', { seq_name }) as returning a value. It never could: Postgres's
+// nextval(regclass) takes an unnamed argument that PostgREST cannot bind by
+// name, so every real call returned PGRST202 and the scan below was always the
+// actual implementation. A mock proved the code handled a response the database
+// would never send.
+//
+// It was removed rather than repaired because the sequences are global while
+// these are per-tenant identifiers — a shared sequence numbers the second
+// tenant's first invoice INV-2026-002.
+// ============================================================================
+
+describe('the sequence path no longer exists', () => {
+  it('never calls an RPC — the scan is the only path', async () => {
+    const { client, calls } = mockSupabase({ rows: [] })
+    await nextDocumentNumber({ ...baseOpts, supabase: client })
+    expect(calls.rpc).toEqual([])
   })
 
-  it('pads 2-digit sequence values to 3 digits', async () => {
-    const { client } = mockSupabase({ rpc: { data: 42, error: null } })
-    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-042')
-  })
-
-  it('does not truncate sequence values above 999', async () => {
-    const { client } = mockSupabase({ rpc: { data: 1234, error: null } })
-    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-1234')
-  })
-
-  it('treats sequence value 0 as legitimate (seqData != null), emitting -000', async () => {
-    const { client, calls } = mockSupabase({ rpc: { data: 0, error: null } })
-    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-000')
-    expect(calls.from).toHaveLength(0)
-  })
-
-  it('uses the prefix verbatim (per-type isolation: EXP vs INV never overlap)', async () => {
-    const { client } = mockSupabase({ rpc: { data: 7, error: null } })
-    await expect(
-      nextDocumentNumber({ ...baseOpts, supabase: client, prefix: 'EXP' }),
-    ).resolves.toBe('EXP-2026-007')
-  })
-
-  it('defaults to the current year when no year override is given', async () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2031-03-15T12:00:00Z'))
-    const { client } = mockSupabase({ rpc: { data: 5, error: null } })
-    await expect(
-      nextDocumentNumber({ ...baseOpts, year: undefined, supabase: client }),
-    ).resolves.toBe('INV-2031-005')
+  it('numbers the first document of the year 001, per tenant', async () => {
+    // The scan is RLS-scoped, so "no rows" means none for THIS tenant —
+    // which is exactly why every tenant gets its own 001.
+    const { client } = mockSupabase({ rows: [] })
+    await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).resolves.toBe('INV-2026-001')
   })
 })
 
-describe('nextDocumentNumber — fallback scan path (sequence RPC fails)', () => {
+describe('nextDocumentNumber — the scan path (now the only path)', () => {
   const rpcFail = { data: null, error: { message: 'function nextval does not exist' } }
 
   it('starts at 001 for an empty year', async () => {
@@ -212,7 +199,7 @@ describe('nextDocumentNumber — fallback scan path (sequence RPC fails)', () =>
   it('throws (never emits a guaranteed-duplicate default) when both paths fail', async () => {
     const { client } = mockSupabase({ rpc: rpcFail, scanError: { message: 'permission denied' } })
     await expect(nextDocumentNumber({ ...baseOpts, supabase: client })).rejects.toThrow(
-      /Failed to generate INV number.*function nextval does not exist.*permission denied/,
+      /Failed to generate INV number.*scan failed.*permission denied/,
     )
   })
 
