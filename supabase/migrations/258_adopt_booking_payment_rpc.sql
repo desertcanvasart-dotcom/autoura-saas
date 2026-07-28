@@ -1,37 +1,44 @@
--- ============================================
--- Atomic booking-payment recording
--- ============================================
--- POST /api/bookings/[id]/payments used to (1) generate a payment number,
--- (2) INSERT a booking_payments row, then (3) UPDATE the parent booking's
--- total_paid / status / dates based on a read-side snapshot. Three separate
--- PostgREST round-trips with no row lock — so two concurrent payments on
--- the same booking (e.g. a double-clicked "Record payment" button or a
--- deposit + balance recorded simultaneously) could:
---   - both read a stale total_paid,
---   - both compute the wrong new_total_paid,
---   - both UPDATE the booking, last write wins.
--- Symptoms: total_paid not reflecting both payments, status stuck on
--- pending_deposit when it should be confirmed, confirmation_date set on
--- the wrong payment, or paid_full transition missed entirely. Both
--- ledger rows survive, so the booking's denormalized total_paid silently
--- disagrees with the SUM(booking_payments.amount) for the booking.
+-- ============================================================================
+-- 258 — adopt record_booking_payment, and close the split-brain
+-- ============================================================================
 --
--- This function moves the whole sequence inside a single PL/pgSQL
--- transaction with SELECT ... FOR UPDATE on the booking row, so
--- concurrent callers serialize on this booking_id. A currency check
--- keeps mixed-currency rows from poisoning the SUM, even though the
--- application normally enforces single-currency per booking.
+-- This repo had TWO migration directories:
+--   supabase/migrations/  — 148 files, the ones actually applied
+--   migrations/           — 2 files, added 2026-06-26, NEVER applied
 --
--- This RPC is adapted from a sibling app for the autoura-saas schema:
--- bookings uses (total_amount, total_paid, balance_due, status) with
--- balance_due auto-computed by an existing BEFORE INSERT/UPDATE trigger,
--- so the RPC writes total_paid and the trigger handles balance_due.
--- Status transitions follow the existing route logic exactly:
---   pending_deposit + deposit payment → confirmed (+ confirmation_date)
---   any status + balance_due <= 0 → paid_full (+ full_payment_date)
+-- Nothing recorded which was canonical, so "which migrations are live?" had
+-- no answer. Verified against production: `record_booking_payment` does not
+-- exist (PGRST202), so POST /api/bookings/[id]/payments — which calls it —
+-- has returned 500 since the day that route shipped.
 --
--- Date: 2026-06-26
--- ============================================
+-- The two orphaned files were NOT equal in value, so they are not treated
+-- equally here:
+--
+--   * record_booking_payment  — ADOPTED below, verbatim. It is correct, and
+--     it fixes a genuine race: the route used to insert the payment and then
+--     recompute the booking's total_paid in separate round-trips with no row
+--     lock, so two concurrent payments could both read a stale total and the
+--     last write would win. The RPC does it under SELECT ... FOR UPDATE.
+--
+--   * 20260626_unique_document_numbers.sql — REJECTED, and deleted in this
+--     commit. It adds GLOBALLY unique constraints on invoice_number,
+--     expense_number and internal_reference. Its own header says it was
+--     ported from a sibling app; this app is MULTI-TENANT, and those are
+--     per-tenant identifiers. 006 already declares
+--     UNIQUE(tenant_id, invoice_number) and UNIQUE(tenant_id, expense_number),
+--     which is the correct shape.
+--
+--     Applying it would have bricked new tenants: lib/document-numbering.ts
+--     scans with an RLS-scoped client, so tenant B — seeing none of tenant
+--     A's rows — generates INV-2026-001, collides with A's globally-unique
+--     001, and insertWithUniqueRetry rescans B's still-empty set and
+--     regenerates the SAME number. Five attempts, same collision, permanent
+--     500. Tenant B could never create an invoice.
+--
+-- What that migration was RIGHT about is that supplier_invoices had no
+-- uniqueness at all on internal_reference, so its retry loop had nothing to
+-- retry against. Added below in the correct per-tenant shape.
+-- ============================================================================
 
 create or replace function public.record_booking_payment(
   p_booking_id uuid,
@@ -146,3 +153,41 @@ grant execute on function public.record_booking_payment(uuid, uuid, text, numeri
 -- After this lands, app/api/bookings/[id]/payments/route.ts POST should
 -- call this RPC instead of inserting and recomputing in three steps.
 -- ============================================
+
+
+-- ============================================================================
+-- The one good idea from the rejected migration, in the correct shape.
+-- supplier_invoices.internal_reference had NO uniqueness (216 declares it as
+-- a bare TEXT), so insertWithUniqueRetry's 23505 handler could never fire.
+-- Per-tenant, not global — two operators may both have SI-2026-001.
+-- ============================================================================
+
+DO $$
+DECLARE
+  dupes INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO dupes FROM (
+    SELECT tenant_id, internal_reference
+    FROM supplier_invoices
+    WHERE internal_reference IS NOT NULL
+    GROUP BY tenant_id, internal_reference
+    HAVING COUNT(*) > 1
+  ) d;
+
+  IF dupes > 0 THEN
+    RAISE EXCEPTION
+      'Cannot add the unique constraint: % tenant/reference pair(s) are duplicated. '
+      'Find them with: SELECT tenant_id, internal_reference, COUNT(*) FROM supplier_invoices '
+      'WHERE internal_reference IS NOT NULL GROUP BY 1,2 HAVING COUNT(*) > 1;', dupes;
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_supplier_invoices_tenant_reference
+  ON supplier_invoices (tenant_id, internal_reference)
+  WHERE internal_reference IS NOT NULL;
+
+-- ============================================================================
+-- Verify after applying:
+--   SELECT proname FROM pg_proc WHERE proname = 'record_booking_payment';
+--   Record a payment against a booking — it has returned 500 until now.
+-- ============================================================================

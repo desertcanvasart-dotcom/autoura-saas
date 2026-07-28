@@ -2,21 +2,24 @@
  * Shared generator for year-scoped business document identifiers.
  *
  * Prior implementations independently:
- *   - rpc('nextval', { seq_name }) — works when the sequence exists
- *   - fell back to `COUNT(*) + 1` on RPC failure — RACY
- *   - silently emitted `${PREFIX}-${year}-001` on the very first failure —
+ *   - called rpc('nextval', { seq_name }) — which NEVER existed, because
+ *     Postgres's built-in nextval(regclass) takes an unnamed argument that
+ *     PostgREST cannot bind by name. Every call returned PGRST202.
+ *   - fell back to `COUNT(*) + 1` — RACY, and wrong after any deletion
+ *   - silently emitted `${PREFIX}-${year}-001` on the first failure —
  *     a guaranteed-collision default
- *   - rejected a legitimate 0 sequence value via `if (seqData)` truthiness
  *
- * This helper centralizes the safer pattern:
- *   1. Try `nextval` (sequence is the source of truth when healthy).
- *   2. On RPC failure, take the NUMERIC max over the current year's values
- *      (`SELECT … WHERE col LIKE 'PREFIX-YYYY-%'`, counter parsed in code).
- *      Year-scoped (the sequence was previously global, so 2027 kept climbing
- *      from 2026's count), tolerates row deletions (count-based fallback
- *      regressed when rows were deleted), and survives 4-digit counters
- *      (lexicographic DESC put '999' above '1000').
- *   3. Use `seqData != null` so sequence value 0 is treated as legitimate.
+ * The sequence path was removed in migration 258 rather than repaired: the
+ * sequences are global while these are PER-TENANT identifiers, so a shared
+ * sequence would number the second tenant's first invoice INV-2026-002 —
+ * gaps that read as lost paperwork. The tenant-scoped scan gives each tenant
+ * its own 001.
+ *
+ * So there is one path:
+ *   Take the NUMERIC max over the current year's values
+ *   (`SELECT … WHERE col LIKE 'PREFIX-YYYY-%'`, counter parsed in code).
+ *   Year-scoped, tolerates row deletions, and survives 4-digit counters
+ *   (a lexicographic DESC put '999' above '1000').
  *
  * The matching DB migration (20260626_unique_document_numbers.sql) adds
  * UNIQUE constraints on each column. Callers should wrap the INSERT in
@@ -33,8 +36,6 @@ interface NextDocumentNumberOpts {
   supabase: SupabaseClient
   /** Prefix, e.g. 'EXP', 'INV', 'SI'. */
   prefix: string
-  /** Sequence name passed to the nextval RPC. */
-  sequenceName: string
   /** Table to scan when the sequence RPC fails. */
   table: string
   /** Column containing the document number — used for the fallback MAX. */
@@ -51,15 +52,20 @@ interface NextDocumentNumberOpts {
 export async function nextDocumentNumber(opts: NextDocumentNumberOpts): Promise<string> {
   const year = opts.year ?? new Date().getFullYear()
 
-  // Primary path — the sequence is the source of truth. `seqData != null`
-  // accepts 0 as a legitimate value.
-  const { data: seqData, error: seqError } = await opts.supabase
-    .rpc('nextval', { seq_name: opts.sequenceName })
-  if (!seqError && seqData != null) {
-    return `${opts.prefix}-${year}-${String(seqData).padStart(3, '0')}`
-  }
-
-  // Fallback — year-scoped NUMERIC max. The prior count-based fallback
+  // There is no sequence path. This used to call rpc('nextval', { seq_name }),
+  // which has NEVER existed: Postgres's built-in nextval(regclass) takes an
+  // unnamed argument, so PostgREST cannot bind `seq_name` and every call
+  // returned PGRST202. The scan below has therefore always been the real
+  // implementation.
+  //
+  // Removing the call rather than creating the function, because the function
+  // would be WRONG here: the sequences (invoice_number_seq, expense_number_seq)
+  // are global, while these are per-tenant identifiers. A shared sequence
+  // means the second tenant's first invoice is numbered INV-2026-002 — gaps
+  // that look like lost paperwork to an operator. The tenant-scoped scan
+  // gives every tenant their own 001.
+  //
+  // Year-scoped NUMERIC max. The prior count-based fallback
   // produced duplicates whenever a row was deleted OR two requests landed
   // concurrently; a lexicographic `ORDER BY col DESC LIMIT 1` breaks at four
   // digits ('999' sorts above '1000', regenerating a used number until the
@@ -73,7 +79,7 @@ export async function nextDocumentNumber(opts: NextDocumentNumberOpts): Promise<
     .like(opts.column, likeNeedle)
     .limit(10000)
   if (scanError) {
-    throw new Error(`Failed to generate ${opts.prefix} number: sequence RPC failed (${seqError?.message || 'unknown'}) and fallback scan failed (${scanError.message})`)
+    throw new Error(`Failed to generate ${opts.prefix} number: scan failed (${scanError.message})`)
   }
 
   // Counter is read ONLY from well-formed values: anchored to this prefix and

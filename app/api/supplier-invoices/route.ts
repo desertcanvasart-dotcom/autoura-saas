@@ -91,7 +91,6 @@ export async function POST(request: NextRequest) {
         internal_reference: await nextDocumentNumber({
           supabase,
           prefix: 'SI',
-          sequenceName: 'supplier_invoice_reference_seq',
           table: 'supplier_invoices',
           column: 'internal_reference',
         }),

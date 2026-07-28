@@ -163,7 +163,6 @@ export async function POST(request: NextRequest) {
       const base = await nextDocumentNumber({
         supabase,
         prefix: 'INV',
-        sequenceName: 'invoice_number_seq',
         table: 'invoices',
         column: 'invoice_number',
       })

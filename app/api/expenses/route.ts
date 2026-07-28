@@ -169,7 +169,6 @@ export async function POST(request: NextRequest) {
         expense_number: await nextDocumentNumber({
           supabase,
           prefix: 'EXP',
-          sequenceName: 'expense_number_seq',
           table: 'expenses',
           column: 'expense_number',
         }),
