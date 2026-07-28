@@ -129,8 +129,10 @@ export async function POST(request: NextRequest) {
 
     // Create checkout session
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://autoura.net'
-    const successUrl = `${appUrl}/admin/billing?success=true&session_id={CHECKOUT_SESSION_ID}`
-    const cancelUrl = `${appUrl}/admin/billing/plans?canceled=true`
+    // /settings/billing is where the billing UI actually lives — the old
+    // /admin/billing paths never existed and 404'd on return from Stripe.
+    const successUrl = `${appUrl}/settings/billing?success=true&session_id={CHECKOUT_SESSION_ID}`
+    const cancelUrl = `${appUrl}/settings/billing/plans?canceled=true`
 
     const session = await createCheckoutSession(
       customerId,

@@ -120,7 +120,7 @@ export function upgradeRequiredResponse(feature: string): NextResponse {
       feature_locked: true,
       feature: feature,
       required_plan: requiredPlan,
-      upgrade_url: '/admin/billing/plans'
+      upgrade_url: '/settings/billing/plans'
     },
     { status: 403 }
   )
