@@ -1,6 +1,7 @@
 'use client'
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
@@ -751,79 +752,81 @@ export default function HotelsContent() {
   }
 
   // Submit form
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { submitting, guard } = useSubmitGuard()
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    guard(async () => {
+      // Calculate legacy room rates from PPD for backward compatibility
+      const lowRates = calculateRoomRates(formData.ppd_eur, formData.single_supplement_eur, formData.triple_reduction_eur)
+      const lowRatesNonEur = calculateRoomRates(formData.ppd_non_eur, formData.single_supplement_non_eur, formData.triple_reduction_non_eur)
+      const highRates = calculateRoomRates(formData.high_season_ppd_eur, formData.high_season_single_supplement_eur, formData.high_season_triple_reduction_eur)
+      const highRatesNonEur = calculateRoomRates(formData.high_season_ppd_non_eur, formData.high_season_single_supplement_non_eur, formData.high_season_triple_reduction_non_eur)
+      const peakRates = calculateRoomRates(formData.peak_season_ppd_eur, formData.peak_season_single_supplement_eur, formData.peak_season_triple_reduction_eur)
+      const peakRatesNonEur = calculateRoomRates(formData.peak_season_ppd_non_eur, formData.peak_season_single_supplement_non_eur, formData.peak_season_triple_reduction_non_eur)
 
-    // Calculate legacy room rates from PPD for backward compatibility
-    const lowRates = calculateRoomRates(formData.ppd_eur, formData.single_supplement_eur, formData.triple_reduction_eur)
-    const lowRatesNonEur = calculateRoomRates(formData.ppd_non_eur, formData.single_supplement_non_eur, formData.triple_reduction_non_eur)
-    const highRates = calculateRoomRates(formData.high_season_ppd_eur, formData.high_season_single_supplement_eur, formData.high_season_triple_reduction_eur)
-    const highRatesNonEur = calculateRoomRates(formData.high_season_ppd_non_eur, formData.high_season_single_supplement_non_eur, formData.high_season_triple_reduction_non_eur)
-    const peakRates = calculateRoomRates(formData.peak_season_ppd_eur, formData.peak_season_single_supplement_eur, formData.peak_season_triple_reduction_eur)
-    const peakRatesNonEur = calculateRoomRates(formData.peak_season_ppd_non_eur, formData.peak_season_single_supplement_non_eur, formData.peak_season_triple_reduction_non_eur)
-
-    // Generate service code if empty and prepare data
-    const dataToSubmit = {
-      ...formData,
-      service_code: formData.service_code || generateServiceCode(formData.city),
-      // Include calculated legacy room rates for backward compatibility
-      single_rate_eur: lowRates.single,
-      double_rate_eur: lowRates.double,
-      triple_rate_eur: lowRates.triple,
-      single_rate_non_eur: lowRatesNonEur.single,
-      double_rate_non_eur: lowRatesNonEur.double,
-      triple_rate_non_eur: lowRatesNonEur.triple,
-      high_season_single_eur: highRates.single,
-      high_season_double_eur: highRates.double,
-      high_season_triple_eur: highRates.triple,
-      high_season_single_non_eur: highRatesNonEur.single,
-      high_season_double_non_eur: highRatesNonEur.double,
-      high_season_triple_non_eur: highRatesNonEur.triple,
-      peak_season_single_eur: peakRates.single,
-      peak_season_double_eur: peakRates.double,
-      peak_season_triple_eur: peakRates.triple,
-      peak_season_single_non_eur: peakRatesNonEur.single,
-      peak_season_double_non_eur: peakRatesNonEur.double,
-      peak_season_triple_non_eur: peakRatesNonEur.triple,
-    }
-
-    try {
-      const url = editingRate
-        ? `/api/rates/hotels/${editingRate.id}`
-        : '/api/rates/hotels'
-
-      const method = editingRate ? 'PUT' : 'POST'
-
-
-
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataToSubmit)
-      })
-
-      const data = await response.json()
-
-
-      if (!response.ok || !data.success) {
-        const errorMsg = data.error || data.hint || `HTTP error ${response.status}`
-        console.error('API error:', data)
-        showToast('error', errorMsg)
-        return
+      // Generate service code if empty and prepare data
+      const dataToSubmit = {
+        ...formData,
+        service_code: formData.service_code || generateServiceCode(formData.city),
+        // Include calculated legacy room rates for backward compatibility
+        single_rate_eur: lowRates.single,
+        double_rate_eur: lowRates.double,
+        triple_rate_eur: lowRates.triple,
+        single_rate_non_eur: lowRatesNonEur.single,
+        double_rate_non_eur: lowRatesNonEur.double,
+        triple_rate_non_eur: lowRatesNonEur.triple,
+        high_season_single_eur: highRates.single,
+        high_season_double_eur: highRates.double,
+        high_season_triple_eur: highRates.triple,
+        high_season_single_non_eur: highRatesNonEur.single,
+        high_season_double_non_eur: highRatesNonEur.double,
+        high_season_triple_non_eur: highRatesNonEur.triple,
+        peak_season_single_eur: peakRates.single,
+        peak_season_double_eur: peakRates.double,
+        peak_season_triple_eur: peakRates.triple,
+        peak_season_single_non_eur: peakRatesNonEur.single,
+        peak_season_double_non_eur: peakRatesNonEur.double,
+        peak_season_triple_non_eur: peakRatesNonEur.triple,
       }
 
-      if (data.data) {
-        showToast('success', editingRate ? `${formData.property_name} updated!` : `${formData.property_name} created!`)
-        setShowModal(false)
-        fetchRates()
-      } else {
-        showToast('error', 'No data returned from server. Check console for details.')
-        console.error('No data in response:', data)
+      try {
+        const url = editingRate
+          ? `/api/rates/hotels/${editingRate.id}`
+          : '/api/rates/hotels'
+
+        const method = editingRate ? 'PUT' : 'POST'
+
+
+
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dataToSubmit)
+        })
+
+        const data = await response.json()
+
+
+        if (!response.ok || !data.success) {
+          const errorMsg = data.error || data.hint || `HTTP error ${response.status}`
+          console.error('API error:', data)
+          showToast('error', errorMsg)
+          return
+        }
+
+        if (data.data) {
+          showToast('success', editingRate ? `${formData.property_name} updated!` : `${formData.property_name} created!`)
+          setShowModal(false)
+          fetchRates()
+        } else {
+          showToast('error', 'No data returned from server. Check console for details.')
+          console.error('No data in response:', data)
+        }
+      } catch (error) {
+        console.error('Error saving rate:', error)
+        showToast('error', 'Failed to save accommodation rate')
       }
-    } catch (error) {
-      console.error('Error saving rate:', error)
-      showToast('error', 'Failed to save accommodation rate')
-    }
+  })
   }
 
   // Delete rate
@@ -2265,7 +2268,7 @@ export default function HotelsContent() {
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="submit" disabled={submitting}
                   className="flex-1 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   <Check className="w-4 h-4" />

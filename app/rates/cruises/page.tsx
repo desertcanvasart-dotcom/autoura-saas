@@ -1,6 +1,7 @@
 'use client'
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -846,59 +847,61 @@ export default function CruisesPage() {
 
   // Export to CSV
   // Import from CSV
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { submitting, guard } = useSubmitGuard()
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    guard(async () => {
+      // Calculate legacy rates from PPD for backward compatibility
+      const singleEur = formData.ppd_eur + formData.single_supplement_eur
+      const doubleEur = formData.ppd_eur * 2
+      const tripleEur = (formData.ppd_eur - formData.triple_reduction_eur) * 3
 
-    // Calculate legacy rates from PPD for backward compatibility
-    const singleEur = formData.ppd_eur + formData.single_supplement_eur
-    const doubleEur = formData.ppd_eur * 2
-    const tripleEur = (formData.ppd_eur - formData.triple_reduction_eur) * 3
-
-    const submitData = {
-      ...formData,
-      cruise_code: formData.cruise_code || generateCode(),
-      route_name: formData.route_name || `${formData.embark_city} to ${formData.disembark_city}`,
-      // Set legacy rates from PPD for backward compatibility
-      rate_single_eur: singleEur,
-      rate_double_eur: doubleEur,
-      rate_triple_eur: tripleEur > 0 ? tripleEur : null,
-      supplier_id: formData.supplier_id || null,
-      // Convert empty date strings to null (PostgreSQL requires null, not empty strings for DATE fields)
-      low_season_start: formData.low_season_start || null,
-      low_season_end: formData.low_season_end || null,
-      high_season_start: formData.high_season_start || null,
-      high_season_end: formData.high_season_end || null,
-      peak_season_1_start: formData.peak_season_1_start || null,
-      peak_season_1_end: formData.peak_season_1_end || null,
-      peak_season_2_start: formData.peak_season_2_start || null,
-      peak_season_2_end: formData.peak_season_2_end || null,
-      rate_valid_from: formData.rate_valid_from || null,
-      rate_valid_to: formData.rate_valid_to || null
-    }
-
-    try {
-      const url = editingCruise 
-        ? `/api/rates/cruises/${editingCruise.id}`
-        : '/api/rates/cruises'
-      
-      const response = await fetch(url, {
-        method: editingCruise ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submitData)
-      })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        showToast('success', editingCruise ? 'Cruise updated!' : 'Cruise created!')
-        setShowModal(false)
-        fetchCruises()
-      } else {
-        showToast('error', data.error || 'Failed to save')
+      const submitData = {
+        ...formData,
+        cruise_code: formData.cruise_code || generateCode(),
+        route_name: formData.route_name || `${formData.embark_city} to ${formData.disembark_city}`,
+        // Set legacy rates from PPD for backward compatibility
+        rate_single_eur: singleEur,
+        rate_double_eur: doubleEur,
+        rate_triple_eur: tripleEur > 0 ? tripleEur : null,
+        supplier_id: formData.supplier_id || null,
+        // Convert empty date strings to null (PostgreSQL requires null, not empty strings for DATE fields)
+        low_season_start: formData.low_season_start || null,
+        low_season_end: formData.low_season_end || null,
+        high_season_start: formData.high_season_start || null,
+        high_season_end: formData.high_season_end || null,
+        peak_season_1_start: formData.peak_season_1_start || null,
+        peak_season_1_end: formData.peak_season_1_end || null,
+        peak_season_2_start: formData.peak_season_2_start || null,
+        peak_season_2_end: formData.peak_season_2_end || null,
+        rate_valid_from: formData.rate_valid_from || null,
+        rate_valid_to: formData.rate_valid_to || null
       }
-    } catch (error) {
-      showToast('error', 'Failed to save cruise')
-    }
+
+      try {
+        const url = editingCruise 
+          ? `/api/rates/cruises/${editingCruise.id}`
+          : '/api/rates/cruises'
+      
+        const response = await fetch(url, {
+          method: editingCruise ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitData)
+        })
+
+        const data = await response.json()
+      
+        if (data.success) {
+          showToast('success', editingCruise ? 'Cruise updated!' : 'Cruise created!')
+          setShowModal(false)
+          fetchCruises()
+        } else {
+          showToast('error', data.error || 'Failed to save')
+        }
+      } catch (error) {
+        showToast('error', 'Failed to save cruise')
+      }
+  })
   }
 
   const handleDelete = async (cruise: Cruise) => {
@@ -1535,7 +1538,7 @@ export default function CruisesPage() {
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
                   Cancel
                 </button>
-                <button type="submit" className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center gap-2">
+                <button type="submit" disabled={submitting} className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center gap-2">
                   <Check className="w-4 h-4" />
                   {editingCruise ? 'Update Rate' : 'Create Rate'}
                 </button>

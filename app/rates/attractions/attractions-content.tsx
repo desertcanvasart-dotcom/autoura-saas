@@ -1,6 +1,7 @@
 'use client'
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -392,41 +393,42 @@ export default function AttractionsContent() {
   }
 
   // Submit form
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { submitting, guard } = useSubmitGuard()
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
-    try {
-      const url = editingAttraction 
-        ? `/api/rates/attractions/${editingAttraction.id}`
-        : '/api/rates/attractions'
+    guard(async () => {  try {
+        const url = editingAttraction 
+          ? `/api/rates/attractions/${editingAttraction.id}`
+          : '/api/rates/attractions'
       
-      const method = editingAttraction ? 'PUT' : 'POST'
+        const method = editingAttraction ? 'PUT' : 'POST'
       
-      // Clean up empty supplier_id
-      const submitData = {
-        ...formData,
-        supplier_id: formData.supplier_id || null
+        // Clean up empty supplier_id
+        const submitData = {
+          ...formData,
+          supplier_id: formData.supplier_id || null
+        }
+      
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submitData)
+        })
+      
+        const data = await response.json()
+      
+        if (data.success) {
+          showToast('success', editingAttraction ? 'Attraction updated!' : 'Attraction created!')
+          setShowModal(false)
+          fetchAttractions()
+        } else {
+          showToast('error', data.error || 'Failed to save')
+        }
+      } catch (error) {
+        console.error('Error saving attraction:', error)
+        showToast('error', 'Failed to save attraction')
       }
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submitData)
-      })
-      
-      const data = await response.json()
-      
-      if (data.success) {
-        showToast('success', editingAttraction ? 'Attraction updated!' : 'Attraction created!')
-        setShowModal(false)
-        fetchAttractions()
-      } else {
-        showToast('error', data.error || 'Failed to save')
-      }
-    } catch (error) {
-      console.error('Error saving attraction:', error)
-      showToast('error', 'Failed to save attraction')
-    }
+  })
   }
 
   // Delete attraction
@@ -1241,7 +1243,7 @@ export default function AttractionsContent() {
                   Cancel
                 </button>
                 <button
-                  type="submit"
+                  type="submit" disabled={submitting}
                   className="flex-1 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium transition-colors flex items-center justify-center gap-2"
                 >
                   <Check className="w-4 h-4" />

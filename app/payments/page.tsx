@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { sumByCurrency, addToTotals, formatTotals, type CurrencyTotals } from '@/lib/currency-totals'
 import { 
   DollarSign, 
   TrendingUp, 
@@ -31,11 +32,12 @@ interface UnifiedPayment {
   created_at: string
 }
 
+// Per-currency, not one number: money in different currencies does not add.
 interface PaymentStats {
-  totalReceived: number
-  pendingPayments: number
-  overduePayments: number
-  thisMonthRevenue: number
+  totalReceived: CurrencyTotals
+  pendingPayments: CurrencyTotals
+  overduePayments: CurrencyTotals
+  thisMonthRevenue: CurrencyTotals
 }
 
 export default function PaymentsPage() {
@@ -43,10 +45,10 @@ export default function PaymentsPage() {
   const [filteredPayments, setFilteredPayments] = useState<UnifiedPayment[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<PaymentStats>({
-    totalReceived: 0,
-    pendingPayments: 0,
-    overduePayments: 0,
-    thisMonthRevenue: 0
+    totalReceived: {},
+    pendingPayments: {},
+    overduePayments: {},
+    thisMonthRevenue: {}
   })
   
   const [methodFilter, setMethodFilter] = useState('all')
@@ -71,9 +73,9 @@ export default function PaymentsPage() {
       ])
 
       const allPayments: UnifiedPayment[] = []
-      let totalReceived = 0
-      let pendingPayments = 0
-      let overduePayments = 0
+      const totalReceived: CurrencyTotals = {}
+      const pendingPayments: CurrencyTotals = {}
+      const overduePayments: CurrencyTotals = {}
 
       // Process itinerary payments
       if (itineraryPaymentsRes.ok) {
@@ -96,7 +98,7 @@ export default function PaymentsPage() {
             notes: p.notes,
             created_at: p.created_at
           })
-          totalReceived += Number(p.amount) || 0
+          addToTotals(totalReceived, p.amount, p.currency || 'EUR')
         })
       }
 
@@ -108,14 +110,17 @@ export default function PaymentsPage() {
         // For each invoice, fetch its payments
         for (const invoice of invoices) {
           // Track pending and overdue from invoices
-          if (['sent', 'partial', 'viewed'].includes(invoice.status)) {
-            pendingPayments += Number(invoice.balance_due) || 0
+          // 'partially_paid' is the real status value; the old 'partial'
+          // matched nothing, silently excluding every part-paid invoice.
+          // 'overdue' was also missing from the pending total.
+          if (['sent', 'viewed', 'partially_paid', 'overdue'].includes(invoice.status)) {
+            addToTotals(pendingPayments, invoice.balance_due, invoice.currency || 'EUR')
           }
           
           if (invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.due_date) {
             const dueDate = new Date(invoice.due_date)
             if (dueDate < now && Number(invoice.balance_due) > 0) {
-              overduePayments += Number(invoice.balance_due) || 0
+              addToTotals(overduePayments, invoice.balance_due, invoice.currency || 'EUR')
             }
           }
 
@@ -142,7 +147,7 @@ export default function PaymentsPage() {
                     notes: p.notes,
                     created_at: p.created_at
                   })
-                  totalReceived += Number(p.amount) || 0
+                  addToTotals(totalReceived, p.amount, p.currency || invoice.currency || 'EUR')
                 })
               }
             }
@@ -164,9 +169,11 @@ export default function PaymentsPage() {
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)
       
-      const thisMonthRevenue = allPayments
-        .filter(p => p.payment_date && new Date(p.payment_date) >= startOfMonth)
-        .reduce((sum, p) => sum + p.amount, 0)
+      const thisMonthRevenue = sumByCurrency(
+        allPayments.filter(p => p.payment_date && new Date(p.payment_date) >= startOfMonth),
+        p => p.amount,
+        p => p.currency
+      )
 
       setPayments(allPayments)
       setStats({
@@ -278,7 +285,7 @@ export default function PaymentsPage() {
           </div>
           <h3 className="text-xs text-gray-600 font-medium">Total Received</h3>
           <p className="text-2xl font-bold text-gray-900 mt-1">
-            €{stats.totalReceived.toLocaleString()}
+            {formatTotals(stats.totalReceived)}
           </p>
           <p className="text-xs text-gray-500 mt-1">All time payments</p>
         </div>
@@ -290,7 +297,7 @@ export default function PaymentsPage() {
           </div>
           <h3 className="text-xs text-gray-600 font-medium">Pending Payments</h3>
           <p className="text-2xl font-bold text-gray-900 mt-1">
-            €{stats.pendingPayments.toLocaleString()}
+            {formatTotals(stats.pendingPayments)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Outstanding balance</p>
         </div>
@@ -302,7 +309,7 @@ export default function PaymentsPage() {
           </div>
           <h3 className="text-xs text-gray-600 font-medium">Overdue</h3>
           <p className="text-2xl font-bold text-red-600 mt-1">
-            €{stats.overduePayments.toLocaleString()}
+            {formatTotals(stats.overduePayments)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Past due date</p>
         </div>
@@ -314,7 +321,7 @@ export default function PaymentsPage() {
           </div>
           <h3 className="text-xs text-gray-600 font-medium">This Month</h3>
           <p className="text-2xl font-bold text-gray-900 mt-1">
-            €{stats.thisMonthRevenue.toLocaleString()}
+            {formatTotals(stats.thisMonthRevenue)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Revenue this month</p>
         </div>

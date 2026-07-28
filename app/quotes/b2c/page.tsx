@@ -223,6 +223,11 @@ export default function B2CQuotesPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
+    // Clear the selection too: select-all spans ALL filtered pages, so a
+    // selection made under one filter must not survive into another. Without
+    // this, an operator could filter to drafts, select all, switch to 'sent',
+    // and bulk-delete the drafts they can no longer see.
+    setSelectedQuotes(new Set())
   }, [statusFilter, tierFilter, currencyFilter, createdFrom, createdTo, validUntilFrom, validUntilTo, searchQuery])
 
   const goToPage = (page: number) => {

@@ -1,6 +1,7 @@
 'use client'
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -340,36 +341,37 @@ export default function MealRatesContent() {
     setShowModal(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const { submitting, guard } = useSubmitGuard()
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    guard(async () => {  try {
+        const url = editingRate
+          ? `/api/rates/meals/${editingRate.id}`
+          : '/api/rates/meals'
 
-    try {
-      const url = editingRate
-        ? `/api/rates/meals/${editingRate.id}`
-        : '/api/rates/meals'
+        const method = editingRate ? 'PUT' : 'POST'
 
-      const method = editingRate ? 'PUT' : 'POST'
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        })
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
+        const data = await response.json()
 
-      const data = await response.json()
+        if (!response.ok || !data.success) {
+          showNotification('error', 'Error', data.error || 'Failed to save rate')
+          return
+        }
 
-      if (!response.ok || !data.success) {
-        showNotification('error', 'Error', data.error || 'Failed to save rate')
-        return
+        showNotification('success', 'Success', editingRate ? 'Meal rate updated successfully!' : 'Meal rate created successfully!')
+        setShowModal(false)
+        fetchRates()
+      } catch (error) {
+        console.error('Error saving rate:', error)
+        showNotification('error', 'Error', 'Failed to save rate. Please try again.')
       }
-
-      showNotification('success', 'Success', editingRate ? 'Meal rate updated successfully!' : 'Meal rate created successfully!')
-      setShowModal(false)
-      fetchRates()
-    } catch (error) {
-      console.error('Error saving rate:', error)
-      showNotification('error', 'Error', 'Failed to save rate. Please try again.')
-    }
+  })
   }
 
   // Open delete confirmation modal
@@ -1302,7 +1304,7 @@ export default function MealRatesContent() {
               >
                 Cancel
               </button>
-              <button
+              <button disabled={submitting}
                 onClick={handleSubmit}
                 className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 flex items-center gap-2"
               >
