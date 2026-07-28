@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { escapeHtml, safeUrl } from '@/lib/html-escape'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import puppeteer from 'puppeteer'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
@@ -43,7 +44,7 @@ function generateQuoteHTML(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${quote.quote_number} - Quote</title>
+  <title>${escapeHtml(quote.quote_number)} - Quote</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -438,13 +439,13 @@ function generateQuoteHTML(
       <div class="logo-section">
         <div class="logo-circle">T2E</div>
         <div class="company-info">
-          ${company.logoUrl ? `<img src="${company.logoUrl}" alt="" style="height:44px;margin-bottom:8px" />` : ''}
-          <h1>${company.name || ''}</h1>
+          ${safeUrl(company.logoUrl) ? `<img src="${safeUrl(company.logoUrl)}" alt="" style="height:44px;margin-bottom:8px" />` : ''}
+          <h1>${escapeHtml(company.name || '')}</h1>
           <p>B2B Partner Quote</p>
         </div>
       </div>
       <div class="quote-box">
-        <div class="quote-number">${quote.quote_number}</div>
+        <div class="quote-number">${escapeHtml(quote.quote_number)}</div>
         <div class="quote-dates">
           Issued: ${today}<br>
           Valid until: ${formatDate(quote.valid_until, 'short')}
@@ -457,9 +458,9 @@ function generateQuoteHTML(
       ${partner ? `
       <div class="info-card">
         <h4>Partner</h4>
-        <p>${partner.company_name}</p>
-        <p class="secondary">${partner.partner_code}</p>
-        ${partner.contact_name ? `<p class="secondary">${partner.contact_name}</p>` : ''}
+        <p>${escapeHtml(partner.company_name)}</p>
+        <p class="secondary">${escapeHtml(partner.partner_code)}</p>
+        ${partner.contact_name ? `<p class="secondary">${escapeHtml(partner.contact_name)}</p>` : ''}
       </div>
       ` : `
       <div class="info-card">
@@ -470,17 +471,17 @@ function generateQuoteHTML(
       
       <div class="info-card">
         <h4>Client</h4>
-        <p>${quote.client_name || 'To be confirmed'}</p>
-        ${quote.client_email ? `<p class="secondary">${quote.client_email}</p>` : ''}
-        ${quote.client_phone ? `<p class="secondary">${quote.client_phone}</p>` : ''}
-        ${quote.client_nationality ? `<p class="secondary">${quote.client_nationality}</p>` : ''}
+        <p>${escapeHtml(quote.client_name || 'To be confirmed')}</p>
+        ${quote.client_email ? `<p class="secondary">${escapeHtml(quote.client_email)}</p>` : ''}
+        ${quote.client_phone ? `<p class="secondary">${escapeHtml(quote.client_phone)}</p>` : ''}
+        ${quote.client_nationality ? `<p class="secondary">${escapeHtml(quote.client_nationality)}</p>` : ''}
       </div>
     </div>
     
     <!-- Tour Banner -->
     <div class="tour-banner">
-      <h2>${template?.template_name || 'Tour Package'}</h2>
-      <p>${variation?.variation_name || ''}</p>
+      <h2>${escapeHtml(template?.template_name || 'Tour Package')}</h2>
+      <p>${escapeHtml(variation?.variation_name || '')}</p>
       <div class="tour-meta">
         <div class="tour-meta-item">
           📅 ${template?.duration_days || '-'} Days / ${template?.duration_nights || '-'} Nights
@@ -570,7 +571,7 @@ function generateQuoteHTML(
     ${quote.notes ? `
     <div class="notes-section">
       <h4>Notes</h4>
-      <p>${quote.notes}</p>
+      <p>${escapeHtml(quote.notes)}</p>
     </div>
     ` : ''}
     
@@ -611,7 +612,7 @@ function generateQuoteHTML(
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-card">
-        <h3>${company.name || ''}</h3>
+        <h3>${escapeHtml(company.name || '')}</h3>
         <p>${[company.email, company.phone, company.website].filter(Boolean).join(' • ')}</p>
       </div>
     </footer>
