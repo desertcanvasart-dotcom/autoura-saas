@@ -30,6 +30,9 @@ export interface SystemEmailInput {
   html: string
   /** Optional override; defaults to RESEND_FROM_EMAIL. */
   from?: string
+  /** Reply-To — e.g. the prospect's address on contact-form mail, so a
+   *  plain reply in the inbox goes to the sender, not to our system from. */
+  replyTo?: string
 }
 
 export interface SystemEmailResult {
@@ -59,6 +62,7 @@ export async function sendSystemEmail(input: SystemEmailInput): Promise<SystemEm
     to: input.to,
     subject: input.subject,
     html: input.html,
+    ...(input.replyTo ? { replyTo: input.replyTo } : {}),
   })
 
   if (error) {

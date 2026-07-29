@@ -41,6 +41,11 @@ export const RATE_LIMITS = {
     limit: 5,          // attempts
     windowMs: 300000,  // per 5 minutes
   },
+  // Public marketing contact form (no session, keyed by IP)
+  contact: {
+    limit: 5,          // submissions
+    windowMs: 60000,   // per minute
+  },
   // File uploads
   upload: {
     limit: 10,         // uploads
