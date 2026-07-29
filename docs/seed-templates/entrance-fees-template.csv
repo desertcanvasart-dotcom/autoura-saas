@@ -1,0 +1,28 @@
+service_code,attraction_name,city,fee_type,eur_rate,non_eur_rate,egyptian_rate,student_discount_percentage,child_discount_percent,category,is_active
+ENT-ABU-SIMBEL,Abu Simbel Temples,Abu Simbel,standard,,,,,,Temples,true
+ENT-BIBLIOTHECA,Bibliotheca Alexandrina,Alexandria,standard,,,,,,Museums,true
+ENT-CATACOMBS,Catacombs of Kom el-Shoqafa,Alexandria,standard,,,,,,Tombs,true
+ENT-QAITBAY,Qaitbay Citadel,Alexandria,standard,,,,,,Historical,true
+ENT-HIGH-DAM,Aswan High Dam,Aswan,standard,,,,,,Monuments,true
+ENT-ELEPHANTINE,Elephantine Island,Aswan,standard,,,,,,Historical,true
+ENT-NUBIAN-MUSEUM,Nubian Museum,Aswan,standard,,,,,,Museums,true
+ENT-PHILAE,Philae Temple,Aswan,standard,,,,,,Temples,true
+ENT-OBELISK,Unfinished Obelisk,Aswan,standard,,,,,,Historical,true
+ENT-CITADEL,Citadel of Saladin,Cairo,standard,,,,,,Historical,true
+ENT-COPTIC-CAIRO,Coptic Cairo,Cairo,standard,,,,,,Religious,true
+ENT-EGYPTIAN-MUSEUM,Egyptian Museum,Cairo,standard,,,,,,Museums,true
+ENT-GEM,Grand Egyptian Museum,Cairo,standard,,,,,,Museums,true
+ENT-PYRAMID-INTERIOR,Great Pyramid Interior,Cairo,premium,,,,,,Pyramids,true
+ENT-KHAN,Khan el-Khalili,Cairo,free,,,,,,Markets,true
+ENT-PYRAMIDS,Pyramids of Giza,Cairo,standard,,,,,,Pyramids,true
+ENT-SPHINX,Sphinx Area,Cairo,standard,,,,,,Pyramids,true
+ENT-EDFU,Edfu Temple,Edfu,standard,,,,,,Temples,true
+ENT-KOM-OMBO,Kom Ombo Temple,Kom Ombo,standard,,,,,,Temples,true
+ENT-COLOSSI,Colossi of Memnon,Luxor,free,,,,,,Monuments,true
+ENT-HATSHEPSUT,Hatshepsut Temple,Luxor,standard,,,,,,Temples,true
+ENT-KARNAK,Karnak Temple,Luxor,standard,,,,,,Temples,true
+ENT-LUXOR-MUSEUM,Luxor Museum,Luxor,standard,,,,,,Museums,true
+ENT-LUXOR-TEMPLE,Luxor Temple,Luxor,standard,,,,,,Temples,true
+ENT-TUT-TOMB,Tomb of Tutankhamun,Luxor,premium,,,,,,Tombs,true
+ENT-VALLEY-KINGS,Valley of the Kings,Luxor,standard,,,,,,Tombs,true
+ENT-VALLEY-QUEENS,Valley of the Queens,Luxor,standard,,,,,,Tombs,true

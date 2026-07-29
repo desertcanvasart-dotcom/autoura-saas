@@ -1,0 +1,17 @@
+route_name,service_type,city,origin_city,destination_city,duration,area,includes,sedan_rate_eur,sedan_rate_non_eur,sedan_capacity_min,sedan_capacity_max,minivan_rate_eur,minivan_rate_non_eur,minivan_capacity_min,minivan_capacity_max,van_rate_eur,van_rate_non_eur,van_capacity_min,van_capacity_max,minibus_rate_eur,minibus_rate_non_eur,minibus_capacity_min,minibus_capacity_max,bus_rate_eur,bus_rate_non_eur,bus_capacity_min,bus_capacity_max,is_active
+Cairo Airport Transfer,airport_transfer,Cairo,,,,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Cairo Day Tour — Pyramids & Sphinx,day_tour,Cairo,,,full_day,pyramids,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Cairo Day Tour — Islamic & Coptic Cairo,day_tour,Cairo,,,full_day,islamic_cairo,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Cairo Half Day,half_day,Cairo,,,half_day,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Cairo Sound & Light Transfer,sound_light,Cairo,,,,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Cairo to Alexandria Day Trip,intercity_day_trip,Cairo,Cairo,Alexandria,full_day,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Cairo to Alexandria Drop-off,intercity_dropoff,Cairo,Cairo,Alexandria,,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Luxor Airport Transfer,airport_transfer,Luxor,,,,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Luxor East Bank Day Tour,day_tour,Luxor,,,full_day,east_bank,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Luxor West Bank Day Tour,day_tour,Luxor,,,full_day,west_bank,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Luxor to Aswan Drop-off,intercity_dropoff,Luxor,Luxor,Aswan,,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Aswan Airport Transfer,airport_transfer,Aswan,,,,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Aswan Day Tour — Philae & High Dam,day_tour,Aswan,,,full_day,temple_visit,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Aswan to Abu Simbel Day Trip,intercity_day_trip,Aswan,Aswan,Abu Simbel,full_day,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Aswan to Luxor Drop-off,intercity_dropoff,Aswan,Aswan,Luxor,,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true
+Hurghada Airport Transfer,airport_transfer,Hurghada,,,,,,,,1,2,,,3,7,,,8,14,,,15,20,,,21,45,true

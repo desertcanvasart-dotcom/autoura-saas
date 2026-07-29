@@ -574,12 +574,18 @@ function normalizeAttractionName(name: string): string {
     'unfinished obelisk': 'Unfinished Obelisk',
     'pyramid': 'Pyramids of Giza',
     'pyramids': 'Pyramids of Giza',
-    'sphinx': 'Great Sphinx',
+    // Canonical outputs MUST be substrings of entrance_fees.attraction_name
+    // (the lookup is ilike '%name%'). 'Great Sphinx' and 'Saladin Citadel'
+    // matched nothing — the catalog rows are 'Sphinx Area' and
+    // 'Citadel of Saladin' — so both attractions always priced as holes.
+    'sphinx': 'Sphinx Area',
+    'great sphinx': 'Sphinx Area',
     'egyptian museum': 'Egyptian Museum',
     'cairo museum': 'Egyptian Museum',
     'grand egyptian museum': 'Grand Egyptian Museum',
     'gem': 'Grand Egyptian Museum',
-    'citadel': 'Saladin Citadel',
+    'citadel': 'Citadel of Saladin',
+    'saladin citadel': 'Citadel of Saladin',
     'khan el khalili': 'Khan El Khalili',
     'khan el-khalili': 'Khan El Khalili',
     'abu simbel': 'Abu Simbel'
