@@ -133,18 +133,8 @@ const navigation: NavSection[] = [
   {
     title: 'Operations',
     key: 'operations',
-    roles: ['admin', 'manager'],
-    items: [
-      { label: 'Suppliers', href: '/suppliers', icon: Building },
-      { label: 'Itineraries', href: '/itineraries', icon: Route },
-      { label: 'Tour Departures', href: '/departures', icon: Calendar },
-      { label: 'Team Members', href: '/team-members', icon: Users },
-      { label: 'Tasks', href: '/tasks', icon: CheckSquare },
-    ]
-  },
-  {
-    title: 'Quotes',
-    key: 'quotes',
+    // Group widened to agents for the quote items moved from the removed
+    // Quotes group; the original items keep admin/manager via item roles.
     roles: ['admin', 'manager', 'agent'],
     items: [
       { label: 'New Quote', href: '/pricing-grid', icon: Grid3x3 },
@@ -154,14 +144,16 @@ const navigation: NavSection[] = [
         icon: User,
         businessTypes: ['b2c_only', 'b2c_and_b2b']
       },
-      {
-        label: 'B2B Quotes',
-        href: '/quotes/b2b',
-        icon: Building,
-        businessTypes: ['b2b_only', 'b2c_and_b2b']
-      },
+      { label: 'Suppliers', href: '/suppliers', icon: Building, roles: ['admin', 'manager'] },
+      { label: 'Itineraries', href: '/itineraries', icon: Route, roles: ['admin', 'manager'] },
+      { label: 'Tour Departures', href: '/departures', icon: Calendar, roles: ['admin', 'manager'] },
+      { label: 'Team Members', href: '/team-members', icon: Users, roles: ['admin', 'manager'] },
+      { label: 'Tasks', href: '/tasks', icon: CheckSquare, roles: ['admin', 'manager'] },
     ]
   },
+  // There is deliberately no 'Quotes' group: '/quotes/b2b' duplicated the B2B
+  // group's Quotes entry (same b2b_quotes data, two pages). New Quote and B2C
+  // Quotes live under Operations; B2B quotes under B2B.
   {
     title: 'Bookings',
     key: 'bookings',
