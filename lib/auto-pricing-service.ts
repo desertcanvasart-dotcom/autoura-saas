@@ -271,7 +271,7 @@ const SPECIAL_VEHICLE_CITIES: Record<string, VehicleType> = {
 // pricing harness (Layer 1). Per policy — "never fabricate or invent rates" —
 // a missing or fuzzy-matched rate now produces a PricingHole and marks the
 // result `complete: false`, instead of silently substituting a guessed number.
-// See PRICING-HARNESS-PLAN.md.
+// See docs/PRICING-HARNESS-PLAN.md.
 
 // ============================================
 // HELPER FUNCTIONS

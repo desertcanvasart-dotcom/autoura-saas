@@ -2,7 +2,7 @@
 //
 // The template's itinerary uses EXPLICIT fields (city, accommodation_type,
 // attractions, meals object, services) so parseItinerary() does no inference —
-// the parse is fully deterministic. See PRICING-HARNESS-PLAN.md (Layer 0).
+// the parse is fully deterministic. See docs/PRICING-HARNESS-PLAN.md (Layer 0).
 
 import type { MockTables } from '../_mock-supabase'
 

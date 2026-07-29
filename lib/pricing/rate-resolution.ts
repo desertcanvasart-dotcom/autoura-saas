@@ -12,7 +12,7 @@
 // surface so consumers don't depend on the engine file directly and a future
 // physical relocation is a no-op for callers.
 //
-// See PRICING-CONSOLIDATION-PLAN.md (Phase A) and PRICING-HARNESS-PLAN.md.
+// See docs/PRICING-CONSOLIDATION-PLAN.md (Phase A) and docs/PRICING-HARNESS-PLAN.md.
 
 export {
   // Accommodation

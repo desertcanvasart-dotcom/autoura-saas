@@ -16,7 +16,7 @@
 //   • the rate-sheet derivation — lib/auto-pricing-service.ts
 //
 // Sits next to rate-resolution.ts as part of the canonical pricing core. See
-// PRICING-CONSOLIDATION-PLAN.md and [[grid-multipax-consolidation]].
+// docs/PRICING-CONSOLIDATION-PLAN.md and [[grid-multipax-consolidation]].
 
 export interface PaxPriceCell {
   totalCost: number

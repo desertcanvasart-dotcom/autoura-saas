@@ -5,7 +5,7 @@
 // hits it — turning "incomplete quote" into a concrete to-do list.
 //
 // The engine call is injected (`calc`) so this stays pure and unit-testable.
-// See PRICING-HARNESS-PLAN.md.
+// See docs/PRICING-HARNESS-PLAN.md.
 
 import type { ServiceTier, DayPricingResult } from './auto-pricing-service'
 import type { PricingHole } from './pricing-types'

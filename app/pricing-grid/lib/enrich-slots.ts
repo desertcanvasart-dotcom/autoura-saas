@@ -6,7 +6,7 @@
 // flagged needsHumanInput — the AI's figure is kept only as a non-binding hint.
 //
 // Extracted from app/api/pricing-grid/parse/route.ts so it can be unit-tested
-// without importing the route's AI/supabase graph. See PRICING-HARNESS-PLAN.md.
+// without importing the route's AI/supabase graph. See docs/PRICING-HARNESS-PLAN.md.
 
 export interface EnrichedSlot {
   selectedItems: any[]

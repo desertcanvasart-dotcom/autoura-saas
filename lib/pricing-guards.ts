@@ -7,7 +7,7 @@
 //
 // `check*` functions are pure and return violations so callers control the
 // HTTP response; `assertDeliverablePrice` throws for imperative call sites.
-// See PRICING-HARNESS-PLAN.md.
+// See docs/PRICING-HARNESS-PLAN.md.
 
 import type { PricingHole } from './pricing-types'
 

@@ -64,6 +64,11 @@ QUICK*.md
 MASTER-*.md
 EMAIL_SETUP_GUIDE.md
 SETUP_*.md
+# docs/ is real documentation — the ignore patterns above are for
+# session working notes (kept locally in docs/archive/)
+!docs/PRICING-HARNESS-PLAN.md
+!docs/PRICING-CONSOLIDATION-PLAN.md
+!docs/ARCHITECTURE.md
 
 # Test and verification scripts
 test-*.js

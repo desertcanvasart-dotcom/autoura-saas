@@ -6,7 +6,7 @@
 // builder directly -> { data: rows[], error }).
 //
 // Tests set the dataset with setMockTables({ table: rows }) before invoking
-// the engine. See PRICING-HARNESS-PLAN.md (Layer 0).
+// the engine. See docs/PRICING-HARNESS-PLAN.md (Layer 0).
 
 type Row = Record<string, any>
 export type MockTables = Record<string, Row[]>
