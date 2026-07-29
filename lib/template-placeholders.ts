@@ -204,4 +204,9 @@ export const PLACEHOLDER_REFERENCE = [
   { key: 'balance', label: 'Balance Due', example: '€2,450' },
   { key: 'company_name', label: 'Company Name', example: 'Your Company' },
   { key: 'agent_name', label: 'Agent Name', example: 'Islam' },
+  // Partner & supplier correspondence (seeded lifecycle templates use these)
+  { key: 'partner_name', label: 'Partner Contact', example: 'Maria' },
+  { key: 'partner_company', label: 'Partner Company', example: 'Sunrise Travel GmbH' },
+  { key: 'supplier_name', label: 'Supplier Name', example: 'Nile View Hotel' },
+  { key: 'details', label: 'Details / Changes', example: 'Room type upgraded to suite' },
 ]
