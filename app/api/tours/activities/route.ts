@@ -10,13 +10,17 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const dayId = searchParams.get('tour_day_id')
 
+    // This select used to embed entrance:attractions(...) and
+    // transportation:transportation_rates(...), and failed on both — PGRST200:
+    // entrance_id/transportation_id have no FK constraints, `attractions` is
+    // not a table (entrance data lives in entrance_fees), and the embedded
+    // column lists (vehicle_type, rate_per_day) don't exist either. Every GET
+    // 500'd. Same situation and resolution as lib/tour-matcher-service.ts:
+    // the embeds are dropped rather than repaired — no caller reads them, and
+    // entrance_id has no unambiguous target table to join against.
     let query = supabase
       .from('tour_day_activities')
-      .select(`
-        *,
-        entrance:attractions(id, name, city, entrance_fee_eur, entrance_fee_non_eur),
-        transportation:transportation_rates(id, vehicle_type, city, rate_per_day)
-      `)
+      .select('*')
       .order('sequence_order', { ascending: true })
 
     if (dayId) {
