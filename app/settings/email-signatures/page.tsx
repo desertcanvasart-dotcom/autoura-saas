@@ -164,6 +164,9 @@ function SignatureModal({
   const [name, setName] = useState(signature?.name || '')
   const [content, setContent] = useState(signature?.content || '')
   const [isDefault, setIsDefault] = useState(signature?.is_default ?? !existingDefault)
+  // Both tabs edit the same content string — the visual editor emits HTML, so
+  // an HTML mode is just a different view of it, not a different storage.
+  const [mode, setMode] = useState<'editor' | 'html'>('editor')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -215,16 +218,63 @@ function SignatureModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Signature</label>
-            <RichReplyEditor
-              html={content}
-              onChange={setContent}
-              placeholder="Your name, title, contact info…"
-              minHeight={180}
-            />
-            <p className="text-[11px] text-gray-400 mt-1">
-              Formatting is preserved when attached to emails.
-            </p>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-medium text-gray-700">Signature</label>
+              <div className="flex rounded-md border border-gray-200 overflow-hidden text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setMode('editor')}
+                  className={`px-2.5 py-1 ${mode === 'editor' ? 'bg-[#647C47] text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                >
+                  Editor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('html')}
+                  className={`px-2.5 py-1 ${mode === 'html' ? 'bg-[#647C47] text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                >
+                  HTML
+                </button>
+              </div>
+            </div>
+            {mode === 'editor' ? (
+              <>
+                <RichReplyEditor
+                  html={content}
+                  onChange={setContent}
+                  placeholder="Your name, title, contact info…"
+                  minHeight={180}
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Formatting is preserved when attached to emails.
+                </p>
+              </>
+            ) : (
+              <>
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder={'<table>\n  <tr>\n    <td><img src="https://…/logo.png" width="90" alt="Logo" /></td>\n    <td style="padding-left:12px">\n      <strong>Your Name</strong><br/>\n      Title · Company<br/>\n      <a href="https://example.com">example.com</a>\n    </td>\n  </tr>\n</table>'}
+                  spellCheck={false}
+                  className="w-full px-3 py-2 text-xs font-mono border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]/40 resize-y"
+                  style={{ minHeight: 180 }}
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Paste a full HTML signature. Use absolute image URLs (https://…). Scripts and
+                  event handlers are stripped; switching back to the visual editor may reformat
+                  complex layouts.
+                </p>
+                {content.trim() && (
+                  <div className="mt-2">
+                    <div className="text-[11px] font-medium text-gray-500 mb-1">Preview</div>
+                    <div
+                      className="border border-gray-200 rounded-lg p-3 text-sm [&_a]:text-blue-600"
+                      dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(content) }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
