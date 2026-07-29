@@ -27,6 +27,16 @@ const ContactSchema = z.object({
   source_page: z.string().trim().max(500).optional().default(''),
   referrer: z.string().trim().max(1000).optional().default(''),
   utm: z.record(z.string(), z.string().max(500)).optional().default({}),
+  // First-touch attribution (sessionStorage): the campaign that originally
+  // brought the visitor this session, surviving navigation to /contact.
+  first_touch: z
+    .object({
+      utm: z.record(z.string(), z.string().max(500)).optional().default({}),
+      landing_page: z.string().trim().max(500).optional().default(''),
+      referrer: z.string().trim().max(1000).optional().default(''),
+      captured_at: z.string().trim().max(50).optional().default(''),
+    })
+    .optional(),
   // Honeypot: humans never see this field
   website_hp: z.string().optional().default(''),
 })
@@ -100,6 +110,19 @@ export async function POST(request: NextRequest) {
         <tr><td style="color:#666">Referrer</td><td>${esc(d.referrer) || '—'}</td></tr>
         ${utmRows}
       </table>
+      ${
+        d.first_touch
+          ? `<h3 style="margin:16px 0 6px">First touch (this session)</h3>
+      <table cellpadding="4" style="font-size:12px">
+        <tr><td style="color:#666">Landing page</td><td>${esc(d.first_touch.landing_page) || '—'}</td></tr>
+        <tr><td style="color:#666">Referrer</td><td>${esc(d.first_touch.referrer) || '—'}</td></tr>
+        <tr><td style="color:#666">Captured</td><td>${esc(d.first_touch.captured_at) || '—'}</td></tr>
+        ${Object.entries(d.first_touch.utm)
+          .map(([k, v]) => `<tr><td style="color:#666">${esc(k)}</td><td>${esc(v)}</td></tr>`)
+          .join('')}
+      </table>`
+          : ''
+      }
     `,
   })
 

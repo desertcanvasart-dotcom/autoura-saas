@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import { captureFirstTouch } from '@/lib/marketing-attribution'
 import Sidebar from "@/components/Sidebar"
 import ImpersonationBanner from "@/components/ImpersonationBanner"
 import SupportChatWidget from "@/components/SupportChatWidget"
@@ -36,6 +37,13 @@ export default function ClientShell({
     pathname.startsWith('/docs') ||
     pathname.startsWith('/share/')
   const isSuperAdminPage = pathname.startsWith('/super-admin')
+
+  // First-touch UTM/referrer capture (sessionStorage, cookie-free) so the
+  // contact form can attribute a submission to the campaign that actually
+  // brought the visitor — not just whatever URL they submitted from.
+  useEffect(() => {
+    if (isPublicPage && !pathname.startsWith('/share/')) captureFirstTouch()
+  }, [isPublicPage, pathname])
 
   return (
     <AuthProvider>
