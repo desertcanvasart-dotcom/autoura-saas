@@ -321,8 +321,8 @@ export async function POST(request: NextRequest) {
         } else if (quoteError) {
           console.error('B2C quote creation error:', quoteError.message)
         }
-      } catch (b2cError: any) {
-        console.error('B2C quote creation error:', b2cError.message)
+      } catch (b2cError) {
+        console.error('B2C quote creation error:', b2cError instanceof Error ? b2cError.message : b2cError)
         // Non-fatal: itinerary was still saved
       }
     }
