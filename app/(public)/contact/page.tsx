@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Mail, MapPin, Clock, Send, CheckCircle } from 'lucide-react'
+import { getFirstTouch } from '@/lib/marketing-attribution'
 
 export default function ContactPage() {
   const [formState, setFormState] = useState<'idle' | 'submitting' | 'success'>('idle')
@@ -37,6 +38,9 @@ export default function ContactPage() {
           source_page: window.location.pathname + window.location.search,
           referrer: document.referrer || '',
           utm,
+          // First-touch (sessionStorage): the campaign that originally
+          // brought this visitor, even if they navigated here since.
+          first_touch: getFirstTouch() || undefined,
         }),
       })
       const data = await res.json().catch(() => ({}))
