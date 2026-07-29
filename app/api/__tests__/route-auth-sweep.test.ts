@@ -59,6 +59,9 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   // credential, and both handlers look the row up by it.
   '/api/invitations/verify': ['invitation_token'],
   '/api/invitations/accept': ['invitation_token'],
+  // Public marketing contact form — prospect has no session by definition.
+  // Self-auth = abuse controls: per-IP rate limit + honeypot field.
+  '/api/contact': ['checkRateLimit', 'website_hp'],
 }
 
 /** All route.ts files under app/api, as URL paths with dummy dynamic params. */

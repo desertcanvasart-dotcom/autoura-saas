@@ -7,20 +7,49 @@ import { ArrowLeft, Mail, MapPin, Clock, Send, CheckCircle } from 'lucide-react'
 
 export default function ContactPage() {
   const [formState, setFormState] = useState<'idle' | 'submitting' | 'success'>('idle')
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     company: '',
-    message: ''
+    whatsapp: '',
+    monthly_bookings: '',
+    message: '',
+    website_hp: '', // honeypot — humans never see or fill this
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormState('submitting')
-    
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setFormState('success')
+    setSubmitError(null)
+    try {
+      // Attribution captured at submit time: current query (utm_*) + referrer.
+      const params = new URLSearchParams(window.location.search)
+      const utm: Record<string, string> = {}
+      for (const [k, v] of params.entries()) {
+        if (k.startsWith('utm_')) utm[k] = v
+      }
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          source_page: window.location.pathname + window.location.search,
+          referrer: document.referrer || '',
+          utm,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) {
+        setSubmitError(data.error || 'Something went wrong — please email us directly at hello@getautoura.net.')
+        setFormState('idle')
+        return
+      }
+      setFormState('success')
+    } catch {
+      setSubmitError('Network error — please try again or email us directly at hello@getautoura.net.')
+      setFormState('idle')
+    }
   }
 
   return (
@@ -103,20 +132,13 @@ export default function ContactPage() {
                 </div>
               </div>
 
-              {/* Schedule Demo CTA */}
+              {/* Assisted pilot note */}
               <div className="mt-10 p-6 bg-[#2d3b2d] rounded-2xl">
-                <h3 className="text-lg font-semibold text-white mb-2">Prefer a live demo?</h3>
-                <p className="text-gray-300 text-sm mb-4">
-                  Schedule a personalized walkthrough of Autoura with our team.
+                <h3 className="text-lg font-semibold text-white mb-2">Applying for the assisted pilot?</h3>
+                <p className="text-gray-300 text-sm">
+                  Use the form — tell us about your agency and volume, and we&apos;ll
+                  schedule a personal walkthrough and set up your workspace with you.
                 </p>
-                <a
-                  href="https://calendly.com/autoura"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-[#2d3b2d] bg-white rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  Schedule a Demo
-                </a>
               </div>
             </div>
 
@@ -134,7 +156,7 @@ export default function ContactPage() {
                   <button
                     onClick={() => {
                       setFormState('idle')
-                      setFormData({ name: '', email: '', company: '', message: '' })
+                      setFormData({ name: '', email: '', company: '', whatsapp: '', monthly_bookings: '', message: '', website_hp: '' })
                     }}
                     className="text-[#2d3b2d] font-medium hover:underline"
                   >
@@ -142,7 +164,12 @@ export default function ContactPage() {
                   </button>
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6 relative">
+                  {submitError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                      {submitError}
+                    </div>
+                  )}
                   <div>
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                       Your Name *
@@ -184,6 +211,53 @@ export default function ContactPage() {
                       onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d3b2d] focus:border-transparent transition-colors"
                       placeholder="Your Travel Company"
+                    />
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="whatsapp" className="block text-sm font-medium text-gray-700 mb-2">
+                        WhatsApp Number
+                      </label>
+                      <input
+                        type="tel"
+                        id="whatsapp"
+                        value={formData.whatsapp}
+                        onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d3b2d] focus:border-transparent transition-colors"
+                        placeholder="+20 1x xxx xxxx"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="monthly_bookings" className="block text-sm font-medium text-gray-700 mb-2">
+                        Bookings per Month
+                      </label>
+                      <select
+                        id="monthly_bookings"
+                        value={formData.monthly_bookings}
+                        onChange={(e) => setFormData({ ...formData, monthly_bookings: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2d3b2d] focus:border-transparent transition-colors bg-white"
+                      >
+                        <option value="">Select…</option>
+                        <option value="just starting">Just starting</option>
+                        <option value="1-10">1–10</option>
+                        <option value="11-50">11–50</option>
+                        <option value="51-200">51–200</option>
+                        <option value="200+">200+</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Honeypot — visually hidden; bots that fill it are dropped */}
+                  <div className="absolute -left-[9999px] top-auto" aria-hidden="true">
+                    <label htmlFor="website_hp">Website</label>
+                    <input
+                      type="text"
+                      id="website_hp"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={formData.website_hp}
+                      onChange={(e) => setFormData({ ...formData, website_hp: e.target.value })}
                     />
                   </div>
 

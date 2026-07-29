@@ -17,23 +17,27 @@ const read = (f: string) => fs.readFileSync(path.join(process.cwd(), f), 'utf8')
 
 describe('customer-facing routes are public in BOTH senses', () => {
   const middleware = read('middleware.ts')
-  const layout = read('app/layout.tsx')
+  // The chrome list moved from app/layout.tsx to app/ClientShell.tsx when the
+  // root layout became a server component (so the site can export metadata).
+  const layout = read('app/ClientShell.tsx')
 
   it('/share is access-public in the middleware', () => {
     expect(middleware).toContain("'/share'")
   })
 
-  it('/share is chrome-free in the root layout', () => {
+  it('/share is chrome-free in the client shell', () => {
     expect(layout).toContain("pathname.startsWith('/share/')")
   })
 
   it('every marketing route public in one is public in the other', () => {
     // These are pages a signed-out visitor lands on; a sidebar there is a bug.
-    for (const route of ['/login', '/signup', '/pricing', '/privacy', '/terms']) {
+    // /pricing used to be exempted here as "marketing-only" — which is exactly
+    // how it shipped rendering the operator sidebar to logged-in visitors.
+    // No exemptions: access-public ⇒ chrome-free.
+    for (const route of ['/login', '/signup', '/pricing', '/privacy', '/terms', '/contact', '/about', '/integrations']) {
       const inMiddleware = middleware.includes(`'${route}'`)
       const inLayout = layout.includes(`'${route}'`)
-      // /pricing is marketing-only; assert the pairing where both should exist.
-      if (inMiddleware && route !== '/pricing') {
+      if (inMiddleware) {
         expect(inLayout, `${route} is access-public but still renders app chrome`).toBe(true)
       }
     }

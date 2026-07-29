@@ -212,15 +212,23 @@ export default function PricingPage() {
                 </ul>
 
                 <Link
-                  href={showsPrice ? '/contact' : '/contact'}
+                  href="/contact"
                   className={`mt-6 block text-center px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     tier.popular
                       ? 'bg-[#647C47] text-white hover:bg-[#55683c]'
                       : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  {showsPrice ? `Start ${TRIAL_DAYS}-day trial` : 'Contact sales'}
+                  {showsPrice ? 'Apply for the assisted pilot' : 'Contact sales'}
                 </Link>
+                {showsPrice && (
+                  <Link
+                    href="/signup"
+                    className="mt-2 block text-center text-xs text-gray-500 hover:text-[#647C47] transition-colors"
+                  >
+                    or start a {TRIAL_DAYS}-day self-serve trial →
+                  </Link>
+                )}
               </div>
             )
           })}

@@ -30,6 +30,9 @@ export const SELF_AUTH_API_PREFIXES = [
   // on the dashboard with no tenant membership.
   '/api/invitations/verify',
   '/api/invitations/accept',
+  // Public marketing contact form: the sender is a prospect with no session.
+  // Self-protects with a per-IP rate limit + honeypot inside the handler.
+  '/api/contact',
 ]
 
 // Define route permissions - which roles can access which routes
@@ -138,6 +141,10 @@ export async function middleware(request: NextRequest) {
   const publicRoutes = [
     '/', '/login', '/signup', '/forgot-password', '/reset-password', '/invite/accept',
     '/about', '/contact', '/docs', '/integrations', '/pricing', '/privacy', '/terms',
+    // Crawler surfaces (Next metadata routes; .txt/.xml are NOT excluded by
+    // the matcher the way images are). These redirected to /login, which
+    // made organic discovery impossible.
+    '/robots.txt', '/sitemap.xml',
     // Token-gated public itinerary pages. The middleware only opens the path;
     // the page itself 404s any token that does not resolve to an unrevoked
     // share (app/share/[token]/page.tsx, service-role lookup).

@@ -468,12 +468,10 @@ export default function AutouraHomepage() {
             <Link href="/about" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">About</Link>
             <Link href="/login" className="text-sm font-medium text-[#555] hover:text-[#111710] transition-colors">Login</Link>
             <a
-              href="https://calendly.com/autoura"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/contact"
               className="px-5 py-[9px] bg-[#647C47] text-white text-sm font-semibold rounded-[9px] hover:bg-[#4f6339] transition-all hover:shadow-[0_4px_16px_rgba(59,94,46,0.22)]"
             >
-              Book a Free Demo
+              Apply for the Assisted Pilot
             </a>
           </div>
 
@@ -497,12 +495,10 @@ export default function AutouraHomepage() {
             <Link href="/about" className="block text-sm text-[#555] hover:text-[#111710] py-2">About</Link>
             <Link href="/login" className="block text-sm text-[#555] hover:text-[#111710] py-2">Login</Link>
             <a
-              href="https://calendly.com/autoura"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/contact"
               className="block w-full px-4 py-2 bg-[#647C47] text-white text-sm font-semibold rounded-[9px] text-center hover:bg-[#4f6339]"
             >
-              Book a Free Demo
+              Apply for the Assisted Pilot
             </a>
           </div>
         )}
@@ -532,12 +528,10 @@ export default function AutouraHomepage() {
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-[14px] mb-10">
             <a
-              href="https://calendly.com/autoura"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/contact"
               className="group w-full sm:w-auto inline-flex items-center justify-center gap-[6px] px-7 py-[14px] bg-[#647C47] text-white text-[15px] font-semibold rounded-[9px] hover:bg-[#4f6339] transition-all hover:shadow-[0_6px_24px_rgba(59,94,46,0.25)] hover:-translate-y-px"
             >
-              Book a Free Demo
+              Apply for the Assisted Pilot
               <span className="group-hover:translate-x-[3px] transition-transform">→</span>
             </a>
             <button
@@ -957,12 +951,10 @@ export default function AutouraHomepage() {
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                   <a
-                    href="https://calendly.com/autoura"
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href="/contact"
                     className="group w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-[#647C47] text-white font-semibold rounded-[9px] hover:bg-[#4f6339] transition-all hover:shadow-xl hover:shadow-[#647C47]/30 flex items-center justify-center gap-2"
                   >
-                    Book a Free Demo
+                    Apply for the Assisted Pilot
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </a>
                   <Link
