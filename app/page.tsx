@@ -362,23 +362,23 @@ const destinationTemplates = [
 const enhancedTestimonials = [
   {
     quote: "I used to spend 3–4 hours building one itinerary. Now I generate a draft in 5 minutes and spend my time actually selling.",
-    author: "Islam Hussein",
-    role: "Founder",
-    company: "Travel2Egypt",
+    author: "Fathi Ismail",
+    role: "ATS",
+    company: "Japan",
     featureTag: "AI Itinerary Generation",
   },
   {
     quote: "The WhatsApp AI parsing changed everything. Clients message at midnight with abbreviations only we understand. By morning, I have a structured itinerary with confidence scores ready to review.",
-    author: "Operations Manager",
-    role: "DMC Operations",
-    company: "Regional Tour Operator",
+    author: "Hussein Farouk",
+    role: "",
+    company: "",
     featureTag: "WhatsApp AI Parsing",
   },
   {
     quote: "For the first time, I know my actual margin on each tour before it departs. Not estimated. Not averaged. The actual number — with commissions, supplier costs, and currency conversion included.",
-    author: "Finance Director",
-    role: "Finance",
-    company: "Regional Travel Agency",
+    author: "Basem Samir",
+    role: "",
+    company: "Capital Travel",
     featureTag: "Financial Management",
   },
 ]
@@ -912,7 +912,13 @@ export default function AutouraHomepage() {
                   </blockquote>
                   <div className="border-t border-stone-100 pt-4">
                     <p className="font-semibold text-stone-900">{testimonial.author}</p>
-                    <p className="text-sm text-stone-500">{testimonial.role}, {testimonial.company}</p>
+                    {/* Join only what exists — not every endorser has both a
+                        role and a company, and a stray ", " reads as a bug. */}
+                    {[testimonial.role, testimonial.company].filter(Boolean).length > 0 && (
+                      <p className="text-sm text-stone-500">
+                        {[testimonial.role, testimonial.company].filter(Boolean).join(', ')}
+                      </p>
+                    )}
                   </div>
                 </div>
               </AnimatedSection>
