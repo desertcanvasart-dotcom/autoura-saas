@@ -286,6 +286,47 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 5. B2C: create the commercial-offer wrapper, mirroring the B2B branch.
+    // The priced itinerary is the trip; the b2c_quotes row is the offer with
+    // the sales lifecycle (quote number, sent/viewed, versioning) and the
+    // anchor bookings convert from (one booking per quote, migration 256).
+    if (config.clientType === 'b2c') {
+      try {
+        const adminClient = createAdminClient()
+        const { data: quoteNum } = await adminClient.rpc('generate_b2c_quote_number')
+
+        const { data: quote, error: quoteError } = await supabase
+          .from('b2c_quotes')
+          .insert({
+            tenant_id,
+            itinerary_id: itineraryId,
+            client_id: config.clientId || null,
+            quote_number: quoteNum || `B2C-${Date.now()}`,
+            num_travelers: pax,
+            tier: config.tier,
+            currency: config.currency || 'EUR',
+            status: 'draft',
+            total_cost: finalSupplierTotal,
+            margin_percent: config.marginPercent || 25,
+            selling_price: finalSellingTotal,
+            price_per_person: round2(finalSellingTotal / pax),
+            internal_notes: 'Created via Pricing Grid',
+          })
+          .select()
+          .single()
+
+        if (!quoteError && quote) {
+          quoteId = quote.id
+          redirectUrl = `/quotes/b2c/${quote.id}`
+        } else if (quoteError) {
+          console.error('B2C quote creation error:', quoteError.message)
+        }
+      } catch (b2cError: any) {
+        console.error('B2C quote creation error:', b2cError.message)
+        // Non-fatal: itinerary was still saved
+      }
+    }
+
     return NextResponse.json({
       success: true,
       itineraryId,
