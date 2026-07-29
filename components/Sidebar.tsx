@@ -121,7 +121,9 @@ const navigation: NavSection[] = [
       { label: 'Copilot Settings', href: '/settings/copilot', icon: Sparkles },
       { label: 'Copilot Analytics', href: '/settings/copilot-analytics', icon: BarChart3 },
       { label: 'Email Signatures', href: '/settings/email-signatures', icon: PenLine },
-      { label: 'Parser', href: '/whatsapp-parser', icon: Send },
+      // '/whatsapp-parser' is deliberately not listed: the page stays live
+      // (the inbox's "generate itinerary" action deep-links into it) but it
+      // is not a destination users should browse to directly.
       { label: 'Message Templates', href: '/templates', icon: FileText },
     ]
   },
