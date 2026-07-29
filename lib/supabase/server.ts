@@ -1,7 +1,8 @@
 import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database.types'
 
 // Lazy initialization to avoid build-time errors when env vars aren't available
-export const createClient = (): SupabaseClient => {
+export const createClient = (): SupabaseClient<Database> => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -15,8 +16,8 @@ export const createClient = (): SupabaseClient => {
       from: () => ({
         select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }),
       })
-    } as unknown as SupabaseClient
+    } as unknown as SupabaseClient<Database>
   }
 
-  return createSupabaseClient(supabaseUrl, supabaseServiceKey)
+  return createSupabaseClient<Database>(supabaseUrl, supabaseServiceKey)
 }

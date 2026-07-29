@@ -22,7 +22,9 @@
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "analyze": "ANALYZE=true npm run build",
     "plans:check": "node scripts/sync-plans.mjs --check",
-    "plans:generate": "vitest run lib/__tests__/plans-sync.test.ts -u"
+    "plans:generate": "vitest run lib/__tests__/plans-sync.test.ts -u",
+    "types:generate": "node scripts/generate-db-types.mjs",
+    "types:check": "node scripts/generate-db-types.mjs --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

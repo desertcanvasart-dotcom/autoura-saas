@@ -105,6 +105,28 @@ appears:
 - Golden basket: `lib/__tests__/golden-basket.test.ts` locks per-person prices
   across every tier × passport combination as a drift guard.
 
+## 6b. Generated database types
+
+`types/database.types.ts` is generated from the **live production schema** by
+`npm run types:generate` (`scripts/generate-db-types.mjs` — PostgREST OpenAPI,
+because the Supabase CLI has no linked project here). Regenerate it after
+applying a migration; `npm run types:check` fails if the file drifted.
+
+- The hand-written interfaces in `types/*.ts` predate this and can drift —
+  prefer `Tables<'x'>` / `TablesInsert<'x'>` / `TablesUpdate<'x'>` from
+  `types/database.types.ts` for new code.
+- **Annotate insert/update payloads** with `TablesInsert<'x'>`: a phantom
+  column in an annotated literal is a compile error (the migration-262 bug
+  class). Passing a bare literal straight into `.insert()` is NOT excess-checked
+  (supabase-js's generic signature), so the annotation is where the protection
+  lives.
+- Adoption state: `lib/supabase/server.ts` (standalone admin client) carries
+  the `Database` generic. The other factories are still untyped because wiring
+  them surfaces pre-existing loose call sites (measured 2026-07-29:
+  `lib/supabase-server.ts` ~374 tsc errors, `app/supabase.ts` ~53 — mostly
+  `string | null` narrowing and embed mismatches). Fix a factory's call sites,
+  then add its `<Database>` generic — never the generic first.
+
 ## 7. Migrations
 
 - `supabase/migrations/` is the **only** migration directory (test-enforced),
