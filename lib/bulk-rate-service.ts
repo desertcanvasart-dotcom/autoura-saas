@@ -129,14 +129,19 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
   transportation_rates: {
     tableName: 'transportation_rates',
     displayName: 'Transportation',
-    uniqueKey: ['service_code'],
+    // route_name is the identity column — transportation_rates has NO
+    // service_code (matching on it made the existence check error out
+    // silently, so every import row went down the raw-insert path and
+    // 400'd on the phantom columns; this table also has no season,
+    // validity dates, supplier_id or notes).
+    uniqueKey: ['route_name'],
     columns: [
-      id(), serviceCode(),
+      id(),
+      col('route_name', 'Route Name', 'text', true),
       col('service_type', 'Service Type', 'text', true),
       col('city', 'City', 'text', true),
       col('origin_city', 'Origin City', 'text', false),
       col('destination_city', 'Destination City', 'text', false),
-      col('route_name', 'Route Name', 'text', false),
       col('duration', 'Duration', 'text', false),
       col('area', 'Area', 'text', false),
       col('includes', 'Includes', 'text', false),
@@ -161,8 +166,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('bus_rate_non_eur', 'Bus Non-EUR', 'number', false),
       col('bus_capacity_min', 'Bus Cap Min', 'number', false),
       col('bus_capacity_max', 'Bus Cap Max', 'number', false),
-      season(), rateValidFrom(), rateValidTo(),
-      supplierId(), notes(), isActive(), createdAt(), updatedAt(),
+      isActive(), createdAt(), updatedAt(),
     ],
   },
 
