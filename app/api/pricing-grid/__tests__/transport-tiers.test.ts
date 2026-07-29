@@ -69,4 +69,55 @@ describe('groupVehicleRowsToTiers — sibling per-vehicle rows → grid tier set
     ])
     expect(opts).toHaveLength(0)
   })
+
+  // WIDE rows (route-first entry form + bulk importer): one row per route,
+  // per-class rate columns, no base_rate_eur. Before expandWideRows these were
+  // silently invisible to the grid.
+  it('expands a wide route row into per-class tier options', () => {
+    const opts = groupVehicleRowsToTiers([
+      {
+        id: 'w1', created_at: '2026-03-01', service_type: 'day_tour', city: 'Cairo', route_name: 'Cairo Day Tour',
+        vehicle_type: null, base_rate_eur: null,
+        sedan_rate_eur: 50, sedan_rate_non_eur: 45, sedan_capacity_min: 1, sedan_capacity_max: 2,
+        van_rate_eur: 90, van_rate_non_eur: 85, van_capacity_min: 8, van_capacity_max: 14,
+        bus_rate_eur: 200, bus_rate_non_eur: null, bus_capacity_min: null, bus_capacity_max: null,
+      },
+    ])
+    expect(opts.map((o) => o.id)).toEqual(['w1__sedan', 'w1__van', 'w1__bus'])
+    expect(opts.find((o) => o.id === 'w1__sedan')).toMatchObject({ rateEur: 50, rateNonEur: 45, capacity_min: 1, capacity_max: 2 })
+    // missing non-EUR mirrors EUR; missing capacities fall back to the canonical band
+    expect(opts.find((o) => o.id === 'w1__bus')).toMatchObject({ rateEur: 200, rateNonEur: 200 })
+    // vehicle classes with no rate are simply not offered
+    expect(opts.some((o) => o.id.includes('minivan') || o.id.includes('minibus'))).toBe(false)
+  })
+
+  it('feeds the tier index from a wide row so per-pax re-selection works', () => {
+    const idx = buildTransportTierIndex(groupVehicleRowsToTiers([
+      {
+        id: 'w2', service_type: 'day_tour', city: 'Luxor', route_name: 'Luxor West Bank',
+        sedan_rate_eur: 40, sedan_capacity_min: 1, sedan_capacity_max: 2,
+        minibus_rate_eur: 150, minibus_capacity_min: 15, minibus_capacity_max: 20,
+      },
+    ]) as Parameters<typeof buildTransportTierIndex>[0])
+    const tiers = idx.get('w2')
+    expect(tiers).toHaveLength(2)
+    const sorted = [...tiers!].sort((a, b) => a.capMin - b.capMin)
+    expect(sorted.map((t) => [t.capMin, t.capMax, t.rateEur])).toEqual([
+      [1, 2, 40],
+      [15, 20, 150],
+    ])
+  })
+
+  it('a mixed batch keeps tall rows tall and expands wide rows', () => {
+    const opts = groupVehicleRowsToTiers([
+      ...cairoDayTour,
+      {
+        id: 'w3', service_type: 'intercity_transfer', origin_city: 'Cairo', destination_city: 'Alexandria',
+        van_rate_eur: 120, van_capacity_min: 8, van_capacity_max: 14,
+      },
+    ])
+    const rowIds = new Set(opts.map((o) => o.id.split('__')[0]))
+    expect(rowIds).toEqual(new Set(['r-sedan', 'w3']))
+    expect(opts).toHaveLength(4)
+  })
 })

@@ -9,73 +9,81 @@ import { useCurrency } from '@/hooks/useCurrency'
 
 interface TransportationRate {
   id: string
-  service_code: string
+  route_name: string | null
   service_type: string
-  vehicle_type: string
+  vehicle_type: string | null
   capacity_min: number
-  capacity_max: number
+  capacity_max: number | null
   city: string
   destination_city?: string | null
-  base_rate_eur: number
+  base_rate_eur: number | null
   base_rate_non: number
-  base_rate_non_eur?: number
-  season: string | null
-  rate_valid_from: string
-  rate_valid_to: string
-  supplier_id: string | null  // NEW: linked to suppliers table
-  supplier_name: string | null
-  notes: string | null
+  base_rate_non_eur?: number | null
   is_active: boolean
   created_at: string
   updated_at: string
-  // Joined supplier data
-  suppliers?: { id: string; name: string; city?: string } | null
+  // WIDE columns — one row per route, per-class rates (matches the bulk
+  // importer and what the engine/grid expand)
+  sedan_rate_eur?: number | null
+  sedan_rate_non_eur?: number | null
+  sedan_capacity_min?: number | null
+  sedan_capacity_max?: number | null
+  minivan_rate_eur?: number | null
+  minivan_rate_non_eur?: number | null
+  minivan_capacity_min?: number | null
+  minivan_capacity_max?: number | null
+  van_rate_eur?: number | null
+  van_rate_non_eur?: number | null
+  van_capacity_min?: number | null
+  van_capacity_max?: number | null
+  minibus_rate_eur?: number | null
+  minibus_rate_non_eur?: number | null
+  minibus_capacity_min?: number | null
+  minibus_capacity_max?: number | null
+  bus_rate_eur?: number | null
+  bus_rate_non_eur?: number | null
+  bus_capacity_min?: number | null
+  bus_capacity_max?: number | null
+  [key: string]: unknown
 }
 
-// NEW: Supplier interface for dropdown
-interface Supplier {
-  id: string
-  name: string
-  type: string
-  city?: string
-  status?: string
+// One entry per vehicle class in the route-first form. Strings because they
+// are text-input bound; blank rate = vehicle not offered on this route.
+interface VehicleRateEntry {
+  rate_eur: string
+  rate_non_eur: string
+  capacity_min: string
+  capacity_max: string
 }
+type VehicleClassKey = 'sedan' | 'minivan' | 'van' | 'minibus' | 'bus'
+// Capacity defaults mirror the engine's VEHICLE_CAPACITY ladder.
+const WIDE_CLASSES: { key: VehicleClassKey; label: string; defMin: number; defMax: number }[] = [
+  { key: 'sedan', label: 'Sedan', defMin: 1, defMax: 2 },
+  { key: 'minivan', label: 'Minivan', defMin: 3, defMax: 7 },
+  { key: 'van', label: 'Van', defMin: 8, defMax: 14 },
+  { key: 'minibus', label: 'Minibus', defMin: 15, defMax: 20 },
+  { key: 'bus', label: 'Bus', defMin: 21, defMax: 45 },
+]
+const emptyVehicles = (): Record<VehicleClassKey, VehicleRateEntry> =>
+  Object.fromEntries(
+    WIDE_CLASSES.map((c) => [c.key, { rate_eur: '', rate_non_eur: '', capacity_min: String(c.defMin), capacity_max: String(c.defMax) }])
+  ) as Record<VehicleClassKey, VehicleRateEntry>
 
 interface FormData {
-  service_code: string
+  route_name: string
   service_type: string
-  vehicle_type: string
-  capacity_min: number
-  capacity_max: number
   city: string
   destination_city: string
-  base_rate_eur: number
-  base_rate_non: number
-  season: string
-  rate_valid_from: string
-  rate_valid_to: string
-  supplier_id: string  // NEW: linked supplier
-  supplier_name: string
-  notes: string
+  vehicles: Record<VehicleClassKey, VehicleRateEntry>
   is_active: boolean
 }
 
 const initialFormData: FormData = {
-  service_code: '',
+  route_name: '',
   service_type: 'airport_transfer',
-  vehicle_type: 'Sedan',
-  capacity_min: 1,
-  capacity_max: 2,
   city: '',
   destination_city: '',
-  base_rate_eur: 0,
-  base_rate_non: 0,
-  season: '',
-  rate_valid_from: new Date().toISOString().split('T')[0],
-  rate_valid_to: '2099-12-31',
-  supplier_id: '',  // NEW
-  supplier_name: '',
-  notes: '',
+  vehicles: emptyVehicles(),
   is_active: true
 }
 
@@ -112,13 +120,11 @@ export default function TransportationContent() {
   const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
   const [rates, setRates] = useState<TransportationRate[]>([])
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])  // NEW: suppliers list
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [cityFilter, setCityFilter] = useState('')
   const [serviceTypeFilter, setServiceTypeFilter] = useState('')
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('')
-  const [supplierFilter, setSupplierFilter] = useState('')  // NEW: filter by supplier
   const [showInactive, setShowInactive] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRate, setEditingRate] = useState<TransportationRate | null>(null)
@@ -130,30 +136,13 @@ export default function TransportationContent() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
 
-  // NEW: Fetch suppliers for dropdown
-  const fetchSuppliers = useCallback(async () => {
-    try {
-      const response = await fetch('/api/suppliers?status=active')
-      if (response.ok) {
-        const result = await response.json()
-        // Filter to only transport-related suppliers
-        const transportSuppliers = (result.data || []).filter((s: Supplier) => 
-          ['transport_company', 'transport', 'driver'].includes(s.type)
-        )
-        setSuppliers(transportSuppliers)
-      }
-    } catch (error) {
-      console.error('Error fetching suppliers:', error)
-    }
-  }, [])
-
   const fetchRates = useCallback(async () => {
     try {
       const params = new URLSearchParams()
       if (cityFilter) params.append('city', cityFilter)
       if (serviceTypeFilter) params.append('serviceType', serviceTypeFilter)
-      if (vehicleTypeFilter) params.append('vehicleType', vehicleTypeFilter)
-      if (supplierFilter) params.append('supplier_id', supplierFilter)  // NEW
+      // vehicleType is filtered CLIENT-side: the API's eq('vehicle_type')
+      // would exclude wide rows (vehicle_type is NULL on route-level rows).
       if (!showInactive) params.append('activeOnly', 'true')
       
       const response = await fetch(`/api/resources/transportation?${params}`)
@@ -166,17 +155,16 @@ export default function TransportationContent() {
     } finally {
       setLoading(false)
     }
-  }, [cityFilter, serviceTypeFilter, vehicleTypeFilter, supplierFilter, showInactive])
+  }, [cityFilter, serviceTypeFilter, vehicleTypeFilter, showInactive])
 
   useEffect(() => {
     fetchRates()
-    fetchSuppliers()  // NEW: fetch suppliers on mount
-  }, [fetchRates, fetchSuppliers])
+  }, [fetchRates])
 
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, cityFilter, serviceTypeFilter, vehicleTypeFilter, supplierFilter, showInactive, itemsPerPage])
+  }, [searchTerm, cityFilter, serviceTypeFilter, vehicleTypeFilter, showInactive, itemsPerPage])
 
   // Check if service type needs destination city
   const needsDestinationCity = (serviceType: string) => {
@@ -184,29 +172,25 @@ export default function TransportationContent() {
     return type?.needsDestination || false
   }
 
-  const generateServiceCode = (city: string, serviceType: string, vehicleType: string, destinationCity?: string) => {
+  // Route-level code — one row per route now, so no vehicle suffix.
+  const generateServiceCode = (city: string, serviceType: string, destinationCity?: string) => {
     if (!city) return ''
     const cityCode = city.toUpperCase().replace(/\s+/g, '-')
     const typeCode = serviceType.toUpperCase().replace(/_/g, '-')
-    const vehicleCode = vehicleType.toUpperCase()
-    
+
     // For intercity, include destination
     if (needsDestinationCity(serviceType) && destinationCity) {
       const destCode = destinationCity.toUpperCase().replace(/\s+/g, '-')
-      return `${cityCode}-TO-${destCode}-${vehicleCode}`
+      return `${cityCode}-TO-${destCode}`
     }
-    
-    return `${cityCode}-${typeCode}-${vehicleCode}`
+
+    return `${cityCode}-${typeCode}`
   }
 
-  const handleVehicleTypeChange = (vehicleType: string) => {
-    const vehicle = VEHICLE_TYPES.find(v => v.value === vehicleType)
+  const handleVehicleFieldChange = (cls: VehicleClassKey, field: keyof VehicleRateEntry, value: string) => {
     setFormData(prev => ({
       ...prev,
-      vehicle_type: vehicleType,
-      capacity_min: vehicle?.minPax || 1,
-      capacity_max: vehicle?.maxPax || 2,
-      service_code: generateServiceCode(prev.city, prev.service_type, vehicleType, prev.destination_city)
+      vehicles: { ...prev.vehicles, [cls]: { ...prev.vehicles[cls], [field]: value } }
     }))
   }
 
@@ -214,7 +198,7 @@ export default function TransportationContent() {
     setFormData(prev => ({
       ...prev,
       city,
-      service_code: generateServiceCode(city, prev.service_type, prev.vehicle_type, prev.destination_city)
+      route_name: prev.route_name || generateServiceCode(city, prev.service_type, prev.destination_city)
     }))
   }
 
@@ -222,7 +206,7 @@ export default function TransportationContent() {
     setFormData(prev => ({
       ...prev,
       destination_city: destinationCity,
-      service_code: generateServiceCode(prev.city, prev.service_type, prev.vehicle_type, destinationCity)
+      route_name: generateServiceCode(prev.city, prev.service_type, destinationCity)
     }))
   }
 
@@ -232,18 +216,39 @@ export default function TransportationContent() {
       ...prev,
       service_type: serviceType,
       destination_city: needsDest ? prev.destination_city : '',
-      service_code: generateServiceCode(prev.city, serviceType, prev.vehicle_type, needsDest ? prev.destination_city : '')
+      route_name: generateServiceCode(prev.city, serviceType, needsDest ? prev.destination_city : '')
     }))
   }
 
-  // NEW: Handle supplier selection - auto-fill supplier_name
-  const handleSupplierChange = (supplierId: string) => {
-    const supplier = suppliers.find(s => s.id === supplierId)
-    setFormData(prev => ({
-      ...prev,
-      supplier_id: supplierId,
-      supplier_name: supplier?.name || ''
-    }))
+  // Load an existing row into the vehicle grid. Wide rows fill their classes;
+  // a legacy tall row (single vehicle_type + base_rate) fills just that class.
+  const rowToVehicles = (rate: TransportationRate): Record<VehicleClassKey, VehicleRateEntry> => {
+    const vehicles = emptyVehicles()
+    let hasWide = false
+    for (const c of WIDE_CLASSES) {
+      const rateEur = Number(rate[`${c.key}_rate_eur`])
+      if (rateEur > 0) {
+        hasWide = true
+        vehicles[c.key] = {
+          rate_eur: String(rateEur),
+          rate_non_eur: rate[`${c.key}_rate_non_eur`] != null ? String(rate[`${c.key}_rate_non_eur`]) : '',
+          capacity_min: rate[`${c.key}_capacity_min`] != null ? String(rate[`${c.key}_capacity_min`]) : String(c.defMin),
+          capacity_max: rate[`${c.key}_capacity_max`] != null ? String(rate[`${c.key}_capacity_max`]) : String(c.defMax),
+        }
+      }
+    }
+    if (!hasWide && rate.vehicle_type && Number(rate.base_rate_eur) > 0) {
+      const cls = WIDE_CLASSES.find(c => c.label.toLowerCase() === String(rate.vehicle_type).toLowerCase())
+      if (cls) {
+        vehicles[cls.key] = {
+          rate_eur: String(rate.base_rate_eur),
+          rate_non_eur: rate.base_rate_non_eur != null ? String(rate.base_rate_non_eur) : (rate.base_rate_non ? String(rate.base_rate_non) : ''),
+          capacity_min: rate.capacity_min ? String(rate.capacity_min) : String(cls.defMin),
+          capacity_max: rate.capacity_max ? String(rate.capacity_max) : String(cls.defMax),
+        }
+      }
+    }
+    return vehicles
   }
 
   const openAddModal = () => {
@@ -257,21 +262,11 @@ export default function TransportationContent() {
     setEditingRate(rate)
     setError(null)
     setFormData({
-      service_code: rate.service_code,
+      route_name: rate.route_name || '',
       service_type: rate.service_type,
-      vehicle_type: rate.vehicle_type,
-      capacity_min: rate.capacity_min,
-      capacity_max: rate.capacity_max,
       city: rate.city,
       destination_city: rate.destination_city || '',
-      base_rate_eur: rate.base_rate_eur,
-      base_rate_non: rate.base_rate_non || rate.base_rate_non_eur || 0,
-      season: rate.season || '',
-      rate_valid_from: rate.rate_valid_from,
-      rate_valid_to: rate.rate_valid_to,
-      supplier_id: rate.supplier_id || '',  // NEW
-      supplier_name: rate.supplier_name || rate.suppliers?.name || '',
-      notes: rate.notes || '',
+      vehicles: rowToVehicles(rate),
       is_active: rate.is_active
     })
     setIsModalOpen(true)
@@ -302,22 +297,31 @@ export default function TransportationContent() {
       return
     }
 
-    if (!formData.base_rate_eur || formData.base_rate_eur <= 0) {
-      setError('Please enter a valid EUR rate')
+    const offeredClasses = WIDE_CLASSES.filter(c => parseFloat(formData.vehicles[c.key].rate_eur) > 0)
+    if (offeredClasses.length === 0) {
+      setError('Enter a EUR rate for at least one vehicle (leave others blank if not offered)')
+      setSaving(false)
+      return
+    }
+    const badCapacity = offeredClasses.find(c => {
+      const v = formData.vehicles[c.key]
+      const min = parseInt(v.capacity_min)
+      const max = parseInt(v.capacity_max)
+      return Number.isFinite(min) && Number.isFinite(max) && min > max
+    })
+    if (badCapacity) {
+      setError(`${badCapacity.label}: capacity min cannot exceed max`)
       setSaving(false)
       return
     }
 
     try {
-      const url = editingRate 
+      const url = editingRate
         ? `/api/resources/transportation/${editingRate.id}`
         : '/api/resources/transportation'
-      
-      // NEW: Include supplier_id in submission, set to null if empty
-      const submitData = {
-        ...formData,
-        supplier_id: formData.supplier_id || null
-      }
+
+      // One WIDE row per route: rates per vehicle class
+      const submitData = formData
       
       const response = await fetch(url, {
         method: editingRate ? 'PUT' : 'POST',
@@ -343,7 +347,7 @@ export default function TransportationContent() {
 
   const handleDelete = async (rate: TransportationRate) => {
     const confirmed = await dialog.confirmDelete('Transportation Rate',
-      `Are you sure you want to delete "${rate.service_code}"? This action cannot be undone.`
+      `Are you sure you want to delete "${rate.route_name || rate.city}"? This action cannot be undone.`
     )
 
     if (!confirmed) return
@@ -370,21 +374,11 @@ export default function TransportationContent() {
     setEditingRate(null)
     setError(null)
     setFormData({
-      service_code: rate.service_code + '-COPY',
+      route_name: (rate.route_name || '') + ' (copy)',
       service_type: rate.service_type,
-      vehicle_type: rate.vehicle_type,
-      capacity_min: rate.capacity_min,
-      capacity_max: rate.capacity_max,
       city: rate.city,
       destination_city: rate.destination_city || '',
-      base_rate_eur: rate.base_rate_eur,
-      base_rate_non: rate.base_rate_non || rate.base_rate_non_eur || 0,
-      season: rate.season || '',
-      rate_valid_from: rate.rate_valid_from,
-      rate_valid_to: rate.rate_valid_to,
-      supplier_id: rate.supplier_id || '',
-      supplier_name: rate.supplier_name || rate.suppliers?.name || '',
-      notes: rate.notes || '',
+      vehicles: rowToVehicles(rate),
       is_active: rate.is_active
     })
     setIsModalOpen(true)
@@ -394,14 +388,19 @@ export default function TransportationContent() {
   // Import rates from CSV file
   // Filter rates
   const filteredRates = rates.filter(rate => {
-    const matchesSearch = 
-      rate.service_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch =
+      (rate.route_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       rate.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rate.vehicle_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (rate.destination_city && rate.destination_city.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (rate.supplier_name && rate.supplier_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (rate.suppliers?.name && rate.suppliers.name.toLowerCase().includes(searchTerm.toLowerCase()))  // NEW: search joined supplier
-    return matchesSearch
+      (rate.vehicle_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (rate.destination_city && rate.destination_city.toLowerCase().includes(searchTerm.toLowerCase()))
+    if (!matchesSearch) return false
+    if (vehicleTypeFilter) {
+      const cls = WIDE_CLASSES.find(c => c.label === vehicleTypeFilter)
+      const offersWide = cls ? Number(rate[`${cls.key}_rate_eur`]) > 0 : false
+      const matchesLegacy = (rate.vehicle_type || '') === vehicleTypeFilter
+      if (!offersWide && !matchesLegacy) return false
+    }
+    return true
   })
 
   // Pagination calculations
@@ -426,8 +425,10 @@ export default function TransportationContent() {
   const activeRates = rates.filter(r => r.is_active).length
   const inactiveRates = totalRates - activeRates
   const uniqueCities = [...new Set(rates.map(r => r.city))].length
-  const uniqueVehicleTypes = [...new Set(rates.map(r => r.vehicle_type))].length
-  const linkedToSuppliers = rates.filter(r => r.supplier_id).length  // NEW: stat
+  const uniqueVehicleTypes = [...new Set(rates.flatMap(r => {
+    const wide = WIDE_CLASSES.filter(c => Number(r[`${c.key}_rate_eur`]) > 0).map(c => c.label)
+    return wide.length > 0 ? wide : (r.vehicle_type ? [r.vehicle_type] : [])
+  }))].length
 
   if (loading) {
     return (
@@ -457,8 +458,8 @@ export default function TransportationContent() {
         </div>
       </div>
 
-      {/* Stats Cards - UPDATED: added linked suppliers stat */}
-      <div className="grid grid-cols-6 gap-3">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-5 gap-3">
         <div className="bg-white rounded-lg border border-gray-200 p-3">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-blue-500"></div>
@@ -494,17 +495,9 @@ export default function TransportationContent() {
           </div>
           <p className="text-xl font-semibold text-gray-900 mt-1">{uniqueVehicleTypes}</p>
         </div>
-        {/* NEW: Linked to Suppliers stat */}
-        <div className="bg-white rounded-lg border border-gray-200 p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-            <span className="text-xs text-gray-500">Linked</span>
-          </div>
-          <p className="text-xl font-semibold text-gray-900 mt-1">{linkedToSuppliers}</p>
-        </div>
       </div>
 
-      {/* Search and Filters - UPDATED: added supplier filter */}
+      {/* Search and Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -559,21 +552,6 @@ export default function TransportationContent() {
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
-        {/* NEW: Supplier filter dropdown */}
-        <div className="relative">
-          <select
-            value={supplierFilter}
-            onChange={(e) => setSupplierFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
-          >
-            <option value="">All Suppliers</option>
-            {suppliers.map(supplier => (
-              <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-        </div>
-
         <button
           onClick={() => setShowInactive(!showInactive)}
           className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
@@ -586,18 +564,15 @@ export default function TransportationContent() {
         </button>
       </div>
 
-      {/* Table - UPDATED: added Supplier column */}
+      {/* Table — one row per route, vehicles as chips */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Service Code</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Supplier</th>
+              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Route Name</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Service Type</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Vehicle</th>
-              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Capacity</th>
+              <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Vehicles &amp; Rates ({userCurrency})</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Route</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">{userCurrency} Rate</th>
               <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Status</th>
               <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Actions</th>
             </tr>
@@ -605,29 +580,17 @@ export default function TransportationContent() {
           <tbody className="divide-y divide-gray-100">
             {paginatedRates.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
                   No transportation rates found
                 </td>
               </tr>
             ) : (
               paginatedRates.map((rate) => {
                 const isIntercity = needsDestinationCity(rate.service_type)
-                const supplierName = rate.suppliers?.name || rate.supplier_name
                 return (
                   <tr key={rate.id} className="hover:bg-gray-50">
                     <td className="px-4 py-2">
-                      <span className="text-sm font-mono text-gray-900">{rate.service_code}</span>
-                    </td>
-                    {/* NEW: Supplier column */}
-                    <td className="px-4 py-2">
-                      {supplierName ? (
-                        <div className="flex items-center gap-1.5">
-                          <Building2 className="h-3.5 w-3.5 text-gray-400" />
-                          <span className="text-sm text-gray-700">{supplierName}</span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">—</span>
-                      )}
+                      <span className="text-sm font-medium text-gray-900">{rate.route_name || '—'}</span>
                     </td>
                     <td className="px-4 py-2">
                       <span className="text-sm text-gray-600">
@@ -635,10 +598,24 @@ export default function TransportationContent() {
                       </span>
                     </td>
                     <td className="px-4 py-2">
-                      <span className="text-sm font-medium text-gray-900">{rate.vehicle_type}</span>
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className="text-sm text-gray-600">{rate.capacity_min || 1}-{rate.capacity_max} pax</span>
+                      {/* One cell per route: every offered vehicle with its rate.
+                          Legacy tall rows fall back to their single vehicle. */}
+                      <div className="flex flex-wrap gap-1">
+                        {(() => {
+                          const chips = WIDE_CLASSES
+                            .filter(c => Number(rate[`${c.key}_rate_eur`]) > 0)
+                            .map(c => ({ label: c.label, eur: Number(rate[`${c.key}_rate_eur`]) }))
+                          if (chips.length === 0 && rate.vehicle_type && Number(rate.base_rate_eur) > 0) {
+                            chips.push({ label: rate.vehicle_type, eur: Number(rate.base_rate_eur) })
+                          }
+                          return chips.length > 0 ? chips.map(chip => (
+                            <span key={chip.label} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-700">
+                              <span className="font-medium">{chip.label}</span>
+                              <span>{symbol}{convert(chip.eur).toFixed(0)}</span>
+                            </span>
+                          )) : <span className="text-sm text-gray-400">—</span>
+                        })()}
+                      </div>
                     </td>
                     <td className="px-4 py-2">
                       {isIntercity && rate.destination_city ? (
@@ -650,9 +627,6 @@ export default function TransportationContent() {
                       ) : (
                         <span className="text-sm text-gray-600">{rate.city}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <span className="text-sm font-medium text-gray-900">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-2 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -789,7 +763,7 @@ export default function TransportationContent() {
         )}
       </div>
 
-      {/* Add/Edit Modal - UPDATED: added supplier dropdown */}
+      {/* Add/Edit Modal — route once, vehicle-rate grid */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -813,48 +787,6 @@ export default function TransportationContent() {
                 </div>
               )}
 
-              {/* NEW: Supplier Selection - at the top for prominence */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-700 border-b pb-2 flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-cyan-600" />
-                  Transport Company (Supplier)
-                </h3>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                    Link to Supplier
-                  </label>
-                  <select
-                    value={formData.supplier_id}
-                    onChange={(e) => handleSupplierChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                  >
-                    <option value="">Select supplier (optional)</option>
-                    {suppliers.map(supplier => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}{supplier.city ? ` (${supplier.city})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Link this rate to a transport company for better tracking. 
-                    <a href="/suppliers?type=transport_company" className="text-[#647C47] hover:underline ml-1">
-                      Manage suppliers →
-                    </a>
-                  </p>
-                </div>
-
-                {/* Show selected supplier info */}
-                {formData.supplier_id && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-cyan-50 border border-cyan-100 rounded-md">
-                    <Building2 className="h-4 w-4 text-cyan-600" />
-                    <span className="text-sm text-cyan-800">
-                      Linked to: <strong>{formData.supplier_name}</strong>
-                    </span>
-                  </div>
-                )}
-              </div>
-
               {/* Basic Info */}
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-gray-700 border-b pb-2">Basic Information</h3>
@@ -876,21 +808,6 @@ export default function TransportationContent() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Vehicle Type <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      value={formData.vehicle_type}
-                      onChange={(e) => handleVehicleTypeChange(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                    >
-                      {VEHICLE_TYPES.map(type => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
 
                 {/* Route - Departure & Destination */}
@@ -945,135 +862,85 @@ export default function TransportationContent() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Service Code
+                      Route Name
                     </label>
                     <input
                       type="text"
-                      value={formData.service_code}
-                      onChange={(e) => setFormData(prev => ({ ...prev, service_code: e.target.value }))}
-                      placeholder="Auto-generated"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-gray-50 font-mono"
+                      value={formData.route_name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, route_name: e.target.value }))}
+                      placeholder="Auto-generated from city & type"
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                        Min Pax
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.capacity_min}
-                        onChange={(e) => setFormData(prev => ({ ...prev, capacity_min: parseInt(e.target.value) || 1 }))}
-                        min="1"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                        Max Pax
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.capacity_max}
-                        onChange={(e) => setFormData(prev => ({ ...prev, capacity_max: parseInt(e.target.value) || 2 }))}
-                        min="1"
-                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
 
-              {/* Pricing */}
-              <div className="space-y-4">
+              {/* Vehicle rates — one row per class, the whole route in one save.
+                  Blank EUR rate = vehicle not offered on this route. */}
+              <div className="space-y-3">
                 <div className="flex items-center justify-between border-b pb-2">
-                  <h3 className="text-sm font-medium text-gray-700">Pricing</h3>
-                  <span className="text-xs text-gray-400">Enter rates in EUR (base currency)</span>
+                  <h3 className="text-sm font-medium text-gray-700">Vehicle Rates</h3>
+                  <span className="text-xs text-gray-400">EUR base · leave blank if a vehicle is not offered</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      EU Passport Rate <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">€</span>
-                      <input
-                        type="number"
-                        value={formData.base_rate_eur}
-                        onChange={(e) => setFormData(prev => ({ ...prev, base_rate_eur: parseFloat(e.target.value) || 0 }))}
-                        step="0.01"
-                        min="0"
-                        required
-                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Non-EU Passport Rate
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">€</span>
-                      <input
-                        type="number"
-                        value={formData.base_rate_non}
-                        onChange={(e) => setFormData(prev => ({ ...prev, base_rate_non: parseFloat(e.target.value) || 0 }))}
-                        step="0.01"
-                        min="0"
-                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Validity */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-700 border-b pb-2">Validity Period</h3>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Season
-                    </label>
-                    <select
-                      value={formData.season}
-                      onChange={(e) => setFormData(prev => ({ ...prev, season: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                    >
-                      <option value="">All Year</option>
-                      <option value="high_season">High Season</option>
-                      <option value="low_season">Low Season</option>
-                      <option value="peak">Peak</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Valid From
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.rate_valid_from}
-                      onChange={(e) => setFormData(prev => ({ ...prev, rate_valid_from: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Valid To
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.rate_valid_to}
-                      onChange={(e) => setFormData(prev => ({ ...prev, rate_valid_to: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                    />
-                  </div>
+                <div className="border border-gray-200 rounded-md overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Vehicle</th>
+                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">EU Rate (€)</th>
+                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Non-EU Rate (€)</th>
+                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Min Pax</th>
+                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Max Pax</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {WIDE_CLASSES.map(cls => {
+                        const v = formData.vehicles[cls.key]
+                        const offered = parseFloat(v.rate_eur) > 0
+                        return (
+                          <tr key={cls.key} className={offered ? 'bg-white' : 'bg-gray-50/50'}>
+                            <td className="px-3 py-1.5">
+                              <span className={`text-sm font-medium ${offered ? 'text-gray-900' : 'text-gray-400'}`}>{cls.label}</span>
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <input
+                                type="number" step="0.01" min="0" placeholder="—"
+                                value={v.rate_eur}
+                                onChange={(e) => handleVehicleFieldChange(cls.key, 'rate_eur', e.target.value)}
+                                className="w-24 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47]"
+                              />
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <input
+                                type="number" step="0.01" min="0" placeholder="—"
+                                value={v.rate_non_eur}
+                                onChange={(e) => handleVehicleFieldChange(cls.key, 'rate_non_eur', e.target.value)}
+                                className="w-24 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47]"
+                              />
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <input
+                                type="number" min="1"
+                                value={v.capacity_min}
+                                onChange={(e) => handleVehicleFieldChange(cls.key, 'capacity_min', e.target.value)}
+                                className="w-16 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47]"
+                              />
+                            </td>
+                            <td className="px-3 py-1.5">
+                              <input
+                                type="number" min="1"
+                                value={v.capacity_max}
+                                onChange={(e) => handleVehicleFieldChange(cls.key, 'capacity_max', e.target.value)}
+                                className="w-16 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47]"
+                              />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
@@ -1081,38 +948,6 @@ export default function TransportationContent() {
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-gray-700 border-b pb-2">Additional Information</h3>
                 
-                {/* Legacy supplier name field - hidden if supplier_id is set */}
-                {!formData.supplier_id && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Supplier Name (Legacy)
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.supplier_name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, supplier_name: e.target.value }))}
-                      placeholder="e.g., Cairo Cars Co. (prefer using dropdown above)"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      For backwards compatibility. Prefer using the supplier dropdown above.
-                    </p>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                    Notes
-                  </label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    rows={3}
-                    placeholder="Any additional notes..."
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] resize-none"
-                  />
-                </div>
-
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
