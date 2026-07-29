@@ -14,6 +14,18 @@ import RequireFeature from '@/components/RequireFeature'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
+interface CostBreakdown {
+  accommodation?: number
+  transportation?: number
+  entrance_fees?: number
+  meals?: number
+  guide?: number
+  cruise?: number
+  domestic_flights?: number
+  tips?: number
+  other?: number
+}
+
 interface B2CQuote {
   id: string
   quote_number: string
@@ -25,18 +37,8 @@ interface B2CQuote {
   selling_price: number
   price_per_person: number
   currency: string
-  cost_breakdown: {
-    accommodation?: number
-    transportation?: number
-    entrance_fees?: number
-    meals?: number
-    guide?: number
-    cruise?: number
-    domestic_flights?: number
-    tips?: number
-    other?: number
-  }
-  created_at: string
+  cost_breakdown: CostBreakdown | null
+  created_at: string | null
   valid_until: string | null
   sent_at: string | null
   viewed_at: string | null
@@ -45,20 +47,20 @@ interface B2CQuote {
   pdf_url: string | null
   clients: {
     id: string
-    full_name: string
-    email: string
-    phone: string
-    nationality: string
+    full_name: string | null
+    email: string | null
+    phone: string | null
+    nationality: string | null
   } | null
   itineraries: {
     id: string
     itinerary_code: string
-    trip_name: string
-    start_date: string
-    end_date: string
-    total_days: number
-    num_adults: number
-    num_children: number
+    trip_name: string | null
+    start_date: string | null
+    end_date: string | null
+    total_days: number | null
+    num_adults: number | null
+    num_children: number | null
   } | null
 }
 
@@ -114,7 +116,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
         .single()
 
       if (error) throw error
-      setQuote(data)
+      setQuote({ ...data, cost_breakdown: data.cost_breakdown as CostBreakdown | null })
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -351,9 +353,11 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                   onStatusChange={fetchQuote}
                 />
               </div>
-              <p className="text-sm text-gray-500">
-                Created {new Date(quote.created_at).toLocaleDateString()} at {new Date(quote.created_at).toLocaleTimeString()}
-              </p>
+              {quote.created_at && (
+                <p className="text-sm text-gray-500">
+                  Created {new Date(quote.created_at).toLocaleDateString()} at {new Date(quote.created_at).toLocaleTimeString()}
+                </p>
+              )}
             </div>
 
             <div className="text-right">
@@ -437,7 +441,9 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                     <label className="text-xs text-gray-500 uppercase tracking-wide">Start Date</label>
                     <div className="text-sm font-medium text-gray-900 mt-1 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-400" />
-                      {new Date(quote.itineraries.start_date).toLocaleDateString()}
+                      {quote.itineraries.start_date
+                        ? new Date(quote.itineraries.start_date).toLocaleDateString()
+                        : 'Not set'}
                     </div>
                   </div>
                   <div>
@@ -449,7 +455,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                     <div className="text-sm font-medium text-gray-900 mt-1 flex items-center gap-2">
                       <Users className="w-4 h-4 text-gray-400" />
                       {quote.itineraries.num_adults} adults
-                      {quote.itineraries.num_children > 0 && `, ${quote.itineraries.num_children} children`}
+                      {(quote.itineraries.num_children ?? 0) > 0 && `, ${quote.itineraries.num_children} children`}
                     </div>
                   </div>
                   <div>
@@ -624,7 +630,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
                 <div>
                   <div className="text-xs text-gray-500 uppercase tracking-wide">Created</div>
                   <div className="text-gray-900 mt-1">
-                    {new Date(quote.created_at).toLocaleDateString()}
+                    {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : 'Unknown'}
                   </div>
                 </div>
                 {quote.valid_until && (

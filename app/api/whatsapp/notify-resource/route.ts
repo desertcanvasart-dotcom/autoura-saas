@@ -6,7 +6,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -85,8 +85,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Guest count string
+    const numChildren = itinerary.num_children ?? 0
     const guestCount = `${itinerary.num_adults || 1} adult${(itinerary.num_adults || 1) > 1 ? 's' : ''}` +
-      `${itinerary.num_children > 0 ? `, ${itinerary.num_children} child${itinerary.num_children > 1 ? 'ren' : ''}` : ''}`
+      `${numChildren > 0 ? `, ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : ''}`
 
     // Generate message based on resource type
     let message = ''

@@ -5,7 +5,7 @@ import { type WorkspaceMode } from '@/lib/workspace-mode'
 export async function PATCH(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }

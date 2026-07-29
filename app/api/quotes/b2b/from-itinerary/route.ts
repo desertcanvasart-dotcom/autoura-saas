@@ -11,7 +11,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server';
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -81,6 +81,8 @@ export async function POST(request: NextRequest) {
     let accommodationCost = 0;  // Will calculate PPD from this
     let cruiseCost = 0;          // Cruise PPD
 
+    const paxDivisor = (itinerary.num_adults ?? 0) + (itinerary.num_children ?? 0) || 2;
+
     // Analyze services
     services.forEach((service: any) => {
       const cost = parseFloat(service.total_cost || 0);
@@ -97,16 +99,16 @@ export async function POST(request: NextRequest) {
           fixedCosts.guide += cost;
           break;
         case 'entrance_fee':
-          perPersonCosts.entrance_fees += cost / (itinerary.num_adults + itinerary.num_children || 2);
+          perPersonCosts.entrance_fees += cost / paxDivisor;
           break;
         case 'meal':
-          perPersonCosts.meals += cost / (itinerary.num_adults + itinerary.num_children || 2);
+          perPersonCosts.meals += cost / paxDivisor;
           break;
         case 'tip':
-          perPersonCosts.tips += cost / (itinerary.num_adults + itinerary.num_children || 2);
+          perPersonCosts.tips += cost / paxDivisor;
           break;
         case 'flight':
-          perPersonCosts.domestic_flights += cost / (itinerary.num_adults + itinerary.num_children || 2);
+          perPersonCosts.domestic_flights += cost / paxDivisor;
           break;
         default:
           fixedCosts.other += cost;

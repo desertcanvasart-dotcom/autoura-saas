@@ -363,7 +363,7 @@ export async function POST(request: NextRequest) {
   try {
     // Get authenticated user and tenant
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -721,6 +721,7 @@ export async function POST(request: NextRequest) {
             cruiseEndDate.setDate(startDateObj.getDate() + duration_days - 1)
 
             await supabase.from('itinerary_resources').insert({
+              tenant_id,
               itinerary_id: itinerary.id,
               resource_type: 'cruise',
               resource_id: cruiseRate.supplierId,
@@ -1197,6 +1198,7 @@ export async function POST(request: NextRequest) {
           const cruiseNights = cruiseDetection.cruiseNights || (duration_days - 1)
 
           await supabase.from('itinerary_resources').insert({
+            tenant_id,
             itinerary_id: itinerary.id,
             resource_type: 'cruise',
             resource_id: cruiseRate.supplierId,

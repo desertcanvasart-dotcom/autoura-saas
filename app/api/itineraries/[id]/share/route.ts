@@ -19,7 +19,7 @@ import { appRedirectBase } from '@/lib/oauth-config'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const auth = await requireAuth()
-  if (auth.error) {
+  if (auth.error !== null) {
     return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
   const { supabase, tenant_id, user } = auth
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const auth = await requireAuth()
-  if (auth.error) {
+  if (auth.error !== null) {
     return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
 

@@ -55,7 +55,7 @@ export async function PUT(request: NextRequest) {
   try {
     // Require authentication and get user info
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }

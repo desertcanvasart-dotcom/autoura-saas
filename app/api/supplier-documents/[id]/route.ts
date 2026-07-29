@@ -7,7 +7,7 @@ export async function GET(
 ) {
   // Authenticate and get tenant context
   const authResult = await requireAuth()
-  if (authResult.error) {
+  if (authResult.error !== null) {
     return NextResponse.json(
       { success: false, error: authResult.error },
       { status: authResult.status }
@@ -51,7 +51,7 @@ export async function PUT(
 ) {
   // Authenticate and get tenant context
   const authResult = await requireAuth()
-  if (authResult.error) {
+  if (authResult.error !== null) {
     return NextResponse.json(
       { success: false, error: authResult.error },
       { status: authResult.status }
@@ -114,7 +114,7 @@ export async function DELETE(
 ) {
   // Authenticate and get tenant context
   const authResult = await requireAuth()
-  if (authResult.error) {
+  if (authResult.error !== null) {
     return NextResponse.json(
       { success: false, error: authResult.error },
       { status: authResult.status }

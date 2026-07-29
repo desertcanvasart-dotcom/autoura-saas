@@ -120,12 +120,14 @@ applying a migration; `npm run types:check` fails if the file drifted.
   class). Passing a bare literal straight into `.insert()` is NOT excess-checked
   (supabase-js's generic signature), so the annotation is where the protection
   lives.
-- Adoption state: `lib/supabase/server.ts` (standalone admin client) carries
-  the `Database` generic. The other factories are still untyped because wiring
-  them surfaces pre-existing loose call sites (measured 2026-07-29:
-  `lib/supabase-server.ts` ~374 tsc errors, `app/supabase.ts` ~53 — mostly
-  `string | null` narrowing and embed mismatches). Fix a factory's call sites,
-  then add its `<Database>` generic — never the generic first.
+- Adoption state: all three client factories (`lib/supabase-server.ts`,
+  `app/supabase.ts`, `lib/supabase/server.ts`) carry the `Database` generic;
+  their call sites were migrated 2026-07-29. `requireAuth()`/`getUserTenantId()`
+  return discriminated unions — guard with `error !== null` (bare truthiness
+  does not narrow; see the comment in lib/supabase-server.ts).
+- `tsc --noEmit` on this repo needs `NODE_OPTIONS=--max-old-space-size=8192`.
+  At the default heap it dies OOM — and a piped `grep -c "error TS"` then
+  reads 0, masquerading as a clean pass. Always check tsc's exit code.
 
 ## 7. Migrations
 

@@ -8,7 +8,7 @@ export async function GET(
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -52,7 +52,7 @@ export async function PUT(
   try {
     // ✅ SECURITY: Require authentication - prevents unauthorized rate modification
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -176,7 +176,7 @@ export async function DELETE(
   try {
     // ✅ SECURITY: Require authentication - prevents unauthorized rate deletion
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }

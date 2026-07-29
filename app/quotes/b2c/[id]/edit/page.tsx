@@ -24,10 +24,10 @@ interface B2CQuote {
   internal_notes: string | null
   client_notes: string | null
   clients: {
-    full_name: string
+    full_name: string | null
   } | null
   itineraries: {
-    trip_name: string
+    trip_name: string | null
   } | null
 }
 

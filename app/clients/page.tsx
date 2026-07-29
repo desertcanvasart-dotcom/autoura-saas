@@ -13,17 +13,17 @@ import { showToast } from '@/app/contexts/ToastContext'
 
 interface ClientSummary {
   id: string
-  client_code: string
-  full_name: string
-  email: string
-  phone?: string
-  whatsapp?: string
-  nationality?: string
-  client_type: string
-  vip_status: boolean
-  status: string
-  lead_source?: string
-  created_at: string
+  client_code: string | null
+  full_name: string | null
+  email: string | null
+  phone: string | null
+  whatsapp: string | null
+  nationality: string | null
+  client_type: string | null
+  vip_status: boolean | null
+  status: string | null
+  lead_source: string | null
+  created_at: string | null
 }
 
 interface DeleteModalState {
@@ -229,7 +229,7 @@ export default function ClientsPage() {
           total: allClients.length,
           active: allClients.filter(c => c.status === 'active').length,
           vip: allClients.filter(c => c.vip_status).length,
-          newThisMonth: allClients.filter(c => new Date(c.created_at) >= firstDayOfMonth).length,
+          newThisMonth: allClients.filter(c => c.created_at !== null && new Date(c.created_at) >= firstDayOfMonth).length,
           totalRevenue: 0 // Revenue tracking not yet implemented
         })
       }
@@ -265,7 +265,7 @@ export default function ClientsPage() {
     filters.dateTo ||
     filters.sortBy !== 'recent'
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800'
       case 'inactive': return 'bg-gray-100 text-gray-800'
@@ -275,7 +275,7 @@ export default function ClientsPage() {
     }
   }
 
-  const getTypeColor = (type: string) => {
+  const getTypeColor = (type: string | null) => {
     switch (type) {
       case 'individual': return 'bg-purple-100 text-purple-800'
       case 'family': return 'bg-pink-100 text-pink-800'
@@ -286,7 +286,7 @@ export default function ClientsPage() {
     }
   }
 
-  const getLeadSourceConfig = (source: string | undefined) => {
+  const getLeadSourceConfig = (source: string | null) => {
     return LEAD_SOURCES.find(s => s.value === source) || null
   }
 
@@ -756,7 +756,7 @@ export default function ClientsPage() {
                             </Link>
                             <span className="text-gray-300">|</span>
                             <button
-                              onClick={() => openDeleteModal(client.id, client.full_name)}
+                              onClick={() => openDeleteModal(client.id, client.full_name ?? '')}
                               className="text-red-600 hover:text-red-800 font-medium"
                             >
                               Delete

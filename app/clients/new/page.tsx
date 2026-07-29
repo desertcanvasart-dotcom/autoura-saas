@@ -9,6 +9,7 @@ import {
   Star, Bell, Heart, ArrowLeft, Save, X, ChevronRight
 } from 'lucide-react'
 import RequireFeature from '@/components/RequireFeature'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 const LEAD_SOURCES = [
   { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
@@ -23,6 +24,7 @@ const LEAD_SOURCES = [
 
 export default function NewClientPage() {
   const router = useRouter()
+  const { tenant } = useTenant()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentStep, setCurrentStep] = useState(1)
@@ -73,10 +75,13 @@ export default function NewClientPage() {
     setError('')
 
     try {
+      if (!tenant) throw new Error('Tenant not loaded yet. Please try again.')
+
       // Convert empty strings to null for date fields
       const cleanedData = {
         ...formData,
         date_of_birth: formData.date_of_birth || null,
+        tenant_id: tenant.id,
       }
 
       const { data, error: insertError } = await supabase

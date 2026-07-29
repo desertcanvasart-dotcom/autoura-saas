@@ -14,7 +14,7 @@ function getSeason(date: Date): 'low' | 'high' | 'peak' {
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -29,13 +29,13 @@ export async function POST(request: NextRequest) {
 
     // 2. Fetch days with services
     const { data: days } = await supabase
-      .from('itinerary_days').select('*, itinerary_services(*)').eq('itinerary_id', itinerary_id).order('day_number')
+      .from('itinerary_days').select('*, itinerary_services!itinerary_services_itinerary_day_id_fkey(*)').eq('itinerary_id', itinerary_id).order('day_number')
 
     // 3. Partner margin override
     let effectiveMargin = margin_percent
     if (partner_id) {
-      const { data: partner } = await supabase.from('b2b_partners').select('commission_rate').eq('id', partner_id).single()
-      if (partner?.commission_rate) effectiveMargin = Number(partner.commission_rate)
+      const { data: partner } = await supabase.from('b2b_partners').select('default_margin_percent').eq('id', partner_id).single()
+      if (partner?.default_margin_percent) effectiveMargin = Number(partner.default_margin_percent)
     }
 
     const tier = itinerary.tier || 'standard'
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         let unitCost = svc.unit_cost || svc.total_cost || 0
         let lineTotal = svc.total_cost || 0
         let rateSource = 'itinerary'
-        let quantityMode = svc.quantity > 1 ? 'per_pax' : 'fixed'
+        let quantityMode = (svc.quantity ?? 0) > 1 ? 'per_pax' : 'fixed'
 
         const serviceType = svc.service_type || ''
         const serviceName = svc.service_name || ''
@@ -64,9 +64,11 @@ export async function POST(request: NextRequest) {
           if (rules?.length) {
             const rule = rules[0]
             const rate = numPax <= (rule.tier1_max_pax || 999) ? rule.tier1_rate_eur : (rule.tier2_rate_eur || rule.tier1_rate_eur)
-            if (rule.pricing_model === 'per_unit') { unitCost = rate; lineTotal = rate; quantityMode = 'fixed' }
-            else { unitCost = rate; lineTotal = rate * numPax; quantityMode = 'per_pax' }
-            rateSource = 'b2b_rule'
+            if (rate != null) {
+              if (rule.pricing_model === 'per_unit') { unitCost = rate; lineTotal = rate; quantityMode = 'fixed' }
+              else { unitCost = rate; lineTotal = rate * numPax; quantityMode = 'per_pax' }
+              rateSource = 'b2b_rule'
+            }
           } else {
             // Entrance fees table
             const { data: fees } = await supabase.from('entrance_fees').select('eur_rate, non_eur_rate').ilike('attraction_name', `%${serviceName}%`).limit(1)
@@ -144,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     // Generate quote number via admin RPC
     const adminClient = createAdminClient()
-    const { data: quoteNum } = await adminClient.rpc('generate_b2b_quote_number', { p_tenant_id: tenant_id })
+    const { data: quoteNum } = await adminClient.rpc('generate_b2b_quote_number')
 
     const { data: quote, error: quoteError } = await supabase
       .from('b2b_quotes')

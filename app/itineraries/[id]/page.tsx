@@ -210,7 +210,7 @@ export default function ViewItineraryPage() {
       const { error } = await supabase
         .from('itineraries')
         .update({ cost_mode: newMode })
-        .eq('id', params.id)
+        .eq('id', params.id as string)
 
       if (error) throw error
 
@@ -285,7 +285,7 @@ export default function ViewItineraryPage() {
       await supabase
         .from('itineraries')
         .update({ total_cost: newTotalCost })
-        .eq('id', params.id)
+        .eq('id', params.id as string)
 
       if (itinerary) {
         setItinerary({ ...itinerary, total_cost: newTotalCost })

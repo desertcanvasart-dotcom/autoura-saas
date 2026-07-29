@@ -3,6 +3,45 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF';
 import React from 'react';
+import type { Tables } from '@/types/database.types';
+
+type B2BQuoteWithRelations = Tables<'b2b_quotes'> & {
+  b2b_partners: Pick<
+    Tables<'b2b_partners'>,
+    'id' | 'company_name' | 'partner_code' | 'contact_name' | 'email' | 'country'
+  > | null;
+  itineraries: Pick<
+    Tables<'itineraries'>,
+    'id' | 'itinerary_code' | 'trip_name' | 'start_date' | 'end_date' | 'total_days'
+  > | null;
+};
+
+/**
+ * The generated Row is looser than B2BQuotePDF's props — Json pricing table,
+ * nullable timestamps and embed fields — so narrow it to the prop shape
+ * without changing what gets rendered.
+ */
+function toPdfQuote(quote: B2BQuoteWithRelations) {
+  return {
+    ...quote,
+    pricing_table: quote.pricing_table as Record<string, { pp: number; total: number }>,
+    tour_leader_cost: quote.tour_leader_cost ?? 0,
+    created_at: quote.created_at ?? '',
+    b2b_partners: quote.b2b_partners && {
+      company_name: quote.b2b_partners.company_name,
+      partner_code: quote.b2b_partners.partner_code,
+      contact_name: quote.b2b_partners.contact_name ?? '',
+      email: quote.b2b_partners.email ?? '',
+      country: quote.b2b_partners.country ?? '',
+    },
+    itineraries: quote.itineraries && {
+      itinerary_code: quote.itineraries.itinerary_code,
+      trip_name: quote.itineraries.trip_name ?? '',
+      start_date: quote.itineraries.start_date ?? '',
+      total_days: quote.itineraries.total_days ?? 0,
+    },
+  };
+}
 
 /**
  * POST /api/quotes/b2b/[id]/generate-pdf
@@ -77,7 +116,7 @@ export async function POST(
 
     // Generate PDF using React PDF renderer
     const pdfBuffer = await renderToBuffer(
-      React.createElement(B2BQuotePDF, { quote }) as any
+      React.createElement(B2BQuotePDF, { quote: toPdfQuote(quote) }) as any
     );
 
     // Generate storage path
@@ -207,7 +246,7 @@ export async function GET(
 
     // Generate PDF using React PDF renderer
     const pdfBuffer = await renderToBuffer(
-      React.createElement(B2BQuotePDF, { quote }) as any
+      React.createElement(B2BQuotePDF, { quote: toPdfQuote(quote) }) as any
     );
 
     // Return PDF as downloadable file

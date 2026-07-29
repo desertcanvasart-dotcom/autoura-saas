@@ -79,11 +79,12 @@ function EmailSettingsContent() {
   }, [user])
 
   const checkGmailConnection = async () => {
+    if (!user) return
     try {
       const { data, error } = await supabase
         .from('gmail_tokens')
         .select('email')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .single()
 
       if (data && !error) {

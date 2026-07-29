@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
 
 
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       console.error('❌ Auth failed:', authResult.error)
       return NextResponse.json(
         { success: false, error: authResult.error },

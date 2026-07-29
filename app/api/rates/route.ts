@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    let data = []
+    let data: unknown[] = []
     let error = null
 
     switch (type) {
@@ -168,21 +168,11 @@ export async function GET(request: NextRequest) {
 
       case 'service':
       case 'service_fee':
-        // `service_fees` does not exist. The comment said "keep it if it
-        // exists", but the error was assigned anyway, so asking for this rate
-        // type failed the whole request instead of returning nothing. Treat an
-        // absent table as an empty list — every other optional source here
-        // already does.
-        const serviceQuery = supabase
-          .from('service_fees')
-          .select('*')
-          .eq('is_active', true)
-
-        const serviceResult = await serviceQuery
-        data = serviceResult.data || []
-        error = serviceResult.error?.code === 'PGRST205' || serviceResult.error?.code === '42P01'
-          ? null
-          : serviceResult.error
+        // `service_fees` does not exist in the schema, so the query always
+        // came back with PGRST205 and we returned an empty list. Skip the
+        // round-trip and return the empty list directly.
+        data = []
+        error = null
         break
 
       // ============================================

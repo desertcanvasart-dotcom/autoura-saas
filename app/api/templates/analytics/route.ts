@@ -8,7 +8,7 @@ import { requireAuth } from '@/lib/supabase-server'
 export async function GET() {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -54,7 +54,7 @@ export async function GET() {
     }
 
     allTemplates?.forEach(t => {
-      if (t.channel in channelCounts) {
+      if (t.channel && t.channel in channelCounts) {
         channelCounts[t.channel as keyof typeof channelCounts]++
       }
     })
@@ -98,7 +98,7 @@ export async function GET() {
       stats.totalSent++
       if (s.status === 'sent') stats.successful++
       if (s.status === 'failed') stats.failed++
-      if (s.channel in stats.byChannel) {
+      if (s.channel && s.channel in stats.byChannel) {
         stats.byChannel[s.channel as keyof typeof stats.byChannel]++
       }
     })

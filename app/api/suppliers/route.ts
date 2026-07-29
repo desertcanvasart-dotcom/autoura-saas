@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import type { TablesInsert } from '@/types/database.types'
 
 // All valid supplier fields (including hierarchical fields)
 const VALID_FIELDS = [
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -118,9 +119,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Filter to only valid fields and set defaults
-    const newSupplier = {
+    const newSupplier: TablesInsert<'suppliers'> = {
       tenant_id, // ✅ Explicit tenant_id
       ...filterValidFields(body),
+      // company_name is NOT NULL in the DB; mirror the legacy name column
+      company_name: body.name,
       country: body.country || 'Egypt',
       status: body.status || 'active',
       is_property: body.is_property || false,

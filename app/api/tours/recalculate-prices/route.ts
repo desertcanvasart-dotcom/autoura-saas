@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     let tenantId: string | null = null
     if (!isCronCall) {
       const authResult = await requireAuth()
-      if (authResult.error) {
+      if (authResult.error !== null) {
         return NextResponse.json(
           { success: false, error: authResult.error },
           { status: authResult.status }
@@ -214,7 +214,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }

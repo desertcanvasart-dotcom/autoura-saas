@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json({
         success: false,
         error: authResult.error
@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const staffData = {
+      tenant_id: authResult.tenant_id,
       name: body.name,
       role: body.role || null,
       airport_location: body.airport_location,
@@ -113,8 +114,7 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== undefined ? body.is_active : true
     }
 
-    // ✅ MULTI-TENANT: tenant_id is auto-populated by database trigger
-    // The trigger automatically sets tenant_id from the authenticated user's session
+    // ✅ MULTI-TENANT: tenant_id comes from the authenticated session (never the request body)
     // RLS policies enforce that users can only insert staff for their own tenant
     const { data, error } = await supabase
       .from('airport_staff')

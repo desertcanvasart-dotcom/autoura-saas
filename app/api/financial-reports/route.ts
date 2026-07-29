@@ -275,6 +275,7 @@ export async function GET(request: NextRequest) {
       })
 
       const monthTrips = yearTrips.filter(itin => {
+        if (!itin.start_date) return false
         const tripMonth = new Date(itin.start_date).getMonth() + 1
         return tripMonth === monthNum
       })

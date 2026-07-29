@@ -11,7 +11,7 @@ interface UserProfile {
   full_name: string | null
   company_name: string | null
   phone: string | null
-  is_active: boolean
+  is_active: boolean | null
   role?: string | null
   avatar_url?: string | null
 }

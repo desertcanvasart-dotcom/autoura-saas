@@ -4,7 +4,7 @@ import { requireSuperAdmin } from '@/lib/super-admin'
 export async function GET() {
   try {
     const auth = await requireSuperAdmin()
-    if (auth.error) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const admin = auth.adminClient!
 
     const [tenantsRes, membersRes, subsRes, plansRes, invoicesRes] = await Promise.all([

@@ -7,11 +7,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import type { TablesInsert } from '@/types/database.types'
 
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -109,12 +110,13 @@ export async function GET(request: NextRequest) {
             .eq('assigned_guide_id', guide.id)
 
           const now = new Date()
-          const activeBookings = bookings?.filter(b => 
+          const activeBookings = bookings?.filter(b =>
+            b.start_date !== null && b.end_date !== null &&
             new Date(b.start_date) <= now && new Date(b.end_date) >= now
           ).length || 0
 
-          const upcomingBookings = bookings?.filter(b => 
-            new Date(b.start_date) > now
+          const upcomingBookings = bookings?.filter(b =>
+            b.start_date !== null && new Date(b.start_date) > now
           ).length || 0
 
           const totalRevenue = bookings?.reduce((sum, b) => sum + (b.total_cost || 0), 0) || 0
@@ -146,7 +148,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -166,20 +168,20 @@ export async function POST(request: NextRequest) {
     // Create guide as a supplier. Set BOTH type and supplier_type: the GET
     // list filters on supplier_type, and while a DB trigger mirrors the two,
     // setting both keeps this correct even if that trigger is absent.
-    const guideData = {
+    // Note: suppliers has no specialties/daily_rate/hourly_rate columns —
+    // guide rates live in guide_rates.
+    const guideData: TablesInsert<'suppliers'> = {
       tenant_id: authResult.tenant_id,
       type: 'guide',
       supplier_type: 'guide',
       name: body.name,
+      company_name: body.name,
       contact_email: body.email || null,
       contact_phone: body.phone || body.contact_phone || null,
       whatsapp: body.whatsapp || null,
       city: body.city || null,
       languages: body.languages || [],
-      specialties: body.specialties || [],
       status: body.is_active !== false ? 'active' : 'inactive',
-      daily_rate: body.daily_rate || null,
-      hourly_rate: body.hourly_rate || null,
       notes: body.notes || null,
     }
 

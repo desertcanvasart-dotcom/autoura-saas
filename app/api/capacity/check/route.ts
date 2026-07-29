@@ -33,7 +33,7 @@ interface CapacityCheckResult {
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -88,8 +88,8 @@ export async function POST(request: NextRequest) {
       status: string
       max_groups: number
       booked_groups: number
-      notes?: string
-      reason?: string
+      notes?: string | null
+      reason?: string | null
     }>()
 
     capacityData?.forEach(entry => {

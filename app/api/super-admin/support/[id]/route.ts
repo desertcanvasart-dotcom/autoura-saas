@@ -14,7 +14,7 @@ export async function GET(
   try {
     const { id } = await params
     const auth = await requireSuperAdmin()
-    if (auth.error) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const admin = auth.adminClient!
 
     const { data: conversation, error: convError } = await admin
@@ -49,7 +49,7 @@ export async function POST(
   try {
     const { id } = await params
     const auth = await requireSuperAdmin()
-    if (auth.error) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const admin = auth.adminClient!
 
     const { body } = await request.json()
@@ -119,7 +119,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const auth = await requireSuperAdmin()
-    if (auth.error) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const admin = auth.adminClient!
 
     const { status } = await request.json()

@@ -262,11 +262,12 @@ export default function InboxPage() {
   }, [user])
 
   const checkConnectionAndFetchEmails = async () => {
+    if (!user) return
     try {
       const { data } = await supabase
         .from('gmail_tokens')
         .select('email')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .single()
 
       if (!data) {

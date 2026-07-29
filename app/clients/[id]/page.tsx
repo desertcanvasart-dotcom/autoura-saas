@@ -18,27 +18,27 @@ import RequireFeature from '@/components/RequireFeature'
 
 interface Client {
   id: string
-  client_code: string
-  first_name: string
-  last_name: string
-  email: string
-  phone?: string
-  nationality?: string
-  passport_type?: string
-  preferred_language?: string
-  preferred_contact_method?: string
-  client_type: string
-  vip_status: boolean
-  status: string
-  total_bookings_count: number
-  total_revenue_generated: number
-  average_booking_value: number
-  created_at: string
-  last_contacted_at?: string
-  internal_notes?: string
-  company_name?: string
-  special_interests?: string[]
-  tags?: string[]
+  client_code: string | null
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  phone?: string | null
+  nationality?: string | null
+  passport_type?: string | null
+  preferred_language?: string | null
+  preferred_contact_method?: string | null
+  client_type: string | null
+  vip_status: boolean | null
+  status: string | null
+  total_bookings_count: number | null
+  total_revenue_generated: number | null
+  average_booking_value: number | null
+  created_at: string | null
+  last_contacted_at?: string | null
+  internal_notes?: string | null
+  company_name?: string | null
+  special_interests?: string[] | null
+  tags?: string[] | null
 }
 
 interface LinkedEmail {
@@ -56,31 +56,27 @@ interface Communication {
   id: string
   communication_type: string
   direction: string
-  subject?: string
+  subject?: string | null
   content?: string
   communication_date: string
-  handled_by?: string
   status: string
 }
 
 interface Followup {
   id: string
-  followup_type: string
-  title: string
   due_date: string
   status: string
   priority: string
   description: string
+  notes: string | null
 }
 
 interface Note {
   id: string
   note_type: string
-  title?: string
-  content: string
-  is_important: boolean
-  created_at: string
-  created_by?: string
+  note_text: string
+  created_at: string | null
+  created_by?: string | null
 }
 const supabase = createClient()
 
@@ -242,7 +238,7 @@ export default function ClientProfilePage() {
     )
   }
   
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800'
       case 'inactive': return 'bg-gray-100 text-gray-800'
@@ -291,7 +287,7 @@ export default function ClientProfilePage() {
               <div className="flex-shrink-0">
                 <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
                   <span className="text-xl font-bold text-white">
-                    {client.first_name[0]}{client.last_name[0]}
+                    {client.first_name?.[0]}{client.last_name?.[0]}
                   </span>
                 </div>
               </div>
@@ -358,13 +354,13 @@ export default function ClientProfilePage() {
               </div>
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 text-center">
                 <div className="text-xl font-bold text-green-600">
-                  €{client.total_revenue_generated.toLocaleString()}
+                  €{client.total_revenue_generated?.toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-600 mt-0.5">Revenue</div>
               </div>
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 text-center">
                 <div className="text-xl font-bold text-purple-600">
-                  €{client.average_booking_value.toLocaleString()}
+                  €{client.average_booking_value?.toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-600 mt-0.5">Avg Value</div>
               </div>
@@ -450,7 +446,7 @@ export default function ClientProfilePage() {
                   </div>
                   <div>
                     <label className="text-xs text-gray-600">Member Since</label>
-                    <p className="text-sm font-medium">{new Date(client.created_at).toLocaleDateString()}</p>
+                    <p className="text-sm font-medium">{client.created_at ? new Date(client.created_at).toLocaleDateString() : 'Not specified'}</p>
                   </div>
                 </div>
               </div>
@@ -782,9 +778,7 @@ export default function ClientProfilePage() {
             ) : (
               <div className="space-y-3">
                 {notes.map((note) => (
-                  <div key={note.id} className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 ${
-                    note.is_important ? 'border-l-4 border-yellow-500' : ''
-                  }`}>
+                  <div key={note.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
@@ -796,13 +790,10 @@ export default function ClientProfilePage() {
                         }`}>
                           {note.note_type}
                         </span>
-                        {note.is_important && (
-                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-500">
-                          {new Date(note.created_at).toLocaleDateString()}
+                          {note.created_at && new Date(note.created_at).toLocaleDateString()}
                         </span>
                         <button
                           onClick={() => {
@@ -816,10 +807,7 @@ export default function ClientProfilePage() {
                         </button>
                       </div>
                     </div>
-                    {note.title && (
-                      <h4 className="text-sm font-semibold mb-2">{note.title}</h4>
-                    )}
-                    <p className="text-sm text-gray-700">{note.content}</p>
+                    <p className="text-sm text-gray-700">{note.note_text}</p>
                     {note.created_by && (
                       <p className="text-xs text-gray-500 mt-2">By: {note.created_by}</p>
                     )}
@@ -866,7 +854,7 @@ export default function ClientProfilePage() {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <h4 className="text-sm font-semibold">{followup.title}</h4>
+                            <h4 className="text-sm font-semibold">{followup.description}</h4>
                             <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                               followup.status === 'completed' ? 'bg-green-100 text-green-800' :
                               followup.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
@@ -891,14 +879,10 @@ export default function ClientProfilePage() {
                                 Due: {new Date(followup.due_date).toLocaleDateString()}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1 capitalize">
-                              <Clock className="w-3 h-3" />
-                              {followup.followup_type.replace('_', ' ')}
-                            </div>
                           </div>
-                          {followup.description && (
+                          {followup.notes && (
                             <p className="text-xs text-gray-700 mt-2 bg-gray-50 p-2 rounded-lg">
-                              {followup.description}
+                              {followup.notes}
                             </p>
                           )}
                         </div>

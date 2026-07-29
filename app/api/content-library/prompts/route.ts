@@ -10,7 +10,7 @@ const VALID_PURPOSES = [
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ error: 'Auth failed' }, { status: 401 })
 
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     const { supabase, tenant_id, user } = authResult
     if (!supabase || !user) return NextResponse.json({ error: 'Auth failed' }, { status: 401 })
 
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ error: 'Auth failed' }, { status: 401 })
 
@@ -139,11 +139,6 @@ export async function PATCH(request: NextRequest) {
     delete updates.created_by
     delete updates.tenant_id
 
-    if (updates.system_prompt || updates.user_prompt_template) {
-      const { data: current } = await supabase.from('prompt_templates').select('version').eq('id', id).single()
-      if (current) updates.version = (current.version || 0) + 1
-    }
-
     const { data, error } = await supabase.from('prompt_templates').update(updates).eq('id', id).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json(data)
@@ -156,7 +151,7 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ error: 'Auth failed' }, { status: 401 })
 

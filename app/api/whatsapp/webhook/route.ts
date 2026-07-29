@@ -126,15 +126,15 @@ export async function POST(request: NextRequest) {
           .eq('id', conversationId)
           .is('client_id', null) // Only update if not already linked
       }
-    } else {
-      // Create new conversation
+    } else if (clientTenantId) {
+      // Create new conversation (requires a tenant — matched via the client)
       const { data: newConversation, error: convError } = await supabase
         .from('whatsapp_conversations')
         .insert({
           phone_number: phoneNumber,
           client_id: clientId,
           client_name: clientName,
-          tenant_id: clientTenantId, // Use client's tenant if available
+          tenant_id: clientTenantId,
           status: 'active'
         })
         .select('id, tenant_id')
@@ -147,23 +147,30 @@ export async function POST(request: NextRequest) {
         tenantId = newConversation.tenant_id || clientTenantId
 
       }
+    } else {
+      console.error('❌ Cannot create conversation: no tenant found for', phoneNumber)
     }
 
     // ============================================
     // STEP 3: Store the incoming message
     // ============================================
-    const { error: msgError } = await supabase
-      .from('whatsapp_messages')
-      .insert({
-        conversation_id: conversationId,
-        message_sid: messageSid,
-        direction: 'inbound',
-        message_body: body,
-        media_url: mediaUrl,
-        media_type: mediaType,
-        status: 'delivered',
-        sent_at: new Date().toISOString()
-      })
+    let msgError: { code: string; message: string } | null = null
+    if (conversationId && tenantId) {
+      const insertResult = await supabase
+        .from('whatsapp_messages')
+        .insert({
+          tenant_id: tenantId,
+          conversation_id: conversationId,
+          message_sid: messageSid,
+          direction: 'inbound',
+          message_body: body,
+          media_url: mediaUrl,
+          media_type: mediaType,
+          status: 'delivered',
+          sent_at: new Date().toISOString()
+        })
+      msgError = insertResult.error
+    }
 
     // 23505 = unique violation on message_sid, i.e. Twilio re-delivered a
     // webhook it already sent (timeout, 5xx, or its normal retry policy).
@@ -262,7 +269,7 @@ export async function POST(request: NextRequest) {
     // STEP 4: AI-Powered Auto-Response
     // ============================================
     // Only process if AI is globally enabled and we have a message body
-    if (process.env.WHATSAPP_AI_ENABLED === 'true' && body && conversationId && !isDuplicateDelivery) {
+    if (process.env.WHATSAPP_AI_ENABLED === 'true' && body && conversationId && tenantId && !isDuplicateDelivery) {
       try {
         // Check tenant-specific AI setting
         let tenantAiEnabled = false
@@ -303,6 +310,7 @@ export async function POST(request: NextRequest) {
             if (sendResult.success) {
               // Store the outbound message
               await supabase.from('whatsapp_messages').insert({
+                tenant_id: tenantId,
                 conversation_id: conversationId,
                 message_sid: sendResult.messageId,
                 direction: 'outbound',

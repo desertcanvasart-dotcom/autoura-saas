@@ -46,9 +46,9 @@ import { showToast } from '@/app/contexts/ToastContext'
 interface Attraction {
   id: string
   activity_name: string
-  city: string
-  base_rate_eur: number
-  base_rate_non_eur: number
+  city: string | null
+  base_rate_eur: number | null
+  base_rate_non_eur: number | null
 }
 
 interface DayService {
@@ -69,11 +69,12 @@ interface ItineraryDay {
   overnight_city: string | null
   attractions: string[]
   services: DayService
-  flight_from?: string
+  flight_from?: string | null
 }
 
 interface Itinerary {
   id: string
+  tenant_id: string
   itinerary_code: string
   client_id: string | null
   client_name: string
@@ -95,27 +96,27 @@ interface Itinerary {
 
 interface ItineraryService {
   id: string
-  itinerary_day_id: string
+  itinerary_day_id: string | null
   day_number?: number
-  service_type: string
+  service_type: string | null
   service_name: string
   supplier_id?: string | null
   supplier_name?: string | null
-  quantity: number
-  rate_eur: number
-  rate_non_eur: number
-  total_cost: number
-  notes: string
+  quantity: number | null
+  rate_eur: number | null
+  rate_non_eur: number | null
+  total_cost: number | null
+  notes: string | null
   isNew?: boolean
   isDeleted?: boolean
 }
 
 interface Supplier {
   id: string
-  name: string
-  type: string
-  city?: string
-  contact_phone?: string
+  name: string | null
+  type: string | null
+  city?: string | null
+  contact_phone?: string | null
 }
 
 // ============================================
@@ -176,12 +177,12 @@ const SERVICE_TYPES = [
 
 const getCityColor = (city: string) => CITY_COLORS[city] || CITY_COLORS['default']
 const generateId = () => `new-${Math.random().toString(36).substr(2, 9)}`
-const getServiceIcon = (type: string) => {
+const getServiceIcon = (type: string | null) => {
   const icons: Record<string, string> = {
     accommodation: '🏨', transportation: '🚗', guide: '👨‍🏫', entrance: '🎫',
     meal: '🍽️', activity: '🎭', service_fee: '💼', tips: '💰', supplies: '💧'
   }
-  return icons[type] || '📋'
+  return icons[type ?? ''] || '📋'
 }
 
 // ============================================
@@ -275,7 +276,27 @@ export default function ItineraryEditorPage() {
         throw new Error('Itinerary not found or you do not have access')
       }
 
-      setItinerary(itin)
+      setItinerary({
+        id: itin.id,
+        tenant_id: itin.tenant_id,
+        itinerary_code: itin.itinerary_code,
+        client_id: itin.client_id,
+        client_name: itin.client_name ?? '',
+        client_email: itin.client_email ?? '',
+        client_phone: itin.client_phone ?? '',
+        trip_name: itin.trip_name ?? '',
+        start_date: itin.start_date ?? '',
+        end_date: itin.end_date ?? '',
+        total_days: itin.total_days ?? 0,
+        num_adults: itin.num_adults ?? 0,
+        num_children: itin.num_children ?? 0,
+        currency: itin.currency ?? '',
+        tier: itin.tier ?? '',
+        package_type: itin.package_type ?? '',
+        status: itin.status ?? 'draft',
+        total_cost: itin.total_cost ?? 0,
+        notes: itin.notes ?? ''
+      })
 
       // Load days
       const { data: daysData, error: daysError } = await supabase
@@ -373,7 +394,7 @@ export default function ItineraryEditorPage() {
   }
 
   // Helper to get relevant suppliers for a service type
-  const getSuppliersForServiceType = (serviceType: string) => {
+  const getSuppliersForServiceType = (serviceType: string | null) => {
     const typeMapping: Record<string, string[]> = {
       transportation: ['transport', 'driver', 'dmc', 'ground_handler'],
       guide: ['guide', 'dmc', 'ground_handler'],
@@ -387,10 +408,10 @@ export default function ItineraryEditorPage() {
       service_fee: ['dmc', 'ground_handler', 'tour_operator']
     }
 
-    const relevantTypes = typeMapping[serviceType] || []
+    const relevantTypes = (serviceType && typeMapping[serviceType]) || []
     if (relevantTypes.length === 0) return suppliers
 
-    return suppliers.filter(s => relevantTypes.includes(s.type))
+    return suppliers.filter(s => s.type !== null && relevantTypes.includes(s.type))
   }
 
   const checkExistingInvoice = async () => {
@@ -544,7 +565,7 @@ export default function ItineraryEditorPage() {
 
   const calculateServiceTotal = (service: ItineraryService) => {
     const rate = service.rate_non_eur || service.rate_eur || 0
-    return service.quantity * rate
+    return (service.quantity ?? 0) * rate
   }
 
   const recalculateTotalCost = () => {
@@ -630,7 +651,7 @@ export default function ItineraryEditorPage() {
         if (!isRealUUID) {
           const { data: newDay, error: insertError } = await supabase
             .from('itinerary_days')
-            .insert({ ...dayData, itinerary_id: itineraryId })
+            .insert({ ...dayData, itinerary_id: itineraryId, tenant_id: itinerary.tenant_id })
             .select()
             .single()
 
@@ -663,12 +684,14 @@ export default function ItineraryEditorPage() {
         const toInsert = services.filter(s => s.isNew && !s.isDeleted)
         for (const service of toInsert) {
           const { isNew, isDeleted, day_number, ...serviceData } = service
+          // The placeholder `new-…` id is not a valid uuid and must not reach the insert.
+          delete (serviceData as { id?: unknown }).id
           // Make sure we have a valid day ID
           const day = days.find(d => d.day_number === day_number)
           if (day) {
             const { data: newService, error } = await supabase
               .from('itinerary_services')
-              .insert({ ...serviceData, itinerary_day_id: day.id })
+              .insert({ ...serviceData, itinerary_day_id: day.id, tenant_id: itinerary.tenant_id })
               .select()
               .single()
 
@@ -1267,7 +1290,7 @@ export default function ItineraryEditorPage() {
                                     <div className="flex items-center gap-2">
                                       <span className="text-lg w-8">{getServiceIcon(service.service_type)}</span>
                                       <select
-                                        value={service.service_type}
+                                        value={service.service_type ?? ''}
                                         onChange={(e) => updateService(service.id, { service_type: e.target.value })}
                                         className="w-36 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47]"
                                       >
@@ -1329,7 +1352,7 @@ export default function ItineraryEditorPage() {
                                         <label className="text-xs text-gray-500">Qty:</label>
                                         <input
                                           type="number"
-                                          value={service.quantity}
+                                          value={service.quantity ?? ''}
                                           onChange={(e) => {
                                             const qty = parseInt(e.target.value) || 1
                                             const total = qty * (service.rate_non_eur || service.rate_eur || 0)
@@ -1346,10 +1369,10 @@ export default function ItineraryEditorPage() {
                                           value={service.rate_non_eur || service.rate_eur || 0}
                                           onChange={(e) => {
                                             const rate = parseFloat(e.target.value) || 0
-                                            updateService(service.id, { 
-                                              rate_non_eur: rate, 
+                                            updateService(service.id, {
+                                              rate_non_eur: rate,
                                               rate_eur: rate,
-                                              total_cost: service.quantity * rate 
+                                              total_cost: (service.quantity ?? 0) * rate
                                             })
                                           }}
                                           className="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm text-right focus:outline-none focus:border-[#647C47]"
@@ -1377,8 +1400,8 @@ export default function ItineraryEditorPage() {
                                     <div className="flex-1">
                                       <p className="text-sm font-medium text-gray-900">{service.service_name}</p>
                                       <p className="text-xs text-gray-500">
-                                        <span className="capitalize">{service.service_type.replace('_', ' ')}</span>
-                                        {service.quantity > 1 && ` • Qty: ${service.quantity}`}
+                                        <span className="capitalize">{(service.service_type ?? '').replace('_', ' ')}</span>
+                                        {(service.quantity ?? 0) > 1 && ` • Qty: ${service.quantity}`}
                                         {service.supplier_name && (
                                           <span className="ml-2 px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
                                             📦 {service.supplier_name}

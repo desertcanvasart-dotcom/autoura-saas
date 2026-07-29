@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -52,6 +52,13 @@ export async function POST(request: NextRequest) {
     if (!itinerary.client_phone) {
       return NextResponse.json(
         { success: false, error: 'Client phone number not found' },
+        { status: 400 }
+      )
+    }
+
+    if (!itinerary.start_date) {
+      return NextResponse.json(
+        { success: false, error: 'Itinerary start date not set' },
         { status: 400 }
       )
     }

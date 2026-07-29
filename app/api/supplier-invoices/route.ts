@@ -14,8 +14,10 @@ export async function GET(request: NextRequest) {
 
     const sp = request.nextUrl.searchParams
     let query = supabase.from('supplier_invoices').select('*').order('invoice_date', { ascending: false })
-    if (sp.get('status')) query = query.eq('status', sp.get('status'))
-    if (sp.get('matchStatus')) query = query.eq('match_status', sp.get('matchStatus'))
+    const status = sp.get('status')
+    if (status) query = query.eq('status', status)
+    const matchStatus = sp.get('matchStatus')
+    if (matchStatus) query = query.eq('match_status', matchStatus)
     if (sp.get('supplierName')) query = query.ilike('supplier_name', `%${sp.get('supplierName')}%`)
     if (sp.get('startDate')) query = query.gte('invoice_date', sp.get('startDate'))
     if (sp.get('endDate')) query = query.lte('invoice_date', sp.get('endDate'))

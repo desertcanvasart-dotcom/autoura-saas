@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import type { Tables, TablesInsert } from '@/types/database.types'
 
 export async function POST(request: NextRequest) {
   try {
 
 
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -44,17 +45,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch the quote
-    const quoteTable = quote_type === 'b2c' ? 'b2c_quotes' : 'b2b_quotes'
-    const { data: quote, error: quoteError } = await adminClient
-      .from(quoteTable)
-      .select('*')
-      .eq('id', quote_id)
-      .eq('tenant_id', tenant_id)
-      .single()
+    // Fetch the quote (separate typed queries — the two tables share almost
+    // no pricing columns, so the narrowed vars are used where shapes differ)
+    let b2cQuote: Tables<'b2c_quotes'> | null = null
+    let b2bQuote: Tables<'b2b_quotes'> | null = null
 
-    if (quoteError || !quote) {
-      console.error('Error fetching quote:', quoteError)
+    if (quote_type === 'b2c') {
+      const { data, error } = await adminClient
+        .from('b2c_quotes')
+        .select('*')
+        .eq('id', quote_id)
+        .eq('tenant_id', tenant_id)
+        .single()
+      if (error) console.error('Error fetching quote:', error)
+      b2cQuote = data
+    } else {
+      const { data, error } = await adminClient
+        .from('b2b_quotes')
+        .select('*')
+        .eq('id', quote_id)
+        .eq('tenant_id', tenant_id)
+        .single()
+      if (error) console.error('Error fetching quote:', error)
+      b2bQuote = data
+    }
+
+    const quote = b2cQuote ?? b2bQuote
+    if (!quote) {
       return NextResponse.json(
         { success: false, error: 'Quote not found' },
         { status: 404 }
@@ -104,10 +121,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch the itinerary
+    const itinerary_id = quote.itinerary_id
+    if (!itinerary_id) {
+      return NextResponse.json(
+        { success: false, error: 'Quote has no linked itinerary' },
+        { status: 404 }
+      )
+    }
+
     const { data: itinerary, error: itineraryError } = await adminClient
       .from('itineraries')
       .select('*')
-      .eq('id', quote.itinerary_id)
+      .eq('id', itinerary_id)
       .eq('tenant_id', tenant_id)
       .single()
 
@@ -134,25 +159,33 @@ export async function POST(request: NextRequest) {
     const booking_number = bookingNumberData
 
     // Calculate deposit and payment details
-    const total_amount = quote_type === 'b2c' ? quote.selling_price : 0 // B2B pricing is in pricing_table
+    const total_amount = b2cQuote ? b2cQuote.selling_price : 0 // B2B pricing is in pricing_table
     const deposit_amount = (total_amount * deposit_percent) / 100
     const balance_due = total_amount
 
+    // Bookings require concrete dates; an itinerary without them cannot be booked.
+    if (!itinerary.start_date || !itinerary.end_date) {
+      return NextResponse.json(
+        { success: false, error: 'Itinerary is missing start or end date' },
+        { status: 400 }
+      )
+    }
+
     // Create booking
-    const bookingData = {
+    const bookingData: TablesInsert<'bookings'> = {
       tenant_id,
-      itinerary_id: quote.itinerary_id,
+      itinerary_id,
       quote_id,
       quote_type,
-      client_id: quote.client_id || null,
-      partner_id: quote.partner_id || null,
+      client_id: b2cQuote?.client_id ?? null,
+      partner_id: b2bQuote?.partner_id ?? null,
       booking_number,
       booking_date: new Date().toISOString().split('T')[0],
       trip_name: itinerary.trip_name || `Trip to ${itinerary.client_name}`,
       start_date: itinerary.start_date,
       end_date: itinerary.end_date,
       total_days: itinerary.total_days || 0,
-      num_travelers: quote_type === 'b2c' ? quote.num_travelers : 2,
+      num_travelers: b2cQuote ? b2cQuote.num_travelers : 2,
       total_amount,
       currency: quote.currency || 'EUR',
       payment_terms: quote_type === 'b2c'
@@ -218,7 +251,7 @@ export async function POST(request: NextRequest) {
     await adminClient
       .from('itineraries')
       .update({ status: 'confirmed' })
-      .eq('id', quote.itinerary_id)
+      .eq('id', itinerary_id)
 
 
 

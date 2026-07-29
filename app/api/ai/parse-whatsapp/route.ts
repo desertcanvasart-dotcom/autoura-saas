@@ -397,7 +397,7 @@ export async function POST(request: Request) {
   try {
     // Require authentication - this makes expensive Anthropic API calls
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }

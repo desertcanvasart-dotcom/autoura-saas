@@ -30,7 +30,7 @@ function getDirection(from: string | null | undefined, userEmail: string): 'inbo
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ error: authResult.error, success: false }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ error: authResult.error, success: false }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ error: 'Auth failed', success: false }, { status: 401 })
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
   let userId: string | undefined
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ error: authResult.error, success: false }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ error: authResult.error, success: false }, { status: authResult.status })
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ error: 'Auth failed', success: false }, { status: 401 })
 
@@ -60,15 +60,16 @@ export async function POST(request: NextRequest) {
 
     // Get Gmail tokens
     const { data: tokenRecord } = await supabase.from('gmail_tokens').select('access_token, refresh_token, email').eq('user_id', userId).single()
-    if (!tokenRecord) return NextResponse.json({ error: 'Gmail not connected', success: false }, { status: 401 })
+    if (!tokenRecord || !tokenRecord.access_token || !tokenRecord.refresh_token) return NextResponse.json({ error: 'Gmail not connected', success: false }, { status: 401 })
+    const refreshToken = tokenRecord.refresh_token
 
     let accessToken = tokenRecord.access_token
     try {
-      const refreshed = await refreshAccessToken(tokenRecord.refresh_token)
+      const refreshed = await refreshAccessToken(refreshToken)
       accessToken = refreshed.access_token || accessToken
     } catch {}
 
-    const gmail = getGmailClient(accessToken, tokenRecord.refresh_token)
+    const gmail = getGmailClient(accessToken, refreshToken)
     const userEmail = tokenRecord.email || ''
 
     // Update sync state

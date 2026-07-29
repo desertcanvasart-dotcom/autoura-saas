@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -67,6 +67,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // A null date would render as 1 Jan 1970 in the client message.
+    if (!itinerary.start_date || !itinerary.end_date) {
+      return NextResponse.json(
+        { success: false, error: 'Itinerary is missing start or end date' },
+        { status: 422 }
+      )
+    }
+
     // Identity comes from the TENANT, not env vars: BUSINESS_NAME was one
     // global value defaulting to Travel2Egypt, so every other tenant's quote
     // messages carried the wrong company. Blank fields are omitted downstream.
@@ -84,6 +92,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Build message
+    const numChildren = itinerary.num_children ?? 0
     const message = (businessName ? `🌟 *${businessName}* 🌟\n\n` : '') +
       `Dear ${clientName || itinerary.client_name},\n\n` +
       `Thank you for your interest in exploring Egypt with us! 🇪🇬\n\n` +
@@ -92,7 +101,7 @@ export async function POST(request: NextRequest) {
       `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
       `📅 *Dates:* ${startDate} - ${endDate}\n` +
       `👥 *Travelers:* ${itinerary.num_adults || 1} adult${(itinerary.num_adults || 1) > 1 ? 's' : ''}` +
-      `${itinerary.num_children > 0 ? `, ${itinerary.num_children} child${itinerary.num_children > 1 ? 'ren' : ''}` : ''}\n` +
+      `${numChildren > 0 ? `, ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : ''}\n` +
       `💰 *Total Cost:* ${itinerary.currency || 'EUR'} ${(itinerary.total_cost || 0).toFixed(2)}\n\n` +
       `✨ *What's Included:*\n` +
       `✅ Professional tour guide\n` +

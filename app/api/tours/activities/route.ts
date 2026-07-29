@@ -10,14 +10,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const dayId = searchParams.get('tour_day_id')
 
+    // This select used to embed entrance:attractions(...) and
+    // transportation:transportation_rates(...), and failed on both — PGRST200:
+    // entrance_id/transportation_id have no FK constraints, `attractions` is
+    // not a table (entrance data lives in entrance_fees), and the embedded
+    // column lists (vehicle_type, rate_per_day) don't exist either. Every GET
+    // 500'd. Same situation and resolution as lib/tour-matcher-service.ts:
+    // the embeds are dropped rather than repaired — no caller reads them, and
+    // entrance_id has no unambiguous target table to join against.
     let query = supabase
       .from('tour_day_activities')
-      .select(`
-        *,
-        entrance:attractions(id, name, city, entrance_fee_eur, entrance_fee_non_eur),
-        transportation:transportation_rates(id, vehicle_type, city, rate_per_day)
-      `)
-      .order('activity_order', { ascending: true })
+      .select('*')
+      .order('sequence_order', { ascending: true })
 
     if (dayId) {
       query = query.eq('tour_day_id', dayId)
@@ -53,7 +57,7 @@ export async function POST(request: NextRequest) {
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -97,25 +101,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get max activity_order for this day if not provided
+    // Get max sequence_order for this day if not provided
     let activityOrder = body.activity_order
     if (activityOrder === null || activityOrder === undefined) {
       const { data: existingActivities } = await supabase
         .from('tour_day_activities')
-        .select('activity_order')
+        .select('sequence_order')
         .eq('tour_day_id', body.tour_day_id)
-        .order('activity_order', { ascending: false })
+        .order('sequence_order', { ascending: false })
         .limit(1)
 
       activityOrder = existingActivities && existingActivities.length > 0
-        ? (existingActivities[0].activity_order || 0) + 1
+        ? (existingActivities[0].sequence_order || 0) + 1
         : 1
     }
 
     const activityData = {
       tenant_id, // ✅ Explicit tenant_id
       tour_day_id: body.tour_day_id,
-      activity_order: activityOrder,
+      sequence_order: activityOrder,
       entrance_id: body.entrance_id || null,
       transportation_id: body.transportation_id || null,
       activity_notes: body.activity_notes || null

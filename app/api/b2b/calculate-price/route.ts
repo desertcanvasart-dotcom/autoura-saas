@@ -349,7 +349,7 @@ async function getHotelRate(city: string, tier: string = 'standard', tenantId?: 
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -862,7 +862,7 @@ export async function POST(request: NextRequest) {
 // GET endpoint for simple queries
 export async function GET(request: NextRequest) {
   const authResult = await requireAuth()
-  if (authResult.error) {
+  if (authResult.error !== null) {
     return NextResponse.json(
       { success: false, error: authResult.error },
       { status: authResult.status }

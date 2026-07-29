@@ -166,7 +166,7 @@ export async function POST(
 
     // Require authentication and get tenant info
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -253,7 +253,7 @@ export async function PUT(
 
     // Require authentication - RLS will enforce tenant boundaries
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -385,7 +385,7 @@ export async function DELETE(
 
     // Require authentication - RLS will enforce tenant boundaries
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
