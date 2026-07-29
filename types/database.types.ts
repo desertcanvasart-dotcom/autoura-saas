@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 123
+ * Tables: 122
  */
 
 export type Json =
@@ -3430,42 +3430,6 @@ export interface Database {
             referencedColumns: ["id"]
           },
         ]
-      }
-      effective_exchange_rates: {
-        Row: {
-          effective_tenant_id: string | null
-          base_currency: string | null
-          target_currency: string | null
-          rate: number | null
-          source: string | null
-          is_active: boolean | null
-          last_updated_at: string | null
-          api_fetched_at: string | null
-          is_tenant_override: boolean | null
-        }
-        Insert: {
-          effective_tenant_id?: string | null
-          base_currency?: string | null
-          target_currency?: string | null
-          rate?: number | null
-          source?: string | null
-          is_active?: boolean | null
-          last_updated_at?: string | null
-          api_fetched_at?: string | null
-          is_tenant_override?: boolean | null
-        }
-        Update: {
-          effective_tenant_id?: string | null
-          base_currency?: string | null
-          target_currency?: string | null
-          rate?: number | null
-          source?: string | null
-          is_active?: boolean | null
-          last_updated_at?: string | null
-          api_fetched_at?: string | null
-          is_tenant_override?: boolean | null
-        }
-        Relationships: []
       }
       email_client_links: {
         Row: {
