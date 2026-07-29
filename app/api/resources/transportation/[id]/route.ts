@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { buildWideVehicleColumns } from '../route'
 
 // Helper function to get min capacity based on vehicle type
 function getMinCapacityForVehicle(vehicleType: string): number {
@@ -71,39 +72,48 @@ export async function PUT(
 
     const { id } = await params
     const body = await request.json()
+    const isWide = body.vehicles && typeof body.vehicles === 'object'
 
-    // Validate required fields
-    if (!body.city || !body.vehicle_type || !body.service_type) {
+    // Validate required fields (wide payloads carry rates per vehicle class
+    // instead of a single vehicle_type/base_rate pair)
+    if (!body.city || !body.service_type || (!isWide && !body.vehicle_type)) {
       return NextResponse.json(
-        { error: 'City, vehicle type, and service type are required' },
+        { error: 'City, service type, and vehicle rates are required' },
         { status: 400 }
       )
     }
 
-    // Validate base_rate_eur
-    if (body.base_rate_eur === undefined || body.base_rate_eur === null) {
+    let wideCols: Record<string, number | null> = {}
+    if (isWide) {
+      const { cols, offered } = buildWideVehicleColumns(body.vehicles)
+      if (offered === 0) {
+        return NextResponse.json({ error: 'At least one vehicle needs a EUR rate' }, { status: 400 })
+      }
+      wideCols = cols
+    } else if (body.base_rate_eur === undefined || body.base_rate_eur === null) {
       return NextResponse.json(
         { error: 'EUR rate is required' },
         { status: 400 }
       )
     }
 
-    // Build update object matching ACTUAL database columns
+    // Real columns ONLY — the previous payload wrote service_code, season,
+    // rate_valid_from/to, supplier fields and notes, none of which exist in
+    // the live schema (PGRST204 on every update).
     const updateData = {
-      service_code: body.service_code,
+      route_name: body.route_name || body.service_code || null,
       service_type: body.service_type,
-      vehicle_type: body.vehicle_type,
-      // capacity_min does NOT exist in database - don't include
-      capacity_max: body.capacity_max || 2,
+      vehicle_type: isWide ? null : body.vehicle_type,
+      capacity: isWide ? null : (body.capacity_max || 2),
       city: body.city,
-      base_rate_eur: parseFloat(body.base_rate_eur) || 0,
-      // FIXED: Use correct column name base_rate_non_eur
-      base_rate_non_eur: parseFloat(body.base_rate_non || body.base_rate_non_eur) || 0,
-      season: body.season || null,
-      rate_valid_from: body.rate_valid_from,
-      rate_valid_to: body.rate_valid_to,
-      supplier_name: body.supplier_name || null,
-      notes: body.notes || null,
+      origin_city: body.origin_city || null,
+      destination_city: body.destination_city || null,
+      base_rate_eur: isWide ? null : (parseFloat(body.base_rate_eur) || 0),
+      base_rate_non_eur: isWide ? null : (parseFloat(body.base_rate_non || body.base_rate_non_eur) || 0),
+      ...wideCols,
+      duration: body.duration || null,
+      area: body.area || null,
+      includes: body.includes || null,
       is_active: body.is_active !== undefined ? body.is_active : true,
       updated_at: new Date().toISOString()
     }
