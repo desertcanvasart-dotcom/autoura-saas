@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
+import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/app/supabase'
 import {
@@ -52,9 +53,6 @@ interface Profile {
 interface EmailSettings {
   gmail_connected: boolean
   gmail_email?: string
-  signature?: string
-  auto_reply_enabled: boolean
-  auto_reply_message?: string
 }
 
 interface NotificationPreference {
@@ -436,31 +434,6 @@ function SettingsContent() {
     }
   }
 
-  const saveEmailSettings = async () => {
-    if (!emailSettings) return
-    setSaving(true)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/settings/email', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(emailSettings)
-      })
-
-      if (response.ok) {
-        setSaveSuccess(true)
-        setTimeout(() => setSaveSuccess(false), 3000)
-      } else {
-        throw new Error('Failed to save email settings')
-      }
-    } catch (err) {
-      setError('Failed to save email settings')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const saveNotificationPrefs = async () => {
     setSaving(true)
     setError(null)
@@ -698,77 +671,37 @@ function SettingsContent() {
           </div>
 
           <div className="flex items-center gap-2">
-            {emailSettings?.gmail_connected ? (
-              <>
-                <span className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full">
-                  <CheckCircle className="w-3 h-3" />
-                  Connected
-                </span>
-                <button className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                  Disconnect
-                </button>
-              </>
-            ) : (
-              <button className="px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors">
-                Connect Gmail
-              </button>
+            {emailSettings?.gmail_connected && (
+              <span className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+                <CheckCircle className="w-3 h-3" />
+                Connected
+              </span>
             )}
+            <Link
+              href="/settings/email"
+              className="px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors"
+            >
+              {emailSettings?.gmail_connected ? 'Manage connection' : 'Connect Gmail'}
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Email Signature */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Email Signature</label>
-        <textarea
-          value={emailSettings?.signature || ''}
-          onChange={(e) => setEmailSettings(prev => prev ? { ...prev, signature: e.target.value } : null)}
-          rows={5}
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-          placeholder="Best regards,&#10;Your name&#10;Your company"
-        />
-        <p className="text-xs text-gray-500 mt-1">This signature will be added to all outgoing emails.</p>
-      </div>
-
-      {/* Auto Reply */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-900">Auto-Reply</p>
-            <p className="text-xs text-gray-500">Automatically reply to incoming emails</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={emailSettings?.auto_reply_enabled || false}
-              onChange={(e) => setEmailSettings(prev => prev ? { ...prev, auto_reply_enabled: e.target.checked } : null)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#647C47]/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#647C47]"></div>
-          </label>
+      {/* Signatures live in their own manager — a plain-text box here used to
+          save to a column no send path ever read. */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-900">Email Signatures</p>
+          <p className="text-xs text-gray-500">
+            Rich and HTML signatures; the default one auto-appears in the reply composer.
+          </p>
         </div>
-
-        {emailSettings?.auto_reply_enabled && (
-          <textarea
-            value={emailSettings?.auto_reply_message || ''}
-            onChange={(e) => setEmailSettings(prev => prev ? { ...prev, auto_reply_message: e.target.value } : null)}
-            rows={3}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-            placeholder="Thank you for your email. We will get back to you within 24 hours..."
-          />
-        )}
-      </div>
-
-      {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-gray-200">
-        <button
-          onClick={saveEmailSettings}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] transition-colors disabled:opacity-50"
+        <Link
+          href="/settings/email-signatures"
+          className="px-3 py-1.5 text-sm font-medium text-[#647C47] border border-[#647C47]/40 rounded-lg hover:bg-[#647C47]/5 transition-colors"
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {saving ? 'Saving...' : 'Save Changes'}
-        </button>
+          Manage signatures
+        </Link>
       </div>
     </div>
   )
