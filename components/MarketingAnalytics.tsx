@@ -2,23 +2,33 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
-// Consent-aware marketing analytics (GA4), public pages only.
+// Consent-aware marketing analytics (GA4 + Google Tag Manager), public
+// pages only.
 //
 // Strict consent model: NO analytics script is loaded until the visitor
 // explicitly accepts — there is nothing to "deny" server-side because
 // nothing runs beforehand. The choice persists in localStorage.
 //
-// Activation requires NEXT_PUBLIC_GA_MEASUREMENT_ID; without it this
-// renders nothing (no banner, no script), so non-marketing deploys and
-// local dev stay clean.
+// This deliberately does NOT use Google's copy-paste snippets: both load
+// Google and set cookies on page load, before any consent. The GTM
+// <noscript> iframe is omitted for the same reason — it fires the
+// container with JavaScript (and therefore the consent gate) disabled.
+//
+// DOUBLE-COUNTING: GA4 is configured HERE, directly. Do not also add a
+// GA4 Configuration tag inside the GTM container, or every page view is
+// counted twice. Use GTM for everything else (ad pixels, etc.).
 
 const CONSENT_KEY = 'autoura-analytics-consent' // 'granted' | 'denied'
-// Measurement IDs are public (they ship in every page's HTML), so the
-// production default lives in code; the env var overrides it, and non-prod
-// builds stay analytics-free so local clicks never pollute the property.
+// Container/measurement IDs are public (they ship in every page's HTML),
+// so production defaults live in code; env vars override them, and
+// non-prod builds stay analytics-free so local clicks never pollute the
+// property.
 const GA_ID =
   process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ||
   (process.env.NODE_ENV === 'production' ? 'G-0201EVXNEG' : undefined)
+const GTM_ID =
+  process.env.NEXT_PUBLIC_GTM_ID ||
+  (process.env.NODE_ENV === 'production' ? 'GTM-5GV2BBQ5' : undefined)
 
 declare global {
   interface Window {
@@ -56,6 +66,26 @@ function loadGa(gaId: string) {
   document.head.appendChild(s)
 }
 
+function loadGtm(gtmId: string) {
+  if (document.getElementById('gtm-script')) return
+  window.dataLayer = window.dataLayer || []
+  // Tell container tags the visitor has consented, so anything built to
+  // respect consent state (Google Consent Mode, custom triggers) can fire.
+  window.dataLayer.push({ event: 'consent_granted', analytics_consent: true })
+  window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
+  const s = document.createElement('script')
+  s.id = 'gtm-script'
+  s.async = true
+  s.src = `https://www.googletagmanager.com/gtm.js?id=${encodeURIComponent(gtmId)}`
+  document.head.appendChild(s)
+}
+
+/** Load every consented tag platform that is configured for this build. */
+function loadConsented() {
+  if (GA_ID) loadGa(GA_ID)
+  if (GTM_ID) loadGtm(GTM_ID)
+}
+
 export default function MarketingAnalytics() {
   const [consent, setConsent] = useState<'granted' | 'denied' | 'unset' | 'loading'>('loading')
   const pathname = usePathname()
@@ -64,7 +94,7 @@ export default function MarketingAnalytics() {
     const stored = localStorage.getItem(CONSENT_KEY)
     if (stored === 'granted' || stored === 'denied') {
       setConsent(stored)
-      if (stored === 'granted' && GA_ID) loadGa(GA_ID)
+      if (stored === 'granted') loadConsented()
     } else {
       setConsent('unset')
     }
@@ -79,12 +109,13 @@ export default function MarketingAnalytics() {
     }
   }, [pathname])
 
-  if (!GA_ID || consent === 'loading' || consent !== 'unset') return null
+  // Banner shows if ANY tag platform is configured for this build.
+  if ((!GA_ID && !GTM_ID) || consent === 'loading' || consent !== 'unset') return null
 
   const decide = (choice: 'granted' | 'denied') => {
     localStorage.setItem(CONSENT_KEY, choice)
     setConsent(choice)
-    if (choice === 'granted') loadGa(GA_ID)
+    if (choice === 'granted') loadConsented()
   }
 
   return (
