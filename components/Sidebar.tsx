@@ -436,8 +436,10 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
         <div className="flex items-center justify-between h-14 px-3 border-b border-gray-200 flex-shrink-0">
           <Link href="/dashboard" className="flex items-center gap-2 min-w-0 flex-1">
             <div className="w-7 h-7 flex-shrink-0">
+              {/* Icon-only mark: the sidebar collapses to a 28px square, where
+                  the full wordmark lockup would render illegibly small. */}
               <img
-                src="/autoura-logo.png"
+                src="/get-autoura-icon.png"
                 alt="Autoura"
                 className="w-full h-full object-contain"
               />

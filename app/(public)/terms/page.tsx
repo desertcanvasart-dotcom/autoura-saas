@@ -14,11 +14,11 @@ export default function TermsPage() {
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center gap-2">
               <Image 
-                src="/autoura-logo.png" 
+                src="/get-autoura-logo.png" 
                 alt="Autoura" 
-                width={140} 
-                height={36}
-                className="h-9 w-auto"
+                width={560} 
+                height={219}
+                className="h-9 w-auto max-w-none"
               />
             </Link>
             <Link 

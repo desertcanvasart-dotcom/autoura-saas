@@ -173,8 +173,8 @@ export default function IntegrationsPage() {
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
             <img 
-               src="/autoura-logo.png" 
-                 alt="Autoura" 
+               src="/get-autoura-icon.png"
+                 alt="Autoura"
                   className="w-8 h-8 object-contain"
                    />
               <span className="text-xl font-semibold text-stone-900 tracking-tight">Autoura</span>

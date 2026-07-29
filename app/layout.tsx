@@ -43,7 +43,7 @@ const structuredData = {
       '@type': 'Organization',
       name: 'Autoura',
       url: SITE_URL,
-      logo: `${SITE_URL}/autoura-logo.png`,
+      logo: `${SITE_URL}/get-autoura-logo.png`,
     },
     {
       '@type': 'SoftwareApplication',

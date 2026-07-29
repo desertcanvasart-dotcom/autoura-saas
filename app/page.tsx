@@ -454,8 +454,7 @@ export default function AutouraHomepage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[#F5F3EF] border-b border-[#E8E5DF]">
         <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-[10px]">
-            <img src="/autoura-logo.png" alt="Autoura" className="w-12 h-12 object-contain" />
-            <span className="text-[19px] font-bold text-[#111710] tracking-[-0.3px]">Autoura</span>
+            <img src="/get-autoura-logo.png" alt="Autoura" className="h-9 w-auto max-w-none object-contain" />
           </Link>
 
           {/* Desktop Navigation */}
@@ -981,7 +980,7 @@ export default function AutouraHomepage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-2">
-              <img src="/autoura-logo.png" alt="Autoura" className="w-14 h-14 object-contain" />
+              <img src="/get-autoura-logo.png" alt="Autoura" className="h-10 w-auto max-w-none object-contain" />
             </div>
             <div className="flex items-center gap-6 sm:gap-8 text-sm text-stone-500">
               <Link href="/pricing" className="hover:text-stone-700 transition-colors">Pricing</Link>
