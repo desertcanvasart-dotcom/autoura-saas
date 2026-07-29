@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildSlotsFromAI } from '@/app/api/pricing-grid/parse/route'
 
 // Layer 3 of the pricing harness: the AI fence. The model may SELECT validated
-// DB rate ids but must never EMIT a price number. See PRICING-HARNESS-PLAN.md.
+// DB rate ids but must never EMIT a price number. See docs/PRICING-HARNESS-PLAN.md.
 //
 // Slots now carry the passport-aware `selectedItems` model (rateEur/rateNonEur),
 // matching app/pricing-grid/types — the calculator picks the rate by passport.

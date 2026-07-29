@@ -6,7 +6,7 @@
 // skipped. The aim is a safe data-integrity belt at the point of entry, so the
 // pricing engine never reads a negative or nonsensical rate.
 //
-// See PRICING-HARNESS-PLAN.md.
+// See docs/PRICING-HARNESS-PLAN.md.
 
 // Field names that hold a monetary amount / rate.
 const MONEY_FIELD =

@@ -6,7 +6,7 @@ import {
   PriceNotDeliverableError,
 } from '@/lib/pricing-guards'
 
-// Layer 2 of the pricing harness: the output gate. See PRICING-HARNESS-PLAN.md.
+// Layer 2 of the pricing harness: the output gate. See docs/PRICING-HARNESS-PLAN.md.
 
 describe('checkDeliverablePrice', () => {
   const good = {

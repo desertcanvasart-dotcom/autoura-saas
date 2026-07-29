@@ -5,7 +5,7 @@ import { TEMPLATE_ID, multiTierRateTables } from './fixtures/sample-templates'
 // Phase 5 drift guard: lock the engine's computed per-person prices across a
 // canonical basket (every tier × both passports). Any code change that shifts
 // a number — intended or not — fails CI here, surfacing the drift for review.
-// See PRICING-HARNESS-PLAN.md.
+// See docs/PRICING-HARNESS-PLAN.md.
 
 vi.mock('@supabase/supabase-js', async () => {
   const mock = await import('./_mock-supabase')

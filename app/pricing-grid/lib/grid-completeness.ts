@@ -19,7 +19,7 @@
 //   rate (either passport variant) OR a non-zero customAmount.
 //
 // Ported from the sibling app (autoura-saas) and adapted to our
-// SelectedItem shape. See PRICING-CONSOLIDATION-PLAN.md (Phase B) and the
+// SelectedItem shape. See docs/PRICING-CONSOLIDATION-PLAN.md (Phase B) and the
 // migration 20260627_itinerary_days_day_type_components.sql.
 
 import type {

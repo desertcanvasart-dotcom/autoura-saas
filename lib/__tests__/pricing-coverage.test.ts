@@ -7,7 +7,7 @@ import {
   TEMPLATE_ID,
 } from './fixtures/sample-templates'
 
-// Layer 4 of the pricing harness: the coverage report. See PRICING-HARNESS-PLAN.md.
+// Layer 4 of the pricing harness: the coverage report. See docs/PRICING-HARNESS-PLAN.md.
 
 vi.mock('@supabase/supabase-js', async () => {
   const mock = await import('./_mock-supabase')

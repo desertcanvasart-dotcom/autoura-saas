@@ -5,7 +5,7 @@ import * as engine from '@/lib/auto-pricing-service'
 // Consolidation Phase A: the canonical rate-resolution surface. These tests
 // guard the facade — that every lookup is exposed and is the SAME hardened
 // implementation, so no one silently forks a second copy. See
-// PRICING-CONSOLIDATION-PLAN.md.
+// docs/PRICING-CONSOLIDATION-PLAN.md.
 
 const CANONICAL_LOOKUPS = [
   'getHotelRates',

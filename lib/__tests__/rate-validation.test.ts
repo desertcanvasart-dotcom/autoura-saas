@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { validateRatePayload } from '@/lib/rate-validation'
 
-// Layer 4 of the pricing harness: rate-entry sanity. See PRICING-HARNESS-PLAN.md.
+// Layer 4 of the pricing harness: rate-entry sanity. See docs/PRICING-HARNESS-PLAN.md.
 
 describe('validateRatePayload', () => {
   it('accepts a clean hotel-style payload', () => {

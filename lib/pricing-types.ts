@@ -1,5 +1,5 @@
 // Shared pricing-provenance types for the correctness harness.
-// See PRICING-HARNESS-PLAN.md (Layer 1).
+// See docs/PRICING-HARNESS-PLAN.md (Layer 1).
 
 /**
  * Where a price component came from.
