@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 // Consent-aware marketing analytics (GA4), public pages only.
 //
@@ -12,7 +13,12 @@ import { useEffect, useState } from 'react'
 // local dev stay clean.
 
 const CONSENT_KEY = 'autoura-analytics-consent' // 'granted' | 'denied'
-const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID
+// Measurement IDs are public (they ship in every page's HTML), so the
+// production default lives in code; the env var overrides it, and non-prod
+// builds stay analytics-free so local clicks never pollute the property.
+const GA_ID =
+  process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ||
+  (process.env.NODE_ENV === 'production' ? 'G-0201EVXNEG' : undefined)
 
 declare global {
   interface Window {
@@ -52,6 +58,7 @@ function loadGa(gaId: string) {
 
 export default function MarketingAnalytics() {
   const [consent, setConsent] = useState<'granted' | 'denied' | 'unset' | 'loading'>('loading')
+  const pathname = usePathname()
 
   useEffect(() => {
     const stored = localStorage.getItem(CONSENT_KEY)
@@ -62,6 +69,15 @@ export default function MarketingAnalytics() {
       setConsent('unset')
     }
   }, [])
+
+  // Marketing pages navigate client-side (next/link), so the initial
+  // gtag('config') pageview is the only one GA would ever see. Report
+  // subsequent route changes explicitly.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.gtag === 'function') {
+      window.gtag('event', 'page_view', { page_path: pathname })
+    }
+  }, [pathname])
 
   if (!GA_ID || consent === 'loading' || consent !== 'unset') return null
 
