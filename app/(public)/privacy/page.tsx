@@ -143,7 +143,7 @@ export default function PrivacyPage() {
                 <li>Withdraw consent where applicable</li>
               </ul>
               <p className="text-gray-600 mt-4">
-                To exercise these rights, please contact us at privacy@autoura.net.
+                To exercise these rights, please contact us at hello@getautoura.net.
               </p>
             </section>
 
@@ -175,7 +175,7 @@ export default function PrivacyPage() {
               </p>
               <div className="bg-gray-50 rounded-xl p-6">
                 <p className="text-gray-700">
-                  <strong>Email:</strong> privacy@autoura.net<br />
+                  <strong>Email:</strong> hello@getautoura.net<br />
                   <strong>Address:</strong> Cairo, Egypt
                 </p>
               </div>

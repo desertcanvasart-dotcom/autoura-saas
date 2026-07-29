@@ -103,7 +103,7 @@ export default function CompleteStep({ onComplete, tenant }: CompleteStepProps) 
                 Need help getting started?
               </p>
               <p className="text-gray-600">
-                Check out our knowledge base or reach out to support at support@autoura.net
+                Check out our knowledge base or reach out to support at support@getautoura.net
               </p>
             </div>
           </div>

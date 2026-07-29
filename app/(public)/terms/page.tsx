@@ -225,7 +225,7 @@ export default function TermsPage() {
               </p>
               <div className="bg-gray-50 rounded-xl p-6">
                 <p className="text-gray-700">
-                  <strong>Email:</strong> legal@autoura.net<br />
+                  <strong>Email:</strong> hello@getautoura.net<br />
                   <strong>Address:</strong> Cairo, Egypt
                 </p>
               </div>
