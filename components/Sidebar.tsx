@@ -112,7 +112,10 @@ const navigation: NavSection[] = [
     key: 'communication',
     roles: ['admin', 'manager', 'agent'],
     items: [
-      { label: 'Communications', href: '/communications', icon: Mail },
+      // '/communications' is deliberately not listed: despite its "unified"
+      // components it only shows email conversations — redundant with both
+      // Conversations (the real unified box, unified_conversations) and
+      // Inbox (the full email client). Page stays live.
       { label: 'Conversations', href: '/conversations', icon: MessageSquare },
       { label: 'Inbox', href: '/inbox', icon: Mail },
       { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageSquare },
