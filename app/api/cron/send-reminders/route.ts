@@ -155,6 +155,13 @@ export async function GET(request: NextRequest) {
         continue
       }
 
+      // The query filters `client_email not is null`, but the column is
+      // nullable so re-check before addressing an email to it.
+      if (!invoice.client_email) {
+        skipped++
+        continue
+      }
+
       let reminderType = 'reminder'
       if (daysOverdue <= -7) reminderType = 'before_due_7'
       else if (daysOverdue <= 0) reminderType = 'on_due'
@@ -170,7 +177,7 @@ export async function GET(request: NextRequest) {
         // Sent as the operator's own verified domain when they have one;
         // resolveSender falls back to the platform sender otherwise.
         from: resolveSender(invoice.tenant, process.env.RESEND_FROM_EMAIL || '').from,
-        replyTo: invoice.tenant?.contact_email,
+        replyTo: invoice.tenant?.contact_email ?? undefined,
       })
 
       if (result.success) {
@@ -189,6 +196,7 @@ export async function GET(request: NextRequest) {
         await supabase
           .from('invoice_reminders')
           .insert({
+            tenant_id: invoice.tenant_id,
             invoice_id: invoice.id,
             reminder_type: reminderType,
             recipient_email: invoice.client_email,
@@ -202,6 +210,7 @@ export async function GET(request: NextRequest) {
         await supabase
           .from('invoice_reminders')
           .insert({
+            tenant_id: invoice.tenant_id,
             invoice_id: invoice.id,
             reminder_type: reminderType,
             recipient_email: invoice.client_email,

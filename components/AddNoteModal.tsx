@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { X, FileText, AlertCircle, Trash2 } from 'lucide-react'
 
 const supabase = createClient()
@@ -23,6 +24,7 @@ export default function AddNoteModal({
   onSuccess,
   editNote 
 }: AddNoteModalProps) {
+  const { tenant } = useTenant()
   const isEditMode = !!editNote
   
   const [formData, setFormData] = useState({
@@ -39,9 +41,9 @@ export default function AddNoteModal({
   useEffect(() => {
     if (editNote) {
       setFormData({
-        note_text: editNote.content || '',
+        note_text: editNote.note_text || '',
         note_type: editNote.note_type || 'general',
-        is_internal: editNote.is_important || false
+        is_internal: editNote.is_internal || false
       })
     } else {
       // Reset form for adding new
@@ -69,22 +71,27 @@ export default function AddNoteModal({
         const { error: updateError } = await supabase
           .from('client_notes')
           .update({
-            content: formData.note_text,
+            note_text: formData.note_text,
             note_type: formData.note_type,
-            is_important: formData.is_internal
+            is_internal: formData.is_internal
           })
           .eq('id', editNote.id)
 
         if (updateError) throw updateError
       } else {
+        if (!tenant) {
+          throw new Error('No active tenant found')
+        }
+
         // Create new note
         const { error: insertError } = await supabase
           .from('client_notes')
           .insert({
+            tenant_id: tenant.id,
             client_id: clientId,
-            content: formData.note_text,
+            note_text: formData.note_text,
             note_type: formData.note_type,
-            is_important: formData.is_internal
+            is_internal: formData.is_internal
           })
 
         if (insertError) throw insertError

@@ -58,7 +58,7 @@ export async function POST(
 
     // Require authentication and get tenant info
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { error: authResult.error },
         { status: authResult.status }

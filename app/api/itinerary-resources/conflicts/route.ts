@@ -36,27 +36,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Try to use the view first (if it exists), fall back to manual query
-    const { data: viewData, error: viewError } = await supabase
-      .from('resource_conflicts')
-      .select('*')
-      .or(`itinerary_1_id.eq.${itineraryId},itinerary_2_id.eq.${itineraryId}`)
-
-    if (!viewError && viewData) {
-      // View exists - format conflicts for response
-      const conflicts = viewData.map((c: any) => ({
-        resource_id: c.resource_id,
-        resource_name: c.resource_name,
-        conflicting_itinerary: c.itinerary_1_id === itineraryId
-          ? c.itinerary_2_code || c.itinerary_2_id
-          : c.itinerary_1_code || c.itinerary_1_id,
-        dates: `${c.conflict_start || c.start_date_1} - ${c.conflict_end || c.end_date_1}`
-      }))
-
-      return NextResponse.json({ success: true, data: conflicts })
-    }
-
-    // Fallback: Manual conflict detection (RLS will filter to tenant's resources only)
+    // Manual conflict detection (RLS will filter to tenant's resources only).
+    // A `resource_conflicts` view was once queried first, but it does not exist
+    // in the live schema — that query failed on every request and always fell
+    // through to this path.
     const { data: resources, error: resourcesError } = await supabase
       .from('itinerary_resources')
       .select('*')

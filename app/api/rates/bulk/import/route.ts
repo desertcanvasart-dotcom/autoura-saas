@@ -7,7 +7,7 @@ import Papa from 'papaparse'
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 

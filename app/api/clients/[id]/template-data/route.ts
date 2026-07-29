@@ -11,7 +11,7 @@ export async function GET(
   try {
     // Require authentication
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -119,7 +119,7 @@ export async function GET(
 
 // Helper function to build placeholder data
 function buildPlaceholderData(
-  client: { name: string; email: string; phone?: string | null },
+  client: { name: string; email: string | null; phone?: string | null },
   itinerary?: any
 ,
   identity: { company_name?: string; agent_name?: string; company_email?: string; company_phone?: string } = {}

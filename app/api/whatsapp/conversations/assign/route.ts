@@ -37,7 +37,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    const oldAssigneeId = conversation.assigned_team_member_id || conversation.assigned_agent_id
+    // whatsapp_conversations has no assignment columns in the live schema,
+    // so there is no previous assignee to read.
+    const oldAssigneeId = null
 
     // Handle different actions
     let newAssigneeId: string | null = null
@@ -95,7 +97,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (teamMember) {
-        const clientName = conversation.client_name || conversation.contact_name || conversation.phone_number
+        const clientName = conversation.client_name || conversation.phone_number
 
         // teamMember was fetched via the tenant-scoped (RLS) client above, so it
         // is guaranteed to belong to the caller's tenant.
@@ -104,7 +106,7 @@ export async function POST(request: NextRequest) {
             team_member_id: teamMember.id,
             type: 'whatsapp_assigned',
             title: 'New WhatsApp Chat Assigned',
-            message: `You've been assigned a WhatsApp conversation with ${clientName}. Last message: "${conversation.last_message?.substring(0, 100) || 'No messages yet'}"`,
+            message: `You've been assigned a WhatsApp conversation with ${clientName}.`,
             link: `/whatsapp-inbox?conversation=${conversation_id}`,
             send_email: Boolean(teamMember.email),
           })
@@ -188,7 +190,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation ID is required' }, { status: 400 })
     }
 
-    const { data: conversation, error } = await supabase
+    const { error } = await supabase
       .from('whatsapp_conversations')
       .select('*')
       .eq('id', conversationId)
@@ -196,7 +198,9 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    const assigneeId = conversation?.assigned_team_member_id || conversation?.assigned_agent_id
+    // whatsapp_conversations has no assignment columns in the live schema,
+    // so there is no persisted assignee to report.
+    const assigneeId: string | null = null
 
     let assignee = null
     if (assigneeId) {
@@ -227,7 +231,7 @@ export async function GET(request: NextRequest) {
       success: true,
       assignment: {
         current_agent: assignee,
-        assigned_at: conversation?.assigned_at,
+        assigned_at: null,
         conversation_id: conversationId
       },
       history

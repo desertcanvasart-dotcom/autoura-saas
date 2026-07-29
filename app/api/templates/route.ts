@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import type { TablesInsert } from '@/types/database.types'
 
 // GET - List all templates
 export async function GET(request: NextRequest) {
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -75,26 +76,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract placeholders from body
-    const placeholderMatches = templateBody.match(/\{\{[^}]+\}\}/g) || []
+    const placeholderMatches: string[] = templateBody.match(/\{\{[^}]+\}\}/g) || []
     const placeholders = [...new Set(placeholderMatches)]
+
+    const insertPayload: TablesInsert<'message_templates'> = {
+      tenant_id, // ✅ Explicit tenant_id
+      name,
+      description,
+      category: category || 'customer',
+      subcategory,
+      channel: channel || 'email',
+      subject,
+      body: templateBody,
+      placeholders,
+      is_active: true,
+      language: language || 'en',
+      parent_template_id: parent_template_id || null,
+      version: 1,
+    }
 
     const { data, error } = await supabase
       .from('message_templates')
-      .insert({
-        tenant_id, // ✅ Explicit tenant_id
-        name,
-        description,
-        category: category || 'customer',
-        subcategory,
-        channel: channel || 'email',
-        subject,
-        body: templateBody,
-        placeholders,
-        is_active: true,
-        language: language || 'en',
-        parent_template_id: parent_template_id || null,
-        version: 1,
-      })
+      .insert(insertPayload)
       .select()
       .single()
 

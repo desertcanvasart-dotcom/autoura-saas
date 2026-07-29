@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET /api/whatsapp/agents - List all team members (for WhatsApp assignment)
 export async function GET(request: NextRequest) {
@@ -50,18 +50,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - prevents unauthorized agent creation
-    const supabase = await createAuthenticatedClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // (also resolves tenant_id, which team_members inserts require)
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
       return NextResponse.json({
-        error: 'Not authenticated'
-      }, { status: 401 })
+        error: authResult.error
+      }, { status: authResult.status })
     }
+    const { supabase, tenant_id } = authResult
 
     const body = await request.json()
 
-    const { name, email, phone, user_id, avatar_url, max_conversations, role } = body
+    const { name, email, phone, role } = body
 
     if (!name) {
       return NextResponse.json({ error: 'Agent name is required' }, { status: 400 })
@@ -82,16 +82,12 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('team_members')
       .insert({
+        tenant_id,
         name,
         email: email || null,
         phone: phone || null,
-        user_id: user_id || null,
-        avatar_url: avatar_url || null,
         role: role || 'sales',
-        max_conversations: max_conversations || 50,
-        is_active: true,
-        is_available: true,
-        current_conversations: 0
+        is_active: true
       })
       .select()
       .single()
@@ -176,7 +172,6 @@ export async function DELETE(request: NextRequest) {
       .from('team_members')
       .update({
         is_active: false,
-        is_available: false,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
@@ -184,15 +179,6 @@ export async function DELETE(request: NextRequest) {
       .single()
 
     if (error) throw error
-
-    await supabase
-      .from('whatsapp_conversations')
-      .update({
-        assigned_team_member_id: null,
-        assigned_agent_id: null,
-        assigned_at: null
-      })
-      .eq('assigned_team_member_id', id)
 
     return NextResponse.json({
       success: true,

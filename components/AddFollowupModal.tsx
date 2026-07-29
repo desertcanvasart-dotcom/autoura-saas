@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { X, Clock, AlertCircle, Trash2 } from 'lucide-react'
 
 const supabase = createClient()
@@ -23,8 +24,9 @@ export default function AddFollowupModal({
   onSuccess,
   editFollowup 
 }: AddFollowupModalProps) {
+  const { tenant } = useTenant()
   const isEditMode = !!editFollowup
-  
+
   const [formData, setFormData] = useState({
     followup_type: 'call',
     due_date: '',
@@ -43,7 +45,7 @@ export default function AddFollowupModal({
         followup_type: editFollowup.followup_type || 'call',
         due_date: editFollowup.due_date || '',
         priority: editFollowup.priority || 'medium',
-        notes: editFollowup.description || ''
+        notes: editFollowup.notes || ''
       })
     } else {
       // Reset form for adding new
@@ -87,27 +89,30 @@ export default function AddFollowupModal({
         const { error: updateError } = await supabase
           .from('client_followups')
           .update({
-            title: title,
-            followup_type: formData.followup_type,
+            description: title,
             due_date: formData.due_date,
             priority: formData.priority,
-            description: formData.notes || null
+            notes: formData.notes || null
           })
           .eq('id', editFollowup.id)
 
         if (updateError) throw updateError
       } else {
+        if (!tenant) {
+          throw new Error('No active tenant found')
+        }
+
         // Create new followup
         const { error: insertError } = await supabase
           .from('client_followups')
           .insert({
+            tenant_id: tenant.id,
             client_id: clientId,
-            title: title,
-            followup_type: formData.followup_type,
+            description: title,
             due_date: formData.due_date,
             priority: formData.priority,
             status: 'pending',
-            description: formData.notes || null
+            notes: formData.notes || null
           })
 
         if (insertError) throw insertError

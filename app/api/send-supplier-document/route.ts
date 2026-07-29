@@ -7,7 +7,7 @@ import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 export async function POST(request: Request) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       .limit(1)
       .single()
 
-    if (!tokenRecord) {
+    if (!tokenRecord || !tokenRecord.refresh_token) {
       return NextResponse.json({ success: false, error: 'Gmail not connected. Connect in Settings > Email.' }, { status: 401 })
     }
 

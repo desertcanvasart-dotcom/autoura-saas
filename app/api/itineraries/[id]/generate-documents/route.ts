@@ -116,7 +116,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await requireAuth()
-  if (authResult.error) {
+  if (authResult.error !== null) {
     return NextResponse.json(
       { success: false, error: authResult.error },
       { status: authResult.status }
@@ -168,7 +168,7 @@ export async function POST(
       .from('itinerary_days')
       .select(`
         *,
-        services:itinerary_services(*)
+        services:itinerary_services!itinerary_services_day_id_fkey(*)
       `)
       .eq('itinerary_id', itineraryId)
       .order('day_number', { ascending: true })
@@ -229,10 +229,10 @@ export async function POST(
     for (const day of days || []) {
       for (const service of day.services || []) {
         const serviceDate = day.date
-        const serviceCity = day.city || service.city || 'Cairo'
+        const serviceCity = day.city || 'Cairo'
 
         // Check if this service type should generate a document
-        const serviceMapping = SERVICE_TO_DOC_TYPE[service.service_type]
+        const serviceMapping = service.service_type ? SERVICE_TO_DOC_TYPE[service.service_type] : undefined
         if (!serviceMapping || serviceMapping.docType === null) {
           // Skip services that don't need documents (tips, water, supplies, service_fee)
 
@@ -377,7 +377,7 @@ export async function POST(
         supplier_contact_phone: group.supplier.contact_phone,
         supplier_address: [group.supplier.address, group.supplier.city, group.supplier.country].filter(Boolean).join(', '),
         client_name: itinerary.client_name,
-        client_nationality: itinerary.client_nationality,
+        client_nationality: itinerary.nationality,
         num_adults: itinerary.num_adults || 1,
         num_children: itinerary.num_children || 0,
         services: formattedServices,
@@ -442,7 +442,7 @@ export async function POST(
         supplier_contact_phone: null,
         supplier_address: group.city,
         client_name: itinerary.client_name,
-        client_nationality: itinerary.client_nationality,
+        client_nationality: itinerary.nationality,
         num_adults: itinerary.num_adults || 1,
         num_children: itinerary.num_children || 0,
         services: formattedServices,

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       .order('day_number', { ascending: true })
 
     if (tourId) {
-      query = query.eq('tour_id', tourId)
+      query = query.eq('template_id', tourId)
     }
 
     const { data, error } = await query
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     const dayData = {
       tenant_id, // ✅ Explicit tenant_id
-      tour_id: body.tour_id,
+      template_id: body.tour_id,
       day_number: body.day_number,
       city: body.city,
       accommodation_id: body.accommodation_id || null,

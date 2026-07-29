@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
   try {
     // Require authentication and get tenant info
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -134,6 +134,7 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('client_preferences')
           .insert({
+            tenant_id,
             client_id: newClient.id,
             preferred_accommodation_type: body.preferences.accommodation_type || '3-star',
             tour_pace_preference: body.preferences.tour_pace || 'moderate',
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('client_notes')
           .insert({
+            tenant_id,
             client_id: newClient.id,
             note_text: body.note,
             note_type: 'general',

@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }

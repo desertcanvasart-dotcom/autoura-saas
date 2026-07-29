@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET /api/whatsapp/conversations - List all conversations
 export async function GET(request: NextRequest) {
@@ -85,15 +85,14 @@ export async function GET(request: NextRequest) {
 // POST /api/whatsapp/conversations - Create or get conversation
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createAuthenticatedClient()
-
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // Verify authentication and resolve tenant (tenant_id is required on insert)
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
       return NextResponse.json({
-        error: 'Not authenticated'
-      }, { status: 401 })
+        error: authResult.error
+      }, { status: authResult.status })
     }
+    const { supabase, tenant_id } = authResult
 
     const body = await request.json()
     const { phone_number, client_name, client_id, auto_assign } = body
@@ -113,17 +112,10 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existing) {
-      // If it was hidden, unhide it
       const updates: any = {
         updated_at: new Date().toISOString()
       }
-      
-      if (existing.is_hidden) {
-        updates.is_hidden = false
-        updates.hidden_at = null
-        updates.hidden_by = null
-      }
-      
+
       if (client_name) updates.client_name = client_name
       if (client_id) updates.client_id = client_id
 
@@ -167,13 +159,10 @@ export async function POST(request: NextRequest) {
     const { data: newConversation, error } = await supabase
       .from('whatsapp_conversations')
       .insert({
+        tenant_id,
         phone_number: cleanPhone,
         client_name: client_name || null,
-        client_id: client_id || null,
-        is_hidden: false,
-        assigned_team_member_id: assignedTeamMemberId,
-        assigned_agent_id: assignedTeamMemberId, // Keep in sync for backwards compatibility
-        assigned_at: assignedTeamMemberId ? new Date().toISOString() : null
+        client_id: client_id || null
       })
       .select(`
         *,
@@ -183,22 +172,7 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    // Update team member's count if assigned
     if (assignedTeamMemberId) {
-      const { data: memberData } = await supabase
-        .from('team_members')
-        .select('current_conversations')
-        .eq('id', assignedTeamMemberId)
-        .single()
-
-      await supabase
-        .from('team_members')
-        .update({ 
-          current_conversations: (memberData?.current_conversations || 0) + 1,
-          last_assigned_at: new Date().toISOString()
-        })
-        .eq('id', assignedTeamMemberId)
-
       // Log activity
       await supabase
         .from('conversation_activity')

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import type { Json } from '@/types/database.types'
 
 interface B2BQuote {
   id: string
@@ -18,8 +19,8 @@ interface B2BQuote {
   tier: string
   tour_leader_included: boolean
   currency: string
-  pricing_table: Record<string, { pp: number; total: number }>
-  created_at: string
+  pricing_table: Json
+  created_at: string | null
   valid_from: string | null
   valid_until: string | null
   season: string | null
@@ -27,14 +28,14 @@ interface B2BQuote {
     id: string
     company_name: string
     partner_code: string
-    country: string
+    country: string | null
   } | null
   itineraries: {
     id: string
     itinerary_code: string
-    trip_name: string
-    start_date: string
-    total_days: number
+    trip_name: string | null
+    start_date: string | null
+    total_days: number | null
   } | null
 }
 
@@ -131,12 +132,12 @@ export default function B2BQuotesPage() {
 
     // Filter by created date range
     if (createdFrom) {
-      const quoteDate = new Date(quote.created_at)
+      const quoteDate = new Date(quote.created_at ?? 0)
       const filterDate = new Date(createdFrom)
       if (quoteDate < filterDate) return false
     }
     if (createdTo) {
-      const quoteDate = new Date(quote.created_at)
+      const quoteDate = new Date(quote.created_at ?? 0)
       const filterDate = new Date(createdTo)
       filterDate.setHours(23, 59, 59, 999)
       if (quoteDate > filterDate) return false
@@ -246,12 +247,14 @@ export default function B2BQuotesPage() {
     setCurrentPage(1)
   }
 
-  const getLowestPPD = (pricingTable: Record<string, { pp: number; total: number }>) => {
+  const getLowestPPD = (pricingTableJson: Json) => {
+    const pricingTable = (pricingTableJson ?? {}) as Record<string, { pp: number; total: number }>
     const prices = Object.values(pricingTable).map(p => p.pp)
     return Math.min(...prices)
   }
 
-  const getPaxRange = (pricingTable: Record<string, { pp: number; total: number }>) => {
+  const getPaxRange = (pricingTableJson: Json) => {
+    const pricingTable = (pricingTableJson ?? {}) as Record<string, { pp: number; total: number }>
     const paxCounts = Object.keys(pricingTable).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b)
     if (paxCounts.length === 0) return 'N/A'
     return `${paxCounts[0]}-${paxCounts[paxCounts.length - 1]}`
@@ -375,7 +378,7 @@ export default function B2BQuotesPage() {
       quote.tour_leader_included ? 'Yes' : 'No',
       quote.status,
       quote.currency,
-      new Date(quote.created_at).toLocaleDateString(),
+      new Date(quote.created_at ?? 0).toLocaleDateString(),
       quote.valid_from ? new Date(quote.valid_from).toLocaleDateString() : '',
       quote.valid_until ? new Date(quote.valid_until).toLocaleDateString() : '',
       quote.season || ''

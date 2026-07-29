@@ -15,7 +15,7 @@ export async function POST(
 ) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -32,6 +32,17 @@ export async function POST(
 
     if (itinError || !itinerary) {
       return NextResponse.json({ success: false, error: 'Itinerary not found' }, { status: 404 })
+    }
+
+    // Task due dates are computed from the trip dates and pax counts; without
+    // them the generated tasks would be built from "null" placeholders.
+    const { client_name, start_date, end_date, total_days, num_adults, num_children, status } = itinerary
+    if (client_name === null || start_date === null || end_date === null ||
+        total_days === null || num_adults === null || num_children === null || status === null) {
+      return NextResponse.json(
+        { success: false, error: 'Itinerary is missing dates or traveler counts required for task generation' },
+        { status: 400 }
+      )
     }
 
     // 2. Fetch days
@@ -59,17 +70,17 @@ export async function POST(
     // 4. Group services by day
     const daysWithServices: DayForTasks[] = days.map(day => ({
       day_number: day.day_number,
-      date: day.date,
-      city: day.city,
-      title: day.title,
-      overnight_city: day.overnight_city,
+      date: day.date ?? '',
+      city: day.city ?? '',
+      title: day.title ?? '',
+      overnight_city: day.overnight_city ?? undefined,
       services: (services || [])
         .filter(s => s.day_id === day.id)
         .map(s => ({
-          service_type: s.service_type,
+          service_type: s.service_type ?? '',
           service_name: s.service_name,
-          quantity: s.quantity,
-          total_cost: s.total_cost,
+          quantity: s.quantity ?? 0,
+          total_cost: s.total_cost ?? 0,
           notes: s.notes,
           supplier_name: s.supplier_name,
         })),
@@ -82,7 +93,18 @@ export async function POST(
       .eq('is_active', true)
 
     // 6. Call Claude AI
-    const prompt = buildTaskGenerationPrompt(itinerary, daysWithServices)
+    const prompt = buildTaskGenerationPrompt({
+      itinerary_code: itinerary.itinerary_code,
+      client_name,
+      start_date,
+      end_date,
+      total_days,
+      num_adults,
+      num_children,
+      num_infants: itinerary.num_infants ?? undefined,
+      status,
+      trip_name: itinerary.trip_name ?? undefined,
+    }, daysWithServices)
     const message = await createMessageWithRetry({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
@@ -108,8 +130,13 @@ export async function POST(
     }
 
     // 8. Map tasks to records
+    const departmentsForMatching = (departments ?? []).map(d => ({
+      id: d.id,
+      name: d.name,
+      service_types: d.service_types ?? [],
+    }))
     const taskRecords = aiTasks.map(task => {
-      const dept = departments?.length ? findDepartmentForServiceType(task.service_type, departments) : null
+      const dept = departmentsForMatching.length ? findDepartmentForServiceType(task.service_type, departmentsForMatching) : null
       const assignedTo = dept ? (assignments[dept.id] || null) : null
 
       return {

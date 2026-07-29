@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     // Restricted to admins: it exists to prove an integration works, which
     // is a settings-level action.
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
     if ((ROLE_RANK[auth.role || ''] || 0) < ROLE_RANK.admin) {

@@ -1,9 +1,10 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database.types'
 
-let client: SupabaseClient | null = null
+let client: SupabaseClient<Database> | null = null
 
-export function createClient(): SupabaseClient {
+export function createClient(): SupabaseClient<Database> {
   // Return existing client if already created (singleton pattern)
   if (client) {
     return client
@@ -32,11 +33,11 @@ export function createClient(): SupabaseClient {
         update: async () => ({ data: null, error: null }),
         delete: async () => ({ data: null, error: null })
       })
-    } as unknown as SupabaseClient
+    } as unknown as SupabaseClient<Database>
   }
 
   // Create new client only if it doesn't exist
-  client = createBrowserClient(supabaseUrl, supabaseAnonKey)
+  client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
 
   return client
 }

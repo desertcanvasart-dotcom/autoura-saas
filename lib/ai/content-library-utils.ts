@@ -5,13 +5,12 @@
 import { createClient } from '@/app/supabase'
 import type {
   ContentVariation,
-  WritingRule,
-  PromptTemplate,
   Tier,
   PromptPurpose,
   ContentForGeneration,
   WritingRulesForGeneration
 } from '@/types/content-library'
+import type { Tables } from '@/types/database.types'
 
 // =====================================================
 // CONTENT FETCHING
@@ -285,7 +284,7 @@ export async function fetchWritingRules(
 /**
  * Fetch writing rules with examples (for training/documentation)
  */
-export async function fetchWritingRulesWithExamples(): Promise<WritingRule[]> {
+export async function fetchWritingRulesWithExamples(): Promise<Tables<'writing_rules'>[]> {
   const supabase = createClient()
   
   const { data, error } = await supabase
@@ -311,7 +310,7 @@ export async function fetchWritingRulesWithExamples(): Promise<WritingRule[]> {
  */
 export async function fetchDefaultPrompt(
   purpose: PromptPurpose
-): Promise<PromptTemplate | null> {
+): Promise<Tables<'prompt_templates'> | null> {
   const supabase = createClient()
   
   const { data, error } = await supabase
@@ -341,7 +340,7 @@ export async function fetchDefaultPrompt(
 /**
  * Fetch prompt template by ID
  */
-export async function fetchPromptById(id: string): Promise<PromptTemplate | null> {
+export async function fetchPromptById(id: string): Promise<Tables<'prompt_templates'> | null> {
   const supabase = createClient()
   
   const { data, error } = await supabase

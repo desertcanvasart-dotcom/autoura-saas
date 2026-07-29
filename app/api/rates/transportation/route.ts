@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -116,13 +116,13 @@ export async function POST(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
       )
     }
-    const { supabase } = authResult
+    const { supabase, tenant_id } = authResult
     if (!supabase) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
@@ -140,18 +140,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate service code if not provided
-    const serviceCode = body.service_code || generateServiceCode(body)
-
     // Generate route name if not provided
     const routeName = body.route_name || generateRouteName(body)
 
-    // ✅ MULTI-TENANT: tenant_id is auto-populated by database trigger
-    // See migration: 007_create_tours_templates_tables.sql (creates auto_set_tenant_id trigger)
-    // The trigger automatically sets tenant_id from the authenticated user's session
-    // RLS policies enforce that users can only insert rates for their own tenant
+    // ✅ MULTI-TENANT: RLS policies enforce that users can only insert rates
+    // for their own tenant
     const newRate = {
-      service_code: serviceCode,
+      tenant_id,
       service_type: body.service_type,
       vehicle_type: body.vehicle_type,
       city: body.city || null,
@@ -162,14 +157,6 @@ export async function POST(request: NextRequest) {
       route_name: routeName,
       base_rate_eur: parseFloat(body.base_rate_eur) || 0,
       base_rate_non_eur: parseFloat(body.base_rate_non_eur) || parseFloat(body.base_rate_eur) || 0,
-      capacity_min: body.capacity_min ? parseInt(body.capacity_min) : null,
-      capacity_max: body.capacity_max ? parseInt(body.capacity_max) : null,
-      season: body.season || null,
-      rate_valid_from: body.rate_valid_from || null,
-      rate_valid_to: body.rate_valid_to || null,
-      supplier_id: body.supplier_id || null,
-      supplier_name: body.supplier_name || null,
-      notes: body.notes || null,
       is_active: body.is_active !== false
     }
 
@@ -214,7 +201,7 @@ export async function PUT(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -298,7 +285,7 @@ export async function DELETE(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -340,31 +327,6 @@ export async function DELETE(request: NextRequest) {
 // HELPER FUNCTIONS
 // ============================================
 
-function generateServiceCode(data: any): string {
-  const parts: string[] = []
-
-  if (data.service_type === 'intercity_transfer') {
-    parts.push('INTERCITY')
-    parts.push(data.origin_city?.substring(0, 3).toUpperCase() || 'XXX')
-    parts.push(data.destination_city?.substring(0, 3).toUpperCase() || 'XXX')
-  } else {
-    parts.push(data.city?.toUpperCase().replace(/\s+/g, '') || 'CITY')
-    
-    if (data.area) {
-      parts.push(data.area.toUpperCase().replace(/_/g, ''))
-    }
-    
-    if (data.duration === 'half_day') {
-      parts.push('HALF')
-    } else if (data.duration === 'full_day') {
-      parts.push('FULL')
-    }
-  }
-
-  parts.push(data.vehicle_type?.toUpperCase().replace(/\s+/g, '') || 'VEHICLE')
-
-  return parts.join('-')
-}
 
 function generateRouteName(data: any): string {
   if (data.service_type === 'intercity_transfer') {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import type { TablesInsert } from '@/types/database.types'
 
 // POST - Sync suppliers from linked itinerary services into booking_supplier_status
 export async function POST(
@@ -8,7 +9,7 @@ export async function POST(
 ) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -17,7 +18,7 @@ export async function POST(
     // Get booking with itinerary link
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
-      .select('id, itinerary_id, booking_code, start_date')
+      .select('id, itinerary_id, start_date')
       .eq('id', bookingId)
       .single()
 
@@ -79,7 +80,7 @@ export async function POST(
 
     // Build supplier entries from services
     const entries = services
-      .map(service => {
+      .map((service): TablesInsert<'booking_supplier_status'> | null => {
         const day = days.find(d => d.id === service.day_id)
         if (!day) return null
 
@@ -102,7 +103,7 @@ export async function POST(
           status: 'pending',
         }
       })
-      .filter(Boolean)
+      .filter((entry): entry is TablesInsert<'booking_supplier_status'> => entry !== null)
 
     if (entries.length === 0) {
       return NextResponse.json({

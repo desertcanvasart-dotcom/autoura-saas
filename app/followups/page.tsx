@@ -15,18 +15,36 @@ const supabase = createClient()
 interface Followup {
   id: string
   client_id: string
-  followup_type: string
+  description: string
   due_date: string
   priority: string
   status: string
   notes: string | null
-  created_at: string
+  created_at: string | null
   client: {
-    client_code: string
-    full_name: string
-    email: string
-    phone: string
-  }
+    client_code: string | null
+    full_name: string | null
+    email: string | null
+    phone: string | null
+  } | null
+}
+
+// client_followups has no type column: AddFollowupModal encodes the type as a
+// label prefix in description ("Phone Call - <client>"). Reverse that mapping.
+const DESCRIPTION_LABEL_TO_TYPE: Record<string, string> = {
+  'Phone Call': 'call',
+  'Email': 'email',
+  'WhatsApp Message': 'whatsapp',
+  'Meeting': 'meeting',
+  'Send Quote': 'quote',
+  'Booking Confirmation': 'booking_confirmation',
+  'Payment Reminder': 'payment_reminder',
+  'Request Feedback': 'feedback',
+}
+
+const getFollowupType = (description: string): string => {
+  const label = description.split(' - ')[0]
+  return DESCRIPTION_LABEL_TO_TYPE[label] || 'other'
 }
 
 export default function FollowupDashboard() {
@@ -159,7 +177,7 @@ export default function FollowupDashboard() {
     }
 
     if (typeFilter !== 'all') {
-      filtered = filtered.filter(f => f.followup_type === typeFilter)
+      filtered = filtered.filter(f => getFollowupType(f.description) === typeFilter)
     }
 
     return filtered
@@ -396,7 +414,8 @@ export default function FollowupDashboard() {
           </div>
         ) : (
           filteredFollowups.map((followup) => {
-            const TypeIcon = getTypeIcon(followup.followup_type)
+            const followupType = getFollowupType(followup.description)
+            const TypeIcon = getTypeIcon(followupType)
             const overdue = isOverdue(followup.due_date)
             const today = isToday(followup.due_date)
 
@@ -438,7 +457,7 @@ export default function FollowupDashboard() {
                       <div className="flex items-center gap-3 text-xs text-gray-600 mb-2">
                         <div className="flex items-center gap-1">
                           <TypeIcon className="w-3 h-3" />
-                          <span className="capitalize">{followup.followup_type}</span>
+                          <span className="capitalize">{followupType.replace(/_/g, ' ')}</span>
                         </div>
                         <div className={`flex items-center gap-1 font-medium ${
                           overdue ? 'text-danger' : today ? 'text-primary-600' : ''

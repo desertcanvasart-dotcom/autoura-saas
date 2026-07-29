@@ -7,7 +7,7 @@ import { createNotification, resolveTeamMemberIdForUser } from '@/lib/notificati
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 

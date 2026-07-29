@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import type { Tables } from '@/types/database.types'
 
 export async function POST(
   request: NextRequest,
@@ -8,14 +9,14 @@ export async function POST(
   try {
     // Require authentication
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
       )
     }
 
-    const { supabase } = authResult
+    const { supabase, tenant_id } = authResult
     if (!supabase) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
@@ -51,19 +52,40 @@ export async function POST(
 
     const dayIds = days.map(d => d.id)
 
-    // Get all services with suppliers
+    // Get all services with a supplier assigned. There is no FK between
+    // itinerary_services and suppliers, so the supplier rows are fetched
+    // separately (a PostgREST embed would fail without the relation).
     const { data: services, error: servicesError } = await supabase
       .from('itinerary_services')
-      .select(`
-        *,
-        supplier:suppliers(*)
-      `)
+      .select('*')
       .in('day_id', dayIds)
       .not('supplier_id', 'is', null)
 
     if (servicesError) {
       console.error('Error fetching services:', servicesError)
       return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 })
+    }
+
+    const supplierIds = [...new Set(
+      (services || [])
+        .map(s => s.supplier_id)
+        .filter((supplierId): supplierId is string => supplierId !== null)
+    )]
+
+    const suppliersById = new Map<string, Tables<'suppliers'>>()
+    if (supplierIds.length > 0) {
+      const { data: suppliers, error: suppliersError } = await supabase
+        .from('suppliers')
+        .select('*')
+        .in('id', supplierIds)
+
+      if (suppliersError) {
+        console.error('Error fetching suppliers:', suppliersError)
+        return NextResponse.json({ error: 'Failed to fetch suppliers' }, { status: 500 })
+      }
+      for (const supplier of suppliers || []) {
+        suppliersById.set(supplier.id, supplier)
+      }
     }
 
     // Filter services that haven't had commissions generated
@@ -94,30 +116,32 @@ export async function POST(
     }
 
     // Generate commission records
-    const commissionsToCreate = eligibleServices
-      .filter(s => s.supplier && (s.commission_rate || s.supplier.default_commission_rate))
-      .map(s => {
-        const rate = s.commission_rate || s.supplier.default_commission_rate || 0
-        const baseAmount = Number(s.selling_price || s.cost || 0)
-        const commissionAmount = (baseAmount * rate) / 100
+    const commissionsToCreate = eligibleServices.flatMap(s => {
+      const supplier = s.supplier_id ? suppliersById.get(s.supplier_id) : undefined
+      if (!supplier || !(s.commission_rate || supplier.default_commission_rate)) return []
 
-        return {
-          itinerary_id: itineraryId,
-          supplier_id: s.supplier_id,
-          client_id: itinerary.client_id || null,
-          commission_type: s.supplier.commission_type || 'receivable',
-          category: typeToCategory[s.service_type] || 'other',
-          source_name: s.supplier.name,
-          description: `${s.description || s.service_type} - ${itinerary.itinerary_code}`,
-          base_amount: baseAmount,
-          commission_rate: rate,
-          commission_amount: commissionAmount,
-          currency: s.currency || 'EUR',
-          status: 'pending',
-          transaction_date: itinerary.start_date || new Date().toISOString().split('T')[0],
-          notes: `Auto-generated from itinerary ${itinerary.itinerary_code}`
-        }
-      })
+      const rate = s.commission_rate || supplier.default_commission_rate || 0
+      const baseAmount = Number(s.selling_price || s.cost || 0)
+      const commissionAmount = (baseAmount * rate) / 100
+
+      return [{
+        tenant_id,
+        itinerary_id: itineraryId,
+        supplier_id: s.supplier_id,
+        client_id: itinerary.client_id || null,
+        commission_type: supplier.commission_type || 'receivable',
+        category: (s.service_type && typeToCategory[s.service_type]) || 'other',
+        source_name: supplier.name,
+        description: `${s.description || s.service_type} - ${itinerary.itinerary_code}`,
+        base_amount: baseAmount,
+        commission_rate: rate,
+        commission_amount: commissionAmount,
+        currency: s.currency || 'EUR',
+        status: 'pending',
+        transaction_date: itinerary.start_date || new Date().toISOString().split('T')[0],
+        notes: `Auto-generated from itinerary ${itinerary.itinerary_code}`
+      }]
+    })
 
     if (commissionsToCreate.length === 0) {
       return NextResponse.json({ 
@@ -140,7 +164,10 @@ export async function POST(
 
     // Update services to mark commissions as generated
     const serviceIds = eligibleServices
-      .filter(s => s.supplier && (s.commission_rate || s.supplier.default_commission_rate))
+      .filter(s => {
+        const supplier = s.supplier_id ? suppliersById.get(s.supplier_id) : undefined
+        return !!supplier && !!(s.commission_rate || supplier.default_commission_rate)
+      })
       .map(s => s.id)
 
     if (serviceIds.length > 0) {

@@ -21,7 +21,7 @@ const MAX_TEMPLATES = 25 // bound the work for a single diagnostic request
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
     const { supabase, tenant_id } = authResult

@@ -16,7 +16,7 @@ import { normalizeBrandKey, BRAND_KEY_MAX_LENGTH } from '@/lib/concierge-brief-s
 export async function GET() {
   try {
     const auth = await requireSuperAdmin()
-    if (auth.error) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
 
     const { data, error } = await auth.adminClient!
       .from('concierge_brand_mappings')
@@ -35,7 +35,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireSuperAdmin()
-    if (auth.error) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const admin = auth.adminClient!
 
     const body = await request.json()
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const auth = await requireSuperAdmin()
-    if (auth.error) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
 
     const brandKey = normalizeBrandKey(new URL(request.url).searchParams.get('brand_key'))
     if (!brandKey) {

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
+import type { TablesInsert } from '@/types/database.types'
 
 export async function GET(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -60,14 +61,14 @@ export async function POST(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - prevents unauthorized rate creation
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
       )
     }
 
-    const { supabase } = authResult
+    const { supabase, tenant_id } = authResult
     if (!supabase) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
@@ -91,8 +92,9 @@ export async function POST(request: NextRequest) {
     //   - 013_accommodation_rates_rls.sql (applies trigger to this table)
     // The trigger automatically sets tenant_id from the authenticated user's session
     // RLS policies enforce that users can only insert rates for their own tenant
-    const newHotel = {
+    const newHotel: TablesInsert<'accommodation_rates'> = {
       // Basic info
+      tenant_id,
       service_code: body.service_code || `ACC-${Date.now().toString(36).toUpperCase()}`,
       property_name: body.property_name,
       property_type: body.property_type || 'hotel',

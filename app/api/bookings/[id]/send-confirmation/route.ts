@@ -11,7 +11,7 @@ export async function POST(
 
 
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -103,7 +103,7 @@ Thank you for booking with us! Your booking is confirmed.
 ━━━━━━━━━━━━━━━━━━━━━
 ✅ Paid: ${booking.currency} ${booking.total_paid.toFixed(2)}
 ⏳ Balance: ${booking.currency} ${booking.balance_due.toFixed(2)}
-${booking.balance_due > 0 ? `📆 Payment Due: ${new Date(booking.payment_deadline).toLocaleDateString()}` : ''}
+${booking.balance_due > 0 && booking.payment_deadline ? `📆 Payment Due: ${new Date(booking.payment_deadline).toLocaleDateString()}` : ''}
 
 ${booking.special_requests ? `\n📝 Special Requests:\n${booking.special_requests}\n` : ''}
 
@@ -138,7 +138,7 @@ Your Travel Team
         success: true,
         message: 'Confirmation would be sent via WhatsApp (WhatsApp integration pending)',
         preview: {
-          to: client?.whatsapp_number,
+          to: client?.whatsapp,
           message: confirmationMessage
         }
       })

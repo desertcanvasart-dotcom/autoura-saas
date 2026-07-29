@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { indexWhatsAppReply } from '@/lib/copilot-indexer'
 import twilio from 'twilio'
 
@@ -61,14 +61,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - prevents SMS spam abuse
-    const supabase = await createAuthenticatedClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
       return NextResponse.json({
-        error: 'Not authenticated'
-      }, { status: 401 })
+        error: authResult.error
+      }, { status: authResult.status })
     }
+    const { supabase, tenant_id } = authResult
 
     const body = await request.json()
     const { conversation_id, phone_number, message } = body
@@ -110,7 +109,7 @@ export async function POST(request: NextRequest) {
       } else {
         const { data: newConv, error: convError } = await supabase
           .from('whatsapp_conversations')
-          .insert({ phone_number: cleanPhone })
+          .insert({ tenant_id, phone_number: cleanPhone })
           .select()
           .single()
 
@@ -135,6 +134,7 @@ export async function POST(request: NextRequest) {
     const { data: savedMessage, error: saveError } = await supabase
       .from('whatsapp_messages')
       .insert({
+        tenant_id,
         conversation_id: convId,
         message_sid: twilioMessage.sid,
         direction: 'outbound',

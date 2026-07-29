@@ -78,7 +78,7 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
       const allEvents: TimelineEvent[] = []
 
       // Client created event
-      if (client) {
+      if (client?.created_at) {
         allEvents.push({
           id: 'created',
           type: 'created',
@@ -113,6 +113,7 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
 
       // Booking events
       bookings?.forEach((booking) => {
+        if (!booking.created_at) return
         const statusColor: any = {
           'draft': 'gray',
           'sent': 'blue',
@@ -128,25 +129,25 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
           title: `Booking: ${booking.trip_name}`,
           description: `${booking.itinerary_code} • €${booking.total_cost} • ${booking.status}`,
           icon: MapPin,
-          color: statusColor[booking.status] || 'gray',
+          color: (booking.status && statusColor[booking.status]) || 'gray',
           details: booking
         })
       })
 
       // Note events
-      // Note events
       notes?.forEach((note) => {
-      allEvents.push({
-      id: note.id,
-      type: 'note',
-      date: note.created_at,
-      title: note.note_type === 'internal' ? 'Internal Note' : 'Note',
-      description: note.content?.substring(0, 100) || '',  // ← Changed to content
-      icon: FileText,
-      color: note.is_important ? 'orange' : 'yellow',  // ← Changed to is_important
-      details: note
-    })
-  })
+        if (!note.created_at) return
+        allEvents.push({
+          id: note.id,
+          type: 'note',
+          date: note.created_at,
+          title: note.note_type === 'internal' ? 'Internal Note' : 'Note',
+          description: note.note_text.substring(0, 100),
+          icon: FileText,
+          color: 'yellow',
+          details: note
+        })
+      })
 
       // Follow-up events
       followups?.forEach((followup) => {
@@ -160,7 +161,7 @@ export default function ClientTimeline({ clientId }: ClientTimelineProps) {
           id: followup.id,
           type: 'followup',
           date: followup.due_date,
-          title: `Follow-up: ${followup.followup_type}`,
+          title: `Follow-up: ${followup.description}`,
           description: followup.notes || 'No notes',
           icon: statusIcon[followup.status] || Clock,
           color: followup.status === 'completed' ? 'green' : 

@@ -35,10 +35,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: 'Thread not found' }, { status: 404 })
     }
 
+    const channel = thread.channel === 'whatsapp' || thread.channel === 'email' ? thread.channel : null
+    if (!channel) {
+      return NextResponse.json({ success: false, error: `Unsupported channel: ${thread.channel}` }, { status: 400 })
+    }
+
     const result = await generateDraftReplies({
       supabase,
       tenantId: tenant_id,
-      channel: thread.channel,
+      channel,
       whatsappConversationId: thread.whatsapp_conversation_id || undefined,
       unifiedConversationId: thread.email_conversation_id || undefined,
       reviewerUserId: user.id,

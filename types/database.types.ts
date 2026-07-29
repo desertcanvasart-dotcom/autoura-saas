@@ -10012,7 +10012,206 @@ export interface Database {
     // postgrest-js reads as "every column is a computed field" — collapsing
     // every select('*') result to {}.
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: {
+      create_b2b_quote_version: {
+        Args: {
+          p_change_reason?: string
+          p_changed_by?: string
+          p_quote_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      create_b2c_quote_version: {
+        Args: {
+          p_change_reason?: string
+          p_changed_by?: string
+          p_quote_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      find_or_create_unified_conversation: {
+        Args: {
+          p_email?: string
+          p_name?: string
+          p_phone?: string
+          p_tenant_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      generate_b2b_quote_number: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      generate_b2c_quote_number: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      generate_booking_number: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      generate_payment_number: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      get_primary_tenant_id: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      get_quote_pdf_path: {
+        Args: {
+          p_quote_id?: string
+          p_quote_type?: string
+          p_tenant_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      get_tenant_agent_memories: {
+        Args: {
+          p_limit?: number
+          p_min_confidence?: number
+          p_subject_id?: string
+          p_subject_type?: string
+          p_tenant_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      get_tenant_logo_path: {
+        Args: {
+          p_file_extension?: string
+          p_tenant_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      get_tenant_subscription: {
+        Args: {
+          p_tenant_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      get_use_global_catalog: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      get_user_tenant_id: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      increment_usage: {
+        Args: {
+          p_amount?: number
+          p_metric?: string
+          p_period_end?: string
+          p_period_start?: string
+          p_tenant_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      log_activity: {
+        Args: {
+          p_action_type?: string
+          p_details?: Json
+          p_ip_address?: string
+          p_resource_id?: string
+          p_resource_type?: string
+          p_tenant_id?: string
+          p_user_agent?: string
+          p_user_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      mark_overdue_followups: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      match_copilot_knowledge: {
+        Args: {
+          p_match_count?: number
+          p_query_embedding?: string
+          p_source_types?: string[]
+          p_tenant_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      next_supplier_invoice_reference: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      purge_expired_agent_memories: {
+        Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      record_booking_payment: {
+        Args: {
+          p_amount?: number
+          p_booking_id?: string
+          p_created_by?: string
+          p_notes?: string
+          p_payment_date?: string
+          p_payment_method?: string
+          p_payment_number?: string
+          p_payment_type?: string
+          p_tenant_id?: string
+          p_transaction_reference?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      revert_b2b_quote_to_version: {
+        Args: {
+          p_quote_id?: string
+          p_revert_reason?: string
+          p_reverted_by?: string
+          p_version_number?: number
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      revert_b2c_quote_to_version: {
+        Args: {
+          p_quote_id?: string
+          p_revert_reason?: string
+          p_reverted_by?: string
+          p_version_number?: number
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      update_unified_conversation_stats: {
+        Args: {
+          p_unified_id?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      user_has_role: {
+        Args: {
+          required_roles?: string[]
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+    }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }
   }

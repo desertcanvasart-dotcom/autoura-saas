@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects email access
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { error: authResult.error },
         { status: authResult.status }
@@ -56,8 +56,12 @@ export async function GET(request: NextRequest) {
 
     let { access_token, refresh_token, token_expiry } = tokenData
 
-    // Check if token is expired
-    if (new Date(token_expiry) <= new Date()) {
+    if (!refresh_token) {
+      return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })
+    }
+
+    // Check if token is expired (missing expiry is treated as expired)
+    if (!token_expiry || new Date(token_expiry) <= new Date()) {
       // Refresh the token
       const newTokens = await refreshAccessToken(refresh_token)
       access_token = newTokens.access_token!

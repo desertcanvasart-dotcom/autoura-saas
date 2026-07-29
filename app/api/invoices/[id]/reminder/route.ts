@@ -137,7 +137,7 @@ export async function POST(
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json({
         success: false,
         error: authResult.error
@@ -199,6 +199,7 @@ export async function POST(
       await supabase
         .from('invoice_reminders')
         .insert({
+          tenant_id: invoice.tenant_id,
           invoice_id: id,
           reminder_type: 'manual',
           recipient_email: invoice.client_email,
@@ -230,6 +231,7 @@ export async function POST(
     await supabase
       .from('invoice_reminders')
       .insert({
+        tenant_id: invoice.tenant_id,
         invoice_id: id,
         reminder_type: 'manual',
         recipient_email: invoice.client_email,

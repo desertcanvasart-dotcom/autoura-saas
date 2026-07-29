@@ -11,7 +11,7 @@ export async function POST(
 
     // Require authentication - RLS will enforce tenant boundaries
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -26,26 +26,21 @@ export async function POST(
       )
     }
 
-    // Increment usage count
-    const { error } = await supabase.rpc('increment_template_usage', { template_id: id })
+    // Increment usage count. There is no increment RPC in the database — the
+    // read-then-update below has always been the real path.
+    const { data: template } = await supabase
+      .from('message_templates')
+      .select('usage_count')
+      .eq('id', id)
+      .single()
 
-    // Fallback if RPC doesn't exist
-    if (error) {
-      // Fetch current usage count
-      const { data: template } = await supabase
-        .from('message_templates')
-        .select('usage_count')
-        .eq('id', id)
-        .single()
-
-      await supabase
-        .from('message_templates')
-        .update({
-          usage_count: (template?.usage_count || 0) + 1,
-          last_used_at: new Date().toISOString()
-        })
-        .eq('id', id)
-    }
+    await supabase
+      .from('message_templates')
+      .update({
+        usage_count: (template?.usage_count || 0) + 1,
+        last_used_at: new Date().toISOString()
+      })
+      .eq('id', id)
 
     return NextResponse.json({ success: true })
   } catch (error) {

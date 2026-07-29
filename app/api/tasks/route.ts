@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
   // Use authenticated client - RLS automatically filters by tenant_id
@@ -109,23 +109,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Use authenticated client - RLS automatically filters by tenant_id
-    const supabase = await createAuthenticatedClient()
-
-    // Verify authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // Authenticated client + tenant lookup - RLS filters by tenant_id
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
       return NextResponse.json({
         success: false,
-        error: 'Not authenticated'
-      }, { status: 401 })
+        error: authResult.error
+      }, { status: authResult.status })
     }
+    const { supabase, tenant_id } = authResult
 
     const body = await request.json()
 
     const { data, error } = await supabase
       .from('tasks')
       .insert({
+        tenant_id,
         title: body.title,
         description: body.description || null,
         due_date: body.due_date || null,

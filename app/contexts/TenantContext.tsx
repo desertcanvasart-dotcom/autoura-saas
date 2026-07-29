@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/app/supabase'
+import type { Json } from '@/types/database.types'
 import { useAuth } from './AuthContext'
 
 interface Tenant {
@@ -23,8 +24,8 @@ interface Tenant {
   company_phone: string | null
   company_website: string | null
   tagline: string | null
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
 }
 
 interface TenantMember {
@@ -36,8 +37,8 @@ interface TenantMember {
   invited_by: string | null
   invited_at: string | null
   joined_at: string | null
-  created_at: string
-  updated_at: string
+  created_at: string | null
+  updated_at: string | null
 }
 
 interface TenantFeatures {
@@ -49,11 +50,11 @@ interface TenantFeatures {
   analytics_enabled: boolean
   /** DEPRECATED (mig 255): branding lives on Tenant. Never read these. */
   logo_url: string | null
-  primary_color: string
-  secondary_color: string
-  custom_settings: Record<string, any>
-  created_at: string
-  updated_at: string
+  primary_color: string | null
+  secondary_color: string | null
+  custom_settings: Json | null
+  created_at: string | null
+  updated_at: string | null
 }
 
 interface TenantContextType {
@@ -135,7 +136,12 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         throw memberError
       }
 
-      setTenantMember(memberData)
+      // role/status are DB-constrained strings; narrow them to the app-level unions
+      setTenantMember({
+        ...memberData,
+        role: memberData.role as TenantMember['role'],
+        status: memberData.status as TenantMember['status'],
+      })
 
       // 2. Get tenant details
       const { data: tenantData, error: tenantError } = await supabase
@@ -149,7 +155,10 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         throw tenantError
       }
 
-      setTenant(tenantData)
+      setTenant({
+        ...tenantData,
+        workspace_mode: tenantData.workspace_mode as Tenant['workspace_mode'],
+      })
 
       // 3. Get tenant features
       const { data: featuresData, error: featuresError } = await supabase

@@ -6,7 +6,7 @@ import { resolveTeamMemberIdForUser } from '@/lib/notifications'
 export async function PUT(_request: NextRequest) {
   try {
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 

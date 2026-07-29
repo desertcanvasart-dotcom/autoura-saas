@@ -5,7 +5,7 @@ import { workspaceModeFromBusinessType, type WorkspaceMode } from '@/lib/workspa
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }

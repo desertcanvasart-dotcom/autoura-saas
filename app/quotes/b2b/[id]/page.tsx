@@ -32,30 +32,30 @@ interface B2BQuote {
   pp_tips: number
   pp_domestic_flights: number
   pricing_table: Record<string, { pp: number; total: number }>
-  tour_leader_cost: number
+  tour_leader_cost: number | null
   valid_from: string | null
   valid_until: string | null
   season: string | null
   internal_notes: string | null
   terms_and_conditions: string | null
   pdf_url: string | null
-  created_at: string
+  created_at: string | null
   b2b_partners: {
     id: string
     company_name: string
     partner_code: string
-    contact_name: string
-    email: string
-    phone: string
-    country: string
+    contact_name: string | null
+    email: string | null
+    phone: string | null
+    country: string | null
   } | null
   itineraries: {
     id: string
     itinerary_code: string
-    trip_name: string
-    start_date: string
-    end_date: string
-    total_days: number
+    trip_name: string | null
+    start_date: string | null
+    end_date: string | null
+    total_days: number | null
   } | null
 }
 
@@ -110,7 +110,11 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
         .single()
 
       if (error) throw error
-      setQuote(data)
+      setQuote({
+        ...data,
+        // JSONB column; the app-level shape is pax-count -> { pp, total }
+        pricing_table: data.pricing_table as B2BQuote['pricing_table'],
+      })
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -359,7 +363,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
                 )}
               </div>
               <p className="text-sm text-gray-500">
-                Created {new Date(quote.created_at).toLocaleDateString()}
+                Created {quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '—'}
                 {quote.season && ` • ${quote.season}`}
               </p>
             </div>
@@ -450,7 +454,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
                 <label className="text-xs text-gray-500 uppercase tracking-wide">Start Date</label>
                 <div className="text-sm font-medium text-gray-900 mt-1 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-gray-400" />
-                  {new Date(quote.itineraries.start_date).toLocaleDateString()}
+                  {quote.itineraries.start_date ? new Date(quote.itineraries.start_date).toLocaleDateString() : '—'}
                 </div>
               </div>
               <div>
@@ -578,7 +582,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
             </div>
 
             {/* Tour Leader */}
-            {quote.tour_leader_included && (
+            {quote.tour_leader_included && quote.tour_leader_cost !== null && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Tour Leader</h3>
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">

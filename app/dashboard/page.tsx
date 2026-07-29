@@ -74,7 +74,7 @@ export default function DashboardPage() {
           if (!user) return null
           const { data } = await supabase
             .from('user_profiles')
-            .select('full_name, first_name')
+            .select('full_name')
             .eq('id', user.id)
             .maybeSingle()
           return data
@@ -83,9 +83,8 @@ export default function DashboardPage() {
       ])
 
       if (profile) {
-        const first = (profile.first_name as string) || ''
-        const full = (profile.full_name as string) || ''
-        setUserName(first || full.split(' ')[0] || '')
+        const full = profile.full_name || ''
+        setUserName(full.split(' ')[0] || '')
       }
       if (!dashRes?.success) throw new Error(dashRes?.error || 'Could not load your dashboard')
       setData(dashRes as DashboardData)

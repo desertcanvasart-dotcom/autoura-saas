@@ -306,14 +306,14 @@ export async function POST(request: NextRequest) {
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json({
         success: false,
         error: authResult.error
       }, { status: authResult.status })
     }
 
-    const { supabase } = authResult
+    const { supabase, tenant_id } = authResult
     if (!supabase) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
@@ -367,6 +367,14 @@ export async function POST(request: NextRequest) {
     }
 
     for (const invoice of invoices) {
+      // The query filters client_email IS NOT NULL, but keep a row-level
+      // guard so a null can never reach the send path.
+      const clientEmail = invoice.client_email
+      if (!clientEmail) {
+        results.skipped++
+        continue
+      }
+
       // No due date => NaN => every branch below false => 'overdue_30',
       // i.e. a Final Notice for an invoice that was never even due.
       const overdue = daysOverdueOrNull(invoice.due_date)
@@ -388,12 +396,12 @@ export async function POST(request: NextRequest) {
 
       // Send email
       const emailResult = await sendReminderEmail({
-        to: invoice.client_email,
+        to: clientEmail,
         subject,
         html,
         invoiceNumber: invoice.invoice_number,
         from: resolveSender(invoice.tenant, process.env.RESEND_FROM_EMAIL || '').from,
-        replyTo: invoice.tenant?.contact_email,
+        replyTo: invoice.tenant?.contact_email ?? undefined,
       })
 
       if (emailResult.success) {
@@ -414,9 +422,10 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('invoice_reminders')
           .insert({
+            tenant_id,
             invoice_id: invoice.id,
             reminder_type: reminderType,
-            recipient_email: invoice.client_email,
+            recipient_email: clientEmail,
             subject,
             status: 'sent'
           })
@@ -425,7 +434,7 @@ export async function POST(request: NextRequest) {
         results.details.push({
           invoice_id: invoice.id,
           invoice_number: invoice.invoice_number,
-          client_email: invoice.client_email,
+          client_email: clientEmail,
           status: 'sent',
           reminder_type: reminderType
         })
@@ -434,9 +443,10 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('invoice_reminders')
           .insert({
+            tenant_id,
             invoice_id: invoice.id,
             reminder_type: reminderType,
-            recipient_email: invoice.client_email,
+            recipient_email: clientEmail,
             subject,
             status: 'failed',
             error_message: emailResult.error
@@ -446,7 +456,7 @@ export async function POST(request: NextRequest) {
         results.details.push({
           invoice_id: invoice.id,
           invoice_number: invoice.invoice_number,
-          client_email: invoice.client_email,
+          client_email: clientEmail,
           status: 'failed',
           error: emailResult.error
         })

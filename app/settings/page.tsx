@@ -259,7 +259,7 @@ function SettingsContent() {
         setUserPreferences({
           id: data.id,
           user_id: data.user_id,
-          default_cost_mode: data.default_cost_mode || 'auto',
+          default_cost_mode: data.default_cost_mode === 'manual' ? 'manual' : 'auto',
           default_tier: data.default_tier || 'standard',
           default_margin_percent: data.default_margin_percent || 25,
           default_currency: data.default_currency || 'EUR'

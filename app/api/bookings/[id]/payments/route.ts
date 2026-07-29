@@ -9,7 +9,7 @@ export async function GET(
   try {
     const { id } = await params
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -55,7 +55,7 @@ export async function POST(
   try {
     const { id } = await params
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -129,7 +129,7 @@ export async function POST(
         p_payment_date: payment_date,
         p_transaction_reference: transaction_reference || null,
         p_notes: notes || null,
-        p_created_by: user?.id || null,
+        p_created_by: user.id,
       })
 
     if (rpcError) {

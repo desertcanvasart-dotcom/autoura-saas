@@ -38,7 +38,7 @@ function ok(current: number, limit: number | null, extra: Record<string, unknown
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mockAuth.mockResolvedValue({ supabase: {}, tenant_id: 'tenant-1' })
+  mockAuth.mockResolvedValue({ error: null, supabase: {}, tenant_id: 'tenant-1' })
   mockResolvePlan.mockResolvedValue({ plan: { slug: 'studio', name: 'Studio' } })
   mockStructural.mockResolvedValue(ok(2, 12))
   mockVolume.mockResolvedValue(ok(10, 300, { window: WINDOW }))

@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import type { TablesInsert } from '@/types/database.types'
 
 function generateItineraryCode(): string {
   const year = new Date().getFullYear()
@@ -43,7 +44,7 @@ function slotSupplierCost(slot: any, passport: string, pax: number): number {
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
     const { supabase, tenant_id, user } = authResult
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
     const finalSellingTotal = (totals?.sellingPriceTotal && totals.sellingPriceTotal > 0) ? totals.sellingPriceTotal : computedSellingTotal
 
     // 1. Create/update itinerary record
-    const itineraryData: Record<string, any> = {
+    const itineraryData: TablesInsert<'itineraries'> = {
       tenant_id,
       itinerary_code: itineraryCode,
       client_id: config.clientId || null,
@@ -170,6 +171,7 @@ export async function POST(request: NextRequest) {
       const { data: dayRecord, error: dayError } = await supabase
         .from('itinerary_days')
         .insert({
+          tenant_id,
           itinerary_id: itineraryId,
           day_number: day.dayNumber,
           date: dayDate,
@@ -251,10 +253,7 @@ export async function POST(request: NextRequest) {
       try {
         const adminClient = createAdminClient()
         // Generate quote number via RPC
-        const { data: quoteNum } = await adminClient.rpc('generate_quote_number', {
-          p_tenant_id: tenant_id,
-          p_prefix: 'B2B'
-        })
+        const { data: quoteNum } = await adminClient.rpc('generate_b2b_quote_number')
 
         const { data: quote, error: quoteError } = await supabase
           .from('b2b_quotes')

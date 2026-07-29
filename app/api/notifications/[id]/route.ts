@@ -9,7 +9,7 @@ export async function PUT(
 ) {
   try {
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 
@@ -53,7 +53,7 @@ export async function DELETE(
 ) {
   try {
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 

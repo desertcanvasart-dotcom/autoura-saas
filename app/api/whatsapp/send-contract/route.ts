@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -54,6 +54,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!itinerary.start_date || !itinerary.end_date) {
+      return NextResponse.json(
+        { success: false, error: 'Itinerary start and end dates are required' },
+        { status: 400 }
+      )
+    }
+
+    const numAdults = itinerary.num_adults || 1
+    const numChildren = itinerary.num_children || 0
+    const totalCost = itinerary.total_cost || 0
+
     // Generate contract PDF
 
     // The contract names the operator as the legal Service Provider party —
@@ -69,13 +80,13 @@ export async function POST(request: NextRequest) {
       contractNumber: `TC-2025-${itineraryId.slice(0, 8).toUpperCase()}`,
       contractDate: new Date().toISOString(),
       clientName: itinerary.client_name || 'Valued Guest',
-      clientEmail: itinerary.client_email,
-      numTravelers: (itinerary.num_adults || 1) + (itinerary.num_children || 0),
+      clientEmail: itinerary.client_email || undefined,
+      numTravelers: numAdults + numChildren,
       tourName: itinerary.trip_name || 'Egypt Tour',
       startDate: itinerary.start_date,
       endDate: itinerary.end_date,
       destinations: 'Cairo, Luxor, Aswan',
-      totalCost: itinerary.total_cost || 0,
+      totalCost: totalCost,
       currency: itinerary.currency || 'EUR'
     }
 
@@ -115,9 +126,9 @@ export async function POST(request: NextRequest) {
       `━━━━━━━━━━━━━━━━━━━━\n` +
       `🎯 *Tour:* ${itinerary.trip_name || 'Egypt Tour'}\n` +
       `📅 *Dates:* ${new Date(itinerary.start_date).toLocaleDateString()} - ${new Date(itinerary.end_date).toLocaleDateString()}\n` +
-      `👥 *Travelers:* ${itinerary.num_adults} adult${itinerary.num_adults > 1 ? 's' : ''}` +
-      `${itinerary.num_children > 0 ? `, ${itinerary.num_children} child${itinerary.num_children > 1 ? 'ren' : ''}` : ''}\n` +
-      `💰 *Total:* ${itinerary.currency} ${itinerary.total_cost.toFixed(2)}\n\n` +
+      `👥 *Travelers:* ${numAdults} adult${numAdults > 1 ? 's' : ''}` +
+      `${numChildren > 0 ? `, ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : ''}\n` +
+      `💰 *Total:* ${itinerary.currency} ${totalCost.toFixed(2)}\n\n` +
       `📄 Please review the attached contract carefully.\n\n` +
       `✍️ *Next Steps:*\n` +
       `1. Review all terms and conditions\n` +

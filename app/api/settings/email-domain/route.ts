@@ -34,7 +34,7 @@ function canManage(role: string | null | undefined): boolean {
 
 export async function GET() {
   const auth = await requireAuth()
-  if (auth.error) {
+  if (auth.error !== null) {
     return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
 
@@ -67,7 +67,7 @@ export async function GET() {
 /** Claim a domain and return the DNS records the operator must publish. */
 export async function POST(request: NextRequest) {
   const auth = await requireAuth()
-  if (auth.error) {
+  if (auth.error !== null) {
     return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
   if (!canManage(auth.role)) {
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
 /** Re-check verification with Resend after the DNS records are published. */
 export async function PUT() {
   const auth = await requireAuth()
-  if (auth.error) {
+  if (auth.error !== null) {
     return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
   if (!canManage(auth.role)) {

@@ -31,7 +31,7 @@ const SHARED_CATALOG_TABLES = new Set(['train_rates', 'sleeping_train_rates'])
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }

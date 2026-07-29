@@ -28,7 +28,7 @@ export async function POST(
     // UUID got that tenant's full cost breakdown — supplier costs, margins,
     // per-pax pricing across all four tiers.
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 
@@ -165,7 +165,7 @@ export async function GET(
   try {
     const { id: templateId } = await params
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
     const { searchParams } = new URL(request.url)

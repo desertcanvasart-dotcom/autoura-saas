@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import type { TablesInsert } from '@/types/database.types'
 
 export async function GET(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -55,13 +56,13 @@ export async function POST(request: NextRequest) {
   try {
     // ✅ SECURITY: Require authentication - protects pricing data
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
       )
     }
-    const { supabase } = authResult
+    const { supabase, tenant_id } = authResult
     if (!supabase) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
@@ -71,7 +72,8 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
-    const newRate = {
+    const newRate: TablesInsert<'activity_rates'> = {
+      tenant_id,
       service_code: body.service_code || `ACT-${Date.now().toString(36).toUpperCase()}`,
       activity_name: body.activity_name,
       activity_category: body.activity_category || null,

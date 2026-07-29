@@ -6,7 +6,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -43,6 +43,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!itinerary.start_date || !itinerary.end_date) {
+      return NextResponse.json(
+        { success: false, error: 'Itinerary start and end dates are required' },
+        { status: 400 }
+      )
+    }
+
     // Get guide details from SUPPLIERS table (scoped to the session tenant)
     const { data: guide, error: guideError } = await supabase
       .from('suppliers')
@@ -73,6 +80,7 @@ export async function POST(request: NextRequest) {
 
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const businessName = senderTenant?.company_name || ''
+    const numChildren = itinerary.num_children || 0
 
     const message = `🎯 *${businessName} - New Assignment* 🎯\n\n` +
       `Hi ${guide.name},\n\n` +
@@ -83,7 +91,7 @@ export async function POST(request: NextRequest) {
       `📅 *Start Date:* ${new Date(itinerary.start_date).toLocaleDateString()}\n` +
       `📅 *End Date:* ${new Date(itinerary.end_date).toLocaleDateString()}\n` +
       `👥 *Guests:* ${itinerary.num_adults || 1} adult${(itinerary.num_adults || 1) > 1 ? 's' : ''}` +
-      `${itinerary.num_children > 0 ? `, ${itinerary.num_children} child${itinerary.num_children > 1 ? 'ren' : ''}` : ''}\n` +
+      `${numChildren > 0 ? `, ${numChildren} child${numChildren > 1 ? 'ren' : ''}` : ''}\n` +
       `👤 *Client:* ${itinerary.client_name || 'N/A'}\n` +
       `📞 *Phone:* ${itinerary.client_phone || 'N/A'}\n` +
       `🏨 *Pickup:* ${itinerary.pickup_location || 'To be confirmed'}\n` +

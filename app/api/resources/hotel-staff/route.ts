@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json({
         success: false,
         error: authResult.error
@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const staffData = {
+      tenant_id: authResult.tenant_id,
       name: body.name,
       role: body.role || null,
       hotel_id: body.hotel_id || null,
@@ -112,7 +113,6 @@ export async function POST(request: NextRequest) {
       is_active: body.is_active !== undefined ? body.is_active : true
     }
 
-    // Insert with RLS - tenant_id auto-populated by trigger
     const { data, error } = await supabase
       .from('hotel_staff')
       .insert([staffData])

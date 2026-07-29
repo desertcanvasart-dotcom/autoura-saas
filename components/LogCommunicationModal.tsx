@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { X, MessageSquare, AlertCircle, Trash2 } from 'lucide-react'
 
 const supabase = createClient()
@@ -24,7 +25,8 @@ export default function LogCommunicationModal({
   editCommunication 
 }: LogCommunicationModalProps) {
   const isEditMode = !!editCommunication
-  
+  const { tenant } = useTenant()
+
   const [formData, setFormData] = useState({
     communication_type: 'whatsapp',
     direction: 'outbound',
@@ -97,9 +99,11 @@ export default function LogCommunicationModal({
         if (updateError) throw updateError
       } else {
         // Create new communication
+        if (!tenant) throw new Error('Tenant not loaded yet. Please try again.')
         const { error: insertError } = await supabase
           .from('communication_history')
           .insert({
+            tenant_id: tenant.id,
             client_id: clientId,
             communication_type: formData.communication_type,
             direction: formData.direction,

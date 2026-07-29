@@ -25,8 +25,7 @@ interface B2BQuote {
   pp_meals: number
   pp_tips: number
   pp_domestic_flights: number
-  tour_leader_cost: number
-  pricing_table: Record<string, { pp: number; total: number }>
+  tour_leader_cost: number | null
   status: string
   valid_from: string | null
   valid_until: string | null
@@ -37,8 +36,8 @@ interface B2BQuote {
     company_name: string
   } | null
   itineraries: {
-    trip_name: string
-    total_days: number
+    trip_name: string | null
+    total_days: number | null
   } | null
 }
 
@@ -127,7 +126,7 @@ export default function EditB2BQuotePage({ params }: { params: { id: string } })
       setPpTips(data.pp_tips)
       setPpDomesticFlights(data.pp_domestic_flights)
 
-      setTourLeaderCost(data.tour_leader_cost)
+      setTourLeaderCost(data.tour_leader_cost ?? 0)
 
       setStatus(data.status)
       setValidFrom(data.valid_from || '')

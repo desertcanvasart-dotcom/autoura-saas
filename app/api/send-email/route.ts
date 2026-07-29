@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     // Authenticated users only — this route sends mail through the company
     // mailbox, so it must never be callable anonymously.
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 

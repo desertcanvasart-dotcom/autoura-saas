@@ -166,22 +166,21 @@ export async function GET(request: NextRequest) {
   if (perUserMap.size > 0) {
     const userIds = Array.from(perUserMap.keys())
     // Emails live in auth.users which is not directly queryable under RLS.
-    // Best-effort: try tenant_members joined with user details; fall back to raw ids.
+    // Best-effort: user_profiles mirrors auth users; fall back to raw ids.
     const { data: members } = await supabase
-      .from('tenant_members')
-      .select('user_id, email, user_name')
-      .eq('tenant_id', tenant_id)
-      .in('user_id', userIds)
+      .from('user_profiles')
+      .select('id, email, full_name')
+      .in('id', userIds)
 
     perUser = userIds.map((id) => {
       const stats = perUserMap.get(id)!
-      const m = (members || []).find((x: any) => x.user_id === id)
+      const m = (members || []).find((x) => x.id === id)
       const reviewedU = stats.sent + stats.approved + stats.rejected
       const approvedU = stats.sent + stats.approved
       const acceptRate = reviewedU > 0 ? approvedU / reviewedU : 0
       return {
         user_id: id,
-        email: (m?.email as string) || (m?.user_name as string) || null,
+        email: m?.email || m?.full_name || null,
         generated: stats.generated,
         sent: stats.sent,
         accept_rate: acceptRate,

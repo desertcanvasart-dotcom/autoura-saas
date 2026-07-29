@@ -10,7 +10,7 @@ const ALLOWED_TABLES = [
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 

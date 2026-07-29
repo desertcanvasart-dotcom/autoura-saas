@@ -6,7 +6,7 @@ import { requireAuth } from '@/lib/supabase-server'
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const { supabase, tenant_id } = authResult
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
 
     const servicesByDay: Record<string, any[]> = {}
     for (const svc of (services || [])) {
+      if (!svc.day_id) continue
       if (!servicesByDay[svc.day_id]) servicesByDay[svc.day_id] = []
       servicesByDay[svc.day_id].push(svc)
     }
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     })
 
     // 5. Create template
-    const cities = [...new Set(days.map(d => d.city).filter(Boolean))]
+    const cities = [...new Set(days.map(d => d.city).filter((c): c is string => c !== null))]
     const totalDays = itinerary.total_days || days.length
     const cityPrefix = (cities[0] || 'EGY').substring(0, 3).toUpperCase()
     const templateCode = `${cityPrefix}-MUL-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`

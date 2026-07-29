@@ -82,10 +82,10 @@ interface ExtractedData {
 
 interface ExistingClient {
   id: string
-  client_code: string
+  client_code: string | null
   full_name: string
-  email: string
-  phone: string
+  email: string | null
+  phone: string | null
 }
 
 // UPDATED: Package types
@@ -1027,7 +1027,7 @@ function WhatsAppParserContent() {
 
         if (data) {
           const prefs: UserPreferences = {
-            default_cost_mode: data.default_cost_mode || 'auto',
+            default_cost_mode: data.default_cost_mode === 'manual' ? 'manual' : 'auto',
             default_tier: data.default_tier || 'standard',
             default_margin_percent: data.default_margin_percent || 25,
             default_currency: data.default_currency || 'EUR'

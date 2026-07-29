@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { RATE_TABLE_CONFIGS, getExportHeaders } from '@/lib/bulk-rate-service'
+import type { Database } from '@/types/database.types'
 import Papa from 'papaparse'
 
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
-    if (authResult.error) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     const { supabase } = authResult
     if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
@@ -18,9 +19,13 @@ export async function GET(request: NextRequest) {
     const config = RATE_TABLE_CONFIGS[table]
     const headers = getExportHeaders(config)
 
+    // Config keys are live table names; the guard above proves membership,
+    // which the Record<string, ...> config type cannot express.
+    const tableName = table as keyof Database['public']['Tables']
+
     // RLS automatically filters by tenant
     const { data, error } = await supabase
-      .from(table)
+      .from(tableName)
       .select(headers.join(','))
       .order('created_at', { ascending: false })
 

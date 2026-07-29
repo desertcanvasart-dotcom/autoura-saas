@@ -18,7 +18,7 @@ async function assertConversationInTenant(
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
     const supabase = auth.supabase!
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAuth()
-    if (auth.error) {
+    if (auth.error !== null) {
       return NextResponse.json({ error: auth.error }, { status: auth.status })
     }
     const supabase = auth.supabase!
@@ -122,18 +122,10 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
-    // If this is a reply, update the conversation's last_agent fields
-    if (action_type === 'replied' && agent_id) {
-      await supabase
-        .from('whatsapp_conversations')
-        .update({
-          last_agent_id: agent_id,
-          last_agent_reply_at: new Date().toISOString()
-        })
-        .eq('id', conversation_id)
-    }
+    // Agent replies are tracked via conversation_activity above;
+    // whatsapp_conversations has no last_agent_id / last_agent_reply_at columns.
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true, 
       activity: data,
       message: 'Activity logged successfully'

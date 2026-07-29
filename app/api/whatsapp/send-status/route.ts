@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
   try {
     // Require authentication - sends WhatsApp messages (costs money)
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
     const message = getStatusMessage(
       senderTenant?.company_name || '',
       itinerary.client_name || 'Valued Client',
-      itinerary.trip_name || itinerary.tour_name || 'Egypt Tour',
+      itinerary.trip_name || 'Egypt Tour',
       status as BookingStatus,
       notes
     )

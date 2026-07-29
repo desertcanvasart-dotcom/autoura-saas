@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import type { TablesInsert } from '@/types/database.types'
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
     // Authenticate user and get Supabase client
     const authResult = await requireAuth()
 
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json({
         success: false,
         error: authResult.error
@@ -69,7 +70,8 @@ export async function POST(request: NextRequest) {
 
 
     // Minimal insert with only required fields
-    const newRate: Record<string, any> = {
+    const newRate: TablesInsert<'accommodation_rates'> = {
+      tenant_id: authResult.tenant_id,
       service_code: body.service_code || `HTL-${Date.now()}`,
       property_name: body.property_name,
       property_type: body.property_type || 'hotel',

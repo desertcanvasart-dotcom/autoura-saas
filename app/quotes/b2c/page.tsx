@@ -21,18 +21,18 @@ interface B2CQuote {
   selling_price: number
   price_per_person: number
   currency: string
-  created_at: string
+  created_at: string | null
   valid_until: string | null
   clients: {
     id: string
-    full_name: string
-    email: string
+    full_name: string | null
+    email: string | null
   } | null
   itineraries: {
     id: string
     itinerary_code: string
-    trip_name: string
-    start_date: string
+    trip_name: string | null
+    start_date: string | null
   } | null
 }
 
@@ -122,12 +122,12 @@ export default function B2CQuotesPage() {
     if (currencyFilter.length > 0 && !currencyFilter.includes(quote.currency)) return false
 
     // Filter by created date range
-    if (createdFrom) {
+    if (createdFrom && quote.created_at) {
       const quoteDate = new Date(quote.created_at)
       const filterDate = new Date(createdFrom)
       if (quoteDate < filterDate) return false
     }
-    if (createdTo) {
+    if (createdTo && quote.created_at) {
       const quoteDate = new Date(quote.created_at)
       const filterDate = new Date(createdTo)
       filterDate.setHours(23, 59, 59, 999) // End of day
@@ -355,7 +355,7 @@ export default function B2CQuotesPage() {
       quote.status,
       quote.selling_price,
       quote.currency,
-      new Date(quote.created_at).toLocaleDateString(),
+      quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '',
       quote.valid_until ? new Date(quote.valid_until).toLocaleDateString() : ''
     ])
 

@@ -7,8 +7,31 @@
 
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
+import type { User } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { isSuperAdmin, IMPERSONATE_COOKIE } from '@/lib/super-admin';
+import type { Database } from '@/types/database.types';
+
+/**
+ * Discriminated results for getUserTenantId/requireAuth. Callers must guard
+ * with `if (result.error !== null)` — a bare truthiness check does NOT narrow
+ * (TS keeps the failure arm in the else-branch because `""` is falsy), so
+ * tenant_id would stay `string | null` and every .eq('tenant_id', …) breaks.
+ */
+export type TenantIdResult =
+  | { error: string; status: number; user: User | null; tenant_id: null; role?: undefined }
+  | { error: null; status: 200; user: User; tenant_id: string; role: string };
+
+export type RequireAuthResult =
+  | { error: string; status: number; supabase: null; tenant_id: null; user: null; role: null }
+  | {
+      error: null;
+      status: 200;
+      supabase: Awaited<ReturnType<typeof createAuthenticatedClient>>;
+      tenant_id: string;
+      user: User;
+      role: string;
+    };
 
 // Check if we're in build mode (no env vars available)
 const isBuildTime = !process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -27,7 +50,7 @@ export async function createAuthenticatedClient() {
 
   const cookieStore = await cookies();
 
-  return createServerClient(
+  return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -66,7 +89,7 @@ export function createAdminClient() {
     throw new Error('Supabase admin client cannot be created during build time');
   }
 
-  return createClient(
+  return createClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
@@ -77,7 +100,7 @@ export function createAdminClient() {
  *
  * @returns Object containing tenant_id and user, or error response data
  */
-export async function getUserTenantId() {
+export async function getUserTenantId(): Promise<TenantIdResult> {
   const supabase = await createAuthenticatedClient();
 
   // Get authenticated user
@@ -139,7 +162,7 @@ export async function getUserTenantId() {
  * Usage:
  * ```typescript
  * const authResult = await requireAuth();
- * if (authResult.error) {
+ * if (authResult.error !== null) {
  *   return NextResponse.json(
  *     { success: false, error: authResult.error },
  *     { status: authResult.status }
@@ -148,10 +171,10 @@ export async function getUserTenantId() {
  * const { supabase, tenant_id, user } = authResult;
  * ```
  */
-export async function requireAuth() {
+export async function requireAuth(): Promise<RequireAuthResult> {
   const result = await getUserTenantId();
 
-  if (result.error) {
+  if (result.error !== null) {
     return {
       error: result.error,
       status: result.status,

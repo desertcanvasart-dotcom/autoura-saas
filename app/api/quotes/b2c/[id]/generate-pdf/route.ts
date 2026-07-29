@@ -3,6 +3,65 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import B2CQuotePDF from '@/components/pdf/B2CQuotePDF';
 import React from 'react';
+import type { Json, Tables } from '@/types/database.types';
+
+type PdfQuote = React.ComponentProps<typeof B2CQuotePDF>['quote'];
+
+type QuoteWithRelations = Tables<'b2c_quotes'> & {
+  clients: Pick<
+    Tables<'clients'>,
+    'id' | 'full_name' | 'email' | 'phone' | 'nationality'
+  > | null;
+  itineraries: Pick<
+    Tables<'itineraries'>,
+    'id' | 'itinerary_code' | 'trip_name' | 'start_date' | 'end_date' | 'total_days'
+  > | null;
+};
+
+function toCostBreakdown(value: Json | null): Record<string, number> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, number] => typeof entry[1] === 'number'
+    )
+  );
+}
+
+// B2CQuotePDF's props declare non-null display fields; reconcile the fetched
+// row (nullable columns) to that shape without changing what gets rendered.
+function toPdfQuote(quote: QuoteWithRelations): PdfQuote {
+  return {
+    quote_number: quote.quote_number,
+    num_travelers: quote.num_travelers,
+    tier: quote.tier,
+    selling_price: quote.selling_price,
+    price_per_person: quote.price_per_person,
+    total_cost: quote.total_cost,
+    margin_percent: quote.margin_percent,
+    currency: quote.currency,
+    cost_breakdown: toCostBreakdown(quote.cost_breakdown),
+    valid_until: quote.valid_until,
+    created_at: quote.created_at ?? '',
+    client_notes: quote.client_notes,
+    clients: quote.clients
+      ? {
+          full_name: quote.clients.full_name ?? '',
+          email: quote.clients.email ?? '',
+          phone: quote.clients.phone ?? '',
+          nationality: quote.clients.nationality ?? '',
+        }
+      : null,
+    itineraries: quote.itineraries
+      ? {
+          itinerary_code: quote.itineraries.itinerary_code,
+          trip_name: quote.itineraries.trip_name ?? '',
+          start_date: quote.itineraries.start_date ?? '',
+          end_date: quote.itineraries.end_date ?? '',
+          total_days: quote.itineraries.total_days ?? 0,
+        }
+      : null,
+  };
+}
 
 /**
  * POST /api/quotes/b2c/[id]/generate-pdf
@@ -76,7 +135,7 @@ export async function POST(
 
     // Generate PDF using React PDF renderer
     const pdfBuffer = await renderToBuffer(
-      React.createElement(B2CQuotePDF, { quote }) as any
+      React.createElement(B2CQuotePDF, { quote: toPdfQuote(quote) }) as any
     );
 
     // Generate storage path
@@ -205,7 +264,7 @@ export async function GET(
 
     // Generate PDF using React PDF renderer
     const pdfBuffer = await renderToBuffer(
-      React.createElement(B2CQuotePDF, { quote }) as any
+      React.createElement(B2CQuotePDF, { quote: toPdfQuote(quote) }) as any
     );
 
     // Return PDF as downloadable file

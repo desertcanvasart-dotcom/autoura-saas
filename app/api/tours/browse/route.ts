@@ -132,13 +132,13 @@ export async function GET(request: NextRequest) {
           // Try to get from variation_pricing table (legacy) - RLS filters automatically
           const { data: pricing } = await supabase
             .from('variation_pricing')
-            .select('selling_price_per_person')
+            .select('price_per_person')
             .in('variation_id', variations.map((v: any) => v.id))
-            .order('selling_price_per_person', { ascending: true })
+            .order('price_per_person', { ascending: true })
             .limit(1)
 
           if (pricing?.length) {
-            startingFromPrice = pricing[0].selling_price_per_person
+            startingFromPrice = pricing[0].price_per_person
           }
         }
 

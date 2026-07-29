@@ -92,6 +92,7 @@ export async function GET(
 
     for (const activity of activities || []) {
       const dayNum = activity.day_number
+      if (dayNum === null) continue
       if (!dayMap.has(dayNum)) {
         dayMap.set(dayNum, [])
       }
@@ -137,7 +138,7 @@ export async function POST(
 
     // Require authentication and get tenant info
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -342,7 +343,7 @@ export async function PATCH(
 
     // Require authentication - RLS will enforce tenant boundaries
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }
@@ -446,7 +447,7 @@ export async function DELETE(
 
     // Require authentication - RLS will enforce tenant boundaries
     const authResult = await requireAuth()
-    if (authResult.error) {
+    if (authResult.error !== null) {
       return NextResponse.json(
         { success: false, error: authResult.error },
         { status: authResult.status }

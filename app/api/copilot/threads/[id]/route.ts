@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { buildCopilotContext } from '@/lib/copilot-context'
-import type { CopilotThreadSummary } from '@/app/types/copilot'
+import type { CopilotThreadSummary, InboxStatus } from '@/app/types/copilot'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -52,7 +52,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       last_message_at: (thread as any).last_message_at,
       last_draft_at: (thread as any).last_draft_at,
       latest_inbox_snippet: latestInbox ? (latestInbox.message_snippet || (latestInbox.message_body || '').slice(0, 140)) : null,
-      latest_inbox_status: latestInbox ? latestInbox.status : null,
+      latest_inbox_status: latestInbox ? (latestInbox.status as InboxStatus) : null,
       pending_draft_count: pending,
     }
 
