@@ -129,6 +129,29 @@ async function main() {
     process.exit(1)
   }
 
+  // RPC functions: /rpc/{name} paths carry typed args. All args are emitted
+  // optional (the spec can't say which have SQL defaults) and Returns is `any`
+  // (the spec carries no return schemas) — so rpc() validates the function
+  // name and arg names/types, while result typing stays at the call site.
+  const rpcBlocks = Object.entries(spec.paths || {})
+    .filter(([p]) => p.startsWith('/rpc/'))
+    .map(([p, item]) => {
+      const name = p.slice('/rpc/'.length)
+      const body = (item.post?.parameters || []).find((x) => x.in === 'body')
+      const args = Object.entries(body?.schema?.properties || {}).map(
+        ([arg, prop]) => `          ${arg}?: ${tsType(prop)}`
+      )
+      const argsBlock = args.length > 0 ? `{\n${args.join('\n')}\n        }` : `Record<PropertyKey, never>`
+      return [
+        `      ${name}: {`,
+        `        Args: ${argsBlock}`,
+        `        // eslint-disable-next-line @typescript-eslint/no-explicit-any`,
+        `        Returns: any`,
+        `      }`,
+      ].join('\n')
+    })
+    .sort()
+
   const tableNames = Object.keys(defs).sort()
   const blocks = tableNames.map((name) => {
     const { rows, inserts, updates, relationships } = buildTable(name, defs[name])
@@ -181,7 +204,9 @@ ${blocks.join('\n')}
     // postgrest-js reads as "every column is a computed field" — collapsing
     // every select('*') result to {}.
     Views: { [_ in never]: never }
-    Functions: { [_ in never]: never }
+    Functions: {
+${rpcBlocks.join('\n')}
+    }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }
   }
