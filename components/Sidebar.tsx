@@ -142,6 +142,7 @@ const navigation: NavSection[] = [
     key: 'quotes',
     roles: ['admin', 'manager', 'agent'],
     items: [
+      { label: 'New Quote', href: '/pricing-grid', icon: Grid3x3 },
       {
         label: 'B2C Quotes',
         href: '/quotes/b2c',
@@ -184,7 +185,6 @@ const navigation: NavSection[] = [
       { label: 'Hotel Services', href: '/rates/hotel-services', icon: ConciergeBell },
       { label: 'Tipping', href: '/rates/tipping', icon: DollarSign },
       { label: 'Fixed Costs', href: '/rates/fixed-costs', icon: DollarSign },
-      { label: 'Pricing Grid', href: '/pricing-grid', icon: Grid3x3 },
     ]
   },
   {
