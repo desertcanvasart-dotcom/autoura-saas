@@ -37,8 +37,34 @@ if (!url || !anonKey || !serviceKey) {
 const anon = createClient(url, anonKey, { auth: { persistSession: false } })
 const svc = createClient(url, serviceKey, { auth: { persistSession: false } })
 
+// Every relation PostgREST exposes — tables AND views — pulled from the live
+// schema, not a hand-kept list. A hard-coded list is how the
+// effective_exchange_rates view (owner-privilege view, bypasses RLS on the
+// tables beneath it) leaked tenant ids to the anon key until 2026-07-29: it
+// was never on the list, so the sweep never probed it. Migration 263 dropped
+// it; this enumeration makes the next one un-missable.
+async function allRelations() {
+  const res = await fetch(`${url}/rest/v1/`, {
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+  })
+  if (!res.ok) {
+    console.error(`✗ schema fetch failed: HTTP ${res.status} — cannot enumerate relations`)
+    process.exit(1)
+  }
+  const spec = await res.json()
+  const names = Object.keys(spec.definitions || {})
+  if (names.length === 0) {
+    console.error('✗ schema fetch returned no relations — refusing to pass an empty sweep')
+    process.exit(1)
+  }
+  return names.sort()
+}
+
 // The 13 tables migration 242 restores, plus the tenant tables that must never
-// be anonymous under any circumstances.
+// be anonymous under any circumstances. Kept (and unioned with the live
+// schema) so these names stay probed even if PostgREST ever stops exposing
+// one — disappearing from the schema must fail loudly in half 3, not pass
+// silently in half 1.
 const GUARDED = [
   'tenants', 'tenant_members', 'tenant_features', 'departments',
   'entrance_fees', 'flight_rates', 'train_rates', 'tipping_rates',
@@ -65,23 +91,32 @@ const GUARDED = [
 ]
 
 let failures = 0
+const SWEEP = [...new Set([...(await allRelations()), ...GUARDED])].sort()
 
-console.log('\n── 1. anonymous client must see nothing ──')
-for (const t of GUARDED) {
+console.log(`\n── 1. anonymous client must see nothing (${SWEEP.length} relations) ──`)
+let blockedCount = 0
+let emptyCount = 0
+for (const t of SWEEP) {
   const { count: real, error: sErr } = await svc.from(t).select('*', { count: 'exact', head: true })
   if (sErr) {
     console.log(`   skip     ${t.padEnd(22)} (${sErr.code})`)
     continue
   }
   if (!real) {
-    console.log(`   skip     ${t.padEnd(22)} table is empty — nothing to leak`)
+    emptyCount++
     continue
   }
   const { data, error } = await anon.from(t).select('*').limit(1)
   const leaked = !error && data && data.length > 0
-  if (leaked) failures++
-  console.log(`   ${leaked ? '❌ LEAKS ' : '✅ blocked'} ${t.padEnd(22)} ${real} row(s) in table`)
+  if (leaked) {
+    failures++
+    console.log(`   ❌ LEAKS  ${t.padEnd(22)} ${real} row(s) in table`)
+  } else {
+    blockedCount++
+    // Only leaks and skips are worth a line each at this relation count.
+  }
 }
+console.log(`   ✅ blocked ${blockedCount} populated relation(s); ${emptyCount} empty (nothing to leak yet)`)
 
 console.log('\n── 2. anonymous writes must be rejected ──')
 const SENTINEL = 'zz-rls-verify-delete-me'
