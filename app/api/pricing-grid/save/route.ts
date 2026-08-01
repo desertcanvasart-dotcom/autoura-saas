@@ -301,6 +301,8 @@ export async function POST(request: NextRequest) {
             tenant_id,
             itinerary_id: itineraryId,
             client_id: config.clientId || null,
+            // Attribution (mig 269): the staff member saving the quote.
+            created_by: authResult.user!.id,
             quote_number: quoteNum || `B2C-${Date.now()}`,
             num_travelers: pax,
             tier: config.tier,

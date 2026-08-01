@@ -128,8 +128,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const [tasksCompleted, itinerariesTouched, copilotReviewed, copilotSent] =
-      await Promise.all([
+    const [
+      tasksCompleted,
+      itinerariesTouched,
+      copilotReviewed,
+      copilotSent,
+      whatsappSent,
+      emailsSent,
+      quotesCreated,
+      invoicesIssued,
+    ] = await Promise.all([
         subjectTeamMemberId
           ? count(() =>
               adminClient
@@ -172,7 +180,54 @@ export async function GET(request: NextRequest) {
                 .gte('sent_at', startIso)
             )
           : Promise.resolve(null),
+        // Phase 2 attribution (mig 269) — counts start the day the columns
+        // landed; older rows are unattributed (sent_by/created_by null).
+        subjectUserId
+          ? count(() =>
+              adminClient
+                .from('whatsapp_messages')
+                .select('id', { count: 'exact', head: true })
+                .eq('tenant_id', authResult.tenant_id)
+                .eq('sent_by', subjectUserId!)
+                .gte('sent_at', startIso)
+            )
+          : Promise.resolve(null),
+        subjectUserId
+          ? count(() =>
+              adminClient
+                .from('email_messages')
+                .select('id', { count: 'exact', head: true })
+                .eq('tenant_id', authResult.tenant_id)
+                .eq('sent_by', subjectUserId!)
+                .gte('created_at', startIso)
+            )
+          : Promise.resolve(null),
+        subjectUserId
+          ? count(() =>
+              adminClient
+                .from('b2c_quotes')
+                .select('id', { count: 'exact', head: true })
+                .eq('tenant_id', authResult.tenant_id)
+                .eq('created_by', subjectUserId!)
+                .gte('created_at', startIso)
+            )
+          : Promise.resolve(null),
+        subjectUserId
+          ? count(() =>
+              adminClient
+                .from('invoices')
+                .select('id', { count: 'exact', head: true })
+                .eq('tenant_id', authResult.tenant_id)
+                .eq('created_by', subjectUserId!)
+                .gte('created_at', startIso)
+            )
+          : Promise.resolve(null),
       ])
+
+    const messagesSent =
+      whatsappSent === null && emailsSent === null
+        ? null
+        : (whatsappSent ?? 0) + (emailsSent ?? 0)
 
     return NextResponse.json({
       success: true,
@@ -184,9 +239,12 @@ export async function GET(request: NextRequest) {
           itineraries_touched: itinerariesTouched,
           copilot_reviewed: copilotReviewed,
           copilot_sent: copilotSent,
+          messages_sent: messagesSent,
+          quotes_created: quotesCreated,
+          invoices_issued: invoicesIssued,
         },
         unattributed_note:
-          'Messages, quotes, and invoices are not yet per-user attributed.',
+          'Messages, quotes, and invoices count from August 2026 onward; earlier records are not per-user attributed.',
       },
     })
   } catch (error) {

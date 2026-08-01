@@ -153,6 +153,8 @@ export async function POST(request: NextRequest) {
         tenant_id: authResult.tenant_id,
         itinerary_id,
         client_id,
+        // Attribution (mig 269): the staff member creating the quote.
+        created_by: authResult.user!.id,
         quote_number: quoteNumber,
         num_travelers,
         tier,
