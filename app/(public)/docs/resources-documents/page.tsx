@@ -14,54 +14,39 @@ export default function ResourcesDocumentsPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Resources &amp; Documents</h1>
 
-      {/* Resources */}
+      {/* Suppliers */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Resources</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Suppliers</h2>
         <p className="text-gray-600 mb-4">
-          Manage your operational contacts: guides, vehicles, hotels, restaurants, attractions, and airport staff.
+          The <strong>Suppliers</strong> page (Operations &rarr; Suppliers) is where you manage the companies and people you work with: hotels, transport companies, guides, restaurants, cruise operators, and more &mdash; 12 supplier types in total.
         </p>
+        <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
+          <li><strong>Views</strong> &mdash; Switch between grid, table, and list layouts, and filter by supplier type or status</li>
+          <li><strong>Add Supplier</strong> &mdash; Create a supplier with contact details and type</li>
+          <li><strong>Supplier Modal</strong> &mdash; Open any supplier to work across four tabs: <strong>Details</strong>, <strong>Rates</strong> (the rates tied to this supplier), <strong>Properties</strong>, and <strong>Documents</strong></li>
+          <li><strong>Property Hierarchy</strong> &mdash; Hotels, restaurants, and cruises support parent/child records, so a chain can hold its individual properties</li>
+          <li><strong>CSV Export</strong> &mdash; Download your supplier list as a spreadsheet</li>
+        </ul>
+        <DocScreenshot src="/docs/resources-documents/suppliers.jpg" alt="Suppliers page with type filters, view switcher, and supplier cards" />
 
-        <h3 className="text-lg font-medium text-gray-900 mb-3">Guides</h3>
-        <p className="text-gray-600 mb-3">
-          Go to <strong>Resources</strong> (or <strong>Rates &gt; Guides</strong>) to manage your guides:
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Resources Page</h3>
+        <p className="text-gray-600">
+          There is also a <strong>Resources</strong> overview page (not in the sidebar) with tabs for Guides, Vehicles, Hotels, Restaurants, Airport Staff, and Hotel Staff. Use it to browse; for adding and editing resources, use the <strong>Suppliers</strong> page above, and for pricing use the <strong>Rates &amp; Pricing</strong> category pages.
         </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li>Name, phone, email</li>
-          <li>Languages spoken</li>
-          <li>Specialties (e.g., Egyptology, adventure tours)</li>
-          <li>Certifications</li>
-          <li>Daily and hourly rates</li>
-          <li>Availability</li>
-        </ul>
-        <DocScreenshot src="/docs/resources-documents/suppliers.jpg" alt="Guides management page showing guide profiles with languages, rates, and availability" />
-
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Transportation</h3>
-        <p className="text-gray-600 mb-3">Manage transport suppliers:</p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li>Company name</li>
-          <li>Vehicle types available</li>
-          <li>Driver information</li>
-          <li>Contact details</li>
-        </ul>
-
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Other Resources</h3>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Hotels</strong> &mdash; Property contacts and details</li>
-          <li><strong>Restaurants</strong> &mdash; Restaurant information for meal bookings</li>
-          <li><strong>Attractions</strong> &mdash; Contact info for attractions and sites</li>
-          <li><strong>Airport Staff</strong> &mdash; Personnel for airport services</li>
-        </ul>
-        <ScreenshotPlaceholder caption="Resources overview page with tabs for Guides, Vehicles, Hotels, Restaurants, Attractions" />
       </section>
 
       {/* Documents */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Documents</h2>
         <p className="text-gray-600 mb-4">
-          Generate and manage professional documents for your travel business.
+          The <strong>Documents</strong> page is a hub of link cards in two groups:
         </p>
+        <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
+          <li><strong>Customer Documents</strong> &mdash; Contracts and invoices for clients, generated from the itinerary pages</li>
+          <li><strong>Supplier Documents</strong> &mdash; Vouchers and service orders, browsable by type</li>
+        </ul>
 
-        <h3 className="text-lg font-medium text-gray-900 mb-3">Document Types</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-3">Supplier Document Types</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
             <thead className="bg-gray-50">
@@ -71,51 +56,40 @@ export default function ResourcesDocumentsPage() {
               </tr>
             </thead>
             <tbody className="text-gray-700">
-              <tr className="border-b border-gray-100"><td className="px-4 py-2.5 font-medium">Itinerary PDF</td><td className="px-4 py-2.5">Day-by-day trip plan to send to clients</td></tr>
-              <tr className="border-b border-gray-100 bg-gray-50/50"><td className="px-4 py-2.5 font-medium">Invoice PDF</td><td className="px-4 py-2.5">Professional billing document</td></tr>
-              <tr className="border-b border-gray-100"><td className="px-4 py-2.5 font-medium">Contract</td><td className="px-4 py-2.5">Booking agreement with terms and conditions</td></tr>
-              <tr className="border-b border-gray-100 bg-gray-50/50"><td className="px-4 py-2.5 font-medium">Receipt</td><td className="px-4 py-2.5">Payment confirmation</td></tr>
-              <tr><td className="px-4 py-2.5 font-medium">Supplier Documents</td><td className="px-4 py-2.5">Vouchers and confirmations for suppliers</td></tr>
+              <tr className="border-b border-gray-100"><td className="px-4 py-2.5 font-medium">Hotel Vouchers</td><td className="px-4 py-2.5">Accommodation confirmations</td></tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50"><td className="px-4 py-2.5 font-medium">Transport Vouchers</td><td className="px-4 py-2.5">Transfer and transportation orders</td></tr>
+              <tr className="border-b border-gray-100"><td className="px-4 py-2.5 font-medium">Cruise Vouchers</td><td className="px-4 py-2.5">Nile cruise booking confirmations</td></tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50"><td className="px-4 py-2.5 font-medium">Activity Vouchers</td><td className="px-4 py-2.5">Tours and excursion confirmations</td></tr>
+              <tr className="border-b border-gray-100"><td className="px-4 py-2.5 font-medium">Guide Assignments</td><td className="px-4 py-2.5">Guide briefings and assignments</td></tr>
+              <tr><td className="px-4 py-2.5 font-medium">Service Orders</td><td className="px-4 py-2.5">General service instructions</td></tr>
             </tbody>
           </table>
         </div>
 
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Generating Documents</h3>
-        <p className="text-gray-600 mb-3">
-          Most documents are generated from within other pages:
-        </p>
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Generating &amp; Sending Documents</h3>
         <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Itinerary PDF</strong> &mdash; From the itinerary detail page, click <strong>Download PDF</strong></li>
-          <li><strong>Invoice PDF</strong> &mdash; From the invoice page, click <strong>Download PDF</strong></li>
-          <li><strong>Contract</strong> &mdash; From the itinerary, click <strong>Generate Documents</strong></li>
+          <li>Generate supplier documents from any itinerary using its <strong>Documents</strong> button &mdash; documents are auto-grouped by supplier from the itinerary&apos;s services</li>
+          <li>Send vouchers directly to suppliers via <strong>Email</strong> or <strong>WhatsApp</strong></li>
+          <li>Track the confirmation status of each document</li>
         </ul>
         <Tip>
-          PDFs are generated in your browser &mdash; no waiting for server processing. You can also go to <strong>Documents</strong> in the sidebar to see all generated documents in one place.
+          Main documents (itineraries, vouchers, quotes) are generated on the server for consistent, branded output; payment receipts are generated instantly in your browser.
         </Tip>
-        <DocScreenshot src="/docs/resources-documents/documents.jpg" alt="Documents page showing list of generated PDFs, contracts, and receipts with download buttons" />
+        <DocScreenshot src="/docs/resources-documents/documents.jpg" alt="Documents hub with Customer Documents and Supplier Documents link cards" />
       </section>
 
       {/* Content Library */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Content Library</h2>
         <p className="text-gray-600 mb-4">
-          Store and reuse frequently used content:
+          The Content Library stores reusable descriptions of your destinations, attractions, and hotels. Each entry can hold per-tier variations (budget, standard, deluxe, luxury) so the right wording flows into the right tier of itinerary. Browse with the category pills and search, and use <strong>Add Content</strong> to create entries. The <strong>AI Prompts</strong> and <strong>Writing Rules</strong> subpages let you tune how AI-generated content matches your brand voice.
         </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Tour descriptions</strong> &mdash; Reusable descriptions for popular destinations</li>
-          <li><strong>Email templates</strong> &mdash; Pre-written emails for common scenarios</li>
-          <li><strong>Itinerary text blocks</strong> &mdash; Standard day descriptions you use repeatedly</li>
-          <li><strong>AI Prompts</strong> &mdash; Custom prompts for generating content</li>
-          <li><strong>Writing Rules</strong> &mdash; Style guidelines so AI-generated content matches your brand voice</li>
-        </ul>
-
-        <h3 className="text-lg font-medium text-gray-900 mt-4 mb-3">Using the Content Library</h3>
-        <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>Content Library</strong> in the sidebar</li>
-          <li>Browse or search for content</li>
-          <li>Click to view or edit</li>
-          <li>Copy content into itineraries, emails, or other documents</li>
-        </ol>
+        <Tip>
+          Looking for email templates? Those live in <strong>Message Templates</strong>, not the Content Library.
+        </Tip>
+        <p className="text-gray-600">
+          See <Link href="/docs/content-library" className="text-primary-600 hover:underline">Content Library</Link> for the full guide.
+        </p>
       </section>
 
       {/* Navigation */}

@@ -18,35 +18,41 @@ export default function ClientsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewing Your Clients</h2>
         <p className="text-gray-600 mb-3">
-          Go to <strong>Clients</strong> in the sidebar. You will see a list of all your clients with their name, email, phone, nationality, total bookings, and total revenue.
+          Go to <strong>Clients</strong> in the sidebar. Stats cards at the top summarize your client base, and below them the list shows each client in columns: <strong>Client</strong>, <strong>Contact</strong>, <strong>Type &amp; Status</strong>, <strong>Lead Source</strong>, <strong>Bookings</strong>, <strong>Revenue</strong>, and <strong>Actions</strong>.
         </p>
-        <DocScreenshot src="/docs/clients/client-list.jpg" alt="Client list page with search, filters, and client rows" />
+        <DocScreenshot src="/docs/clients/client-list.jpg" alt="Client list with stats cards, search, filters, and columns for client, contact, type and status, lead source, bookings, and revenue" />
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Finding a Client</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li>Type in the <strong>Search</strong> bar (searches name, email, phone, or client code)</li>
-          <li>Use the <strong>Filters</strong> to narrow by status, client type, lead source, or VIP status</li>
-          <li><strong>Sort</strong> by name, revenue, number of bookings, or date added</li>
+          <li>Use the <strong>Filters</strong> to narrow by status, client type, lead source, VIP status, or a date range</li>
+          <li><strong>Sort</strong> by Most Recent, Oldest First, Name A-Z / Z-A, Revenue (high or low), or Bookings (Most)</li>
         </ul>
+        <Tip>
+          When filters are active, a count of applied filters appears with a <strong>Clear Filters</strong> button so you can reset the list in one click.
+        </Tip>
       </section>
 
       {/* Adding a Client */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Adding a New Client</h2>
+        <p className="text-gray-600 mb-3">
+          Click <strong>New Client</strong> (top right). The form is a 5-step wizard:
+        </p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Click the <strong>Add New Client</strong> button (top right)</li>
-          <li>Fill in the client details:
-            <ul className="list-disc list-inside ml-6 mt-2 space-y-1 text-gray-600">
-              <li>Name (required)</li>
-              <li>Email</li>
-              <li>Phone number</li>
-              <li>Nationality</li>
-              <li>Passport type (EU or Non-EU &mdash; this affects entrance fee pricing)</li>
-            </ul>
-          </li>
-          <li>Click <strong>Save</strong></li>
+          <li><strong>Basic Info</strong> &mdash; First Name and Last Name (both required), plus nationality and passport type (<strong>Euro Passport</strong> or <strong>Other Passport</strong> &mdash; this affects entrance fee pricing)</li>
+          <li><strong>Contact</strong> &mdash; Email, phone, and address details</li>
+          <li><strong>Preferences</strong> &mdash; Travel preferences to help you personalize trips</li>
+          <li><strong>Business</strong> &mdash; Company details for corporate clients</li>
+          <li><strong>Classification</strong> &mdash; Client type, status, and lead source (WhatsApp, Email, Website, Referral, Phone, Social Media, Trade Show, or Other)</li>
         </ol>
-        <ScreenshotPlaceholder caption="Add new client form with name, email, phone, and passport type fields" />
+        <p className="text-gray-600 mt-3">
+          Click <strong>Create Client</strong> on the final step to save.
+        </p>
+        <DocScreenshot src="/docs/clients/new-client-wizard.jpg" alt="New Client wizard on the Basic Info step, showing First Name, Last Name, nationality, and passport type fields" />
+        <Tip>
+          Coming from WhatsApp? In the WhatsApp inbox, the <strong>Create</strong> button in a conversation header opens this form with the client&apos;s phone number already filled in.
+        </Tip>
       </section>
 
       {/* Client Details */}
@@ -62,6 +68,9 @@ export default function ClientsPage() {
           <li><strong>Notes</strong> &mdash; Internal notes visible only to your team</li>
           <li><strong>Follow-ups</strong> &mdash; Tasks and reminders linked to this client</li>
         </ul>
+        <p className="text-gray-600 mt-3">
+          The detail page is also where you can <strong>delete</strong> a client if a record was created by mistake.
+        </p>
         <ScreenshotPlaceholder caption="Client detail page with Overview tab selected showing client info, bookings count, and revenue" />
       </section>
 
@@ -70,9 +79,9 @@ export default function ClientsPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <p className="text-gray-600 mb-3">From the client detail page, you can:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Log Communication</strong> &mdash; Record a phone call, meeting, or other interaction</li>
           <li><strong>Add Follow-up</strong> &mdash; Create a reminder to call or email the client</li>
           <li><strong>Add Note</strong> &mdash; Write an internal note</li>
-          <li><strong>Log Communication</strong> &mdash; Record a phone call, meeting, or other interaction</li>
         </ul>
         <Tip>
           <strong>Tip:</strong> Keep detailed notes on client preferences (dietary requirements, hotel preferences, etc.) so you can personalize future trips.

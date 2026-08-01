@@ -14,8 +14,15 @@ export default function B2BQuotesPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">B2B Quotes</h1>
       <p className="text-gray-600 mb-8">
-        B2B Quotes are saved pricing snapshots that you can share with tour operator partners. Each quote captures a specific pricing calculation with all service details, ready for PDF export and partner distribution.
+        B2B Quotes are saved pricing snapshots that you can share with tour operator partners. Each quote captures a specific calculation from the B2B Price Calculator with all service details, ready for PDF export and partner distribution. Like the calculator, this area is restricted to admin and manager roles.
       </p>
+
+      {/* Two stores callout */}
+      <section className="mb-10">
+        <Tip>
+          <strong>Two kinds of B2B quotes:</strong> Quotes saved from the <strong>B2B Price Calculator</strong> appear under <strong>B2B &rarr; Quotes</strong> &mdash; the list documented on this page. Quotes saved from <strong>New Quote</strong> in B2B mode are a different record kept on a separate page at <code>/quotes/b2b</code> (not in the sidebar). A quote created via New Quote will <em>not</em> appear in the B2B &rarr; Quotes list.
+        </Tip>
+      </section>
 
       {/* Creating a Quote */}
       <section className="mb-10">
@@ -25,7 +32,7 @@ export default function B2BQuotesPage() {
           <li>Click <strong>Save as Quote</strong></li>
           <li>Optionally fill in:
             <ul className="list-disc list-inside ml-6 mt-2 space-y-1 text-gray-600">
-              <li><strong>Partner</strong> &mdash; Select the B2B partner (tour operator) from your contacts</li>
+              <li><strong>Partner</strong> &mdash; Select the tour operator from your Partners list</li>
               <li><strong>Client Name</strong> &mdash; End client name if known</li>
               <li><strong>Email &amp; Phone</strong> &mdash; Client contact details</li>
               <li><strong>Nationality</strong> &mdash; For passport-type reference</li>
@@ -35,38 +42,50 @@ export default function B2BQuotesPage() {
           <li>Click <strong>Save Quote</strong></li>
         </ol>
         <p className="text-gray-600 mt-3">
-          The quote is assigned a unique reference code and captures the full pricing snapshot: services, rates, margin, and the rate sheet.
+          The quote is assigned a unique reference number and captures the full pricing snapshot: services, rates, margin, and totals. A confirmation banner shows the reference with a <strong>View Quote</strong> link.
         </p>
-        <ScreenshotPlaceholder caption="Save as Quote dialog with partner selection and client details" />
+        <ScreenshotPlaceholder caption="Save Quote dialog with partner selection, client details, and notes" />
+      </section>
+
+      {/* Partners */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Partners</h2>
+        <p className="text-gray-600 mb-3">
+          B2B partners are managed on their own page: <strong>B2B &rarr; Partners</strong>. Partners are separate from your regular contacts &mdash; each partner record can carry a <strong>default margin percentage</strong> that is applied automatically when you price work for that partner, overriding any manually entered margin.
+        </p>
+        <DocScreenshot src="/docs/b2b-quotes/partners.jpg" alt="Partners page with partner records and default margin percentages" />
       </section>
 
       {/* Viewing Quotes */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewing Quotes</h2>
         <p className="text-gray-600 mb-3">
-          Navigate to <strong>B2B Quotes</strong> from the sidebar. The quotes page shows:
+          Navigate to <strong>B2B &rarr; Quotes</strong> in the sidebar. The quotes page shows:
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Quote List</strong> &mdash; All saved quotes with reference, tour name, partner, date, pax, and price</li>
-          <li><strong>Status Badges</strong> &mdash; Draft, Sent, Confirmed, Expired</li>
-          <li><strong>Search</strong> &mdash; Filter by reference code, tour name, or partner name</li>
-          <li><strong>Quick Actions</strong> &mdash; View, download PDF, or open in calculator</li>
+          <li><strong>Stats Row</strong> &mdash; Total, Draft, Sent, and Accepted counts</li>
+          <li><strong>Quote Table</strong> &mdash; All saved quotes with reference, tour, partner, and pricing details</li>
+          <li><strong>Status Badges</strong> &mdash; Draft, Sent, Accepted, Rejected, or Expired</li>
+          <li><strong>Status Filter</strong> &mdash; Filter by Draft, Sent, Accepted, or Rejected</li>
+          <li><strong>Search</strong> &mdash; Matches reference code, tour name, partner name, or client name</li>
+          <li><strong>Row Actions</strong> &mdash; View, download PDF, or delete a quote</li>
         </ul>
-        <DocScreenshot src="/docs/b2b-quotes/quotes-list.jpg" alt="B2B Quotes list page with quote cards and action buttons" />
+        <DocScreenshot src="/docs/b2b-quotes/quotes-list.jpg" alt="B2B Quotes table with stats row, status filter, and View/PDF/Delete actions" />
       </section>
 
       {/* Quote Details */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quote Details</h2>
         <p className="text-gray-600 mb-3">
-          Click on a quote to see its full details:
+          Click a quote to see its full details:
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Tour Information</strong> &mdash; Tour name, variation, duration, cities</li>
-          <li><strong>Pricing Summary</strong> &mdash; Number of pax, total cost, margin, selling price, per person</li>
-          <li><strong>Service Snapshot</strong> &mdash; Complete service breakdown as calculated at quote time</li>
-          <li><strong>Rate Sheet</strong> &mdash; If generated, the full pax pricing table</li>
-          <li><strong>Client &amp; Partner Info</strong> &mdash; Contact details and notes</li>
+          <li><strong>Tour Info</strong> &mdash; Template name, variation, tier badge, plus Duration, Travelers, Travel Date, and Season</li>
+          <li><strong>Services Included</strong> &mdash; The complete service breakdown as calculated at quote time</li>
+          <li><strong>Pricing</strong> &mdash; Total cost, margin, selling price, per person</li>
+          <li><strong>Notes</strong> and <strong>Client Details</strong> &mdash; Contact information and any special conditions</li>
+          <li><strong>Update Status</strong> &mdash; Buttons to move the quote between Draft, Sent, Accepted, and Rejected</li>
+          <li><strong>Valid Until</strong> &mdash; The quote&apos;s expiry date; expired quotes are flagged in the list</li>
         </ul>
       </section>
 
@@ -74,19 +93,15 @@ export default function B2BQuotesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">PDF Export</h2>
         <p className="text-gray-600 mb-3">
-          Click <strong>Download PDF</strong> to generate a professional B2B quote document. The PDF includes:
+          Click the PDF action to generate a professional B2B quote document. PDFs are rendered on the server for consistent output and include:
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li>Company branding and logo</li>
+          <li>Your company branding and logo</li>
           <li>Quote reference number and date</li>
-          <li>Tour details and itinerary summary</li>
-          <li>Pricing table with rate sheet</li>
-          <li>Single supplement information</li>
+          <li>Tour details and services</li>
+          <li>Pricing summary</li>
           <li>Terms and conditions</li>
         </ul>
-        <Tip>
-          <strong>Japanese Support:</strong> The PDF generator supports Japanese text, so quotes for Japanese partners will render correctly with proper fonts.
-        </Tip>
       </section>
 
       {/* Navigation */}

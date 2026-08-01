@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
 
 export default function FollowupsRemindersPage() {
   return (
@@ -14,62 +14,75 @@ export default function FollowupsRemindersPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Follow-ups &amp; Reminders</h1>
       <p className="text-gray-600 mb-8">
-        Keep track of every client interaction with scheduled follow-ups and automated reminders. Never miss a callback, a quote follow-up, or an important deadline.
+        Two separate tools keep you on schedule: <strong>Follow-ups</strong> track your commitments to clients (calls, quotes, feedback requests), while <strong>Payment Reminders</strong> chase unpaid invoices on a fixed schedule. This page covers both.
       </p>
 
       {/* Follow-ups */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Follow-ups</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Follow-ups (CRM)</h2>
         <p className="text-gray-600 mb-3">
-          Navigate to <strong>Follow-ups</strong> in the sidebar. The follow-ups page lets you:
+          Follow-ups are always attached to a client and are created from the client&apos;s profile. To schedule one:
         </p>
-        <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Schedule Follow-ups</strong> &mdash; Set a date and time to follow up with a client</li>
-          <li><strong>Link to Client or Itinerary</strong> &mdash; Attach the follow-up to a specific client profile or itinerary</li>
-          <li><strong>Set Priority</strong> &mdash; Mark follow-ups as low, normal, or high priority</li>
-          <li><strong>Add Notes</strong> &mdash; Record what needs to be discussed or actioned</li>
-          <li><strong>Track Status</strong> &mdash; Mark as pending, completed, or overdue</li>
-        </ul>
-        <DocScreenshot src="/docs/followups-reminders/followups.jpg" alt="Follow-ups list with scheduled dates, client names, and status indicators" />
-      </section>
-
-      {/* Creating a Follow-up */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Creating a Follow-up</h2>
-        <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Click <strong>New Follow-up</strong> or create one from a client profile</li>
-          <li>Select the <strong>Client</strong> from the dropdown</li>
-          <li>Choose the <strong>Follow-up Date</strong></li>
-          <li>Select the <strong>Type</strong> (call, email, meeting, quote follow-up)</li>
-          <li>Add <strong>Notes</strong> with context about the follow-up</li>
-          <li>Click <strong>Save</strong></li>
+        <ol className="list-decimal list-inside space-y-2 text-gray-700 mb-4">
+          <li>Open the client&apos;s profile and use the <strong>Add Follow-up</strong> quick action</li>
+          <li>Choose the <strong>Type</strong> &mdash; Phone Call, Email, WhatsApp Message, Meeting, Send Quote, Booking Confirmation, Payment Reminder, Request Feedback, or Other</li>
+          <li>Enter a <strong>Description</strong> of what needs to happen</li>
+          <li>Pick the <strong>Due Date</strong> (date only &mdash; no time of day)</li>
+          <li>Set the <strong>Priority</strong> &mdash; Low, Medium, High, or Urgent</li>
+          <li>Add optional <strong>Notes</strong> with extra context</li>
+          <li>Click <strong>Schedule Follow-up</strong></li>
         </ol>
         <Tip>
-          <strong>Quick Follow-up:</strong> You can also create follow-ups directly from the client profile page or from an itinerary detail page.
+          Follow-ups are created only from a client profile &mdash; there is no create button on the Follow-ups page itself, and follow-ups are not linked to itineraries.
         </Tip>
       </section>
 
-      {/* Reminders */}
+      {/* Follow-ups Dashboard */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Reminders</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The Follow-ups Dashboard</h2>
         <p className="text-gray-600 mb-3">
-          Navigate to <strong>Reminders</strong> in the sidebar. Reminders are broader notifications that can be set for:
+          Navigate to <strong>Follow-ups</strong> in the sidebar (under CRM). The page is a dashboard of everything pending:
         </p>
-        <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Payment Due Dates</strong> &mdash; Remind you when a payment is expected</li>
-          <li><strong>Trip Start Dates</strong> &mdash; Alert before a client&apos;s trip begins</li>
-          <li><strong>Supplier Deadlines</strong> &mdash; Booking confirmation deadlines</li>
-          <li><strong>General Tasks</strong> &mdash; Any custom reminder you need</li>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li><strong>Four clickable stat cards</strong> &mdash; <strong>Due Today</strong>, <strong>This Week</strong>, <strong>Overdue</strong>, and <strong>All Pending</strong>. Click a card to filter the list</li>
+          <li><strong>Filters</strong> &mdash; Narrow the list by priority and by type</li>
+          <li><strong>Mark complete</strong> &mdash; Tick off a follow-up when it&apos;s done</li>
+          <li><strong>Edit and delete</strong> &mdash; Update any follow-up, or delete it (with a confirmation prompt)</li>
         </ul>
-        <ScreenshotPlaceholder caption="Reminders page with upcoming reminders sorted by date" />
+        <p className="text-gray-600">
+          A follow-up counts as <strong>overdue</strong> automatically once its due date has passed without being completed &mdash; there is no separate status to set.
+        </p>
+        <DocScreenshot src="/docs/followups-reminders/followups.jpg" alt="Follow-ups dashboard with Due Today, This Week, Overdue, and All Pending stat cards and the pending list" />
       </section>
 
-      {/* Dashboard Integration */}
+      {/* Payment Reminders */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Dashboard Integration</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment Reminders</h2>
         <p className="text-gray-600 mb-3">
-          Your upcoming follow-ups and reminders appear on the <strong>Dashboard</strong> for quick access. Overdue items are highlighted in red so you can prioritize them immediately.
+          Payment Reminders handle one job: chasing unpaid invoices. The page has no sidebar entry &mdash; open it from an invoice&apos;s <strong>Reminder History</strong> link. It shows two tabs, <strong>Pending</strong> and <strong>History</strong>, plus stat tiles for <strong>Pending</strong>, <strong>Overdue</strong>, <strong>Due Soon</strong>, <strong>Paused</strong>, and <strong>Selected</strong>.
         </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mb-3">The Reminder Schedule</h3>
+        <p className="text-gray-600 mb-3">
+          Each invoice follows a fixed schedule relative to its due date:
+        </p>
+        <ul className="list-disc list-inside space-y-1 text-gray-700 mb-4">
+          <li><strong>Before due</strong> &mdash; 7 days and 3 days before</li>
+          <li><strong>On the due date</strong></li>
+          <li><strong>After due</strong> &mdash; 7, 14, and 30 days overdue</li>
+          <li><strong>Manual</strong> &mdash; Send an extra reminder at any time</li>
+        </ul>
+
+        <h3 className="text-lg font-medium text-gray-900 mb-3">Sending and Managing</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li><strong>Batch send</strong> &mdash; Multi-select pending reminders and send them together; you get a sent/failed result for each one</li>
+          <li><strong>Pause / resume</strong> &mdash; Stop reminders for a specific invoice (e.g., while negotiating) and restart them later</li>
+          <li><strong>History</strong> &mdash; The History tab lists every reminder sent, filterable by status</li>
+        </ul>
+        <Tip>
+          Payment Reminders cover invoices only &mdash; for anything else (a callback, a supplier deadline, a feedback request), schedule a follow-up from the client&apos;s profile instead.
+        </Tip>
+        <DocScreenshot src="/docs/followups-reminders/reminders.jpg" alt="Payment Reminders page with Pending/History tabs, stat tiles, and batch-send selection" />
       </section>
 
       {/* Navigation */}

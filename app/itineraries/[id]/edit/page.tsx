@@ -960,7 +960,7 @@ export default function ItineraryEditorPage() {
         <div className="w-10 h-0.5 bg-gray-200"></div>
         <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
           <span className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center text-white text-xs font-bold">3</span>
-          <span className="text-sm font-medium text-gray-500">Calculate Pricing</span>
+          <span className="text-sm font-medium text-gray-500">Price in Grid</span>
         </div>
         <div className="w-10 h-0.5 bg-gray-200"></div>
         <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full">
@@ -1250,7 +1250,7 @@ export default function ItineraryEditorPage() {
                 {services.filter(s => !s.isDeleted).length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <p className="text-sm mb-2">No services added yet</p>
-                    <p className="text-xs">Click "Calculate Pricing" to auto-generate services from your itinerary</p>
+                    <p className="text-xs">Click "Price in Grid" to auto-generate services from your itinerary</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1546,7 +1546,7 @@ export default function ItineraryEditorPage() {
               <li>Edit services directly in the pricing section</li>
               <li>Add/remove services for each day</li>
               <li>Changes are saved when you click Save Draft</li>
-              <li>Calculate Pricing regenerates from rate tables</li>
+              <li>Price in Grid regenerates from rate tables</li>
             </ul>
           </div>
         </div>
