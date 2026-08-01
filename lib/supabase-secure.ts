@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 
 // Types
-export type UserRole = 'admin' | 'manager' | 'agent' | 'viewer'
+export type UserRole = 'admin' | 'manager' | 'member' | 'viewer'
 
 export interface AuthenticatedUser {
   id: string
@@ -108,7 +108,7 @@ export function hasMinimumRole(userRole: UserRole, minimumRole: UserRole): boole
   const hierarchy: Record<UserRole, number> = {
     admin: 4,
     manager: 3,
-    agent: 2,
+    member: 2,
     viewer: 1
   }
   return hierarchy[userRole] >= hierarchy[minimumRole]
@@ -217,5 +217,5 @@ export async function managerOrAbove(
 export async function agentOrAbove(
   handler: (supabase: ReturnType<typeof createServerClient>, user: AuthenticatedUser) => Promise<NextResponse>
 ): Promise<NextResponse> {
-  return withRoles(['admin', 'manager', 'agent'], handler)
+  return withRoles(['admin', 'manager', 'member'], handler)
 }

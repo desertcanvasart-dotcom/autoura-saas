@@ -360,7 +360,7 @@ describe('InvitationCreateSchema — privilege boundary', () => {
   it('defaults role to agent (least privilege among defaults)', () => {
     const r = InvitationCreateSchema.safeParse({ email: 'new@example.com' })
     expect(r.success).toBe(true)
-    if (r.success) expect(r.data.role).toBe('agent')
+    if (r.success) expect(r.data.role).toBe('member')
   })
 
   it.each([
@@ -373,7 +373,7 @@ describe('InvitationCreateSchema — privilege boundary', () => {
   })
 
   it('accepts every declared role', () => {
-    for (const role of ['admin', 'manager', 'agent', 'viewer']) {
+    for (const role of ['admin', 'manager', 'member', 'viewer']) {
       expect(InvitationCreateSchema.safeParse({ email: 'a@example.com', role }).success).toBe(true)
     }
   })
