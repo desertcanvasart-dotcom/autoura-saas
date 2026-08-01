@@ -37,6 +37,7 @@ import {
   Sparkles,
   ConciergeBell,
   Library,
+  Activity,
 } from 'lucide-react'
 
 interface DocItem {
@@ -122,6 +123,7 @@ const CATEGORIES: DocCategory[] = [
     label: 'Settings & Integrations',
     items: [
       { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'Team management, user roles, organization branding, billing, and preferences.' },
+      { href: '/docs/activity-summary', icon: Activity, title: 'Team Activity', description: 'Optional, transparent activity summaries: last seen, focused time, and work counts per member.' },
       { href: '/integrations', icon: Link2, title: 'Integrations', description: 'WhatsApp Business API and Gmail OAuth, both live today. Accounting sync (Xero, QuickBooks) is on the roadmap for Q3 2026.' },
       { href: '/docs/workflows', icon: Lightbulb, title: 'Workflows & Tips', description: 'Step-by-step workflows and productivity shortcuts.' },
     ],
