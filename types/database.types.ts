@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 123
+ * Tables: 124
  */
 
 export type Json =
@@ -6139,6 +6139,60 @@ export interface Database {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          id: string
+          team_member_id: string
+          type: string
+          title: string
+          message: string | null
+          link: string | null
+          related_task_id: string | null
+          is_read: boolean
+          email_sent: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          team_member_id: string
+          type: string
+          title: string
+          message?: string | null
+          link?: string | null
+          related_task_id?: string | null
+          is_read?: boolean
+          email_sent?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          team_member_id?: string
+          type?: string
+          title?: string
+          message?: string | null
+          link?: string | null
+          related_task_id?: string | null
+          is_read?: boolean
+          email_sent?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_related_task_id_fkey"
+            columns: ["related_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
