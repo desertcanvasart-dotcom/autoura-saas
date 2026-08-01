@@ -97,7 +97,7 @@ const navigation: NavSection[] = [
   {
     title: 'CRM',
     key: 'crm',
-    roles: ['admin', 'manager', 'agent'],
+    roles: ['admin', 'manager', 'member'],
     items: [
       { label: 'Clients', href: '/clients', icon: Users, businessTypes: ['b2c_only', 'b2c_and_b2b'] },
       { label: 'Concierge Leads', href: '/concierge-briefs', icon: ConciergeBell },
@@ -111,7 +111,7 @@ const navigation: NavSection[] = [
   {
     title: 'Communication',
     key: 'communication',
-    roles: ['admin', 'manager', 'agent'],
+    roles: ['admin', 'manager', 'member'],
     items: [
       // '/communications' is deliberately not listed: despite its "unified"
       // components it only shows email conversations — redundant with both
@@ -136,7 +136,7 @@ const navigation: NavSection[] = [
     key: 'operations',
     // Group widened to agents for the quote items moved from the removed
     // Quotes group; the original items keep admin/manager via item roles.
-    roles: ['admin', 'manager', 'agent'],
+    roles: ['admin', 'manager', 'member'],
     items: [
       { label: 'New Quote', href: '/pricing-grid', icon: Grid3x3 },
       {
@@ -158,7 +158,7 @@ const navigation: NavSection[] = [
   {
     title: 'Bookings',
     key: 'bookings',
-    roles: ['admin', 'manager', 'agent'],
+    roles: ['admin', 'manager', 'member'],
     items: [
       { label: 'All Bookings', href: '/bookings', icon: BookOpen },
     ]
@@ -256,14 +256,14 @@ const STORAGE_KEY = 'autoura-sidebar-sections'
 const ROLE_COLORS: Record<UserRole, string> = {
   admin: 'bg-purple-100 text-purple-700',
   manager: 'bg-blue-100 text-blue-700',
-  agent: 'bg-green-100 text-green-700',
+  member: 'bg-green-100 text-green-700',
   viewer: 'bg-gray-100 text-gray-600'
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Admin',
   manager: 'Manager',
-  agent: 'Agent',
+  member: 'Member',
   viewer: 'Viewer'
 }
 

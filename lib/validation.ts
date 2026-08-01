@@ -134,7 +134,7 @@ export const InvoiceCreateSchema = z.object({
 
 export const InvitationCreateSchema = z.object({
   email: EmailSchema,
-  role: z.enum(['admin', 'manager', 'agent', 'viewer']).default('agent'),
+  role: z.enum(['admin', 'manager', 'member', 'viewer']).default('member'),
 })
 
 // ============================================

@@ -3,13 +3,13 @@
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useMemo } from 'react'
 
-export type UserRole = 'admin' | 'manager' | 'agent' | 'viewer'
+export type UserRole = 'admin' | 'manager' | 'member' | 'viewer'
 
 interface UseRoleReturn {
   role: UserRole
   isAdmin: boolean
   isManager: boolean
-  isAgent: boolean
+  isMember: boolean
   isViewer: boolean
   canAccess: (requiredRoles: UserRole[]) => boolean
   canManageTeam: boolean
@@ -22,7 +22,7 @@ interface UseRoleReturn {
 const ROLE_HIERARCHY: Record<UserRole, number> = {
   admin: 4,
   manager: 3,
-  agent: 2,
+  member: 2,
   viewer: 1
 }
 
@@ -38,7 +38,7 @@ export function useRole(): UseRoleReturn {
       role,
       isAdmin: role === 'admin',
       isManager: role === 'manager',
-      isAgent: role === 'agent',
+      isMember: role === 'member',
       isViewer: role === 'viewer',
       
       // Check if user can access based on required roles
@@ -85,5 +85,5 @@ export function ManagerOnly({ children, fallback }: { children: React.ReactNode;
 
 // Component to hide content from viewers
 export function NotViewer({ children, fallback }: { children: React.ReactNode; fallback?: React.ReactNode }) {
-  return <WithRole roles={['admin', 'manager', 'agent']} fallback={fallback}>{children}</WithRole>
+  return <WithRole roles={['admin', 'manager', 'member']} fallback={fallback}>{children}</WithRole>
 }
