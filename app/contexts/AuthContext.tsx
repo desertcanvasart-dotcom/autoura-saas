@@ -80,6 +80,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Presence heartbeat: stamp last_seen_at once on session start and every
+  // 5 minutes while a tab stays open. Fire-and-forget — presence must never
+  // affect the auth flow.
+  useEffect(() => {
+    if (!user) return
+    const beat = () => {
+      fetch('/api/profiles/heartbeat', { method: 'POST' }).catch(() => {})
+    }
+    beat()
+    const interval = setInterval(beat, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [user?.id])
+
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
