@@ -1169,13 +1169,6 @@ export interface Database {
             referencedRelation: "tour_variations"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "b2b_quotes_converted_to_itinerary_id_fkey"
-            columns: ["converted_to_itinerary_id"]
-            isOneToOne: false
-            referencedRelation: "itineraries"
-            referencedColumns: ["id"]
-          },
         ]
       }
       b2b_transport_packages: {
