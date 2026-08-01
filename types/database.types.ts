@@ -1219,6 +1219,7 @@ export interface Database {
           last_modified_by: string | null
           last_modified_at: string | null
           pdf_generated_at: string | null
+          created_by: string | null
         }
         Insert: {
           id?: string
@@ -1248,6 +1249,7 @@ export interface Database {
           last_modified_by?: string | null
           last_modified_at?: string | null
           pdf_generated_at?: string | null
+          created_by?: string | null
         }
         Update: {
           id?: string
@@ -1277,6 +1279,7 @@ export interface Database {
           last_modified_by?: string | null
           last_modified_at?: string | null
           pdf_generated_at?: string | null
+          created_by?: string | null
         }
         Relationships: [
           {
@@ -3610,6 +3613,7 @@ export interface Database {
           to_addresses: string[] | null
           cc_addresses: string[] | null
           bcc_addresses: string[] | null
+          sent_by: string | null
         }
         Insert: {
           id?: string
@@ -3643,6 +3647,7 @@ export interface Database {
           to_addresses?: string[] | null
           cc_addresses?: string[] | null
           bcc_addresses?: string[] | null
+          sent_by?: string | null
         }
         Update: {
           id?: string
@@ -3676,6 +3681,7 @@ export interface Database {
           to_addresses?: string[] | null
           cc_addresses?: string[] | null
           bcc_addresses?: string[] | null
+          sent_by?: string | null
         }
         Relationships: [
           {
@@ -4947,6 +4953,7 @@ export interface Database {
           reminder_count: number | null
           next_reminder_date: string | null
           reminder_paused: boolean | null
+          created_by: string | null
         }
         Insert: {
           id?: string
@@ -4982,6 +4989,7 @@ export interface Database {
           reminder_count?: number | null
           next_reminder_date?: string | null
           reminder_paused?: boolean | null
+          created_by?: string | null
         }
         Update: {
           id?: string
@@ -5017,6 +5025,7 @@ export interface Database {
           reminder_count?: number | null
           next_reminder_date?: string | null
           reminder_paused?: boolean | null
+          created_by?: string | null
         }
         Relationships: [
           {
@@ -9942,6 +9951,7 @@ export interface Database {
           message_body: string | null
           message_sid: string | null
           metadata: Json | null
+          sent_by: string | null
         }
         Insert: {
           id?: string
@@ -9959,6 +9969,7 @@ export interface Database {
           message_body?: string | null
           message_sid?: string | null
           metadata?: Json | null
+          sent_by?: string | null
         }
         Update: {
           id?: string
@@ -9976,6 +9987,7 @@ export interface Database {
           message_body?: string | null
           message_sid?: string | null
           metadata?: Json | null
+          sent_by?: string | null
         }
         Relationships: [
           {
