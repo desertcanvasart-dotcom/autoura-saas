@@ -33,33 +33,20 @@ export default function TeamSettingsPage() {
         <DocScreenshot src="/docs/team-settings/team-members.jpg" alt="Team Members staff directory with job-title roles, departments, and filters" />
       </section>
 
-      {/* Team Management */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Team Management (Access)</h2>
-        <p className="text-gray-600 mb-4">
-          Go to <strong>Team Management</strong> in the Settings group (admin only) to control who can log in to your workspace:
-        </p>
-        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li>Click <strong>Invite Member</strong>, enter their email, and pick an access role &mdash; they receive an email to set up their account</li>
-          <li>Change a member&apos;s role inline from the list</li>
-          <li>Remove a member to revoke their access</li>
-          <li>A <strong>Role Permissions</strong> reference table on the page shows what each role can do</li>
-        </ul>
-        <DocScreenshot src="/docs/team-settings/team-management.jpg" alt="Team Management page with Invite Member, inline role changes, and the Role Permissions table" />
-      </section>
-
       {/* User Management */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">User Management</h2>
         <p className="text-gray-600 mb-4">
-          <strong>User Management</strong> (admin only) is where invitations are managed in detail:
+          <strong>User Management</strong> (admin only) is the single place to control who can log in to your workspace:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
-          <li>Click <strong>Invite User</strong> to send an invitation</li>
+          <li>Click <strong>Invite User</strong>, enter their email, and pick an access role &mdash; they receive an email to set up their account</li>
           <li>Access roles are <strong>Administrator</strong> (full access), <strong>Manager</strong> (clients, tasks, and reports), <strong>Member</strong> (assigned work), and <strong>Viewer</strong> (read-only)</li>
-          <li>Change a user&apos;s role from the inline dropdown</li>
+          <li>Change a user&apos;s role from the inline dropdown, or deactivate a user to revoke access</li>
           <li><strong>Pending Invites</strong> and <strong>Expired Invites</strong> sections let you resend or revoke invitations</li>
+          <li>A <strong>Role Permissions</strong> reference table at the bottom of the page shows what each role can do</li>
         </ul>
+        <DocScreenshot src="/docs/getting-started/user-management.jpg" alt="User Management page with users, roles, and invitation management" />
         <Tip>
           Refer to the <Link href="/docs/getting-started" className="text-primary-600 underline hover:text-primary-700">Getting Started</Link> page for a full breakdown of what each access role can do.
         </Tip>

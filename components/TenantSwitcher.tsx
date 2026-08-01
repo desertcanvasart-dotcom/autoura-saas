@@ -100,9 +100,9 @@ export default function TenantSwitcher({ isCollapsed }: TenantSwitcherProps) {
               <Settings className="w-4 h-4" />
             </button>
             <button
-              onClick={() => router.push('/settings/team')}
+              onClick={() => router.push('/users')}
               className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              title="Team Management"
+              title="User Management"
             >
               <Users className="w-4 h-4" />
             </button>

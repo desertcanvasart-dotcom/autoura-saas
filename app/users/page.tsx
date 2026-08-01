@@ -24,6 +24,10 @@ import {
   Trash2,
   ArrowLeft,
   User as UserIcon,
+  Crown,
+  ShieldCheck,
+  UserCog,
+  Eye,
 } from 'lucide-react'
 
 interface TeamMember {
@@ -584,6 +588,48 @@ export default function UserManagementPage() {
             )}
           </div>
         )}
+
+        {/* Role Permissions reference (ported from the retired /settings/team page) */}
+        <div className="mt-6 bg-gray-50 rounded-lg border border-gray-200 p-5">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Role Permissions</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex items-start gap-3">
+              <Crown className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Owner</p>
+                <p className="text-xs text-gray-500">Full access to all features</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <ShieldCheck className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Administrator</p>
+                <p className="text-xs text-gray-500">Full access to everything</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <UserCog className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Manager</p>
+                <p className="text-xs text-gray-500">Manage clients, tasks, and reports</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <UserIcon className="w-5 h-5 text-[#647C47] flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Member</p>
+                <p className="text-xs text-gray-500">Work on assigned tasks and clients</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Eye className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-gray-900">Viewer</p>
+                <p className="text-xs text-gray-500">Read-only access</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Invite Modal */}
         {showInviteModal && (
