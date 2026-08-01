@@ -64,7 +64,6 @@ const ROUTE_PERMISSIONS: Record<string, string[]> = {
   '/inbox': ['admin', 'manager', 'agent'],
   '/whatsapp-inbox': ['admin', 'manager', 'agent'],
   '/whatsapp-parser': ['admin', 'manager', 'agent'],
-  '/contacts': ['admin', 'manager', 'agent'],
   '/communications': ['admin', 'manager', 'agent'],
   '/followups': ['admin', 'manager', 'agent'],
   '/tours': ['admin', 'manager', 'agent'],
@@ -151,7 +150,8 @@ export async function middleware(request: NextRequest) {
     '/share',
   ]
   // Exact match or a true sub-path ('/contact/foo'), never a shared prefix
-  // ('/contacts' must NOT match public '/contact').
+  // (a protected route must NOT match public '/contact' just because it
+  // shares the prefix).
   const isPublicRoute = publicRoutes.some(route =>
     request.nextUrl.pathname === route ||
     (route !== '/' && request.nextUrl.pathname.startsWith(route + '/'))
