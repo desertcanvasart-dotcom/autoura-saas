@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot, ScreenshotPlaceholder } from '../layout'
 
 export default function TeamSettingsPage() {
   return (
@@ -49,6 +49,23 @@ export default function TeamSettingsPage() {
         <DocScreenshot src="/docs/getting-started/user-management.jpg" alt="User Management page with users, roles, and invitation management" />
         <Tip>
           Refer to the <Link href="/docs/getting-started" className="text-primary-600 underline hover:text-primary-700">Getting Started</Link> page for a full breakdown of what each access role can do.
+        </Tip>
+      </section>
+
+      {/* Team Activity */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Team Activity (optional)</h2>
+        <p className="text-gray-600 mb-4">
+          Activity Summaries give admins and managers a light-touch view of how the team uses Autoura. For each member with a login you can see their <strong>last login</strong>, <strong>last seen</strong>, approximate <strong>focused time</strong> per day, and work counts &mdash; tasks completed, itineraries touched, and copilot drafts reviewed and sent.
+        </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
+          <li><strong>Off by default</strong> &mdash; an admin turns it on in <strong>Organization</strong> settings, after confirming the team has been informed; everyone gets an in-app notice when it is enabled</li>
+          <li>Open a member&apos;s summary from the <strong>Activity</strong> button on their card in Team Members (only members with a login have one)</li>
+          <li>Members always see their <strong>own summary</strong> on their Profile page &mdash; the same numbers a manager sees</li>
+        </ul>
+        <ScreenshotPlaceholder caption="Team member Activity modal showing focused-time bars and work counts" />
+        <Tip>
+          Activity reflects work inside Autoura only. Phone calls, meetings, and off-app work are not captured &mdash; treat summaries as context, never as a complete picture of someone&apos;s day.
         </Tip>
       </section>
 

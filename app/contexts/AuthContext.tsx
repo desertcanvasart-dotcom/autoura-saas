@@ -81,16 +81,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // Presence heartbeat: stamp last_seen_at once on session start and every
-  // 5 minutes while a tab stays open. Fire-and-forget — presence must never
-  // affect the auth flow.
+  // 5 minutes while a tab stays open. A beat is "focused" only when the tab
+  // is visible AND the user interacted within the last interval — that is
+  // what accrues activity minutes. Hidden-and-idle skips the beat entirely.
+  // Fire-and-forget — presence must never affect the auth flow.
   useEffect(() => {
     if (!user) return
-    const beat = () => {
-      fetch('/api/profiles/heartbeat', { method: 'POST' }).catch(() => {})
+    let lastInput = Date.now()
+    const markInput = () => { lastInput = Date.now() }
+    const INPUT_EVENTS: (keyof WindowEventMap)[] = ['keydown', 'pointerdown', 'scroll']
+    INPUT_EVENTS.forEach(e => window.addEventListener(e, markInput, { passive: true }))
+
+    const beat = (force = false) => {
+      const visible = document.visibilityState === 'visible'
+      const recentInput = Date.now() - lastInput < 5 * 60 * 1000
+      const focused = visible && recentInput
+      if (!focused && !force) return
+      fetch('/api/profiles/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ focused }),
+      }).catch(() => {})
     }
-    beat()
-    const interval = setInterval(beat, 5 * 60 * 1000)
-    return () => clearInterval(interval)
+    beat(true) // session start: always stamp presence
+    const interval = setInterval(() => beat(), 5 * 60 * 1000)
+    return () => {
+      clearInterval(interval)
+      INPUT_EVENTS.forEach(e => window.removeEventListener(e, markInput))
+    }
   }, [user?.id])
 
   const fetchProfile = async (userId: string) => {

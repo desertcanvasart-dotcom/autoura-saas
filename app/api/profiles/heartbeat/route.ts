@@ -1,15 +1,21 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 /**
- * POST /api/profiles/heartbeat — stamp the caller's last_seen_at.
+ * POST /api/profiles/heartbeat — stamp the caller's last_seen_at and,
+ * when the beat is focused, add 5 minutes to today's activity rollup.
  *
- * Called by AuthContext every 5 minutes while a tab is open (and once on
- * session start), so last_seen_at reads as "active until about then".
- * Admin client: user_profiles has no self-update RLS path for this
- * column and the write is pinned to the session user's own row anyway.
+ * Called by AuthContext every 5 minutes while a tab is open. The client
+ * sends { focused: boolean } — true only when the tab is visible AND the
+ * user interacted within the last interval, so background tabs keep
+ * last_seen_at roughly honest without accruing focused time. The client
+ * skips the beat entirely when hidden-and-idle.
+ *
+ * Admin client on purpose: user_activity_daily has SELECT-only RLS —
+ * clients must not be able to inflate their own minutes — and the write
+ * is pinned to the session user's own row either way.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {
@@ -19,12 +25,40 @@ export async function POST() {
       )
     }
 
-    const { error } = await createAdminClient()
+    let focused = false
+    try {
+      const body = await request.json()
+      focused = body?.focused === true
+    } catch {
+      // No/invalid body (older clients): presence-only beat.
+    }
+
+    const adminClient = createAdminClient()
+    const now = new Date()
+    const nowIso = now.toISOString()
+
+    const { error } = await adminClient
       .from('user_profiles')
-      .update({ last_seen_at: new Date().toISOString() })
+      .update({ last_seen_at: nowIso })
       .eq('id', authResult.user.id)
 
     if (error) throw error
+
+    if (focused) {
+      // UTC day bucket (spec open-question #2: tenant-timezone buckets are
+      // a possible phase 2; the tenants table has no timezone column yet).
+      const day = nowIso.slice(0, 10)
+      const { error: rollupError } = await adminClient.rpc(
+        'increment_activity_minutes',
+        {
+          p_tenant_id: authResult.tenant_id,
+          p_user_id: authResult.user.id,
+          p_day: day,
+          p_minutes: 5,
+        }
+      )
+      if (rollupError) throw rollupError
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

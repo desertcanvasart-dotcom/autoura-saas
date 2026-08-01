@@ -19,6 +19,7 @@ import {
   Users,
   FileText,
   Building,
+  Activity,
 } from 'lucide-react'
 import Image from 'next/image'
 
@@ -47,6 +48,14 @@ export default function TenantSettingsPage() {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Team Activity (tenant_features.activity_summary_enabled) state.
+  // Interactive, unlike the plan-controlled Features card: an admin opts the
+  // workspace in after attesting the team has been informed.
+  const [activityEnabled, setActivityEnabled] = useState(false)
+  const [activityEnableRequested, setActivityEnableRequested] = useState(false)
+  const [activityInformedConfirmed, setActivityInformedConfirmed] = useState(false)
+  const [activitySaving, setActivitySaving] = useState(false)
+
   // UI state
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -70,11 +79,57 @@ export default function TenantSettingsPage() {
       setEmailIntegration(features.email_integration)
       setPdfGeneration(features.pdf_generation)
       setAnalyticsEnabled(features.analytics_enabled)
-
-
-
+      // column lands with migration 267; types regen follows
+      setActivityEnabled((features as any)?.activity_summary_enabled === true)
     }
   }, [tenant, features])
+
+  const saveActivitySummary = async (enabled: boolean) => {
+    setActivitySaving(true)
+    setMessage(null)
+    try {
+      const response = await fetch('/api/settings/activity-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          enabled ? { enabled: true, confirmed_informed: true } : { enabled: false }
+        ),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update setting')
+      }
+      setActivityEnabled(data.enabled === true)
+      setActivityEnableRequested(false)
+      setActivityInformedConfirmed(false)
+      setMessage({
+        type: 'success',
+        text: enabled
+          ? `Enabled — ${data.notified} team members notified in-app`
+          : 'Activity summaries disabled.',
+      })
+      await refetchTenant()
+    } catch (error: any) {
+      console.error('Error updating activity summaries:', error)
+      setMessage({ type: 'error', text: error.message || 'Failed to update setting' })
+    } finally {
+      setActivitySaving(false)
+    }
+  }
+
+  const handleActivityToggle = (checked: boolean) => {
+    if (checked) {
+      // Enabling needs the informed-team confirmation first — reveal it.
+      setActivityEnableRequested(true)
+    } else if (activityEnabled) {
+      // Disabling needs no confirmation.
+      saveActivitySummary(false)
+    } else {
+      // The admin backed out of an unconfirmed enable.
+      setActivityEnableRequested(false)
+      setActivityInformedConfirmed(false)
+    }
+  }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -440,6 +495,80 @@ export default function TenantSettingsPage() {
               Upgrade plan for higher limits
             </Link>
           </div>
+        </div>
+
+        {/* Team Activity */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-gray-600" />
+              <h2 className="text-sm font-semibold text-gray-900">Team Activity</h2>
+            </div>
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded ${
+                activityEnabled ? 'text-green-700 bg-green-50' : 'text-gray-400 bg-gray-100'
+              }`}
+            >
+              {activityEnabled ? 'On' : 'Off'}
+            </span>
+          </div>
+
+          <p className="text-xs text-gray-600 mb-3">
+            Activity Summaries show admins and managers each team member&apos;s last login,
+            last seen, approximate focused time, and work counts. Every member can always
+            see their own summary.
+          </p>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={activityEnabled || activityEnableRequested}
+              onChange={(e) => handleActivityToggle(e.target.checked)}
+              disabled={activitySaving}
+              className="w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+            />
+            <span className="text-xs text-gray-700">
+              {activitySaving && !activityEnableRequested
+                ? 'Updating...'
+                : 'Enable Activity Summaries'}
+            </span>
+          </label>
+
+          {!activityEnabled && activityEnableRequested && (
+            <div className="mt-3 pl-5 space-y-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={activityInformedConfirmed}
+                  onChange={(e) => setActivityInformedConfirmed(e.target.checked)}
+                  className="mt-0.5 w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                />
+                <span className="text-xs text-gray-700">
+                  My team has been informed that activity summaries will be visible
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => saveActivitySummary(true)}
+                disabled={!activityInformedConfirmed || activitySaving}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#647C47] text-white text-xs font-medium rounded-lg hover:bg-[#4f613a] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {activitySaving ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Enabling...
+                  </>
+                ) : (
+                  'Enable'
+                )}
+              </button>
+            </div>
+          )}
+
+          <p className="mt-3 text-[11px] text-gray-400">
+            Activity reflects work inside Autoura only. Phone calls, meetings, and off-app
+            work are not captured.
+          </p>
         </div>
 
         {/* Branding */}

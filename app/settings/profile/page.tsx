@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { showToast } from '@/app/contexts/ToastContext'
@@ -36,6 +36,28 @@ interface PasswordData {
   confirmPassword: string
 }
 
+// Shape of GET /api/activity's data payload (docs/ACTIVITY-SUMMARY-SPEC.md).
+// Self-transparency view: the same numbers a manager sees for this user.
+interface ActivitySummaryData {
+  range: string
+  presence: {
+    last_login_at: string | null
+    last_seen_at: string | null
+    days: Array<{ day: string; active_minutes: number }>
+  }
+  output: {
+    tasks_completed: number | null
+    itineraries_touched: number | null
+    copilot_reviewed: number | null
+    copilot_sent: number | null
+  }
+  unattributed_note: string
+}
+
+// 8h cap per day for the focused-time bars
+const ACTIVITY_DAY_CAP_MINUTES = 8 * 60
+const ACTIVITY_STRIP_DAYS = 7
+
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -62,6 +84,29 @@ export default function ProfilePage() {
     newPassword: '',
     confirmPassword: ''
   })
+
+  // Own activity summary (last 7 days). 403 feature_disabled — or any other
+  // failure — means the card simply does not render.
+  const [activity, setActivity] = useState<ActivitySummaryData | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/activity?range=7d')
+        const result = await res.json()
+        if (!cancelled && res.ok && result.success) {
+          setActivity(result.data)
+        }
+      } catch {
+        // fail-soft: no card
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const fmtDate = (iso?: string | null) => {
     if (!iso) return '—'
@@ -500,6 +545,93 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+
+          {/* YOUR ACTIVITY — the self-transparency view of Activity Summaries.
+              Renders only when the tenant feature is on (a 403 feature_disabled
+              from /api/activity means no card at all). */}
+          {activity && (() => {
+            const byDay = new Map(
+              activity.presence.days.map(d => [d.day, d.active_minutes])
+            )
+            const cells = Array.from({ length: ACTIVITY_STRIP_DAYS }, (_, i) => {
+              const day = new Date(Date.now() - (ACTIVITY_STRIP_DAYS - 1 - i) * 86400000)
+                .toISOString()
+                .slice(0, 10)
+              return { day, minutes: byDay.get(day) ?? 0 }
+            })
+            const total = activity.presence.days.reduce(
+              (sum, d) => sum + d.active_minutes,
+              0
+            )
+            const tiles: Array<[string, number | null]> = [
+              ['Tasks completed', activity.output.tasks_completed],
+              ['Itineraries touched', activity.output.itineraries_touched],
+              ['Copilot reviewed', activity.output.copilot_reviewed],
+              ['Copilot sent', activity.output.copilot_sent],
+            ]
+            return (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-800">Your Activity</h3>
+                  <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Last 7 days</span>
+                </div>
+
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                    <span className="text-xs text-gray-500">Last Login</span>
+                    <span className="text-xs font-medium text-gray-700">{fmtDateTime(activity.presence.last_login_at)}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-1.5 border-b border-gray-100">
+                    <span className="text-xs text-gray-500">Last Seen</span>
+                    <span className="text-xs font-medium text-gray-700">{fmtDateTime(activity.presence.last_seen_at)}</span>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <div className="flex items-end gap-1 h-12">
+                    {cells.map(cell => (
+                      <div
+                        key={cell.day}
+                        className="flex-1 flex flex-col justify-end h-full"
+                        title={`${cell.day}: ${cell.minutes}m`}
+                      >
+                        <div
+                          className="w-full rounded-sm bg-primary-600"
+                          style={{
+                            height: `${Math.max(
+                              cell.minutes > 0 ? 4 : 2,
+                              Math.round(
+                                (Math.min(cell.minutes, ACTIVITY_DAY_CAP_MINUTES) /
+                                  ACTIVITY_DAY_CAP_MINUTES) *
+                                  48
+                              )
+                            )}px`,
+                            opacity: cell.minutes > 0 ? 1 : 0.15
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    ~{Math.floor(total / 60)}h {total % 60}m focused time
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                  {tiles.map(([label, value]) => (
+                    <div key={label} className="bg-gray-50 border border-gray-200 rounded-md p-2">
+                      <p className="text-[10px] text-gray-500">{label}</p>
+                      <p className="text-sm font-semibold text-gray-900">{value === null ? '—' : value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[10px] text-gray-400">
+                  Activity reflects work inside Autoura only. Phone calls, meetings, and off-app work are not captured.
+                </p>
+              </div>
+            )
+          })()}
 
           {/* DANGER ZONE */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 border-l-4 border-l-red-500">

@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 122
+ * Tables: 123
  */
 
 export type Json =
@@ -7668,6 +7668,7 @@ export interface Database {
           concierge_enabled: boolean
           copilot_pregenerate_enabled: boolean
           use_global_catalog: boolean
+          activity_summary_enabled: boolean
         }
         Insert: {
           id?: string
@@ -7690,6 +7691,7 @@ export interface Database {
           concierge_enabled?: boolean
           copilot_pregenerate_enabled?: boolean
           use_global_catalog?: boolean
+          activity_summary_enabled?: boolean
         }
         Update: {
           id?: string
@@ -7712,6 +7714,7 @@ export interface Database {
           concierge_enabled?: boolean
           copilot_pregenerate_enabled?: boolean
           use_global_catalog?: boolean
+          activity_summary_enabled?: boolean
         }
         Relationships: [
           {
@@ -9374,6 +9377,41 @@ export interface Database {
         }
         Relationships: []
       }
+      user_activity_daily: {
+        Row: {
+          tenant_id: string
+          user_id: string
+          day: string
+          active_minutes: number
+          first_seen_at: string | null
+          last_seen_at: string | null
+        }
+        Insert: {
+          tenant_id: string
+          user_id: string
+          day: string
+          active_minutes?: number
+          first_seen_at?: string | null
+          last_seen_at?: string | null
+        }
+        Update: {
+          tenant_id?: string
+          user_id?: string
+          day?: string
+          active_minutes?: number
+          first_seen_at?: string | null
+          last_seen_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_activity_daily_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           id: string
@@ -10078,6 +10116,16 @@ export interface Database {
       }
       get_user_tenant_id: {
         Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      increment_activity_minutes: {
+        Args: {
+          p_day?: string
+          p_minutes?: number
+          p_tenant_id?: string
+          p_user_id?: string
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
       }

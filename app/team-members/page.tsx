@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { 
+import {
   Search,
   Plus,
   Edit2,
@@ -14,9 +14,11 @@ import {
   CheckCircle,
   XCircle,
   Users,
-  KeyRound
+  KeyRound,
+  Activity
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 interface TeamMember {
   id: string
@@ -40,6 +42,54 @@ interface Department {
   description?: string
   service_types?: string[]
 }
+
+// Shape of GET /api/activity's data payload (docs/ACTIVITY-SUMMARY-SPEC.md)
+interface ActivitySummaryData {
+  range: string
+  presence: {
+    last_login_at: string | null
+    last_seen_at: string | null
+    days: Array<{ day: string; active_minutes: number }>
+  }
+  output: {
+    tasks_completed: number | null
+    itineraries_touched: number | null
+    copilot_reviewed: number | null
+    copilot_sent: number | null
+  }
+  unattributed_note: string
+}
+
+type ActivityRange = 'today' | '7d' | '30d'
+
+const ACTIVITY_RANGES: Array<{ value: ActivityRange; label: string; days: number }> = [
+  { value: 'today', label: 'Today', days: 1 },
+  { value: '7d', label: '7 days', days: 7 },
+  { value: '30d', label: '30 days', days: 30 }
+]
+
+const ACTIVITY_FOOTNOTE =
+  'Activity reflects work inside Autoura only. Phone calls, meetings, and off-app work are not captured.'
+
+// 8h cap per day for the focused-time bars
+const ACTIVITY_DAY_CAP_MINUTES = 8 * 60
+
+const fmtActivityDateTime = (iso: string | null) => {
+  if (!iso) return '—'
+  const t = new Date(iso).getTime()
+  return Number.isFinite(t)
+    ? new Date(t).toLocaleString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : '—'
+}
+
+const fmtFocusedTime = (minutes: number) =>
+  `~${Math.floor(minutes / 60)}h ${minutes % 60}m`
 
 const ROLES = [
   { value: 'owner', label: 'Owner', icon: '👑', color: 'bg-purple-100 text-purple-700' },
@@ -72,9 +122,61 @@ export default function TeamMembersPage() {
   })
   const [saving, setSaving] = useState(false)
 
+  const { features } = useTenant()
+  // column lands with migration 267; types regen follows
+  const activitySummaryEnabled = (features as any)?.activity_summary_enabled === true
+
+  // Activity Summary modal state
+  const [activityMember, setActivityMember] = useState<TeamMember | null>(null)
+  const [activityRange, setActivityRange] = useState<ActivityRange>('7d')
+  const [activityData, setActivityData] = useState<ActivitySummaryData | null>(null)
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [activityError, setActivityError] = useState<string | null>(null)
+
   useEffect(() => {
     fetchMembers()
   }, [showInactive])
+
+  useEffect(() => {
+    if (!activityMember) return
+    let cancelled = false
+    const load = async () => {
+      setActivityLoading(true)
+      setActivityError(null)
+      try {
+        const response = await fetch(
+          `/api/activity?team_member_id=${activityMember.id}&range=${activityRange}`
+        )
+        const result = await response.json()
+        if (cancelled) return
+        if (response.ok && result.success) {
+          setActivityData(result.data)
+        } else if (response.status === 403 && result.error === 'feature_disabled') {
+          // Defensive: the button is flag-gated, but the flag may have been
+          // turned off since this page loaded.
+          setActivityError('Activity summaries are turned off for this workspace.')
+        } else {
+          setActivityError(result.error || 'Failed to load activity')
+        }
+      } catch (error) {
+        console.error('Error fetching activity summary:', error)
+        if (!cancelled) setActivityError('Failed to load activity')
+      } finally {
+        if (!cancelled) setActivityLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [activityMember, activityRange])
+
+  const openActivityModal = (member: TeamMember) => {
+    setActivityData(null)
+    setActivityError(null)
+    setActivityRange('7d')
+    setActivityMember(member)
+  }
 
   useEffect(() => {
     fetchDepartments()
@@ -394,6 +496,15 @@ export default function TeamMembersPage() {
                 )}
 
                 <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                  {activitySummaryEnabled && member.user_id && (
+                    <button
+                      onClick={() => openActivityModal(member)}
+                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    >
+                      <Activity className="h-3 w-3" />
+                      Activity
+                    </button>
+                  )}
                   <button
                     onClick={() => handleEdit(member)}
                     className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition-colors"
@@ -533,6 +644,144 @@ export default function TeamMembersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Activity Summary Modal */}
+      {activityMember && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {activityMember.name} — Activity
+              </h2>
+              <button
+                onClick={() => setActivityMember(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Range selector */}
+              <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+                {ACTIVITY_RANGES.map(r => (
+                  <button
+                    key={r.value}
+                    onClick={() => setActivityRange(r.value)}
+                    className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      activityRange === r.value
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              {activityLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#647C47]"></div>
+                </div>
+              ) : activityError ? (
+                <p className="text-sm text-gray-500 text-center py-8">{activityError}</p>
+              ) : activityData ? (
+                <>
+                  {/* Presence */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Last login</span>
+                      <span className="font-medium text-gray-700">
+                        {fmtActivityDateTime(activityData.presence.last_login_at)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Last seen</span>
+                      <span className="font-medium text-gray-700">
+                        {fmtActivityDateTime(activityData.presence.last_seen_at)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Focused-time strip */}
+                  {(() => {
+                    const rangeDays =
+                      ACTIVITY_RANGES.find(r => r.value === activityRange)?.days ?? 7
+                    const byDay = new Map(
+                      activityData.presence.days.map(d => [d.day, d.active_minutes])
+                    )
+                    const cells = Array.from({ length: rangeDays }, (_, i) => {
+                      const day = new Date(Date.now() - (rangeDays - 1 - i) * 86400000)
+                        .toISOString()
+                        .slice(0, 10)
+                      return { day, minutes: byDay.get(day) ?? 0 }
+                    })
+                    const total = activityData.presence.days.reduce(
+                      (sum, d) => sum + d.active_minutes,
+                      0
+                    )
+                    return (
+                      <div>
+                        <div className="flex items-end gap-1 h-16">
+                          {cells.map(cell => (
+                            <div
+                              key={cell.day}
+                              className="flex-1 flex flex-col justify-end h-full"
+                              title={`${cell.day}: ${cell.minutes}m`}
+                            >
+                              <div
+                                className="w-full rounded-sm bg-[#647C47]"
+                                style={{
+                                  height: `${Math.max(
+                                    cell.minutes > 0 ? 4 : 2,
+                                    Math.round(
+                                      (Math.min(cell.minutes, ACTIVITY_DAY_CAP_MINUTES) /
+                                        ACTIVITY_DAY_CAP_MINUTES) *
+                                        64
+                                    )
+                                  )}px`,
+                                  opacity: cell.minutes > 0 ? 1 : 0.15
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1.5">
+                          {fmtFocusedTime(total)} focused time
+                        </p>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Output tiles */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        ['Tasks completed', activityData.output.tasks_completed],
+                        ['Itineraries touched', activityData.output.itineraries_touched],
+                        ['Copilot reviewed', activityData.output.copilot_reviewed],
+                        ['Copilot sent', activityData.output.copilot_sent]
+                      ] as Array<[string, number | null]>
+                    ).map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="bg-gray-50 border border-gray-200 rounded-lg p-2.5"
+                      >
+                        <p className="text-[11px] text-gray-500">{label}</p>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {value === null ? '—' : value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-gray-400">{ACTIVITY_FOOTNOTE}</p>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
       )}
