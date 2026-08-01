@@ -37,7 +37,10 @@ interface TeamMember {
   role: string
   phone?: string
   is_active: boolean
-  last_login_at?: string
+  // Enriched by /api/profiles from auth.users.last_sign_in_at
+  last_login_at?: string | null
+  // Written by the presence heartbeat (POST /api/profiles/heartbeat)
+  last_seen_at?: string | null
   created_at: string
 }
 
@@ -467,6 +470,20 @@ export default function UserManagementPage() {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric'
+                        })} {new Date(member.last_login_at).toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    )}
+                    {member.last_seen_at && (
+                      <span>
+                        Last seen: {new Date(member.last_seen_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric'
+                        })} {new Date(member.last_seen_at).toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit'
                         })}
                       </span>
                     )}

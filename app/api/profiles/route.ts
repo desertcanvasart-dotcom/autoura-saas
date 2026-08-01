@@ -46,9 +46,31 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
+    // Last login comes from Supabase's own auth record (last_sign_in_at) —
+    // user_profiles never had a real last_login_at column; the UI field of
+    // that name rendered nothing until this enrichment.
+    let lastSignIn = new Map<string, string | null>()
+    try {
+      const { data: authUsers } = await adminClient.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      })
+      lastSignIn = new Map(
+        (authUsers?.users || []).map((u) => [u.id, u.last_sign_in_at ?? null])
+      )
+    } catch (e) {
+      // Enrichment only — the member list must not fail because of it.
+      console.error('Error fetching auth last_sign_in_at:', e)
+    }
+
+    const enriched = (data || []).map((p: any) => ({
+      ...p,
+      last_login_at: lastSignIn.get(p.id) ?? null,
+    }))
+
     return NextResponse.json({
       success: true,
-      data
+      data: enriched
     })
   } catch (error) {
     console.error('Error fetching profiles:', error)

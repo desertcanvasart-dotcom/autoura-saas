@@ -9419,6 +9419,7 @@ export interface Database {
           avatar_url: string | null
           created_at: string | null
           updated_at: string | null
+          last_seen_at: string | null
         }
         Insert: {
           id: string
@@ -9431,6 +9432,7 @@ export interface Database {
           avatar_url?: string | null
           created_at?: string | null
           updated_at?: string | null
+          last_seen_at?: string | null
         }
         Update: {
           id?: string
@@ -9443,6 +9445,7 @@ export interface Database {
           avatar_url?: string | null
           created_at?: string | null
           updated_at?: string | null
+          last_seen_at?: string | null
         }
         Relationships: []
       }
