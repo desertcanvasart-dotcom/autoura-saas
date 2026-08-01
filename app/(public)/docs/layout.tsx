@@ -38,6 +38,7 @@ import {
   Building2,
   CheckSquare,
   Library,
+  Activity,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -68,6 +69,7 @@ const NAV_ITEMS = [
   { href: '/docs/content-library', label: 'Content Library', icon: Library },
   { href: '/docs/message-templates', label: 'Message Templates', icon: MailPlus },
   { href: '/docs/team-settings', label: 'Team & Settings', icon: Settings },
+  { href: '/docs/activity-summary', label: 'Team Activity', icon: Activity },
   { href: '/docs/workflows', label: 'Workflows & Tips', icon: Lightbulb },
 ]
 
