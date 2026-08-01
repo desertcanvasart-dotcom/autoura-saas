@@ -568,12 +568,15 @@ export default function ResourcesPage() {
               
               <Link
                 href={
-                  activeTab === 'guides' ? '/guides' :
-                  activeTab === 'vehicles' ? '/vehicles' :
-                  activeTab === 'hotels' ? '/hotels' :
+                  // Guides/vehicles/hotels have no standalone pages — the
+                  // Suppliers module is their management surface. Hotel staff
+                  // has no CRUD page at all; route to the hotel suppliers.
+                  activeTab === 'guides' ? '/suppliers?type=guide' :
+                  activeTab === 'vehicles' ? '/suppliers?type=transport_company' :
+                  activeTab === 'hotels' ? '/suppliers?type=hotel' :
                   activeTab === 'restaurants' ? '/restaurants' :
                   activeTab === 'airportStaff' ? '/airport-staff' :
-                  '/hotel-staff'
+                  '/suppliers?type=hotel'
                 }
                 className="px-2 py-1 text-xs bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium"
               >
@@ -733,7 +736,7 @@ export default function ResourcesPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
                           <Link 
-                            href="/guides"
+                            href="/suppliers?type=guide"
                             className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                           >
                             Edit
@@ -768,7 +771,7 @@ export default function ResourcesPage() {
                           <span className="text-3xl text-gray-400">👨‍🏫</span>
                           <p className="text-sm font-medium">No guides found</p>
                           <Link 
-                            href="/guides/new"
+                            href="/suppliers?type=guide"
                             className="mt-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 inline-block"
                           >
                             Add Your First Guide
@@ -827,7 +830,7 @@ export default function ResourcesPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
                           <Link 
-                            href="/vehicles"
+                            href="/suppliers?type=transport_company"
                             className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                           >
                             Edit
@@ -862,7 +865,7 @@ export default function ResourcesPage() {
                           <span className="text-3xl text-gray-400">🚗</span>
                           <p className="text-sm font-medium">No vehicles found</p>
                           <Link 
-                            href="/vehicles/new"
+                            href="/suppliers?type=transport_company"
                             className="mt-2 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 inline-block"
                           >
                             Add Your First Vehicle
@@ -926,7 +929,7 @@ export default function ResourcesPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
                           <Link 
-                            href="/hotels"
+                            href="/suppliers?type=hotel"
                             className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                           >
                             Edit
@@ -1182,9 +1185,7 @@ export default function ResourcesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-2">
-                          <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">
-                            Edit
-                          </button>
+                          {/* No hotel-staff edit surface exists; Delete is the only action */}
                           <button 
                             onClick={() => handleDeleteHotelStaff(staff.id, staff.name)}
                             className="text-xs text-red-600 hover:text-red-800 font-medium"

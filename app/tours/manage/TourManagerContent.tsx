@@ -776,7 +776,6 @@ function DayBuilderModal({ template, onClose, onSave }: DayBuilderModalProps) {
 
 export default function TourManagerContent() {
   const dialog = useConfirmDialog()
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const [templates, setTemplates] = useState<TourTemplate[]>([])
   const [themes, setThemes] = useState<TourTheme[]>([])  // Renamed from categories
   const [attractions, setAttractions] = useState<Attraction[]>([])  // NEW: Attractions from DB
@@ -1323,8 +1322,6 @@ export default function TourManagerContent() {
         ))}
       </div>
 
-      <input ref={fileInputRef} type="file" accept=".csv,.json" className="hidden" />
-
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="container mx-auto px-4 lg:px-6 py-3">
@@ -1344,7 +1341,7 @@ export default function TourManagerContent() {
                 Browse Tours
               </Link>
               <Link href="/rates" className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
-                ← Resources
+                ← Rates Hub
               </Link>
             </div>
           </div>
