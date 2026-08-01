@@ -43,7 +43,6 @@ import {
   BedDouble,
   Ship,
   Building,
-  UserCog,
   Shield,
   BookOpen,
   Handshake,
@@ -102,7 +101,9 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Clients', href: '/clients', icon: Users, businessTypes: ['b2c_only', 'b2c_and_b2b'] },
       { label: 'Concierge Leads', href: '/concierge-briefs', icon: ConciergeBell },
-      { label: 'Staff', href: '/contacts?type=staff', icon: UserCog },
+      // 'Staff' (/contacts?type=staff) removed: the Contacts page duplicated
+      // Clients and showed airport staff under a misleading label — airport
+      // staff is managed via /airport-staff and the Resources page.
       { label: 'Follow-ups', href: '/followups', icon: CheckSquare },
       { label: 'Calendar', href: '/calendar', icon: Calendar },
     ]
@@ -273,7 +274,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'crm', 'trips'])
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['Contacts'])
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([])
   const [currentUrl, setCurrentUrl] = useState('')
 
   // Filter navigation based on user role AND feature flags
@@ -320,7 +321,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       try {
         const parsed = JSON.parse(saved)
         setExpandedSections(parsed.sections || ['main', 'crm', 'trips'])
-        setExpandedMenus(parsed.menus || ['Contacts'])
+        setExpandedMenus(parsed.menus || [])
       } catch {
         // Use defaults if parsing fails
       }
@@ -354,13 +355,6 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
     })
   }, [pathname, currentUrl, filteredNavigation])
 
-  // Auto-expand menu if on contacts page
-  useEffect(() => {
-    if (pathname === '/contacts') {
-      setExpandedMenus(prev => prev.includes('Contacts') ? prev : [...prev, 'Contacts'])
-    }
-  }, [pathname])
-
   const toggleSection = (key: string) => {
     setExpandedSections(prev => 
       prev.includes(key) 
@@ -380,11 +374,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   // Check if a child link is active (works with query params on client)
   const isChildActive = (childHref: string): boolean => {
     if (!currentUrl) return false
-    
-    if (childHref === '/contacts') {
-      return pathname === '/contacts' && !currentUrl.includes('type=')
-    }
-    
+
     const typeMatch = childHref.match(/type=(\w+)/)
     if (typeMatch) {
       return currentUrl.includes(`type=${typeMatch[1]}`)
@@ -529,10 +519,9 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                     const hasChildren = item.children && item.children.length > 0
                     const isExpanded = expandedMenus.includes(item.label)
                     
-                    const isOnContactsPage = pathname === '/contacts'
-                    const isActive = hasChildren 
-                      ? isOnContactsPage
-                      : pathname === item.href || 
+                    const isActive = hasChildren
+                      ? item.children!.some(child => isChildActive(child.href))
+                      : pathname === item.href ||
                         (item.href !== '/dashboard' && pathname.startsWith(item.href))
 
                     // For items with children (collapsible)
