@@ -7448,6 +7448,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           department_id: string | null
+          user_id: string | null
         }
         Insert: {
           id?: string
@@ -7461,6 +7462,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           department_id?: string | null
+          user_id?: string | null
         }
         Update: {
           id?: string
@@ -7474,6 +7476,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           department_id?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
