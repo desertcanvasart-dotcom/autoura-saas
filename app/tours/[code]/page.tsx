@@ -199,6 +199,7 @@ export default function TourDetailPage() {
     const styles: Record<string, { bg: string; text: string; icon: string }> = {
       budget: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', icon: '💰' },
       standard: { bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700', icon: '💎' },
+      deluxe: { bg: 'bg-purple-50 border-purple-200', text: 'text-purple-700', icon: '✨' },
       luxury: { bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', icon: '👑' }
     }
     return styles[tier] || styles.standard
