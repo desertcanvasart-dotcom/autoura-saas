@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Resolve the subject
-    let subjectUserId = authResult.user.id
+    let subjectUserId: string | null = authResult.user.id
     let subjectTeamMemberId: string | null = null
     if (teamMemberId) {
       const { data: tm, error: tmError } = await adminClient
