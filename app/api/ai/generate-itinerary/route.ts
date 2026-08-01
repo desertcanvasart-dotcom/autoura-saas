@@ -326,6 +326,7 @@ async function createQuotesForItinerary(params: {
           tenant_id,
           itinerary_id,
           partner_id,
+          created_by: created_by || null,
           quote_number: quoteNumber,
           tier,
           tour_leader_included,

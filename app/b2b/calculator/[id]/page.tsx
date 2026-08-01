@@ -349,7 +349,7 @@ export default function TourPriceCalculator() {
           </div>
         </div>
         <Link 
-          href="/b2b/quotes" 
+          href="/quotes/b2b" 
           className="flex items-center gap-2 px-4 py-2 text-sm border rounded-lg hover:bg-gray-50"
         >
           <FileText className="w-4 h-4" />
@@ -368,7 +368,7 @@ export default function TourPriceCalculator() {
             </div>
           </div>
           <Link
-            href={`/b2b/quotes/${savedQuote.id}`}
+            href={`/quotes/b2b/${savedQuote.id}`}
             className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             View Quote

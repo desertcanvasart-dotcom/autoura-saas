@@ -152,9 +152,9 @@ const navigation: NavSection[] = [
       { label: 'Tasks', href: '/tasks', icon: CheckSquare, roles: ['admin', 'manager'] },
     ]
   },
-  // There is deliberately no 'Quotes' group: '/quotes/b2b' duplicated the B2B
-  // group's Quotes entry (same b2b_quotes data, two pages). New Quote and B2C
-  // Quotes live under Operations; B2B quotes under B2B.
+  // There is deliberately no 'Quotes' group: New Quote and B2C Quotes live
+  // under Operations; the single B2B quotes list (b2b_quotes, /quotes/b2b)
+  // lives under B2B.
   {
     title: 'Bookings',
     key: 'bookings',
@@ -228,7 +228,9 @@ const navigation: NavSection[] = [
       { label: 'Tour Builder', href: '/tours/manage', icon: LayoutTemplate },
       { label: 'Ready Made Packages', href: '/tours', icon: Package },
       { label: 'Partners', href: '/b2b/partners', icon: Handshake },
-      { label: 'Quotes', href: '/b2b/quotes', icon: FileText },
+      // Single B2B quote store since migration 270 — calculator and
+      // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.
+      { label: 'Quotes', href: '/quotes/b2b', icon: FileText },
       { label: 'Pricing Rules', href: '/b2b/pricing-rules', icon: Tags },
     ]
   },

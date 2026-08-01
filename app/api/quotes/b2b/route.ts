@@ -3,7 +3,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server';
 
 /**
  * GET /api/quotes/b2b
- * List all B2B quotes (for itinerary-based quotes, not tour_quotes)
+ * List all B2B quotes (single store since migration 270)
  * Explicitly scoped to the authenticated user's tenant
  */
 export async function GET(request: NextRequest) {

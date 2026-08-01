@@ -162,7 +162,7 @@ export default function B2BQuotesPage() {
     return (
       quote.quote_number.toLowerCase().includes(search) ||
       quote.b2b_partners?.company_name?.toLowerCase().includes(search) ||
-      quote.itineraries?.trip_name?.toLowerCase().includes(search)
+      (quote.itineraries?.trip_name || (quote as any).trip_name)?.toLowerCase().includes(search)
     )
   })
 
@@ -371,7 +371,7 @@ export default function B2BQuotesPage() {
       quote.quote_number,
       quote.b2b_partners?.company_name || '',
       quote.b2b_partners?.country || '',
-      quote.itineraries?.trip_name || '',
+      quote.itineraries?.trip_name || (quote as any).trip_name || '',
       quote.itineraries?.start_date || '',
       quote.itineraries?.total_days || '',
       quote.tier,
@@ -940,7 +940,7 @@ export default function B2BQuotesPage() {
                             <span className="text-xs">Trip</span>
                           </div>
                           <div className="font-medium text-gray-900">
-                            {quote.itineraries?.trip_name || 'No itinerary'}
+                            {quote.itineraries?.trip_name || (quote as any).trip_name || 'No itinerary'}
                           </div>
                         </div>
 
