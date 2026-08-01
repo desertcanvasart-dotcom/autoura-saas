@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
 
 export default function TeamSettingsPage() {
   return (
@@ -45,7 +45,7 @@ export default function TeamSettingsPage() {
           <li>Remove a member to revoke their access</li>
           <li>A <strong>Role Permissions</strong> reference table on the page shows what each role can do</li>
         </ul>
-        <ScreenshotPlaceholder caption="Team Management page with Invite Member, inline role changes, and the Role Permissions table" />
+        <DocScreenshot src="/docs/team-settings/team-management.jpg" alt="Team Management page with Invite Member, inline role changes, and the Role Permissions table" />
       </section>
 
       {/* User Management */}

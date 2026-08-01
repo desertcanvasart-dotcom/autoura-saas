@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip } from '../layout'
+import { DocScreenshot, Tip } from '../layout'
 
 export default function TasksDeparturesPage() {
   return (
@@ -31,7 +31,7 @@ export default function TasksDeparturesPage() {
         <p className="text-gray-600 mb-3">
           Metric cards at the top show the totals at a glance: total tasks, overdue, due today, and high priority. Below them you can filter by search, status, priority, assignee, and due date, plus a <strong>Show archived</strong> toggle. The table view supports sorting and pagination.
         </p>
-        <ScreenshotPlaceholder caption="Tasks page at /tasks in Kanban view — metric cards (total, overdue, due today, high priority) across the top, filter bar, and the To Do / In Progress / Done columns" />
+        <DocScreenshot src="/docs/tasks-departures/tasks.jpg" alt="Tasks page in Kanban view with metric cards across the top, the filter bar, and the To Do / In Progress / Done columns" />
 
         <h3 className="text-lg font-medium text-gray-900 mb-2">Linking tasks to records</h3>
         <p className="text-gray-600 mb-3">
@@ -63,12 +63,12 @@ export default function TasksDeparturesPage() {
         <p className="text-gray-600 mb-3">
           The list defaults to the <strong>Upcoming</strong> filter and can be searched by tour name. Each row shows the start date, duration, tour code, capacity as booked/max with spots remaining, an occupancy bar (yellow at 80% or more, red at 100% or more), and the price per person. You can change status inline from a dropdown on the row (hidden once a departure is cancelled or full) and delete with a confirmation.
         </p>
-        <ScreenshotPlaceholder caption="Departures list at /departures with the Upcoming filter active — rows showing status badges, booked/max capacity with spots remaining, occupancy bars, and price per person" />
+        <DocScreenshot src="/docs/tasks-departures/departures.jpg" alt="Departures list with rows showing status badges, booked/max capacity with spots remaining, occupancy bars, and price per person" />
         <h3 className="text-lg font-medium text-gray-900 mb-2">Creating a departure</h3>
         <p className="text-gray-600">
           The <strong>New Departure</strong> modal takes a tour template, name, start date, duration, maximum and minimum pax, price per person, and the initial status.
         </p>
-        <ScreenshotPlaceholder caption="New Departure modal on /departures showing template, name, start date, duration, max/min pax, price per person, and status fields" />
+        <DocScreenshot src="/docs/tasks-departures/new-departure-modal.jpg" alt="New Departure modal showing template, name, start date, duration, max/min pax, price per person, and status fields" />
       </section>
 
       {/* Capacity */}
@@ -81,7 +81,7 @@ export default function TasksDeparturesPage() {
         <p className="text-gray-600 mb-3">
           Each date gets a status &mdash; <strong>available</strong>, <strong>limited</strong>, <strong>busy</strong>, or <strong>blackout</strong> &mdash; plus per-date limits for maximum groups, guides, and vehicles, and a blackout reason where relevant. Edits are staged as you click through dates, then written all at once with the <strong>Save N Changes</strong> button.
         </p>
-        <ScreenshotPlaceholder caption="Capacity calendar at /settings/capacity in General Capacity view — a month with date statuses (available/limited/busy/blackout), per-date max groups/guides/vehicles, and the Save N Changes button with staged edits" />
+        <DocScreenshot src="/docs/tasks-departures/capacity.jpg" alt="Capacity calendar in General Capacity view showing a month with date statuses (available/limited/busy/blackout) and per-date capacity settings" />
         <Tip>
           <strong>The WhatsApp AI reads this calendar.</strong> When a client asks about dates, the assistant answers according to the date status: <strong>available</strong> &rarr; confirms the dates; <strong>limited</strong> &rarr; suggests booking soon; <strong>busy</strong> &rarr; suggests alternative dates; <strong>blackout</strong> &rarr; says you&rsquo;re unavailable. Hotel availability still needs separate confirmation &mdash; the calendar covers your own operation&rsquo;s capacity only.
         </Tip>

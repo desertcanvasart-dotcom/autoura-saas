@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
 
 export default function FollowupsRemindersPage() {
   return (
@@ -82,7 +82,7 @@ export default function FollowupsRemindersPage() {
         <Tip>
           Payment Reminders cover invoices only &mdash; for anything else (a callback, a supplier deadline, a feedback request), schedule a follow-up from the client&apos;s profile instead.
         </Tip>
-        <ScreenshotPlaceholder caption="Payment Reminders page with Pending/History tabs, stat tiles, and batch-send selection" />
+        <DocScreenshot src="/docs/followups-reminders/reminders.jpg" alt="Payment Reminders page with Pending/History tabs, stat tiles, and batch-send selection" />
       </section>
 
       {/* Navigation */}

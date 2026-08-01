@@ -52,7 +52,7 @@ export default function ItinerariesPage() {
           </li>
           <li>Click <strong>Create Itinerary</strong></li>
         </ol>
-        <ScreenshotPlaceholder caption="New itinerary form with trip name, client name, dates, adults, children, and currency" />
+        <DocScreenshot src="/docs/itineraries/new-itinerary.jpg" alt="New itinerary form with trip name, client name, dates, adults, children, and currency" />
       </section>
 
       {/* Editing */}
@@ -75,7 +75,7 @@ export default function ItinerariesPage() {
           <li>Choose the type: Hotel, Guide, Transportation, Entrance Fee, Meal, Activity, Tips, or other</li>
           <li>Enter the service name, quantity, and rates</li>
         </ol>
-        <ScreenshotPlaceholder caption="Itinerary edit page showing workflow status bar, draggable day cards, and the Price in Grid button" />
+        <DocScreenshot src="/docs/itineraries/editor.jpg" alt="Itinerary editor showing the workflow status bar, draggable day cards, and the Price in Grid button" />
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Pricing the Itinerary</h3>
         <p className="text-gray-600 mb-3">
@@ -101,7 +101,7 @@ export default function ItinerariesPage() {
         <p className="text-gray-600">
           The detail page also has an <strong>Auto / Manual</strong> cost mode toggle. In <strong>Auto</strong> mode, costs come from the pricing calculation. Switch to <strong>Manual</strong> to edit each service&apos;s cost inline, right on the detail page.
         </p>
-        <ScreenshotPlaceholder caption="Itinerary detail page with client info, trip summary, cost mode toggle, and day-by-day breakdown" />
+        <DocScreenshot src="/docs/itineraries/detail.jpg" alt="Itinerary detail page with client info, trip summary, and day-by-day breakdown" />
       </section>
 
       {/* Actions */}

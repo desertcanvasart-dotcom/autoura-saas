@@ -153,7 +153,7 @@ export default function MessageTemplatesPage() {
           <li><strong>Top templates</strong> &mdash; Your most-used templates</li>
           <li><strong>Channel distribution</strong> &mdash; How sends split across email, WhatsApp, and SMS</li>
         </ul>
-        <ScreenshotPlaceholder caption="Template analytics panel with totals, 30-day sends, success rate, top templates, and channel distribution" />
+        <DocScreenshot src="/docs/message-templates/analytics-panel.jpg" alt="Templates page with the analytics panel showing totals, 30-day sends, success rate, top templates, and channel distribution" />
       </section>
 
       {/* Managing Templates */}

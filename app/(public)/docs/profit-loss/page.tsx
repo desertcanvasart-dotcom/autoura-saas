@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
 
 export default function ProfitLossPage() {
   return (
@@ -53,7 +53,7 @@ export default function ProfitLossPage() {
         <p className="mt-3 text-gray-600 mb-3">
           Below the equation, panels show the <strong>Expense Breakdown</strong> by category, the full <strong>Expenses</strong> list, the <strong>Invoices</strong> list, and <strong>Trip Details</strong>.
         </p>
-        <ScreenshotPlaceholder caption="Per-trip P&L page with the Revenue − Expenses ± Commission equation, margin badge, and breakdown panels" />
+        <DocScreenshot src="/docs/profit-loss/trip-pl.jpg" alt="Per-trip P&L page with the Revenue − Expenses ± Commission equation, margin badge, and breakdown panels" />
       </section>
 
       {/* Multi-currency */}

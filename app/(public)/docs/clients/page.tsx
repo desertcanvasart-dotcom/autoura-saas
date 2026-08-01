@@ -49,7 +49,7 @@ export default function ClientsPage() {
         <p className="text-gray-600 mt-3">
           Click <strong>Create Client</strong> on the final step to save.
         </p>
-        <ScreenshotPlaceholder caption="New Client 5-step wizard on the Basic Info step, showing First Name, Last Name, nationality, and passport type fields" />
+        <DocScreenshot src="/docs/clients/new-client-wizard.jpg" alt="New Client wizard on the Basic Info step, showing First Name, Last Name, nationality, and passport type fields" />
         <Tip>
           Coming from WhatsApp? In the WhatsApp inbox, the <strong>Create</strong> button in a conversation header opens this form with the client&apos;s phone number already filled in.
         </Tip>

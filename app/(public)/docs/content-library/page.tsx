@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip } from '../layout'
+import { DocScreenshot, Tip } from '../layout'
 
 export default function ContentLibraryPage() {
   return (
@@ -29,7 +29,7 @@ export default function ContentLibraryPage() {
           <li><strong>Cards</strong> &mdash; Each shows the category, name, location or duration, tags, the number of variations, and which tiers are still missing (tiers: Budget, Standard, Deluxe, Luxury)</li>
           <li><strong>Add Content</strong> &mdash; Create a new entry; existing entries can be viewed, edited, or deleted</li>
         </ul>
-        <ScreenshotPlaceholder caption="Content Library page with category pills showing counts, the search bar, and content cards showing name, location/duration, tags, variation count and missing tiers" />
+        <DocScreenshot src="/docs/content-library/library.jpg" alt="Content Library page with category pills showing counts, the search bar, and content cards showing name, location/duration, tags, and variation count" />
         <Tip>
           <strong>Tiers matter:</strong> An entry with variations for every tier (Budget, Standard, Deluxe, Luxury) lets the AI describe the same attraction or hotel appropriately at any comfort level. The cards flag missing tiers so you know what to fill in.
         </Tip>
@@ -49,7 +49,7 @@ export default function ContentLibraryPage() {
         <p className="text-gray-600 mt-3">
           A star marks the default template for each purpose. Templates can be viewed, edited, copied, or deleted.
         </p>
-        <ScreenshotPlaceholder caption="AI Prompts page with templates grouped by purpose, a starred default template visible, and a template showing its model, temperature, active flag and version" />
+        <DocScreenshot src="/docs/content-library/prompts.jpg" alt="AI Prompts page with templates grouped by purpose, showing each template's model, temperature, active flag, and version" />
       </section>
 
       {/* Writing Rules */}
@@ -64,7 +64,7 @@ export default function ContentLibraryPage() {
           <li><strong>Priority and Scope</strong> &mdash; Rules can apply everywhere or only to itineraries, email, or WhatsApp</li>
           <li><strong>Active Flag</strong> &mdash; Turn rules on and off without deleting them</li>
         </ul>
-        <ScreenshotPlaceholder caption="Writing Rules page showing rules with their category, Must Follow / Preferred / Avoid type, good/bad examples, priority, scope, and active toggles" />
+        <DocScreenshot src="/docs/content-library/rules.jpg" alt="Writing Rules page showing rules with their category, Must Follow / Preferred / Avoid type, good/bad examples, priority, scope, and active toggles" />
       </section>
 
       {/* Documents */}
@@ -80,7 +80,7 @@ export default function ContentLibraryPage() {
         <p className="text-gray-600 mt-3">
           To generate supplier documents, open any itinerary and use its <strong>Documents</strong> button &mdash; services are automatically grouped by supplier. Vouchers can be sent by Email or WhatsApp, and you can track each one&rsquo;s confirmation status.
         </p>
-        <ScreenshotPlaceholder caption="Documents hub page showing the Customer Documents section (contracts, invoices) and the Supplier Documents section listing the six document types" />
+        <DocScreenshot src="/docs/content-library/documents-hub.jpg" alt="Documents hub page showing the Customer Documents section (contracts, invoices) and the Supplier Documents section listing the document types" />
       </section>
 
       {/* Navigation */}

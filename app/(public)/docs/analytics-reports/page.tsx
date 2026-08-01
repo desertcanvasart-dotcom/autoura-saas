@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip } from '../layout'
+import { DocScreenshot, Tip } from '../layout'
 
 export default function AnalyticsReportsPage() {
   return (
@@ -27,7 +27,7 @@ export default function AnalyticsReportsPage() {
           <li><strong>One Reporting Currency</strong> &mdash; Revenue is converted using historical exchange rates. An amber provenance banner explains any trips converted at today&rsquo;s rate or excluded because a rate was missing</li>
           <li><strong>Booked Revenue</strong> &mdash; Only confirmed and completed trips count</li>
         </ul>
-        <ScreenshotPlaceholder caption="Analytics page top: time range selector, amber FX provenance banner, and the four KPI cards (Total Revenue, Total Bookings, Total Clients, Conversion Rate) with sparklines" />
+        <DocScreenshot src="/docs/analytics-reports/analytics-overview.jpg" alt="Analytics page top: time range selector and the four KPI cards (Total Revenue, Total Bookings, Total Clients, Conversion Rate) with sparklines" />
       </section>
 
       {/* KPI + panels */}
@@ -43,7 +43,7 @@ export default function AnalyticsReportsPage() {
           <li><strong>Booking Status and Revenue by Destination</strong> &mdash; Distribution panels</li>
           <li><strong>Quick Actions</strong> &mdash; A grid of shortcuts to common tasks</li>
         </ul>
-        <ScreenshotPlaceholder caption="Analytics page scrolled to show the Revenue Forecast card with confidence %, Booking Pipeline, Highlights This Month, Revenue Trend & Forecast chart, and Top Destinations panel" />
+        <DocScreenshot src="/docs/analytics-reports/analytics-forecast.jpg" alt="Analytics page scrolled to the Revenue Forecast card with confidence %, Booking Pipeline, Highlights This Month, and the Revenue Trend & Forecast chart" />
       </section>
 
       {/* Financial Reports */}
@@ -62,8 +62,8 @@ export default function AnalyticsReportsPage() {
         <p className="text-gray-600 mt-3">
           Every table exports to CSV, and the same FX provenance banner from Analytics appears here so you always know how currencies were converted.
         </p>
-        <ScreenshotPlaceholder caption="Financial Reports page with year selector, the five tabs (Overview, Revenue, Cash Flow, Tax Summary, Commissions), Overview tab active showing summary cards and Quarterly Performance" />
-        <ScreenshotPlaceholder caption="Financial Reports Cash Flow tab showing Inflows, Outflows, Net, Pending Receivables, Pending Payables, Projected Cash, and the monthly table with its CSV export" />
+        <DocScreenshot src="/docs/analytics-reports/financial-reports-overview.jpg" alt="Financial Reports page with year selector and the five tabs, Overview tab active showing summary cards and Quarterly Performance" />
+        <DocScreenshot src="/docs/analytics-reports/financial-reports-cashflow.jpg" alt="Financial Reports Cash Flow tab showing Inflows, Outflows, Net, Pending Receivables, Pending Payables, Projected Cash, and the monthly table" />
         <Tip>
           <strong>Looking for per-trip numbers?</strong> The <Link href="/docs/profit-loss" className="text-primary-600 hover:underline">Profit &amp; Loss</Link> page breaks down revenue, supplier costs, commissions, and margin for each individual trip. Keep <Link href="/docs/expenses-commissions" className="text-primary-600 hover:underline">Expenses &amp; Commissions</Link> up to date so the reports here stay accurate.
         </Tip>

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
 
 export default function CommunicationPage() {
   return (
@@ -81,7 +81,7 @@ export default function CommunicationPage() {
           <li><strong>Step 3 &mdash; Confirm Client:</strong> Match the inquiry to an existing client, or review the new client details and click <strong>Create Client &amp; Generate</strong></li>
           <li><strong>Step 4 &mdash; Generate:</strong> Click <strong>Quick Generate</strong> to build the itinerary in one go, or <strong>Generate &amp; Edit</strong> to open it in the editor straight away</li>
         </ol>
-        <ScreenshotPlaceholder caption="WhatsApp Parser opened from a conversation, showing the 4-step wizard (Analyze, Configure, Confirm Client, Generate) with extracted trip details" />
+        <DocScreenshot src="/docs/communication/whatsapp-parser.jpg" alt="WhatsApp Parser wizard opened from a conversation, showing the 4-step flow (Analyze, Configure, Confirm Client, Generate) with extracted trip details" />
         <Tip>
           If the client already sent you a day-by-day plan, the parser detects the structured itinerary and can follow it exactly instead of designing its own.
         </Tip>
@@ -115,7 +115,7 @@ export default function CommunicationPage() {
           <li>Download attachments</li>
           <li>Link emails to client records</li>
         </ul>
-        <ScreenshotPlaceholder caption="Email inbox showing the email list and a compose window with the rich text editor, templates dropdown, and signature" />
+        <DocScreenshot src="/docs/communication/email-inbox.jpg" alt="Email inbox showing the message list with sender, subject, and preview for each email" />
       </section>
 
       {/* Copilot */}

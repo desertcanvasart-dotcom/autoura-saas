@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip } from '../layout'
+import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
 
 export default function SuppliersPage() {
   return (
@@ -52,7 +52,7 @@ export default function SuppliersPage() {
         <p className="text-gray-600">
           The header carries two actions: <strong>Export</strong> downloads the directory as CSV, and <strong>Add Supplier</strong> opens the creation form.
         </p>
-        <ScreenshotPlaceholder caption="Suppliers directory at /suppliers in grid view — type filter, search bar, properties/companies toggles, and the Export and Add Supplier buttons in the header" />
+        <DocScreenshot src="/docs/suppliers/suppliers-grid.jpg" alt="Suppliers directory in grid view with the type filter, search bar, and the Export and Add Supplier buttons in the header" />
       </section>
 
       {/* Adding */}
@@ -71,7 +71,7 @@ export default function SuppliersPage() {
         <p className="text-gray-600">
           For hotels, restaurants, and cruises, use the parent-company selector to attach a property to the company that owns it.
         </p>
-        <ScreenshotPlaceholder caption="Add Supplier form at /suppliers with a hierarchical type selected (e.g. Hotel), showing the parent-company selector and the type-specific fields" />
+        <DocScreenshot src="/docs/suppliers/supplier-form.jpg" alt="Add Supplier form with the type selector and type-specific fields" />
       </section>
 
       {/* Viewing */}

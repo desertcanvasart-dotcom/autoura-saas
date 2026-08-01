@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
+import { Tip, DocScreenshot } from '../layout'
 
 export default function B2CPricingPage() {
   return (
@@ -102,7 +102,7 @@ export default function B2CPricingPage() {
         <Tip>
           <strong>Completeness gate:</strong> The grid blocks saving while mandatory components are still unpriced, based on each day&apos;s day type. Fill or clear the flagged slots and the save buttons unlock.
         </Tip>
-        <ScreenshotPlaceholder caption="Grand Summary card showing per-category totals, cost, margin, and sell price" />
+        <DocScreenshot src="/docs/b2c-pricing/grand-summary.jpg" alt="Pricing grid scrolled to the Grand Summary showing per-category totals, cost, margin, and sell price" />
       </section>
 
       {/* B2C Quotes */}
@@ -111,7 +111,7 @@ export default function B2CPricingPage() {
         <p className="text-gray-600 mb-3">
           Saved B2C quotes live under <strong>B2C Quotes</strong> in the sidebar. The page shows status counts &mdash; <strong>draft</strong>, <strong>sent</strong>, <strong>viewed</strong>, <strong>accepted</strong>, <strong>rejected</strong>, and <strong>expired</strong> &mdash; with search and filters to find any quote, and an export option for your records. The <strong>New Quote</strong> button here opens the WhatsApp Parser to start a fresh quote.
         </p>
-        <ScreenshotPlaceholder caption="B2C Quotes page with status counts, search and filters, and the New Quote button" />
+        <DocScreenshot src="/docs/b2c-pricing/b2c-quotes.jpg" alt="B2C Quotes page with status counts, search and filters, and the New Quote button" />
       </section>
 
       {/* Navigation */}

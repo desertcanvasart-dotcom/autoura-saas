@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip } from '../layout'
+import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
 
 export default function B2BPricingRulesPage() {
   return (
@@ -46,7 +46,7 @@ export default function B2BPricingRulesPage() {
         <p className="text-gray-600 mb-3">
           Rules can be deactivated when a service is out of rotation, and each rule carries a notes field. On the page, tiers render as colored chips showing the pax range and rate, so a rule&rsquo;s full price ladder is readable at a glance.
         </p>
-        <ScreenshotPlaceholder caption="B2B Pricing Rules page at /b2b/pricing-rules — Activity Pricing Rules section expanded, showing rules with their category, pricing model, and tier chips with pax ranges and EUR rates" />
+        <DocScreenshot src="/docs/b2b-pricing-rules/pricing-rules.jpg" alt="B2B Pricing Rules page with the Activity Pricing Rules section expanded, showing rules with their category, pricing model, and tier chips with pax ranges and EUR rates" />
         <ScreenshotPlaceholder caption="Add/edit Activity Pricing Rule form on /b2b/pricing-rules with the tiered model selected, showing up to 4 tiers with min/max pax, EUR rate, and label fields" />
       </section>
 

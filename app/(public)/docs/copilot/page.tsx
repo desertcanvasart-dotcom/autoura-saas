@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip } from '../layout'
+import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
 
 export default function CopilotPage() {
   return (
@@ -28,7 +28,7 @@ export default function CopilotPage() {
           <li><strong>Tone Selector</strong> &mdash; In the header, pick your preferred drafting tone: professional, friendly, or formal (saved per user)</li>
           <li><strong>Refresh</strong> &mdash; Reloads the queue to pick up new threads and drafts</li>
         </ul>
-        <ScreenshotPlaceholder caption="Copilot review queue: thread list on the left with urgency dots, channel icons and draft badges; review panel on the right; Tone selector and Refresh in the header" />
+        <DocScreenshot src="/docs/copilot/review-queue.jpg" alt="Copilot review queue: thread list on the left with channel icons and draft badges, review panel on the right, and the Tone selector in the header" />
       </section>
 
       {/* Review Panel */}
@@ -69,7 +69,7 @@ export default function CopilotPage() {
           <li><strong>Per-Entry Controls</strong> &mdash; Enable or disable each entry, edit it, or delete it</li>
           <li><strong>Bulk Import</strong> &mdash; Paste long text and choose <em>AI extract</em> (the AI splits it into typed entries) or <em>as-is</em> (one entry). Long content is automatically chunked, and the result reports how many entries were created or failed</li>
         </ul>
-        <ScreenshotPlaceholder caption="Copilot Knowledge page with type filter pills (FAQs, Policies, Tours, Custom) showing counts, a list of entries with enable/disable toggles, and the bulk import dialog with AI extract vs as-is modes" />
+        <DocScreenshot src="/docs/copilot/knowledge.jpg" alt="Copilot Knowledge page with type filter pills (FAQs, Policies, Tours, Custom) showing counts and a list of entries with enable/disable toggles" />
       </section>
 
       {/* Settings */}
@@ -82,7 +82,7 @@ export default function CopilotPage() {
           <li><strong>Background Draft Pre-Generation</strong> &mdash; Prepares a draft automatically whenever a new WhatsApp or email message arrives, so a suggestion is already waiting in the queue. This is <em>not</em> auto-reply &mdash; nothing is sent without review</li>
           <li><strong>WhatsApp Auto-Reply</strong> &mdash; A clearly-marked dangerous option that lets the bot answer WhatsApp messages without human review. It is off by default</li>
         </ul>
-        <ScreenshotPlaceholder caption="Copilot Settings page showing the background draft pre-generation toggle and the danger-marked WhatsApp auto-reply toggle" />
+        <DocScreenshot src="/docs/copilot/settings.jpg" alt="Copilot Settings page showing the background draft pre-generation toggle and the danger-marked WhatsApp auto-reply toggle" />
         <Tip>
           <strong>Caution:</strong> Leave WhatsApp auto-reply off unless you fully trust the bot with your customers. With it off, every message still gets a human review before anything is sent.
         </Tip>
@@ -102,7 +102,7 @@ export default function CopilotPage() {
           <li><strong>Top Knowledge Entries</strong> &mdash; Which knowledge base entries the AI retrieves most</li>
           <li><strong>Per-User Table</strong> &mdash; Drafts reviewed, sent, and accept rate for each team member</li>
         </ul>
-        <ScreenshotPlaceholder caption="Copilot Analytics with period filter, cards for drafts generated/sent/dismissed/pending, accept and edit rate metrics, daily volume chart, and breakdowns by channel, tone, and confidence" />
+        <DocScreenshot src="/docs/copilot/analytics.jpg" alt="Copilot Analytics with period filter, cards for drafts generated/sent/dismissed/pending, accept and edit rate metrics, daily volume chart, and breakdowns by channel, tone, and confidence" />
       </section>
 
       {/* Inline suggestions */}

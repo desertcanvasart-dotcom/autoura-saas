@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { ScreenshotPlaceholder, Tip } from '../layout'
+import { ScreenshotPlaceholder, Tip, DocScreenshot } from '../layout'
 
 export default function ConciergeLeadsPage() {
   return (
@@ -30,7 +30,7 @@ export default function ConciergeLeadsPage() {
           <li><strong>Archived</strong> &mdash; Briefs you have set aside</li>
           <li><strong>All</strong> &mdash; Everything in one list</li>
         </ul>
-        <ScreenshotPlaceholder caption="Concierge Leads page with the Needs Review / In Progress / Responded / Archived / All tabs showing live counts, and a list of brief cards" />
+        <DocScreenshot src="/docs/concierge-leads/briefs-list.jpg" alt="Concierge Leads page with the Needs Review / In Progress / Responded / Archived / All tabs showing live counts, and a list of brief cards" />
       </section>
 
       {/* Cards */}
