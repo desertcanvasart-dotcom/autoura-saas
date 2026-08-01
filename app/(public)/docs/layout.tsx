@@ -220,28 +220,6 @@ export default function DocsLayout({
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="py-8 bg-[#2d3b2d]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-gray-400 text-sm">&copy; 2026 Autoura. All rights reserved.</p>
-            <div className="flex items-center gap-6">
-              <Link href="/docs" className="text-gray-400 hover:text-white text-sm transition-colors">
-                Docs
-              </Link>
-              <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
-                Privacy
-              </Link>
-              <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
-                Terms
-              </Link>
-              <Link href="/contact" className="text-gray-400 hover:text-white text-sm transition-colors">
-                Contact
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }
