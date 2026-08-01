@@ -33,7 +33,7 @@ export async function GET(
           id, variation_id, margin_percent_override, fixed_price_per_pax, is_active,
           tour_variations (variation_name, variation_code, tier, tour_templates (template_name))
         ),
-        tour_quotes (id, quote_number, status, selling_price, created_at)
+        b2b_quotes (id, quote_number, status, selling_price, created_at)
       `)
       .eq('id', id)
       .single()
@@ -93,7 +93,7 @@ export async function DELETE(
     const supabase = await createAuthenticatedClient()
 
     const { data: quotes } = await supabase
-      .from('tour_quotes')
+      .from('b2b_quotes')
       .select('id')
       .eq('partner_id', id)
       .limit(1)

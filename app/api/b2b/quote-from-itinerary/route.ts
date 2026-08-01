@@ -153,6 +153,8 @@ export async function POST(request: NextRequest) {
       .insert({
         tenant_id,
         itinerary_id,
+        // Attribution (mig 270): the staff member creating the quote.
+        created_by: authResult.user!.id,
         partner_id: partner_id || null,
         quote_number: quoteNum || `B2B-${Date.now()}`,
         tier,

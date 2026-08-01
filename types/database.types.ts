@@ -1006,6 +1006,27 @@ export interface Database {
           last_modified_by: string | null
           last_modified_at: string | null
           pdf_generated_at: string | null
+          variation_id: string | null
+          trip_name: string | null
+          client_name: string | null
+          client_email: string | null
+          client_phone: string | null
+          client_nationality: string | null
+          travel_date: string | null
+          num_adults: number | null
+          num_children: number | null
+          is_eur_passport: boolean | null
+          services_snapshot: Json | null
+          total_cost: number | null
+          margin_percent: number | null
+          margin_amount: number | null
+          selling_price: number | null
+          price_per_person: number | null
+          source: string | null
+          notes: string | null
+          converted_to_itinerary_id: string | null
+          converted_at: string | null
+          created_by: string | null
         }
         Insert: {
           id?: string
@@ -1041,6 +1062,27 @@ export interface Database {
           last_modified_by?: string | null
           last_modified_at?: string | null
           pdf_generated_at?: string | null
+          variation_id?: string | null
+          trip_name?: string | null
+          client_name?: string | null
+          client_email?: string | null
+          client_phone?: string | null
+          client_nationality?: string | null
+          travel_date?: string | null
+          num_adults?: number | null
+          num_children?: number | null
+          is_eur_passport?: boolean | null
+          services_snapshot?: Json | null
+          total_cost?: number | null
+          margin_percent?: number | null
+          margin_amount?: number | null
+          selling_price?: number | null
+          price_per_person?: number | null
+          source?: string | null
+          notes?: string | null
+          converted_to_itinerary_id?: string | null
+          converted_at?: string | null
+          created_by?: string | null
         }
         Update: {
           id?: string
@@ -1076,6 +1118,27 @@ export interface Database {
           last_modified_by?: string | null
           last_modified_at?: string | null
           pdf_generated_at?: string | null
+          variation_id?: string | null
+          trip_name?: string | null
+          client_name?: string | null
+          client_email?: string | null
+          client_phone?: string | null
+          client_nationality?: string | null
+          travel_date?: string | null
+          num_adults?: number | null
+          num_children?: number | null
+          is_eur_passport?: boolean | null
+          services_snapshot?: Json | null
+          total_cost?: number | null
+          margin_percent?: number | null
+          margin_amount?: number | null
+          selling_price?: number | null
+          price_per_person?: number | null
+          source?: string | null
+          notes?: string | null
+          converted_to_itinerary_id?: string | null
+          converted_at?: string | null
+          created_by?: string | null
         }
         Relationships: [
           {
@@ -1097,6 +1160,20 @@ export interface Database {
             columns: ["partner_id"]
             isOneToOne: false
             referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "b2b_quotes_variation_id_fkey"
+            columns: ["variation_id"]
+            isOneToOne: false
+            referencedRelation: "tour_variations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "b2b_quotes_converted_to_itinerary_id_fkey"
+            columns: ["converted_to_itinerary_id"]
+            isOneToOne: false
+            referencedRelation: "itineraries"
             referencedColumns: ["id"]
           },
         ]

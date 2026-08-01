@@ -27,7 +27,7 @@ export default function GridSummary({ totals, config, dayCount, onSave, isSaving
 
   // Determine the primary view link based on B2B/B2C
   const viewLink = isB2B && savedQuoteId
-    ? `/b2b/quotes/${savedQuoteId}`
+    ? `/quotes/b2b/${savedQuoteId}`
     : savedItineraryId
       ? `/itineraries/${savedItineraryId}`
       : null
