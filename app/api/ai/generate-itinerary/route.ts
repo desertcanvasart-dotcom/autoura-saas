@@ -83,6 +83,11 @@ async function createItineraryRecord(supabase: any, data: Record<string, any>): 
 
 async function createQuotesForItinerary(params: {
   itinerary_id: string
+  // The caller's session tenant. This used to be resolved via an
+  // UNFILTERED `from('tenants').select('id').single()` on the admin
+  // client — which errors (or picks an arbitrary tenant) the moment more
+  // than one tenant exists. Quotes must carry the caller's tenant.
+  tenant_id: string
   quote_type: 'b2c' | 'b2b' | 'both' | 'none'
   num_travelers: number
   tier: ServiceTier
@@ -90,25 +95,25 @@ async function createQuotesForItinerary(params: {
   currency: string
   client_id?: string | null
   partner_id?: string | null
+  // Attribution (mig 269): the staff member driving the generation.
+  created_by?: string | null
 }) {
   const {
     itinerary_id,
+    tenant_id,
     quote_type,
     num_travelers,
     tier,
     margin_percent,
     currency,
     client_id,
-    partner_id
+    partner_id,
+    created_by
   } = params
 
   if (quote_type === 'none') {
     return { b2c_quote: null, b2b_quote: null }
   }
-
-  const { data: tenant } = await (getSupabaseAdmin() as any).from('tenants').select('id').single()
-  const t = tenant as any
-  const tenant_id = t?.id
 
   if (!tenant_id) {
     console.error('⚠️ No tenant found - cannot create quotes')
@@ -210,6 +215,7 @@ async function createQuotesForItinerary(params: {
           tenant_id,
           itinerary_id,
           client_id,
+          created_by: created_by || null,
           quote_number: quoteNumber,
           num_travelers,
           tier,
@@ -745,6 +751,8 @@ export async function POST(request: NextRequest) {
 
           cruiseQuotesCreated = await createQuotesForItinerary({
             itinerary_id: itinerary.id,
+            tenant_id,
+            created_by: userId,
             quote_type: quote_type as 'b2c' | 'b2b' | 'both' | 'none',
             num_travelers: totalPax,
             tier,
@@ -1226,6 +1234,8 @@ export async function POST(request: NextRequest) {
 
       quotesCreated = await createQuotesForItinerary({
         itinerary_id: itinerary.id,
+        tenant_id,
+        created_by: userId,
         quote_type: quote_type as 'b2c' | 'b2b' | 'both' | 'none',
         num_travelers: totalPax,
         tier,

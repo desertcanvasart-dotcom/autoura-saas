@@ -56,6 +56,9 @@ interface ActivitySummaryData {
     itineraries_touched: number | null
     copilot_reviewed: number | null
     copilot_sent: number | null
+    messages_sent: number | null
+    quotes_created: number | null
+    invoices_issued: number | null
   }
   unattributed_note: string
 }
@@ -762,6 +765,9 @@ export default function TeamMembersPage() {
                       [
                         ['Tasks completed', activityData.output.tasks_completed],
                         ['Itineraries touched', activityData.output.itineraries_touched],
+                        ['Messages sent', activityData.output.messages_sent],
+                        ['Quotes created', activityData.output.quotes_created],
+                        ['Invoices issued', activityData.output.invoices_issued],
                         ['Copilot reviewed', activityData.output.copilot_reviewed],
                         ['Copilot sent', activityData.output.copilot_sent]
                       ] as Array<[string, number | null]>

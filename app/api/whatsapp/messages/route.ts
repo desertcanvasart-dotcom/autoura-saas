@@ -140,7 +140,10 @@ export async function POST(request: NextRequest) {
         direction: 'outbound',
         message_body: message,
         status: twilioMessage.status,
-        sent_at: new Date().toISOString()
+        sent_at: new Date().toISOString(),
+        // Attribution (mig 269): the staff member sending. The webhook
+        // auto-reply and AI agent leave this null on purpose.
+        sent_by: authResult.user!.id
       })
       .select()
       .single()

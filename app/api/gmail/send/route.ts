@@ -153,6 +153,8 @@ export async function POST(request: NextRequest) {
               gmail_message_id: response.data.id,
               gmail_thread_id: threadId || null,
               direction: 'outbound',
+              // Attribution (mig 269): the staff member sending.
+              sent_by: user.id,
               from_email: user.email || '',
               to_email: Array.isArray(to) ? to[0] : to,
               subject,

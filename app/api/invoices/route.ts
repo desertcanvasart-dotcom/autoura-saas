@@ -231,6 +231,8 @@ export async function POST(request: NextRequest) {
       status: 'draft',
       issue_date: body.issue_date || new Date().toISOString().split('T')[0],
       due_date: body.due_date || null,
+      // Attribution (mig 269): the staff member issuing the invoice.
+      created_by: authResult.user!.id,
       notes: body.notes || null,
       payment_terms: body.payment_terms || getDefaultPaymentTerms(invoiceType),
       payment_instructions: body.payment_instructions || null,

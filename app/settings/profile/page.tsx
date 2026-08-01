@@ -50,6 +50,9 @@ interface ActivitySummaryData {
     itineraries_touched: number | null
     copilot_reviewed: number | null
     copilot_sent: number | null
+    messages_sent: number | null
+    quotes_created: number | null
+    invoices_issued: number | null
   }
   unattributed_note: string
 }
@@ -566,6 +569,9 @@ export default function ProfilePage() {
             const tiles: Array<[string, number | null]> = [
               ['Tasks completed', activity.output.tasks_completed],
               ['Itineraries touched', activity.output.itineraries_touched],
+              ['Messages sent', activity.output.messages_sent],
+              ['Quotes created', activity.output.quotes_created],
+              ['Invoices issued', activity.output.invoices_issued],
               ['Copilot reviewed', activity.output.copilot_reviewed],
               ['Copilot sent', activity.output.copilot_sent],
             ]
