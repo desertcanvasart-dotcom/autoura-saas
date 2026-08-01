@@ -34,6 +34,9 @@ import {
   Truck,
   BarChart,
   FileInput,
+  Sparkles,
+  ConciergeBell,
+  Library,
 } from 'lucide-react'
 
 interface DocItem {
@@ -52,66 +55,73 @@ const CATEGORIES: DocCategory[] = [
   {
     label: 'Getting Started',
     items: [
-      { href: '/docs/getting-started', icon: Rocket, title: 'Getting Started', description: 'Log in, set up your account, and understand your role.' },
-      { href: '/docs/dashboard', icon: LayoutDashboard, title: 'Dashboard', description: 'Your home base with quick stats, actions, and recent activity.' },
+      { href: '/docs/getting-started', icon: Rocket, title: 'Getting Started', description: 'Sign up or accept an invitation, complete onboarding, and understand your role.' },
+      { href: '/docs/dashboard', icon: LayoutDashboard, title: 'Dashboard', description: 'Your home base: departures, outstanding balances, replies needed, and quotes awaiting clients.' },
+      { href: '/docs/analytics-reports', icon: BarChart3, title: 'Analytics & Reports', description: 'KPIs, revenue forecast, booking pipeline, and financial reports with CSV export.' },
     ],
   },
   {
     label: 'Communication & CRM',
     items: [
-      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'WhatsApp inbox, AI parser, and email management.' },
+      { href: '/docs/communication', icon: MessageCircle, title: 'Communication', description: 'Conversations, WhatsApp inbox with AI translation, email inbox, and the AI parser.' },
+      { href: '/docs/copilot', icon: Sparkles, title: 'AI Copilot', description: 'Review and send AI-drafted replies, manage the knowledge base, and track copilot analytics.' },
+      { href: '/docs/concierge-leads', icon: ConciergeBell, title: 'Concierge Leads', description: 'Triage planning briefs from the AI Concierge and turn them into itineraries.' },
       { href: '/docs/clients', icon: Users, title: 'Clients (CRM)', description: 'Add, search, and manage client profiles, notes, and follow-ups.' },
     ],
   },
   {
     label: 'Itineraries & Pricing',
     items: [
-      { href: '/docs/itinerary-creation', icon: Wand2, title: 'Itinerary Creation', description: 'AI-powered itinerary generation from WhatsApp conversations and emails.' },
-      { href: '/docs/itineraries', icon: Map, title: 'Itineraries', description: 'Build day-by-day trip plans with drag-and-drop reordering, pricing, services, and PDF export.' },
-      { href: '/docs/b2c-pricing', icon: Calculator, title: 'B2C Pricing', description: 'Calculate itinerary pricing with automatic rate lookup and service costing.' },
+      { href: '/docs/itinerary-creation', icon: Wand2, title: 'Itinerary Creation', description: 'AI-powered itinerary generation from WhatsApp conversations and the New Quote pricing grid.' },
+      { href: '/docs/itineraries', icon: Map, title: 'Itineraries', description: 'Build day-by-day trip plans with drag-and-drop reordering, shareable client links, and PDF export.' },
+      { href: '/docs/b2c-pricing', icon: Calculator, title: 'B2C Pricing', description: 'Price itineraries interactively in the pricing grid with automatic rate lookup.' },
     ],
   },
   {
     label: 'B2B',
     items: [
       { href: '/docs/b2b-pricing', icon: Briefcase, title: 'B2B Pricing', description: 'B2B price calculator with rate sheets, pax tables, and single supplement.' },
-      { href: '/docs/b2b-pricing-rules', icon: PackageSearch, title: 'B2B Pricing Rules', description: 'Partner-specific margin rules, volume discounts, and date-based pricing overrides.' },
-      { href: '/docs/tour-programs', icon: ClipboardList, title: 'Tour Programs Manager', description: 'Create and manage tour templates, variations, and the template-to-pricing flow.' },
+      { href: '/docs/b2b-pricing-rules', icon: PackageSearch, title: 'B2B Pricing Rules', description: 'Per-person, per-unit, and tiered pricing rules plus transport packages with vehicle tiers.' },
+      { href: '/docs/tour-programs', icon: ClipboardList, title: 'Tour Builder', description: 'Create and manage tour templates, variations, and the template-to-pricing flow.' },
       { href: '/docs/b2b-quotes', icon: FileCheck, title: 'B2B Quotes', description: 'Save, manage, and export B2B quotes with PDF generation.' },
-      { href: '/docs/b2b-import', icon: FileInput, title: 'B2B Import', description: 'Convert standard itineraries into B2B packages for partner distribution.' },
+      { href: '/docs/b2b-import', icon: FileInput, title: 'Converting Itineraries to B2B', description: 'Turn standard itineraries into B2B quotes, templates, and partner rate sheets.' },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { href: '/docs/bookings', icon: CalendarCheck, title: 'Bookings', description: 'Track supplier confirmations, payments, and operational status.' },
+      { href: '/docs/bookings', icon: CalendarCheck, title: 'Bookings', description: 'Convert quotes to bookings, manage passengers, and track payments and status.' },
+      { href: '/docs/suppliers', icon: Building2, title: 'Suppliers', description: 'Your supplier directory: hotels, transport, guides, cruises, and property hierarchies.' },
+      { href: '/docs/tasks-departures', icon: CheckSquare, title: 'Tasks, Departures & Capacity', description: 'Kanban task boards, scheduled group departures, and the capacity calendar.' },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { href: '/docs/invoices-payments', icon: FileText, title: 'Invoices & Payments', description: 'Create standard, deposit, and final invoices. Record payments via bank transfer, card, Wise, Stripe, and more.' },
-      { href: '/docs/profit-loss', icon: TrendingUp, title: 'Profit & Loss', description: 'Per-trip and aggregate P&L reports with supplier cost vs. client revenue analysis.' },
+      { href: '/docs/invoices-payments', icon: FileText, title: 'Invoices & Payments', description: 'Invoices, payments, receipts, receivables, payables, and supplier invoices with AI extraction.' },
+      { href: '/docs/expenses-commissions', icon: Wallet, title: 'Expenses & Commissions', description: 'Record trip expenses, track commissions, and export financial data.' },
+      { href: '/docs/profit-loss', icon: TrendingUp, title: 'Profit & Loss', description: 'Per-trip and aggregate P&L with multi-currency reporting and margin analysis.' },
     ],
   },
   {
     label: 'Rates & Content',
     items: [
-      { href: '/docs/tours-rates', icon: Globe, title: 'Tours & Rates', description: 'Pre-built tour templates and comprehensive rate management across 15 categories.' },
-      { href: '/docs/resources-documents', icon: FolderOpen, title: 'Resources & Documents', description: 'Manage guides, vehicles, hotels, restaurants, and airport staff. Generate invoices, contracts, vouchers, and receipts.' },
+      { href: '/docs/tours-rates', icon: Globe, title: 'Tours & Rates', description: 'Ready-made packages and rate management across 14 categories.' },
+      { href: '/docs/resources-documents', icon: FolderOpen, title: 'Resources & Documents', description: 'Manage operational resources and generate vouchers, contracts, and supplier documents.' },
+      { href: '/docs/content-library', icon: Library, title: 'Content Library & Documents', description: 'Reusable destination content, AI prompts, and house writing rules for generated itineraries.' },
     ],
   },
   {
     label: 'Messaging & Follow-ups',
     items: [
-      { href: '/docs/message-templates', icon: MailPlus, title: 'Message Templates', description: 'Create and send pre-designed messages via WhatsApp and email with placeholder auto-fill.' },
-      { href: '/docs/followups-reminders', icon: Bell, title: 'Follow-ups & Reminders', description: 'Schedule follow-ups, set reminders, and never miss a client touchpoint.' },
+      { href: '/docs/message-templates', icon: MailPlus, title: 'Message Templates', description: 'Create and send pre-designed messages via WhatsApp, email, and SMS with placeholder auto-fill.' },
+      { href: '/docs/followups-reminders', icon: Bell, title: 'Follow-ups & Reminders', description: 'Client follow-ups from the CRM and automated invoice payment reminders.' },
     ],
   },
   {
     label: 'Settings & Integrations',
     items: [
-      { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'Invite team members, assign roles, configure email signatures, and manage preferences.' },
+      { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'Team management, user roles, organization branding, billing, and preferences.' },
       { href: '/integrations', icon: Link2, title: 'Integrations', description: 'WhatsApp Business API and Gmail OAuth, both live today. Accounting sync (Xero, QuickBooks) is on the roadmap for Q3 2026.' },
       { href: '/docs/workflows', icon: Lightbulb, title: 'Workflows & Tips', description: 'Step-by-step workflows and productivity shortcuts.' },
     ],

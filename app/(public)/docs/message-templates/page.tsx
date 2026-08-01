@@ -14,21 +14,21 @@ export default function MessageTemplatesPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Message Templates</h1>
       <p className="text-gray-600 mb-8">
-        Create, manage, and send pre-designed messages to clients, partners, and suppliers via WhatsApp or email. Templates save time by letting you reuse common messages with smart placeholders that auto-fill with real data.
+        Create, manage, and send pre-designed messages to clients, partners, suppliers, and team members via email, WhatsApp, or SMS. Templates save time by letting you reuse common messages with smart placeholders that auto-fill with real data.
       </p>
 
       {/* Viewing Templates */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewing Templates</h2>
         <p className="text-gray-600 mb-3">
-          Go to <strong>Templates</strong> in the sidebar. You will see all your message templates with their name, category, channel, and usage count.
+          Go to <strong>Message Templates</strong> in the sidebar. You will see all your message templates with their name, category, subcategory badge, channel, and usage count.
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
           <li>Use the <strong>Search</strong> bar to find templates by name, description, or content</li>
           <li>Filter by <strong>Category</strong> (Customer, Partner, Supplier, Internal)</li>
-          <li>Filter by <strong>Channel</strong> (Email, WhatsApp, or Both)</li>
+          <li>Filter by <strong>Channel</strong> (Email, WhatsApp, SMS, or Both)</li>
         </ul>
-        <DocScreenshot src="/docs/message-templates/templates-list.jpg" alt="Message templates list page with search, category filter, and template cards" />
+        <DocScreenshot src="/docs/message-templates/templates-list.jpg" alt="Message Templates list with search, category and channel filters, subcategory badges, and per-card Send buttons" />
       </section>
 
       {/* Creating a Template */}
@@ -46,18 +46,20 @@ export default function MessageTemplatesPage() {
               <li><strong>Internal</strong> &mdash; For team communications</li>
             </ul>
           </li>
+          <li>Optionally set a <strong>Subcategory</strong> (e.g., booking confirmation, transport booking, guide booking) &mdash; shown as a badge on the template card</li>
           <li>Choose the <strong>Channel</strong>:
             <ul className="list-disc list-inside ml-6 mt-2 space-y-1 text-gray-600">
               <li><strong>Email</strong> &mdash; Includes subject line and body</li>
               <li><strong>WhatsApp</strong> &mdash; Body text only</li>
+              <li><strong>SMS</strong> &mdash; Body text only</li>
               <li><strong>Both</strong> &mdash; You pick the channel when sending</li>
             </ul>
           </li>
           <li>Write the <strong>Subject</strong> (for email templates)</li>
-          <li>Write the <strong>Body</strong> using placeholders for dynamic content</li>
+          <li>Write the <strong>Body</strong> using placeholders for dynamic content &mdash; a live preview updates as you type</li>
           <li>Click <strong>Save</strong></li>
         </ol>
-        <ScreenshotPlaceholder caption="Template creation form with name, category, channel, subject, and body fields" />
+        <ScreenshotPlaceholder caption="Template creation form with name, category, subcategory, channel, body, and live preview" />
       </section>
 
       {/* Placeholders */}
@@ -78,35 +80,39 @@ export default function MessageTemplatesPage() {
             </thead>
             <tbody className="text-gray-700">
               <tr className="border-b border-gray-100">
-                <td className="px-4 py-2.5 font-medium">Guest Info</td>
-                <td className="px-4 py-2.5">Name, email, phone, nationality, group size</td>
+                <td className="px-4 py-2.5 font-medium">Guest</td>
+                <td className="px-4 py-2.5 font-mono text-xs">{'{{GuestName}}'} {'{{PaxCount}}'} {'{{Nationality}}'} {'{{ClientPhone}}'} {'{{ClientEmail}}'}</td>
               </tr>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                <td className="px-4 py-2.5 font-medium">Trip Details</td>
-                <td className="px-4 py-2.5">Trip name, dates, booking reference, cities, duration</td>
+                <td className="px-4 py-2.5 font-medium">Trip</td>
+                <td className="px-4 py-2.5 font-mono text-xs">{'{{TripName}}'} {'{{TripDates}}'} {'{{BookingRef}}'} {'{{Cities}}'}</td>
               </tr>
               <tr className="border-b border-gray-100">
-                <td className="px-4 py-2.5 font-medium">Accommodation</td>
-                <td className="px-4 py-2.5">Hotel name, room type, meal plans</td>
+                <td className="px-4 py-2.5 font-medium">Hotel</td>
+                <td className="px-4 py-2.5 font-mono text-xs">{'{{HotelName}}'} {'{{RoomType}}'} {'{{MealPlan}}'}</td>
               </tr>
               <tr className="border-b border-gray-100 bg-gray-50/50">
-                <td className="px-4 py-2.5 font-medium">Transportation</td>
-                <td className="px-4 py-2.5">Guide/driver name, vehicle type, pickup times</td>
+                <td className="px-4 py-2.5 font-medium">Guide / Driver</td>
+                <td className="px-4 py-2.5 font-mono text-xs">{'{{GuideName}}'} {'{{GuidePhone}}'} {'{{DriverName}}'} {'{{VehicleType}}'}</td>
               </tr>
               <tr className="border-b border-gray-100">
+                <td className="px-4 py-2.5 font-medium">Schedule</td>
+                <td className="px-4 py-2.5 font-mono text-xs">{'{{PickupTime}}'} {'{{PickupPoint}}'} {'{{Date}}'}</td>
+              </tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
                 <td className="px-4 py-2.5 font-medium">Financial</td>
-                <td className="px-4 py-2.5">Total price, deposit amount, balance due, payment deadlines</td>
+                <td className="px-4 py-2.5 font-mono text-xs">{'{{TotalPrice}}'} {'{{Currency}}'} {'{{DepositAmount}}'} {'{{DepositDeadline}}'} {'{{PaymentLink}}'}</td>
               </tr>
               <tr>
-                <td className="px-4 py-2.5 font-medium">Company</td>
-                <td className="px-4 py-2.5">Agent name, company name, ops manager contact</td>
+                <td className="px-4 py-2.5 font-medium">Operations</td>
+                <td className="px-4 py-2.5 font-mono text-xs">{'{{OpsManagerName}}'} {'{{OpsManagerPhone}}'} {'{{AgentName}}'} {'{{CompanyName}}'}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <Tip>
-          The system automatically detects all placeholders in your template body. You don&apos;t need to register them &mdash; just type them in double curly braces.
+          The system detects every <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">{'{{...}}'}</code> placeholder in your body text, but only the registered placeholders above auto-fill from the recipient&apos;s record &mdash; anything else stays for you to fill in manually before sending.
         </Tip>
       </section>
 
@@ -114,19 +120,40 @@ export default function MessageTemplatesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Sending a Template</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Open the template you want to send</li>
-          <li>Click <strong>Send</strong></li>
-          <li>Select the <strong>Recipient</strong> &mdash; choose a client, partner, or supplier</li>
-          <li>Optionally link an <strong>Itinerary</strong> to auto-fill trip-related placeholders</li>
-          <li>Review the <strong>Live Preview</strong> &mdash; all placeholders are replaced with real data</li>
-          <li>Edit the message if needed (you can override any auto-filled text)</li>
-          <li>Choose the channel (if the template supports both Email and WhatsApp)</li>
+          <li>Click <strong>Send</strong> on a template card, or open <strong>Preview</strong> and click <strong>Send This Template</strong></li>
+          <li>The recipient type (client, partner, supplier, or team member) is pre-selected from the template&apos;s category &mdash; supplier templates even pick the right supplier list, so a hotel template fills <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">{'{{HotelName}}'}</code>, a guide template fills <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">{'{{GuideName}}'}</code>, and so on</li>
+          <li>Select the <strong>Recipient</strong> &mdash; their name, phone, email, and other known fields auto-fill the placeholders</li>
+          <li>Fill in trip-specific fields (dates, prices, pickup times) manually &mdash; these are not linked to an itinerary</li>
+          <li>Review the <strong>Live Preview</strong> and edit the message if needed</li>
+          <li>Choose the channel (if the template supports more than one)</li>
           <li>Click <strong>Send</strong></li>
         </ol>
-        <ScreenshotPlaceholder caption="Send template dialog with recipient selection, itinerary link, and live preview of auto-filled message" />
+        <ScreenshotPlaceholder caption="Send template dialog with recipient selection, auto-filled placeholders, and live preview" />
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Bulk and Scheduled Sending</h3>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Bulk send</strong> &mdash; Select multiple recipients and send the same template to all of them, with live progress as each message goes out</li>
+          <li><strong>Scheduled send</strong> &mdash; Pick a future date and time instead of sending immediately</li>
+        </ul>
         <Tip>
           The system tracks how many times each template has been sent and when it was last used, so you can see which templates your team uses most.
         </Tip>
+      </section>
+
+      {/* Analytics */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Template Analytics</h2>
+        <p className="text-gray-600 mb-3">
+          The analytics panel on the templates page summarizes usage across your team:
+        </p>
+        <ul className="list-disc list-inside space-y-1 text-gray-700">
+          <li><strong>Totals</strong> &mdash; Templates and messages sent overall</li>
+          <li><strong>Sends in the last 30 days</strong></li>
+          <li><strong>Success rate</strong> &mdash; Share of sends delivered without error</li>
+          <li><strong>Top templates</strong> &mdash; Your most-used templates</li>
+          <li><strong>Channel distribution</strong> &mdash; How sends split across email, WhatsApp, and SMS</li>
+        </ul>
+        <ScreenshotPlaceholder caption="Template analytics panel with totals, 30-day sends, success rate, top templates, and channel distribution" />
       </section>
 
       {/* Managing Templates */}
@@ -136,7 +163,7 @@ export default function MessageTemplatesPage() {
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Edit</strong> &mdash; Update the name, content, or settings of any template</li>
           <li><strong>Preview</strong> &mdash; View the full template content before sending</li>
-          <li><strong>Copy</strong> &mdash; Copy the template text to your clipboard for manual use</li>
+          <li><strong>Duplicate</strong> &mdash; Create a copy (named &ldquo;&lt;name&gt; (Copy)&rdquo;) to use as a starting point</li>
           <li><strong>Delete</strong> &mdash; Remove templates you no longer need</li>
         </ul>
       </section>
@@ -149,13 +176,13 @@ export default function MessageTemplatesPage() {
           <div className="text-sm text-gray-700 space-y-2 font-mono">
             <p>Hello {'{{GuestName}}'},</p>
             <p>Your booking for {'{{TripName}}'} has been confirmed!</p>
-            <p>Dates: {'{{StartDate}}'} &ndash; {'{{EndDate}}'}<br />
-            Travelers: {'{{GroupSize}}'}<br />
-            Reference: {'{{BookingReference}}'}</p>
-            <p>Your guide {'{{GuideName}}'} will meet you at {'{{PickupLocation}}'} at {'{{PickupTime}}'}.</p>
-            <p>Total: {'{{TotalPrice}}'}<br />
-            Deposit paid: {'{{DepositAmount}}'}<br />
-            Balance due: {'{{BalanceDue}}'} by {'{{PaymentDeadline}}'}</p>
+            <p>Dates: {'{{TripDates}}'}<br />
+            Travelers: {'{{PaxCount}}'}<br />
+            Reference: {'{{BookingRef}}'}</p>
+            <p>Your guide {'{{GuideName}}'} will meet you at {'{{PickupPoint}}'} at {'{{PickupTime}}'}.</p>
+            <p>Total: {'{{TotalPrice}}'} {'{{Currency}}'}<br />
+            Deposit: {'{{DepositAmount}}'} {'{{Currency}}'} by {'{{DepositDeadline}}'}<br />
+            Pay here: {'{{PaymentLink}}'}</p>
             <p>Best regards,<br />{'{{AgentName}}'}<br />{'{{CompanyName}}'}</p>
           </div>
         </div>

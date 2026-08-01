@@ -14,71 +14,90 @@ export default function BookingsPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Bookings</h1>
       <p className="text-gray-600 mb-8">
-        When a client confirms an itinerary, you convert it into a booking. Bookings track the operational side: supplier confirmations, payments, and status.
+        When a client accepts a quote, you convert it into a booking. Bookings track the operational side of a confirmed trip: passenger details, payments, and status from deposit through completion.
       </p>
+
+      {/* Creating a Booking */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Creating a Booking</h2>
+        <p className="text-gray-600 mb-3">
+          Bookings are created from quotes, not from itineraries:
+        </p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-700">
+          <li>Open the quote detail page (B2C or B2B)</li>
+          <li>Click <strong>Convert to Booking</strong></li>
+          <li>The booking is created and linked to the quote</li>
+        </ol>
+        <Tip>
+          Each quote can be converted to a booking only once. After conversion, the quote links through to its booking.
+        </Tip>
+      </section>
 
       {/* Viewing Bookings */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewing Bookings</h2>
         <p className="text-gray-600 mb-3">
-          Go to <strong>Bookings</strong> in the sidebar. Status cards at the top show:
+          Go to <strong>All Bookings</strong> in the sidebar. Stat cards at the top show <strong>Total Bookings</strong>, <strong>Pending Deposit</strong>, <strong>Confirmed</strong>, <strong>In Progress</strong>, and <strong>Completed</strong> counts. Use the status filter dropdown to narrow the list, and if your account has both B2C and B2B workspaces, tabs let you switch between them.
         </p>
+        <p className="text-gray-600 mb-3">A booking moves through six statuses:</p>
         <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li><strong>Pending</strong> &mdash; Just created, waiting on suppliers</li>
-          <li><strong>Supplier Confirmed</strong> &mdash; All suppliers confirmed</li>
-          <li><strong>Payment Received</strong> &mdash; Client has paid</li>
-          <li><strong>Ready</strong> &mdash; Everything is set for the trip</li>
+          <li><strong>Pending Deposit</strong> &mdash; Created, waiting for the first payment</li>
+          <li><strong>Confirmed</strong> &mdash; Deposit received, trip is confirmed</li>
+          <li><strong>Paid in Full</strong> &mdash; The full amount has been paid</li>
           <li><strong>In Progress</strong> &mdash; Client is currently traveling</li>
           <li><strong>Completed</strong> &mdash; Trip finished</li>
           <li><strong>Cancelled</strong></li>
         </ul>
-        <DocScreenshot src="/docs/bookings/bookings-list.jpg" alt="Bookings list page with status cards and booking rows" />
+        <DocScreenshot src="/docs/bookings/bookings-list.jpg" alt="All Bookings list page with stat cards, status filter, and booking rows" />
       </section>
 
       {/* Booking Detail */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Booking Detail Page</h2>
-        <p className="text-gray-600 mb-3">Click any booking to see:</p>
-
-        <h3 className="text-lg font-medium text-gray-900 mt-5 mb-3">Suppliers Tab</h3>
         <p className="text-gray-600 mb-3">
-          Each service (hotel, guide, transport, etc.) has a confirmation status:
+          Click any booking to open it. The detail page has four tabs:
+        </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-5 mb-3">Overview Tab</h3>
+        <p className="text-gray-600 mb-3">
+          Shows the core booking information alongside a <strong>Payment Summary</strong> with a progress bar indicating the percentage paid so far.
+        </p>
+        <ScreenshotPlaceholder caption="Booking detail Overview tab with booking information and Payment Summary progress bar" />
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Passengers Tab</h3>
+        <p className="text-gray-600 mb-3">
+          The full passenger manifest. Add, edit, or remove passengers with:
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
-          <li><strong>Pending</strong> &mdash; Not yet contacted</li>
-          <li><strong>Requested</strong> &mdash; Confirmation requested</li>
-          <li><strong>Confirmed</strong> &mdash; Supplier confirmed with a confirmation number</li>
-          <li><strong>Issues</strong> &mdash; Problems that need attention</li>
-          <li><strong>Rejected / Cancelled</strong></li>
+          <li>Title, first name, and last name</li>
+          <li>Date of birth and nationality</li>
+          <li>Passport number</li>
+          <li>Passenger type (adult, child, etc.)</li>
+          <li>Lead-passenger flag</li>
+          <li>Contact details</li>
         </ul>
-        <Tip>
-          Click <strong>Sync from Itinerary</strong> to automatically pull in all services from the linked itinerary.
-        </Tip>
-        <ScreenshotPlaceholder caption="Booking detail page showing Suppliers tab with confirmation statuses" />
+        <ScreenshotPlaceholder caption="Passengers tab with the manifest list and add-passenger form" />
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Payments Tab</h3>
-        <p className="text-gray-600">
-          View all payments received for this booking and link to the invoice.
+        <p className="text-gray-600 mb-3">
+          Every payment recorded against the booking, with payment number, type, status, amount, method, date, reference, and notes. Payment types are <strong>deposit</strong>, <strong>installment</strong>, <strong>balance</strong>, and <strong>full payment</strong>.
         </p>
 
-        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Notes Tab</h3>
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Documents Tab</h3>
         <p className="text-gray-600">
-          Add internal operational notes for your team.
+          A placeholder for now &mdash; document management for bookings will be available soon.
         </p>
       </section>
 
-      {/* Updating Supplier Status */}
+      {/* Confirmations */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Updating Supplier Status</h2>
-        <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Open the booking</li>
-          <li>Go to the <strong>Suppliers</strong> tab</li>
-          <li>Click on a supplier</li>
-          <li>Update the status (e.g., Pending to Confirmed)</li>
-          <li>Enter the <strong>confirmation number</strong> if applicable</li>
-          <li>Add any notes</li>
-        </ol>
-        <ScreenshotPlaceholder caption="Supplier status update dialog with status dropdown and confirmation number field" />
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Sending Booking Confirmations</h2>
+        <p className="text-gray-600 mb-3">
+          For B2C bookings, the header offers <strong>Send Email</strong> and <strong>WhatsApp</strong> actions to send the client a booking confirmation.
+        </p>
+        <Tip>
+          The WhatsApp option requires a phone number on the client record.
+        </Tip>
       </section>
 
       {/* Navigation */}

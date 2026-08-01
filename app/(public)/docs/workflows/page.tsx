@@ -21,36 +21,78 @@ export default function WorkflowsPage() {
           The complete end-to-end workflow for handling a new client inquiry:
         </p>
         <ol className="list-decimal list-inside space-y-3 text-gray-700">
-          <li><strong>Receive inquiry</strong> &mdash; Client messages on WhatsApp. The message appears in your WhatsApp Inbox.</li>
-          <li><strong>Parse with AI</strong> &mdash; Copy the conversation and use the WhatsApp Parser. AI extracts all trip details.</li>
-          <li><strong>Create itinerary</strong> &mdash; Click &ldquo;Create Itinerary&rdquo; from the parser results. A complete day-by-day plan with pricing is generated.</li>
-          <li><strong>Review and edit</strong> &mdash; Open the itinerary editor. Adjust days, services, hotels, and pricing as needed.</li>
-          <li><strong>Send to client</strong> &mdash; Download as PDF and send via WhatsApp or email.</li>
-          <li><strong>Client confirms</strong> &mdash; Update the itinerary status to &ldquo;Confirmed.&rdquo;</li>
-          <li><strong>Generate invoice</strong> &mdash; Click &ldquo;Generate Invoice&rdquo; to create the billing document.</li>
-          <li><strong>Send invoice</strong> &mdash; Send via WhatsApp or email. Set up reminders for payment.</li>
-          <li><strong>Create booking</strong> &mdash; The system creates a booking when you confirm the itinerary.</li>
+          <li><strong>Receive inquiry</strong> &mdash; The client messages on WhatsApp. The conversation appears in your WhatsApp inbox.</li>
+          <li><strong>Parse with AI</strong> &mdash; Open the conversation and click <strong>Parse</strong>. The parser opens with the chat already loaded &mdash; no copying and pasting. Click <strong>Analyze with AI</strong> to extract the trip details.</li>
+          <li><strong>Configure and confirm</strong> &mdash; Review the extracted details, choose the output (B2C quote, B2B quote, or itinerary only), and confirm the client (or click <strong>Create Client &amp; Generate</strong> for a new one).</li>
+          <li><strong>Generate</strong> &mdash; Click <strong>Quick Generate</strong> for a one-shot itinerary, or <strong>Generate &amp; Edit</strong> to open it straight in the editor.</li>
+          <li><strong>Review and edit</strong> &mdash; Adjust days, services, hotels, and pricing as needed.</li>
+          <li><strong>Send to client</strong> &mdash; Share the itinerary link or download the PDF and send it via WhatsApp or email.</li>
+          <li><strong>Client accepts</strong> &mdash; Open the quote&apos;s detail page (under <strong>B2C Quotes</strong>, or B2B Quotes for partners) and click <strong>Convert to Booking</strong>. Each quote can be converted once.</li>
           <li><strong>Confirm suppliers</strong> &mdash; In the booking, track each supplier&apos;s confirmation status.</li>
-          <li><strong>Record payments</strong> &mdash; As the client pays, record payments on the invoice.</li>
-          <li><strong>Generate tasks</strong> &mdash; Use AI to create operational tasks for your team.</li>
+          <li><strong>Invoice and get paid</strong> &mdash; Create the invoice, send it, and record payments as they arrive.</li>
           <li><strong>Complete trip</strong> &mdash; After the trip, mark the booking as completed and review the P&amp;L.</li>
         </ol>
         <ScreenshotPlaceholder caption="Flow diagram showing the complete journey from WhatsApp message to completed booking" />
+      </section>
+
+      {/* Quote pipeline */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Working the Quote Pipeline</h2>
+        <ol className="list-decimal list-inside space-y-2 text-gray-700">
+          <li>Go to <strong>B2C Quotes</strong> to see every quote and its status</li>
+          <li>Chase the ones the client hasn&apos;t answered &mdash; the dashboard&apos;s <strong>Quotes awaiting client</strong> card takes you to the same list</li>
+          <li>When a client says yes, open the quote and click <strong>Convert to Booking</strong></li>
+        </ol>
+        <Tip>
+          Bookings are always created from a quote&apos;s detail page &mdash; convert the quote rather than looking for a booking button elsewhere.
+        </Tip>
+      </section>
+
+      {/* Follow up on opened proposals */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Following Up When a Client Reads Their Proposal</h2>
+        <p className="text-gray-600 mb-3">
+          When you share an itinerary link, Autoura tracks when the client opens it. The dashboard&apos;s <strong>Clients reading their proposal</strong> panel shows who has been looking &mdash; the perfect moment to follow up:
+        </p>
+        <ol className="list-decimal list-inside space-y-2 text-gray-700">
+          <li>Check the <strong>Clients reading their proposal</strong> panel on the dashboard</li>
+          <li>If a client opened the proposal recently, message or call them while the trip is fresh in their mind</li>
+          <li>Log the touchpoint on the client&apos;s profile</li>
+        </ol>
+      </section>
+
+      {/* Concierge Leads */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Triaging Concierge Leads</h2>
+        <ol className="list-decimal list-inside space-y-2 text-gray-700">
+          <li>Go to <strong>Concierge Leads</strong> (CRM group) to see inbound briefs from your intake form</li>
+          <li>Open a brief to review the trip request</li>
+          <li>Follow up by WhatsApp or email, and create a client record for promising leads</li>
+        </ol>
+      </section>
+
+      {/* Copilot replies */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Replying Faster with Copilot</h2>
+        <ol className="list-decimal list-inside space-y-2 text-gray-700">
+          <li>Open <strong>Copilot</strong> in the sidebar to see AI-drafted replies to incoming messages</li>
+          <li>Review each draft, edit if needed, then send &mdash; nothing is ever sent without your approval</li>
+          <li>In the WhatsApp inbox, Copilot suggestions also appear right in the composer</li>
+          <li>Improve future drafts by adding facts to <strong>Copilot Knowledge</strong> and tuning <strong>Copilot Settings</strong></li>
+        </ol>
       </section>
 
       {/* Quick Quote */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Quote (Under 5 Minutes)</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Dashboard &gt; <strong>New Quote</strong></li>
-          <li>Enter client name, dates, and number of travelers</li>
-          <li>Use <strong>Auto</strong> cost mode to let the system price everything</li>
-          <li>Add the days and services</li>
-          <li>Click <strong>Download PDF</strong></li>
-          <li>Send to the client</li>
+          <li>On the Dashboard, click <strong>New Quote</strong> &mdash; this opens a simple new-itinerary form</li>
+          <li>Enter the client, dates, and number of travelers, then create the itinerary</li>
+          <li>On the itinerary&apos;s detail page, add days and services, and use the <strong>Auto</strong>/<strong>Manual</strong> cost toggle &mdash; Auto prices everything from your rates database</li>
+          <li>Click <strong>Download PDF</strong> and send it to the client</li>
         </ol>
         <Tip>
-          Auto cost mode uses your rates database to calculate prices instantly. Keep your rates updated for the most accurate quotes.
+          Two different &ldquo;New Quote&rdquo; buttons: the <strong>Dashboard</strong> quick action opens the plain new-itinerary form, while <strong>New Quote in the sidebar</strong> (Operations group) opens the <strong>Pricing Grid</strong> &mdash; the spreadsheet-style quoting surface. Use whichever fits the job.
         </Tip>
       </section>
 
@@ -67,14 +109,15 @@ export default function WorkflowsPage() {
 
       {/* Payment Reminder */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Sending a Payment Reminder</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Chasing Payments</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>Invoices</strong></li>
-          <li>Find the overdue invoice</li>
-          <li>Click on it</li>
-          <li>Click <strong>Send Reminder</strong></li>
-          <li>Choose WhatsApp or Email</li>
+          <li>Go to <strong>Receivables</strong> (Finance group) to see everything clients still owe</li>
+          <li>Click the <strong>Send Reminder</strong> mail action on an overdue item &mdash; the reminder goes out by email</li>
+          <li>To review past and scheduled reminders for an invoice, open the invoice and follow its <strong>Reminder History</strong> to the Payment Reminders page</li>
         </ol>
+        <p className="text-gray-600 mt-3">
+          The invoice detail page itself gives you <strong>Send via WhatsApp</strong>, <strong>Download PDF</strong>, <strong>Mark as Sent</strong>, and <strong>Record Payment</strong>.
+        </p>
       </section>
 
       {/* B2B */}
@@ -102,9 +145,6 @@ export default function WorkflowsPage() {
           <li><strong>List View</strong> &mdash; Simple list with filters</li>
         </ul>
         <DocScreenshot src="/docs/workflows/tasks.jpg" alt="Task management page showing Kanban board with draggable task cards" />
-        <Tip>
-          Use <strong>Generate Tasks</strong> from an itinerary to let AI create operational tasks automatically. For example, it will create tasks like &ldquo;Confirm hotel reservation&rdquo; and &ldquo;Book airport transfer.&rdquo;
-        </Tip>
       </section>
 
       {/* Tips */}
@@ -117,15 +157,11 @@ export default function WorkflowsPage() {
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
-            <span><strong>Auto-pricing saves time</strong> &mdash; Keep your rates database updated and use Auto cost mode for instant pricing</span>
+            <span><strong>Auto-pricing saves time</strong> &mdash; Keep your rates database updated and use Auto cost mode on the itinerary page for instant pricing</span>
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
             <span><strong>Link everything</strong> &mdash; Link expenses to itineraries, tasks to clients, and commissions to services for a complete picture</span>
-          </li>
-          <li className="flex items-start gap-3 text-gray-700">
-            <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
-            <span><strong>Use AI for tasks</strong> &mdash; After building an itinerary, click &ldquo;Generate Tasks&rdquo; to automatically create your to-do list</span>
           </li>
           <li className="flex items-start gap-3 text-gray-700">
             <span className="mt-1.5 w-1.5 h-1.5 bg-primary-500 rounded-full flex-shrink-0" />
@@ -157,7 +193,7 @@ export default function WorkflowsPage() {
           If you run into any issues or have questions:
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700">
-          <li>Contact your system administrator</li>
+          <li>Message the Autoura team via the floating <strong>Support Chat</strong> widget on any page &mdash; you&apos;ll be notified by email when they reply</li>
           <li>Check this documentation for step-by-step instructions</li>
           <li>The system shows helpful error messages when something goes wrong</li>
         </ul>

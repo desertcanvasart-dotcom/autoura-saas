@@ -23,18 +23,38 @@ export default function GettingStartedPage() {
           <li>Click <strong>Sign In</strong></li>
         </ol>
         <p className="mt-3 text-gray-600">
-          You can also sign in with your Google account by clicking the Google button.
+          Forgot your password? Use the <strong>Forgot password</strong> link on the login page to reset it by email.
         </p>
-        <DocScreenshot src="/docs/getting-started/login-page.jpg" alt="Login page with email, password fields, and Google sign-in button" />
+        <DocScreenshot src="/docs/getting-started/login-page.jpg" alt="Login page with email and password fields and a Forgot password link" />
+      </section>
+
+      {/* Creating an Account */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Creating a New Account</h2>
+        <p className="text-gray-600 mb-3">
+          If your company is new to Autoura, you can sign up directly &mdash; no invitation needed. After you create your account, a guided onboarding wizard walks you through setting up your workspace in seven steps:
+        </p>
+        <ol className="list-decimal list-inside space-y-1 text-gray-700">
+          <li><strong>Welcome</strong> &mdash; A quick introduction</li>
+          <li><strong>Business</strong> &mdash; Your company details</li>
+          <li><strong>Branding</strong> &mdash; Logo and colors used on your documents</li>
+          <li><strong>Catalog</strong> &mdash; Choose your starting rates and content</li>
+          <li><strong>Team</strong> &mdash; Invite your teammates</li>
+          <li><strong>Tour</strong> &mdash; A short tour of the app</li>
+          <li><strong>Complete</strong> &mdash; You&apos;re ready to work</li>
+        </ol>
+        <Tip>
+          The onboarding wizard is resumable &mdash; if you leave partway through, you&apos;ll pick up where you left off the next time you log in.
+        </Tip>
       </section>
 
       {/* First-Time Setup */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">First-Time Setup</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Joining by Invitation</h2>
         <p className="text-gray-600 mb-3">If you received an invitation email from your team admin:</p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Click the invitation link in the email</li>
-          <li>Set your password</li>
+          <li>Enter a <strong>Password</strong> and <strong>Confirm Password</strong> (minimum 8 characters)</li>
           <li>You will be taken to the dashboard</li>
         </ol>
         <Tip>
@@ -58,25 +78,33 @@ export default function GettingStartedPage() {
             </thead>
             <tbody>
               <tr className="border-b border-gray-100">
-                <td className="px-4 py-3 font-medium text-gray-900">Admin</td>
-                <td className="px-4 py-3 text-gray-600">Everything: settings, users, rates, finances, and all operations</td>
+                <td className="px-4 py-3 font-medium text-gray-900">Administrator</td>
+                <td className="px-4 py-3 text-gray-600">Everything, including the admin-only Settings area: organization settings, team management, WhatsApp configuration, billing, and user management</td>
               </tr>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <td className="px-4 py-3 font-medium text-gray-900">Manager</td>
-                <td className="px-4 py-3 text-gray-600">Rates, team members, financial reports, clients, itineraries, invoices, tours</td>
+                <td className="px-4 py-3 text-gray-600">All day-to-day operations plus Rates &amp; Pricing, Finance, Suppliers, Itineraries, Tour Departures, Team Members, and Tasks</td>
               </tr>
               <tr className="border-b border-gray-100">
-                <td className="px-4 py-3 font-medium text-gray-900">Agent</td>
-                <td className="px-4 py-3 text-gray-600">Clients, itineraries, invoices, payments, tasks, inbox, WhatsApp, tours</td>
+                <td className="px-4 py-3 font-medium text-gray-900">Member</td>
+                <td className="px-4 py-3 text-gray-600">Works on the clients and tasks assigned to them &mdash; communication, quotes, and bookings. Does not see Rates &amp; Pricing, Finance, or the operations management pages</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-medium text-gray-900">Viewer</td>
-                <td className="px-4 py-3 text-gray-600">View-only: dashboard, analytics, calendar, notifications</td>
+                <td className="px-4 py-3 text-gray-600">View-only access</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <DocScreenshot src="/docs/getting-started/user-management.jpg" alt="User management page showing roles and permissions" />
+        <DocScreenshot src="/docs/getting-started/user-management.jpg" alt="User management page listing team members with their assigned roles" />
+      </section>
+
+      {/* Getting Help */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Getting Help</h2>
+        <p className="text-gray-600">
+          Every page in the app has a floating <strong>Support Chat</strong> widget in the corner. Use it to message the Autoura support team directly &mdash; you&apos;ll get an email notification when they reply, and the full conversation stays in the widget.
+        </p>
       </section>
 
       {/* Next Page */}

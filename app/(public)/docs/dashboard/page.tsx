@@ -14,54 +14,57 @@ export default function DashboardPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
       <p className="text-gray-600 mb-8">
-        The dashboard is your home base. When you log in, you see everything at a glance.
+        The dashboard is your home base. It greets you by name and shows the things that need your attention today: trips about to depart, money still owed, messages waiting for a reply, and quotes your clients haven&apos;t answered yet.
       </p>
 
-      <DocScreenshot src="/docs/dashboard/full-dashboard.jpg" alt="Full dashboard view with stats cards, quick actions, and recent activity" />
+      <DocScreenshot src="/docs/dashboard/full-dashboard.jpg" alt="Dashboard with greeting, four action cards, list panels, and quick action buttons" />
 
-      {/* Quick Stats */}
+      {/* Action Cards */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Stats</h2>
-        <p className="text-gray-600 mb-3">Four cards at the top showing:</p>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Action Cards</h2>
+        <p className="text-gray-600 mb-3">Four cards at the top summarize what needs attention. Click a card to jump straight to the relevant page:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Total Clients</strong> in the system</li>
-          <li><strong>Pending Follow-ups</strong> that need your attention</li>
-          <li><strong>Client Quotes</strong> you have created</li>
-          <li><strong>Upcoming Trips</strong> in the next 30 days</li>
+          <li><strong>Departing in N days</strong> &mdash; Bookings with upcoming departure dates. Click through to <strong>Bookings</strong>.</li>
+          <li><strong>Outstanding</strong> &mdash; The total amount clients still owe you. Click through to <strong>Invoices</strong>.</li>
+          <li><strong>Needs a reply</strong> &mdash; Conversations waiting on you. Click through to the <strong>Inbox</strong>.</li>
+          <li><strong>Quotes awaiting client</strong> &mdash; Quotes sent but not yet answered. Click through to <strong>B2C Quotes</strong>.</li>
         </ul>
-        <DocScreenshot src="/docs/dashboard/quick-stats.jpg" alt="Quick stats cards showing client count, follow-ups, quotes, and upcoming trips" />
+        <Tip>
+          If a figure can&apos;t be loaded, the card shows a dash (&mdash;) instead of a misleading zero, and a warning banner appears at the top of the page.
+        </Tip>
+      </section>
+
+      {/* List Panels */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">List Panels</h2>
+        <p className="text-gray-600 mb-3">Below the cards, four panels list the specific items behind the numbers:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Departing soon</strong> &mdash; The next trips to depart, so nothing sneaks up on you</li>
+          <li><strong>Clients reading their proposal</strong> &mdash; Clients who have opened the itinerary link you shared with them. This is proposal open/view tracking &mdash; a great signal for a well-timed follow-up call.</li>
+          <li><strong>Largest balances owed</strong> &mdash; The invoices with the biggest outstanding amounts</li>
+          <li><strong>Waiting on your reply</strong> &mdash; Conversations where the client spoke last</li>
+        </ul>
       </section>
 
       {/* Quick Actions */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <p className="text-gray-600 mb-3">Four buttons for the most common tasks:</p>
+        <p className="text-gray-600 mb-3">Shortcut buttons for the most common tasks:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>Parse WhatsApp</strong> &mdash; Paste a WhatsApp conversation and let AI extract client details and trip requirements</li>
-          <li><strong>New Quote</strong> &mdash; Create a new itinerary/quote from scratch</li>
+          <li><strong>New Quote</strong> &mdash; Start a new itinerary/quote. On B2B-only workspaces this opens the Tour Builder instead.</li>
           <li><strong>Rates Hub</strong> &mdash; View and update your pricing</li>
-          <li><strong>B2B Packages</strong> &mdash; Browse ready-made tour packages</li>
+          <li><strong>B2B Packages</strong> &mdash; Browse ready-made tour packages (hidden on B2C-only workspaces)</li>
+          <li><strong>Clients</strong> &mdash; Jump to your client list</li>
         </ul>
-        <Tip>
-          <strong>Tip:</strong> The Parse WhatsApp button is the fastest way to turn a client inquiry into a professional quote.
-        </Tip>
       </section>
 
-      {/* Recent Activity */}
+      {/* Analytics */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Activity</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Analytics</h2>
         <p className="text-gray-600">
-          A list of your latest itineraries and actions, so you can quickly pick up where you left off.
+          The dashboard is deliberately focused on what needs action <em>today</em>. For trends and totals &mdash; revenue, bookings, and performance over time &mdash; open <strong>Analytics</strong> in the sidebar (just under Dashboard).
         </p>
-      </section>
-
-      {/* System Status */}
-      <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">System Status</h2>
-        <p className="text-gray-600">
-          Small indicators showing whether the AI Parser, B2B Packages, and Email Service are online and working.
-        </p>
-        <DocScreenshot src="/docs/dashboard/system-status.jpg" alt="Quick Actions, Recent Activity, Today's Summary, and System Status indicators" />
+        <DocScreenshot src="/docs/dashboard/analytics.jpg" alt="Analytics page with revenue and booking trend charts" />
       </section>
 
       {/* Navigation */}
