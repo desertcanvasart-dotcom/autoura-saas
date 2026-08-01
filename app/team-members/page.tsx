@@ -13,7 +13,8 @@ import {
   Shield,
   CheckCircle,
   XCircle,
-  Users
+  Users,
+  KeyRound
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -26,6 +27,9 @@ interface TeamMember {
   department_id: string | null
   notes: string
   is_active: boolean
+  // Set by migration 264's tenant_members trigger when this person has a
+  // login account; null for directory-only people (drivers, freelancers).
+  user_id: string | null
   created_at: string
   updated_at: string
 }
@@ -348,6 +352,15 @@ export default function TeamMembersPage() {
                       {departmentName(member.department_id) && (
                         <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
                           🏢 {departmentName(member.department_id)}
+                        </span>
+                      )}
+                      {member.user_id && (
+                        <span
+                          className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700"
+                          title="This person has a login account"
+                        >
+                          <KeyRound className="h-3 w-3" />
+                          Has login
                         </span>
                       )}
                     </div>
