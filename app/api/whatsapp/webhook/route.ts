@@ -12,7 +12,7 @@ import { after } from 'next/server'
 import { createClient } from '@/app/supabase'
 import twilio from 'twilio'
 import { processIncomingMessage } from '@/lib/whatsapp-ai-agent'
-import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { sendWhatsAppMessage, getTenantByWhatsAppNumber } from '@/lib/twilio-whatsapp'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 
 export async function POST(request: NextRequest) {
@@ -70,6 +70,10 @@ export async function POST(request: NextRequest) {
     const numMedia = parseInt(params['NumMedia'] || '0')
     const mediaUrl = params['MediaUrl0'] || null
     const mediaType = params['MediaContentType0'] || null
+
+    // Which brand was messaged? Each tenant has its own WhatsApp number
+    // (tenants.settings.whatsapp_number); route the conversation to it.
+    const senderTenantId = to ? await getTenantByWhatsAppNumber(to) : null
 
 
 
@@ -134,7 +138,7 @@ export async function POST(request: NextRequest) {
           phone_number: phoneNumber,
           client_id: clientId,
           client_name: clientName,
-          tenant_id: clientTenantId, // Use client's tenant if available
+          tenant_id: senderTenantId ?? clientTenantId, // Brand messaged, else client's tenant
           status: 'active'
         })
         .select('id, tenant_id')
@@ -144,7 +148,7 @@ export async function POST(request: NextRequest) {
         console.error('❌ Error creating conversation:', convError)
       } else {
         conversationId = newConversation.id
-        tenantId = newConversation.tenant_id || clientTenantId
+        tenantId = newConversation.tenant_id || senderTenantId || clientTenantId
 
       }
     }
@@ -290,7 +294,8 @@ export async function POST(request: NextRequest) {
             // Send the AI-generated response
             const sendResult = await sendWhatsAppMessage({
               to: phoneNumber,
-              body: aiResponse.reply
+              body: aiResponse.reply,
+              from: to // reply from the brand number the customer messaged
             })
 
             if (sendResult.success) {

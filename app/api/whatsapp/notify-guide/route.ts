@@ -95,7 +95,8 @@ export async function POST(request: NextRequest) {
 
     const result = await sendWhatsAppMessage({
       to: guidePhone,
-      body: message
+      body: message,
+      tenantId: authResult.tenant_id ?? undefined
     })
 
     if (!result.success) {

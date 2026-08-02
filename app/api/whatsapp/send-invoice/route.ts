@@ -322,7 +322,8 @@ export async function POST(request: NextRequest) {
     const result = await sendWhatsAppMessage({
       to: clientPhone,
       body: message,
-      mediaUrl: pdfUrl
+      mediaUrl: pdfUrl,
+      tenantId: authResult.tenant_id ?? undefined
     })
 
     if (!result.success) {

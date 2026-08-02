@@ -107,7 +107,8 @@ export async function POST(request: NextRequest) {
     // Send message (text only - no PDF attachment)
     const result = await sendWhatsAppMessage({
       to: clientPhone,
-      body: message
+      body: message,
+      tenantId: authResult.tenant_id ?? undefined
     })
 
     if (!result.success) {

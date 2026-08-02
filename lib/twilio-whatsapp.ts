@@ -7,12 +7,67 @@
 // ============================================
 
 import twilio from 'twilio'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+// ============================================
+// PER-TENANT SENDER RESOLUTION
+// ============================================
+// Each brand (tenant) has its own WhatsApp number, stored in
+// tenants.settings.whatsapp_number (E.164, e.g. "+15551234567").
+// Falls back to the account-wide TWILIO_WHATSAPP_FROM env var.
+// Service-role client: this runs in webhooks/API routes with no user
+// session, and tenants is RLS-protected from anon reads.
+
+let _senderDb: ReturnType<typeof createSupabaseClient> | null = null
+function getSenderDb() {
+  if (!_senderDb) {
+    _senderDb = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _senderDb
+}
+
+const tenantFromCache = new Map<string, string>()
+
+export async function getTenantWhatsAppFrom(tenantId?: string): Promise<string | null> {
+  if (tenantId) {
+    const cached = tenantFromCache.get(tenantId)
+    if (cached) return cached
+    const { data } = await getSenderDb()
+      .from('tenants')
+      .select('settings')
+      .eq('id', tenantId)
+      .single<{ settings: Record<string, string> | null }>()
+    const num = data?.settings?.whatsapp_number
+    if (num) {
+      const from = num.startsWith('whatsapp:') ? num : `whatsapp:${num}`
+      tenantFromCache.set(tenantId, from)
+      return from
+    }
+  }
+  return process.env.TWILIO_WHATSAPP_FROM ?? null
+}
+
+/** Find which tenant owns a given WhatsApp business number (webhook To). */
+export async function getTenantByWhatsAppNumber(number: string): Promise<string | null> {
+  const clean = number.replace('whatsapp:', '')
+  const { data } = await getSenderDb()
+    .from('tenants')
+    .select('id')
+    .eq('settings->>whatsapp_number', clean)
+    .single<{ id: string }>()
+  return data?.id ?? null
+}
 
 // Types
 export interface WhatsAppMessage {
   to: string // Phone number in international format: +201234567890
   body: string
   mediaUrl?: string // Optional: PDF or image URL
+  tenantId?: string // Resolve the sender number from this tenant's settings
+  from?: string // Explicit sender override (e.g. echo the webhook's To number)
 }
 
 export interface QuoteMessage {
@@ -113,14 +168,18 @@ function formatDate(dateString: string): string {
 export async function sendWhatsAppMessage({
   to,
   body,
-  mediaUrl
+  mediaUrl,
+  tenantId,
+  from: fromOverride
 }: WhatsAppMessage): Promise<{ success: boolean; messageId?: string; error?: string; warning?: string }> {
   try {
     const client = getTwilioClient()
-    const from = process.env.TWILIO_WHATSAPP_FROM
+    const from = fromOverride
+      ? (fromOverride.startsWith('whatsapp:') ? fromOverride : `whatsapp:${fromOverride}`)
+      : await getTenantWhatsAppFrom(tenantId)
 
     if (!from) {
-      throw new Error('TWILIO_WHATSAPP_FROM not configured')
+      throw new Error('No WhatsApp sender: tenant has no whatsapp_number and TWILIO_WHATSAPP_FROM is unset')
     }
 
     const formattedTo = formatWhatsAppNumber(to)

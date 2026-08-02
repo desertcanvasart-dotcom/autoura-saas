@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     if (channel === 'email') {
       result = await sendEmail(recipient, subject, messageBody, supabase)
     } else if (channel === 'whatsapp') {
-      result = await sendWhatsApp(recipient, messageBody)
+      result = await sendWhatsApp(recipient, messageBody, authResult.tenant_id)
     } else if (channel === 'sms') {
       result = await sendSMS(recipient, messageBody)
     } else {
@@ -194,11 +194,13 @@ async function sendEmail(to: string, subject: string, body: string, supabase: an
 // WHATSAPP SENDING (via Twilio)
 // ============================================
 
-async function sendWhatsApp(to: string, body: string): Promise<{ success: boolean; error?: string }> {
+async function sendWhatsApp(to: string, body: string, tenantId?: string | null): Promise<{ success: boolean; error?: string }> {
   try {
     const accountSid = process.env.TWILIO_ACCOUNT_SID
     const authToken = process.env.TWILIO_AUTH_TOKEN
-    const fromNumber = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886'
+    const { getTenantWhatsAppFrom } = await import('@/lib/twilio-whatsapp')
+    const fromNumber = (tenantId ? await getTenantWhatsAppFrom(tenantId) : null)
+      || process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886'
 
     if (!accountSid || !authToken) {
       return {

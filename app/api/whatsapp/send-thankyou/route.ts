@@ -82,7 +82,8 @@ export async function POST(request: NextRequest) {
 
     const result = await sendWhatsAppMessage({
       to: itinerary.client_phone,
-      body: message
+      body: message,
+      tenantId: authResult.tenant_id ?? undefined
     })
 
     if (!result.success) {

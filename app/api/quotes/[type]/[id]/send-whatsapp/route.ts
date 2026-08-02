@@ -293,7 +293,8 @@ export async function POST(
     const result = await sendWhatsAppMessage({
       to: toPhone,
       body: message,
-      mediaUrl: pdfUrl
+      mediaUrl: pdfUrl,
+      tenantId
     })
 
     if (!result.success) {

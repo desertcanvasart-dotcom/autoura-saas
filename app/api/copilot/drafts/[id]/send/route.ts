@@ -47,7 +47,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const editPatch = editedBody ? { edited_body: editedBody, was_edited: true } : {}
 
     if (thread.channel === 'whatsapp') {
-      const res = await sendWhatsAppMessage({ to: thread.contact_info, body: finalBody })
+      const res = await sendWhatsAppMessage({ to: thread.contact_info, body: finalBody, tenantId: tenant_id ?? undefined })
       if (!res.success) {
         await supabase.from('communication_drafts').update({ send_error: res.error || 'send failed', ...editPatch }).eq('id', id)
         return NextResponse.json({ success: false, error: res.error || 'Failed to send WhatsApp message' }, { status: 502 })
