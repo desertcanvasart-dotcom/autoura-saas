@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
-import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 

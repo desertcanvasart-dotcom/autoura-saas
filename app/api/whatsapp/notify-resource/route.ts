@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
-import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function POST(request: NextRequest) {

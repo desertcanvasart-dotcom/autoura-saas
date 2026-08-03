@@ -4,7 +4,7 @@
 //             threaded sending lives there); avoids fragile server-side email send.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

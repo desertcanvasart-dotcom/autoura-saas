@@ -8,7 +8,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { SupabaseClient } from '@supabase/supabase-js'
-import { sendWhatsAppMessage } from '@/lib/twilio-whatsapp'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 // ============================================
 // TYPES

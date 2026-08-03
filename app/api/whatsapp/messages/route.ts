@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { indexWhatsAppReply } from '@/lib/copilot-indexer'
-import twilio from 'twilio'
-
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-)
-
-const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 // GET /api/whatsapp/messages - Get messages for a conversation
 export async function GET(request: NextRequest) {
@@ -119,16 +112,18 @@ export async function POST(request: NextRequest) {
       toPhone = cleanPhone
     }
 
-    // Format phone number for Twilio
     const formattedPhone = toPhone.startsWith('+') ? toPhone : `+${toPhone}`
 
-    // Send via Twilio
-    const twilioMessage = await twilioClient.messages.create({
+    // Send via the active provider (Twilio or Meta Cloud API)
+    const sendResult = await sendWhatsAppMessage({
+      to: formattedPhone,
       body: message,
-      from: TWILIO_WHATSAPP_NUMBER,
-      to: `whatsapp:${formattedPhone}`,
       statusCallback: `${process.env.NEXT_PUBLIC_APP_URL || "https://autoura.net"}/api/whatsapp/status-callback`
     })
+
+    if (!sendResult.success || !sendResult.messageId) {
+      throw new Error(sendResult.error || 'Failed to send WhatsApp message')
+    }
 
     // Store in database
     const { data: savedMessage, error: saveError } = await supabase
@@ -136,10 +131,10 @@ export async function POST(request: NextRequest) {
       .insert({
         tenant_id,
         conversation_id: convId,
-        message_sid: twilioMessage.sid,
+        message_sid: sendResult.messageId,
         direction: 'outbound',
         message_body: message,
-        status: twilioMessage.status,
+        status: 'sent',
         sent_at: new Date().toISOString(),
         // Attribution (mig 269): the staff member sending. The webhook
         // auto-reply and AI agent leave this null on purpose.
@@ -167,7 +162,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: savedMessage,
-      twilio_sid: twilioMessage.sid
+      // Provider message id (Twilio SID or Meta wamid). The twilio_sid key
+      // is kept for existing UI callers.
+      message_id: sendResult.messageId,
+      twilio_sid: sendResult.messageId
     })
   } catch (error: any) {
     console.error('Error sending message:', error)
