@@ -2,7 +2,7 @@
 
 Multi-tenant SaaS for tour operators and DMCs — from WhatsApp conversation to priced itinerary, branded quote, booking, and invoice.
 
-**Stack:** Next.js (App Router) · React · TypeScript · Supabase (Postgres + Auth + RLS + pgvector) · Stripe · Twilio WhatsApp · Gmail OAuth · Resend · Anthropic + OpenAI
+**Stack:** Next.js (App Router) · React · TypeScript · Supabase (Postgres + Auth + RLS + pgvector) · Stripe · WhatsApp (Twilio or Meta Cloud API, switched via `WHATSAPP_PROVIDER` — see `lib/whatsapp.ts`) · Gmail OAuth · Resend · Anthropic + OpenAI
 
 **Deployment:** Railway — web service (`railway.toml`, auto-deploys on merge to `main`) plus two cron services (`railway.cron-exchange-rates.toml`, `railway.cron-agent-memory.toml`). See [docs/CRON-JOBS.md](docs/CRON-JOBS.md) before touching cron config — the start command comes from the config file, not the dashboard.
 

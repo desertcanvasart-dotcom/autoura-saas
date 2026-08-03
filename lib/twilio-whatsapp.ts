@@ -17,6 +17,7 @@ export interface WhatsAppMessage {
   to: string // Phone number in international format: +201234567890
   body: string
   mediaUrl?: string // Optional: PDF or image URL
+  statusCallback?: string // Optional: override the delivery-receipt URL (Twilio only)
 }
 
 export interface QuoteMessage {
@@ -117,11 +118,12 @@ function formatDate(dateString: string): string {
 export async function sendWhatsAppMessage({
   to,
   body,
-  mediaUrl
+  mediaUrl,
+  statusCallback
 }: WhatsAppMessage): Promise<{ success: boolean; messageId?: string; error?: string; warning?: string }> {
   try {
     const client = getTwilioClient()
-    const from = process.env.TWILIO_WHATSAPP_FROM
+    const from = process.env.TWILIO_WHATSAPP_FROM || process.env.TWILIO_WHATSAPP_NUMBER
 
     if (!from) {
       throw new Error('TWILIO_WHATSAPP_FROM not configured')
@@ -129,11 +131,19 @@ export async function sendWhatsAppMessage({
 
     const formattedTo = formatWhatsAppNumber(to)
 
+    // Delivery receipts for every send, not just inbox-composed messages.
+    const callbackUrl =
+      statusCallback ??
+      (process.env.NEXT_PUBLIC_APP_URL
+        ? `${process.env.NEXT_PUBLIC_APP_URL}/api/whatsapp/status-callback`
+        : undefined)
+
     const message = await client.messages.create({
       from,
       to: formattedTo,
       body,
-      ...(mediaUrl && { mediaUrl: [mediaUrl] })
+      ...(mediaUrl && { mediaUrl: [mediaUrl] }),
+      ...(callbackUrl && { statusCallback: callbackUrl })
     })
 
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 export async function POST(request: NextRequest) {
   try {
@@ -191,60 +192,15 @@ async function sendEmail(to: string, subject: string, body: string, supabase: an
 }
 
 // ============================================
-// WHATSAPP SENDING (via Twilio)
+// WHATSAPP SENDING (via active provider)
 // ============================================
 
 async function sendWhatsApp(to: string, body: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const accountSid = process.env.TWILIO_ACCOUNT_SID
-    const authToken = process.env.TWILIO_AUTH_TOKEN
-    const fromNumber = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886'
-
-    if (!accountSid || !authToken) {
-      return {
-        success: false,
-        error: 'WhatsApp (Twilio) not configured. Please add Twilio credentials.'
-      }
-    }
-
-    // Format phone number for WhatsApp
-    let formattedTo = to.replace(/\s+/g, '').replace(/[^\d+]/g, '')
-    if (!formattedTo.startsWith('+')) {
-      formattedTo = '+' + formattedTo
-    }
-    formattedTo = `whatsapp:${formattedTo}`
-
-    const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          From: fromNumber,
-          To: formattedTo,
-          Body: body,
-        }),
-      }
-    )
-
-    if (!response.ok) {
-      const error = await response.json()
-      console.error('Twilio error:', error)
-      return {
-        success: false,
-        error: error.message || 'Failed to send WhatsApp message'
-      }
-    }
-
-    return { success: true }
-
-  } catch (error: any) {
-    console.error('WhatsApp send error:', error)
-    return { success: false, error: error.message || 'Failed to send WhatsApp message' }
+  const result = await sendWhatsAppMessage({ to, body })
+  if (!result.success) {
+    return { success: false, error: result.error || 'Failed to send WhatsApp message' }
   }
+  return { success: true }
 }
 
 // ============================================
