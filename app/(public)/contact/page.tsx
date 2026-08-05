@@ -109,8 +109,16 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Email</h3>
-                    <p className="text-gray-600">hello@getautoura.net</p>
-                    <p className="text-gray-600">support@getautoura.net</p>
+                    <p className="text-gray-600">
+                      <a href="mailto:hello@getautoura.net" className="hover:text-gray-900 transition-colors">
+                        hello@getautoura.net
+                      </a>
+                    </p>
+                    <p className="text-gray-600">
+                      <a href="mailto:support@getautoura.net" className="hover:text-gray-900 transition-colors">
+                        support@getautoura.net
+                      </a>
+                    </p>
                   </div>
                 </div>
 
