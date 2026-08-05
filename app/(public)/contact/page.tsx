@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Mail, MapPin, Clock, Send, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Mail, MapPin, Phone, Clock, Send, CheckCircle } from 'lucide-react'
 import { getFirstTouch } from '@/lib/marketing-attribution'
 
 export default function ContactPage() {
@@ -109,8 +109,30 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Email</h3>
-                    <p className="text-gray-600">hello@getautoura.net</p>
-                    <p className="text-gray-600">support@getautoura.net</p>
+                    <p className="text-gray-600">
+                      <a href="mailto:hello@getautoura.net" className="hover:text-gray-900 transition-colors">
+                        hello@getautoura.net
+                      </a>
+                    </p>
+                    <p className="text-gray-600">
+                      <a href="mailto:support@getautoura.net" className="hover:text-gray-900 transition-colors">
+                        support@getautoura.net
+                      </a>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-[#2d3b2d]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Phone className="w-6 h-6 text-[#2d3b2d]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Phone</h3>
+                    <p className="text-gray-600">
+                      <a href="tel:+201080916066" className="hover:text-gray-900 transition-colors">
+                        +20 10 8091 6066
+                      </a>
+                    </p>
                   </div>
                 </div>
 
@@ -119,9 +141,13 @@ export default function ContactPage() {
                     <MapPin className="w-6 h-6 text-[#2d3b2d]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Location</h3>
-                    <p className="text-gray-600">Cairo, Egypt</p>
-                    <p className="text-gray-600">Serving clients worldwide</p>
+                    <h3 className="font-semibold text-gray-900 mb-1">Address</h3>
+                    <address className="not-italic text-gray-600">
+                      <span className="block font-medium text-gray-900">Online Era</span>
+                      36 Central St. Moqattam<br />
+                      Cairo 11571, Egypt
+                    </address>
+                    <p className="text-gray-600 mt-1">Serving clients worldwide</p>
                   </div>
                 </div>
 
@@ -308,7 +334,7 @@ export default function ContactPage() {
       <footer className="py-8 bg-[#2d3b2d]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-gray-400 text-sm">© 2026 Autoura. All rights reserved.</p>
+            <p className="text-gray-400 text-sm">© 2026 Autoura by Online Era. All rights reserved.</p>
             <div className="flex items-center gap-6">
               <Link href="/about" className="text-gray-400 hover:text-white text-sm transition-colors">
                 About

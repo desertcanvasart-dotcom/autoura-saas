@@ -42,7 +42,7 @@ export default function TermsPage() {
             <section className="mb-10">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">1. Agreement to Terms</h2>
               <p className="text-gray-600 mb-4">
-                By accessing or using Autoura's travel operations management platform ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, you may not access the Service.
+                By accessing or using Autoura's travel operations management platform ("Service"), operated by Online Era (36 Central St. Moqattam, Cairo 11571, Egypt), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, you may not access the Service.
               </p>
               <p className="text-gray-600">
                 These Terms apply to all visitors, users, and others who access or use the Service.
@@ -225,8 +225,9 @@ export default function TermsPage() {
               </p>
               <div className="bg-gray-50 rounded-xl p-6">
                 <p className="text-gray-700">
+                  <strong>Company:</strong> Online Era<br />
                   <strong>Email:</strong> hello@getautoura.net<br />
-                  <strong>Address:</strong> Cairo, Egypt
+                  <strong>Address:</strong> 36 Central St. Moqattam, Cairo 11571, Egypt
                 </p>
               </div>
             </section>
@@ -238,7 +239,7 @@ export default function TermsPage() {
       <footer className="py-8 bg-[#2d3b2d]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-gray-400 text-sm">© 2026 Autoura. All rights reserved.</p>
+            <p className="text-gray-400 text-sm">© 2026 Autoura by Online Era. All rights reserved.</p>
             <div className="flex items-center gap-6">
               <Link href="/about" className="text-gray-400 hover:text-white text-sm transition-colors">
                 About

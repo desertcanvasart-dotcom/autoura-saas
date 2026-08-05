@@ -41,7 +41,7 @@ export default function PrivacyPage() {
             <section className="mb-10">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">1. Introduction</h2>
               <p className="text-gray-600 mb-4">
-                Autoura ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our travel operations management platform.
+                Autoura, operated by Online Era (36 Central St. Moqattam, Cairo 11571, Egypt) ("we," "our," or "us"), is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our travel operations management platform.
               </p>
               <p className="text-gray-600">
                 Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the platform.
@@ -175,8 +175,9 @@ export default function PrivacyPage() {
               </p>
               <div className="bg-gray-50 rounded-xl p-6">
                 <p className="text-gray-700">
+                  <strong>Company:</strong> Online Era<br />
                   <strong>Email:</strong> hello@getautoura.net<br />
-                  <strong>Address:</strong> Cairo, Egypt
+                  <strong>Address:</strong> 36 Central St. Moqattam, Cairo 11571, Egypt
                 </p>
               </div>
             </section>
@@ -188,7 +189,7 @@ export default function PrivacyPage() {
       <footer className="py-8 bg-[#2d3b2d]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-gray-400 text-sm">© 2026 Autoura. All rights reserved.</p>
+            <p className="text-gray-400 text-sm">© 2026 Autoura by Online Era. All rights reserved.</p>
             <div className="flex items-center gap-6">
               <Link href="/about" className="text-gray-400 hover:text-white text-sm transition-colors">
                 About

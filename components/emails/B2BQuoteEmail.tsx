@@ -224,10 +224,10 @@ export default function B2BQuoteEmail({
               Questions about this rate sheet? Contact your account manager or reply to this email.
             </Text>
             <Text style={footerText}>
-              📧 b2b@autoura.com | 📱 +20 123 456 7890
+              📧 hello@getautoura.net | 📱 +20 10 8091 6066
             </Text>
             <Text style={footerTextSmall}>
-              © 2026 Autoura. All rights reserved.
+              © 2026 Autoura by Online Era. All rights reserved.
             </Text>
           </Section>
         </Container>

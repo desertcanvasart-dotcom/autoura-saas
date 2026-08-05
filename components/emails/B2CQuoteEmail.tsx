@@ -169,10 +169,10 @@ export default function B2CQuoteEmail({
               Need assistance? Reply to this email or contact us at:
             </Text>
             <Text style={footerText}>
-              📧 info@autoura.com | 📱 +20 123 456 7890
+              📧 hello@getautoura.net | 📱 +20 10 8091 6066
             </Text>
             <Text style={footerTextSmall}>
-              © 2026 Autoura. All rights reserved.
+              © 2026 Autoura by Online Era. All rights reserved.
             </Text>
           </Section>
         </Container>

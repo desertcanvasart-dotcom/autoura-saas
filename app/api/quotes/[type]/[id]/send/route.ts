@@ -245,7 +245,7 @@ export async function POST(
       : `B2B Rate Sheet - ${quote.quote_number} - ${quote.itineraries?.trip_name || 'Egypt Tour'}`
 
     const { data: emailData, error: emailError } = await getResend().emails.send({
-      from: process.env.RESEND_FROM_EMAIL || 'Autoura <quotes@autoura.com>',
+      from: process.env.RESEND_FROM_EMAIL || 'Autoura <quotes@getautoura.net>',
       to: toEmail,
       subject: emailSubject,
       html: emailHtml,
