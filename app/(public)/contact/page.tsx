@@ -119,9 +119,13 @@ export default function ContactPage() {
                     <MapPin className="w-6 h-6 text-[#2d3b2d]" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Location</h3>
-                    <p className="text-gray-600">Cairo, Egypt</p>
-                    <p className="text-gray-600">Serving clients worldwide</p>
+                    <h3 className="font-semibold text-gray-900 mb-1">Address</h3>
+                    <address className="not-italic text-gray-600">
+                      <span className="block font-medium text-gray-900">Online Era</span>
+                      36 Central St. Moqattam<br />
+                      Cairo 11571, Egypt
+                    </address>
+                    <p className="text-gray-600 mt-1">Serving clients worldwide</p>
                   </div>
                 </div>
 
@@ -308,7 +312,7 @@ export default function ContactPage() {
       <footer className="py-8 bg-[#2d3b2d]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <p className="text-gray-400 text-sm">© 2026 Autoura. All rights reserved.</p>
+            <p className="text-gray-400 text-sm">© 2026 Autoura by Online Era. All rights reserved.</p>
             <div className="flex items-center gap-6">
               <Link href="/about" className="text-gray-400 hover:text-white text-sm transition-colors">
                 About

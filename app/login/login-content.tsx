@@ -114,7 +114,7 @@ export default function LoginContent() {
         </div>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          © 2025 Autoura. All rights reserved.
+          © 2026 Autoura by Online Era. All rights reserved.
         </p>
       </div>
     </div>

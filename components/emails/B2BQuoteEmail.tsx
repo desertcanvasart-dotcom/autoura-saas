@@ -227,7 +227,7 @@ export default function B2BQuoteEmail({
               📧 b2b@autoura.com | 📱 +20 123 456 7890
             </Text>
             <Text style={footerTextSmall}>
-              © 2026 Autoura. All rights reserved.
+              © 2026 Autoura by Online Era. All rights reserved.
             </Text>
           </Section>
         </Container>
