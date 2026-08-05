@@ -55,7 +55,7 @@ export async function sendSystemEmail(input: SystemEmailInput): Promise<SystemEm
     return { sent: false, skipped: true }
   }
 
-  const from = input.from || process.env.RESEND_FROM_EMAIL || 'Autoura <notifications@autoura.com>'
+  const from = input.from || process.env.RESEND_FROM_EMAIL || 'Autoura <notifications@getautoura.net>'
 
   const { data, error } = await resend.emails.send({
     from,

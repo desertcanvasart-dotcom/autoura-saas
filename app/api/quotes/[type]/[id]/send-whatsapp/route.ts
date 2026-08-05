@@ -221,7 +221,7 @@ export async function POST(
     // Build WhatsApp message
     const senderTenant = await loadSenderTenant(tenant_id)
     const businessName = senderTenant?.company_name || ''
-    const businessEmail = process.env.BUSINESS_EMAIL || 'info@autoura.com'
+    const businessEmail = process.env.BUSINESS_EMAIL || 'hello@getautoura.net'
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
     let message = ''

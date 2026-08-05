@@ -169,7 +169,7 @@ export default function B2CQuoteEmail({
               Need assistance? Reply to this email or contact us at:
             </Text>
             <Text style={footerText}>
-              📧 info@autoura.com | 📱 +20 123 456 7890
+              📧 hello@getautoura.net
             </Text>
             <Text style={footerTextSmall}>
               © 2026 Autoura by Online Era. All rights reserved.
