@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowLeft, Mail, MapPin, Clock, Send, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Mail, MapPin, Phone, Clock, Send, CheckCircle } from 'lucide-react'
 import { getFirstTouch } from '@/lib/marketing-attribution'
 
 export default function ContactPage() {
@@ -111,6 +111,20 @@ export default function ContactPage() {
                     <h3 className="font-semibold text-gray-900 mb-1">Email</h3>
                     <p className="text-gray-600">hello@getautoura.net</p>
                     <p className="text-gray-600">support@getautoura.net</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-[#2d3b2d]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Phone className="w-6 h-6 text-[#2d3b2d]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Phone</h3>
+                    <p className="text-gray-600">
+                      <a href="tel:+201080916066" className="hover:text-gray-900 transition-colors">
+                        +20 10 8091 6066
+                      </a>
+                    </p>
                   </div>
                 </div>
 
