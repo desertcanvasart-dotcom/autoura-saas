@@ -243,6 +243,7 @@ const navigation: NavSection[] = [
       { label: 'Organization', href: '/settings/tenant', icon: Building },
       // 'Team Management' (/settings/team) consolidated into User Management
       // (/users) below; the old route redirects there.
+      { label: 'Departments', href: '/settings/departments', icon: Building },
       { label: 'WhatsApp', href: '/settings/whatsapp', icon: MessageSquare },
       { label: 'Capacity', href: '/settings/capacity', icon: Calendar },
       { label: 'Billing and Subscriptions', href: '/settings/billing', icon: CreditCard },

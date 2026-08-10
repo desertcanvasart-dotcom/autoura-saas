@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import {
   Search,
   Plus,
@@ -411,6 +412,13 @@ export default function TeamMembersPage() {
             ))}
           </select>
         )}
+
+        <Link
+          href="/settings/departments"
+          className="text-sm text-[#647C47] hover:text-[#4f6238] hover:underline whitespace-nowrap"
+        >
+          Manage departments
+        </Link>
 
         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
           <input
