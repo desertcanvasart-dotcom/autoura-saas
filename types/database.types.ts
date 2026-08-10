@@ -1784,6 +1784,7 @@ export interface Database {
           cancelled_by: string | null
           created_at: string
           updated_at: string
+          assigned_to: string | null
         }
         Insert: {
           id?: string
@@ -1823,6 +1824,7 @@ export interface Database {
           cancelled_by?: string | null
           created_at?: string
           updated_at?: string
+          assigned_to?: string | null
         }
         Update: {
           id?: string
@@ -1862,6 +1864,7 @@ export interface Database {
           cancelled_by?: string | null
           created_at?: string
           updated_at?: string
+          assigned_to?: string | null
         }
         Relationships: [
           {
@@ -1890,6 +1893,13 @@ export interface Database {
             columns: ["partner_id"]
             isOneToOne: false
             referencedRelation: "b2b_partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]
@@ -5200,6 +5210,7 @@ export interface Database {
           idempotency_key: string | null
           generation_warnings: Json | null
           thread_id: string | null
+          assigned_to: string | null
         }
         Insert: {
           id?: string
@@ -5272,6 +5283,7 @@ export interface Database {
           idempotency_key?: string | null
           generation_warnings?: Json | null
           thread_id?: string | null
+          assigned_to?: string | null
         }
         Update: {
           id?: string
@@ -5344,6 +5356,7 @@ export interface Database {
           idempotency_key?: string | null
           generation_warnings?: Json | null
           thread_id?: string | null
+          assigned_to?: string | null
         }
         Relationships: [
           {
@@ -5358,6 +5371,13 @@ export interface Database {
             columns: ["thread_id"]
             isOneToOne: false
             referencedRelation: "communication_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itineraries_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { validateAssignee, notifyTripAssignment } from '@/lib/trip-assignee'
 
 // GET single booking
 export async function GET(
@@ -132,7 +133,8 @@ export async function PATCH(
       dietary_requirements,
       internal_notes,
       payment_deadline,
-      cancellation_reason
+      cancellation_reason,
+      assigned_to
     } = body
 
     // Build update object
@@ -165,6 +167,35 @@ export async function PATCH(
     if (payment_deadline !== undefined) updates.payment_deadline = payment_deadline
     if (cancellation_reason !== undefined) updates.cancellation_reason = cancellation_reason
 
+    // Trip owner (migration 272). This route uses the admin client, which
+    // bypasses RLS, so the tenant filter has to be passed explicitly —
+    // otherwise any team_members id in the database would be accepted.
+    let newAssignee: string | null = null
+    if (assigned_to !== undefined) {
+      if (assigned_to === null || assigned_to === '') {
+        updates.assigned_to = null
+      } else {
+        const check = await validateAssignee(adminClient, assigned_to, tenant_id)
+        if (!check.ok) {
+          return NextResponse.json({ success: false, error: check.error }, { status: 400 })
+        }
+        updates.assigned_to = assigned_to
+        newAssignee = assigned_to
+      }
+    }
+
+    // Only notify on an actual change of owner, not on every save.
+    let previousAssignee: string | null = null
+    if (newAssignee) {
+      const { data: current } = await adminClient
+        .from('bookings')
+        .select('assigned_to')
+        .eq('id', id)
+        .eq('tenant_id', tenant_id)
+        .maybeSingle()
+      previousAssignee = (current as { assigned_to?: string | null } | null)?.assigned_to ?? null
+    }
+
     // Update the booking
     const { data: booking, error } = await adminClient
       .from('bookings')
@@ -183,6 +214,16 @@ export async function PATCH(
     }
 
 
+
+    if (newAssignee && newAssignee !== previousAssignee) {
+      const row = booking as { booking_number?: string | null; trip_name?: string | null }
+      await notifyTripAssignment({
+        assigneeId: newAssignee,
+        tripLabel: row?.booking_number || row?.trip_name || 'this booking',
+        kind: 'booking',
+        link: `/bookings/${id}`,
+      })
+    }
 
     return NextResponse.json({
       success: true,

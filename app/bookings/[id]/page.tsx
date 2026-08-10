@@ -9,6 +9,7 @@ import {
   PartyPopper, XCircle, Mail, MessageSquare, Plus, Trash2,
   Download, AlertCircle, X as XIcon
 } from 'lucide-react'
+import AssigneeSelect from '@/components/AssigneeSelect'
 
 interface Booking {
   id: string
@@ -30,6 +31,7 @@ interface Booking {
   quote_type: string
   special_requests: string | null
   internal_notes: string | null
+  assigned_to: string | null
   clients: {
     id: string
     full_name: string
@@ -401,6 +403,14 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                       : 'Not confirmed yet'}
                   </p>
                 </div>
+                <AssigneeSelect
+                  value={booking.assigned_to}
+                  endpoint={`/api/bookings/${booking.id}`}
+                  method="PATCH"
+                  onSaved={(assigneeId) =>
+                    setBooking((prev) => (prev ? { ...prev, assigned_to: assigneeId } : prev))
+                  }
+                />
               </div>
 
               {booking.special_requests && (
