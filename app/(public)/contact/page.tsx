@@ -144,7 +144,7 @@ export default function ContactPage() {
                     <h3 className="font-semibold text-gray-900 mb-1">Address</h3>
                     <address className="not-italic text-gray-600">
                       <span className="block font-medium text-gray-900">Online Era</span>
-                      36 Central St. Moqattam<br />
+                      36 Central St. Moqattam, Cairo<br />
                       Cairo 11571, Egypt
                     </address>
                     <p className="text-gray-600 mt-1">Serving clients worldwide</p>

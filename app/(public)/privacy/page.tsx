@@ -41,7 +41,7 @@ export default function PrivacyPage() {
             <section className="mb-10">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">1. Introduction</h2>
               <p className="text-gray-600 mb-4">
-                Autoura, operated by Online Era (36 Central St. Moqattam, Cairo 11571, Egypt) ("we," "our," or "us"), is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our travel operations management platform.
+                Autoura, operated by Online Era (36 Central St. Moqattam, Cairo - Cairo 11571, Egypt) ("we," "our," or "us"), is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our travel operations management platform.
               </p>
               <p className="text-gray-600">
                 Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the platform.
@@ -177,7 +177,7 @@ export default function PrivacyPage() {
                 <p className="text-gray-700">
                   <strong>Company:</strong> Online Era<br />
                   <strong>Email:</strong> hello@getautoura.net<br />
-                  <strong>Address:</strong> 36 Central St. Moqattam, Cairo 11571, Egypt
+                  <strong>Address:</strong> 36 Central St. Moqattam, Cairo - Cairo 11571, Egypt
                 </p>
               </div>
             </section>

@@ -42,7 +42,7 @@ export default function TermsPage() {
             <section className="mb-10">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">1. Agreement to Terms</h2>
               <p className="text-gray-600 mb-4">
-                By accessing or using Autoura's travel operations management platform ("Service"), operated by Online Era (36 Central St. Moqattam, Cairo 11571, Egypt), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, you may not access the Service.
+                By accessing or using Autoura's travel operations management platform ("Service"), operated by Online Era (36 Central St. Moqattam, Cairo - Cairo 11571, Egypt), you agree to be bound by these Terms of Service ("Terms"). If you disagree with any part of these terms, you may not access the Service.
               </p>
               <p className="text-gray-600">
                 These Terms apply to all visitors, users, and others who access or use the Service.
@@ -227,7 +227,7 @@ export default function TermsPage() {
                 <p className="text-gray-700">
                   <strong>Company:</strong> Online Era<br />
                   <strong>Email:</strong> hello@getautoura.net<br />
-                  <strong>Address:</strong> 36 Central St. Moqattam, Cairo 11571, Egypt
+                  <strong>Address:</strong> 36 Central St. Moqattam, Cairo - Cairo 11571, Egypt
                 </p>
               </div>
             </section>
