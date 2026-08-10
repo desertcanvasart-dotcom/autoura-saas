@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { evaluateDeleteGuard } from '@/lib/delete-guard'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { validateAssignee, notifyTripAssignment } from '@/lib/trip-assignee'
 
 /**
  * GET /api/itineraries/[id]
@@ -101,6 +102,35 @@ export async function PUT(
     if (body.pickup_location !== undefined) updateData.pickup_location = body.pickup_location
     if (body.pickup_time !== undefined) updateData.pickup_time = body.pickup_time
 
+    // Trip owner (migration 272). `null` clears the assignment; any other value
+    // must be an active team member of the caller's tenant — RLS scopes the
+    // lookup, so a foreign id simply isn't found.
+    let newAssignee: string | null = null
+    if (body.assigned_to !== undefined) {
+      if (body.assigned_to === null || body.assigned_to === '') {
+        updateData.assigned_to = null
+      } else {
+        const check = await validateAssignee(supabase, body.assigned_to)
+        if (!check.ok) {
+          return NextResponse.json({ success: false, error: check.error }, { status: 400 })
+        }
+        updateData.assigned_to = body.assigned_to
+        newAssignee = body.assigned_to
+      }
+    }
+
+    // Read the current owner first so the notification only fires on a real
+    // change (a PUT that resends the same assignee shouldn't re-notify).
+    let previousAssignee: string | null = null
+    if (newAssignee) {
+      const { data: current } = await supabase
+        .from('itineraries')
+        .select('assigned_to')
+        .eq('id', id)
+        .maybeSingle()
+      previousAssignee = (current as { assigned_to?: string | null } | null)?.assigned_to ?? null
+    }
+
     const { data, error } = await supabase
       .from('itineraries')
       .update(updateData)
@@ -109,6 +139,16 @@ export async function PUT(
       .single()
 
     if (error) throw error
+
+    if (newAssignee && newAssignee !== previousAssignee) {
+      const row = data as { itinerary_code?: string | null; trip_name?: string | null }
+      await notifyTripAssignment({
+        assigneeId: newAssignee,
+        tripLabel: row?.trip_name || row?.itinerary_code || 'this itinerary',
+        kind: 'itinerary',
+        link: `/itineraries/${id}`,
+      })
+    }
 
     return NextResponse.json({
       success: true,

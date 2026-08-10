@@ -12,6 +12,7 @@ import ResourceSummaryCard from '@/app/components/ResourceSummaryCard'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import { generateWhatsAppMessage, generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
 import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
+import AssigneeSelect from '@/components/AssigneeSelect'
 import ItineraryPL from '@/app/components/ItineraryPL'
 import { createClient } from '@/app/supabase'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
@@ -36,6 +37,8 @@ interface Itinerary {
   total_cost: number
   status: string
   notes: string
+  /** Team member who owns this itinerary (migration 272) — staff, not a supplier. */
+  assigned_to: string | null
   assigned_guide_id: string
   assigned_vehicle_id: string
   guide_notes: string
@@ -991,6 +994,16 @@ export default function ViewItineraryPage() {
                 )}
               </div>
             </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-200 max-w-sm">
+            <AssigneeSelect
+              value={itinerary.assigned_to}
+              endpoint={`/api/itineraries/${itinerary.id}`}
+              method="PUT"
+              onSaved={(assigneeId) =>
+                setItinerary(prev => (prev ? { ...prev, assigned_to: assigneeId } : prev))
+              }
+            />
           </div>
           {itinerary.notes && (
             <div className="mt-3 pt-3 border-t border-gray-200">
