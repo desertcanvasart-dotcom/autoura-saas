@@ -30,10 +30,16 @@ concurrency:
 jobs:
   test:
     name: Tests + type-check
-    # `edited` also fires for title and body edits, which cannot affect the
-    # build. `changes.base` is present only when the base branch itself moved,
-    # so this runs the suite for a retarget and skips the prose edits.
-    if: github.event.action != 'edited' || github.event.changes.base != null
+    # NOTE: do NOT add `if: github.event.changes.base != null` here to skip the
+    # title/body edits that `edited` also fires for. It looks like a free
+    # saving and it is not: a skipped job still publishes a check run under
+    # this name, and it supersedes the previous one on the same SHA. A red
+    # build could then be turned green by editing the PR description —
+    # `gh pr checks` reports "skipping", and branch protection counts a
+    # skipped required check as satisfied. Measured on PR #176, 2026-08-23.
+    #
+    # A prose edit therefore costs one full run. That is the price of the
+    # check on a PR always being a real result.
     runs-on: ubuntu-latest
     env:
       # Tests/tsc don't use Puppeteer's bundled browser — skip the slow download.
