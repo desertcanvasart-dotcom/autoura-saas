@@ -43,8 +43,14 @@ export async function GET(request: NextRequest) {
     // Remove ability to specify userId in query params
     const userId = user.id
 
-    // Get authenticated user's Gmail tokens (RLS enforces user can only access their own)
-    const { data: tokenData, error: tokenError } = await supabase
+    // Gmail tokens for the signed-in user.
+    //
+    // Read with the admin client, not `supabase` (the RLS-bound client from
+    // requireAuth). Migration 273 revokes access_token/refresh_token from
+    // `authenticated`, so this `select` — which needs both — must not go
+    // through that role. The user filter is what RLS was contributing and it
+    // is already explicit: `userId` is `user.id`, never a request parameter.
+    const { data: tokenData, error: tokenError } = await getSupabaseAdmin()
       .from('gmail_tokens')
       .select('*')
       .eq('user_id', userId)
@@ -54,7 +60,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })
     }
 
-    let { access_token, refresh_token, token_expiry } = tokenData
+    let { access_token, refresh_token, token_expiry } = tokenData as any
 
     if (!refresh_token) {
       return NextResponse.json({ error: 'Gmail not connected' }, { status: 401 })

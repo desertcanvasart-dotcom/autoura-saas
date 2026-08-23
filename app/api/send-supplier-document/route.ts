@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 
 // POST - Send supplier document via Gmail with PDF attachment
@@ -56,11 +56,16 @@ export async function POST(request: Request) {
 </body>
 </html>`
 
-    // Get Gmail tokens for the user
-    const { data: tokenRecord } = await supabase
+    // Get Gmail tokens for the signed-in user.
+    //
+    // This previously selected `.limit(1)` with NO user filter and leaned
+    // entirely on RLS to narrow it to the caller's own row. Read with the
+    // admin client (see migration 273) that would pick an arbitrary row from
+    // any tenant, so the filter RLS was applying is now written out.
+    const { data: tokenRecord } = await createAdminClient()
       .from('gmail_tokens')
       .select('access_token, refresh_token, user_id')
-      .limit(1)
+      .eq('user_id', authResult.user!.id)
       .single()
 
     if (!tokenRecord || !tokenRecord.refresh_token) {
