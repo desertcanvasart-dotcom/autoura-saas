@@ -213,3 +213,110 @@ describe('cron-exchange-rates', () => {
     expect(noUrl.stderr).toContain('APP_URL')
   })
 })
+
+// ============================================================================
+// cron-reminders — two sweeps, one exit code.
+//
+// These endpoints existed for months with nothing calling them: no runner, no
+// npm script, no Railway service. Wiring them is only half the job — both
+// answer 200 with a summary that can describe a failed night (send-reminders
+// `failed > 0`, task-reminders `results.errors[]`), so a runner that trusted
+// the status code would restore the silence it was written to end.
+//
+// Note these two authenticate with `Authorization: Bearer`, not the
+// `x-cron-secret` header the other two jobs use.
+// ============================================================================
+
+const REMINDERS = path.join(ROOT, 'scripts/cron-reminders.mjs')
+
+/** Stub that answers per path, and records what each path received. */
+async function stubByPath(
+  routes: Record<string, { status?: number; body: string }>
+): Promise<{ url: string; hits: string[]; auth: (string | undefined)[] }> {
+  const hits: string[] = []
+  const auth: (string | undefined)[] = []
+
+  server = http.createServer((req, res) => {
+    hits.push(req.url ?? '')
+    auth.push(req.headers['authorization'] as string | undefined)
+    const match = Object.entries(routes).find(([p]) => (req.url ?? '').startsWith(p))
+    const r = match?.[1] ?? { status: 404, body: '{}' }
+    res.writeHead(r.status ?? 200, { 'Content-Type': 'application/json' })
+    res.end(r.body)
+  })
+
+  await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (!address || typeof address === 'string') throw new Error('stub server has no port')
+  return { url: `http://127.0.0.1:${address.port}`, hits, auth }
+}
+
+const OK_INVOICES = JSON.stringify({ success: true, message: 'Processed 3 reminders', sent: 3, failed: 0, skipped: 0 })
+const OK_TASKS = JSON.stringify({ success: true, message: 'Task reminders sent: 2 due soon, 1 overdue', results: { dueSoon: 2, overdue: 1, errors: [] } })
+
+describe('cron-reminders', () => {
+  it('exits 0 on a clean run and calls BOTH endpoints with a Bearer secret', async () => {
+    const { url, hits, auth } = await stubByPath({
+      '/api/cron/send-reminders': { body: OK_INVOICES },
+      '/api/cron/task-reminders': { body: OK_TASKS },
+    })
+
+    const result = await run(REMINDERS, { APP_URL: url, CRON_SECRET: 'shh' })
+
+    expect(result.code).toBe(0)
+    expect(hits).toContain('/api/cron/send-reminders')
+    expect(hits).toContain('/api/cron/task-reminders')
+    expect(auth).toEqual(['Bearer shh', 'Bearer shh'])
+    expect(result.stdout).toContain('send-reminders ok')
+    expect(result.stdout).toContain('task-reminders ok')
+  })
+
+  it('exits 0 when there was simply nothing to do', async () => {
+    const { url } = await stubByPath({
+      '/api/cron/send-reminders': { body: JSON.stringify({ success: true, message: 'No reminders to send', processed: 0 }) },
+      '/api/cron/task-reminders': { body: JSON.stringify({ success: true, message: 'Task reminders sent: 0 due soon, 0 overdue', results: { dueSoon: 0, overdue: 0, errors: [] } }) },
+    })
+    const result = await run(REMINDERS, { APP_URL: url, CRON_SECRET: 'shh' })
+    expect(result.code).toBe(0)
+  })
+
+  it('exits 1 when dunning emails failed inside a 200', async () => {
+    const { url } = await stubByPath({
+      '/api/cron/send-reminders': { body: JSON.stringify({ success: true, message: 'Processed 4 reminders', sent: 1, failed: 3, skipped: 0 }) },
+      '/api/cron/task-reminders': { body: OK_TASKS },
+    })
+    const result = await run(REMINDERS, { APP_URL: url, CRON_SECRET: 'shh' })
+    expect(result.code).toBe(1)
+    expect(result.stderr).toContain('3 reminder email(s) FAILED')
+  })
+
+  it('exits 1 when the task sweep reported errors inside a 200', async () => {
+    const { url } = await stubByPath({
+      '/api/cron/send-reminders': { body: OK_INVOICES },
+      '/api/cron/task-reminders': { body: JSON.stringify({ success: true, message: 'done', results: { dueSoon: 0, overdue: 0, errors: ['Due soon query error: boom'] } }) },
+    })
+    const result = await run(REMINDERS, { APP_URL: url, CRON_SECRET: 'shh' })
+    expect(result.code).toBe(1)
+    expect(result.stderr).toContain('boom')
+  })
+
+  it('still calls the second sweep when the first one fails', async () => {
+    // One broken job must not hide the state of the other.
+    const { url, hits } = await stubByPath({
+      '/api/cron/send-reminders': { status: 500, body: 'kaboom' },
+      '/api/cron/task-reminders': { body: OK_TASKS },
+    })
+    const result = await run(REMINDERS, { APP_URL: url, CRON_SECRET: 'shh' })
+    expect(result.code).toBe(1)
+    expect(hits).toContain('/api/cron/task-reminders')
+    expect(result.stdout).toContain('task-reminders ok')
+  })
+
+  it('exits 1 rather than running unauthenticated when CRON_SECRET is absent', async () => {
+    const { url, hits } = await stubByPath({ '/api/cron/': { body: OK_TASKS } })
+    const result = await run(REMINDERS, { APP_URL: url })
+    expect(result.code).toBe(1)
+    expect(result.stderr).toContain('CRON_SECRET')
+    expect(hits).toEqual([])
+  })
+})

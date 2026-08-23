@@ -11,6 +11,7 @@
     "start": "node scripts/sync-plans.mjs && next start",
     "cron:agent-memory": "node scripts/cron-agent-memory.mjs",
     "cron:exchange-rates": "node scripts/cron-exchange-rates.mjs",
+    "cron:reminders": "node scripts/cron-reminders.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",

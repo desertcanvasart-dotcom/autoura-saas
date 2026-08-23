@@ -1,0 +1,20 @@
+# =====================================================================
+# Railway config — "Reminders cron" SERVICE ONLY
+# =====================================================================
+# Point the cron service at this file:
+#   Service → Settings → Config-as-code → Railway Config File
+#   → railway.cron-reminders.toml
+#
+# See railway.cron-exchange-rates.toml for why each cron service needs its own
+# file: railway.toml's `startCommand = "npm run start"` is inherited by every
+# service built from this repo and cannot be overridden in the dashboard.
+#
+# Cron schedule (set in the dashboard): 0 6 * * *
+# Env on this service: APP_URL, CRON_SECRET (must match the WEB service).
+# =====================================================================
+
+[deploy]
+# Must EXIT when finished — Railway records the run from the exit code.
+# scripts/cron-reminders.mjs exits 0 only when BOTH sweeps succeeded, and 1
+# when either failed — including a 200 that carries failed>0 or errors[].
+startCommand = "npm run cron:reminders"
