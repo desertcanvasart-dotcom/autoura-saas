@@ -1,4 +1,56 @@
 {
-  "errors": 1553,
-  "warnings": 581
+  "totals": {
+    "errors": 1551,
+    "warnings": 581
+  },
+  "rules": {
+    "(no rule — parse or config error)": {
+      "errors": 0,
+      "warnings": 3
+    },
+    "@next/next/no-img-element": {
+      "errors": 0,
+      "warnings": 12
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "errors": 1420,
+      "warnings": 0
+    },
+    "@typescript-eslint/no-require-imports": {
+      "errors": 8,
+      "warnings": 0
+    },
+    "@typescript-eslint/no-unnecessary-type-constraint": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "@typescript-eslint/no-unused-expressions": {
+      "errors": 0,
+      "warnings": 4
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "errors": 0,
+      "warnings": 474
+    },
+    "import/no-anonymous-default-export": {
+      "errors": 0,
+      "warnings": 1
+    },
+    "jsx-a11y/alt-text": {
+      "errors": 0,
+      "warnings": 3
+    },
+    "prefer-const": {
+      "errors": 23,
+      "warnings": 0
+    },
+    "react-hooks/exhaustive-deps": {
+      "errors": 0,
+      "warnings": 84
+    },
+    "react/no-unescaped-entities": {
+      "errors": 99,
+      "warnings": 0
+    }
+  }
 }
