@@ -57,6 +57,11 @@ export default function TenantSettingsPage() {
   const [activitySaving, setActivitySaving] = useState(false)
 
   // UI state
+  // Kept as a STRING so the field can be genuinely empty. '' means "no house
+  // rate set" and saves as NULL, which lib/pricing/resolve-margin.ts treats as
+  // "fall through to the platform constant". A number state would force 0 —
+  // and 0 is a real house rate (an at-cost agency), not an absence.
+  const [defaultMargin, setDefaultMargin] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -69,6 +74,12 @@ export default function TenantSettingsPage() {
       setLogoPreview(tenant.logo_url || null)
       setPrimaryColor(tenant.primary_color || '#647C47')
       setSecondaryColor(tenant.secondary_color || '#2d3b2d')
+      // `?? ''` not `|| ''`: a stored 0 must show as 0, not as blank.
+      setDefaultMargin(
+        tenant.default_margin_percent === null || tenant.default_margin_percent === undefined
+          ? ''
+          : String(tenant.default_margin_percent)
+      )
       // Workspace visibility is a tenant preference, free on every tier —
       // no longer derived from feature flags, which read like entitlements.
       setWorkspaceMode(tenant.workspace_mode ?? 'both')
@@ -223,6 +234,9 @@ export default function TenantSettingsPage() {
           workspace_mode: workspaceMode,
           primary_color: primaryColor,
           secondary_color: secondaryColor,
+          // Empty field -> NULL -> the resolver falls through to the platform
+          // constant. Storing 0 here would silently make every quote at-cost.
+          default_margin_percent: defaultMargin.trim() === '' ? null : Number(defaultMargin),
         })
         .eq('id', tenant.id)
 
@@ -385,6 +399,27 @@ export default function TenantSettingsPage() {
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                 placeholder="contact@company.com"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                House Margin %
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Applies to anyone without a personal margin)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="200"
+                step="0.5"
+                value={defaultMargin}
+                onChange={(e) => setDefaultMargin(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                placeholder="Not set — uses 25%"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                Leave blank to use the platform default. A colleague who clears their own
+                margin falls back to this.
+              </p>
             </div>
           </div>
 

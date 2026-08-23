@@ -3876,7 +3876,7 @@ export interface Database {
           city: string
           category: string | null
           fee_type: string | null
-          eur_rate: number
+          eur_rate: number | null
           non_eur_rate: number | null
           egyptian_rate: number | null
           student_discount_percentage: number | null
@@ -3900,7 +3900,7 @@ export interface Database {
           city: string
           category?: string | null
           fee_type?: string | null
-          eur_rate?: number
+          eur_rate?: number | null
           non_eur_rate?: number | null
           egyptian_rate?: number | null
           student_discount_percentage?: number | null
@@ -3924,7 +3924,7 @@ export interface Database {
           city?: string
           category?: string | null
           fee_type?: string | null
-          eur_rate?: number
+          eur_rate?: number | null
           non_eur_rate?: number | null
           egyptian_rate?: number | null
           student_discount_percentage?: number | null
@@ -8148,6 +8148,7 @@ export interface Database {
           resend_domain_id: string | null
           email_domain_status: string
           email_domain_verified_at: string | null
+          default_margin_percent: number | null
         }
         Insert: {
           id?: string
@@ -8176,6 +8177,7 @@ export interface Database {
           resend_domain_id?: string | null
           email_domain_status?: string
           email_domain_verified_at?: string | null
+          default_margin_percent?: number | null
         }
         Update: {
           id?: string
@@ -8204,6 +8206,7 @@ export interface Database {
           resend_domain_id?: string | null
           email_domain_status?: string
           email_domain_verified_at?: string | null
+          default_margin_percent?: number | null
         }
         Relationships: []
       }
@@ -10347,6 +10350,13 @@ export interface Database {
           p_payment_type?: string
           p_tenant_id?: string
           p_transaction_reference?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      recount_client_bookings: {
+        Args: {
+          p_client_id?: string
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
