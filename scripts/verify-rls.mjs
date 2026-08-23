@@ -95,7 +95,7 @@ const SWEEP = [...new Set([...(await allRelations()), ...GUARDED])].sort()
 
 console.log(`\n── 1. anonymous client must see nothing (${SWEEP.length} relations) ──`)
 let blockedCount = 0
-let emptyCount = 0
+const unverified = []
 for (const t of SWEEP) {
   const { count: real, error: sErr } = await svc.from(t).select('*', { count: 'exact', head: true })
   if (sErr) {
@@ -103,7 +103,21 @@ for (const t of SWEEP) {
     continue
   }
   if (!real) {
-    emptyCount++
+    // An EMPTY relation cannot be judged from here, and this used to be
+    // reported as "nothing to leak yet" — which reads as a pass and is not one.
+    //
+    // PostgREST answers `200 []` both when RLS filtered every row away AND
+    // when the caller could read everything but there is nothing there. The
+    // two are indistinguishable over HTTP, so an empty relation is UNVERIFIED,
+    // not safe.
+    //
+    // That distinction is not academic. unified_messages is a view over
+    // whatsapp_messages and email_messages that executes with its OWNER's
+    // privileges, bypassing RLS on both; anon held SELECT on it. Both tables
+    // were empty, so this sweep passed it every time it ran, and the exposure
+    // would have opened silently on the first synced message. Migration 277
+    // fixed it and asserts the invariant for every future view.
+    unverified.push(t)
     continue
   }
   const { data, error } = await anon.from(t).select('*').limit(1)
@@ -116,7 +130,16 @@ for (const t of SWEEP) {
     // Only leaks and skips are worth a line each at this relation count.
   }
 }
-console.log(`   ✅ blocked ${blockedCount} populated relation(s); ${emptyCount} empty (nothing to leak yet)`)
+console.log(`   ✅ blocked ${blockedCount} populated relation(s)`)
+if (unverified.length) {
+  console.log(`   ⚠️  UNVERIFIED: ${unverified.length} relation(s) are empty, so this probe proves`)
+  console.log('      nothing about them. They become real the day they hold data:')
+  for (let i = 0; i < unverified.length; i += 4) {
+    console.log('        ' + unverified.slice(i, i + 4).map(n => n.padEnd(28)).join('').trimEnd())
+  }
+  console.log('      Views among these cannot be protected by RLS at all — migration 277')
+  console.log('      asserts every public view carries security_invoker=true.')
+}
 
 console.log('\n── 2. anonymous writes must be rejected ──')
 const SENTINEL = 'zz-rls-verify-delete-me'
