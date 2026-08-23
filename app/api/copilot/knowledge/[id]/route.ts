@@ -83,8 +83,24 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: `Embedding failed: ${err?.message}` }, { status: 502 })
   }
 
-  // Delete old chunks, update parent, insert new chunks
-  await supabase.from('copilot_knowledge').delete().eq('parent_id', id)
+  // Delete old chunks, update parent, insert new chunks.
+  //
+  // CHECKED, and it must abort: the new chunks are inserted a few lines below,
+  // so a silent failure here leaves the OLD chunks in place alongside them.
+  // The copilot then retrieves both and answers from superseded knowledge —
+  // with no error anywhere, and a knowledge base that looks correctly edited.
+  const { error: purgeErr } = await supabase
+    .from('copilot_knowledge')
+    .delete()
+    .eq('parent_id', id)
+
+  if (purgeErr) {
+    console.error(`[copilot/knowledge PUT] purging old chunks failed for ${id}:`, purgeErr.message)
+    return NextResponse.json(
+      { error: 'Could not replace the existing chunks — entry left unchanged' },
+      { status: 500 }
+    )
+  }
 
   const parentPatch: Record<string, any> = {
     title: title ?? null,

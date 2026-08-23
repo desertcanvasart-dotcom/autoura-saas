@@ -225,21 +225,39 @@ export async function DELETE(
       .select('id')
       .eq('tour_id', id)
 
+    // Every child delete below is CHECKED, and any failure aborts before the
+    // template itself is removed.
+    //
+    // Previously all five ran with their errors discarded and only the final
+    // template delete was checked, so an RLS denial or a constraint violation
+    // on any child left the route returning `success: true` with the days,
+    // activities, variations, services and pricing still in the table — and
+    // now unreachable, because the parent they hang off had been deleted.
+    // Orphaned rows nothing can list are worse than a failed delete: a failed
+    // delete can be retried.
+    const failStep = (step: string, message: string) => {
+      console.error(`[tours/templates DELETE] ${step} failed for ${id}: ${message}`)
+      return NextResponse.json(
+        { success: false, error: `Failed to delete ${step}. Nothing was removed.` },
+        { status: 500 }
+      )
+    }
+
     if (days && days.length > 0) {
       const dayIds = days.map(d => d.id)
 
-      // Delete activities for these days (RLS enforced)
-      await supabase
+      const { error: actErr } = await supabase
         .from('tour_day_activities')
         .delete()
         .in('tour_day_id', dayIds)
+      if (actErr) return failStep('day activities', actErr.message)
     }
 
-    // Delete days (RLS enforced)
-    await supabase
+    const { error: daysErr } = await supabase
       .from('tour_days')
       .delete()
       .eq('tour_id', id)
+    if (daysErr) return failStep('days', daysErr.message)
 
     // Delete variation services first (RLS filters to tenant's variations only)
     const { data: variations } = await supabase
@@ -249,23 +267,24 @@ export async function DELETE(
 
     if (variations && variations.length > 0) {
       const variationIds = variations.map(v => v.id)
-      await supabase
+      const { error: vsErr } = await supabase
         .from('variation_services')
         .delete()
         .in('variation_id', variationIds)
+      if (vsErr) return failStep('variation services', vsErr.message)
     }
 
-    // Delete variations (RLS enforced)
-    await supabase
+    const { error: varErr } = await supabase
       .from('tour_variations')
       .delete()
       .eq('template_id', id)
+    if (varErr) return failStep('variations', varErr.message)
 
-    // Delete pricing (RLS enforced)
-    await supabase
+    const { error: priceErr } = await supabase
       .from('tour_pricing')
       .delete()
       .eq('tour_id', id)
+    if (priceErr) return failStep('pricing', priceErr.message)
 
     // Delete template (RLS requires manager role)
     const { error } = await supabase

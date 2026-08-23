@@ -122,10 +122,21 @@ export async function DELETE(
     const supabase = await createAuthenticatedClient()
 
     // First delete related payments (RLS will filter to tenant's payments only)
-    await supabase
+    // Checked, and it aborts before the invoice is removed. Unchecked, a
+    // failure here left payment records attached to an invoice that no longer
+    // exists — orphaned financial data, and the route reported success.
+    const { error: paymentsErr } = await supabase
       .from('invoice_payments')
       .delete()
       .eq('invoice_id', id)
+
+    if (paymentsErr) {
+      console.error('[invoices DELETE] invoice_payments:', paymentsErr.message)
+      return NextResponse.json(
+        { error: 'Failed to delete the invoice payments. The invoice was not removed.' },
+        { status: 500 }
+      )
+    }
 
     // Then delete the invoice (RLS will filter to tenant's invoices only)
     const { error } = await supabase

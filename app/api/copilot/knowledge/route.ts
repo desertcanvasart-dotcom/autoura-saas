@@ -123,8 +123,21 @@ export async function POST(request: NextRequest) {
     }))
     const { error: childErr } = await supabase.from('copilot_knowledge').insert(childRows)
     if (childErr) {
-      // Rollback parent so caller sees consistent state
-      await supabase.from('copilot_knowledge').delete().eq('id', parent.id)
+      // Rollback parent so caller sees consistent state.
+      //
+      // Checked but NOT returned on: the chunk-insert failure below is the
+      // error the caller needs. A failed rollback is a second, separate
+      // problem — it leaves a parent entry with no chunks, which the copilot
+      // will retrieve as an empty answer — so it is logged distinctly rather
+      // than swallowed or allowed to mask the real cause.
+      const { error: rollbackErr } = await supabase
+        .from('copilot_knowledge').delete().eq('id', parent.id)
+      if (rollbackErr) {
+        console.error(
+          `[copilot/knowledge POST] ROLLBACK FAILED for parent ${parent.id} — ` +
+          `an entry with no chunks is now orphaned:`, rollbackErr.message
+        )
+      }
       return NextResponse.json({ success: false, error: `Chunk insert failed: ${childErr.message}` }, { status: 500 })
     }
   }

@@ -73,7 +73,21 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const { expenseId } = await request.json()
     if (!expenseId) return NextResponse.json({ success: false, error: 'expenseId is required' }, { status: 400 })
 
-    await supabase.from('supplier_invoice_expenses').delete().eq('supplier_invoice_id', id).eq('expense_id', expenseId)
+    // Checked: unchecked, a failed unmatch still ran recompute and returned
+    // success, so the caller was told the expense was detached while it was
+    // still attached — and the recomputed totals were derived from the stale
+    // link.
+    const { error: unmatchErr } = await supabase
+      .from('supplier_invoice_expenses')
+      .delete()
+      .eq('supplier_invoice_id', id)
+      .eq('expense_id', expenseId)
+
+    if (unmatchErr) {
+      console.error('[supplier-invoices/match DELETE]', unmatchErr.message)
+      return NextResponse.json({ success: false, error: 'Failed to unmatch the expense' }, { status: 500 })
+    }
+
     const result = await recompute(supabase, id)
     return NextResponse.json({ success: true, ...result })
   } catch (e: any) {
