@@ -26,6 +26,7 @@
 // ============================================
 
 import { createClient } from '@supabase/supabase-js'
+import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
@@ -957,9 +958,25 @@ export async function getEntranceFee(
     }
 
     const fee = fees[0] as any
-    const rate = isEurPassport
-      ? (fee.eur_rate || 0)
-      : (fee.non_eur_rate || fee.eur_rate || 0)
+
+    // `??`, not `||`. Since migration 278 the schema distinguishes the two
+    // cases that used to collapse into one:
+    //
+    //   NULL = not priced yet  -> return null, so the caller records an
+    //                             `entrance` hole and the quote needs manual
+    //                             pricing rather than silently discounting.
+    //   0    = genuinely free  -> a real price. Khan el-Khalili and the
+    //                             Colossi of Memnon have no entry ticket, and
+    //                             flagging them as missing rates sent the
+    //                             operator to fix something already correct.
+    //
+    // `||` treated free as absent, which is exactly the "blank cell read as a
+    // price of zero" defect from the other direction.
+    const rate = resolveEntranceRate(fee, isEurPassport)
+
+    if (rate === null) {
+      return null
+    }
 
     return {
       id: fee.id,
@@ -1785,7 +1802,11 @@ export async function calculateDayBasedPricing(
 
   entranceLookups.forEach(({ attraction, day }, i) => {
     const fee = entranceFees[i]
-    if (fee && fee.source === 'db' && fee.rate > 0) {
+    // `>= 0`, not `> 0`: getEntranceFee now returns null for an unpriced
+    // attraction, so anything arriving here has a real price — and 0 is a
+    // real price for an attraction with no entry ticket. Requiring `> 0`
+    // reported those as missing rates.
+    if (fee && fee.source === 'db' && fee.rate >= 0) {
       entranceFeesPerPax += fee.rate
       services.push({
         id: `entrance-${fee.id}`,

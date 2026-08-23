@@ -1,4 +1,4 @@
-import { toNumber } from './parsing-utils'
+import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { ServiceTier } from './parsing-utils'
 import { getCruiseRate } from './cruise-pricing'
 
@@ -241,9 +241,10 @@ export async function createLandItineraryServices(
           // Check if it's an add-on (should be excluded from automatic pricing)
           if (fee.is_addon) continue
 
-          const feePerPerson = isEuroPassport
-            ? toNumber(fee.eur_rate, 0)
-            : toNumber(fee.non_eur_rate, fee.eur_rate || 0)
+          // An unpriced attraction is skipped, not charged at 0. It is also
+          // left out of matchedAttractions so it is not reported as priced.
+          const feePerPerson = resolveEntranceRate(fee, isEuroPassport)
+          if (feePerPerson === null) continue
           dayEntranceTotal += feePerPerson * totalPax
           matchedAttractions.push(fee.attraction_name)
         }

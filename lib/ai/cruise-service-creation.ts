@@ -1,4 +1,4 @@
-import { toNumber } from './parsing-utils'
+import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 
 export async function createCruiseItineraryServices(
   supabase: any,
@@ -91,7 +91,9 @@ export async function createCruiseItineraryServices(
         )
 
         if (fee) {
-          const feePerPerson = isEuroPassport ? toNumber(fee.eur_rate, 0) : toNumber(fee.non_eur_rate, fee.eur_rate || 0)
+          // Unpriced -> skip, never charge 0. See lib/pricing/entrance-rate.ts.
+          const feePerPerson = resolveEntranceRate(fee, isEuroPassport)
+          if (feePerPerson === null) continue
           dayEntranceTotal += feePerPerson * totalPax
           matchedAttractions.push(fee.attraction_name)
         }
