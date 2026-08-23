@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
 export async function POST(request: NextRequest) {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     let result
 
     if (channel === 'email') {
-      result = await sendEmail(recipient, subject, messageBody, supabase)
+      result = await sendEmail(recipient, subject, messageBody, authResult.user!.id)
     } else if (channel === 'whatsapp') {
       result = await sendWhatsApp(recipient, messageBody)
     } else if (channel === 'sms') {
@@ -128,13 +128,20 @@ export async function POST(request: NextRequest) {
 // EMAIL SENDING (via Gmail API)
 // ============================================
 
-async function sendEmail(to: string, subject: string, body: string, supabase: any): Promise<{ success: boolean; error?: string }> {
+async function sendEmail(to: string, subject: string, body: string, userId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // Get Gmail tokens from database (RLS filters to tenant's tokens only)
-    const { data: tokens } = await supabase
+    // Gmail tokens for the signed-in user.
+    //
+    // The previous comment here ("RLS filters to tenant's tokens only") was
+    // wrong on both counts: migration 249 scopes gmail_tokens to the USER, not
+    // the tenant, and this query carried no filter of its own — `.limit(1)`
+    // over whatever RLS left visible. Read with the admin client (migration
+    // 273) that would be an arbitrary row from any tenant, i.e. sending mail
+    // from a stranger's mailbox, so the filter is explicit now.
+    const { data: tokens } = await createAdminClient()
       .from('gmail_tokens')
-      .select('*')
-      .limit(1)
+      .select('access_token, refresh_token, email')
+      .eq('user_id', userId)
       .single()
 
     if (!tokens) {

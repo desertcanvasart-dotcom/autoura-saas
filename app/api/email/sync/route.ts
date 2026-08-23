@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 
@@ -58,8 +58,21 @@ export async function POST(request: NextRequest) {
     userId = user_id || authResult.user?.id
     if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
 
-    // Get Gmail tokens
-    const { data: tokenRecord } = await supabase.from('gmail_tokens').select('access_token, refresh_token, email').eq('user_id', userId).single()
+    // `user_id` arrives in the request body. Until now RLS was the only thing
+    // stopping one user syncing another's mailbox: the authenticated client
+    // could not see a foreign gmail_tokens row, so the request fell through to
+    // "Gmail not connected". The token read below uses the admin client, which
+    // has no such backstop, so the ownership rule is stated here instead of
+    // being an accident of the policy.
+    if (userId !== authResult.user?.id) {
+      return NextResponse.json({ error: 'Cannot sync another user\u2019s mailbox', success: false }, { status: 403 })
+    }
+
+    // Gmail tokens are read with the admin client so that access_token and
+    // refresh_token can be revoked from `authenticated` (migration 273) — RLS
+    // is row-level, not column-level, so an own-row SELECT policy necessarily
+    // hands the refresh token to the user's own browser.
+    const { data: tokenRecord } = await createAdminClient().from('gmail_tokens').select('access_token, refresh_token, email').eq('user_id', userId).single()
     if (!tokenRecord || !tokenRecord.access_token || !tokenRecord.refresh_token) return NextResponse.json({ error: 'Gmail not connected', success: false }, { status: 401 })
     const refreshToken = tokenRecord.refresh_token
 
