@@ -5,6 +5,20 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # `edited` is here for ONE reason: retargeting a PR's base branch.
+    #
+    # The default types are [opened, synchronize, reopened]. None of them fire
+    # when a PR's base changes, and `branches: [main]` is evaluated against the
+    # base at event time — so a PR opened against another branch (the usual
+    # shape of a stacked PR) is filtered out at open, and retargeting it to
+    # main fires only `edited`, which was not subscribed.
+    #
+    # The result was a PR sitting at mergeStateStatus CLEAN with zero checks
+    # ever executed: `gh pr checks` reported "no checks reported" rather than a
+    # failure, and nothing about the PR looked untested. PR #175 merged that
+    # way on 2026-08-23 (CI was run by hand first). Every stacked PR had this
+    # hole — parent tested, child silently not.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
@@ -16,6 +30,16 @@ concurrency:
 jobs:
   test:
     name: Tests + type-check
+    # NOTE: do NOT add `if: github.event.changes.base != null` here to skip the
+    # title/body edits that `edited` also fires for. It looks like a free
+    # saving and it is not: a skipped job still publishes a check run under
+    # this name, and it supersedes the previous one on the same SHA. A red
+    # build could then be turned green by editing the PR description —
+    # `gh pr checks` reports "skipping", and branch protection counts a
+    # skipped required check as satisfied. Measured on PR #176, 2026-08-23.
+    #
+    # A prose edit therefore costs one full run. That is the price of the
+    # check on a PR always being a real result.
     runs-on: ubuntu-latest
     env:
       # Tests/tsc don't use Puppeteer's bundled browser — skip the slow download.
