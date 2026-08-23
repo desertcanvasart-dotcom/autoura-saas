@@ -13,7 +13,6 @@
 -- is unversioned and worth reading closely.
 -- ============================================================================
 
-\pset format unaligned
 \pset fieldsep '\t'
 \pset tuples_only on
 

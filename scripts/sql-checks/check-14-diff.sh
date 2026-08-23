@@ -13,8 +13,11 @@ here="$(cd "$(dirname "$0")" && pwd)"
 live="${LIVE_TSV:-/tmp/live-triggers.tsv}"
 
 if [ -z "${LIVE_TSV:-}" ]; then
-  psql "$DB_URL" -v ON_ERROR_STOP=1 -f "$here/check-14-unversioned-triggers.sql" \
-    | sed '/^$/d' > "$live"
+  # -qtA -F$'\t': quiet, tuples-only, unaligned, tab-separated. Set here rather
+  # than with \pset in the .sql file — psql echoes a confirmation line for each
+  # \pset ("Field separator is ...") and those land in the data.
+  psql "$DB_URL" -v ON_ERROR_STOP=1 -qtA -F$'\t' \
+       -f "$here/check-14-unversioned-triggers.sql" | sed '/^$/d' > "$live"
 fi
 
 key() { awk -F'\t' 'NF>=2 {print $1"."$2}' "$1" | sort -u; }
