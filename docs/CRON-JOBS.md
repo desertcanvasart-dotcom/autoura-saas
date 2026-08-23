@@ -318,3 +318,59 @@ project builds and tests on Node 20. `npm i` silently resolves `railway` to the
 ancient 2.0.17 under Node 20 — which has no `iac` export and fails with a
 confusing module-not-found. Install `railway@3` explicitly, and run the CLI with
 Node 22 on PATH.
+
+
+## Status of the IaC migration (2026-08-23)
+
+`.railway/railway.ts` is committed and **verified against the live project**:
+
+```
+Plan: 0 to add, 2 to change, 0 to destroy
+  ~ Update Reminders Cron deploy.startCommand (null → "npm run cron:reminders")
+  ~ Update get-autoura   deploy.startCommand (null → "npm run start")
+```
+
+Those two changes ARE the fix: they write the start commands into Railway's own
+state, so the services stop depending on config files that expire on
+2026-12-01. Nothing else differs — cron schedules, domains, variables, replicas
+and networking all matched, which also proves IaC preserves `cronSchedule`
+despite the reference page not documenting it.
+
+**The apply has NOT been run.** Until it is, `Reminders Cron` and `get-autoura`
+still keep their start command only in a config file.
+
+### Running it
+
+The SDK is not a project dependency — it needs Node >=22 while this repo builds
+on Node 20, and CI has no use for it. Install it ad hoc:
+
+```bash
+export PATH="$HOME/.nvm/versions/node/v22.21.1/bin:$PATH"   # IaC needs Node >=22
+npm i --no-save railway@3                                    # NOT railway@2 — no iac export
+railway link -p bf159aa7-8bc4-45fb-a812-f9daade4606a -e production -s "Reminders Cron"
+railway config plan     # re-check the diff first
+railway config apply    # applies it
+```
+
+Then confirm the live site is unharmed:
+
+```bash
+npm run verify:deploy
+```
+
+`.railway/` is a dot-directory, so `tsc` and eslint never see `railway.ts` —
+no tsconfig change and no devDependency are required.
+
+### Do not regenerate this file blindly
+
+`railway config pull` can only export what Railway has stored, and today two
+services keep their start command only in a config file. A fresh import DROPS
+both — the generated file had no `start` for `Reminders Cron` or `get-autoura`,
+and applying that would have left the live web service with no start command at
+all. The two `start:` lines carry comments saying so.
+
+### Once the apply is verified
+
+`railway.toml` and the three `railway.cron-*.toml` become redundant and can be
+deleted, and each service's "Railway Config File" setting cleared. Not before —
+until the apply lands they are the only source of two start commands.
