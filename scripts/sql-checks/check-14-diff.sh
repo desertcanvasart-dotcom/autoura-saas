@@ -11,6 +11,13 @@ set -euo pipefail
 : "${DB_URL:?set DB_URL to the Supabase pooler connection string}"
 here="$(cd "$(dirname "$0")" && pwd)"
 live="${LIVE_TSV:-/tmp/live-triggers.tsv}"
+expected="$(mktemp)"
+trap 'rm -f "$expected"' EXIT
+
+# Computed on every run, never read from a committed file: a stored reference
+# goes stale the moment a migration adds a trigger, and then reports it as
+# UNVERSIONED forever. (It did exactly that for migration 275.)
+python3 "$here/build-expected-triggers.py" > "$expected"
 
 if [ -z "${LIVE_TSV:-}" ]; then
   # -qtA -F$'\t': quiet, tuples-only, unaligned, tab-separated. Set here rather
@@ -23,15 +30,15 @@ fi
 key() { awk -F'\t' 'NF>=2 {print $1"."$2}' "$1" | sort -u; }
 
 echo "live triggers:    $(wc -l < "$live" | tr -d ' ')"
-echo "declared in repo: $(wc -l < "$here/expected-triggers.tsv" | tr -d ' ')"
+echo "declared in repo: $(wc -l < "$expected" | tr -d ' ')"
 
 echo
 echo "=== UNVERSIONED — live, declared in no migration ==="
-comm -23 <(key "$live") <(key "$here/expected-triggers.tsv") | sed 's/^/  /' || true
+comm -23 <(key "$live") <(key "$expected") | sed 's/^/  /' || true
 
 echo
 echo "=== MISSING — declared in a migration, not live ==="
-comm -13 <(key "$live") <(key "$here/expected-triggers.tsv") | sed 's/^/  /' || true
+comm -13 <(key "$live") <(key "$expected") | sed 's/^/  /' || true
 
 echo
 echo "=== DISABLED in production (present but not firing) ==="
