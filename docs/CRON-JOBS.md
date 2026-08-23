@@ -1,6 +1,6 @@
 # Scheduled jobs
 
-Two background jobs run on a schedule. Both are HTTP-triggered: a tiny Node
+Three background jobs run on a schedule. Both are HTTP-triggered: a tiny Node
 script POSTs to an authenticated endpoint and exits with the right code so the
 scheduler records success or failure.
 
@@ -17,6 +17,7 @@ start command that runs once and exits. They do not serve traffic.
 |---|---|---|---|
 | Agent memory | `railway.cron-agent-memory.toml` | `0 2 * * *` | `POST /api/cron/process-agent-memory` |
 | Exchange rates | `railway.cron-exchange-rates.toml` | `0 1 * * *` | `POST /api/cron/refresh-exchange-rates` |
+| Reminders | `railway.cron-reminders.toml` | `0 6 * * *` | `GET /api/cron/send-reminders` + `GET /api/cron/task-reminders` |
 
 ### ⚠️ The start command comes from a config file, NOT the dashboard
 
@@ -36,6 +37,7 @@ So each cron service must be pointed at its own config file:
 **Service → Settings → Config-as-code → Railway Config File → + Add File Path**
 
 - Exchange rates service → `railway.cron-exchange-rates.toml`
+- Reminders service → `railway.cron-reminders.toml`
 - Agent memory service → `railway.cron-agent-memory.toml`
 
 Only `startCommand` is pinned in those files. The **cron schedule** and
@@ -198,3 +200,36 @@ from exchange_rate_snapshots;
 
 Any transaction dated before `history_starts` converts at the live rate and is
 labelled as approximate in the UI.
+
+
+## The reminders job runs two sweeps
+
+`cron:reminders` calls **two** endpoints, invoice dunning and task
+due/overdue notices. They are one service because the per-service config-file
+mistake above is the easy one to make, and two jobs sharing a service is one
+chance to make it rather than two. The script reports them separately and
+calls the second even when the first fails, so nothing is masked.
+
+**Both authenticate with `Authorization: Bearer $CRON_SECRET`** — not the
+`x-cron-secret` header the exchange-rates and agent-memory jobs use. The two
+conventions coexist; a runner must match the handler it calls.
+
+### These two had never run
+
+They existed for months with nothing invoking them: no runner script, no npm
+script, no Railway service. `package.json` had exactly two cron entries and
+neither was these. Nothing surfaced it — an endpoint nobody calls raises no
+error and fails no test.
+
+### A 200 is not success here
+
+Both answer 200 with a summary that can describe a failed night:
+
+| Endpoint | Failure hiding inside a 200 |
+|---|---|
+| `send-reminders` | `failed > 0` — dunning emails did not send |
+| `task-reminders` | `results.errors[]` — a query or insert failed |
+
+`scripts/cron-reminders.mjs` inspects the body and exits 1 in both cases.
+`scripts/__tests__/cron-runners.test.ts` spawns the real script against a stub
+and asserts the exit code for each.
