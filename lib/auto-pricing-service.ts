@@ -1097,11 +1097,33 @@ export async function getMealRates(
 /**
  * Get airport service rate
  */
+/**
+ * The airport assistance level an itinerary is priced at.
+ *
+ * The rate table also carries `customs_assist`, `full_service` and
+ * `vip_service`, but the itinerary model has only a boolean
+ * (`day.services.airport_arrival` / `airport_departure`) and no way to say
+ * WHICH level is wanted — so nothing can currently request them. Expressing
+ * service levels is a product decision, not something this lookup should
+ * invent; until then `meet_greet` is the baseline and is what the engine has
+ * de-facto been charging.
+ */
+export type AirportServiceType = 'meet_greet' | 'customs_assist' | 'full_service' | 'vip_service'
+
+/**
+ * Get the airport assistance rate.
+ *
+ * NOTE: deliberately takes no `tier`. It used to, and silently ignored it —
+ * `airport_staff_rates` has no tier or category column, so there is nothing to
+ * filter on. A parameter that looks like it selects a price and does not is
+ * worse than its absence: every call site read as though airport assistance
+ * were tier-aware, and it never has been.
+ */
 export async function getAirportServiceRate(
   scope: CatalogScope,
   airportCode: string,
   direction: 'arrival' | 'departure',
-  tier: ServiceTier
+  serviceType: AirportServiceType = 'meet_greet'
 ): Promise<number | null> {
   try {
     const { data: rates } = await getSupabaseAdmin()
@@ -1110,7 +1132,19 @@ export async function getAirportServiceRate(
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('airport_code', airportCode)
+      // Without this the query matched EVERY service level for the airport and
+      // took `.limit(1)` off an unordered result. Cairo arrival has four
+      // candidates — meet_greet €15, customs_assist €25, full_service €40,
+      // vip_service €75 — so the same trip could be priced anywhere across a
+      // 5x spread. It returned €15 only because that row happened to sit first
+      // on disk; a row rewrite or a different query plan would have changed the
+      // price with no code change and nothing to notice.
+      .eq('service_type', serviceType)
       .or(`direction.eq.${direction},direction.eq.both`)
+      // Belt and braces: if a tenant ever holds two rows for the same airport,
+      // direction and service level, price the cheaper rather than an
+      // arbitrary one. Deterministic beats incidental.
+      .order('rate_eur', { ascending: true })
       .limit(1)
 
     if (!rates || rates.length === 0) {
@@ -1142,6 +1176,10 @@ export async function getHotelServiceRate(
       .eq('is_active', true)
       .eq('service_type', serviceType)
       .or(`hotel_category.eq.${category},hotel_category.eq.all`)
+      // Unambiguous on today's data (service_type + category resolves to one
+      // row), but ordered anyway so it cannot become arbitrary the day a
+      // second row is added.
+      .order('rate_eur', { ascending: true })
       .limit(1)
 
     if (!rates || rates.length === 0) {
@@ -1610,7 +1648,7 @@ export async function calculateDayBasedPricing(
     // ----- AIRPORT SERVICES (fixed per service) -----
     if (day.services.airport_arrival) {
       const airportCode = getAirportCode(day.city)
-      const rate = await getAirportServiceRate(catalogScope, airportCode, 'arrival', tier)
+      const rate = await getAirportServiceRate(catalogScope, airportCode, 'arrival')
       if (rate != null) {
         fixedCosts += rate
         services.push({
@@ -1641,7 +1679,7 @@ export async function calculateDayBasedPricing(
 
     if (day.services.airport_departure) {
       const airportCode = getAirportCode(day.city)
-      const rate = await getAirportServiceRate(catalogScope, airportCode, 'departure', tier)
+      const rate = await getAirportServiceRate(catalogScope, airportCode, 'departure')
       if (rate != null) {
         fixedCosts += rate
         services.push({
