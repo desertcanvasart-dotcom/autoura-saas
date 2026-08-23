@@ -146,10 +146,21 @@ export async function PUT(
       // Delete variations that are no longer being submitted (user cleared description)
       for (const [tier, variationId] of existingTierMap) {
         if (!submittedTiers.has(tier)) {
-          await supabase
+          // Checked: unchecked, a failure here meant a tier the user had
+          // cleared silently reappeared on the next load, and the save
+          // reported success.
+          const { error: delErr } = await supabase
             .from('content_variations')
             .delete()
             .eq('id', variationId)
+
+          if (delErr) {
+            console.error(`[content-library PUT] clearing ${tier} variation failed:`, delErr.message)
+            return NextResponse.json(
+              { error: `Could not clear the ${tier} variation` },
+              { status: 500 }
+            )
+          }
         }
       }
 

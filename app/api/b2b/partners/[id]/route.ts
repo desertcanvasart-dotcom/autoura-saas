@@ -105,7 +105,18 @@ export async function DELETE(
       )
     }
 
-    await supabase.from('b2b_partner_pricing').delete().eq('partner_id', id)
+    // Checked, and it aborts: the partner itself is deleted next, so a silent
+    // failure here leaves pricing rows hanging off a partner that no longer
+    // exists — unreachable, and impossible to retry because the parent is gone.
+    const { error: pricingErr } = await supabase
+      .from('b2b_partner_pricing').delete().eq('partner_id', id)
+    if (pricingErr) {
+      console.error('[b2b/partners DELETE] partner pricing:', pricingErr.message)
+      return NextResponse.json(
+        { success: false, error: 'Failed to delete partner pricing. Nothing was removed.' },
+        { status: 500 }
+      )
+    }
 
     const { error } = await supabase.from('b2b_partners').delete().eq('id', id)
 

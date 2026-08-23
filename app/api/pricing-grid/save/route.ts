@@ -133,8 +133,18 @@ export async function POST(request: NextRequest) {
       if (error) throw error
       itinerary = data
 
-      // Delete old days and services
-      await supabase.from('itinerary_days').delete().eq('itinerary_id', config.itineraryId)
+      // Delete old days and services — CHECKED, because the replacements are
+      // inserted immediately below. A silent failure here leaves the old days
+      // in place alongside the new ones and the itinerary silently doubles.
+      const { error: daysErr } = await supabase
+        .from('itinerary_days').delete().eq('itinerary_id', config.itineraryId)
+      if (daysErr) {
+        console.error('[pricing-grid/save] clearing old days:', daysErr.message)
+        return NextResponse.json(
+          { error: 'Could not clear the existing itinerary days — nothing was saved' },
+          { status: 500 }
+        )
+      }
     } else {
       // Create new
       try {
