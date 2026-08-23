@@ -5,6 +5,20 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # `edited` is here for ONE reason: retargeting a PR's base branch.
+    #
+    # The default types are [opened, synchronize, reopened]. None of them fire
+    # when a PR's base changes, and `branches: [main]` is evaluated against the
+    # base at event time — so a PR opened against another branch (the usual
+    # shape of a stacked PR) is filtered out at open, and retargeting it to
+    # main fires only `edited`, which was not subscribed.
+    #
+    # The result was a PR sitting at mergeStateStatus CLEAN with zero checks
+    # ever executed: `gh pr checks` reported "no checks reported" rather than a
+    # failure, and nothing about the PR looked untested. PR #175 merged that
+    # way on 2026-08-23 (CI was run by hand first). Every stacked PR had this
+    # hole — parent tested, child silently not.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
@@ -16,6 +30,10 @@ concurrency:
 jobs:
   test:
     name: Tests + type-check
+    # `edited` also fires for title and body edits, which cannot affect the
+    # build. `changes.base` is present only when the base branch itself moved,
+    # so this runs the suite for a retarget and skips the prose edits.
+    if: github.event.action != 'edited' || github.event.changes.base != null
     runs-on: ubuntu-latest
     env:
       # Tests/tsc don't use Puppeteer's bundled browser — skip the slow download.
