@@ -31,13 +31,16 @@ for f in sorted(glob.glob("supabase/migrations/*.sql")):
         if (m.group(2) or "public").lower() == "public":
             latest[(m.group(1).lower(), m.group(3).lower())] = base
 
-    for tm in re.finditer(r"CREATE\s+TRIGGER\s+([a-z0-9_]+)%[Is]", src, re.I):
-        prefix = tm.group(1).lower()
+    # The table name can be interpolated anywhere in the trigger name, not just
+    # at the end: 276 builds `update_%I_updated_at`, so capturing only a prefix
+    # yields `update_agent_memory` and reports the real trigger as UNVERSIONED.
+    for tm in re.finditer(r"CREATE\s+TRIGGER\s+([a-z0-9_]*)%[Is]([a-z0-9_]*)", src, re.I):
+        prefix, suffix = tm.group(1).lower(), tm.group(2).lower()
         arrs = re.findall(r"ARRAY\s*\[([^\]]*)\]", src[:tm.start()], re.S)
         if not arrs:
             continue
         for t in re.findall(r"'([a-z0-9_]+)'", arrs[-1]):
-            latest[(f"{prefix}{t}", t)] = f"{base} (dynamic)"
+            latest[(f"{prefix}{t}{suffix}", t)] = f"{base} (dynamic)"
 
 if not latest:
     sys.exit("refusing to emit an empty reference — parser or path is wrong")
