@@ -233,3 +233,88 @@ Both answer 200 with a summary that can describe a failed night:
 `scripts/cron-reminders.mjs` inspects the body and exits 1 in both cases.
 `scripts/__tests__/cron-runners.test.ts` spawns the real script against a stub
 and asserts the exit code for each.
+
+
+---
+
+# ⚠️ Config-as-Code is deprecated — hard cutoff 2026-12-01
+
+Railway is retiring `railway.json` / `railway.toml` in favour of Infrastructure
+as Code (`.railway/railway.ts`).
+
+| Date | What happens |
+|---|---|
+| **2026-08-28** | Services that have never used Config-as-Code can no longer opt in. All four of ours already have, so they are grandfathered. |
+| **2026-12-01** | **Existing config files stop being read.** |
+
+## Why this is dangerous here, specifically
+
+Every `railway.cron-*.toml` in this repo exists to set ONE thing: the service's
+`startCommand`. On 2026-12-01 those files stop being read, and each service
+falls back to whatever start command Railway has stored on the service itself.
+
+Investigated on 2026-08-23 with `railway config pull --json`, which reports
+Railway's own state rather than what the files claim:
+
+| Service | cronSchedule | startCommand stored on the service |
+|---|---|---|
+| Agent memory cron | `0 2 * * *` | `npm run cron:agent-memory` |
+| cron:exchange-rates | `0 1 * * *` | `npm run cron:exchange-rates` |
+| **Reminders Cron** | `0 6 * * *` | **none — config file only** |
+| **get-autoura** (web) | – | **none — config file only** |
+
+So on 2026-12-01 the two crons with a stored value keep working. **Reminders
+Cron has nothing to fall back on.** It would take the builder's detected default
+for a Next.js app — `npm run start` — boot a web server that never exits, and
+because Railway SKIPS a scheduled run while the previous one is still running,
+the job would stop firing permanently. Silently, and while being billed for a
+web server. That is the exact failure this document was written about, with a
+date on it.
+
+`get-autoura` is in the same position but survives by luck: the default it
+falls back to is `npm run start`, which is what it wants anyway.
+
+## Cheap insurance, no migration required
+
+Set the start command ON the service, so the config file is belt-and-braces
+rather than the only copy. The field is greyed out while a config file is set,
+so the order matters:
+
+1. Settings → Config-as-code → **clear** the Railway Config File field
+2. Settings → Deploy → **Custom Start Command** → `npm run cron:reminders`
+3. Settings → Config-as-code → set it back to `railway.cron-reminders.toml`
+
+That is almost certainly how the other two crons ended up with both.
+
+## The real migration
+
+**`railway config migrate` does NOT work for this repo.** Run on 2026-08-23 it
+found only `railway.toml`, emitted a single service with `start: "npm run
+start"`, and ignored all three `railway.cron-*.toml` files entirely. Applying
+it would have cleared the Config File setting on a service whose start command
+lives nowhere else.
+
+**Use `railway config pull` instead.** It imports Railway's live state — all
+four services, their cron schedules, restart policies and sources — rather than
+parsing the files. Verified: it captures `deploy.cronSchedule` correctly.
+
+Note the IaC *reference page* does not document a cron field, which suggests
+IaC cannot express a schedule. That is wrong — `deploy.cronSchedule` is present
+in the imported graph for all three crons. Do not abandon the migration on the
+strength of the docs; check the import.
+
+Variables come back as `preserve()`, so secrets are never written into the file.
+
+### Prerequisites
+
+| Requirement | Status on 2026-08-23 |
+|---|---|
+| Railway CLI v5+ (`config` subcommand) | Upgraded from 4.12.0 → 5.43.1 |
+| Node **≥22** | Project runs Node 20 (`.github/workflows/ci.yml` pins `node-version: 20`) |
+| `railway` npm package **≥3** (`railway/iac` export) | v3.10.0; `engines: node >=22` |
+
+The Node constraint is the awkward one: the IaC SDK requires Node 22 while this
+project builds and tests on Node 20. `npm i` silently resolves `railway` to the
+ancient 2.0.17 under Node 20 — which has no `iac` export and fails with a
+confusing module-not-found. Install `railway@3` explicitly, and run the CLI with
+Node 22 on PATH.
