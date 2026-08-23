@@ -10,6 +10,7 @@
 // quote RPC are the sibling's own and are preserved unchanged.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
 
@@ -79,7 +80,9 @@ export async function POST(request: NextRequest) {
         return dsum + slotSupplierCost(slot, passport, pax)
       }, 0)
     }, 0)
-    const marginPct = config.marginPercent || 25
+    // `resolveMarginPercent`, not `|| 25`: 0 is an at-cost grid, and `0 || 25`
+    // resold it at 25%.
+    const marginPct = resolveMarginPercent({ explicit: config.marginPercent }).marginPercent
     const round2 = (n: number) => Math.round(n * 100) / 100
     const computedSupplierTotal = round2(supplierTotal)
     const computedSellingTotal = round2(supplierTotal * (1 + marginPct / 100))
@@ -106,7 +109,11 @@ export async function POST(request: NextRequest) {
       package_type: 'land-package',
       total_cost: finalSellingTotal,
       selling_price: finalSellingTotal,
-      margin_percent: config.marginPercent || 25,
+      // The SAME resolved value the price was computed from above.
+      // `config.marginPercent || 25` stored 25 for an at-cost grid whose
+      // price had been calculated at 0 — the record then disagreed with
+      // its own total.
+      margin_percent: marginPct,
       profit: round2(finalSellingTotal - finalSupplierTotal),
       currency: config.currency || 'EUR',
       status: 'draft',
@@ -309,7 +316,11 @@ export async function POST(request: NextRequest) {
             currency: config.currency || 'EUR',
             status: 'draft',
             total_cost: finalSupplierTotal,
-            margin_percent: config.marginPercent || 25,
+            // The SAME resolved value the price was computed from above.
+      // `config.marginPercent || 25` stored 25 for an at-cost grid whose
+      // price had been calculated at 0 — the record then disagreed with
+      // its own total.
+      margin_percent: marginPct,
             selling_price: finalSellingTotal,
             price_per_person: round2(finalSellingTotal / pax),
             internal_notes: 'Created via Pricing Grid',
