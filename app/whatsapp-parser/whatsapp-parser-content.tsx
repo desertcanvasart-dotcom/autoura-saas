@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useRef, Suspense } from 'react'
+import { DEFAULT_MARGIN_PERCENT } from '@/lib/ai/parsing-utils'
 import { createClient } from '@/app/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -1029,7 +1030,9 @@ function WhatsAppParserContent() {
           const prefs: UserPreferences = {
             default_cost_mode: data.default_cost_mode === 'manual' ? 'manual' : 'auto',
             default_tier: data.default_tier || 'standard',
-            default_margin_percent: data.default_margin_percent || 25,
+            // `??`, not `|| 25`. A user who set a 0% (at-cost) margin was shown
+            // 25% here, and the next save wrote 25 back over their choice.
+            default_margin_percent: data.default_margin_percent ?? DEFAULT_MARGIN_PERCENT,
             default_currency: data.default_currency || 'EUR'
           }
           setUserPreferences(prefs)

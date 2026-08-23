@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { DEFAULT_MARGIN_PERCENT } from '@/lib/ai/parsing-utils'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
@@ -85,7 +86,9 @@ export async function PUT(request: NextRequest) {
       user_id: user.id,
       default_cost_mode: body.default_cost_mode || 'auto',
       default_tier: body.default_tier || 'standard',
-      default_margin_percent: body.default_margin_percent || 25,
+      // `??`, not `|| 25`: a user who chooses a 0% (at-cost) margin had 25
+      // written to their profile instead. See lib/pricing/resolve-margin.ts.
+      default_margin_percent: body.default_margin_percent ?? DEFAULT_MARGIN_PERCENT,
       default_currency: body.default_currency || 'EUR',
       updated_at: new Date().toISOString()
     }

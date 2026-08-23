@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
+import { DEFAULT_MARGIN_PERCENT } from '@/lib/ai/parsing-utils'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/app/supabase'
@@ -259,7 +260,9 @@ function SettingsContent() {
           user_id: data.user_id,
           default_cost_mode: data.default_cost_mode === 'manual' ? 'manual' : 'auto',
           default_tier: data.default_tier || 'standard',
-          default_margin_percent: data.default_margin_percent || 25,
+          // `??`, not `|| 25`. A user who set a 0% (at-cost) margin was shown
+          // 25% here, and the next save wrote 25 back over their choice.
+          default_margin_percent: data.default_margin_percent ?? DEFAULT_MARGIN_PERCENT,
           default_currency: data.default_currency || 'EUR'
         })
       }
