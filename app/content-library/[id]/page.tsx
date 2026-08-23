@@ -107,6 +107,89 @@ interface DynamicFieldProps {
   onChange: (name: string, value: unknown) => void
 }
 
+interface DynamicListFieldProps {
+  field: CategoryField
+  value: unknown
+  onChange: (newValue: unknown) => void
+}
+
+// A `list` field needs its own state for the item being typed but not yet added.
+// That hook cannot live inside DynamicField's `switch (field.type)`: it would run
+// for one branch only, so React sees a different hook count on the same instance
+// as soon as a field position changes type (switching tier or category does this)
+// and the page dies with "rendered fewer hooks than expected". Own component,
+// hook at the top level, order is unconditional.
+function DynamicListField({ field, value, onChange }: DynamicListFieldProps) {
+  const listItems = (value as string[]) || []
+  const [newItem, setNewItem] = useState('')
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {field.label}
+        {field.required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      <div className="space-y-2">
+        {listItems.map((item, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <input
+              type="text"
+              value={item}
+              onChange={(e) => {
+                const updated = [...listItems]
+                updated[index] = e.target.value
+                onChange(updated)
+              }}
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+            />
+            <button
+              type="button"
+              onClick={() => onChange(listItems.filter((_, i) => i !== index))}
+              className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+            placeholder={field.placeholder}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && newItem.trim()) {
+                e.preventDefault()
+                onChange([...listItems, newItem.trim()])
+                setNewItem('')
+              }
+            }}
+            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (newItem.trim()) {
+                onChange([...listItems, newItem.trim()])
+                setNewItem('')
+              }
+            }}
+            className="p-2 text-[#647C47] hover:bg-[#647C47]/10 rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      {field.helpText && (
+        <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+          <Info className="w-3 h-3" />
+          {field.helpText}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function DynamicField({ field, value, onChange }: DynamicFieldProps) {
   const handleChange = (newValue: unknown) => {
     onChange(field.name, newValue)
@@ -355,73 +438,7 @@ function DynamicField({ field, value, onChange }: DynamicFieldProps) {
       )
 
     case 'list':
-      const listItems = (value as string[]) || []
-      const [newItem, setNewItem] = useState('')
-      return (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {field.label}
-            {field.required && <span className="text-red-500 ml-1">*</span>}
-          </label>
-          <div className="space-y-2">
-            {listItems.map((item, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={item}
-                  onChange={(e) => {
-                    const updated = [...listItems]
-                    updated[index] = e.target.value
-                    handleChange(updated)
-                  }}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleChange(listItems.filter((_, i) => i !== index))}
-                  className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={newItem}
-                onChange={(e) => setNewItem(e.target.value)}
-                placeholder={field.placeholder}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newItem.trim()) {
-                    e.preventDefault()
-                    handleChange([...listItems, newItem.trim()])
-                    setNewItem('')
-                  }
-                }}
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (newItem.trim()) {
-                    handleChange([...listItems, newItem.trim()])
-                    setNewItem('')
-                  }
-                }}
-                className="p-2 text-[#647C47] hover:bg-[#647C47]/10 rounded-lg transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-          {field.helpText && (
-            <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
-              <Info className="w-3 h-3" />
-              {field.helpText}
-            </p>
-          )}
-        </div>
-      )
+      return <DynamicListField field={field} value={value} onChange={handleChange} />
 
     default:
       return null
