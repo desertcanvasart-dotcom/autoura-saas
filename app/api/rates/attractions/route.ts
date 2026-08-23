@@ -165,8 +165,15 @@ export async function POST(request: NextRequest) {
         attraction_name,
         city,
         fee_type: fee_type || 'standard',
-        eur_rate: eur_rate || 0,
-        non_eur_rate: non_eur_rate || 0,
+        // `?? null`, not `|| 0`. This is where "unpriced" used to become
+        // "free": saving an attraction before entering a price stored 0, and
+        // every consumer read 0 as a real price. Since migration 278 the
+        // column is nullable with no default, so an omitted rate stays NULL
+        // and the pricing engine reports it as a hole. A deliberate 0 (an
+        // attraction with no entry ticket) still survives, because `??` only
+        // falls through on null/undefined.
+        eur_rate: eur_rate ?? null,
+        non_eur_rate: non_eur_rate ?? null,
         egyptian_rate: egyptian_rate || null,
         student_discount_percentage: student_discount_percentage || null,
         child_discount_percent: child_discount_percent || null,

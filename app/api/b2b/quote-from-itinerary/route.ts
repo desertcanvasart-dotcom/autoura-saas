@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { getCatalogScope } from '@/lib/catalog-scope'
+import { getEntranceFee } from '@/lib/pricing/rate-resolution'
 
 // POST /api/b2b/quote-from-itinerary
 // Creates a B2B quote by re-pricing itinerary services using B2B rate tables
@@ -70,10 +72,25 @@ export async function POST(request: NextRequest) {
               rateSource = 'b2b_rule'
             }
           } else {
-            // Entrance fees table
-            const { data: fees } = await supabase.from('entrance_fees').select('eur_rate, non_eur_rate').ilike('attraction_name', `%${serviceName}%`).limit(1)
-            if (fees?.length) {
-              unitCost = is_eur_passport ? (fees[0].eur_rate || 0) : (fees[0].non_eur_rate || 0)
+            // Entrance fees — through the canonical lookup, not a local query.
+            //
+            // The inline version this replaces had four faults, all of which
+            // the canonical implementation already handles: it coerced a NULL
+            // or absent rate to 0 (`|| 0`) and priced it as free; for a
+            // non-EUR passport it never fell back to eur_rate, so a fee
+            // priced only in EUR came out at 0; it did not filter
+            // `is_active`; and it queried through the RLS-bound client, so it
+            // could not see the intentional global-catalog rows
+            // (tenant_id IS NULL, migrations 109/260).
+            //
+            // Since migration 278 a NULL rate means "not priced yet" and the
+            // lookup returns null, so the service simply keeps its itinerary
+            // cost instead of being silently zeroed. A real 0 means free and
+            // prices as such.
+            const scope = await getCatalogScope(createAdminClient(), tenant_id)
+            const fee = await getEntranceFee(scope, serviceName, is_eur_passport)
+            if (fee) {
+              unitCost = fee.rate
               lineTotal = unitCost * numPax; quantityMode = 'per_pax'; rateSource = 'entrance_fees'
             }
           }

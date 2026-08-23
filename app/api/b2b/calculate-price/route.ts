@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateAutoPricing, ServiceTier } from '@/lib/auto-pricing-service'
-import { getCatalogScope, catalogOrExpr } from '@/lib/catalog-scope'
+import { getEntranceFee as canonicalGetEntranceFee } from '@/lib/pricing/rate-resolution'
+import { getCatalogScope } from '@/lib/catalog-scope'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // ============================================
@@ -277,32 +278,27 @@ async function selectGuideFromB2CTable(language: string = 'English', tier: strin
   }
 }
 
-// Get entrance fee from entrance_fees table
-async function getEntranceFee(attractionName: string, isEurPassport: boolean, tenantId?: string): Promise<{ rate: number; name: string; id: string } | null> {
-  // entrance_fees supports intentional global fallback rows (tenant_id IS NULL —
-  // see migration 109), visible only while the tenant's use_global_catalog
-  // flag is on (migration 260 / lib/catalog-scope.ts).
+// Entrance fee lookup — delegates to the canonical implementation.
+//
+// This route used to carry its own copy, and it drifted: it had no `rate > 0`
+// guard, so an attraction with a 0 rate produced a real EUR 0 line labelled
+// rateSource 'entrance_fees' with a note reading "EUR 0/pax". The engine's own
+// caller has always rejected that. lib/pricing/rate-resolution.ts says exactly
+// why this must not be reimplemented — "any route that needs a rate must
+// import from HERE, never reimplement lookups" — and this is what happens when
+// it is: one surface learns the fix (migration 278's unpriced-vs-free
+// distinction) and the copy does not.
+//
+// The signature is kept so the call site below is unchanged.
+async function getEntranceFee(
+  attractionName: string,
+  isEurPassport: boolean,
+  tenantId?: string
+): Promise<{ rate: number; name: string; id: string } | null> {
   const scope = await getCatalogScope(getSupabaseAdmin(), tenantId ?? '')
-  const { data: fees, error } = await (getSupabaseAdmin() as any)
-    .from('entrance_fees')
-    .select('id, attraction_name, eur_rate, non_eur_rate')
-    .eq('is_active', true)
-    .or(catalogOrExpr(scope))
-    .ilike('attraction_name', `%${attractionName}%`)
-    .limit(1)
-
-  if (error || !fees || fees.length === 0) return null
-
-  const fee = fees[0] as any
-  const rate = isEurPassport
-    ? (fee.eur_rate || 0)
-    : (fee.non_eur_rate || fee.eur_rate || 0)
-
-  return {
-    rate,
-    name: fee.attraction_name,
-    id: fee.id
-  }
+  const fee = await canonicalGetEntranceFee(scope, attractionName, isEurPassport)
+  if (!fee) return null
+  return { rate: fee.rate, name: fee.name, id: fee.id }
 }
 
 // Get hotel rate from hotel_contacts table

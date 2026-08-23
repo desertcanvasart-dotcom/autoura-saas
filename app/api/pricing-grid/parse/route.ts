@@ -113,7 +113,9 @@ function buildRateCatalog(rates: Record<string, any[]>): string {
   if (rates.entrance_fees.length > 0) {
     catalog += '\n## ENTRANCE FEES (per person)\n'
     for (const r of rates.entrance_fees) {
-      catalog += `ID: ${r.id} | ${r.attraction_name} | ${r.city || ''} | EU: €${r.eur_rate || 0} | Non-EU: €${r.non_eur_rate || 0}\n`
+      // `?? 'unpriced'` — printing €0 for a NULL rate told the model the
+      // attraction is free, which is how an unpriced line reaches a quote.
+      catalog += `ID: ${r.id} | ${r.attraction_name} | ${r.city || ''} | EU: ${r.eur_rate ?? 'unpriced'} | Non-EU: ${r.non_eur_rate ?? 'unpriced'}\n`
     }
   }
 
