@@ -137,8 +137,12 @@ if (unverified.length) {
   for (let i = 0; i < unverified.length; i += 4) {
     console.log('        ' + unverified.slice(i, i + 4).map(n => n.padEnd(28)).join('').trimEnd())
   }
-  console.log('      Views among these cannot be protected by RLS at all — migration 277')
-  console.log('      asserts every public view carries security_invoker=true.')
+  console.log('      This probe CANNOT judge them. Run the policy-level check, which does')
+  console.log('      not care whether a table has ever held a row:')
+  console.log('        psql "$DB_URL" -f scripts/sql-checks/check-rls-coverage.sql')
+  console.log('      It found tenant_invitations, writing_rules and content_variations with')
+  console.log('      RLS switched OFF on 2026-08-24 — all three empty, so every run of this')
+  console.log('      sweep had passed them (migration 283).')
 }
 
 console.log('\n── 2. anonymous writes must be rejected ──')
