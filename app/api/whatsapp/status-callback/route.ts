@@ -68,8 +68,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing MessageSid' }, { status: 400 })
     }
 
-    // Update message status in database
-    const { data, error } = await (getSupabaseAdmin() as any)
+    // Update message status in database.
+    //
+    // Deliberately NOT `.single()`. A status callback for a SID we have no row
+    // for is not an exception, it is a miss — but `.single()` turns it into
+    // PGRST116, which the catch below logged with the same words as a database
+    // outage. Both then returned 200 and vanished. Every delivery status could
+    // have stopped recording without a single distinguishable line in the log.
+    //
+    // The 200 is correct and stays: a non-2xx makes Twilio retry this callback
+    // for hours. The failure has to be visible in the logs instead of in the
+    // status code, so the two cases are separated and each is greppable.
+    const { data: updated, error } = await (getSupabaseAdmin() as any)
       .from('whatsapp_messages')
       .update({
         status: messageStatus,
@@ -78,14 +88,26 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString()
       })
       .eq('message_sid', messageSid)
-      .select()
-      .single()
+      .select('id')
 
     if (error) {
-      console.error('Error updating message status:', error)
-      // Don't return error - Twilio expects 200 OK
-    } else {
-
+      // The database refused or was unreachable — this status is lost.
+      console.error('[whatsapp/status-callback] DB_ERROR — status not recorded', {
+        messageSid,
+        messageStatus,
+        code: error.code,
+        message: error.message,
+      })
+    } else if (!updated || updated.length === 0) {
+      // Signature was valid, so Twilio really did send this on our behalf, but
+      // no whatsapp_messages row carries the SID. Either the send never
+      // persisted its row, or the callback beat the insert. Silent until now.
+      console.error('[whatsapp/status-callback] NO_MATCHING_MESSAGE — status dropped', {
+        messageSid,
+        messageStatus,
+        to,
+        from,
+      })
     }
 
     // Log failed messages for debugging
