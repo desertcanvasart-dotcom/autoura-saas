@@ -99,6 +99,21 @@ export interface ItineraryDay {
     hotel_checkin: boolean
     hotel_checkout: boolean
     guide_required: boolean
+    // ---- Service levels (optional) ----
+    // The booleans say WHETHER a service is wanted; these say WHICH LEVEL.
+    // Both rate tables carry levels the itinerary had no way to ask for — 7
+    // rows in hotel_staff_rates (full_service, concierge) and 14 in
+    // airport_staff_rates (customs_assist, full_service, vip_service) were
+    // priced and permanently unreachable.
+    //
+    // Optional, and each falls back to the level that has always been charged,
+    // so every existing itinerary prices exactly as before.
+    /** Defaults to 'meet_greet'. Applies to both arrival and departure. */
+    airport_service_level?: AirportServiceType
+    /** Defaults to 'checkin_assist'. */
+    hotel_checkin_level?: HotelServiceType
+    /** Defaults to 'porter'. */
+    hotel_checkout_level?: HotelServiceType
   }
   // NEW: Transport overrides (optional)
   transport?: {
@@ -1111,6 +1126,31 @@ export async function getMealRates(
 export type AirportServiceType = 'meet_greet' | 'customs_assist' | 'full_service' | 'vip_service'
 
 /**
+ * The hotel assistance level an itinerary is priced at.
+ *
+ * `checkin_assist` and `porter` are the defaults the two booleans have always
+ * mapped to. `full_service` bundles both (its rates sit at roughly the sum of
+ * the two) and `concierge` is a separate premium service — 7 priced rows that
+ * nothing could request until day.services gained a level.
+ */
+export type HotelServiceType = 'checkin_assist' | 'porter' | 'full_service' | 'concierge'
+
+/** Human labels for the service levels, used on line items and holes. */
+const AIRPORT_LEVEL_LABEL: Record<AirportServiceType, string> = {
+  meet_greet: 'Meet & Greet',
+  customs_assist: 'Customs Assistance',
+  full_service: 'Full Service',
+  vip_service: 'VIP Service',
+}
+const HOTEL_LEVEL_LABEL: Record<HotelServiceType, string> = {
+  checkin_assist: 'Check-in Assistance',
+  porter: 'Check-out & Porter',
+  full_service: 'Full Service',
+  concierge: 'Concierge',
+}
+
+
+/**
  * Get the airport assistance rate.
  *
  * NOTE: deliberately takes no `tier`. It used to, and silently ignored it —
@@ -1163,7 +1203,7 @@ export async function getAirportServiceRate(
  */
 export async function getHotelServiceRate(
   scope: CatalogScope,
-  serviceType: 'checkin_assist' | 'porter' | 'full_service',
+  serviceType: HotelServiceType,
   tier: ServiceTier
 ): Promise<number | null> {
   try {
@@ -1645,10 +1685,17 @@ export async function calculateDayBasedPricing(
       }
     }
 
+    // ----- SERVICE LEVELS -----
+    // Each defaults to the level that has always been charged, so an itinerary
+    // that does not specify one prices exactly as it did before.
+    const airportLevel: AirportServiceType = day.services.airport_service_level ?? 'meet_greet'
+    const checkinLevel: HotelServiceType = day.services.hotel_checkin_level ?? 'checkin_assist'
+    const checkoutLevel: HotelServiceType = day.services.hotel_checkout_level ?? 'porter'
+
     // ----- AIRPORT SERVICES (fixed per service) -----
     if (day.services.airport_arrival) {
       const airportCode = getAirportCode(day.city)
-      const rate = await getAirportServiceRate(catalogScope, airportCode, 'arrival')
+      const rate = await getAirportServiceRate(catalogScope, airportCode, 'arrival', airportLevel)
       if (rate != null) {
         fixedCosts += rate
         services.push({
@@ -1671,7 +1718,7 @@ export async function calculateDayBasedPricing(
           tier,
           dayNumber: day.day,
           city: day.city,
-          lookupAttempted: `airport arrival (${airportCode})`,
+          lookupAttempted: `airport arrival ${airportLevel} (${airportCode})`,
           message: `No airport meet & greet rate for ${airportCode}. Add it in Rates → Airport Services.`,
         })
       }
@@ -1679,7 +1726,7 @@ export async function calculateDayBasedPricing(
 
     if (day.services.airport_departure) {
       const airportCode = getAirportCode(day.city)
-      const rate = await getAirportServiceRate(catalogScope, airportCode, 'departure')
+      const rate = await getAirportServiceRate(catalogScope, airportCode, 'departure', airportLevel)
       if (rate != null) {
         fixedCosts += rate
         services.push({
@@ -1702,22 +1749,22 @@ export async function calculateDayBasedPricing(
           tier,
           dayNumber: day.day,
           city: day.city,
-          lookupAttempted: `airport departure (${airportCode})`,
-          message: `No airport departure assist rate for ${airportCode}. Add it in Rates → Airport Services.`,
+          lookupAttempted: `airport departure ${airportLevel} (${airportCode})`,
+          message: `No ${AIRPORT_LEVEL_LABEL[airportLevel]} departure rate for ${airportCode}. Add it in Rates → Airport Services.`,
         })
       }
     }
 
     // ----- HOTEL SERVICES (fixed per service) -----
     if (day.services.hotel_checkin) {
-      const rate = await getHotelServiceRate(catalogScope, 'checkin_assist', tier)
+      const rate = await getHotelServiceRate(catalogScope, checkinLevel, tier)
       if (rate != null) {
         fixedCosts += rate
         services.push({
           id: `day${day.day}-hotel-checkin`,
           dayNumber: day.day,
           serviceType: 'hotel_service',
-          serviceName: 'Hotel Check-in Assistance',
+          serviceName: `Hotel ${HOTEL_LEVEL_LABEL[checkinLevel]}`,
           quantity: 1,
           quantityMode: 'fixed',
           unitCost: rate,
@@ -1733,21 +1780,21 @@ export async function calculateDayBasedPricing(
           tier,
           dayNumber: day.day,
           city: day.city,
-          lookupAttempted: `hotel check-in assist (${tier})`,
-          message: `No hotel check-in assistance rate. Add it in Rates → Hotel Services.`,
+          lookupAttempted: `hotel ${checkinLevel} (${tier})`,
+          message: `No hotel ${HOTEL_LEVEL_LABEL[checkinLevel]} rate for ${tier}. Add it in Rates → Hotel Services.`,
         })
       }
     }
 
     if (day.services.hotel_checkout) {
-      const rate = await getHotelServiceRate(catalogScope, 'porter', tier)
+      const rate = await getHotelServiceRate(catalogScope, checkoutLevel, tier)
       if (rate != null) {
         fixedCosts += rate
         services.push({
           id: `day${day.day}-hotel-checkout`,
           dayNumber: day.day,
           serviceType: 'hotel_service',
-          serviceName: 'Hotel Check-out & Porter',
+          serviceName: `Hotel ${HOTEL_LEVEL_LABEL[checkoutLevel]}`,
           quantity: 1,
           quantityMode: 'fixed',
           unitCost: rate,
@@ -1763,8 +1810,8 @@ export async function calculateDayBasedPricing(
           tier,
           dayNumber: day.day,
           city: day.city,
-          lookupAttempted: `hotel porter/checkout (${tier})`,
-          message: `No hotel check-out & porter rate. Add it in Rates → Hotel Services.`,
+          lookupAttempted: `hotel ${checkoutLevel} (${tier})`,
+          message: `No hotel ${HOTEL_LEVEL_LABEL[checkoutLevel]} rate for ${tier}. Add it in Rates → Hotel Services.`,
         })
       }
     }
