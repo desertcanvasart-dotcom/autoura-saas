@@ -10458,13 +10458,6 @@ export interface Database {
     // every select('*') result to {}.
     Views: { [_ in never]: never }
     Functions: {
-      trip_unread_counts: {
-        Args: {
-          p_itinerary_ids?: string[]
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Returns: any
-      }
       convert_amount: {
         Args: {
           p_amount?: number
@@ -10671,6 +10664,13 @@ export interface Database {
           p_revert_reason?: string
           p_reverted_by?: string
           p_version_number?: number
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      trip_unread_counts: {
+        Args: {
+          p_itinerary_ids?: string[]
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
