@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { 
   Users, Truck, Hotel, UtensilsCrossed, Ship, Plane, UserCheck,
   Check, AlertCircle, Loader2, MapPin, Clock, Plus, Trash2, Calendar,
-  ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor, Link2 } from 'lucide-react'
+  ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor, Link2, Car } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -121,6 +121,19 @@ const RESOURCE_TYPES = [
     canNotify: false,
     filterType: 'city',
     cityField: 'city'
+  },
+  {
+    key: 'driver',
+    label: 'Drivers',
+    icon: Car,
+    color: 'teal',
+    // Unified staff identity (mig 288): drivers ARE team_members rows with
+    // staff_type='driver' — assigning one references the directory directly.
+    apiEndpoint: '/api/team-members?staff_type=driver',
+    nameField: 'name',
+    phoneField: 'phone',
+    displayField: (r: { name?: string; phone?: string }) => `${r.name}${r.phone ? ` · ${r.phone}` : ''}`,
+    canNotify: true
   },
   { 
     key: 'hotel', 
@@ -283,7 +296,7 @@ export default function ResourceAssignmentV2({
 
     for (const type of RESOURCE_TYPES) {
       try {
-        const response = await fetch(`${type.apiEndpoint}?is_active=true`)
+        const response = await fetch(`${type.apiEndpoint}${type.apiEndpoint.includes('?') ? '&' : '?'}is_active=true`)
 
         // Handle 404 or other errors gracefully
         if (!response.ok) {

@@ -76,11 +76,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Unified identity (mig 288): the session user's directory row, if the
+    // 264/265 link triggers created one. Best-effort — never blocks the log.
+    const { data: me } = await supabase
+      .from('team_members')
+      .select('id')
+      .eq('tenant_id', tenant_id)
+      .eq('user_id', authResult.user!.id)
+      .maybeSingle()
+
     const { data: event, error: insertErr } = await supabase
       .from('trip_events')
       .insert({
         tenant_id,
         itinerary_id,
+        actor_team_member_id: me?.id ?? null,
         itinerary_resource_id: itinerary_resource_id || null,
         event_kind,
         occurred_at: occurred_at || new Date().toISOString(),

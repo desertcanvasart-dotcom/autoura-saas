@@ -597,6 +597,7 @@ export interface Database {
           is_active: boolean | null
           created_at: string | null
           updated_at: string | null
+          team_member_id: string | null
         }
         Insert: {
           id?: string
@@ -614,6 +615,7 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          team_member_id?: string | null
         }
         Update: {
           id?: string
@@ -631,6 +633,7 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          team_member_id?: string | null
         }
         Relationships: [
           {
@@ -638,6 +641,13 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "airport_staff_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]
@@ -4546,6 +4556,7 @@ export interface Database {
           tier: string | null
           is_preferred: boolean | null
           city: string | null
+          team_member_id: string | null
         }
         Insert: {
           id?: string
@@ -4577,6 +4588,7 @@ export interface Database {
           tier?: string | null
           is_preferred?: boolean | null
           city?: string | null
+          team_member_id?: string | null
         }
         Update: {
           id?: string
@@ -4608,6 +4620,7 @@ export interface Database {
           tier?: string | null
           is_preferred?: boolean | null
           city?: string | null
+          team_member_id?: string | null
         }
         Relationships: [
           {
@@ -4615,6 +4628,13 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guides_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]
@@ -4787,6 +4807,7 @@ export interface Database {
           is_active: boolean | null
           created_at: string | null
           updated_at: string | null
+          team_member_id: string | null
         }
         Insert: {
           id?: string
@@ -4803,6 +4824,7 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          team_member_id?: string | null
         }
         Update: {
           id?: string
@@ -4819,6 +4841,7 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          team_member_id?: string | null
         }
         Relationships: [
           {
@@ -4833,6 +4856,13 @@ export interface Database {
             columns: ["hotel_id"]
             isOneToOne: false
             referencedRelation: "hotel_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_staff_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]
@@ -7695,6 +7725,9 @@ export interface Database {
           updated_at: string | null
           department_id: string | null
           user_id: string | null
+          staff_type: string
+          whatsapp: string | null
+          photo_url: string | null
         }
         Insert: {
           id?: string
@@ -7709,6 +7742,9 @@ export interface Database {
           updated_at?: string | null
           department_id?: string | null
           user_id?: string | null
+          staff_type?: string
+          whatsapp?: string | null
+          photo_url?: string | null
         }
         Update: {
           id?: string
@@ -7723,6 +7759,9 @@ export interface Database {
           updated_at?: string | null
           department_id?: string | null
           user_id?: string | null
+          staff_type?: string
+          whatsapp?: string | null
+          photo_url?: string | null
         }
         Relationships: [
           {
@@ -9493,6 +9532,7 @@ export interface Database {
           note: string | null
           actor_name: string | null
           created_at: string
+          actor_team_member_id: string | null
         }
         Insert: {
           id?: string
@@ -9506,6 +9546,7 @@ export interface Database {
           note?: string | null
           actor_name?: string | null
           created_at?: string
+          actor_team_member_id?: string | null
         }
         Update: {
           id?: string
@@ -9519,6 +9560,7 @@ export interface Database {
           note?: string | null
           actor_name?: string | null
           created_at?: string
+          actor_team_member_id?: string | null
         }
         Relationships: [
           {
@@ -9540,6 +9582,13 @@ export interface Database {
             columns: ["itinerary_resource_id"]
             isOneToOne: false
             referencedRelation: "itinerary_resources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_events_actor_team_member_id_fkey"
+            columns: ["actor_team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]
@@ -10041,6 +10090,7 @@ export interface Database {
           tier: string | null
           is_preferred: boolean | null
           city: string | null
+          default_driver_id: string | null
         }
         Insert: {
           id?: string
@@ -10075,6 +10125,7 @@ export interface Database {
           tier?: string | null
           is_preferred?: boolean | null
           city?: string | null
+          default_driver_id?: string | null
         }
         Update: {
           id?: string
@@ -10109,6 +10160,7 @@ export interface Database {
           tier?: string | null
           is_preferred?: boolean | null
           city?: string | null
+          default_driver_id?: string | null
         }
         Relationships: [
           {
@@ -10123,6 +10175,13 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicles_default_driver_id_fkey"
+            columns: ["default_driver_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]
