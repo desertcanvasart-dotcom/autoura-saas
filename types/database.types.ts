@@ -10323,6 +10323,7 @@ export interface Database {
           message_sid: string | null
           metadata: Json | null
           sent_by: string | null
+          media_storage_path: string | null
         }
         Insert: {
           id?: string
@@ -10341,6 +10342,7 @@ export interface Database {
           message_sid?: string | null
           metadata?: Json | null
           sent_by?: string | null
+          media_storage_path?: string | null
         }
         Update: {
           id?: string
@@ -10359,6 +10361,7 @@ export interface Database {
           message_sid?: string | null
           metadata?: Json | null
           sent_by?: string | null
+          media_storage_path?: string | null
         }
         Relationships: [
           {

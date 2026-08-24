@@ -68,11 +68,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: 'Message not found' }, { status: 404 })
     }
 
-    // TODO(types): drop this cast once migration 293 is applied and
-    // `npm run types:generate` has re-introspected whatsapp_messages. The
-    // column is new, so the checked-in generated types do not carry it yet.
-    const storagePath = (message as unknown as { media_storage_path: string | null })
-      .media_storage_path
+    const storagePath = message.media_storage_path
     if (!storagePath) {
       // Either no attachment, or one hosted elsewhere (Twilio's own media URL,
       // an outbound PDF) — those are in media_url and are not ours to sign.
