@@ -16,10 +16,7 @@ export async function GET(
     // Use authenticated client - RLS automatically filters by tenant
     const supabase = await createAuthenticatedClient()
 
-    // Fetch variation with all related data (removed tour_days - doesn't exist)
-    const { data: variation, error: varError } = await supabase
-      .from('tour_variations')
-      .select(`
+    const VARIATION_SELECT = `
         *,
         tour_templates (
           id,
@@ -34,15 +31,36 @@ export async function GET(
           tour_categories (category_name),
           destinations (destination_name)
         )
-      `)
+      `
+
+    // Fetch variation with all related data (removed tour_days - doesn't exist)
+    let { data: variation, error: varError } = await supabase
+      .from('tour_variations')
+      .select(VARIATION_SELECT)
       .eq('variation_code', code)
-      .single()
+      .maybeSingle()
+
+    // Legacy links (and old bookmarks) carried the TEMPLATE UUID instead of a
+    // variation code — resolve those to the template's first active variation
+    // rather than dead-ending them.
+    if (!variation && !varError && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)) {
+      const fallback = await supabase
+        .from('tour_variations')
+        .select(VARIATION_SELECT)
+        .eq('template_id', code)
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      variation = fallback.data
+      varError = fallback.error
+    }
 
     if (varError) {
       console.error('Variation fetch error:', varError)
       throw varError
     }
-    
+
     if (!variation) {
       return NextResponse.json(
         { success: false, error: 'Tour not found' },

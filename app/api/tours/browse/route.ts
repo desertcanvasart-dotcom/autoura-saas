@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
         tour_variations (
           id,
           variation_name,
+          variation_code,
           tier,
           min_pax,
           max_pax,
@@ -162,6 +163,14 @@ export async function GET(request: NextRequest) {
           cover_image_url: template.image_url,
           category: template.tour_categories,
           
+          // Where "View Details" lands: the detail page is variation-centric
+          // (looks up by variation_code), so hand the card the code of the
+          // variation its "starting from" tier describes. Linking the
+          // template UUID here was the bug that dead-ended every click.
+          default_variation_code:
+            (variations.find((v: { tier?: string }) => v.tier === startingFromTier) ?? variations[0])
+              ?.variation_code ?? null,
+
           // Variations summary
           variations_count: variations.length,
           available_tiers: [...new Set(variations.map((v: any) => v.tier))],
