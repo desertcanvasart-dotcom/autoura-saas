@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ChevronDown, ChevronUp, Radio } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, MessageCircle, Radio } from 'lucide-react'
 import TripTimeline from '@/app/components/TripTimeline'
+import TravellerChat from '@/app/components/TravellerChat'
 import PushToggle from './PushToggle'
 
 // ============================================
@@ -21,6 +22,7 @@ interface TodayTrip {
   start_date: string | null
   end_date: string | null
   latest_event: { event_kind: string; occurred_at: string; actor_name: string | null } | null
+  unread_messages: number
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -120,6 +122,15 @@ export default function OpsPage() {
                   )}
                 </p>
               </div>
+              {t.unread_messages > 0 && (
+                <span
+                  className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-600 text-white text-xs font-semibold"
+                  title="Unanswered traveller messages"
+                >
+                  <MessageCircle className="w-3 h-3" />
+                  {t.unread_messages}
+                </span>
+              )}
               {open.has(t.id) ? (
                 <ChevronUp className="w-4 h-4 shrink-0 text-gray-400" />
               ) : (
@@ -127,8 +138,11 @@ export default function OpsPage() {
               )}
             </button>
             {open.has(t.id) && (
-              <div className="border-t border-gray-100 p-1">
+              <div className="border-t border-gray-100 p-1 space-y-1">
                 <TripTimeline itineraryId={t.id} />
+                {/* Same thread as the itinerary page and the traveller's share
+                    page; opening it here marks their messages read. */}
+                <TravellerChat itineraryId={t.id} />
               </div>
             )}
           </div>

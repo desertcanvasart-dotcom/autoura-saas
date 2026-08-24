@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { MapPin, Radio } from 'lucide-react'
+import { MapPin, MessageCircle, Radio } from 'lucide-react'
 
 // ============================================
 // TODAY ON THE GROUND — the ops-board seed
@@ -25,6 +25,7 @@ interface TodayTrip {
     lat: number | null
     lng: number | null
   } | null
+  unread_messages: number
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -120,6 +121,15 @@ export default function TodayOnTheGround() {
                     )}
                   </p>
                 </div>
+                {t.unread_messages > 0 && (
+                  <span
+                    className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-primary-600 text-white text-[10px] font-semibold"
+                    title="Unanswered traveller messages"
+                  >
+                    <MessageCircle className="w-3 h-3" />
+                    {t.unread_messages}
+                  </span>
+                )}
                 {t.latest_event?.lat != null && t.latest_event?.lng != null && (
                   <MapPin className="w-3.5 h-3.5 shrink-0 text-gray-400" />
                 )}

@@ -56,6 +56,25 @@ export async function GET() {
       if (!latest.has(e.itinerary_id)) latest.set(e.itinerary_id, e)
     }
 
+    // Unanswered traveller messages per trip (mig 291) — the board's "someone
+    // is waiting on you" signal. Best-effort: a failure here must not take
+    // down the board, which predates the chat.
+    const unread = new Map<string, number>()
+    try {
+      const { data: unreadRows } = await supabase
+        .from('trip_messages')
+        .select('itinerary_id')
+        .in('itinerary_id', trips.map(t => t.id))
+        .eq('direction', 'inbound')
+        .eq('is_read', false)
+        .limit(500)
+      for (const m of unreadRows ?? []) {
+        unread.set(m.itinerary_id, (unread.get(m.itinerary_id) ?? 0) + 1)
+      }
+    } catch (err) {
+      console.error('[trip-events today] unread count failed:', err)
+    }
+
     return NextResponse.json({
       success: true,
       trips: trips.map(t => ({
@@ -65,6 +84,7 @@ export async function GET() {
         start_date: t.start_date,
         end_date: t.end_date,
         latest_event: latest.get(t.id) ?? null,
+        unread_messages: unread.get(t.id) ?? 0,
       })),
     })
   } catch (err) {
