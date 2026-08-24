@@ -117,3 +117,111 @@ export function toClientItinerary(
       })),
   }
 }
+
+// ============================================
+// THE TRAVELLER'S TEAM — execution layer, phase 0
+// ============================================
+// Who is actually with you: confirmed assignments from itinerary_resources,
+// joined to the people tables for a name, a face and a WhatsApp button.
+//
+// Same allowlist discipline as toClientItinerary, and the stakes are higher
+// here: the source rows carry the operator's COST BASE (cost_eur on the
+// assignment, daily_rate/hourly_rate on guides), internal notes, and staff
+// EMERGENCY CONTACTS. None of that has any business on a traveller's phone.
+// Named copies only; the tests feed a fully poisoned row and assert nothing
+// survives but the allowlist.
+
+export type ClientTeamMemberType =
+  | 'guide' | 'vehicle' | 'hotel' | 'restaurant'
+  | 'cruise' | 'airport_staff' | 'hotel_staff'
+
+export interface ClientTeamMember {
+  type: ClientTeamMemberType
+  name: string
+  /** Vehicles only: the human behind the wheel. */
+  driverName: string | null
+  phone: string | null
+  whatsapp: string | null
+  photoUrl: string | null
+  startDate: string | null
+  endDate: string | null
+}
+
+const TEAM_TYPES: ClientTeamMemberType[] = [
+  'guide', 'vehicle', 'hotel', 'restaurant', 'cruise', 'airport_staff', 'hotel_staff',
+]
+
+export interface TeamContactRows {
+  guides?: Array<Record<string, unknown>>
+  airportStaff?: Array<Record<string, unknown>>
+  hotelStaff?: Array<Record<string, unknown>>
+  vehicles?: Array<Record<string, unknown>>
+}
+
+/**
+ * Assemble the traveller-facing team from CONFIRMED assignment rows plus the
+ * matching contact rows. Callers must pass only status='confirmed' resources —
+ * a pending assignment is an internal plan, not a promise to the customer.
+ */
+export function toClientTeam(
+  resources: Array<Record<string, unknown>>,
+  contacts: TeamContactRows
+): ClientTeamMember[] {
+  const byId = (rows?: Array<Record<string, unknown>>) => {
+    const m = new Map<string, Record<string, unknown>>()
+    for (const r of rows ?? []) if (typeof r.id === 'string') m.set(r.id, r)
+    return m
+  }
+  const guides = byId(contacts.guides)
+  const airport = byId(contacts.airportStaff)
+  const hotelStaff = byId(contacts.hotelStaff)
+  const vehicles = byId(contacts.vehicles)
+
+  const out: ClientTeamMember[] = []
+  for (const r of resources ?? []) {
+    const type = TEAM_TYPES.includes(r.resource_type as ClientTeamMemberType)
+      ? (r.resource_type as ClientTeamMemberType)
+      : null
+    if (!type) continue
+
+    const rid = typeof r.resource_id === 'string' ? r.resource_id : ''
+    let name = str(r.resource_name) ?? ''
+    let driverName: string | null = null
+    let phone: string | null = null
+    let whatsapp: string | null = null
+    let photoUrl: string | null = null
+
+    if (type === 'guide') {
+      const g = guides.get(rid)
+      if (g) {
+        name = str(g.name) ?? str(g.full_name) ?? name
+        phone = str(g.phone)
+        whatsapp = str(g.whatsapp)
+        photoUrl = str(g.profile_photo_url)
+      }
+    } else if (type === 'airport_staff') {
+      const a = airport.get(rid)
+      if (a) { name = str(a.name) ?? name; phone = str(a.phone); whatsapp = str(a.whatsapp) }
+    } else if (type === 'hotel_staff') {
+      const h = hotelStaff.get(rid)
+      if (h) { name = str(h.name) ?? name; phone = str(h.phone); whatsapp = str(h.whatsapp) }
+    } else if (type === 'vehicle') {
+      const v = vehicles.get(rid)
+      if (v) {
+        name = str(v.name) ?? str(v.vehicle_type) ?? name
+        driverName = str(v.default_driver_name)
+        phone = str(v.default_driver_phone)
+        photoUrl = str(v.photo_url)
+      }
+    }
+    // hotel / restaurant / cruise: the assignment name and dates are the story.
+
+    if (!name) continue
+    out.push({
+      type, name, driverName, phone, whatsapp, photoUrl,
+      startDate: str(r.start_date), endDate: str(r.end_date),
+    })
+  }
+
+  return out.sort((a, b) => (a.startDate ?? '').localeCompare(b.startDate ?? ''))
+}

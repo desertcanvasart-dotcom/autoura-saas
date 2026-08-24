@@ -3,6 +3,7 @@ import {
   generateShareToken,
   isValidShareToken,
   toClientItinerary,
+  toClientTeam,
 } from '@/lib/itinerary-share'
 
 // ============================================================================
@@ -118,5 +119,78 @@ describe('toClientItinerary — the allowlist', () => {
     expect(v.tripName).toBe('Your trip')
     expect(v.totalPrice).toBeNull()
     expect(v.days.map((d) => d.dayNumber)).toEqual([0, 1, 3])
+  })
+})
+
+describe('toClientTeam — the allowlist for people', () => {
+  // Assignment rows carrying the operator's cost base and internal notes.
+  const POISONED_RESOURCES = [
+    {
+      id: 'res-1', tenant_id: 'TENANT-SECRET', itinerary_id: 'itin-1',
+      resource_type: 'guide', resource_id: 'g-1', resource_name: 'Ahmed Hassan',
+      start_date: '2026-09-02', end_date: '2026-09-04', status: 'confirmed',
+      cost_eur: 400, cost_non_eur: 19000, notes: 'INTERNAL: client is difficult',
+      quantity: 1,
+    },
+    {
+      id: 'res-2', tenant_id: 'TENANT-SECRET', itinerary_id: 'itin-1',
+      resource_type: 'vehicle', resource_id: 'v-1', resource_name: 'Luxury Van (Cairo)',
+      start_date: '2026-09-01', end_date: '2026-09-07',
+      cost_eur: 850, notes: 'negotiated below rate card',
+    },
+    // unknown type must be dropped, not guessed at
+    { resource_type: 'submarine', resource_id: 'x', resource_name: 'Nope', start_date: '2026-09-01' },
+  ]
+  const POISONED_CONTACTS = {
+    guides: [{
+      id: 'g-1', name: 'Ahmed Hassan', full_name: 'Ahmed M. Hassan',
+      phone: '+20 100 555 0101', whatsapp: '+20 100 555 0101',
+      profile_photo_url: 'https://cdn.example/ahmed.jpg',
+      daily_rate: 200, hourly_rate: 30,
+      emergency_contact_name: 'MUST NOT LEAK', emergency_contact_phone: 'MUST-NOT-LEAK',
+      email: 'private@example.com', address: 'MUST NOT LEAK', license_number: 'LIC-123',
+    }],
+    vehicles: [{
+      id: 'v-1', name: 'Mercedes V-Class', vehicle_type: 'Van',
+      default_driver_name: 'Mostafa', default_driver_phone: '+20 122 555 0202',
+      photo_url: 'https://cdn.example/van.jpg',
+      daily_rate: 120, rate_per_km: 0.6, insurance_expiry: '2027-01-01',
+      license_plate: 'MUST NOT LEAK', supplier_id: 'sup-9',
+    }],
+  }
+
+  it('keeps only the allowlist and sorts by start date', () => {
+    const team = toClientTeam(POISONED_RESOURCES, POISONED_CONTACTS)
+    expect(team).toHaveLength(2)                       // submarine dropped
+    expect(team[0].type).toBe('vehicle')               // 09-01 before 09-02
+    expect(team[0].name).toBe('Mercedes V-Class')
+    expect(team[0].driverName).toBe('Mostafa')
+    expect(team[0].phone).toBe('+20 122 555 0202')
+    expect(team[1].type).toBe('guide')
+    expect(team[1].name).toBe('Ahmed Hassan')
+    expect(team[1].whatsapp).toBe('+20 100 555 0101')
+    expect(team[1].photoUrl).toBe('https://cdn.example/ahmed.jpg')
+  })
+
+  it('lets NOTHING from the cost base or private fields survive', () => {
+    const json = JSON.stringify(toClientTeam(POISONED_RESOURCES, POISONED_CONTACTS))
+    for (const secret of [
+      '400', '19000', '850', '200', '120', '0.6',        // costs and rates
+      'INTERNAL', 'negotiated',                            // notes
+      'MUST NOT LEAK', 'MUST-NOT-LEAK',                    // emergency contacts, address, plate
+      'TENANT-SECRET', 'g-1', 'v-1', 'sup-9',              // ids
+      'private@example.com', 'LIC-123',
+    ]) {
+      expect(json, `leaked: ${secret}`).not.toContain(secret)
+    }
+  })
+
+  it('a resource with no matching contact still appears, contactless', () => {
+    const team = toClientTeam(
+      [{ resource_type: 'hotel', resource_id: 'h-1', resource_name: 'Steigenberger', start_date: '2026-09-01', cost_eur: 999 }],
+      {}
+    )
+    expect(team).toHaveLength(1)
+    expect(team[0]).toMatchObject({ type: 'hotel', name: 'Steigenberger', phone: null, whatsapp: null })
   })
 })
