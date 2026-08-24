@@ -53,28 +53,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id)
-        checkSuperAdmin()
+    // Supabase re-fires auth events for the SAME person constantly — token
+    // refreshes, tab focus, route-triggered session reads. Each one used to
+    // replace the user object (new identity) and re-run profile/tenant
+    // fetches, which rippled a loading flash through everything keyed on
+    // auth (the sidebar's tenant block visibly blinked on every
+    // navigation). Only a change of ACTUAL user should churn state.
+    let fetchedForUserId: string | null = null
+
+    const applySession = (session: { user?: User | null } | null) => {
+      const nextUser = session?.user ?? null
+      setUser(prev => (prev?.id === nextUser?.id ? prev : nextUser))
+      if (nextUser) {
+        if (nextUser.id !== fetchedForUserId) {
+          fetchedForUserId = nextUser.id
+          fetchProfile(nextUser.id)
+          checkSuperAdmin()
+        }
       } else {
+        fetchedForUserId = null
+        setProfile(null)
+        setIsSuperAdmin(false)
         setLoading(false)
       }
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: any } }) => {
+      applySession(session)
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id)
-        checkSuperAdmin()
-      } else {
-        setProfile(null)
-        setIsSuperAdmin(false)
-        setLoading(false)
-      }
+      applySession(session)
     })
 
     return () => subscription.unsubscribe()

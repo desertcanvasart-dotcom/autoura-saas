@@ -13,11 +13,15 @@ export default function TenantSwitcher({ isCollapsed }: TenantSwitcherProps) {
   const { tenant, tenantMember, loading, isAdmin } = useTenant()
   const router = useRouter()
 
-  if (loading) {
+  // Skeleton only when there is nothing to show yet. While a background
+  // refresh runs, keep rendering the current tenant — flipping to a
+  // skeleton (which is a different height) made the whole block below
+  // jump on every auth event.
+  if (loading && (!tenant || !tenantMember)) {
     return (
-      <div className="px-3 py-2 mb-4">
+      <div className="px-3 py-2 mb-2">
         <div className="animate-pulse">
-          <div className="h-10 bg-gray-200 rounded-lg"></div>
+          <div className="h-[26px] bg-gray-200 rounded-md"></div>
         </div>
       </div>
     )
