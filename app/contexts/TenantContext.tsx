@@ -126,7 +126,13 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       setFeatures(null)
       setLoading(false)
     }
-  }, [user, authLoading])
+    // user?.id, not user: the auth provider keeps the object identity stable
+    // for the same person, but depending on the id makes this effect immune
+    // to upstream identity churn regardless — a re-fetch here flips `loading`
+    // and blinks every consumer that renders a skeleton on it (the sidebar's
+    // tenant block did, on every navigation).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, authLoading])
 
   const fetchTenantData = async () => {
     if (!user) {
@@ -135,7 +141,10 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      setLoading(true)
+      // Stale-while-revalidate: only show a loading state when there is
+      // nothing to show yet. A background refresh keeps the current tenant
+      // on screen instead of collapsing it into a skeleton.
+      if (!tenant) setLoading(true)
 
       // 1. Get user's tenant membership
       const { data: memberData, error: memberError } = await supabase
