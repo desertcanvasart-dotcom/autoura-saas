@@ -26,8 +26,8 @@ import { generateSupplierDocumentPDF } from '@/lib/supplier-document-pdf'
 const RED_PNG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 
-function expectRealPdf(doc: { output: (t: string) => ArrayBuffer; getNumberOfPages: () => number }) {
-  const buf = Buffer.from(doc.output('arraybuffer'))
+function expectRealPdf(doc: jsPDFDefault) {
+  const buf = Buffer.from(doc.output('arraybuffer') as ArrayBuffer)
   expect(buf.subarray(0, 5).toString()).toBe('%PDF-')
   // A generator that silently produced an empty document would still emit a
   // valid header, so require it to have actual content.
@@ -36,7 +36,7 @@ function expectRealPdf(doc: { output: (t: string) => ArrayBuffer; getNumberOfPag
   return buf
 }
 
-const INVOICE = {
+const INVOICE: Parameters<typeof generateInvoicePDF>[0] = {
   invoice_number: 'INV-TEST',
   client_name: 'Test Client',
   client_email: 'client@example.test',
@@ -56,7 +56,7 @@ const INVOICE = {
   line_items: [{ description: 'Cairo day tour', quantity: 2, unit_price: 500, amount: 1000 }],
   payment_terms: '10% deposit to confirm',
   notes: 'Thank you',
-} as any
+}
 
 describe('PDF generators still render on the installed jsPDF', () => {
   it('invoice — unbranded tenant (the default path)', () => {
@@ -75,7 +75,7 @@ describe('PDF generators still render on the installed jsPDF', () => {
       }),
     )
     const plain = Buffer.from(
-      (generateInvoicePDF(INVOICE, { name: 'Acme Tours' }) as any).output('arraybuffer'),
+      generateInvoicePDF(INVOICE, { name: 'Acme Tours' }).output('arraybuffer') as ArrayBuffer,
     )
     // The logo has to actually reach the document, not be swallowed by the
     // best-effort try/catch around addImage.
@@ -96,7 +96,7 @@ describe('PDF generators still render on the installed jsPDF', () => {
           currency: 'EUR',
           transactionRef: 'tx_test',
           notes: 'Deposit received',
-        } as any,
+        },
         {
           invoice_number: 'INV-TEST',
           client_name: 'Test Client',
@@ -123,7 +123,7 @@ describe('PDF generators still render on the installed jsPDF', () => {
         currency: 'EUR',
         total_cost: 1140,
         company: { name: 'Acme Tours', primaryColor: '#112233', logoDataUrl: RED_PNG },
-      } as any),
+      }),
     )
   })
 
@@ -142,6 +142,6 @@ describe('PDF generators still render on the installed jsPDF', () => {
         ['2026-08-26', 'Luxor transfer', '140.00'],
       ],
     })
-    expectRealPdf(doc as any)
+    expectRealPdf(doc)
   })
 })
