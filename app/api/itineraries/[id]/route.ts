@@ -94,9 +94,18 @@ export async function PUT(
     if (body.status !== undefined) updateData.status = body.status
     if (body.notes !== undefined) updateData.notes = body.notes
 
-    // Resource fields
-    if (body.assigned_guide_id !== undefined) updateData.assigned_guide_id = body.assigned_guide_id
-    if (body.assigned_vehicle_id !== undefined) updateData.assigned_vehicle_id = body.assigned_vehicle_id
+    // Assignments consolidated (mig 289): the assigned_* columns are DERIVED
+    // from itinerary_resources and the database rejects direct writes. This
+    // was the second writer — refuse loudly rather than 500 on the trigger.
+    if (body.assigned_guide_id !== undefined || body.assigned_vehicle_id !== undefined) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Assignments are managed through itinerary resources now — use POST /api/itinerary-resources. The assigned_* fields on the itinerary are derived automatically.',
+        },
+        { status: 400 }
+      )
+    }
     if (body.guide_notes !== undefined) updateData.guide_notes = body.guide_notes
     if (body.vehicle_notes !== undefined) updateData.vehicle_notes = body.vehicle_notes
     if (body.pickup_location !== undefined) updateData.pickup_location = body.pickup_location
