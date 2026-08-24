@@ -20,6 +20,7 @@ interface TourTemplate {
     category_name: string
     category_code: string
   } | null
+  default_variation_code: string | null
   variations_count: number
   available_tiers: string[]
   min_pax: number
@@ -326,8 +327,8 @@ export default function ToursBrowsePage() {
                     per person • {tour.starting_from_tier || 'standard'}
                   </p>
                 </div>
-                <Link 
-                  href={`/tours/${tour.id}`}
+                <Link
+                  href={`/tours/${tour.default_variation_code ?? tour.id}`}
                   className="bg-[#647C47] text-white px-4 py-2 rounded-lg hover:bg-[#4a5c35] transition-colors text-xs font-medium"
                 >
                   View Details
