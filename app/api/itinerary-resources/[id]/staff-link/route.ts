@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { generateStaffToken } from '@/lib/staff-link'
+import { generateStaffToken, resolveAssigneeContact } from '@/lib/staff-link'
 import { appRedirectBase } from '@/lib/oauth-config'
 
 /**
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const { data: resource, error } = await supabase!
     .from('itinerary_resources')
-    .select('id, itinerary_id, status')
+    .select('id, itinerary_id, status, resource_type, resource_id, resource_name')
     .eq('id', id)
     .eq('tenant_id', tenant_id!)
     .maybeSingle()
@@ -68,10 +68,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const base = appRedirectBase(process.env.NEXT_PUBLIC_APP_URL, request.url)
+  // The assignee's contact rides along so the UI can hand the link over on
+  // the office's own WhatsApp (wa.me — our API never sends). RLS scopes the
+  // lookups; null phone just means "copy it yourself".
+  // The generated-types client can't type dynamic column strings; the
+  // resolver's minimal structural interface is the real contract here.
+  const contact = await resolveAssigneeContact(
+    supabase! as unknown as Parameters<typeof resolveAssigneeContact>[0],
+    resource
+  )
   return NextResponse.json({
     success: true,
     token,
     url: new URL(`/staff/${token}`, base).toString(),
+    contact,
   })
 }
 
