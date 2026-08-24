@@ -5,8 +5,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { 
   Users, Truck, Hotel, UtensilsCrossed, Ship, Plane, UserCheck,
   Check, AlertCircle, Loader2, MapPin, Clock, Plus, Trash2, Calendar,
-  ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor
-} from 'lucide-react'
+  ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor, Link2 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -248,6 +247,9 @@ export default function ResourceAssignmentV2({
 
   // WhatsApp sending state
   const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null)
+  // Staff tap-link: POST is idempotent, so copying twice is safe.
+  const [copyingLink, setCopyingLink] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState<Set<string>>(new Set())
   const [whatsAppSent, setWhatsAppSent] = useState<Set<string>>(new Set())
 
   // Reset filters when modal opens or tab changes
@@ -504,6 +506,24 @@ export default function ResourceAssignmentV2({
   }
 
   // WhatsApp notification handler
+  const handleCopyStaffLink = async (resourceId: string) => {
+    setCopyingLink(resourceId)
+    try {
+      const res = await fetch(`/api/itinerary-resources/${resourceId}/staff-link`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || !data.success || !data.url) throw new Error(data.error || 'Failed')
+      await navigator.clipboard.writeText(data.url)
+      setLinkCopied(prev => new Set([...prev, resourceId]))
+      setTimeout(() => {
+        setLinkCopied(prev => { const n = new Set(prev); n.delete(resourceId); return n })
+      }, 3000)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not create the staff link')
+    } finally {
+      setCopyingLink(null)
+    }
+  }
+
   const handleSendWhatsApp = async (resource: AssignedResource) => {
     const typeConfig = RESOURCE_TYPES.find(t => t.key === resource.resource_type)
     if (!typeConfig?.canNotify) return
@@ -755,6 +775,29 @@ export default function ResourceAssignmentV2({
                           </span>
                         </button>
                       )}
+
+                      {/* Staff tap-link: copies the no-login checkpoint URL */}
+                      <button
+                        onClick={() => handleCopyStaffLink(resource.id)}
+                        disabled={copyingLink === resource.id}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          linkCopied.has(resource.id)
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        } disabled:opacity-50`}
+                        title="Copy staff tap-link (no login needed)"
+                      >
+                        {copyingLink === resource.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : linkCopied.has(resource.id) ? (
+                          <Check className="w-4 h-4" />
+                        ) : (
+                          <Link2 className="w-4 h-4" />
+                        )}
+                        <span className="hidden sm:inline">
+                          {linkCopied.has(resource.id) ? 'Copied!' : 'Staff link'}
+                        </span>
+                      </button>
 
                       {/* Remove Button */}
                       <button

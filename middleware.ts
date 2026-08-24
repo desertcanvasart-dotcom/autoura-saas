@@ -15,6 +15,9 @@ import { isSuperAdmin } from '@/lib/super-admin-shared'
 // each allowlisted handler actually self-authenticates. Adding an entry here
 // fails that test until its self-auth mechanism is registered there too.
 export const SELF_AUTH_API_PREFIXES = [
+  // Staff tap-event endpoint: the token in the path IS the auth (drivers
+  // have no login). The route 404s invalid/revoked tokens itself.
+  '/api/staff/',
   '/api/webhooks/',         // HMAC-verified inbound (e.g. concierge brief, departure mirror)
   '/api/integrations/',     // server-to-server feeds; verifies SAWA_SYNC_SECRET inside the handler
   '/api/auth/',             // login / signup / OAuth callbacks (no session yet)
@@ -148,6 +151,10 @@ export async function middleware(request: NextRequest) {
     // the page itself 404s any token that does not resolve to an unrevoked
     // share (app/share/[token]/page.tsx, service-role lookup).
     '/share',
+    // Staff tap-link pages — same model: token-gated, service-role lookup,
+    // page 404s any token that does not resolve to an active staff_link
+    // (app/staff/[token]/page.tsx).
+    '/staff',
   ]
   // Exact match or a true sub-path ('/contact/foo'), never a shared prefix
   // (a protected route must NOT match public '/contact' just because it
