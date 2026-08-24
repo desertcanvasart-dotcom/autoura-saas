@@ -7,7 +7,6 @@ import { useParams } from 'next/navigation'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import Link from 'next/link'
 import { ArrowLeft, Download, Eye, Edit2, Plus, X, Loader2 } from 'lucide-react'
-import { generateContractPDF } from '@/lib/contract-pdf-generator'
 import { showToast } from '@/app/contexts/ToastContext'
 
 interface Itinerary {
@@ -172,6 +171,10 @@ export default function ContractPage() {
   const handleDownloadPDF = async () => {
     setSaving(true)
     try {
+      // Loaded on demand: pdf-lib is ~176 KB gzipped and this page is the only
+      // route that needs it, so it must not sit in the first-load bundle.
+      const { generateContractPDF } = await import('@/lib/contract-pdf-generator')
+
       // Use client-side PDF generation
       const pdfBytes = await generateContractPDF({
         company: { ...identityFromTenant(tenant), logoUrl: tenant?.logo_url },

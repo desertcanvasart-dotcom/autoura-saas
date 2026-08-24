@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useCurrency } from '@/hooks/useCurrency'
-import { csvCell } from '@/lib/finance-export'
 
 // ============================================
 // INTERFACES
@@ -447,10 +446,11 @@ export default function RatesPage() {
     return pages
   }
 
-  const exportToCSV = () => {
+  const exportToCSV = async () => {
     const currentRates = filteredRates[activeTab] as any[]
     if (!currentRates.length) return
-    
+
+    const { csvCell } = await import('@/lib/finance-export')
     const headers = Object.keys(currentRates[0]).join(',')
     const rows = currentRates.map(rate =>
       Object.values(rate).map(v => csvCell(v as string)).join(',')

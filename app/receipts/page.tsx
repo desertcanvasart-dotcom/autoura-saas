@@ -19,7 +19,6 @@ import {
   FileText,
   MapPin
 } from 'lucide-react'
-import { downloadReceiptPDF } from '@/lib/receipt-pdf-generator'
 import { showToast } from '@/app/contexts/ToastContext'
 
 interface UnifiedPayment {
@@ -156,7 +155,8 @@ export default function ReceiptsPage() {
     
     try {
       const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
-      
+
+      const { downloadReceiptPDF } = await import('@/lib/receipt-pdf-generator')
       downloadReceiptPDF({
         receiptNumber,
         invoiceNumber: payment.source_reference,

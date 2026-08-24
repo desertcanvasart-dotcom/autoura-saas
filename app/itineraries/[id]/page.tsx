@@ -6,7 +6,6 @@ import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake } from 'lucide-react'
-import { generateItineraryPDF } from '@/lib/pdf-generator'
 import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
 import ResourceSummaryCard from '@/app/components/ResourceSummaryCard'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
@@ -483,6 +482,7 @@ export default function ViewItineraryPage() {
     try {
       // Open a preview first; the modal exposes Download / Print / Email and a
       // breakdown toggle. The current breakdown choice is preserved.
+      const { generateItineraryPDF } = await import('@/lib/pdf-generator')
       const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: pdfShowBreakdown }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
       setPdfPreviewBlob(pdf.output('blob'))
       setShowPdfPreview(true)
@@ -499,6 +499,7 @@ export default function ViewItineraryPage() {
     setPdfShowBreakdown(show)
     if (!itinerary || days.length === 0) return
     try {
+      const { generateItineraryPDF } = await import('@/lib/pdf-generator')
       const pdf = await generateItineraryPDF(itinerary, days, { showPricingBreakdown: show }, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
       setPdfPreviewBlob(pdf.output('blob'))
     } catch (error) {
@@ -560,6 +561,7 @@ export default function ViewItineraryPage() {
       // Same identity + logo as the Download and preview paths. This call
       // omitted them, so the ONE PDF a client actually receives was the only
       // unbranded one: blank header name, no logo, empty footer.
+      const { generateItineraryPDF } = await import('@/lib/pdf-generator')
       const pdf = generateItineraryPDF(itinerary, days, undefined, {
         ...identityFromTenant(tenant),
         logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url),
