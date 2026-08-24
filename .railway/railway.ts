@@ -74,6 +74,7 @@ export default defineRailway(() => {
       NEXT_PUBLIC_APP_URL: preserve(),
       NEXT_PUBLIC_SUPABASE_ANON_KEY: preserve(),
       NEXT_PUBLIC_SUPABASE_URL: preserve(),
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: preserve(),
       OAUTH_STATE_SECRET: preserve(),
       OPENAI_API_KEY: preserve(),
       RESEND_API_KEY: preserve(),
@@ -89,6 +90,8 @@ export default defineRailway(() => {
       TWILIO_AUTH_TOKEN: preserve(),
       TWILIO_WHATSAPP_FROM: preserve(),
       TWILIO_WHATSAPP_NUMBER: preserve(),
+      VAPID_PRIVATE_KEY: preserve(),
+      VAPID_SUBJECT: preserve(),
       WHATSAPP_AI_ENABLED: preserve(),
     },
   });
