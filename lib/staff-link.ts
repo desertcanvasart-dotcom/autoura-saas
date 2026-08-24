@@ -112,8 +112,22 @@ export async function resolveAssigneeContact(
       if (!v) return null
       return { name: str(v.default_driver_name) ?? str(resource.resource_name), phone: str(v.default_driver_phone) }
     }
-    const table = type === 'guide' ? 'guides'
-      : type === 'airport_staff' ? 'airport_staff'
+    if (type === 'guide') {
+      // Guides live in the SUPPLIERS table (supplier_type='guide') — that is
+      // what /api/guides serves and what assignment resource_ids reference.
+      // The standalone guides table is legacy; check it second so old
+      // assignment rows still resolve.
+      const { data: sup } = await supabase
+        .from('suppliers').select('name, phone, contact_phone, whatsapp').eq('id', rid).maybeSingle()
+      if (sup) {
+        const phone = str(sup.whatsapp) ?? str(sup.phone) ?? str(sup.contact_phone)
+        return { name: str(sup.name) ?? str(resource.resource_name), phone }
+      }
+      const { data: legacy } = await supabase
+        .from('guides').select('name, phone, whatsapp').eq('id', rid).maybeSingle()
+      return pick(legacy)
+    }
+    const table = type === 'airport_staff' ? 'airport_staff'
       : type === 'hotel_staff' ? 'hotel_staff'
       : null
     if (!table) return null

@@ -23,6 +23,10 @@ let messageRows: Array<Record<string, unknown>> = []
 let recentInboundCount = 0
 let prevConversationId: string | null = null
 let existingConversationId: string | null = null
+// when non-empty, email lookups consume this queue (for race sequencing)
+let emailLookupQueue: Array<string | null> = []
+let conversationInsertResult: { data: { id: string } | null; error: { code: string; message: string } | null } =
+  { data: { id: 'conv-new' }, error: null }
 
 vi.mock('@/lib/supabase-server', () => ({
   createAdminClient: () => ({
@@ -35,17 +39,25 @@ vi.mock('@/lib/supabase-server', () => ({
       }
       if (table === 'unified_conversations') {
         return {
+          // email lookup: .select('id').eq().eq().order().limit().maybeSingle()
           select: () => ({
             eq: () => ({
-              eq: () => ({ maybeSingle: async () => ({ data: existingConversationId ? { id: existingConversationId } : null }) }),
-              maybeSingle: async () => ({ data: { total_messages: 3, unread_messages: 1 } }),
+              eq: () => ({
+                order: () => ({
+                  limit: () => ({
+                    maybeSingle: async () => {
+                      const id = emailLookupQueue.length > 0 ? emailLookupQueue.shift()! : existingConversationId
+                      return { data: id ? { id } : null }
+                    },
+                  }),
+                }),
+              }),
             }),
           }),
           insert: (row: Record<string, unknown>) => {
             inserted.push({ table, row })
-            return { select: () => ({ single: async () => ({ data: { id: 'conv-new' }, error: null }) }) }
+            return { select: () => ({ single: async () => ({ data: conversationInsertResult.data, error: conversationInsertResult.error }) }) }
           },
-          update: () => ({ eq: async () => ({ data: null, error: null }) }),
         }
       }
       if (table === 'trip_messages') {
@@ -110,6 +122,8 @@ beforeEach(() => {
   recentInboundCount = 0
   prevConversationId = null
   existingConversationId = null
+  emailLookupQueue = []
+  conversationInsertResult = { data: { id: 'conv-new' }, error: null }
 })
 
 describe('token gate (both methods)', () => {
@@ -205,13 +219,27 @@ describe('POST — identity is derived, direction is pinned', () => {
     expect(inserted).toHaveLength(0)
   })
 
-  it('429s a single token hammering the endpoint', async () => {
+  it('allows normal chat cadence (6 quick lines) but 429s a hammering token', async () => {
     const token = 'H'.repeat(32)
-    let last: Response | null = null
-    for (let i = 0; i < 6; i++) {
+    const statuses: number[] = []
+    for (let i = 0; i < 21; i++) {
       const { req, params } = makeReq('POST', { message: 'spam' }, token)
-      last = await POST(req, params)
+      statuses.push((await POST(req, params)).status)
     }
-    expect(last!.status).toBe(429)
+    // the 'chat' limit (20/min) must not trip on a real conversation burst...
+    expect(statuses.slice(0, 6).every(s => s === 200)).toBe(true)
+    // ...but the 21st message in a minute is not a conversation
+    expect(statuses[20]).toBe(429)
+  })
+
+  it('recovers the conversation when the unique-email insert race is lost', async () => {
+    prevConversationId = null
+    // first lookup misses (race window), insert loses on 23505, retry finds the winner
+    emailLookupQueue = [null, 'conv-winner']
+    conversationInsertResult = { data: null, error: { code: '23505', message: 'duplicate key' } }
+    const { req, params } = makeReq('POST', { message: 'raced' })
+    const res = await POST(req, params)
+    expect(res.status).toBe(200)
+    expect(inserted.find(i => i.table === 'trip_messages')!.row.unified_conversation_id).toBe('conv-winner')
   })
 })

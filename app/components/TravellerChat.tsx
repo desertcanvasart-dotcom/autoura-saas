@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2, MessageCircle } from 'lucide-react'
 
 // ============================================
@@ -44,6 +44,30 @@ export default function TravellerChat({ itineraryId }: { itineraryId: string }) 
     return () => clearInterval(t)
   }, [fetchMessages])
 
+  // Reading happens when a human SEES the thread, not when it mounts —
+  // expanding an /ops row (or an itinerary page where this card sits below
+  // the fold) must not silently clear the office's unread signal. The PATCH
+  // fires once per view; the mig 292 trigger keeps the inbox badge in step.
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const markedRef = useRef(false)
+  const markRead = useCallback(() => {
+    if (markedRef.current) return
+    markedRef.current = true
+    fetch(`/api/itineraries/${itineraryId}/messages`, { method: 'PATCH' }).catch(() => {
+      markedRef.current = false
+    })
+  }, [itineraryId])
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const obs = new IntersectionObserver(
+      entries => { if (entries.some(e => e.isIntersecting)) markRead() },
+      { threshold: 0.5 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [markRead])
+
   const send = async () => {
     if (sending || !draft.trim()) return
     setSending(true)
@@ -58,6 +82,7 @@ export default function TravellerChat({ itineraryId }: { itineraryId: string }) 
       if (!res.ok || !data.success) throw new Error(data.error || 'Failed to send')
       setMessages(prev => [...prev, data.message])
       setDraft('')
+      markRead() // replying is reading, even if the observer never fired
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to send')
     } finally {
@@ -76,7 +101,7 @@ export default function TravellerChat({ itineraryId }: { itineraryId: string }) 
   // No thread yet and nothing to say? Stay quiet — the composer is the
   // invitation, the empty state should not shout.
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+    <div ref={rootRef} className="bg-white rounded-lg border border-gray-200 shadow-sm">
       <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
         <MessageCircle className="w-4 h-4 text-gray-500" />
         <h3 className="text-sm font-semibold text-gray-900">Traveller chat</h3>

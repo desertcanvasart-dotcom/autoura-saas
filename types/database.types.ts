@@ -10458,6 +10458,13 @@ export interface Database {
     // every select('*') result to {}.
     Views: { [_ in never]: never }
     Functions: {
+      trip_unread_counts: {
+        Args: {
+          p_itinerary_ids?: string[]
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
       convert_amount: {
         Args: {
           p_amount?: number

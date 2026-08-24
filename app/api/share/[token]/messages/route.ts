@@ -60,8 +60,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { token } = await params
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
-    if (!checkRateLimit(`share-msg:${ip}`, 'contact').success ||
-        !checkRateLimit(`share-msg:${token}`, 'contact').success) {
+    if (!checkRateLimit(`share-msg:${ip}`, 'chat').success ||
+        !checkRateLimit(`share-msg:${token}`, 'chat').success) {
       return NextResponse.json(
         { success: false, error: 'Too many messages — please slow down.' },
         { status: 429 }
@@ -122,17 +122,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         .maybeSingle()
       conversationId = (prev?.unified_conversation_id as string | null) ?? null
 
-      if (!conversationId && itinerary?.client_email) {
+      const findByEmail = async () => {
+        if (!itinerary?.client_email) return null
+        // limit(1)+order, not bare maybeSingle: sync paths don't guarantee a
+        // single row per email, and a multi-row result must pick the oldest
+        // conversation, not silently behave as "none found".
         const { data: existing } = await supabase
           .from('unified_conversations')
           .select('id')
           .eq('tenant_id', share.tenant_id)
           .eq('contact_email', itinerary.client_email)
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle()
-        conversationId = existing?.id ?? null
+        return existing?.id ?? null
       }
+      if (!conversationId) conversationId = await findByEmail()
       if (!conversationId) {
-        const { data: created } = await supabase
+        const { data: created, error: convErr } = await supabase
           .from('unified_conversations')
           .insert({
             tenant_id: share.tenant_id,
@@ -143,6 +150,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           .select('id')
           .single()
         conversationId = created?.id ?? null
+        // Lost the UNIQUE(tenant_id, contact_email) race (e.g. a concurrent
+        // email sync created the conversation between our lookup and insert):
+        // the row now exists — take it rather than orphaning the message.
+        if (!conversationId && convErr?.code === '23505') {
+          conversationId = await findByEmail()
+        }
+        if (!conversationId && convErr) {
+          console.error('[share messages POST] conversation create failed:', convErr.message)
+        }
       }
     } catch (err) {
       console.error('[share messages POST] conversation link failed:', err)
@@ -168,30 +184,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // Conversation counters: read-modify-write at signal fidelity (the
-    // view_count precedent) — never worth failing the send over.
-    if (conversationId) {
-      try {
-        const { data: conv } = await supabase
-          .from('unified_conversations')
-          .select('total_messages, unread_messages')
-          .eq('id', conversationId)
-          .maybeSingle()
-        await supabase
-          .from('unified_conversations')
-          .update({
-            total_messages: (conv?.total_messages ?? 0) + 1,
-            unread_messages: (conv?.unread_messages ?? 0) + 1,
-            last_message_at: new Date().toISOString(),
-            last_message_preview: content.length > 120 ? `${content.slice(0, 117)}…` : content,
-            last_message_channel: 'trip',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', conversationId)
-      } catch (err) {
-        console.error('[share messages POST] counter update failed:', err)
-      }
-    }
+    // Conversation counters/preview: recomputed from source by the DB
+    // trigger on trip_messages (mig 292) — the same rail whatsapp and email
+    // ride. No app-side increments (the total_bookings_count lesson).
 
     void sendPushToTenant(share.tenant_id, {
       title: `${name ?? itinerary?.client_name ?? 'Traveller'} — ${itinerary?.trip_name ?? 'trip message'}`,
