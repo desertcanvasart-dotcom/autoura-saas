@@ -19,6 +19,7 @@ import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
 import PDFPreviewModal from '@/app/components/PDFPreviewModal'
 import ItineraryExpenses from '@/app/components/ItineraryExpenses'
 import TripTimeline from '@/app/components/TripTimeline'
+import TravellerChat from '@/app/components/TravellerChat'
 import { showToast } from '@/app/contexts/ToastContext'
 
 interface Itinerary {
@@ -1083,6 +1084,9 @@ export default function ViewItineraryPage() {
 
         {/* Trip timeline — the execution layer's checkpoint log, office view */}
         <TripTimeline itineraryId={itinerary.id} />
+
+        {/* Traveller chat — office side of the share-page thread (mig 291) */}
+        <TravellerChat itineraryId={itinerary.id} />
 
         {/* DAY CONTROLS */}
         <div className="flex justify-between items-center">

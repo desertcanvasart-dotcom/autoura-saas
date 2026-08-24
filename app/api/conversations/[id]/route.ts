@@ -76,6 +76,22 @@ export async function GET(
         })))
       }
 
+      // Get trip-thread messages (share-page chat, mig 291)
+      const { data: tripMessages, error: tripError } = await supabase
+        .from('trip_messages')
+        .select('*')
+        .eq('unified_conversation_id', id)
+        .order('created_at', { ascending: true })
+        .limit(messagesLimit)
+
+      if (!tripError && tripMessages) {
+        messages.push(...tripMessages.map(m => ({
+          ...m,
+          channel: 'trip',
+          message_at: m.created_at
+        })))
+      }
+
       // Sort all messages by timestamp
       messages.sort((a, b) =>
         new Date(a.message_at).getTime() - new Date(b.message_at).getTime()
@@ -149,6 +165,14 @@ export async function PATCH(
       // Mark emails as read
       await supabase
         .from('email_messages')
+        .update({ is_read: true })
+        .eq('unified_conversation_id', id)
+        .eq('direction', 'inbound')
+        .eq('is_read', false)
+
+      // Mark trip-thread messages as read
+      await supabase
+        .from('trip_messages')
         .update({ is_read: true })
         .eq('unified_conversation_id', id)
         .eq('direction', 'inbound')

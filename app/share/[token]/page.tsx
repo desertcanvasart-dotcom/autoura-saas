@@ -5,11 +5,14 @@ import {
   toClientItinerary,
   toClientTeam,
   toClientTripEvents,
+  toClientTripMessages,
   type ClientItinerary,
   type ClientTeamMember,
   type ClientTripEvent,
+  type ClientTripMessage,
 } from '@/lib/itinerary-share'
 import ReportProblem from './ReportProblem'
+import TripChat from './TripChat'
 
 // ============================================
 // THE SHAREABLE ITINERARY PAGE — public, token-gated
@@ -45,7 +48,7 @@ interface Operator {
   website: string | null
 }
 
-async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; operator: Operator; team: ClientTeamMember[]; events: ClientTripEvent[] } | null> {
+async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; operator: Operator; team: ClientTeamMember[]; events: ClientTripEvent[]; messages: ClientTripMessage[] } | null> {
   if (!isValidShareToken(token)) return null
   const supabase = admin()
 
@@ -81,6 +84,14 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     .eq('itinerary_id', share.itinerary_id)
     .order('occurred_at', { ascending: false })
     .limit(30)
+  // The trip thread (mig 291) — explicit columns; ids, team_member_id and
+  // is_read are internal and are not even fetched for this page.
+  const { data: messageRows } = await supabase
+    .from('trip_messages')
+    .select('direction, content, sender_name, created_at')
+    .eq('itinerary_id', share.itinerary_id)
+    .order('created_at', { ascending: false })
+    .limit(50)
   if (!itinerary) return null
 
   // Contacts for the assigned people. Explicit columns again — guides carry
@@ -112,6 +123,7 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
 
   return {
     itinerary: toClientItinerary(itinerary, days ?? []),
+    messages: toClientTripMessages((messageRows ?? []) as Array<Record<string, unknown>>),
     events: toClientTripEvents(
       (eventRows ?? []) as Array<Record<string, unknown>>,
       (resources ?? []) as Array<Record<string, unknown>>
@@ -149,7 +161,7 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
   const data = await loadShare(token)
   if (!data) notFound()
 
-  const { itinerary: it, operator: op, team, events } = data
+  const { itinerary: it, operator: op, team, events, messages } = data
   const EVENT_LABEL: Record<ClientTripEvent['kind'], string> = {
     departed: 'Departed', en_route: 'En route', arrived: 'Arrived',
     picked_up: 'Picked up', dropped_off: 'Dropped off',
@@ -353,6 +365,9 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
             {it.code && <span className="text-xs text-gray-400">Ref: {it.code}</span>}
           </div>
         )}
+
+        {/* The trip thread — two-way with the office (mig 291) */}
+        <TripChat token={token} brandHex={op.brandHex} operatorName={op.name} initialMessages={messages} />
 
         {/* Report a problem — lands as an urgent task in the operator's app */}
         <ReportProblem token={token} brandHex={op.brandHex} />

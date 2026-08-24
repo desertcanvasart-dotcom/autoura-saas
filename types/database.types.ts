@@ -9587,6 +9587,74 @@ export interface Database {
           },
         ]
       }
+      trip_messages: {
+        Row: {
+          id: string
+          tenant_id: string
+          itinerary_id: string
+          unified_conversation_id: string | null
+          direction: string
+          content: string
+          sender_name: string | null
+          team_member_id: string | null
+          is_read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          itinerary_id: string
+          unified_conversation_id?: string | null
+          direction: string
+          content: string
+          sender_name?: string | null
+          team_member_id?: string | null
+          is_read?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          itinerary_id?: string
+          unified_conversation_id?: string | null
+          direction?: string
+          content?: string
+          sender_name?: string | null
+          team_member_id?: string | null
+          is_read?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_messages_itinerary_id_fkey"
+            columns: ["itinerary_id"]
+            isOneToOne: false
+            referencedRelation: "itineraries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_messages_unified_conversation_id_fkey"
+            columns: ["unified_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "unified_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_messages_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unified_conversations: {
         Row: {
           id: string
