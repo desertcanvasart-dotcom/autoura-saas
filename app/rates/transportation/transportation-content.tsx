@@ -320,8 +320,15 @@ export default function TransportationContent() {
         ? `/api/resources/transportation/${editingRate.id}`
         : '/api/resources/transportation'
 
-      // One WIDE row per route: rates per vehicle class
-      const submitData = formData
+      // One WIDE row per route: rates per vehicle class.
+      // Single-rate entry: mirror the EUR rate into the non-EU column so both
+      // DB columns stay filled and nationality-based selection keeps working.
+      const submitData = {
+        ...formData,
+        vehicles: Object.fromEntries(
+          Object.entries(formData.vehicles).map(([key, v]) => [key, { ...v, rate_non_eur: v.rate_eur }])
+        ) as Record<VehicleClassKey, VehicleRateEntry>,
+      }
       
       const response = await fetch(url, {
         method: editingRate ? 'PUT' : 'POST',
@@ -889,8 +896,7 @@ export default function TransportationContent() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Vehicle</th>
-                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">EU Rate (€)</th>
-                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Non-EU Rate (€)</th>
+                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Rate (€)</th>
                         <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Min Pax</th>
                         <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Max Pax</th>
                       </tr>
@@ -909,14 +915,6 @@ export default function TransportationContent() {
                                 type="number" step="0.01" min="0" placeholder="—"
                                 value={v.rate_eur}
                                 onChange={(e) => handleVehicleFieldChange(cls.key, 'rate_eur', e.target.value)}
-                                className="w-24 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47]"
-                              />
-                            </td>
-                            <td className="px-3 py-1.5">
-                              <input
-                                type="number" step="0.01" min="0" placeholder="—"
-                                value={v.rate_non_eur}
-                                onChange={(e) => handleVehicleFieldChange(cls.key, 'rate_non_eur', e.target.value)}
                                 className="w-24 px-2 py-1 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#647C47]"
                               />
                             </td>

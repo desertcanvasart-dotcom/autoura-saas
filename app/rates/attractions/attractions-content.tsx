@@ -375,7 +375,7 @@ export default function AttractionsContent() {
       city: attraction.city,
       fee_type: attraction.fee_type || 'standard',
       eur_rate: attraction.eur_rate,
-      non_eur_rate: attraction.non_eur_rate,
+      non_eur_rate: attraction.eur_rate,
       egyptian_rate: attraction.egyptian_rate || 0,
       student_discount_percentage: attraction.student_discount_percentage || 0,
       child_discount_percent: attraction.child_discount_percent || 0,
@@ -404,8 +404,10 @@ export default function AttractionsContent() {
         const method = editingAttraction ? 'PUT' : 'POST'
       
         // Clean up empty supplier_id
+        // Single-rate entry: non_eur_rate mirrors eur_rate so both DB columns stay filled
         const submitData = {
           ...formData,
+          non_eur_rate: formData.eur_rate,
           supplier_id: formData.supplier_id || null
         }
       
@@ -467,7 +469,7 @@ export default function AttractionsContent() {
       city: rate.city,
       fee_type: rate.fee_type || 'standard',
       eur_rate: rate.eur_rate,
-      non_eur_rate: rate.non_eur_rate,
+      non_eur_rate: rate.eur_rate,
       egyptian_rate: rate.egyptian_rate || 0,
       student_discount_percentage: rate.student_discount_percentage || 0,
       child_discount_percent: rate.child_discount_percent || 0,
@@ -746,8 +748,7 @@ export default function AttractionsContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Supplier</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Category</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Rate</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Non-{userCurrency}</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Rate</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">
                     <span className="flex items-center justify-center gap-1">
                       <Sparkles className="w-3.5 h-3.5 text-orange-500" />
@@ -796,11 +797,6 @@ export default function AttractionsContent() {
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm font-bold text-green-600">
                       {attraction.fee_type === 'free' ? 'FREE' : `${symbol}${convert(attraction.eur_rate || 0).toFixed(2)}`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-semibold text-primary-600">
-                      {attraction.fee_type === 'free' ? 'FREE' : `${symbol}${convert(attraction.non_eur_rate || 0).toFixed(2)}`}
                       </span>
                     </td>
                     {/* NEW: Add-on toggle column */}
@@ -858,7 +854,7 @@ export default function AttractionsContent() {
                 ))}
                 {paginatedAttractions.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                       <div className="flex flex-col items-center gap-2">
                         <span className="text-3xl text-gray-400">🎫</span>
                         <p className="text-sm font-medium">No attractions found</p>
@@ -1038,32 +1034,15 @@ export default function AttractionsContent() {
               {/* Pricing Information */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3">Pricing (stored in EUR)</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      EUR Passport Rate (€) *
+                      Rate (€) *
                     </label>
                     <input
                       type="number"
                       name="eur_rate"
                       value={formData.eur_rate}
-                      onChange={handleChange}
-                      step="0.01"
-                      min="0"
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Non-EUR Passport Rate (€) *
-                    </label>
-                    <input
-                      type="number"
-                      name="non_eur_rate"
-                      value={formData.non_eur_rate}
                       onChange={handleChange}
                       step="0.01"
                       min="0"

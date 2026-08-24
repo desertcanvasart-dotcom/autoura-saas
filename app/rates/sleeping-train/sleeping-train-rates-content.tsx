@@ -17,10 +17,8 @@ const SLEEPER_CITIES = [
 ]
 
 const CABIN_TYPES = [
-  'Single Cabin',
-  'Double Cabin',
-  'Suite Cabin',
-  'Royal Suite'
+  'Half Twin Cabin',
+  'Single Cabin'
 ]
 
 const OPERATORS = [
