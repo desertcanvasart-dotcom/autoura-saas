@@ -476,7 +476,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
           <div className="px-2 pt-3">
             <Link
               href="/super-admin"
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-purple-900/40 text-purple-300 hover:bg-purple-900/60 border border-purple-800/50"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-primary-600 text-white hover:bg-primary-700"
               title="Platform management"
             >
               <Shield className="w-4 h-4 shrink-0" />
