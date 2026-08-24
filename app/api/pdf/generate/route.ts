@@ -660,9 +660,14 @@ export async function POST(request: NextRequest) {
     
     const page = await browser.newPage()
     
-    // Set content and wait for fonts to load
-    await page.setContent(html, { 
-      waitUntil: ['networkidle0', 'domcontentloaded'] 
+    // Set content and wait for fonts to load.
+    // 'load' — not 'networkidle0'. Puppeteer excludes the networkidle events
+    // from setContent's options because they describe a NAVIGATION settling,
+    // and setContent does not navigate. 'load' is the strongest event that
+    // applies here and still waits for images and stylesheets in the markup;
+    // fonts are gated separately by document.fonts.ready below.
+    await page.setContent(html, {
+      waitUntil: 'load'
     })
     
     // Wait a bit for fonts to fully load
