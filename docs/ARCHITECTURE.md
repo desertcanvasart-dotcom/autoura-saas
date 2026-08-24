@@ -157,8 +157,9 @@ applying a migration; `npm run types:check` fails if the file drifted.
 
 ## 9. Cron / deploy
 
-- Railway cron services must point at their own `railway.cron-*.toml` via
-  Settings → Config-as-code, or they inherit the web start command and never
+- Railway start commands are stored on each service (Config-as-Code was
+  deprecated; the `railway*.toml` files were deleted 2026-08-24). The topology
+  is defined in `.railway/railway.ts`.
   run. See `docs/CRON-JOBS.md`.
 - Cron entrypoints are tested as spawned processes asserting **exit codes** —
   the only signal Railway records.

@@ -33,10 +33,10 @@ export default defineRailway(() => {
   });
   const RemindersCron = service("Reminders Cron", {
     source: autouraSaas,
-    // NOT imported from Railway — this service has no stored start command;
-    // it comes from railway.cron-reminders.toml, which stops being read on
-    // 2026-12-01. Written out here so the migration is behaviour-preserving
-    // rather than the thing that breaks it.
+    // Written out explicitly when this file was first generated, because the
+    // service then had NO stored start command (it lived only in a
+    // config-as-code toml). Applied 2026-08-24: the command is now stored on
+    // the service and the toml files are deleted.
     start: "npm run cron:reminders",
     replicas: { "asia-southeast1-eqsg3a": 1 },
     deploy: { cronSchedule: "0 6 * * *", restartPolicyType: "NEVER" },
@@ -48,9 +48,8 @@ export default defineRailway(() => {
   });
   const getAutoura = service("get-autoura", {
     source: autouraSaas,
-    // Same as above: not stored on the service, supplied today by railway.toml.
-    // This is the live site — applying without it would clear the config-file
-    // setting and leave the web service with no start command at all.
+    // Same history as above — this is the live site; the command is now
+    // stored on the service (applied 2026-08-24, tomls deleted).
     start: "npm run start",
     replicas: { "asia-southeast1-eqsg3a": 1 },
     domains: ["getautoura.net", "www.getautoura.net"],

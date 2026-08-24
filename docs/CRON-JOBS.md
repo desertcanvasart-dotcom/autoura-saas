@@ -6,7 +6,7 @@ scheduler records success or failure.
 
 ## How cron works on Railway
 
-Railway has **no `[[cron]]` table in `railway.toml`**. Cron is configured
+Railway has **no `[[cron]]` config-file table**. Cron is configured
 per-service in the dashboard (Settings → Cron Schedule), and it runs that
 service's **start command**, which must exit when finished.
 
@@ -15,36 +15,34 @@ start command that runs once and exits. They do not serve traffic.
 
 | Job | Config file (sets the start command) | Schedule (UTC) | Endpoint |
 |---|---|---|---|
-| Agent memory | `railway.cron-agent-memory.toml` | `0 2 * * *` | `POST /api/cron/process-agent-memory` |
-| Exchange rates | `railway.cron-exchange-rates.toml` | `0 1 * * *` | `POST /api/cron/refresh-exchange-rates` |
-| Reminders | `railway.cron-reminders.toml` | `0 6 * * *` | `GET /api/cron/send-reminders` + `GET /api/cron/task-reminders` |
+| Agent memory | `npm run cron:agent-memory` | `0 2 * * *` | `POST /api/cron/process-agent-memory` |
+| Exchange rates | `npm run cron:exchange-rates` | `0 1 * * *` | `POST /api/cron/refresh-exchange-rates` |
+| Reminders | `npm run cron:reminders` | `0 6 * * *` | `GET /api/cron/send-reminders` + `GET /api/cron/task-reminders` |
 
-### ⚠️ The start command comes from a config file, NOT the dashboard
+(The second column is the START COMMAND **stored on the service** — see the
+Config-as-Code retirement note below. The full topology is defined in
+`.railway/railway.ts`.)
 
-This is the single easiest thing to get wrong, and it fails silently.
+### How start commands are configured (updated 2026-08-24)
 
-`railway.toml` sets `startCommand = "npm run start"`, and **every service built
-from this repo reads it by default**. Config-as-code overrides the dashboard,
-so on a cron service the Custom Start Command field is **greyed out**, showing
-*"The value is set in /railway.toml"*.
+Each service's **start command is stored on the service itself** (Settings →
+Deploy → Custom Start Command), and the whole topology is defined in
+`.railway/railway.ts` (Infrastructure as Code — `railway config plan` /
+`apply`).
 
-The result: the cron service inherits the web service's start command, boots a
-Next.js server that never exits, sits in **"Running"** forever, never fires the
-job — and Railway bills for an extra web server. Nothing errors.
+**History, kept because the failure mode is worth remembering:** these
+services originally took their start command from per-service Config-as-Code
+files (`railway.cron-*.toml`). A cron service that missed that setting
+silently inherited the web service's `npm run start`, booted a Next.js server
+that never exits, never fired its job, and billed for an extra web server.
+Config-as-Code was deprecated by Railway (files stop being read 2026-12-01);
+on 2026-08-24 the start commands were moved onto the services, the dashboard
+Config File fields were cleared, and the toml files were deleted from the
+repo.
 
-So each cron service must be pointed at its own config file:
-
-**Service → Settings → Config-as-code → Railway Config File → + Add File Path**
-
-- Exchange rates service → `railway.cron-exchange-rates.toml`
-- Reminders service → `railway.cron-reminders.toml`
-- Agent memory service → `railway.cron-agent-memory.toml`
-
-Only `startCommand` is pinned in those files. The **cron schedule** and
-**restart policy** stay editable in the dashboard.
-
-**A cron service stuck on "Running" for more than a few seconds is this bug.**
-A correct run finishes in about a second and exits.
+**A cron service stuck on "Running" for more than a few seconds is still the
+signature of a wrong start command.** A correct run finishes in about a second
+and exits.
 
 ### Why cron jobs must use an `/api/cron/` endpoint
 
@@ -237,7 +235,7 @@ and asserts the exit code for each.
 
 ---
 
-# ⚠️ Config-as-Code is deprecated — hard cutoff 2026-12-01
+# Config-as-Code retirement — RESOLVED 2026-08-24 (deadline was 2026-12-01)
 
 Railway is retiring `railway.json` / `railway.toml` in favour of Infrastructure
 as Code (`.railway/railway.ts`).
@@ -249,7 +247,7 @@ as Code (`.railway/railway.ts`).
 
 ## Why this is dangerous here, specifically
 
-Every `railway.cron-*.toml` in this repo exists to set ONE thing: the service's
+Every `railway.cron-*.toml` in this repo existed to set ONE thing: the service's
 `startCommand`. On 2026-12-01 those files stop being read, and each service
 falls back to whatever start command Railway has stored on the service itself.
 
@@ -282,7 +280,8 @@ so the order matters:
 
 1. Settings → Config-as-code → **clear** the Railway Config File field
 2. Settings → Deploy → **Custom Start Command** → `npm run cron:reminders`
-3. Settings → Config-as-code → set it back to `railway.cron-reminders.toml`
+3. ~~Settings → Config-as-code → set it back~~ (superseded — the files are
+   deleted; the stored command is now the only source, which is the point)
 
 That is almost certainly how the other two crons ended up with both.
 
@@ -371,6 +370,7 @@ all. The two `start:` lines carry comments saying so.
 
 ### Once the apply is verified
 
-`railway.toml` and the three `railway.cron-*.toml` become redundant and can be
-deleted, and each service's "Railway Config File" setting cleared. Not before —
-until the apply lands they are the only source of two start commands.
+DONE 2026-08-24: the apply landed, all four services carry stored start
+commands, the dashboard Config File fields were cleared, and the four
+`railway*.toml` files were deleted from the repo. `.railway/railway.ts` is the
+single source of truth for the topology.

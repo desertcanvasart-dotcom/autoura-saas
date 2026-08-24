@@ -39,10 +39,11 @@
  *
  * DEPLOY (Railway)
  * ----------------
- *   Service        Config file                    Cron (UTC)
- *   Reminders      railway.cron-reminders.toml    0 6 * * *
+ *   Service        Start command (stored on the service)   Cron (UTC)
+ *   Reminders      npm run cron:reminders                  0 6 * * *
  *
- *   Start Command comes from the config file, NOT the dashboard.
+ *   Config-as-Code was retired 2026-08-24; the start command is stored on
+ *   the service itself and the topology lives in .railway/railway.ts.
  *   Env: APP_URL, CRON_SECRET (must match the WEB service's value).
  *
  * 06:00 UTC is ~08:00-09:00 in Egypt, which is what task-reminders' own header
