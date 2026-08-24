@@ -41,7 +41,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     let up = await admin().storage.from(BUCKET).upload(filePath, buffer, { contentType: file.type, upsert: true })
     if (up.error?.message?.includes('Bucket not found')) {
-      await admin().storage.createBucket(BUCKET, { public: true })
+      // PRIVATE. A public bucket serves supplier invoices — what an operator
+      // pays whom — to anyone holding the URL, with no session and no tenant
+      // check. Reads go through GET /api/supplier-invoices/[id]/document,
+      // which re-checks permission and signs a 60-second URL.
+      await admin().storage.createBucket(BUCKET, { public: false })
       up = await admin().storage.from(BUCKET).upload(filePath, buffer, { contentType: file.type, upsert: true })
     }
     if (up.error) {
@@ -49,12 +53,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: 'Failed to upload document' }, { status: 500 })
     }
 
-    const { data: urlData } = admin().storage.from(BUCKET).getPublicUrl(filePath)
-
+    // Only the PATH is persisted. `document_url` stays reserved for the
+    // externally-hosted link a caller may supply at create time; a stored
+    // public URL for our own object is the exposure this route removed.
     const { data, error } = await supabase
       .from('supplier_invoices')
       .update({
-        document_url: urlData.publicUrl,
         document_filename: file.name,
         document_storage_path: filePath,
         updated_at: new Date().toISOString(),
@@ -62,7 +66,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .eq('id', id).select().single()
     if (error) return NextResponse.json({ success: false, error: 'Uploaded, but failed to attach to invoice' }, { status: 500 })
 
-    return NextResponse.json({ success: true, data, document_url: urlData.publicUrl })
+    return NextResponse.json({ success: true, data })
   } catch (e: any) {
     console.error('upload route error:', e?.message)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
