@@ -282,7 +282,7 @@ export default function GuideRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur })
         })
 
         const data = await response.json()
@@ -708,7 +708,6 @@ export default function GuideRatesContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Duration</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Rate</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Non-EU</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
                 </tr>
@@ -747,9 +746,6 @@ export default function GuideRatesContent() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-gray-600">{symbol}{convert(Number(rate.base_rate_non_eur)).toFixed(2)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1065,7 +1061,7 @@ export default function GuideRatesContent() {
                   <span className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-xs font-bold">3</span>
                   Duration & Rates
                 </h3>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Tour Duration</label>
                     <select
@@ -1080,7 +1076,7 @@ export default function GuideRatesContent() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="base_rate_eur" className="block text-xs font-medium text-gray-600 mb-1">EU Client Rate (EUR) *</label>
+                    <label htmlFor="base_rate_eur" className="block text-xs font-medium text-gray-600 mb-1">Rate (EUR) *</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">€</span>
                       <input
@@ -1090,22 +1086,6 @@ export default function GuideRatesContent() {
                         value={formData.base_rate_eur}
                         onChange={handleChange}
                         required
-                        min="0"
-                        step="0.01"
-                        className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="base_rate_non_eur" className="block text-xs font-medium text-gray-600 mb-1">Non-EU Client Rate (EUR)</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">€</span>
-                      <input
-                        type="number"
-                        id="base_rate_non_eur"
-                        name="base_rate_non_eur"
-                        value={formData.base_rate_non_eur}
-                        onChange={handleChange}
                         min="0"
                         step="0.01"
                         className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"

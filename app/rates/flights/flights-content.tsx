@@ -19,6 +19,8 @@ interface FlightRate {
   cabin_class: 'economy' | 'business' | 'first'
   base_rate_eur: number
   base_rate_non_eur: number
+  tax_eur: number | null
+  tax_non_eur: number | null
   baggage_kg: number | null
   departure_time: string | null
   arrival_time: string | null
@@ -54,6 +56,7 @@ interface FormData {
   cabin_class: 'economy' | 'business' | 'first'
   base_rate_eur: number
   base_rate_non_eur: number
+  tax_eur: number
   baggage_kg: number
   departure_time: string
   arrival_time: string
@@ -78,6 +81,7 @@ const initialFormData: FormData = {
   cabin_class: 'economy',
   base_rate_eur: 0,
   base_rate_non_eur: 0,
+  tax_eur: 0,
   baggage_kg: 23,
   departure_time: '',
   arrival_time: '',
@@ -308,6 +312,7 @@ export default function FlightsContent() {
       cabin_class: rate.cabin_class,
       base_rate_eur: rate.base_rate_eur,
       base_rate_non_eur: rate.base_rate_non_eur || 0,
+      tax_eur: rate.tax_eur || 0,
       baggage_kg: rate.baggage_kg || 23,
       departure_time: rate.departure_time || '',
       arrival_time: rate.arrival_time || '',
@@ -367,6 +372,8 @@ export default function FlightsContent() {
       
       const submitData = {
         ...formData,
+        base_rate_non_eur: formData.base_rate_eur,
+        tax_non_eur: formData.tax_eur,
         supplier_id: formData.supplier_id || null,
         flight_number: formData.flight_number || null,
         departure_time: formData.departure_time || null,
@@ -436,6 +443,7 @@ export default function FlightsContent() {
       cabin_class: rate.cabin_class,
       base_rate_eur: rate.base_rate_eur,
       base_rate_non_eur: rate.base_rate_non_eur || 0,
+      tax_eur: rate.tax_eur || 0,
       baggage_kg: rate.baggage_kg || 23,
       departure_time: rate.departure_time || '',
       arrival_time: rate.arrival_time || '',
@@ -1159,14 +1167,14 @@ export default function FlightsContent() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                      Alt Rate (USD)
+                      Tax (EUR)
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">€</span>
                       <input
                         type="number"
-                        value={formData.base_rate_non_eur}
-                        onChange={(e) => setFormData(prev => ({ ...prev, base_rate_non_eur: parseFloat(e.target.value) || 0 }))}
+                        value={formData.tax_eur}
+                        onChange={(e) => setFormData(prev => ({ ...prev, tax_eur: parseFloat(e.target.value) || 0 }))}
                         step="0.01"
                         min="0"
                         className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
