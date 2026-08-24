@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Download, Send, Mail, MessageSquare, Printer, CheckCircle } from 'lucide-react'
-import { generateSupplierDocumentPDF } from '@/lib/supplier-document-pdf'
 import { showToast } from '@/app/contexts/ToastContext'
 
 interface SupplierDocument {
@@ -86,17 +85,19 @@ export default function SupplierDocumentViewPage() {
     }
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!document) return
-    
+
+    const { generateSupplierDocumentPDF } = await import('@/lib/supplier-document-pdf')
     const pdf = generateSupplierDocumentPDF({ ...document, company: identityFromTenant(tenant) })
     const filename = `${document.document_number}_${document.supplier_name.replace(/\s+/g, '_')}.pdf`
     pdf.save(filename)
   }
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!document) return
-    
+
+    const { generateSupplierDocumentPDF } = await import('@/lib/supplier-document-pdf')
     const pdf = generateSupplierDocumentPDF({ ...document, company: identityFromTenant(tenant) })
     const pdfBlob = pdf.output('blob')
     const pdfUrl = URL.createObjectURL(pdfBlob)
@@ -117,6 +118,7 @@ export default function SupplierDocumentViewPage() {
     
     setActionLoading('email')
     try {
+      const { generateSupplierDocumentPDF } = await import('@/lib/supplier-document-pdf')
       const pdf = generateSupplierDocumentPDF({ ...document, company: identityFromTenant(tenant) })
       const pdfBase64 = pdf.output('datauristring').split(',')[1]
       

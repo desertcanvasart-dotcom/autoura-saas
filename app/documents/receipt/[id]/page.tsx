@@ -19,7 +19,6 @@ import {
   Mail,
   Phone
 } from 'lucide-react'
-import { downloadReceiptPDF } from '@/lib/receipt-pdf-generator'
 import { showToast } from '@/app/contexts/ToastContext'
 
 interface Payment {
@@ -76,6 +75,7 @@ export default function ReceiptPage() {
     setDownloading(true)
     
     try {
+      const { downloadReceiptPDF } = await import('@/lib/receipt-pdf-generator')
       downloadReceiptPDF({
         receiptNumber: payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`,
         invoiceNumber: payment.itinerary_code,

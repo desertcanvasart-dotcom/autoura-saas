@@ -51,7 +51,7 @@
     "dotenv": "^17.2.3",
     "googleapis": "^166.0.0",
     "isomorphic-dompurify": "^3.18.0",
-    "jspdf": "^3.0.3",
+    "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "jszip": "^3.10.1",
     "leaflet": "^1.9.4",

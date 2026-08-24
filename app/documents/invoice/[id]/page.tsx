@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Download, Loader2, FileText, Calendar, CreditCard } from 'lucide-react'
-import { downloadInvoicePDF } from '@/lib/invoice-pdf-generator'
 import { showToast } from '@/app/contexts/ToastContext'
 
 interface Payment {
@@ -96,6 +95,7 @@ export default function InvoicePage() {
         payment_instructions: 'Payment accepted via bank transfer or credit card.'
       }
       
+      const { downloadInvoicePDF } = await import('@/lib/invoice-pdf-generator')
       downloadInvoicePDF(invoiceData, { ...identityFromTenant(tenant), logoDataUrl: await fetchLogoDataUrl(tenant?.logo_url) })
     } catch (error) {
       console.error('Error downloading PDF:', error)
