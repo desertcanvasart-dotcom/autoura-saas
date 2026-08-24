@@ -88,8 +88,17 @@ export default function SupplierInvoiceDetail() {
           <KV k="Discrepancy" v={money(inv.discrepancy_amount, inv.currency)} accent={Math.abs(Number(inv.discrepancy_amount)) > 0.01 ? 'text-red-600' : ''} />
         </div>
         {inv.description && <p className="text-sm text-gray-600 mt-3">{inv.description}</p>}
-        {inv.document_url && (
-          <a href={inv.document_url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm text-[#647C47] hover:underline">
+        {/* An uploaded document lives in a PRIVATE bucket, so it is reached
+            through the route that re-checks permission and signs a short-lived
+            URL. `document_url` is a link the operator supplied themselves at
+            create time — it is external, and stays a plain link. */}
+        {(inv.document_storage_path || inv.document_url) && (
+          <a
+            href={inv.document_storage_path ? `/api/supplier-invoices/${id}/document` : inv.document_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1 text-sm text-[#647C47] hover:underline"
+          >
             <FileText className="h-4 w-4" /> {inv.document_filename || 'View document'}
           </a>
         )}
