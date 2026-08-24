@@ -10180,6 +10180,15 @@ export interface Database {
     // every select('*') result to {}.
     Views: { [_ in never]: never }
     Functions: {
+      convert_amount: {
+        Args: {
+          p_amount?: number
+          p_from?: string
+          p_to?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
       create_b2b_quote_version: {
         Args: {
           p_change_reason?: string
