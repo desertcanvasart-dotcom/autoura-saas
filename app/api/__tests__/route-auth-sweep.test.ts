@@ -64,6 +64,10 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   // Public marketing contact form — prospect has no session by definition.
   // Self-auth = abuse controls: per-IP rate limit + honeypot field.
   '/api/contact': ['checkRateLimit', 'website_hp'],
+  // Staff tap-links: the driver has no session by design — the secret staff
+  // token in the path IS the credential. The handler validates its shape and
+  // looks up an unrevoked staff_links row by it.
+  '/api/staff/': ['isValidStaffToken', 'revoked_at'],
 }
 
 /** All route.ts files under app/api, as URL paths with dummy dynamic params. */

@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 125
+ * Tables: 126
  */
 
 export type Json =
@@ -6895,6 +6895,61 @@ export interface Database {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_links: {
+        Row: {
+          id: string
+          tenant_id: string
+          itinerary_id: string
+          itinerary_resource_id: string
+          token: string
+          created_by: string | null
+          created_at: string
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          itinerary_id: string
+          itinerary_resource_id: string
+          token: string
+          created_by?: string | null
+          created_at?: string
+          revoked_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          itinerary_id?: string
+          itinerary_resource_id?: string
+          token?: string
+          created_by?: string | null
+          created_at?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_links_itinerary_id_fkey"
+            columns: ["itinerary_id"]
+            isOneToOne: false
+            referencedRelation: "itineraries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_links_itinerary_resource_id_fkey"
+            columns: ["itinerary_resource_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_resources"
             referencedColumns: ["id"]
           },
         ]

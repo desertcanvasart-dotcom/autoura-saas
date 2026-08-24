@@ -65,11 +65,11 @@ export function isValidShareToken(token: string | null | undefined): boolean {
   return typeof token === 'string' && /^[A-Za-z0-9_-]{32}$/.test(token)
 }
 
-const num = (v: unknown): number | null => {
+export const num = (v: unknown): number | null => {
   const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN
   return Number.isFinite(n) ? n : null
 }
-const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
+export const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : null)
 
 /**
  * The traveller-facing projection. Named copies only — see the header.
