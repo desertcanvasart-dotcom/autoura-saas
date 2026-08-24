@@ -104,6 +104,30 @@ export async function fetchLogoDataUrl(
 }
 
 /**
+ * Fetch a logo as raw bytes for pdf-lib (embedPng/embedJpg take bytes, not
+ * data: URLs). Same contract as fetchLogoDataUrl: isomorphic, PNG/JPEG only,
+ * BEST-EFFORT — any failure returns undefined and the document renders its
+ * text-only header.
+ */
+export async function fetchLogoBytes(
+  logoUrl: string | null | undefined
+): Promise<{ bytes: Uint8Array; format: 'png' | 'jpeg' } | undefined> {
+  if (!logoUrl) return undefined
+  try {
+    const res = await fetch(logoUrl)
+    if (!res.ok) return undefined
+    const m = (res.headers.get('content-type') || '').match(/^image\/(png|jpe?g)/)
+    if (!m) return undefined
+    return {
+      bytes: new Uint8Array(await res.arrayBuffer()),
+      format: m[1] === 'png' ? 'png' : 'jpeg',
+    }
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * The "Name | website | email" footer used across the generators, built from
  * whatever exists. Returns '' when nothing does, and callers skip the line.
  */
