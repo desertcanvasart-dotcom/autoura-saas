@@ -9,6 +9,7 @@ import {
   type ClientTeamMember,
   type ClientTripEvent,
 } from '@/lib/itinerary-share'
+import ReportProblem from './ReportProblem'
 
 // ============================================
 // THE SHAREABLE ITINERARY PAGE — public, token-gated
@@ -352,6 +353,9 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
             {it.code && <span className="text-xs text-gray-400">Ref: {it.code}</span>}
           </div>
         )}
+
+        {/* Report a problem — lands as an urgent task in the operator's app */}
+        <ReportProblem token={token} brandHex={op.brandHex} />
       </main>
 
       {/* Operator footer */}

@@ -18,6 +18,9 @@ export const SELF_AUTH_API_PREFIXES = [
   // Staff tap-event endpoint: the token in the path IS the auth (drivers
   // have no login). The route 404s invalid/revoked tokens itself.
   '/api/staff/',
+  // Traveller report endpoint on the share page: same shape — the unrevoked
+  // share token in the path IS the auth. The route 404s anything else.
+  '/api/share/',
   '/api/webhooks/',         // HMAC-verified inbound (e.g. concierge brief, departure mirror)
   '/api/integrations/',     // server-to-server feeds; verifies SAWA_SYNC_SECRET inside the handler
   '/api/auth/',             // login / signup / OAuth callbacks (no session yet)

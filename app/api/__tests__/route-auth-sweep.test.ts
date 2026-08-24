@@ -68,6 +68,10 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   // token in the path IS the credential. The handler validates its shape and
   // looks up an unrevoked staff_links row by it.
   '/api/staff/': ['isValidStaffToken', 'revoked_at'],
+  // Traveller report from the share page — the traveller has no session by
+  // design; the secret share token in the path IS the credential. The handler
+  // validates its shape and looks up an unrevoked itinerary_shares row by it.
+  '/api/share/': ['isValidShareToken', 'revoked_at'],
 }
 
 /** All route.ts files under app/api, as URL paths with dummy dynamic params. */
