@@ -1170,6 +1170,7 @@ export default function FlightsContent() {
                       Tax (EUR)
                     </label>
                     <div className="relative">
+                      {/* tax_eur is EUR by definition — hard-coded symbol is correct here (euro-literal ratchet) */}
                       <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">€</span>
                       <input
                         type="number"
