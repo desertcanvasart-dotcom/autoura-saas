@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { sumByCurrency, formatTotals, currencySymbol } from '@/lib/currency-totals'
 import { 
   Search, 
   Plus, 
@@ -69,6 +70,8 @@ interface Itinerary {
   client_name: string
   client_email: string
   total_cost: number
+  /** The itinerary's own currency — select('*') has always returned it. */
+  currency?: string
 }
 
 interface FormData {
@@ -507,12 +510,14 @@ export default function InvoicesContent() {
 
   // Stats
   const totalInvoices = invoices.length
-  const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.total_amount), 0)
-  const totalPaid = invoices.reduce((sum, inv) => sum + Number(inv.amount_paid), 0)
-  const totalOutstanding = invoices.reduce((sum, inv) => sum + Number(inv.balance_due), 0)
-  const overdueAmount = processedInvoices
-    .filter(inv => inv.status === 'overdue')
-    .reduce((sum, inv) => sum + Number(inv.balance_due), 0)
+  // Per currency, never summed across them: a $10,000 and a €5,000 invoice do
+  // not make €15,000 of revenue (see lib/currency-totals.ts).
+  const totalRevenue = sumByCurrency(invoices, inv => inv.total_amount, inv => inv.currency)
+  const totalPaid = sumByCurrency(invoices, inv => inv.amount_paid, inv => inv.currency)
+  const totalOutstanding = sumByCurrency(invoices, inv => inv.balance_due, inv => inv.currency)
+  const overdueAmount = sumByCurrency(
+    processedInvoices.filter(inv => inv.status === 'overdue'),
+    inv => inv.balance_due, inv => inv.currency)
   const depositCount = invoices.filter(inv => inv.invoice_type === 'deposit').length
   const finalCount = invoices.filter(inv => inv.invoice_type === 'final').length
 
@@ -574,28 +579,28 @@ export default function InvoicesContent() {
             <div className="w-2 h-2 rounded-full bg-purple-500"></div>
             <span className="text-xs text-gray-500 font-medium">Billed</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900 mt-2">€{totalRevenue.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-2">{formatTotals(totalRevenue)}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-green-500"></div>
             <span className="text-xs text-gray-500 font-medium">Paid</span>
           </div>
-          <p className="text-2xl font-bold text-green-600 mt-2">€{totalPaid.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-green-600 mt-2">{formatTotals(totalPaid)}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-orange-500"></div>
             <span className="text-xs text-gray-500 font-medium">Outstanding</span>
           </div>
-          <p className="text-2xl font-bold text-orange-600 mt-2">€{totalOutstanding.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-orange-600 mt-2">{formatTotals(totalOutstanding)}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 hover:shadow-md transition-shadow">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-red-500"></div>
             <span className="text-xs text-gray-500 font-medium">Overdue</span>
           </div>
-          <p className="text-2xl font-bold text-red-600 mt-2">€{overdueAmount.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-red-600 mt-2">{formatTotals(overdueAmount)}</p>
         </div>
       </div>
 
@@ -704,12 +709,12 @@ export default function InvoicesContent() {
                     </td>
                     <td className="px-4 py-2 text-right">
                       <span className="text-sm font-medium text-gray-900">
-                        €{Number(invoice.total_amount).toLocaleString()}
+                        {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.total_amount).toLocaleString()}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-right">
                       <span className={`text-sm font-medium ${Number(invoice.balance_due) > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
-                        €{Number(invoice.balance_due).toLocaleString()}
+                        {currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-center">
@@ -880,7 +885,7 @@ export default function InvoicesContent() {
                     <option value="">No Itinerary</option>
                     {itineraries.map(it => (
                       <option key={it.id} value={it.id}>
-                        {it.itinerary_code} - {it.client_name} (€{it.total_cost})
+                        {it.itinerary_code} - {it.client_name} ({currencySymbol(it.currency || 'EUR')}{it.total_cost})
                       </option>
                     ))}
                   </select>
@@ -978,7 +983,7 @@ export default function InvoicesContent() {
                             />
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                            €{item.amount.toFixed(2)}
+                            {currencySymbol(formData.currency)}{item.amount.toFixed(2)}
                           </td>
                           <td className="px-3 py-3">
                             {formData.line_items.length > 1 && (
@@ -1003,7 +1008,7 @@ export default function InvoicesContent() {
                 <div className="w-72 bg-gray-50 rounded-lg p-4 space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal</span>
-                    <span className="font-medium text-gray-900">€{formData.subtotal.toFixed(2)}</span>
+                    <span className="font-medium text-gray-900">{currencySymbol(formData.currency)}{formData.subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Tax Rate (%)</span>
@@ -1018,7 +1023,7 @@ export default function InvoicesContent() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Tax Amount</span>
-                    <span className="text-gray-900">€{formData.tax_amount.toFixed(2)}</span>
+                    <span className="text-gray-900">{currencySymbol(formData.currency)}{formData.tax_amount.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Discount</span>
@@ -1033,7 +1038,7 @@ export default function InvoicesContent() {
                   </div>
                   <div className="flex justify-between pt-3 border-t border-gray-200">
                     <span className="font-semibold text-gray-900">Total</span>
-                    <span className="font-bold text-xl text-gray-900">€{formData.total_amount.toFixed(2)}</span>
+                    <span className="font-bold text-xl text-gray-900">{currencySymbol(formData.currency)}{formData.total_amount.toFixed(2)}</span>
                   </div>
                 </div>
               </div>

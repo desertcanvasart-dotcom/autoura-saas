@@ -1,19 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+// Money in different currencies does not add (lib/currency-totals.ts).
+import { CurrencyTotals, emptyTotals, addToTotals, sumByCurrency } from '@/lib/currency-totals'
 
 interface AgingBucket {
-  current: number
-  days30: number
-  days60: number
-  days90Plus: number
+  current: CurrencyTotals
+  days30: CurrencyTotals
+  days60: CurrencyTotals
+  days90Plus: CurrencyTotals
 }
 
 interface SupplierPayable {
   supplier_name: string
   supplier_type: string
-  total_expenses: number
-  total_paid: number
-  total_outstanding: number
+  total_expenses: CurrencyTotals
+  total_paid: CurrencyTotals
+  total_outstanding: CurrencyTotals
   expense_count: number
   oldest_expense_date: string
   aging: AgingBucket
@@ -123,32 +125,32 @@ export async function GET(request: NextRequest) {
         supplierMap.set(supplierKey, {
           supplier_name: exp.supplier_name || 'Unknown Supplier',
           supplier_type: exp.supplier_type || 'other',
-          total_expenses: 0,
-          total_paid: 0,
-          total_outstanding: 0,
+          total_expenses: emptyTotals(),
+          total_paid: emptyTotals(),
+          total_outstanding: emptyTotals(),
           expense_count: 0,
           oldest_expense_date: exp.expense_date,
-          aging: { current: 0, days30: 0, days60: 0, days90Plus: 0 },
+          aging: { current: emptyTotals(), days30: emptyTotals(), days60: emptyTotals(), days90Plus: emptyTotals() },
           expenses: []
         })
       }
 
       const supplier = supplierMap.get(supplierKey)!
       const amount = Number(exp.amount || 0)
-      supplier.total_expenses += amount
-      supplier.total_outstanding += amount
+      addToTotals(supplier.total_expenses, amount, exp.currency)
+      addToTotals(supplier.total_outstanding, amount, exp.currency)
       supplier.expense_count += 1
       supplier.expenses.push(exp)
 
       // Update aging buckets
       if (exp.days_outstanding <= 14) {
-        supplier.aging.current += amount
+        addToTotals(supplier.aging.current, amount, exp.currency)
       } else if (exp.days_outstanding <= 30) {
-        supplier.aging.days30 += amount
+        addToTotals(supplier.aging.days30, amount, exp.currency)
       } else if (exp.days_outstanding <= 60) {
-        supplier.aging.days60 += amount
+        addToTotals(supplier.aging.days60, amount, exp.currency)
       } else {
-        supplier.aging.days90Plus += amount
+        addToTotals(supplier.aging.days90Plus, amount, exp.currency)
       }
 
       // Track oldest expense
@@ -158,7 +160,11 @@ export async function GET(request: NextRequest) {
     })
 
     const supplierPayables = Array.from(supplierMap.values())
-      .sort((a, b) => b.total_outstanding - a.total_outstanding)
+      .sort((a, b) => {
+        // magnitude for ORDERING only — never displayed as one number
+        const mag = (t: CurrencyTotals) => Object.values(t).reduce((x, v) => x + Math.abs(v), 0)
+        return mag(b.total_outstanding) - mag(a.total_outstanding)
+      })
 
     // Fetch paid expenses for payment history
     // RLS automatically filters by tenant_id
@@ -170,36 +176,46 @@ export async function GET(request: NextRequest) {
       .limit(50)
 
     // Calculate summary
+    const merge = (into: CurrencyTotals, from: CurrencyTotals) => {
+      for (const [code, v] of Object.entries(from)) into[code] = (into[code] || 0) + v
+      return into
+    }
+    const currencies = [...new Set(filteredExpenses.map(e => (e.currency || 'EUR') as string))]
+
     const summary = {
-      total_outstanding: supplierPayables.reduce((sum, s) => sum + s.total_outstanding, 0),
+      total_outstanding: supplierPayables.reduce((t, s) => merge(t, s.total_outstanding), emptyTotals()),
       supplier_count: supplierPayables.length,
       expense_count: filteredExpenses.length,
       aging: {
-        current: supplierPayables.reduce((sum, s) => sum + s.aging.current, 0),
-        days30: supplierPayables.reduce((sum, s) => sum + s.aging.days30, 0),
-        days60: supplierPayables.reduce((sum, s) => sum + s.aging.days60, 0),
-        days90Plus: supplierPayables.reduce((sum, s) => sum + s.aging.days90Plus, 0)
+        current: supplierPayables.reduce((t, s) => merge(t, s.aging.current), emptyTotals()),
+        days30: supplierPayables.reduce((t, s) => merge(t, s.aging.days30), emptyTotals()),
+        days60: supplierPayables.reduce((t, s) => merge(t, s.aging.days60), emptyTotals()),
+        days90Plus: supplierPayables.reduce((t, s) => merge(t, s.aging.days90Plus), emptyTotals())
       },
       pending_count: filteredExpenses.filter(e => e.status === 'pending').length,
-      pending_amount: filteredExpenses.filter(e => e.status === 'pending').reduce((sum, e) => sum + Number(e.amount || 0), 0),
+      pending_amount: sumByCurrency(filteredExpenses.filter(e => e.status === 'pending'), e => e.amount, e => e.currency),
       approved_count: filteredExpenses.filter(e => e.status === 'approved').length,
-      approved_amount: filteredExpenses.filter(e => e.status === 'approved').reduce((sum, e) => sum + Number(e.amount || 0), 0),
+      approved_amount: sumByCurrency(filteredExpenses.filter(e => e.status === 'approved'), e => e.amount, e => e.currency),
       overdue_count: filteredExpenses.filter(e => e.is_overdue).length,
-      overdue_amount: filteredExpenses.filter(e => e.is_overdue).reduce((sum, e) => sum + Number(e.amount || 0), 0)
+      overdue_amount: sumByCurrency(filteredExpenses.filter(e => e.is_overdue), e => e.amount, e => e.currency),
+      // exactly one currency present -> the page may draw percentage bars
+      single_currency: currencies.length === 1 ? currencies[0] : (currencies.length === 0 ? 'EUR' : null)
     }
 
     // Group expenses by category for breakdown
-    const categoryBreakdown: Record<string, number> = {}
+    const categoryBreakdown: Record<string, CurrencyTotals> = {}
     filteredExpenses.forEach(exp => {
       const cat = exp.category || 'other'
-      categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + Number(exp.amount || 0)
+      categoryBreakdown[cat] ??= emptyTotals()
+      addToTotals(categoryBreakdown[cat], exp.amount, exp.currency)
     })
 
     // Group by supplier type
-    const supplierTypeBreakdown: Record<string, number> = {}
+    const supplierTypeBreakdown: Record<string, CurrencyTotals> = {}
     filteredExpenses.forEach(exp => {
       const type = exp.supplier_type || 'other'
-      supplierTypeBreakdown[type] = (supplierTypeBreakdown[type] || 0) + Number(exp.amount || 0)
+      supplierTypeBreakdown[type] ??= emptyTotals()
+      addToTotals(supplierTypeBreakdown[type], exp.amount, exp.currency)
     })
 
     return NextResponse.json({
