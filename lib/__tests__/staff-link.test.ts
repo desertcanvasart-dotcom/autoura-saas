@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toStaffView, isValidStaffToken, generateStaffToken, STAFF_EVENT_KINDS } from '@/lib/staff-link'
+import { toStaffView, isValidStaffToken, generateStaffToken, resolveAssigneeContact, STAFF_EVENT_KINDS } from '@/lib/staff-link'
 
 // The tap-link page is held by "anyone with the URL" — so the view is built
 // the same way the customer share page is: from poisoned rows, asserting the
@@ -62,5 +62,53 @@ describe('staff tokens', () => {
   })
   it("the tap kinds never include the office-internal 'note'", () => {
     expect(STAFF_EVENT_KINDS).not.toContain('note')
+  })
+})
+
+describe('resolveAssigneeContact — who gets the wa.me handoff', () => {
+  const client = (tables: Record<string, Record<string, unknown> | null>) => ({
+    from: (table: string) => ({
+      select: () => ({
+        eq: () => ({ maybeSingle: async () => ({ data: tables[table] ?? null }) }),
+      }),
+    }),
+  })
+
+  it('resolves a driver from the directory, preferring whatsapp', async () => {
+    const c = client({ team_members: { name: 'Mostafa Ali', phone: '+201', whatsapp: '+202' } })
+    expect(await resolveAssigneeContact(c, { resource_type: 'driver', resource_id: 'tm-1' }))
+      .toEqual({ name: 'Mostafa Ali', phone: '+202' })
+  })
+
+  it('resolves a vehicle through its default driver, falling back to the legacy phone', async () => {
+    const linked = client({
+      vehicles: { default_driver_id: 'tm-9', default_driver_name: 'Legacy', default_driver_phone: '+200' },
+      team_members: { name: 'Real Driver', phone: '+209', whatsapp: null },
+    })
+    expect(await resolveAssigneeContact(linked, { resource_type: 'vehicle', resource_id: 'v-1' }))
+      .toEqual({ name: 'Real Driver', phone: '+209' })
+
+    const legacyOnly = client({
+      vehicles: { default_driver_id: null, default_driver_name: 'Legacy', default_driver_phone: '+200' },
+    })
+    expect(await resolveAssigneeContact(legacyOnly, { resource_type: 'vehicle', resource_id: 'v-1' }))
+      .toEqual({ name: 'Legacy', phone: '+200' })
+  })
+
+  it('resolves guides and hotel/airport staff from their own tables', async () => {
+    const c = client({ guides: { name: 'Ahmed', phone: '+203', whatsapp: null } })
+    expect(await resolveAssigneeContact(c, { resource_type: 'guide', resource_id: 'g-1' }))
+      .toEqual({ name: 'Ahmed', phone: '+203' })
+  })
+
+  it('venues and unknowns resolve to null — a hotel is not a link-holder', async () => {
+    const c = client({})
+    expect(await resolveAssigneeContact(c, { resource_type: 'hotel', resource_id: 'h-1' })).toBeNull()
+    expect(await resolveAssigneeContact(c, { resource_type: 'guide', resource_id: null })).toBeNull()
+  })
+
+  it('a missing row yields null, never a throw', async () => {
+    const c = client({ guides: null })
+    expect(await resolveAssigneeContact(c, { resource_type: 'guide', resource_id: 'g-404' })).toBeNull()
   })
 })

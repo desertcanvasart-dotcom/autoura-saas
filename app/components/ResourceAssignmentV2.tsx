@@ -537,6 +537,31 @@ export default function ResourceAssignmentV2({
     }
   }
 
+  // Hand the tap-link over on the OFFICE's own WhatsApp (wa.me deep link) —
+  // our API never sends, so no template approval and no auto-send risk. The
+  // staff-link POST returns the assignee's contact alongside the URL.
+  const handleWhatsAppStaffLink = async (resourceId: string) => {
+    setCopyingLink(resourceId)
+    try {
+      const res = await fetch(`/api/itinerary-resources/${resourceId}/staff-link`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || !data.success || !data.url) throw new Error(data.error || 'Failed')
+      const phone = data.contact?.phone as string | undefined
+      if (!phone) {
+        showToast('error', 'No phone number on file for this person — link copied instead')
+        await navigator.clipboard.writeText(data.url)
+        return
+      }
+      const firstName = (data.contact?.name as string | undefined)?.split(' ')[0] ?? 'there'
+      const text = `Hi ${firstName}! Here is your check-in link${tripName ? ` for "${tripName}"` : ''}. Tap a button at each step (Departed, Arrived, Picked up…) — no login needed:\n${data.url}`
+      window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not create the staff link')
+    } finally {
+      setCopyingLink(null)
+    }
+  }
+
   const handleSendWhatsApp = async (resource: AssignedResource) => {
     const typeConfig = RESOURCE_TYPES.find(t => t.key === resource.resource_type)
     if (!typeConfig?.canNotify) return
@@ -810,6 +835,17 @@ export default function ResourceAssignmentV2({
                         <span className="hidden sm:inline">
                           {linkCopied.has(resource.id) ? 'Copied!' : 'Staff link'}
                         </span>
+                      </button>
+
+                      {/* Same tap-link, handed over via the office's own WhatsApp */}
+                      <button
+                        onClick={() => handleWhatsAppStaffLink(resource.id)}
+                        disabled={copyingLink === resource.id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
+                        title="Send the staff tap-link from your WhatsApp"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span className="hidden sm:inline">WhatsApp link</span>
                       </button>
 
                       {/* Remove Button */}
