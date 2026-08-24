@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 124
+ * Tables: 125
  */
 
 export type Json =
@@ -9383,6 +9383,70 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_events: {
+        Row: {
+          id: string
+          tenant_id: string
+          itinerary_id: string
+          itinerary_resource_id: string | null
+          event_kind: string
+          occurred_at: string
+          lat: number | null
+          lng: number | null
+          note: string | null
+          actor_name: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          itinerary_id: string
+          itinerary_resource_id?: string | null
+          event_kind: string
+          occurred_at?: string
+          lat?: number | null
+          lng?: number | null
+          note?: string | null
+          actor_name?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          itinerary_id?: string
+          itinerary_resource_id?: string | null
+          event_kind?: string
+          occurred_at?: string
+          lat?: number | null
+          lng?: number | null
+          note?: string | null
+          actor_name?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_events_itinerary_id_fkey"
+            columns: ["itinerary_id"]
+            isOneToOne: false
+            referencedRelation: "itineraries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_events_itinerary_resource_id_fkey"
+            columns: ["itinerary_resource_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_resources"
             referencedColumns: ["id"]
           },
         ]
