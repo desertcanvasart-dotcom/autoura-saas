@@ -15,6 +15,9 @@ interface Message {
   status?: string
   is_read?: boolean
   media_url?: string
+  /** Set when the file lives in OUR private bucket — read it through the
+   *  signed-URL route, never as a direct link. */
+  media_storage_path?: string
   media_type?: string
   attachments?: any[]
 }
@@ -406,9 +409,14 @@ export default function ConversationsPage() {
                           <p className="whitespace-pre-wrap break-words">{msg.content}</p>
 
                           {/* Media attachment */}
-                          {msg.media_url && (
+                          {/* Media we stored ourselves lives in a PRIVATE
+                              bucket and is reached through the route that
+                              re-checks permission and signs a short-lived URL.
+                              media_url is a link someone else hosts (Twilio's
+                              inbound media, an outbound PDF) — still direct. */}
+                          {(msg.media_storage_path || msg.media_url) && (
                             <a
-                              href={msg.media_url}
+                              href={msg.media_storage_path ? `/api/whatsapp/media/${msg.id}` : msg.media_url}
                               target="_blank"
                               rel="noopener noreferrer"
                               className={`block mt-2 text-sm underline ${

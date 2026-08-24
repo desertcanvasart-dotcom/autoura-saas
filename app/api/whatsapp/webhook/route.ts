@@ -99,7 +99,9 @@ async function handleTwilioWebhook(request: NextRequest, rawBody: string) {
       toNumber: to.replace('whatsapp:', ''),
       body: params['Body'],
       messageSid: params['MessageSid'],
+      // Twilio hosts this one itself; we never copied it into our bucket.
       mediaUrl: params['MediaUrl0'] || null,
+      mediaStoragePath: null,
       mediaType: params['MediaContentType0'] || null
     })
 
@@ -151,9 +153,9 @@ async function handleMetaWebhook(request: NextRequest, rawBody: string) {
     for (const msg of messages) {
       // Media arrives as an ID whose download URL expires in ~5 minutes —
       // persist the bytes to our own storage before processing.
-      let mediaUrl: string | null = null
+      let mediaStoragePath: string | null = null
       if (msg.mediaId) {
-        mediaUrl = await persistInboundMedia(msg.mediaId, msg.messageSid, msg.mediaType)
+        mediaStoragePath = await persistInboundMedia(msg.mediaId, msg.messageSid, msg.mediaType)
       }
 
       await processInboundWhatsAppMessage({
@@ -161,7 +163,10 @@ async function handleMetaWebhook(request: NextRequest, rawBody: string) {
         toNumber: msg.to,
         body: msg.body,
         messageSid: msg.messageSid,
-        mediaUrl,
+        // The bytes are ours now, in a private bucket — there is no external
+        // URL to keep, and Meta's own download link expires in ~5 minutes.
+        mediaUrl: null,
+        mediaStoragePath,
         mediaType: msg.mediaType || null
       })
     }
@@ -243,6 +248,7 @@ async function persistInboundMedia(
   messageSid: string,
   mimeType?: string
 ): Promise<string | null> {
+  // Returns the STORAGE PATH in the private bucket, not a URL.
   try {
     const media = await fetchMetaMedia(mediaId)
     if (!media) return null
@@ -258,7 +264,12 @@ async function persistInboundMedia(
       .from(MEDIA_BUCKET)
       .upload(filePath, media.buffer, { contentType: media.contentType, upsert: true })
     if (upload.error && /bucket.*not.*found/i.test(upload.error.message)) {
-      await admin.storage.createBucket(MEDIA_BUCKET, { public: true })
+      // PRIVATE. This holds whatever a customer sent into a WhatsApp thread —
+      // a passport page, a payment receipt. A public bucket would serve every
+      // one of them to anyone holding the URL, and the path carries no tenant
+      // prefix to scope even a guess. Reads go through
+      // GET /api/whatsapp/media/[id], which re-checks permission and signs.
+      await admin.storage.createBucket(MEDIA_BUCKET, { public: false })
       upload = await admin.storage
         .from(MEDIA_BUCKET)
         .upload(filePath, media.buffer, { contentType: media.contentType, upsert: true })
@@ -268,8 +279,8 @@ async function persistInboundMedia(
       return null
     }
 
-    const { data: urlData } = admin.storage.from(MEDIA_BUCKET).getPublicUrl(filePath)
-    return urlData?.publicUrl ?? null
+    // The PATH, not a URL. Callers store it in media_storage_path.
+    return filePath
   } catch (error: any) {
     console.error('❌ Error persisting inbound media:', error?.message || error)
     return null
@@ -285,7 +296,12 @@ interface InboundWhatsAppMessage {
   toNumber: string
   body: string
   messageSid: string
+  /** A link hosted by SOMEONE ELSE — Twilio serves its own inbound media.
+   *  Never a public URL for an object in our own bucket. */
   mediaUrl: string | null
+  /** Path in the PRIVATE whatsapp-media bucket, for media we downloaded
+   *  ourselves (Meta hands us an id whose URL expires in ~5 minutes). */
+  mediaStoragePath: string | null
   mediaType: string | null
 }
 
@@ -294,6 +310,7 @@ async function processInboundWhatsAppMessage({
   body,
   messageSid,
   mediaUrl,
+  mediaStoragePath,
   mediaType
 }: InboundWhatsAppMessage) {
   const supabase = createClient()
@@ -383,6 +400,7 @@ async function processInboundWhatsAppMessage({
         direction: 'inbound',
         message_body: body,
         media_url: mediaUrl,
+        media_storage_path: mediaStoragePath,
         media_type: mediaType,
         status: 'delivered',
         sent_at: new Date().toISOString()
