@@ -21,6 +21,13 @@ interface Tenant {
   // which is how code reading the wrong table type-checked for two days.
   primary_color: string | null
   secondary_color: string | null
+  /**
+   * The agency's house margin (migration 279). NULL means "not set" — the
+   * resolver then falls through to the platform constant. 0 is a real value
+   * (an at-cost agency), so never coerce this with `|| 25`.
+   * See lib/pricing/resolve-margin.ts.
+   */
+  default_margin_percent: number | null
   company_phone: string | null
   company_website: string | null
   tagline: string | null
