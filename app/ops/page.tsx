@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, ChevronDown, ChevronUp, Radio } from 'lucide-react'
 import TripTimeline from '@/app/components/TripTimeline'
+import PushToggle from './PushToggle'
 
 // ============================================
 // /ops — the phone-first ops board (PWA start_url)
@@ -77,6 +78,9 @@ export default function OpsPage() {
             <p className="text-xs text-gray-400">
               {trips === null ? 'Loading…' : `${trips.length} active trip${trips.length === 1 ? '' : 's'} · updates every 30s`}
             </p>
+          </div>
+          <div className="ml-auto">
+            <PushToggle />
           </div>
         </div>
       </header>
