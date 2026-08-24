@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { isValidStaffToken, STAFF_EVENT_KINDS, type StaffEventKind } from '@/lib/staff-link'
+import { sendPushToTenant } from '@/lib/push'
 
 /**
  * The tap. Token-authenticated (no session — the driver has no login), on the
@@ -83,6 +84,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       console.error('[staff events POST]', insErr.message)
       return NextResponse.json({ success: false, error: 'Failed to record the event' }, { status: 500 })
     }
+    // Alert the office — fire-and-forget by contract: the driver's tap is
+    // already recorded, and a push failure must never turn into a 500 here.
+    const KIND_LABEL: Record<string, string> = {
+      departed: 'Departed', en_route: 'En route', arrived: 'Arrived',
+      picked_up: 'Picked up', dropped_off: 'Dropped off',
+      checked_in: 'Checked in', checked_out: 'Checked out',
+      completed: 'Completed', delayed: 'Running late',
+    }
+    const { data: itin } = await supabase
+      .from('itineraries').select('trip_name').eq('id', link.itinerary_id).maybeSingle()
+    void sendPushToTenant(link.tenant_id, {
+      title: `${resource.resource_name ?? 'Team member'} — ${KIND_LABEL[event_kind] ?? event_kind}`,
+      body: itin?.trip_name ?? 'Trip checkpoint',
+      url: '/ops',
+      tag: `trip-${link.itinerary_id}`,
+    })
+
     return NextResponse.json({ success: true, event })
   } catch (err) {
     console.error('[staff events POST]', err)

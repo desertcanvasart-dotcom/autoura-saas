@@ -150,6 +150,10 @@ export async function middleware(request: NextRequest) {
     // PWA manifest (app/manifest.ts): a manifest behind a login redirect is
     // no manifest at all — install would silently break for logged-out users.
     '/manifest.webmanifest',
+    // Service worker (public/sw.js, push-only). The browser refetches it on
+    // its own schedule, sometimes without fresh credentials — a login
+    // redirect here would kill push silently on every expired session.
+    '/sw.js',
     // Token-gated public itinerary pages. The middleware only opens the path;
     // the page itself 404s any token that does not resolve to an unrevoked
     // share (app/share/[token]/page.tsx, service-role lookup).
