@@ -7,7 +7,7 @@ import { showToast } from '@/app/contexts/ToastContext'
 
 interface Message {
   id: string
-  channel: 'whatsapp' | 'email'
+  channel: 'whatsapp' | 'email' | 'trip'
   content: string
   subject?: string
   direction: 'inbound' | 'outbound'
@@ -167,6 +167,7 @@ export default function ConversationsPage() {
     switch (channel) {
       case 'whatsapp': return '📱'
       case 'email': return '✉️'
+      case 'trip': return '🧳'
       default: return '💬'
     }
   }
@@ -246,6 +247,7 @@ export default function ConversationsPage() {
                 <option value="all">All Channels</option>
                 <option value="whatsapp">WhatsApp Only</option>
                 <option value="email">Email Only</option>
+                <option value="trip">Trip Chat Only</option>
               </select>
             </div>
           </div>

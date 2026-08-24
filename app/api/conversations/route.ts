@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
       query = query.not('whatsapp_conversation_id', 'is', null)
     } else if (channel === 'email') {
       query = query.is('whatsapp_conversation_id', null).not('contact_email', 'is', null)
+    } else if (channel === 'trip') {
+      query = query.eq('last_message_channel', 'trip')
     }
 
     // Filter by starred

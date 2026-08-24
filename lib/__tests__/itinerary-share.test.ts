@@ -5,6 +5,8 @@ import {
   toClientItinerary,
   toClientTeam,
   toClientTripEvents,
+  toClientTripMessages,
+  cleanClientText,
 } from '@/lib/itinerary-share'
 
 // ============================================================================
@@ -247,5 +249,51 @@ describe('toClientTripEvents — the checkpoint allowlist', () => {
     )
     expect(evs).toHaveLength(1)
     expect(evs[0].teamMemberName).toBeNull()
+  })
+})
+
+describe('toClientTripMessages — the thread the traveller sees', () => {
+  const POISONED = [
+    { direction: 'outbound', content: 'On our way!', sender_name: 'Adham',
+      created_at: '2026-08-24T10:00:00Z', team_member_id: 'TM-SECRET-ID',
+      unified_conversation_id: 'CONV-SECRET-ID', tenant_id: 'TENANT-SECRET-ID',
+      itinerary_id: 'ITIN-SECRET-ID', id: 'MSG-SECRET-ID', is_read: false },
+    { direction: 'inbound', content: 'Thanks!', sender_name: null,
+      created_at: '2026-08-24T10:05:00Z' },
+    { direction: 'sideways', content: 'bogus-direction-row', created_at: '2026-08-24T11:00:00Z' },
+    { direction: 'inbound', content: '', created_at: '2026-08-24T12:00:00Z' },
+    { direction: 'inbound', content: 'no timestamp' },
+  ]
+
+  it('keeps the conversation, oldest first', () => {
+    const out = toClientTripMessages(POISONED)
+    expect(out).toHaveLength(2)
+    expect(out[0].content).toBe('On our way!')
+    expect(out[0].senderName).toBe('Adham')
+    expect(out[1].direction).toBe('inbound')
+  })
+
+  it('lets NOTHING internal survive — ids, read-state, junk rows', () => {
+    const json = JSON.stringify(toClientTripMessages(POISONED))
+    for (const secret of [
+      'TM-SECRET-ID', 'CONV-SECRET-ID', 'TENANT-SECRET-ID', 'ITIN-SECRET-ID',
+      'MSG-SECRET-ID', 'is_read', 'bogus-direction-row', 'no timestamp',
+    ]) {
+      expect(json, `leaked: ${secret}`).not.toContain(secret)
+    }
+  })
+})
+
+describe('cleanClientText — free text from a token-holder', () => {
+  it('strips control characters but keeps newlines and tabs', () => {
+    expect(cleanClientText('a\u0000b\u0007c', 100)).toBe('abc')
+    expect(cleanClientText('line one\nline two\tend', 100)).toBe('line one\nline two\tend')
+  })
+  it('trims, caps, and returns null for non-strings and empties', () => {
+    expect(cleanClientText('  hi  ', 100)).toBe('hi')
+    expect(cleanClientText('x'.repeat(500), 20)).toHaveLength(20)
+    expect(cleanClientText('   ', 100)).toBeNull()
+    expect(cleanClientText(42, 100)).toBeNull()
+    expect(cleanClientText(undefined, 100)).toBeNull()
   })
 })

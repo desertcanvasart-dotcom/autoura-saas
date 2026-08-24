@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
-import { isValidShareToken } from '@/lib/itinerary-share'
+import { isValidShareToken, cleanClientText } from '@/lib/itinerary-share'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { createNotification } from '@/lib/notifications'
 import { sendPushToTenant } from '@/lib/push'
@@ -23,13 +23,6 @@ const MAX_NAME = 120
 // deploy): a leaked share link must not be able to bury the task list.
 const MAX_REPORTS_PER_HOUR = 10
 
-// Strip control characters (keep newlines and tabs -- travellers write
-// multi-line messages), then trim and cap. Empty after cleaning = no input.
-const clean = (v: unknown, max: number): string | null => {
-  if (typeof v !== 'string') return null
-  const s = v.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim()
-  return s ? s.slice(0, max) : null
-}
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
@@ -64,14 +57,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 })
     }
     const { message: rawMessage, name: rawName } = (body ?? {}) as Record<string, unknown>
-    const message = clean(rawMessage, MAX_MESSAGE)
+    const message = cleanClientText(rawMessage, MAX_MESSAGE)
     if (!message) {
       return NextResponse.json(
         { success: false, error: 'Please describe the problem.' },
         { status: 400 }
       )
     }
-    const name = clean(rawName, MAX_NAME)
+    const name = cleanClientText(rawName, MAX_NAME)
 
     const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
     const { count } = await supabase
