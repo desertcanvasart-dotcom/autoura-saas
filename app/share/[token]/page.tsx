@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation'
 import {
   isValidShareToken,
   toClientItinerary,
+  toClientTeam,
   type ClientItinerary,
+  type ClientTeamMember,
 } from '@/lib/itinerary-share'
 
 // ============================================
@@ -40,7 +42,7 @@ interface Operator {
   website: string | null
 }
 
-async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; operator: Operator } | null> {
+async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; operator: Operator; team: ClientTeamMember[] } | null> {
   if (!isValidShareToken(token)) return null
   const supabase = admin()
 
@@ -51,7 +53,7 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     .maybeSingle()
   if (!share || share.revoked_at) return null
 
-  const [{ data: itinerary }, { data: days }, { data: tenant }] = await Promise.all([
+  const [{ data: itinerary }, { data: days }, { data: tenant }, { data: resources }] = await Promise.all([
     supabase.from('itineraries').select('*').eq('id', share.itinerary_id).maybeSingle(),
     supabase.from('itinerary_days').select('*').eq('itinerary_id', share.itinerary_id),
     supabase
@@ -59,8 +61,33 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
       .select('company_name, logo_url, primary_color, contact_email, company_phone, company_website')
       .eq('id', share.tenant_id)
       .maybeSingle(),
+    // CONFIRMED only — a pending assignment is an internal plan, not a promise.
+    // Explicit columns: this table also carries cost_eur/cost_non_eur/notes,
+    // which must never even reach this process's memory for the page.
+    supabase
+      .from('itinerary_resources')
+      .select('resource_type, resource_id, resource_name, start_date, end_date')
+      .eq('itinerary_id', share.itinerary_id)
+      .eq('status', 'confirmed'),
   ])
   if (!itinerary) return null
+
+  // Contacts for the assigned people. Explicit columns again — guides carry
+  // daily_rate and emergency_contact_*, none of which crosses this boundary.
+  const idsOf = (t: string) =>
+    (resources ?? []).filter((r) => r.resource_type === t && typeof r.resource_id === 'string').map((r) => r.resource_id as string)
+  // supabase-js cannot type a dynamic column string; rows go straight into the
+  // allowlist sanitizer, which is the real type boundary here.
+  const fetchContacts = async (table: string, cols: string, ids: string[]): Promise<Array<Record<string, unknown>>> =>
+    ids.length === 0
+      ? []
+      : (((await supabase.from(table).select(cols).in('id', ids)).data ?? []) as unknown as Array<Record<string, unknown>>)
+  const [guideRows, airportRows, hotelStaffRows, vehicleRows] = await Promise.all([
+    fetchContacts('guides', 'id, name, full_name, phone, whatsapp, profile_photo_url', idsOf('guide')),
+    fetchContacts('airport_staff', 'id, name, phone, whatsapp', idsOf('airport_staff')),
+    fetchContacts('hotel_staff', 'id, name, phone, whatsapp', idsOf('hotel_staff')),
+    fetchContacts('vehicles', 'id, name, vehicle_type, default_driver_name, default_driver_phone, photo_url', idsOf('vehicle')),
+  ])
 
   // Engagement signal, best-effort — a failed count must never break the page.
   // Read-modify-write is fine at this fidelity; it is a signal, not a ledger.
@@ -74,6 +101,12 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
 
   return {
     itinerary: toClientItinerary(itinerary, days ?? []),
+    team: toClientTeam((resources ?? []) as Array<Record<string, unknown>>, {
+      guides: guideRows,
+      airportStaff: airportRows,
+      hotelStaff: hotelStaffRows,
+      vehicles: vehicleRows,
+    }),
     operator: {
       name: tenant?.company_name || '',
       logoUrl: tenant?.logo_url || null,
@@ -101,7 +134,20 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
   const data = await loadShare(token)
   if (!data) notFound()
 
-  const { itinerary: it, operator: op } = data
+  const { itinerary: it, operator: op, team } = data
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const withYouToday = (m: ClientTeamMember) =>
+    !!m.startDate && m.startDate <= todayStr && (!m.endDate || todayStr <= m.endDate)
+  const waLink = (n: string) => `https://wa.me/${n.replace(/\D/g, '')}`
+  const TEAM_META: Record<ClientTeamMember['type'], { emoji: string; label: string }> = {
+    guide: { emoji: '🧭', label: 'Your guide' },
+    vehicle: { emoji: '🚐', label: 'Your driver' },
+    airport_staff: { emoji: '🛬', label: 'Airport assistance' },
+    hotel_staff: { emoji: '🛎', label: 'Hotel assistance' },
+    hotel: { emoji: '🏨', label: 'Hotel' },
+    restaurant: { emoji: '🍽', label: 'Restaurant' },
+    cruise: { emoji: '🚢', label: 'Nile cruise' },
+  }
   const sym = (it.currency && CURRENCY[it.currency]) || it.currency || ''
   const travellers = it.numAdults + it.numChildren
 
@@ -180,6 +226,58 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
             </li>
           ))}
         </ol>
+
+        {/* Your team — confirmed assignments only; contacts for the people */}
+        {team.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Who&rsquo;s with you</h2>
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {team.map((m, i) => (
+                <li key={i} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex gap-3">
+                  {m.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- tenant-uploaded staff photo
+                    <img src={m.photoUrl} alt={m.name} className="w-12 h-12 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <span className="w-12 h-12 rounded-full bg-gray-100 text-xl flex items-center justify-center shrink-0">
+                      {TEAM_META[m.type].emoji}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-gray-500">{TEAM_META[m.type].label}</p>
+                    <p className="font-semibold text-gray-900 truncate">{m.name}</p>
+                    {m.type === 'vehicle' && m.driverName && (
+                      <p className="text-xs text-gray-600">Driver: {m.driverName}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {fmtDate(m.startDate)}{m.endDate && m.endDate !== m.startDate ? ` – ${fmtDate(m.endDate)}` : ''}
+                      {withYouToday(m) && (
+                        <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-white text-[10px] font-medium align-middle" style={{ background: op.brandHex }}>
+                          with you today
+                        </span>
+                      )}
+                    </p>
+                    {(m.whatsapp || m.phone) && (
+                      <p className="mt-2 flex gap-2">
+                        {m.whatsapp && (
+                          <a href={waLink(m.whatsapp)} target="_blank" rel="noopener noreferrer"
+                             className="text-xs px-2.5 py-1 rounded-full text-white font-medium" style={{ background: '#25D366' }}>
+                            WhatsApp
+                          </a>
+                        )}
+                        {m.phone && (
+                          <a href={`tel:${m.phone.replace(/\s+/g, '')}`}
+                             className="text-xs px-2.5 py-1 rounded-full border border-gray-300 text-gray-700 font-medium">
+                            Call
+                          </a>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Price — the client total, the only money on this page */}
         {it.totalPrice !== null && it.totalPrice > 0 && (
