@@ -147,6 +147,9 @@ export async function middleware(request: NextRequest) {
     // the matcher the way images are). These redirected to /login, which
     // made organic discovery impossible.
     '/robots.txt', '/sitemap.xml',
+    // PWA manifest (app/manifest.ts): a manifest behind a login redirect is
+    // no manifest at all — install would silently break for logged-out users.
+    '/manifest.webmanifest',
     // Token-gated public itinerary pages. The middleware only opens the path;
     // the page itself 404s any token that does not resolve to an unrevoked
     // share (app/share/[token]/page.tsx, service-role lookup).

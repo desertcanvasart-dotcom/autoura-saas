@@ -71,9 +71,10 @@ export default function TodayOnTheGround() {
           <Radio className="w-4 h-4 text-green-600" />
           Today on the ground
         </h3>
-        {trips !== null && trips.length > 0 && (
-          <span className="text-xs text-gray-400">{trips.length} active trip{trips.length === 1 ? '' : 's'}</span>
-        )}
+        <span className="text-xs text-gray-400">
+          {trips !== null && trips.length > 0 && <>{trips.length} active trip{trips.length === 1 ? '' : 's'} · </>}
+          <Link href="/ops" className="underline hover:text-gray-600">ops view</Link>
+        </span>
       </div>
 
       {trips === null ? (
