@@ -225,3 +225,68 @@ export function toClientTeam(
 
   return out.sort((a, b) => (a.startDate ?? '').localeCompare(b.startDate ?? ''))
 }
+
+// ============================================
+// LIVE TRIP EVENTS — execution layer
+// ============================================
+// The traveller's view of checkpoints: "Your driver — en route, 08:47".
+// Same allowlist as everything on the share page. The source rows carry an
+// INTERNAL note field and a free-text actor name; neither crosses. lat/lng DO
+// cross — the checkpoint pin is the feature — but they are captured at
+// tap-time only, staff-side; the customer is never tracked.
+
+export type ClientTripEventKind =
+  | 'departed' | 'en_route' | 'arrived' | 'picked_up' | 'dropped_off'
+  | 'checked_in' | 'checked_out' | 'completed' | 'delayed'
+
+export interface ClientTripEvent {
+  kind: ClientTripEventKind
+  occurredAt: string
+  /** The assignment the event concerns, by its customer-visible name. */
+  teamMemberName: string | null
+  lat: number | null
+  lng: number | null
+}
+
+const CLIENT_EVENT_KINDS: ClientTripEventKind[] = [
+  'departed', 'en_route', 'arrived', 'picked_up', 'dropped_off',
+  'checked_in', 'checked_out', 'completed', 'delayed',
+]
+
+/**
+ * Traveller-facing projection of trip_events rows. 'note' kind is dropped
+ * entirely — internal annotations are not a customer timeline entry — and the
+ * note/actor fields never cross regardless of kind.
+ */
+export function toClientTripEvents(
+  events: Array<Record<string, unknown>>,
+  resources: Array<Record<string, unknown>>
+): ClientTripEvent[] {
+  const nameByResourceId = new Map<string, string>()
+  for (const r of resources ?? []) {
+    if (typeof r.id === 'string' && typeof r.resource_name === 'string') {
+      nameByResourceId.set(r.id, r.resource_name)
+    }
+  }
+
+  const out: ClientTripEvent[] = []
+  for (const e of events ?? []) {
+    const kind = CLIENT_EVENT_KINDS.includes(e.event_kind as ClientTripEventKind)
+      ? (e.event_kind as ClientTripEventKind)
+      : null
+    const occurredAt = str(e.occurred_at)
+    if (!kind || !occurredAt) continue
+    out.push({
+      kind,
+      occurredAt,
+      teamMemberName:
+        typeof e.itinerary_resource_id === 'string'
+          ? nameByResourceId.get(e.itinerary_resource_id) ?? null
+          : null,
+      lat: num(e.lat),
+      lng: num(e.lng),
+    })
+  }
+  // Newest first — the traveller cares about now.
+  return out.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+}

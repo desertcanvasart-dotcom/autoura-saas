@@ -4,8 +4,10 @@ import {
   isValidShareToken,
   toClientItinerary,
   toClientTeam,
+  toClientTripEvents,
   type ClientItinerary,
   type ClientTeamMember,
+  type ClientTripEvent,
 } from '@/lib/itinerary-share'
 
 // ============================================
@@ -42,7 +44,7 @@ interface Operator {
   website: string | null
 }
 
-async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; operator: Operator; team: ClientTeamMember[] } | null> {
+async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; operator: Operator; team: ClientTeamMember[]; events: ClientTripEvent[] } | null> {
   if (!isValidShareToken(token)) return null
   const supabase = admin()
 
@@ -66,10 +68,18 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     // which must never even reach this process's memory for the page.
     supabase
       .from('itinerary_resources')
-      .select('resource_type, resource_id, resource_name, start_date, end_date')
+      .select('id, resource_type, resource_id, resource_name, start_date, end_date')
       .eq('itinerary_id', share.itinerary_id)
       .eq('status', 'confirmed'),
   ])
+  // Checkpoint log — explicit columns; `note` and `actor_name` are INTERNAL
+  // and are not even fetched for this page.
+  const { data: eventRows } = await supabase
+    .from('trip_events')
+    .select('event_kind, occurred_at, itinerary_resource_id, lat, lng')
+    .eq('itinerary_id', share.itinerary_id)
+    .order('occurred_at', { ascending: false })
+    .limit(30)
   if (!itinerary) return null
 
   // Contacts for the assigned people. Explicit columns again — guides carry
@@ -101,6 +111,10 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
 
   return {
     itinerary: toClientItinerary(itinerary, days ?? []),
+    events: toClientTripEvents(
+      (eventRows ?? []) as Array<Record<string, unknown>>,
+      (resources ?? []) as Array<Record<string, unknown>>
+    ),
     team: toClientTeam((resources ?? []) as Array<Record<string, unknown>>, {
       guides: guideRows,
       airportStaff: airportRows,
@@ -134,7 +148,22 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
   const data = await loadShare(token)
   if (!data) notFound()
 
-  const { itinerary: it, operator: op, team } = data
+  const { itinerary: it, operator: op, team, events } = data
+  const EVENT_LABEL: Record<ClientTripEvent['kind'], string> = {
+    departed: 'Departed', en_route: 'En route', arrived: 'Arrived',
+    picked_up: 'Picked up', dropped_off: 'Dropped off',
+    checked_in: 'Checked in', checked_out: 'Checked out',
+    completed: 'Completed', delayed: 'Running late',
+  }
+  const fmtTime = (iso: string) => {
+    try {
+      const d = new Date(iso)
+      const sameDay = d.toISOString().slice(0, 10) === todayStr
+      return sameDay
+        ? d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    } catch { return iso }
+  }
   const todayStr = new Date().toISOString().slice(0, 10)
   const withYouToday = (m: ClientTeamMember) =>
     !!m.startDate && m.startDate <= todayStr && (!m.endDate || todayStr <= m.endDate)
@@ -226,6 +255,38 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
             </li>
           ))}
         </ol>
+
+        {/* Live updates — the checkpoint log, newest first */}
+        {events.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Live updates</h2>
+            <ol className="bg-white rounded-xl border border-gray-200 shadow-sm divide-y divide-gray-100">
+              {events.map((e, i) => (
+                <li key={i} className="px-4 py-3 flex items-center gap-3">
+                  <span className={`shrink-0 w-2 h-2 rounded-full ${i === 0 ? 'animate-pulse' : ''}`} style={{ background: op.brandHex }} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-gray-900">
+                      <span className="font-medium">{e.teamMemberName || 'Your team'}</span>
+                      {' — '}{EVENT_LABEL[e.kind]}
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2 text-xs text-gray-500">
+                    {e.lat !== null && e.lng !== null && (
+                      <a
+                        href={`https://www.google.com/maps?q=${e.lat},${e.lng}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        📍 map
+                      </a>
+                    )}
+                    <span>{fmtTime(e.occurredAt)}</span>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
 
         {/* Your team — confirmed assignments only; contacts for the people */}
         {team.length > 0 && (

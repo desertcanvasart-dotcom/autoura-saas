@@ -4,6 +4,7 @@ import {
   isValidShareToken,
   toClientItinerary,
   toClientTeam,
+  toClientTripEvents,
 } from '@/lib/itinerary-share'
 
 // ============================================================================
@@ -192,5 +193,59 @@ describe('toClientTeam — the allowlist for people', () => {
     )
     expect(team).toHaveLength(1)
     expect(team[0]).toMatchObject({ type: 'hotel', name: 'Steigenberger', phone: null, whatsapp: null })
+  })
+})
+
+describe('toClientTripEvents — the checkpoint allowlist', () => {
+  const RESOURCES = [
+    { id: 'res-1', resource_name: 'Ahmed Hassan' },
+    { id: 'res-2', resource_name: 'Mercedes V-Class' },
+  ]
+  const POISONED_EVENTS = [
+    {
+      id: 'ev-1', tenant_id: 'TENANT-SECRET', itinerary_id: 'itin-1',
+      itinerary_resource_id: 'res-2', event_kind: 'en_route',
+      occurred_at: '2026-09-02T08:47:00Z', lat: 30.0444, lng: 31.2357,
+      note: 'INTERNAL: client complained about pickup time',
+      actor_name: 'office-user@company.com',
+    },
+    {
+      id: 'ev-2', itinerary_resource_id: 'res-1', event_kind: 'picked_up',
+      occurred_at: '2026-09-02T09:15:00Z',
+      note: 'MUST NOT LEAK', actor_name: 'MUST-NOT-LEAK',
+    },
+    // internal annotation kind: dropped entirely from the customer timeline
+    { event_kind: 'note', occurred_at: '2026-09-02T10:00:00Z', note: 'internal only' },
+    // bogus kind: dropped, not guessed at
+    { event_kind: 'teleported', occurred_at: '2026-09-02T11:00:00Z' },
+  ]
+
+  it('keeps the allowlist, joins names, sorts newest first', () => {
+    const evs = toClientTripEvents(POISONED_EVENTS, RESOURCES)
+    expect(evs).toHaveLength(2)                       // note + bogus dropped
+    expect(evs[0].kind).toBe('picked_up')             // 09:15 before 08:47 desc
+    expect(evs[0].teamMemberName).toBe('Ahmed Hassan')
+    expect(evs[1].kind).toBe('en_route')
+    expect(evs[1].teamMemberName).toBe('Mercedes V-Class')
+    expect(evs[1].lat).toBeCloseTo(30.0444)
+  })
+
+  it('lets NOTHING internal survive — notes, actors, ids', () => {
+    const json = JSON.stringify(toClientTripEvents(POISONED_EVENTS, RESOURCES))
+    for (const secret of [
+      'INTERNAL', 'MUST NOT LEAK', 'MUST-NOT-LEAK',
+      'office-user@company.com', 'TENANT-SECRET', 'ev-1', 'itin-1', 'res-1', 'res-2',
+      'internal only',
+    ]) {
+      expect(json, `leaked: ${secret}`).not.toContain(secret)
+    }
+  })
+
+  it('an event with no resource still shows, unattributed', () => {
+    const evs = toClientTripEvents(
+      [{ event_kind: 'arrived', occurred_at: '2026-09-01T12:00:00Z' }], []
+    )
+    expect(evs).toHaveLength(1)
+    expect(evs[0].teamMemberName).toBeNull()
   })
 })
