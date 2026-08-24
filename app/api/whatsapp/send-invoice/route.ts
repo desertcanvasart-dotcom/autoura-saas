@@ -5,11 +5,18 @@ import { requireAuth } from '@/lib/supabase-server'
 import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
+import { brandColorRgb, fetchLogoBytes } from '@/lib/company-identity'
 
 // Generate Invoice PDF
 async function generateInvoicePDF(
   invoice: any,
-  company: { name: string; email?: string | null; website?: string | null } = { name: '' }
+  company: {
+    name: string
+    email?: string | null
+    website?: string | null
+    primaryColor?: string | null
+    logoUrl?: string | null
+  } = { name: '' }
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
   const page = pdfDoc.addPage([595, 842]) // A4
@@ -23,10 +30,30 @@ async function generateInvoicePDF(
 
   const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
 
-  // Header
+  // Brand accent: tenant color, falling back to the template's original olive.
+  const [br, bg, bb] = brandColorRgb(
+    { primaryColor: company.primaryColor || undefined },
+    [100, 124, 71]
+  )
+  const brand = rgb(br / 255, bg / 255, bb / 255)
+
+  // Header — logo left of the name when the tenant uploaded one (best-effort),
+  // matching the jsPDF letterhead in lib/invoice-pdf-generator.ts.
+  let nameX = margin
+  const logo = await fetchLogoBytes(company.logoUrl)
+  if (logo) {
+    try {
+      const img = logo.format === 'png' ? await pdfDoc.embedPng(logo.bytes) : await pdfDoc.embedJpg(logo.bytes)
+      const scale = Math.min(30 / img.height, 90 / img.width, 1)
+      const w = img.width * scale
+      const h = img.height * scale
+      page.drawImage(img, { x: margin, y: y - 6, width: w, height: h })
+      nameX = margin + w + 10
+    } catch { /* bad image data — text-only header */ }
+  }
   if (company.name) {
     page.drawText(company.name, {
-      x: margin, y, size: 24, font: helveticaBold, color: rgb(0.39, 0.49, 0.28)
+      x: nameX, y, size: 24, font: helveticaBold, color: brand
     })
   }
 
@@ -134,13 +161,13 @@ async function generateInvoicePDF(
     start: { x: 350, y },
     end: { x: width - margin, y },
     thickness: 1,
-    color: rgb(0.39, 0.49, 0.28)
+    color: brand
   })
   y -= 20
 
   // Total
   page.drawText('TOTAL:', { x: 400, y, size: 12, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  page.drawText(`${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`, { x: 480, y, size: 14, font: helveticaBold, color: rgb(0.39, 0.49, 0.28) })
+  page.drawText(`${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`, { x: 480, y, size: 14, font: helveticaBold, color: brand })
   y -= 25
 
   // Amount Paid & Balance
@@ -273,6 +300,8 @@ export async function POST(request: NextRequest) {
       name: senderTenant?.company_name || '',
       email: senderTenant?.contact_email || null,
       website: senderTenant?.company_website || null,
+      primaryColor: senderTenant?.primary_color || null,
+      logoUrl: senderTenant?.logo_url || null,
     })
 
     // Upload to Supabase Storage (use admin client for storage)

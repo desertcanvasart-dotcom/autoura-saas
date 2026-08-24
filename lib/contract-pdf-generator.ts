@@ -4,12 +4,22 @@
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { formatDateOnly } from '@/lib/date-utils'
+import { brandColorRgb, fetchLogoBytes } from '@/lib/company-identity'
 
 interface ContractData {
   /** The operator issuing the contract — the "Service Provider" party. This
    *  generator hardcoded Travel2Egypt there, i.e. named the wrong LEGAL PARTY
-   *  on other tenants' contracts. Omitted fields omit their lines. */
-  company?: { name: string; email?: string | null; phone?: string | null; website?: string | null }
+   *  on other tenants' contracts. Omitted fields omit their lines; a missing
+   *  primaryColor keeps the original olive palette, a missing logoUrl keeps
+   *  the text-only header. */
+  company?: {
+    name: string
+    email?: string | null
+    phone?: string | null
+    website?: string | null
+    primaryColor?: string | null
+    logoUrl?: string | null
+  }
   contractNumber: string
   contractDate: string
   clientName: string
@@ -32,12 +42,32 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
   
-  const { height } = page.getSize()
+  const { width, height } = page.getSize()
   let y = height - 50
+
+  // Brand accent: tenant color, falling back to the template's original olive.
+  const [br, bg, bb] = brandColorRgb(
+    { primaryColor: data.company?.primaryColor || undefined },
+    [100, 124, 71]
+  )
+  const brand = rgb(br / 255, bg / 255, bb / 255)
+
+  // Tenant logo, top-right of the letterhead (best-effort — the title sits at
+  // x:200 so the right corner is free).
+  const logo = await fetchLogoBytes(data.company?.logoUrl)
+  if (logo) {
+    try {
+      const img = logo.format === 'png' ? await pdfDoc.embedPng(logo.bytes) : await pdfDoc.embedJpg(logo.bytes)
+      const scale = Math.min(36 / img.height, 110 / img.width, 1)
+      const w = img.width * scale
+      const h = img.height * scale
+      page.drawImage(img, { x: width - 50 - w, y: y - 8, width: w, height: h })
+    } catch { /* bad image data — text-only header */ }
+  }
 
   // Title
   page.drawText('TRAVEL CONTRACT', {
-    x: 200, y, size: 20, font: helveticaBold, color: rgb(0.39, 0.49, 0.28)
+    x: 200, y, size: 20, font: helveticaBold, color: brand
   })
   y -= 30
 
@@ -83,8 +113,8 @@ export async function generateContractPDF(data: ContractData): Promise<Uint8Arra
   // Financial
   page.drawText('FINANCIAL TERMS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
   y -= 20
-  page.drawText(`Total Price: ${data.currency} ${data.totalCost.toLocaleString()}`, { 
-    x: 50, y, size: 13, font: helveticaBold, color: rgb(0.39, 0.49, 0.28) 
+  page.drawText(`Total Price: ${data.currency} ${data.totalCost.toLocaleString()}`, {
+    x: 50, y, size: 13, font: helveticaBold, color: brand
   })
   y -= 20
   page.drawText('Payment: 10% deposit to confirm. Balance due upon arrival.', { x: 50, y, size: 10, font: helvetica })

@@ -174,7 +174,7 @@ export default function ContractPage() {
     try {
       // Use client-side PDF generation
       const pdfBytes = await generateContractPDF({
-        company: identityFromTenant(tenant),
+        company: { ...identityFromTenant(tenant), logoUrl: tenant?.logo_url },
         contractNumber: contractData.contractNumber,
         contractDate: contractData.contractDate,
         clientName: contractData.clientName,

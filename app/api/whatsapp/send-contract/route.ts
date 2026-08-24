@@ -76,6 +76,8 @@ export async function POST(request: NextRequest) {
         email: senderTenant?.contact_email || null,
         phone: senderTenant?.company_phone || null,
         website: senderTenant?.company_website || null,
+        primaryColor: senderTenant?.primary_color || null,
+        logoUrl: senderTenant?.logo_url || null,
       },
       contractNumber: `TC-2025-${itineraryId.slice(0, 8).toUpperCase()}`,
       contractDate: new Date().toISOString(),
