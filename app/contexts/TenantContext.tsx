@@ -28,6 +28,13 @@ interface Tenant {
    * See lib/pricing/resolve-margin.ts.
    */
   default_margin_percent: number | null
+  /**
+   * The currency this agency bills in (migration 281 reconciled it with the
+   * legacy `currency` column and pins the two together). Amounts belonging to
+   * a tenant must be rendered in THIS, not a hard-coded symbol — tenants
+   * genuinely differ, and one already bills in USD.
+   */
+  default_currency: string | null
   company_phone: string | null
   company_website: string | null
   tagline: string | null
