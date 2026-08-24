@@ -5620,8 +5620,6 @@ export interface Database {
           commission_status: string | null
           is_preferred_supplier: boolean | null
           vehicle_type: string | null
-          driver_name: string | null
-          driver_phone: string | null
           is_optional: boolean | null
           service_code: string | null
           selling_price: number | null
@@ -5663,8 +5661,6 @@ export interface Database {
           commission_status?: string | null
           is_preferred_supplier?: boolean | null
           vehicle_type?: string | null
-          driver_name?: string | null
-          driver_phone?: string | null
           is_optional?: boolean | null
           service_code?: string | null
           selling_price?: number | null
@@ -5706,8 +5702,6 @@ export interface Database {
           commission_status?: string | null
           is_preferred_supplier?: boolean | null
           vehicle_type?: string | null
-          driver_name?: string | null
-          driver_phone?: string | null
           is_optional?: boolean | null
           service_code?: string | null
           selling_price?: number | null
