@@ -32,18 +32,22 @@ export default function ClientShell({
   // decides ACCESS, this one decides CHROME) — a route usually needs both.
   // /pricing was missing here until 2026-07-29: the public pricing page
   // rendered the operator sidebar for logged-in visitors.
+  // Token pages: held by a traveller (/share) or a no-login staff member
+  // (/staff). No sidebar, no analytics, no first-touch capture — and no
+  // notification-polling nav 401ing in their console.
+  const isTokenPage = pathname.startsWith('/share/') || pathname.startsWith('/staff/')
   const isPublicPage =
     publicPages.includes(pathname) ||
     pathname.startsWith('/docs') ||
-    pathname.startsWith('/share/')
+    isTokenPage
   const isSuperAdminPage = pathname.startsWith('/super-admin')
 
   // First-touch UTM/referrer capture (sessionStorage, cookie-free) so the
   // contact form can attribute a submission to the campaign that actually
   // brought the visitor — not just whatever URL they submitted from.
   useEffect(() => {
-    if (isPublicPage && !pathname.startsWith('/share/')) captureFirstTouch()
-  }, [isPublicPage, pathname])
+    if (isPublicPage && !isTokenPage) captureFirstTouch()
+  }, [isPublicPage, isTokenPage, pathname])
 
   return (
     <AuthProvider>
@@ -56,7 +60,7 @@ export default function ClientShell({
             // lives ONLY here — never on app or traveller-share pages.
             <main className="min-h-screen">
               {children}
-              {!pathname.startsWith('/share/') && <MarketingAnalytics />}
+              {!isTokenPage && <MarketingAnalytics />}
             </main>
           ) : isSuperAdminPage ? (
             // Super admin pages - own layout handles sidebar

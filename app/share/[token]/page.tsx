@@ -190,7 +190,7 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
             <img src={op.logoUrl} alt={op.name} className="h-12 mb-4 rounded bg-white/90 p-1" />
           )}
           <p className="text-sm uppercase tracking-widest opacity-80">{op.name}</p>
-          <h1 className="text-3xl sm:text-4xl font-bold mt-1">{it.tripName}</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold mt-1 text-white">{it.tripName}</h1>
           <p className="mt-3 text-sm opacity-90">
             {fmtDate(it.startDate)}{it.endDate ? ` – ${fmtDate(it.endDate)}` : ''}
             {it.totalDays ? ` · ${it.totalDays} days` : ''}
