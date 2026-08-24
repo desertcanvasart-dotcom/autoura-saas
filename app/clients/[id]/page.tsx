@@ -15,6 +15,8 @@ import {
   Building, Globe, CreditCard, Tag, Bell, Heart
 } from 'lucide-react'
 import RequireFeature from '@/components/RequireFeature'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { formatCurrency } from '@/lib/currency'
 
 interface Client {
   id: string
@@ -82,10 +84,25 @@ const supabase = createClient()
 
 export default function ClientProfilePage() {
   const params = useParams()
+  const { tenant } = useTenant()
+
+  // The agency's billing currency. Falls back to EUR only while the tenant is
+  // still loading (useTenant returns a null tenant during SSR) — NOT as a
+  // default, because tenants genuinely differ and one already bills in USD.
+  const tenantCurrency = tenant?.default_currency || 'EUR'
+
   const router = useRouter()
   const clientId = params?.id as string
 
   const [client, setClient] = useState<Client | null>(null)
+  // Revenue over bookings. null when there is nothing to divide, or when the
+  // revenue itself could not be computed — never a fabricated 0.
+  const avgBookingValue: number | null = (() => {
+    const rev = client?.total_revenue_generated
+    const n = client?.total_bookings_count
+    if (rev === null || rev === undefined || !n) return null
+    return Number(rev) / n
+  })()
   const [communications, setCommunications] = useState<Communication[]>([])
   // Emails linked to this client from the inbox (email_client_links). Rendered
   // from the snapshot stored on the link — message ids are per-mailbox, so
@@ -354,13 +371,30 @@ export default function ClientProfilePage() {
               </div>
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 text-center">
                 <div className="text-xl font-bold text-green-600">
-                  €{client.total_revenue_generated?.toLocaleString()}
+                  {/*
+                    NULL means migration 284 could not compute this — a booking
+                    in a currency with no conversion path. Rendering it as 0
+                    would say "this client generated nothing", which is the
+                    unset-vs-zero conflation the whole schema work removed.
+                  */}
+                  {client.total_revenue_generated === null || client.total_revenue_generated === undefined
+                    ? <span className="text-gray-400" title="Some bookings are in a currency with no exchange rate">&mdash;</span>
+                    : formatCurrency(Number(client.total_revenue_generated), tenantCurrency)}
                 </div>
                 <div className="text-xs text-gray-600 mt-0.5">Revenue</div>
               </div>
               <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3 text-center">
                 <div className="text-xl font-bold text-purple-600">
-                  €{client.average_booking_value?.toLocaleString()}
+                  {/*
+                    DERIVED, not read. clients.average_booking_value is a column
+                    nothing has ever written — 0 on every row — so it rendered
+                    as a zero amount beside a real revenue figure. Revenue over bookings
+                    is exact and cannot drift from the two values shown next to
+                    it, so there is nothing to store.
+                  */}
+                  {avgBookingValue === null
+                    ? <span className="text-gray-400">&mdash;</span>
+                    : formatCurrency(avgBookingValue, tenantCurrency)}
                 </div>
                 <div className="text-xs text-gray-600 mt-0.5">Avg Value</div>
               </div>
@@ -736,7 +770,13 @@ export default function ClientProfilePage() {
                       </div>
                       <div className="text-right">
                         <div className="text-xl font-bold text-green-600">
-                          €{booking.total_cost?.toLocaleString()}
+                          {/*
+                            Each itinerary carries its OWN currency column, and
+                            `select('*')` already fetches it. A hard-coded symbol here
+                            labelled a USD trip in euros. Falls back to the
+                            agency's currency only when the row has none.
+                          */}
+                          {formatCurrency(Number(booking.total_cost ?? 0), booking.currency || tenantCurrency)}
                         </div>
                         <Link
                           href={`/view-itinerary/${booking.id}`}
