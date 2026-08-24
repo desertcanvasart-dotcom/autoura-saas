@@ -26,7 +26,7 @@ import path from 'node:path'
 const API_DIR = path.resolve(__dirname, '..')
 
 // Buckets holding documents that only a signed-in operator ever reads.
-const MUST_BE_PRIVATE = ['supplier-invoices']
+const MUST_BE_PRIVATE = ['supplier-invoices', 'whatsapp-media']
 
 // Routes that legitimately hand a public URL to an external fetcher.
 const EXTERNAL_FETCHER_ROUTES = [
@@ -36,9 +36,6 @@ const EXTERNAL_FETCHER_ROUTES = [
   'quotes/[type]/[id]/send-whatsapp/route.ts',
   'quotes/b2b/[id]/generate-pdf/route.ts',
   'quotes/b2c/[id]/generate-pdf/route.ts',
-  // Inbound WhatsApp media is NOT in this list on purpose: nothing external
-  // fetches it. It is still public and is tracked as its own follow-up.
-  'whatsapp/webhook/route.ts',
   // Avatars and tenant branding are public by design — a logo is embedded in
   // PDFs and emails that have no session to present.
   'avatar/upload/route.ts',
@@ -108,21 +105,28 @@ describe('documents only an operator reads live in private buckets', () => {
     ).toEqual([])
   })
 
-  it('the document is served by a route that re-derives permission', () => {
-    const route = path.join(API_DIR, 'supplier-invoices/[id]/document/route.ts')
-    expect(fs.existsSync(route), 'the signed-URL route is missing').toBe(true)
+  // Each private bucket needs a route that re-derives permission per view.
+  // The pairs are (route, the table whose row proves the caller may look).
+  const SIGNED_ROUTES = [
+    { route: 'supplier-invoices/[id]/document/route.ts', table: 'supplier_invoices' },
+    { route: 'whatsapp/media/[id]/route.ts', table: 'whatsapp_messages' },
+  ]
 
-    const src = code(fs.readFileSync(route, 'utf8'))
+  it.each(SIGNED_ROUTES)('$route re-derives permission before signing', ({ route, table }) => {
+    const full = path.join(API_DIR, route)
+    expect(fs.existsSync(full), `the signed-URL route ${route} is missing`).toBe(true)
+
+    const src = code(fs.readFileSync(full, 'utf8'))
 
     // Short-lived, and signed rather than public.
     expect(src).toMatch(/createSignedUrl/)
     expect(src).not.toMatch(/getPublicUrl/)
 
-    // The permission check must run on the CALLER'S client. Reading the
-    // invoice with the service-role client would sign a document for a caller
-    // who cannot see the invoice — the silent-empty lesson inverted.
-    const readsInvoiceViaRls = /supabase\s*\n?\s*\.from\('supplier_invoices'\)/.test(src)
-    expect(readsInvoiceViaRls, 'the invoice must be read with the RLS-bound client').toBe(true)
-    expect(src).not.toMatch(/admin\(\)[\s\S]{0,80}from\('supplier_invoices'\)/)
+    // The permission check must run on the CALLER'S client. Reading the row
+    // with the service-role client would sign a file for a caller who cannot
+    // see it — the silent-empty lesson inverted.
+    const readsViaRls = new RegExp(`supabase\\s*\\n?\\s*\\.from\\('${table}'\\)`).test(src)
+    expect(readsViaRls, `${table} must be read with the RLS-bound client`).toBe(true)
+    expect(src).not.toMatch(new RegExp(`admin\\(\\)[\\s\\S]{0,80}from\\('${table}'\\)`))
   })
 })
