@@ -393,6 +393,10 @@ export default function HotelsContent() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   const today = new Date().toISOString().split('T')[0]
   const nextYear = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
 
@@ -948,6 +952,68 @@ export default function HotelsContent() {
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems)
   const paginatedRates = filteredRates.slice(startIndex, endIndex)
 
+  // Bulk selection helpers
+  const allFilteredSelected = filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredRates.map(r => r.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    const confirmed = await dialog.confirmDelete('Hotels',
+      `Delete ${ids.length} selected rate(s)? This action cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    setBulkDeleting(true)
+    try {
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/rates/hotels/${id}`, { method: 'DELETE' }))
+      )
+      const succeededIds = ids.filter((_, i) => {
+        const r = results[i]
+        return r.status === 'fulfilled' && r.value.ok
+      })
+      const failed = ids.length - succeededIds.length
+
+      await fetchRates()
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        succeededIds.forEach(id => next.delete(id))
+        return next
+      })
+
+      if (failed === 0) {
+        showToast('success', `Deleted ${succeededIds.length} rate(s)`)
+      } else {
+        showToast('error', `Deleted ${succeededIds.length} of ${ids.length} — ${failed} failed`)
+      }
+    } catch (error) {
+      console.error('Error bulk deleting rates:', error)
+      showToast('error', 'Failed to delete selected rates')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
   // Get unique cities from data
   const usedCities = Array.from(new Set(rates.map(r => r.city).filter(Boolean))).sort()
 
@@ -1171,6 +1237,29 @@ export default function HotelsContent() {
           </div>
         </div>
 
+        {/* Bulk Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="bg-white rounded-lg shadow-md border border-gray-200 p-3 mb-4 flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">{selectedIds.size} selected</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Clear selection
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4" />
+                {bulkDeleting ? 'Deleting...' : 'Delete Selected'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* TABLE VIEW */}
         {viewMode === 'table' && (
           <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
@@ -1178,6 +1267,15 @@ export default function HotelsContent() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
+                    <th className="px-4 py-2 text-center w-10">
+                      <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-600"
+                        aria-label="Select all hotels"
+                      />
+                    </th>
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Hotel</th>
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Company</th>
                     <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Tier</th>
@@ -1192,6 +1290,16 @@ export default function HotelsContent() {
                 <tbody className="divide-y divide-gray-100">
                   {paginatedRates.map((rate, index) => (
                     <tr key={rate.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(rate.id)}
+                          onChange={() => toggleSelect(rate.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-600"
+                          aria-label={`Select ${rate.property_name}`}
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{rate.property_name}</p>
@@ -1274,7 +1382,7 @@ export default function HotelsContent() {
                   ))}
                   {paginatedRates.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
+                      <td colSpan={10} className="px-4 py-12 text-center text-gray-500">
                         <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                         <p className="text-sm font-medium">No hotels found</p>
                         <button

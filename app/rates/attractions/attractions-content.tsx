@@ -199,6 +199,10 @@ export default function AttractionsContent() {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [togglingAddon, setTogglingAddon] = useState<string | null>(null)  // NEW: Track which row is toggling
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -284,6 +288,9 @@ export default function AttractionsContent() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
+    // A selection made under one filter must not carry into another,
+    // or a bulk action hits invisible, stale rows.
+    setSelectedIds(new Set())
   }, [searchTerm, selectedCity, selectedCategory, showInactive, showAddonsOnly, itemsPerPage])
 
   // Generate service code
@@ -457,6 +464,67 @@ export default function AttractionsContent() {
     } catch (error) {
       console.error('Error deleting attraction:', error)
       await dialog.alert('Error', 'Failed to delete attraction. Please try again.', 'warning')
+    }
+  }
+
+  // Bulk selection handlers
+  const handleSelectAttraction = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (filteredAttractions.length > 0 && filteredAttractions.every(a => selectedIds.has(a.id))) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredAttractions.map(a => a.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+
+    const confirmed = await dialog.confirmDelete('Attractions',
+      `Delete ${selectedIds.size} selected rate(s)? This action cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    setBulkDeleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/rates/attractions/${id}`, { method: 'DELETE' }))
+      )
+      const deletedIds = ids.filter((_, i) => {
+        const result = results[i]
+        return result.status === 'fulfilled' && result.value.ok
+      })
+
+      fetchAttractions()
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        deletedIds.forEach(id => next.delete(id))
+        return next
+      })
+
+      if (deletedIds.length === ids.length) {
+        showToast('success', `${deletedIds.length} attraction(s) deleted!`)
+      } else {
+        showToast('error', `Deleted ${deletedIds.length} of ${ids.length} — ${ids.length - deletedIds.length} failed`)
+      }
+    } catch (error) {
+      console.error('Error bulk deleting attractions:', error)
+      showToast('error', 'Failed to delete attractions')
+    } finally {
+      setBulkDeleting(false)
     }
   }
 
@@ -738,12 +806,44 @@ export default function AttractionsContent() {
           </div>
         </div>
 
+        {/* Bulk action bar */}
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-lg shadow-md mb-4">
+            <span className="text-sm font-medium text-gray-700">{selectedIds.size} selected</span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              Clear selection
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" />
+              {bulkDeleting ? 'Deleting...' : 'Delete Selected'}
+            </button>
+          </div>
+        )}
+
         {/* Attractions Table - UPDATED with Add-on column */}
         <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="w-10 px-4 py-2">
+                    <input
+                      type="checkbox"
+                      checked={filteredAttractions.length > 0 && filteredAttractions.every(a => selectedIds.has(a.id))}
+                      onChange={handleSelectAll}
+                      className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+                      aria-label="Select all attractions"
+                    />
+                  </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Attraction</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Supplier</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Category</th>
@@ -766,6 +866,16 @@ export default function AttractionsContent() {
                       ? 'bg-orange-50/50 hover:bg-orange-50' 
                       : index % 2 === 0 ? 'bg-white hover:bg-gray-100' : 'bg-gray-50 hover:bg-gray-100'
                   } transition-colors`}>
+                    <td className="w-10 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(attraction.id)}
+                        onChange={() => handleSelectAttraction(attraction.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+                        aria-label={`Select ${attraction.attraction_name}`}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{attraction.attraction_name}</p>
@@ -854,7 +964,7 @@ export default function AttractionsContent() {
                 ))}
                 {paginatedAttractions.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={9} className="px-4 py-12 text-center text-gray-500">
                       <div className="flex flex-col items-center gap-2">
                         <span className="text-3xl text-gray-400">🎫</span>
                         <p className="text-sm font-medium">No attractions found</p>

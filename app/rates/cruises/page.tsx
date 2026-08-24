@@ -600,6 +600,10 @@ export default function CruisesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   const getDefaultFormData = (): CruiseFormData => ({
     cruise_code: '',
     ship_name: '',
@@ -947,6 +951,68 @@ export default function CruisesPage() {
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems)
   const paginatedCruises = filteredCruises.slice(startIndex, endIndex)
 
+  // Bulk selection helpers
+  const allFilteredSelected = filteredCruises.length > 0 && filteredCruises.every(c => selectedIds.has(c.id))
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredCruises.map(c => c.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    const confirmed = await dialog.confirmDelete('Cruise Rates',
+      `Delete ${ids.length} selected rate(s)? This action cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    setBulkDeleting(true)
+    try {
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/rates/cruises/${id}`, { method: 'DELETE' }))
+      )
+      const succeededIds = ids.filter((_, i) => {
+        const r = results[i]
+        return r.status === 'fulfilled' && r.value.ok
+      })
+      const failed = ids.length - succeededIds.length
+
+      await fetchCruises()
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        succeededIds.forEach(id => next.delete(id))
+        return next
+      })
+
+      if (failed === 0) {
+        showToast('success', `Deleted ${succeededIds.length} rate(s)`)
+      } else {
+        showToast('error', `Deleted ${succeededIds.length} of ${ids.length} — ${failed} failed`)
+      }
+    } catch (error) {
+      console.error('Error bulk deleting cruises:', error)
+      showToast('error', 'Failed to delete selected rates')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
   const stats = {
     total: cruises.length,
     active: cruises.filter(c => c.is_active).length,
@@ -1097,12 +1163,44 @@ export default function CruisesPage() {
           </div>
         </div>
 
+        {/* Bulk Action Bar */}
+        {selectedIds.size > 0 && (
+          <div className="bg-white rounded-lg shadow-md border p-3 mb-4 flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">{selectedIds.size} selected</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Clear selection
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4" />
+                {bulkDeleting ? 'Deleting...' : 'Delete Selected'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-white rounded-lg shadow-md border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-blue-50 border-b border-blue-100">
                 <tr>
+                  <th className="px-4 py-2 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      aria-label="Select all cruises"
+                    />
+                  </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-blue-800">Ship / Code</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Category</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-blue-800">Route</th>
@@ -1119,6 +1217,16 @@ export default function CruisesPage() {
               <tbody className="divide-y divide-gray-100">
                 {paginatedCruises.map((cruise, idx) => (
                   <tr key={cruise.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(cruise.id)}
+                        onChange={() => toggleSelect(cruise.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                        aria-label={`Select ${cruise.ship_name}`}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {cruise.is_preferred && <Star className="w-4 h-4 text-amber-500 fill-amber-500" />}
@@ -1194,7 +1302,7 @@ export default function CruisesPage() {
                 ))}
                 {paginatedCruises.length === 0 && (
                   <tr>
-                    <td colSpan={11} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={12} className="px-4 py-12 text-center text-gray-500">
                       <Ship className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                       <p className="font-medium">No cruises found</p>
                       <button onClick={handleAddNew} className="mt-2 text-sm text-blue-600 hover:underline">

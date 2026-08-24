@@ -132,6 +132,10 @@ export default function TransportationContent() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -164,6 +168,9 @@ export default function TransportationContent() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
+    // A selection made under one filter must not carry into another,
+    // or a bulk action hits invisible, stale rows.
+    setSelectedIds(new Set())
   }, [searchTerm, cityFilter, serviceTypeFilter, vehicleTypeFilter, showInactive, itemsPerPage])
 
   // Check if service type needs destination city
@@ -376,6 +383,70 @@ export default function TransportationContent() {
     }
   }
 
+  // Bulk selection handlers
+  const handleSelectRate = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredRates.map(r => r.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+
+    const confirmed = await dialog.confirmDelete('Transportation Rates',
+      `Delete ${selectedIds.size} selected rate(s)? This action cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    setBulkDeleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/resources/transportation/${id}`, { method: 'DELETE' }))
+      )
+      const deletedIds = ids.filter((_, i) => {
+        const result = results[i]
+        return result.status === 'fulfilled' && result.value.ok
+      })
+
+      fetchRates()
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        deletedIds.forEach(id => next.delete(id))
+        return next
+      })
+
+      if (deletedIds.length === ids.length) {
+        await dialog.alert('Deleted', `${deletedIds.length} transportation rate(s) have been deleted.`, 'success')
+      } else {
+        await dialog.alert('Partial Delete',
+          `Deleted ${deletedIds.length} of ${ids.length} — ${ids.length - deletedIds.length} failed. Please try again.`,
+          'warning'
+        )
+      }
+    } catch (error) {
+      console.error('Error bulk deleting transportation rates:', error)
+      await dialog.alert('Error', 'Failed to delete transportation rates. Please try again.', 'warning')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
   // Clone a rate - copy all fields to form and open modal for new entry
   const handleClone = (rate: TransportationRate) => {
     setEditingRate(null)
@@ -571,11 +642,43 @@ export default function TransportationContent() {
         </button>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-md">
+          <span className="text-sm font-medium text-gray-700">{selectedIds.size} selected</span>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-gray-500 hover:text-gray-700 underline"
+          >
+            Clear selection
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="h-4 w-4" />
+            {bulkDeleting ? 'Deleting...' : 'Delete Selected'}
+          </button>
+        </div>
+      )}
+
       {/* Table — one row per route, vehicles as chips */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="w-10 px-4 py-2">
+                <input
+                  type="checkbox"
+                  checked={filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))}
+                  onChange={handleSelectAll}
+                  className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                  aria-label="Select all rates"
+                />
+              </th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Route Name</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Service Type</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Vehicles &amp; Rates ({userCurrency})</th>
@@ -587,7 +690,7 @@ export default function TransportationContent() {
           <tbody className="divide-y divide-gray-100">
             {paginatedRates.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
                   No transportation rates found
                 </td>
               </tr>
@@ -596,6 +699,16 @@ export default function TransportationContent() {
                 const isIntercity = needsDestinationCity(rate.service_type)
                 return (
                   <tr key={rate.id} className="hover:bg-gray-50">
+                    <td className="w-10 px-4 py-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(rate.id)}
+                        onChange={() => handleSelectRate(rate.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                        aria-label={`Select ${rate.route_name || rate.city}`}
+                      />
+                    </td>
                     <td className="px-4 py-2">
                       <span className="text-sm font-medium text-gray-900">{rate.route_name || '—'}</span>
                     </td>
