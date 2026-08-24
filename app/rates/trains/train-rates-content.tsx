@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Train, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // Egyptian cities with train stations
 const TRAIN_CITIES = [
@@ -75,6 +76,11 @@ export default function TrainRatesContent() {
   // Delete Confirmation Modal
   const [deleteModal, setDeleteModal] = useState<{ show: boolean; id: string; name: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const dialog = useConfirmDialog()
 
   // Currency conversion
   const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
@@ -308,6 +314,68 @@ export default function TrainRatesContent() {
   const totalPages = Math.ceil(filteredRates.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedRates = filteredRates.slice(startIndex, startIndex + itemsPerPage)
+
+  // Bulk selection helpers
+  const allFilteredSelected = filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredRates.map(r => r.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    const confirmed = await dialog.confirmDelete('Train Rates',
+      `Delete ${ids.length} selected rate(s)? This action cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    setBulkDeleting(true)
+    try {
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/rates/trains/${id}`, { method: 'DELETE' }))
+      )
+      const succeededIds = ids.filter((_, i) => {
+        const r = results[i]
+        return r.status === 'fulfilled' && r.value.ok
+      })
+      const failed = ids.length - succeededIds.length
+
+      await fetchRates()
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        succeededIds.forEach(id => next.delete(id))
+        return next
+      })
+
+      if (failed === 0) {
+        showNotification('success', 'Deleted', `Deleted ${succeededIds.length} rate(s).`)
+      } else {
+        showNotification('error', 'Partial Delete', `Deleted ${succeededIds.length} of ${ids.length} — ${failed} failed`)
+      }
+    } catch (error) {
+      console.error('Error bulk deleting rates:', error)
+      showNotification('error', 'Error', 'Failed to delete selected rates. Please try again.')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
 
   // Stats
   const activeRates = rates.filter(r => r.is_active).length
@@ -593,6 +661,29 @@ export default function TrainRatesContent() {
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700">{selectedIds.size} selected</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+            >
+              Clear selection
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" />
+              {bulkDeleting ? 'Deleting...' : 'Delete Selected'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Rates Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {paginatedRates.length === 0 ? (
@@ -617,6 +708,15 @@ export default function TrainRatesContent() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="px-4 py-2 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-600"
+                      aria-label="Select all train rates"
+                    />
+                  </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Route</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Class</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Duration</th>
@@ -629,6 +729,16 @@ export default function TrainRatesContent() {
               <tbody className="divide-y divide-gray-100">
                 {paginatedRates.map((rate) => (
                   <tr key={rate.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(rate.id)}
+                        onChange={() => toggleSelect(rate.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-2 focus:ring-primary-600"
+                        aria-label={`Select ${rate.origin_city} to ${rate.destination_city}`}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Train className="w-4 h-4 text-emerald-500" />

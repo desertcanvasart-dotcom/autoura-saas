@@ -100,6 +100,11 @@ export default function GuideRatesContent() {
   const [deleteModal, setDeleteModal] = useState<{ show: boolean; id: string; name: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkDeleteModal, setBulkDeleteModal] = useState(false)
+
   // Toast/Notification
   const [notification, setNotification] = useState<{
     type: 'success' | 'error' | 'info' | 'warning'
@@ -338,6 +343,56 @@ export default function GuideRatesContent() {
     }
   }
 
+  // Bulk delete selected rates
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+
+    setBulkDeleting(true)
+    try {
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/rates/guides/${id}`, { method: 'DELETE' }))
+      )
+      const succeededIds = ids.filter((_, i) => {
+        const result = results[i]
+        return result.status === 'fulfilled' && result.value.ok
+      })
+      const failedCount = ids.length - succeededIds.length
+
+      fetchRates()
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        succeededIds.forEach(id => next.delete(id))
+        return next
+      })
+
+      if (failedCount === 0) {
+        showNotification('success', 'Deleted', `${succeededIds.length} rate(s) deleted successfully.`)
+      } else {
+        showNotification('warning', 'Partially Deleted', `Deleted ${succeededIds.length} of ${ids.length} — ${failedCount} failed.`)
+      }
+    } catch (error) {
+      console.error('Error bulk deleting rates:', error)
+      showNotification('error', 'Error', 'Failed to delete selected rates. Please try again.')
+    } finally {
+      setBulkDeleting(false)
+      setBulkDeleteModal(false)
+    }
+  }
+
+  // Toggle a single row's selection
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
   // Filter rates
   const filteredRates = rates.filter(rate => {
     const matchesSearch = searchTerm === '' ||
@@ -353,6 +408,16 @@ export default function GuideRatesContent() {
 
     return matchesSearch && matchesCity && matchesLanguage && matchesGuide && matchesGuideType && matchesActive
   })
+
+  // Select/deselect all currently filtered rates
+  const allFilteredSelected = filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))
+  const toggleSelectAll = () => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredRates.map(r => r.id)))
+    }
+  }
 
   // Pagination
   const totalPages = Math.ceil(filteredRates.length / itemsPerPage)
@@ -466,6 +531,49 @@ export default function GuideRatesContent() {
                   className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isDeleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Modal */}
+      {bulkDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                <Trash2 className="w-7 h-7 text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Selected Rates?</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Delete {selectedIds.size} selected rate(s)? This action cannot be undone.
+              </p>
+              <div className="flex items-center gap-3 w-full">
+                <button
+                  onClick={() => setBulkDeleteModal(false)}
+                  disabled={bulkDeleting}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {bulkDeleting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                       Deleting...
@@ -678,6 +786,29 @@ export default function GuideRatesContent() {
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-primary-300 p-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-gray-900">{selectedIds.size} selected</span>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="text-sm font-medium text-primary-600 hover:text-primary-700 hover:underline"
+            >
+              Clear selection
+            </button>
+          </div>
+          <button
+            onClick={() => setBulkDeleteModal(true)}
+            disabled={bulkDeleting}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Selected
+          </button>
+        </div>
+      )}
+
       {/* Rates Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {paginatedRates.length === 0 ? (
@@ -702,6 +833,15 @@ export default function GuideRatesContent() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="px-4 py-2 w-10">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-primary-600 border-gray-300 rounded"
+                      aria-label="Select all rates"
+                    />
+                  </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Language</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Guide</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Type</th>
@@ -715,6 +855,16 @@ export default function GuideRatesContent() {
               <tbody className="divide-y divide-gray-100">
                 {paginatedRates.map((rate) => (
                   <tr key={rate.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(rate.id)}
+                        onChange={() => toggleSelect(rate.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded"
+                        aria-label={`Select ${rate.guide_language} rate`}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Globe className="w-4 h-4 text-purple-500" />
@@ -790,6 +940,14 @@ export default function GuideRatesContent() {
               <div key={rate.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(rate.id)}
+                      onChange={() => toggleSelect(rate.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-4 h-4 text-primary-600 border-gray-300 rounded"
+                      aria-label={`Select ${rate.guide_language} rate`}
+                    />
                     <Globe className="w-5 h-5 text-purple-500" />
                     <span className="font-semibold text-gray-900">{rate.guide_language}</span>
                   </div>
@@ -850,6 +1008,14 @@ export default function GuideRatesContent() {
             {paginatedRates.map((rate) => (
               <div key={rate.id} className="px-4 py-2 flex items-center justify-between hover:bg-gray-50">
                 <div className="flex items-center gap-4">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(rate.id)}
+                    onChange={() => toggleSelect(rate.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded"
+                    aria-label={`Select ${rate.guide_language} rate`}
+                  />
                   <Globe className="w-4 h-4 text-purple-500" />
                   <span className="font-medium text-gray-900">{rate.guide_language}</span>
                   <span className="text-sm text-gray-500">{rate.city || '—'}</span>

@@ -176,6 +176,10 @@ export default function FlightsContent() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -228,6 +232,9 @@ export default function FlightsContent() {
   // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1)
+    // A selection made under one filter must not carry into another,
+    // or a bulk action hits invisible, stale rows.
+    setSelectedIds(new Set())
   }, [searchTerm, routeFromFilter, routeToFilter, airlineFilter, flightTypeFilter, cabinClassFilter, supplierFilter, showInactive, itemsPerPage])
 
   const generateServiceCode = (from: string, to: string, airline: string, cabinClass: string) => {
@@ -427,6 +434,70 @@ export default function FlightsContent() {
     } catch (error) {
       console.error('Error deleting flight rate:', error)
       await dialog.alert('Error', 'Failed to delete flight rate. Please try again.', 'warning')
+    }
+  }
+
+  // Bulk selection handlers
+  const handleSelectRate = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredRates.map(r => r.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+
+    const confirmed = await dialog.confirmDelete('Flight Rates',
+      `Delete ${selectedIds.size} selected rate(s)? This action cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    setBulkDeleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/rates/flights/${id}`, { method: 'DELETE' }))
+      )
+      const deletedIds = ids.filter((_, i) => {
+        const result = results[i]
+        return result.status === 'fulfilled' && result.value.ok
+      })
+
+      fetchRates()
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        deletedIds.forEach(id => next.delete(id))
+        return next
+      })
+
+      if (deletedIds.length === ids.length) {
+        await dialog.alert('Deleted', `${deletedIds.length} flight rate(s) have been deleted.`, 'success')
+      } else {
+        await dialog.alert('Partial Delete',
+          `Deleted ${deletedIds.length} of ${ids.length} — ${ids.length - deletedIds.length} failed. Please try again.`,
+          'warning'
+        )
+      }
+    } catch (error) {
+      console.error('Error bulk deleting flight rates:', error)
+      await dialog.alert('Error', 'Failed to delete flight rates. Please try again.', 'warning')
+    } finally {
+      setBulkDeleting(false)
     }
   }
 
@@ -676,11 +747,43 @@ export default function FlightsContent() {
         </button>
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-md">
+          <span className="text-sm font-medium text-gray-700">{selectedIds.size} selected</span>
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            className="text-sm text-gray-500 hover:text-gray-700 underline"
+          >
+            Clear selection
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="h-4 w-4" />
+            {bulkDeleting ? 'Deleting...' : 'Delete Selected'}
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="w-10 px-4 py-2">
+                <input
+                  type="checkbox"
+                  checked={filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))}
+                  onChange={handleSelectAll}
+                  className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                  aria-label="Select all rates"
+                />
+              </th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Route</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Airline</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Flight</th>
@@ -695,13 +798,23 @@ export default function FlightsContent() {
           <tbody className="divide-y divide-gray-100">
             {paginatedRates.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-500">
                   No flight rates found
                 </td>
               </tr>
             ) : (
               paginatedRates.map((rate) => (
                 <tr key={rate.id} className="hover:bg-gray-50">
+                  <td className="w-10 px-4 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(rate.id)}
+                      onChange={() => handleSelectRate(rate.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-4 w-4 text-[#647C47] border-gray-300 rounded focus:ring-[#647C47]"
+                      aria-label={`Select ${rate.service_code}`}
+                    />
+                  </td>
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-1.5 text-sm">
                       <span className="font-medium text-gray-900">{rate.route_from}</span>

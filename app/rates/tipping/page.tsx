@@ -174,6 +174,10 @@ export default function TippingPage() {
   const [editingRate, setEditingRate] = useState<TippingRate | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
 
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -339,6 +343,60 @@ export default function TippingPage() {
     return matchesSearch && matchesRole && matchesActive
   })
 
+  // Bulk selection helpers
+  const allFilteredSelected = filteredRates.length > 0 && filteredRates.every(r => selectedIds.has(r.id))
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allFilteredSelected ? new Set() : new Set(filteredRates.map(r => r.id)))
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+
+    const confirmed = await dialog.confirmDelete('Tipping Rates',
+      `Delete ${ids.length} selected rate(s)? This action cannot be undone.`
+    )
+
+    if (!confirmed) return
+
+    setBulkDeleting(true)
+    try {
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/rates/tipping/${id}`, { method: 'DELETE' }))
+      )
+      const deletedIds = ids.filter((id, i) => {
+        const result = results[i]
+        return result.status === 'fulfilled' && result.value.ok
+      })
+      const failed = ids.length - deletedIds.length
+
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        deletedIds.forEach(id => next.delete(id))
+        return next
+      })
+
+      if (failed === 0) {
+        showToast('success', `Deleted ${deletedIds.length} rate${deletedIds.length === 1 ? '' : 's'}!`)
+      } else {
+        showToast('error', `Deleted ${deletedIds.length} of ${ids.length} — ${failed} failed`)
+      }
+      fetchRates()
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
   // Pagination calculations
   const totalItems = filteredRates.length
   const totalPages = Math.ceil(totalItems / itemsPerPage)
@@ -464,12 +522,46 @@ export default function TippingPage() {
           </div>
         </div>
 
+        {/* Bulk Actions Bar */}
+        {selectedIds.size > 0 && (
+          <div className="bg-white rounded-lg shadow-md border p-3 mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-900">{selectedIds.size} selected</span>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-sm text-green-600 hover:text-green-700 hover:underline"
+              >
+                Clear selection
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" />
+              {bulkDeleting ? 'Deleting...' : 'Delete Selected'}
+            </button>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-white rounded-lg shadow-md border overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-green-50 border-b border-green-100">
                 <tr>
+                  <th className="px-4 py-2 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                      aria-label="Select all tipping rates"
+                    />
+                  </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-green-800">Role</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Context</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Unit</th>
@@ -482,6 +574,16 @@ export default function TippingPage() {
               <tbody className="divide-y divide-gray-100">
                 {paginatedRates.map((rate, idx) => (
                   <tr key={rate.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-green-50 transition-colors`}>
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(rate.id)}
+                        onChange={() => toggleSelect(rate.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                        aria-label={`Select rate ${rate.service_code}`}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                         rate.role_type === 'guide' ? 'bg-blue-100 text-blue-800' :
@@ -545,7 +647,7 @@ export default function TippingPage() {
                 ))}
                 {paginatedRates.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                       <DollarSign className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                       <p className="font-medium">No tipping rates found</p>
                       <button onClick={handleAddNew} className="mt-2 text-sm text-green-600 hover:underline">
