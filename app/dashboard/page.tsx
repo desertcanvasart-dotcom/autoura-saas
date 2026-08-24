@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
 import { useTenant } from '@/app/contexts/TenantContext'
+import TodayOnTheGround from '@/app/components/TodayOnTheGround'
 
 // ============================================
 // THE OPERATOR'S DAY
@@ -210,6 +211,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* The execution layer's cross-trip view: every trip running today
+            with its latest checkpoint (staff tap-links / trip_events). */}
+        <TodayOnTheGround />
         <Panel
           title="Departing soon"
           icon={Plane}
