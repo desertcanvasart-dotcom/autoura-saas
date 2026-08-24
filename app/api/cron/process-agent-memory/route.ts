@@ -4,7 +4,7 @@
 // Railway Cron Job — Agent Memory Feedback Loop
 // Schedule: every night at 02:00 UTC
 //
-// In railway.toml, add:
+// Railway cron service config (start command stored on the service):
 //   [[cron]]
 //   schedule = "0 2 * * *"
 //   command = "curl -X POST https://your-domain.com/api/cron/process-agent-memory -H 'x-cron-secret: $CRON_SECRET'"

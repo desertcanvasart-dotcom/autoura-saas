@@ -27,7 +27,7 @@
  *
  * DEPLOY (Railway)
  * ----------------
- * Railway has no `[[cron]]` table in railway.toml — cron is configured
+ * Railway has no `[[cron]]` config-file table — cron is configured
  * per-service in the dashboard, and it runs that service's START COMMAND,
  * which must exit when done. So this needs its own service:
  *
