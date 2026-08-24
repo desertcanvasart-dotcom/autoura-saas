@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+// Money in different currencies does not add (see lib/currency-totals.ts).
+// Every aggregate here is kept PER CURRENCY; the page renders each bucket.
+import { CurrencyTotals, emptyTotals, addToTotals, sumByCurrency } from '@/lib/currency-totals'
 
 interface AgingBucket {
-  current: number
-  days30: number
-  days60: number
-  days90Plus: number
+  current: CurrencyTotals
+  days30: CurrencyTotals
+  days60: CurrencyTotals
+  days90Plus: CurrencyTotals
 }
 
 interface ClientReceivable {
   client_id: string
   client_name: string
   client_email: string
-  total_invoiced: number
-  total_paid: number
-  total_outstanding: number
+  total_invoiced: CurrencyTotals
+  total_paid: CurrencyTotals
+  total_outstanding: CurrencyTotals
   invoice_count: number
   oldest_invoice_date: string
   aging: AgingBucket
@@ -116,34 +119,30 @@ export async function GET(request: NextRequest) {
           client_id: inv.client_id,
           client_name: inv.client_name,
           client_email: inv.client_email,
-          total_invoiced: 0,
-          total_paid: 0,
-          total_outstanding: 0,
+          total_invoiced: emptyTotals(),
+          total_paid: emptyTotals(),
+          total_outstanding: emptyTotals(),
           invoice_count: 0,
           oldest_invoice_date: inv.issue_date,
-          aging: { current: 0, days30: 0, days60: 0, days90Plus: 0 },
+          aging: { current: emptyTotals(), days30: emptyTotals(), days60: emptyTotals(), days90Plus: emptyTotals() },
           invoices: []
         })
       }
 
       const client = clientMap.get(clientKey)!
-      client.total_invoiced += Number(inv.total_amount || 0)
-      client.total_paid += Number(inv.amount_paid || 0)
-      client.total_outstanding += Number(inv.balance_due || 0)
+      addToTotals(client.total_invoiced, inv.total_amount, inv.currency)
+      addToTotals(client.total_paid, inv.amount_paid, inv.currency)
+      addToTotals(client.total_outstanding, inv.balance_due, inv.currency)
       client.invoice_count += 1
       client.invoices.push(inv)
 
       // Update aging buckets
-      const balanceDue = Number(inv.balance_due || 0)
-      if (inv.days_past_due <= 0) {
-        client.aging.current += balanceDue
-      } else if (inv.days_past_due <= 30) {
-        client.aging.days30 += balanceDue
-      } else if (inv.days_past_due <= 60) {
-        client.aging.days60 += balanceDue
-      } else {
-        client.aging.days90Plus += balanceDue
-      }
+      const bucket =
+        inv.days_past_due <= 0 ? client.aging.current
+        : inv.days_past_due <= 30 ? client.aging.days30
+        : inv.days_past_due <= 60 ? client.aging.days60
+        : client.aging.days90Plus
+      addToTotals(bucket, inv.balance_due, inv.currency)
 
       // Track oldest invoice
       if (new Date(inv.issue_date) < new Date(client.oldest_invoice_date)) {
@@ -151,26 +150,41 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    const clientReceivables = Array.from(clientMap.values())
-      .sort((a, b) => b.total_outstanding - a.total_outstanding)
+    // Magnitude across buckets — ONLY for ordering, never displayed. Sorting
+    // needs one number; showing one number is what this change removes.
+    const magnitude = (t: CurrencyTotals) =>
+      Object.values(t).reduce((s, v) => s + Math.abs(v), 0)
+    const merge = (into: CurrencyTotals, from: CurrencyTotals) => {
+      for (const [code, v] of Object.entries(from)) into[code] = (into[code] || 0) + v
+      return into
+    }
 
-    // Calculate summary
+    const clientReceivables = Array.from(clientMap.values())
+      .sort((a, b) => magnitude(b.total_outstanding) - magnitude(a.total_outstanding))
+
+    // The currencies actually present. When there is exactly one, the page may
+    // draw percentage bars; a percentage of mixed-currency money is not a number.
+    const currencies = [...new Set(filteredInvoices.map(inv => (inv.currency || 'EUR') as string))]
+
     const summary = {
-      total_outstanding: clientReceivables.reduce((sum, c) => sum + c.total_outstanding, 0),
-      total_invoiced: clientReceivables.reduce((sum, c) => sum + c.total_invoiced, 0),
-      total_paid: clientReceivables.reduce((sum, c) => sum + c.total_paid, 0),
+      total_outstanding: clientReceivables.reduce((t, c) => merge(t, c.total_outstanding), emptyTotals()),
+      total_invoiced: clientReceivables.reduce((t, c) => merge(t, c.total_invoiced), emptyTotals()),
+      total_paid: clientReceivables.reduce((t, c) => merge(t, c.total_paid), emptyTotals()),
       client_count: clientReceivables.length,
       invoice_count: filteredInvoices.length,
       aging: {
-        current: clientReceivables.reduce((sum, c) => sum + c.aging.current, 0),
-        days30: clientReceivables.reduce((sum, c) => sum + c.aging.days30, 0),
-        days60: clientReceivables.reduce((sum, c) => sum + c.aging.days60, 0),
-        days90Plus: clientReceivables.reduce((sum, c) => sum + c.aging.days90Plus, 0)
+        current: clientReceivables.reduce((t, c) => merge(t, c.aging.current), emptyTotals()),
+        days30: clientReceivables.reduce((t, c) => merge(t, c.aging.days30), emptyTotals()),
+        days60: clientReceivables.reduce((t, c) => merge(t, c.aging.days60), emptyTotals()),
+        days90Plus: clientReceivables.reduce((t, c) => merge(t, c.aging.days90Plus), emptyTotals())
       },
       overdue_count: filteredInvoices.filter(inv => inv.is_overdue).length,
-      overdue_amount: filteredInvoices
-        .filter(inv => inv.is_overdue)
-        .reduce((sum, inv) => sum + Number(inv.balance_due || 0), 0)
+      overdue_amount: sumByCurrency(
+        filteredInvoices.filter(inv => inv.is_overdue),
+        inv => inv.balance_due,
+        inv => inv.currency
+      ),
+      single_currency: currencies.length === 1 ? currencies[0] : (currencies.length === 0 ? 'EUR' : null)
     }
 
     return NextResponse.json({

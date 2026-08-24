@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { CurrencyTotals, sumByCurrency, formatTotals } from '@/lib/currency-totals'
 import { 
   Search, 
   Plus, 
@@ -387,18 +388,24 @@ export default function ExpensesPage() {
   )
 
   // Stats
-  const totalExpenses = expenses.reduce((sum, exp) => sum + Number(exp.amount), 0)
-  const pendingExpenses = expenses.filter(e => e.status === 'pending').reduce((sum, exp) => sum + Number(exp.amount), 0)
-  const approvedExpenses = expenses.filter(e => e.status === 'approved').reduce((sum, exp) => sum + Number(exp.amount), 0)
-  const paidExpenses = expenses.filter(e => e.status === 'paid').reduce((sum, exp) => sum + Number(exp.amount), 0)
+  // Per currency — a $500 hotel bill and a €300 guide fee are not €800 of
+  // expenses (lib/currency-totals.ts).
+  const totalExpenses = sumByCurrency(expenses, e => e.amount, e => e.currency)
+  const pendingExpenses = sumByCurrency(expenses.filter(e => e.status === 'pending'), e => e.amount, e => e.currency)
+  const approvedExpenses = sumByCurrency(expenses.filter(e => e.status === 'approved'), e => e.amount, e => e.currency)
+  const paidExpenses = sumByCurrency(expenses.filter(e => e.status === 'paid'), e => e.amount, e => e.currency)
+  // Percentage bars only make sense when everything shares one currency.
+  const expenseCurrencies = [...new Set(expenses.map(e => e.currency || 'EUR'))]
+  const singleCurrency = expenseCurrencies.length === 1 ? expenseCurrencies[0] : (expenseCurrencies.length === 0 ? 'EUR' : null)
+  const mag = (t: CurrencyTotals) => Object.values(t).reduce((x, v) => x + Math.abs(v), 0)
 
   // Category breakdown for chart
   const categoryBreakdown = CATEGORIES.map(cat => {
-    const total = expenses
-      .filter(e => e.category === cat.value)
-      .reduce((sum, e) => sum + Number(e.amount), 0)
+    const total = sumByCurrency(
+      expenses.filter(e => e.category === cat.value),
+      e => e.amount, e => e.currency)
     return { ...cat, total }
-  }).filter(c => c.total > 0).sort((a, b) => b.total - a.total)
+  }).filter(c => mag(c.total) > 0).sort((a, b) => mag(b.total) - mag(a.total))
 
   const hasActiveFilters = statusFilter || categoryFilter || supplierTypeFilter || startDate || endDate
 
@@ -449,7 +456,7 @@ export default function ExpensesPage() {
             <span className="w-1.5 h-1.5 rounded-full bg-gray-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Total Expenses</p>
-          <p className="text-2xl font-semibold text-gray-900">€{totalExpenses.toLocaleString()}</p>
+          <p className="text-2xl font-semibold text-gray-900">{formatTotals(totalExpenses)}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -457,7 +464,7 @@ export default function ExpensesPage() {
             <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Pending</p>
-          <p className="text-2xl font-semibold text-yellow-600">€{pendingExpenses.toLocaleString()}</p>
+          <p className="text-2xl font-semibold text-yellow-600">{formatTotals(pendingExpenses)}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -465,7 +472,7 @@ export default function ExpensesPage() {
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Approved</p>
-          <p className="text-2xl font-semibold text-blue-600">€{approvedExpenses.toLocaleString()}</p>
+          <p className="text-2xl font-semibold text-blue-600">{formatTotals(approvedExpenses)}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -473,7 +480,7 @@ export default function ExpensesPage() {
             <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Paid</p>
-          <p className="text-2xl font-semibold text-green-600">€{paidExpenses.toLocaleString()}</p>
+          <p className="text-2xl font-semibold text-green-600">{formatTotals(paidExpenses)}</p>
         </div>
       </div>
 
@@ -620,7 +627,11 @@ export default function ExpensesPage() {
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Expenses by Category</h3>
             <div className="space-y-3">
               {categoryBreakdown.slice(0, 10).map(cat => {
-                const percentage = totalExpenses > 0 ? (cat.total / totalExpenses) * 100 : 0
+                // Width by single-currency share when unambiguous; by magnitude otherwise
+                // (ordering signal only — the label shows the real per-currency figures).
+                const percentage = singleCurrency
+                  ? ((cat.total[singleCurrency] || 0) / (totalExpenses[singleCurrency] || 1)) * 100
+                  : (mag(totalExpenses) > 0 ? (mag(cat.total) / mag(totalExpenses)) * 100 : 0)
                 return (
                   <div key={cat.value}>
                     <div className="flex items-center justify-between text-sm mb-1">
@@ -628,7 +639,7 @@ export default function ExpensesPage() {
                         <span>{cat.icon}</span>
                         <span className="text-gray-700">{cat.label}</span>
                       </div>
-                      <span className="font-medium text-gray-900">€{cat.total.toLocaleString()}</span>
+                      <span className="font-medium text-gray-900">{formatTotals(cat.total)}</span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
@@ -647,11 +658,13 @@ export default function ExpensesPage() {
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Expenses by Status</h3>
             <div className="space-y-4">
               {Object.entries(STATUS_CONFIG).map(([key, config]) => {
-                const amount = expenses
-                  .filter(e => e.status === key)
-                  .reduce((sum, e) => sum + Number(e.amount), 0)
+                const amount = sumByCurrency(expenses.filter(e => e.status === key), e => e.amount, e => e.currency)
                 const count = expenses.filter(e => e.status === key).length
-                const percentage = totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0
+                // Same rule as the category bars: real share in a single currency,
+                // magnitude-based ordering signal when currencies are mixed.
+                const percentage = singleCurrency
+                  ? ((amount[singleCurrency] || 0) / (totalExpenses[singleCurrency] || 1)) * 100
+                  : (mag(totalExpenses) > 0 ? (mag(amount) / mag(totalExpenses)) * 100 : 0)
                 
                 return (
                   <div key={key}>
@@ -662,7 +675,7 @@ export default function ExpensesPage() {
                         </span>
                         <span className="text-gray-500">{count} items</span>
                       </div>
-                      <span className="font-medium text-gray-900">€{amount.toLocaleString()}</span>
+                      <span className="font-medium text-gray-900">{formatTotals(amount)}</span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 

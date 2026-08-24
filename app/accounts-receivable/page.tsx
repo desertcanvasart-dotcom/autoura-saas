@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { CurrencyTotals, formatTotals, currencySymbol } from '@/lib/currency-totals'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/app/contexts/AuthContext'
@@ -28,19 +29,19 @@ import {
 } from 'lucide-react'
 
 interface AgingBucket {
-  current: number
-  days30: number
-  days60: number
-  days90Plus: number
+  current: CurrencyTotals
+  days30: CurrencyTotals
+  days60: CurrencyTotals
+  days90Plus: CurrencyTotals
 }
 
 interface ClientReceivable {
   client_id: string
   client_name: string
   client_email: string
-  total_invoiced: number
-  total_paid: number
-  total_outstanding: number
+  total_invoiced: CurrencyTotals
+  total_paid: CurrencyTotals
+  total_outstanding: CurrencyTotals
   invoice_count: number
   oldest_invoice_date: string
   aging: AgingBucket
@@ -48,6 +49,8 @@ interface ClientReceivable {
 }
 
 interface Invoice {
+  /** The invoice's own currency — the API returns full rows (select('*')). */
+  currency?: string
   id: string
   invoice_number: string
   client_id: string
@@ -65,15 +68,21 @@ interface Invoice {
 }
 
 interface Summary {
-  total_outstanding: number
-  total_invoiced: number
-  total_paid: number
+  total_outstanding: CurrencyTotals
+  total_invoiced: CurrencyTotals
+  total_paid: CurrencyTotals
   client_count: number
   invoice_count: number
   aging: AgingBucket
   overdue_count: number
-  overdue_amount: number
+  overdue_amount: CurrencyTotals
+  single_currency: string | null
 }
+
+// Bars and percentages are only drawn when every invoice shares one currency —
+// a percentage of mixed-currency money is not a number. `val` reads that single
+// currency's bucket; `nonZero` says whether a per-currency total has anything.
+const nonZero = (t: CurrencyTotals) => Object.values(t).some(v => v !== 0)
 
 const ITEMS_PER_PAGE = 15
 
@@ -141,13 +150,16 @@ export default function AccountsReceivablePage() {
     // In a real implementation, this would call an API to send the email
     // For now, we'll open the mailto link
     const subject = encodeURIComponent(`Payment Reminder: ${invoice.invoice_number}`)
+    // The reminder quotes the INVOICE's currency — a USD invoice reminded in €
+    // told the client to pay a different amount of money.
+    const sym = currencySymbol(invoice.currency || 'EUR')
     const body = encodeURIComponent(
       `Dear ${invoice.client_name},\n\n` +
       `This is a friendly reminder that invoice ${invoice.invoice_number} ` +
-      `for €${Number(invoice.balance_due).toFixed(2)} is ${invoice.days_past_due > 0 ? `${invoice.days_past_due} days overdue` : 'due soon'}.\n\n` +
-      `Original amount: €${Number(invoice.total_amount).toFixed(2)}\n` +
-      `Amount paid: €${Number(invoice.amount_paid).toFixed(2)}\n` +
-      `Balance due: €${Number(invoice.balance_due).toFixed(2)}\n` +
+      `for ${sym}${Number(invoice.balance_due).toFixed(2)} is ${invoice.days_past_due > 0 ? `${invoice.days_past_due} days overdue` : 'due soon'}.\n\n` +
+      `Original amount: ${sym}${Number(invoice.total_amount).toFixed(2)}\n` +
+      `Amount paid: ${sym}${Number(invoice.amount_paid).toFixed(2)}\n` +
+      `Balance due: ${sym}${Number(invoice.balance_due).toFixed(2)}\n` +
       `Due date: ${new Date(invoice.due_date).toLocaleDateString()}\n\n` +
       `Please arrange payment at your earliest convenience.\n\n` +
       `Best regards,\n${tenant?.company_name || ''}`
@@ -280,7 +292,7 @@ export default function AccountsReceivablePage() {
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Total Outstanding</p>
-            <p className="text-2xl font-semibold text-blue-600">€{summary.total_outstanding.toLocaleString()}</p>
+            <p className="text-2xl font-semibold text-blue-600">{formatTotals(summary.total_outstanding)}</p>
             <p className="text-xs text-gray-400 mt-1">{summary.invoice_count} invoices</p>
           </div>
 
@@ -290,7 +302,7 @@ export default function AccountsReceivablePage() {
               <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Overdue</p>
-            <p className="text-2xl font-semibold text-red-600">€{summary.overdue_amount.toLocaleString()}</p>
+            <p className="text-2xl font-semibold text-red-600">{formatTotals(summary.overdue_amount)}</p>
             <p className="text-xs text-gray-400 mt-1">{summary.overdue_count} invoices</p>
           </div>
 
@@ -300,7 +312,7 @@ export default function AccountsReceivablePage() {
               <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Current</p>
-            <p className="text-2xl font-semibold text-green-600">€{summary.aging.current.toLocaleString()}</p>
+            <p className="text-2xl font-semibold text-green-600">{formatTotals(summary.aging.current)}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -309,7 +321,7 @@ export default function AccountsReceivablePage() {
               <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">1-30 Days</p>
-            <p className="text-2xl font-semibold text-yellow-600">€{summary.aging.days30.toLocaleString()}</p>
+            <p className="text-2xl font-semibold text-yellow-600">{formatTotals(summary.aging.days30)}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -318,7 +330,7 @@ export default function AccountsReceivablePage() {
               <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">31-60 Days</p>
-            <p className="text-2xl font-semibold text-orange-600">€{summary.aging.days60.toLocaleString()}</p>
+            <p className="text-2xl font-semibold text-orange-600">{formatTotals(summary.aging.days60)}</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -327,50 +339,51 @@ export default function AccountsReceivablePage() {
               <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">90+ Days</p>
-            <p className="text-2xl font-semibold text-red-600">€{summary.aging.days90Plus.toLocaleString()}</p>
+            <p className="text-2xl font-semibold text-red-600">{formatTotals(summary.aging.days90Plus)}</p>
           </div>
         </div>
       )}
 
       {/* Aging Report Visual */}
-      {summary && summary.total_outstanding > 0 && (
+      {/* Percentage bars only make sense in ONE currency; hidden when mixed. */}
+      {summary && summary.single_currency && nonZero(summary.total_outstanding) && (
         <div className="bg-white border border-gray-200 rounded-lg p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Aging Report</h3>
           <div className="flex h-8 rounded-lg overflow-hidden">
-            {summary.aging.current > 0 && (
+            {(summary.aging.current[summary.single_currency!] || 0) > 0 && (
               <div 
                 className="bg-green-500 flex items-center justify-center text-white text-xs font-medium"
-                style={{ width: `${(summary.aging.current / summary.total_outstanding) * 100}%` }}
-                title={`Current: €${summary.aging.current.toLocaleString()}`}
+                style={{ width: `${((summary.aging.current[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100}%` }}
+                title={`Current: ${formatTotals(summary.aging.current)}`}
               >
-                {((summary.aging.current / summary.total_outstanding) * 100).toFixed(0)}%
+                {(((summary.aging.current[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100).toFixed(0)}%
               </div>
             )}
-            {summary.aging.days30 > 0 && (
+            {(summary.aging.days30[summary.single_currency!] || 0) > 0 && (
               <div 
                 className="bg-yellow-500 flex items-center justify-center text-white text-xs font-medium"
-                style={{ width: `${(summary.aging.days30 / summary.total_outstanding) * 100}%` }}
-                title={`1-30 Days: €${summary.aging.days30.toLocaleString()}`}
+                style={{ width: `${((summary.aging.days30[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100}%` }}
+                title={`1-30 Days: ${formatTotals(summary.aging.days30)}`}
               >
-                {((summary.aging.days30 / summary.total_outstanding) * 100).toFixed(0)}%
+                {(((summary.aging.days30[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100).toFixed(0)}%
               </div>
             )}
-            {summary.aging.days60 > 0 && (
+            {(summary.aging.days60[summary.single_currency!] || 0) > 0 && (
               <div 
                 className="bg-orange-500 flex items-center justify-center text-white text-xs font-medium"
-                style={{ width: `${(summary.aging.days60 / summary.total_outstanding) * 100}%` }}
-                title={`31-60 Days: €${summary.aging.days60.toLocaleString()}`}
+                style={{ width: `${((summary.aging.days60[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100}%` }}
+                title={`31-60 Days: ${formatTotals(summary.aging.days60)}`}
               >
-                {((summary.aging.days60 / summary.total_outstanding) * 100).toFixed(0)}%
+                {(((summary.aging.days60[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100).toFixed(0)}%
               </div>
             )}
-            {summary.aging.days90Plus > 0 && (
+            {(summary.aging.days90Plus[summary.single_currency!] || 0) > 0 && (
               <div 
                 className="bg-red-500 flex items-center justify-center text-white text-xs font-medium"
-                style={{ width: `${(summary.aging.days90Plus / summary.total_outstanding) * 100}%` }}
-                title={`90+ Days: €${summary.aging.days90Plus.toLocaleString()}`}
+                style={{ width: `${((summary.aging.days90Plus[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100}%` }}
+                title={`90+ Days: ${formatTotals(summary.aging.days90Plus)}`}
               >
-                {((summary.aging.days90Plus / summary.total_outstanding) * 100).toFixed(0)}%
+                {(((summary.aging.days90Plus[summary.single_currency!] || 0) / (summary.total_outstanding[summary.single_currency!] || 1)) * 100).toFixed(0)}%
               </div>
             )}
           </div>
@@ -469,30 +482,30 @@ export default function AccountsReceivablePage() {
                   
                   <div className="flex items-center gap-6">
                     <div className="text-right">
-                      <p className="text-sm font-semibold text-gray-900">€{client.total_outstanding.toLocaleString()}</p>
+                      <p className="text-sm font-semibold text-gray-900">{formatTotals(client.total_outstanding)}</p>
                       <p className="text-xs text-gray-500">{client.invoice_count} invoice{client.invoice_count !== 1 ? 's' : ''}</p>
                     </div>
                     
                     {/* Mini aging bars */}
                     <div className="hidden md:flex items-center gap-1">
-                      {client.aging.current > 0 && (
+                      {nonZero(client.aging.current) && (
                         <div className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded">
-                          €{client.aging.current.toLocaleString()}
+                          {formatTotals(client.aging.current)}
                         </div>
                       )}
-                      {client.aging.days30 > 0 && (
+                      {nonZero(client.aging.days30) && (
                         <div className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">
-                          €{client.aging.days30.toLocaleString()}
+                          {formatTotals(client.aging.days30)}
                         </div>
                       )}
-                      {client.aging.days60 > 0 && (
+                      {nonZero(client.aging.days60) && (
                         <div className="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700 rounded">
-                          €{client.aging.days60.toLocaleString()}
+                          {formatTotals(client.aging.days60)}
                         </div>
                       )}
-                      {client.aging.days90Plus > 0 && (
+                      {nonZero(client.aging.days90Plus) && (
                         <div className="px-2 py-0.5 text-xs font-medium bg-red-100 text-red-700 rounded">
-                          €{client.aging.days90Plus.toLocaleString()}
+                          {formatTotals(client.aging.days90Plus)}
                         </div>
                       )}
                     </div>
@@ -523,7 +536,7 @@ export default function AccountsReceivablePage() {
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="text-right">
-                              <p className="text-sm font-semibold text-gray-900">€{Number(invoice.balance_due).toLocaleString()}</p>
+                              <p className="text-sm font-semibold text-gray-900">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}</p>
                               <span className={`text-xs px-2 py-0.5 rounded ${getAgingColor(invoice.aging_bucket)}`}>
                                 {getAgingLabel(invoice.aging_bucket)}
                               </span>
@@ -613,13 +626,13 @@ export default function AccountsReceivablePage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-gray-900">€{Number(invoice.total_amount).toLocaleString()}</span>
+                      <span className="text-sm text-gray-900">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.total_amount).toLocaleString()}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-green-600">€{Number(invoice.amount_paid).toLocaleString()}</span>
+                      <span className="text-sm text-green-600">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.amount_paid).toLocaleString()}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-semibold text-gray-900">€{Number(invoice.balance_due).toLocaleString()}</span>
+                      <span className="text-sm font-semibold text-gray-900">{currencySymbol(invoice.currency || 'EUR')}{Number(invoice.balance_due).toLocaleString()}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getAgingColor(invoice.aging_bucket)}`}>
