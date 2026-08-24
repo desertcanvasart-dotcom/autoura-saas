@@ -62,7 +62,7 @@ export default async function StaffPage({ params }: { params: Promise<{ token: s
     <main className="min-h-screen bg-gray-50">
       <header className="bg-gray-900 text-white px-5 py-6">
         <p className="text-xs uppercase tracking-widest text-gray-400">{view.operatorName}</p>
-        <h1 className="text-xl font-semibold mt-1">{view.tripTitle}</h1>
+        <h1 className="text-xl font-semibold mt-1 text-white">{view.tripTitle}</h1>
         <p className="text-sm text-gray-300 mt-1">
           Hi {view.memberName}
           {view.assignmentStart && (
