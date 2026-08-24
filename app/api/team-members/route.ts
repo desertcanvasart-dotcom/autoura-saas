@@ -5,8 +5,12 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const activeOnly = searchParams.get('active') === 'true'
+    // 'is_active' accepted as an alias: the resource-assignment picker
+    // appends ?is_active=true to every endpoint it consumes.
+    const activeOnly = searchParams.get('active') === 'true' || searchParams.get('is_active') === 'true'
     const role = searchParams.get('role')
+    // Unified staff identity (mig 288): 'driver', 'guide', etc.
+    const staffType = searchParams.get('staff_type')
     const departmentId = searchParams.get('departmentId')
 
     // Use authenticated client - RLS automatically filters by tenant_id
@@ -36,6 +40,10 @@ export async function GET(request: NextRequest) {
 
     if (departmentId) {
       query = query.eq('department_id', departmentId)
+    }
+
+    if (staffType) {
+      query = query.eq('staff_type', staffType)
     }
 
     const { data, error } = await query

@@ -11,6 +11,38 @@ import { sendPushToTenant } from '@/lib/push'
  * say WHAT happened (kind) and WHERE (an optional tap-time lat/lng pair).
  * occurred_at is server time: a checkpoint log takes no client clocks.
  */
+/**
+ * Migration 288 unified staff identity into team_members; every specialist
+ * row carries a link. Resolve the tapping person's directory id so the event
+ * log records WHO, not just a display string. Best-effort: an unlinked or
+ * legacy row still logs the event with the name fallback.
+ */
+async function resolveActorId(
+  supabase: ReturnType<typeof createAdminClient>,
+  resource: { resource_type?: string | null; resource_id?: string | null } | null
+): Promise<string | null> {
+  try {
+    const type = resource?.resource_type
+    const rid = resource?.resource_id
+    if (!type || !rid) return null
+    // A 'driver' assignment references the team_members row directly.
+    if (type === 'driver') return rid
+    if (type === 'vehicle') {
+      const { data } = await supabase.from('vehicles').select('default_driver_id').eq('id', rid).maybeSingle()
+      return data?.default_driver_id ?? null
+    }
+    const table = type === 'guide' ? 'guides'
+      : type === 'airport_staff' ? 'airport_staff'
+      : type === 'hotel_staff' ? 'hotel_staff'
+      : null
+    if (!table) return null
+    const { data } = await supabase.from(table).select('team_member_id').eq('id', rid).maybeSingle()
+    return data?.team_member_id ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params
@@ -31,7 +63,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { data: resource } = await supabase
       .from('itinerary_resources')
-      .select('id, resource_name, status')
+      .select('id, resource_type, resource_id, resource_name, status')
       .eq('id', link.itinerary_resource_id)
       .maybeSingle()
     if (!resource || resource.status === 'cancelled') {
@@ -72,6 +104,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         tenant_id: link.tenant_id,
         itinerary_id: link.itinerary_id,
         itinerary_resource_id: link.itinerary_resource_id,
+        actor_team_member_id: await resolveActorId(supabase, resource),
         event_kind,
         occurred_at: new Date().toISOString(),
         lat: hasLat ? Number(lat) : null,
