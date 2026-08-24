@@ -18,6 +18,7 @@ import { createClient } from '@/app/supabase'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
 import PDFPreviewModal from '@/app/components/PDFPreviewModal'
 import ItineraryExpenses from '@/app/components/ItineraryExpenses'
+import TripTimeline from '@/app/components/TripTimeline'
 import { showToast } from '@/app/contexts/ToastContext'
 
 interface Itinerary {
@@ -1079,6 +1080,9 @@ export default function ViewItineraryPage() {
         <div id="resource-assignment">
           <ResourceAssignmentV2 itineraryId={itinerary.id} startDate={itinerary.start_date} endDate={itinerary.end_date} numTravelers={itinerary.num_adults} clientName={itinerary.client_name} tripName={itinerary.trip_name} onUpdate={fetchItinerary} />
         </div>
+
+        {/* Trip timeline — the execution layer's checkpoint log, office view */}
+        <TripTimeline itineraryId={itinerary.id} />
 
         {/* DAY CONTROLS */}
         <div className="flex justify-between items-center">
