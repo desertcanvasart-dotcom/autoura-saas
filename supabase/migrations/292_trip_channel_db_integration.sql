@@ -100,6 +100,11 @@ REVOKE ALL ON unified_messages FROM anon;
 -- ----------------------------------------------------------------------------
 -- 2. Stats recompute counts all three channels
 -- ----------------------------------------------------------------------------
+-- Every column is table-qualified. Mig 125's file text left status/direction
+-- unqualified, which is AMBIGUOUS in the three-way whatsapp join (both
+-- whatsapp_conversations and unified_conversations carry status) — the live
+-- function had evidently been fixed in-database (drift), and reproducing the
+-- file text re-broke every whatsapp/email insert until the probe caught it.
 CREATE OR REPLACE FUNCTION update_unified_conversation_stats(p_unified_id UUID)
 RETURNS VOID AS $$
 DECLARE
@@ -112,8 +117,8 @@ BEGIN
   -- Count WhatsApp messages
   SELECT
     COUNT(*),
-    SUM(CASE WHEN status != 'read' AND direction = 'inbound' THEN 1 ELSE 0 END),
-    MAX(sent_at)
+    SUM(CASE WHEN wm.status != 'read' AND wm.direction = 'inbound' THEN 1 ELSE 0 END),
+    MAX(wm.sent_at)
   INTO v_total, v_unread, v_last_at
   FROM whatsapp_messages wm
   JOIN whatsapp_conversations wc ON wm.conversation_id = wc.id
@@ -123,26 +128,26 @@ BEGIN
   -- Add email messages
   SELECT
     v_total + COUNT(*),
-    v_unread + SUM(CASE WHEN NOT is_read AND direction = 'inbound' THEN 1 ELSE 0 END),
-    GREATEST(v_last_at, MAX(sent_at))
+    v_unread + SUM(CASE WHEN NOT em.is_read AND em.direction = 'inbound' THEN 1 ELSE 0 END),
+    GREATEST(v_last_at, MAX(em.sent_at))
   INTO v_total, v_unread, v_last_at
-  FROM email_messages
-  WHERE unified_conversation_id = p_unified_id;
+  FROM email_messages em
+  WHERE em.unified_conversation_id = p_unified_id;
 
   -- Add trip-thread messages (mig 291/292)
   SELECT
     v_total + COUNT(*),
-    v_unread + SUM(CASE WHEN NOT is_read AND direction = 'inbound' THEN 1 ELSE 0 END),
-    GREATEST(v_last_at, MAX(created_at))
+    v_unread + SUM(CASE WHEN NOT tm.is_read AND tm.direction = 'inbound' THEN 1 ELSE 0 END),
+    GREATEST(v_last_at, MAX(tm.created_at))
   INTO v_total, v_unread, v_last_at
-  FROM trip_messages
-  WHERE unified_conversation_id = p_unified_id;
+  FROM trip_messages tm
+  WHERE tm.unified_conversation_id = p_unified_id;
 
   -- Get last message preview
-  SELECT content, channel INTO v_last_preview, v_last_channel
-  FROM unified_messages
-  WHERE unified_conversation_id = p_unified_id
-  ORDER BY message_at DESC
+  SELECT um.content, um.channel INTO v_last_preview, v_last_channel
+  FROM unified_messages um
+  WHERE um.unified_conversation_id = p_unified_id
+  ORDER BY um.message_at DESC
   LIMIT 1;
 
   -- Update stats
