@@ -7,6 +7,7 @@ import {
   Check, AlertCircle, Loader2, MapPin, Clock, Plus, Trash2, Calendar,
   ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor, Link2, Car } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { formatPhoneForWhatsApp, generateWhatsAppLink } from '@/lib/communication-utils'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // Types
@@ -542,20 +543,35 @@ export default function ResourceAssignmentV2({
   // staff-link POST returns the assignee's contact alongside the URL.
   const handleWhatsAppStaffLink = async (resourceId: string) => {
     setCopyingLink(resourceId)
+    // Open the tab SYNCHRONOUSLY, inside the click's gesture stack — a
+    // window.open after an await is popup-blocked on Safari, leaving a
+    // silently dead button. The blank tab gets the wa.me URL (or closes)
+    // once the fetch resolves.
+    const waTab = window.open('', '_blank')
     try {
       const res = await fetch(`/api/itinerary-resources/${resourceId}/staff-link`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok || !data.success || !data.url) throw new Error(data.error || 'Failed')
       const phone = data.contact?.phone as string | undefined
       if (!phone) {
-        showToast('error', 'No phone number on file for this person — link copied instead')
-        await navigator.clipboard.writeText(data.url)
+        waTab?.close()
+        try {
+          await navigator.clipboard.writeText(data.url)
+          showToast('error', 'No phone number on file for this person — link copied instead')
+        } catch {
+          showToast('error', 'No phone number on file for this person')
+        }
         return
       }
       const firstName = (data.contact?.name as string | undefined)?.split(' ')[0] ?? 'there'
       const text = `Hi ${firstName}! Here is your check-in link${tripName ? ` for "${tripName}"` : ''}. Tap a button at each step (Departed, Arrived, Picked up…) — no login needed:\n${data.url}`
-      window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
+      // formatPhoneForWhatsApp normalizes local numbers ('01…' -> '201…');
+      // a raw digit-strip mints dead wa.me links for most Egyptian entries.
+      const waUrl = generateWhatsAppLink(formatPhoneForWhatsApp(phone), text)
+      if (waTab) waTab.location.href = waUrl
+      else window.location.href = waUrl
     } catch (err) {
+      waTab?.close()
       showToast('error', err instanceof Error ? err.message : 'Could not create the staff link')
     } finally {
       setCopyingLink(null)

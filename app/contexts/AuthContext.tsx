@@ -61,13 +61,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // navigation). Only a change of ACTUAL user should churn state.
     let fetchedForUserId: string | null = null
 
-    const applySession = (session: { user?: User | null } | null) => {
+    const applySession = (session: { user?: User | null } | null, event?: string) => {
       const nextUser = session?.user ?? null
-      setUser(prev => (prev?.id === nextUser?.id ? prev : nextUser))
+      // USER_UPDATED carries genuinely new user data (email change, metadata
+      // edit) for the same id — that one event must replace the object and
+      // re-sync the profile; every other same-id event keeps identity stable.
+      const userChanged = event === 'USER_UPDATED'
+      setUser(prev => (!userChanged && prev?.id === nextUser?.id ? prev : nextUser))
       if (nextUser) {
-        if (nextUser.id !== fetchedForUserId) {
+        if (nextUser.id !== fetchedForUserId || userChanged) {
           fetchedForUserId = nextUser.id
-          fetchProfile(nextUser.id)
+          // A transient fetch failure must not be cached for the session:
+          // clearing the stamp lets the next auth event (token refresh, tab
+          // focus) retry — the self-heal the pre-dedup code had by accident.
+          fetchProfile(nextUser.id).then(ok => {
+            if (!ok && fetchedForUserId === nextUser.id) fetchedForUserId = null
+          })
           checkSuperAdmin()
         }
       } else {
@@ -84,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-      applySession(session)
+    } = supabase.auth.onAuthStateChange((event: any, session: any) => {
+      applySession(session, event)
     })
 
     return () => subscription.unsubscribe()
@@ -122,7 +131,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user?.id])
 
-  const fetchProfile = async (userId: string) => {
+  // Returns whether the profile actually loaded, so the caller can decide
+  // to retry on the next auth event instead of caching a failure.
+  const fetchProfile = async (userId: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -134,10 +145,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('Error fetching profile:', error)
         throw error
       }
-      
+
       setProfile(data)
+      return true
     } catch (error) {
       console.error('Profile fetch failed:', error)
+      return false
     } finally {
       setLoading(false)
     }

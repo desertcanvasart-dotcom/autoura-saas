@@ -56,20 +56,19 @@ export async function GET() {
       if (!latest.has(e.itinerary_id)) latest.set(e.itinerary_id, e)
     }
 
-    // Unanswered traveller messages per trip (mig 291) — the board's "someone
-    // is waiting on you" signal. Best-effort: a failure here must not take
-    // down the board, which predates the chat.
+    // Unanswered traveller messages per trip — grouped count in the database
+    // (mig 292's trip_unread_counts; RLS scopes the caller's tenant). The
+    // previous version fetched up to 500 raw rows per poll to tally client-
+    // side, which both wasted bandwidth on a 30s-poll endpoint and silently
+    // zeroed other trips' badges once one chatty trip hit the cap.
+    // Best-effort: a failure here must not take down the board.
     const unread = new Map<string, number>()
     try {
-      const { data: unreadRows } = await supabase
-        .from('trip_messages')
-        .select('itinerary_id')
-        .in('itinerary_id', trips.map(t => t.id))
-        .eq('direction', 'inbound')
-        .eq('is_read', false)
-        .limit(500)
-      for (const m of unreadRows ?? []) {
-        unread.set(m.itinerary_id, (unread.get(m.itinerary_id) ?? 0) + 1)
+      const { data: counts, error: unreadErr } = await supabase
+        .rpc('trip_unread_counts', { p_itinerary_ids: trips.map(t => t.id) })
+      if (unreadErr) throw unreadErr
+      for (const row of (counts ?? []) as Array<{ itinerary_id: string; unread: number }>) {
+        unread.set(row.itinerary_id, Number(row.unread) || 0)
       }
     } catch (err) {
       console.error('[trip-events today] unread count failed:', err)

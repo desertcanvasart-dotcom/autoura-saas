@@ -10668,6 +10668,13 @@ export interface Database {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
       }
+      trip_unread_counts: {
+        Args: {
+          p_itinerary_ids?: string[]
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
       update_unified_conversation_stats: {
         Args: {
           p_unified_id?: string

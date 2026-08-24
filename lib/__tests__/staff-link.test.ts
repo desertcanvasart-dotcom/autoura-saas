@@ -95,7 +95,16 @@ describe('resolveAssigneeContact — who gets the wa.me handoff', () => {
       .toEqual({ name: 'Legacy', phone: '+200' })
   })
 
-  it('resolves guides and hotel/airport staff from their own tables', async () => {
+  it('resolves guides from SUPPLIERS first — that is where /api/guides lives', async () => {
+    const c = client({
+      suppliers: { name: 'Ahmed (supplier)', phone: null, contact_phone: '+205', whatsapp: null },
+      guides: { name: 'Ahmed (legacy)', phone: '+203', whatsapp: null },
+    })
+    expect(await resolveAssigneeContact(c, { resource_type: 'guide', resource_id: 'g-1' }))
+      .toEqual({ name: 'Ahmed (supplier)', phone: '+205' })
+  })
+
+  it('falls back to the legacy guides table when no supplier row matches', async () => {
     const c = client({ guides: { name: 'Ahmed', phone: '+203', whatsapp: null } })
     expect(await resolveAssigneeContact(c, { resource_type: 'guide', resource_id: 'g-1' }))
       .toEqual({ name: 'Ahmed', phone: '+203' })

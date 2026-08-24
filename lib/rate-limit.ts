@@ -46,6 +46,14 @@ export const RATE_LIMITS = {
     limit: 5,          // submissions
     windowMs: 60000,   // per minute
   },
+  // Traveller trip chat (share-token authed). Chat cadence is bursty — six
+  // short lines in a minute is normal, not abuse — and hotel/CGNAT NAT means
+  // one IP can carry several unrelated travellers. The per-trip store-backed
+  // hourly cap remains the real flood control.
+  chat: {
+    limit: 20,         // messages
+    windowMs: 60000,   // per minute
+  },
   // File uploads
   upload: {
     limit: 10,         // uploads

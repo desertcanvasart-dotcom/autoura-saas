@@ -22,30 +22,58 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const { supabase } = authResult
     const { id: itineraryId } = await params
 
+    // NEWEST 200, re-sorted ascending for display: an oldest-first limit
+    // would permanently hide new traveller messages once a thread outgrows
+    // the window. Reading does NOT mark anything read — that is PATCH's job,
+    // fired when a human actually has the thread in view (merely expanding
+    // an /ops row must not clear the office's unread signal).
     const { data: rows, error } = await supabase
       .from('trip_messages')
       .select('id, direction, content, sender_name, is_read, created_at')
       .eq('itinerary_id', itineraryId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(200)
     if (error) {
       console.error('[itinerary messages GET]', error.message)
       return NextResponse.json({ success: false, error: 'Failed to load messages' }, { status: 500 })
     }
 
-    // Opening the thread is reading it. Best-effort — the list already loaded.
-    const unreadIds = (rows ?? []).filter(m => m.direction === 'inbound' && !m.is_read).map(m => m.id)
-    if (unreadIds.length > 0) {
-      supabase
-        .from('trip_messages')
-        .update({ is_read: true })
-        .in('id', unreadIds)
-        .then(() => {}, () => {})
-    }
-
-    return NextResponse.json({ success: true, messages: rows ?? [] })
+    return NextResponse.json({ success: true, messages: (rows ?? []).reverse() })
   } catch (err) {
     console.error('[itinerary messages GET]', err)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+/**
+ * Mark the traveller's messages read. Separate from GET so the signal is
+ * cleared only when a human has actually seen the thread — the chat
+ * component fires this when it scrolls into view (and on reply), not on
+ * mount. The mig 292 trigger recomputes the conversation's unread counter
+ * from this write, so the inbox badge follows automatically.
+ */
+export async function PATCH(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const authResult = await requireAuth()
+    if (authResult.error !== null) {
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    }
+    const { supabase } = authResult
+    const { id: itineraryId } = await params
+
+    const { error } = await supabase
+      .from('trip_messages')
+      .update({ is_read: true })
+      .eq('itinerary_id', itineraryId)
+      .eq('direction', 'inbound')
+      .eq('is_read', false)
+    if (error) {
+      console.error('[itinerary messages PATCH]', error.message)
+      return NextResponse.json({ success: false, error: 'Failed to mark read' }, { status: 500 })
+    }
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('[itinerary messages PATCH]', err)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -116,28 +144,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: 'Failed to send' }, { status: 500 })
     }
 
-    // Keep the conversation preview honest — best-effort.
-    if (prev?.unified_conversation_id) {
-      try {
-        const { data: conv } = await supabase
-          .from('unified_conversations')
-          .select('total_messages')
-          .eq('id', prev.unified_conversation_id)
-          .maybeSingle()
-        await supabase
-          .from('unified_conversations')
-          .update({
-            total_messages: (conv?.total_messages ?? 0) + 1,
-            last_message_at: new Date().toISOString(),
-            last_message_preview: content.length > 120 ? `${content.slice(0, 117)}…` : content,
-            last_message_channel: 'trip',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', prev.unified_conversation_id)
-      } catch (err) {
-        console.error('[itinerary messages POST] counter update failed:', err)
-      }
-    }
+    // Conversation counters/preview: recomputed from source by the DB
+    // trigger on trip_messages (mig 292).
 
     return NextResponse.json({ success: true, message: inserted })
   } catch (err) {

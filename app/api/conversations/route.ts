@@ -65,7 +65,24 @@ export async function GET(request: NextRequest) {
     } else if (channel === 'email') {
       query = query.is('whatsapp_conversation_id', null).not('contact_email', 'is', null)
     } else if (channel === 'trip') {
-      query = query.eq('last_message_channel', 'trip')
+      // Structural membership, like the other channel filters: HAS a trip
+      // thread — not "the last message happened to be trip", which would
+      // drop a conversation from this queue the moment a follow-up email
+      // arrived. RLS scopes trip_messages to the tenant.
+      const { data: tripConvs } = await supabase
+        .from('trip_messages')
+        .select('unified_conversation_id')
+        .not('unified_conversation_id', 'is', null)
+        .limit(2000)
+      const ids = [...new Set((tripConvs ?? []).map(m => m.unified_conversation_id as string))]
+      if (ids.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        })
+      }
+      query = query.in('id', ids)
     }
 
     // Filter by starred

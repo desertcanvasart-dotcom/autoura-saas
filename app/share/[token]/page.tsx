@@ -59,7 +59,10 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     .maybeSingle()
   if (!share || share.revoked_at) return null
 
-  const [{ data: itinerary }, { data: days }, { data: tenant }, { data: resources }] = await Promise.all([
+  const [
+    { data: itinerary }, { data: days }, { data: tenant }, { data: resources },
+    { data: eventRows }, { data: messageRows },
+  ] = await Promise.all([
     supabase.from('itineraries').select('*').eq('id', share.itinerary_id).maybeSingle(),
     supabase.from('itinerary_days').select('*').eq('itinerary_id', share.itinerary_id),
     supabase
@@ -75,23 +78,23 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
       .select('id, resource_type, resource_id, resource_name, start_date, end_date')
       .eq('itinerary_id', share.itinerary_id)
       .eq('status', 'confirmed'),
+    // Checkpoint log — explicit columns; `note` and `actor_name` are INTERNAL
+    // and are not even fetched for this page.
+    supabase
+      .from('trip_events')
+      .select('event_kind, occurred_at, itinerary_resource_id, lat, lng')
+      .eq('itinerary_id', share.itinerary_id)
+      .order('occurred_at', { ascending: false })
+      .limit(30),
+    // The trip thread (mig 291) — explicit columns; ids, team_member_id and
+    // is_read are internal and are not even fetched for this page.
+    supabase
+      .from('trip_messages')
+      .select('direction, content, sender_name, created_at')
+      .eq('itinerary_id', share.itinerary_id)
+      .order('created_at', { ascending: false })
+      .limit(50),
   ])
-  // Checkpoint log — explicit columns; `note` and `actor_name` are INTERNAL
-  // and are not even fetched for this page.
-  const { data: eventRows } = await supabase
-    .from('trip_events')
-    .select('event_kind, occurred_at, itinerary_resource_id, lat, lng')
-    .eq('itinerary_id', share.itinerary_id)
-    .order('occurred_at', { ascending: false })
-    .limit(30)
-  // The trip thread (mig 291) — explicit columns; ids, team_member_id and
-  // is_read are internal and are not even fetched for this page.
-  const { data: messageRows } = await supabase
-    .from('trip_messages')
-    .select('direction, content, sender_name, created_at')
-    .eq('itinerary_id', share.itinerary_id)
-    .order('created_at', { ascending: false })
-    .limit(50)
   if (!itinerary) return null
 
   // Contacts for the assigned people. Explicit columns again — guides carry
@@ -104,12 +107,23 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     ids.length === 0
       ? []
       : (((await supabase.from(table).select(cols).in('id', ids)).data ?? []) as unknown as Array<Record<string, unknown>>)
-  const [guideRows, airportRows, hotelStaffRows, vehicleRows] = await Promise.all([
+  // Guides live in SUPPLIERS (supplier_type='guide') — the guides table is
+  // legacy. Assignment ids may reference either, so fetch both and let the
+  // sanitizer's id-match pick whichever exists; supplier rows are mapped to
+  // the guide contact shape (contact_phone is their alternate phone column).
+  const [guideRows, guideSupplierRows, airportRows, hotelStaffRows, vehicleRows] = await Promise.all([
     fetchContacts('guides', 'id, name, full_name, phone, whatsapp, profile_photo_url', idsOf('guide')),
+    fetchContacts('suppliers', 'id, name, phone, contact_phone, whatsapp', idsOf('guide')),
     fetchContacts('airport_staff', 'id, name, phone, whatsapp', idsOf('airport_staff')),
     fetchContacts('hotel_staff', 'id, name, phone, whatsapp', idsOf('hotel_staff')),
     fetchContacts('vehicles', 'id, name, vehicle_type, default_driver_name, default_driver_phone, photo_url', idsOf('vehicle')),
   ])
+  const mergedGuideRows = [
+    ...guideRows,
+    ...guideSupplierRows.map((s) => ({
+      id: s.id, name: s.name, phone: s.phone ?? s.contact_phone, whatsapp: s.whatsapp,
+    })),
+  ]
 
   // Engagement signal, best-effort — a failed count must never break the page.
   // Read-modify-write is fine at this fidelity; it is a signal, not a ledger.
@@ -129,7 +143,7 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
       (resources ?? []) as Array<Record<string, unknown>>
     ),
     team: toClientTeam((resources ?? []) as Array<Record<string, unknown>>, {
-      guides: guideRows,
+      guides: mergedGuideRows,
       airportStaff: airportRows,
       hotelStaff: hotelStaffRows,
       vehicles: vehicleRows,

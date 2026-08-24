@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/app/supabase'
 import type { Json } from '@/types/database.types'
 import { useAuth } from './AuthContext'
@@ -107,6 +107,9 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const [tenantMember, setTenantMember] = useState<TenantMember | null>(null)
   const [features, setFeatures] = useState<TenantFeatures | null>(null)
   const [loading, setLoading] = useState(true)
+  // Bounded retry budget for transient initial-fetch failures; reset when
+  // the user changes.
+  const retryCount = useRef(0)
 
   // Fetch tenant data when user is authenticated
   // Wait for auth to finish loading before making decisions
@@ -118,6 +121,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (user) {
+      retryCount.current = 0
       fetchTenantData()
     } else {
       // Auth is done loading and there's no user - clear data
@@ -199,6 +203,14 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
 
     } catch (error) {
       console.error('Failed to fetch tenant data:', error)
+      // A transient failure (flaky network at load) must not leave the
+      // whole session with null tenant/features and no error UI. The fetch
+      // effect only re-runs on a user-id change, so retry here — bounded,
+      // backing off, and only while there is still nothing loaded.
+      if (!tenant && retryCount.current < 3) {
+        retryCount.current += 1
+        setTimeout(() => fetchTenantData(), 3000 * retryCount.current)
+      }
     } finally {
       setLoading(false)
     }
