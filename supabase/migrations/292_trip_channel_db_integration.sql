@@ -100,6 +100,11 @@ REVOKE ALL ON unified_messages FROM anon;
 -- ----------------------------------------------------------------------------
 -- 2. Stats recompute counts all three channels
 -- ----------------------------------------------------------------------------
+-- SUMs are COALESCE-wrapped: SUM over zero rows is NULL, and the original
+-- chained v_unread through all three blocks — one channel with no rows
+-- poisoned the total to NULL, so e.g. an email-only conversation always
+-- recomputed unread to 0 (a latent bug inherited from the live function,
+-- caught by the 292 behavioural probe).
 -- Every column is table-qualified. Mig 125's file text left status/direction
 -- unqualified, which is AMBIGUOUS in the three-way whatsapp join (both
 -- whatsapp_conversations and unified_conversations carry status) — the live
@@ -117,7 +122,7 @@ BEGIN
   -- Count WhatsApp messages
   SELECT
     COUNT(*),
-    SUM(CASE WHEN wm.status != 'read' AND wm.direction = 'inbound' THEN 1 ELSE 0 END),
+    COALESCE(SUM(CASE WHEN wm.status != 'read' AND wm.direction = 'inbound' THEN 1 ELSE 0 END), 0),
     MAX(wm.sent_at)
   INTO v_total, v_unread, v_last_at
   FROM whatsapp_messages wm
@@ -128,7 +133,7 @@ BEGIN
   -- Add email messages
   SELECT
     v_total + COUNT(*),
-    v_unread + SUM(CASE WHEN NOT em.is_read AND em.direction = 'inbound' THEN 1 ELSE 0 END),
+    v_unread + COALESCE(SUM(CASE WHEN NOT em.is_read AND em.direction = 'inbound' THEN 1 ELSE 0 END), 0),
     GREATEST(v_last_at, MAX(em.sent_at))
   INTO v_total, v_unread, v_last_at
   FROM email_messages em
@@ -137,7 +142,7 @@ BEGIN
   -- Add trip-thread messages (mig 291/292)
   SELECT
     v_total + COUNT(*),
-    v_unread + SUM(CASE WHEN NOT tm.is_read AND tm.direction = 'inbound' THEN 1 ELSE 0 END),
+    v_unread + COALESCE(SUM(CASE WHEN NOT tm.is_read AND tm.direction = 'inbound' THEN 1 ELSE 0 END), 0),
     GREATEST(v_last_at, MAX(tm.created_at))
   INTO v_total, v_unread, v_last_at
   FROM trip_messages tm
