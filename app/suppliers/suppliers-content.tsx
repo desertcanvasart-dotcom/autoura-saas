@@ -76,8 +76,6 @@ const EGYPTIAN_CITIES = [
 
 const VEHICLE_TYPES = ['Sedan', 'Minivan', 'Van', 'Bus', 'SUV', '4x4']
 
-const LANGUAGES = ['English', 'Spanish', 'Japanese', 'Chinese', 'Russian', 'German', 'French', 'Italian', 'Arabic']
-
 const CUISINE_TYPES = [
   'Egyptian', 'Mediterranean', 'Italian', 'Middle Eastern', 'Asian',
   'International', 'Seafood', 'Vegetarian', 'Fine Dining', 'Lebanese'
@@ -491,61 +489,33 @@ export default function SuppliersContent() {
     a.click()
   }
 
-  // Get form fields based on supplier type
-  const getFormFields = (type: string) => {
-    const baseFields = [
+  // The form collects WHO the supplier is and how to reach them — nothing
+  // more. Property type, star rating, ship name, languages, commission and
+  // payment terms all live in the RATES section against the actual rates
+  // (accommodation_rates carries property_type/star_rating, guide_rates
+  // carries guide_language, …) — collecting them here too created duplicate,
+  // diverging records. Existing values on old rows are untouched and still
+  // display in the list; they just are not entered here any more.
+  const getFormFields = (): Array<{
+    name: string; key: string; type: string; required?: boolean
+    options?: string[]; description?: string
+  }> => {
+    return [
       { name: 'Supplier Name', key: 'name', type: 'text', required: true },
       { name: 'Type', key: 'type', type: 'select', required: true, options: Object.keys(TYPE_CONFIG).filter(k => k !== 'other') },
-    ]
-    
-    // Add hierarchical fields for supported types
-    const hierarchyFields: any[] = []
-    if (HIERARCHICAL_TYPES.includes(type)) {
-      hierarchyFields.push(
-        { name: 'Is Property', key: 'is_property', type: 'checkbox', description: 'Check if this is an individual property (e.g., specific hotel) rather than a company/chain' },
-        { name: 'Parent Company', key: 'parent_supplier_id', type: 'parent_select', description: 'Link to parent company (e.g., Marriott International for Cairo Marriott)' }
-      )
-    }
-
-    const contactFields = [
+      // Contact
       { name: 'Contact Person', key: 'contact_name', type: 'text' },
       { name: 'Email', key: 'contact_email', type: 'email' },
       { name: 'Phone', key: 'contact_phone', type: 'tel' },
       { name: 'Phone 2', key: 'phone2', type: 'tel' },
       { name: 'WhatsApp', key: 'whatsapp', type: 'tel' },
+      { name: 'Website', key: 'website', type: 'url' },
+      // Location
       { name: 'City', key: 'city', type: 'select', options: EGYPTIAN_CITIES },
       { name: 'Address', key: 'address', type: 'textarea' },
-      { name: 'Website', key: 'website', type: 'url' },
-      { name: 'Commission %', key: 'default_commission_rate', type: 'number' },
-      { name: 'Payment Terms', key: 'payment_terms', type: 'select', options: ['prepaid', 'cash_only', 'voucher'] },
+      // Housekeeping
       { name: 'Status', key: 'status', type: 'select', options: ['active', 'inactive', 'pending'] },
-    ]
-
-    // Type-specific fields
-    const typeFields: Record<string, any[]> = {
-      hotel: [
-        { name: 'Property Type', key: 'property_type', type: 'select', options: ['Hotel', 'Resort', 'Boutique Hotel', 'Guest House', 'Camp'] },
-        { name: 'Star Rating', key: 'star_rating', type: 'select', options: ['1', '2', '3', '4', '5'] },
-      ],
-      transport_company: [],
-      guide: [
-        { name: 'Languages', key: 'languages', type: 'multiselect', options: LANGUAGES },
-      ],
-      cruise: [
-        { name: 'Ship Name', key: 'ship_name', type: 'text' },
-        { name: 'Star Rating', key: 'star_rating', type: 'select', options: ['5 Star Standard', '5 Star Superior', '5 Star Deluxe', '5 Star Luxury'] },
-      ],
-      restaurant: [],
-    }
-
-    const extraFields = typeFields[type] || []
-    
-    return [
-      ...baseFields, 
-      ...hierarchyFields,
-      ...extraFields, 
-      ...contactFields, 
-      { name: 'Notes', key: 'notes', type: 'textarea' }
+      { name: 'Notes', key: 'notes', type: 'textarea' },
     ]
   }
 
@@ -1039,7 +1009,7 @@ export default function SuppliersContent() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {getFormFields(formData.type || 'hotel').map((field) => (
+                {getFormFields().map((field) => (
                   <div key={field.key} className={field.type === 'textarea' || field.key === 'is_property' || field.key === 'parent_supplier_id' ? 'md:col-span-2' : ''}>
                     {field.type !== 'checkbox' && (
                       <label className="block text-sm font-medium text-gray-700 mb-1">
