@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { type WorkspaceMode } from '@/lib/workspace-mode'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -37,6 +38,7 @@ export async function PATCH(request: NextRequest) {
       analytics_enabled,
       primary_color,
       secondary_color,
+      rates_currency,
     } = body
 
     // Update tenant basic info
@@ -54,6 +56,18 @@ export async function PATCH(request: NextRequest) {
       tenantUpdates.workspace_mode = resolvedMode
     }
     if (logo_url !== undefined) tenantUpdates.logo_url = logo_url
+    // Run currency (C3.4): the currency ALL this tenant's stored rates are
+    // read in. Changing it reinterprets stored numbers — the UI warns.
+    if (rates_currency !== undefined) {
+      const rc = rates_currency === null || rates_currency === '' ? null : String(rates_currency).toUpperCase()
+      if (rc !== null && !(SUPPORTED_CURRENCIES as readonly string[]).includes(rc)) {
+        return NextResponse.json(
+          { success: false, error: `rates_currency must be one of ${SUPPORTED_CURRENCIES.join(', ')}` },
+          { status: 400 }
+        )
+      }
+      tenantUpdates.rates_currency = rc
+    }
     // Branding is tenant identity — tenants table, same as the logo (mig 255).
     if (primary_color !== undefined) tenantUpdates.primary_color = primary_color
     if (secondary_color !== undefined) tenantUpdates.secondary_color = secondary_color

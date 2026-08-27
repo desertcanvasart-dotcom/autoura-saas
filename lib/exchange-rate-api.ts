@@ -35,8 +35,11 @@ export interface FetchedRate {
 }
 
 // Supported currencies in our system
-export const SUPPORTED_CURRENCIES = ['EUR', 'USD', 'GBP', 'EGP'] as const
-export type SupportedCurrency = typeof SUPPORTED_CURRENCIES[number]
+// Canonical list lives in lib/currency.ts (C3.4c); re-exported here for
+// existing importers. One EUR-based API call covers every pair.
+export { SUPPORTED_CURRENCIES } from './currency'
+export type { CurrencyCode as SupportedCurrency } from './currency'
+import { SUPPORTED_CURRENCIES } from './currency'
 
 /**
  * Fetch exchange rates from ExchangeRate-API

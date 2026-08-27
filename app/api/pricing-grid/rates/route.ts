@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
+import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
@@ -55,23 +56,25 @@ export async function GET(request: NextRequest) {
 
     // Per-rate currency (P3): rows priced in a contract currency are
     // converted into the run currency on a copy at this fetch boundary.
+    // The run currency itself is the tenant's (C3.4), EUR by default.
+    const runCurrency = await getTenantRunCurrency(supabase, authResult.tenant_id!)
     const [
       transportRates, guideRates, airportRates, hotelServiceRates,
       tippingRates, activityRates, accommodationRates, entranceFees,
       mealRates, cruiseRates, cruiseTransportPkgs, flightRates,
     ] = await Promise.all([
-      normalizeRateRows(supabase, 'transportation_rates', rawTransportRates as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'guide_rates', rawGuideRates as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'airport_staff_rates', rawAirportRates as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'hotel_staff_rates', rawHotelServiceRates as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'tipping_rates', rawTippingRates as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'activity_rates', rawActivityRates as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'accommodation_rates', rawAccommodationRates as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'entrance_fees', rawEntranceFees as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'meal_rates', rawMealRates as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'nile_cruises', rawCruiseRates as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'b2b_transport_packages', rawCruiseTransportPkgs as Record<string, unknown>[]),
-      normalizeRateRows(supabase, 'flight_rates', rawFlightRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'transportation_rates', rawTransportRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'guide_rates', rawGuideRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'airport_staff_rates', rawAirportRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'hotel_staff_rates', rawHotelServiceRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'tipping_rates', rawTippingRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'activity_rates', rawActivityRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'accommodation_rates', rawAccommodationRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'entrance_fees', rawEntranceFees as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'meal_rates', rawMealRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'nile_cruises', rawCruiseRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'b2b_transport_packages', rawCruiseTransportPkgs as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'flight_rates', rawFlightRates as Record<string, unknown>[], runCurrency),
     ])
 
     // Map to RateOption format per slot. Transport tiering is built by

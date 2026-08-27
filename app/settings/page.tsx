@@ -5,6 +5,7 @@ import { DEFAULT_MARGIN_PERCENT } from '@/lib/ai/parsing-utils'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/app/supabase'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import {
   User,
   Mail,
@@ -980,7 +981,7 @@ function SettingsContent() {
         </p>
 
         <div className="flex gap-2">
-          {['EUR', 'USD', 'GBP', 'EGP'].map((currency) => {
+          {SUPPORTED_CURRENCIES.map((currency) => {
             const isSelected = userPreferences.default_currency === currency
             const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
 

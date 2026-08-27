@@ -15,20 +15,41 @@ export interface ExchangeRate {
   last_updated_at: string
 }
 
-export type CurrencyCode = 'EUR' | 'USD' | 'GBP' | 'EGP'
+// The canonical currency vocabulary (C3.4c). MEA-first: the currencies of
+// every seeded destination shell plus the Gulf currencies clients pay in.
+// Widening again = extend this list + a migration redefining the CHECKs
+// (see 299_widen_currency_set.sql).
+export const SUPPORTED_CURRENCIES = ['EUR', 'USD', 'GBP', 'EGP', 'AED', 'SAR', 'JOD', 'MAD', 'TND', 'KES', 'TZS', 'ZAR'] as const
+export type CurrencyCode = typeof SUPPORTED_CURRENCIES[number]
 
 export const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
   EUR: '€',
   USD: '$',
   GBP: '£',
-  EGP: 'E£'
+  EGP: 'E£',
+  AED: 'AED',
+  SAR: 'SR',
+  JOD: 'JD',
+  MAD: 'MAD',
+  TND: 'DT',
+  KES: 'KSh',
+  TZS: 'TSh',
+  ZAR: 'R',
 }
 
 export const CURRENCY_NAMES: Record<CurrencyCode, string> = {
   EUR: 'Euro',
   USD: 'US Dollar',
   GBP: 'British Pound',
-  EGP: 'Egyptian Pound'
+  EGP: 'Egyptian Pound',
+  AED: 'UAE Dirham',
+  SAR: 'Saudi Riyal',
+  JOD: 'Jordanian Dinar',
+  MAD: 'Moroccan Dirham',
+  TND: 'Tunisian Dinar',
+  KES: 'Kenyan Shilling',
+  TZS: 'Tanzanian Shilling',
+  ZAR: 'South African Rand',
 }
 
 /**
@@ -79,6 +100,16 @@ export function convertCurrency(
 
   if (reverseRate) {
     return amount / reverseRate.rate
+  }
+
+  // Cross rate via EUR legs: the exchange_rates table stores only EUR↔X
+  // pairs, so e.g. EGP→USD is EGP→EUR→USD (C3.4 — non-EUR run currencies).
+  if (fromCurrency !== 'EUR' && toCurrency !== 'EUR') {
+    const toEur = convertCurrency(amount, fromCurrency, 'EUR', rates)
+    if (toEur !== null) {
+      const crossed = convertCurrency(toEur, 'EUR', toCurrency, rates)
+      if (crossed !== null) return crossed
+    }
   }
 
   console.warn(`No exchange rate found for ${fromCurrency} to ${toCurrency}`)

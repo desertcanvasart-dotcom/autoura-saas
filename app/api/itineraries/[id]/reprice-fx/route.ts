@@ -8,6 +8,7 @@ import {
   parseFrozenFx,
   type ServiceLineForFx,
 } from '@/lib/itinerary-fx'
+import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 
 // ============================================
 // POST — explicit, logged FX reprice (P4)
@@ -83,8 +84,9 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'No active exchange rates available' }, { status: 409 })
     }
 
+    const runCurrency = await getTenantRunCurrency(supabase, tenant_id)
     const lines = (services ?? []) as ServiceLineForFx[]
-    const result = computeFxReprice(lines, buildFrozenFx(currentRates, null, 'reprice').rates)
+    const result = computeFxReprice(lines, buildFrozenFx(currentRates, null, 'reprice').rates, runCurrency)
 
     // Apply per-line patches.
     for (const patch of result.patches) {
@@ -109,7 +111,7 @@ export async function POST(
       return sum + (patched ? patched.total_cost : (l.total_cost ?? 0))
     }, 0)
     const clientPrice = typeof row.total_cost === 'number' ? row.total_cost : 0
-    const newFrozen = buildFrozenFx(currentRates, user?.id ?? null, 'reprice')
+    const newFrozen = buildFrozenFx(currentRates, user?.id ?? null, 'reprice', undefined, runCurrency)
 
     const { error: headerError } = await supabase
       .from('itineraries')

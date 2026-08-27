@@ -22,6 +22,7 @@ import {
   Activity,
 } from 'lucide-react'
 import Image from 'next/image'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 
 const supabase = createClient()
 
@@ -62,6 +63,9 @@ export default function TenantSettingsPage() {
   // "fall through to the platform constant". A number state would force 0 —
   // and 0 is a real house rate (an at-cost agency), not an absence.
   const [defaultMargin, setDefaultMargin] = useState('')
+  // Run currency (C3.4): '' = EUR default. Reinterprets stored rate amounts;
+  // the field warns about that.
+  const [ratesCurrency, setRatesCurrency] = useState('')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -83,6 +87,7 @@ export default function TenantSettingsPage() {
       // Workspace visibility is a tenant preference, free on every tier —
       // no longer derived from feature flags, which read like entitlements.
       setWorkspaceMode(tenant.workspace_mode ?? 'both')
+      setRatesCurrency((tenant as { rates_currency?: string | null }).rates_currency || '')
     }
 
     if (features) {
@@ -237,6 +242,9 @@ export default function TenantSettingsPage() {
           // Empty field -> NULL -> the resolver falls through to the platform
           // constant. Storing 0 here would silently make every quote at-cost.
           default_margin_percent: defaultMargin.trim() === '' ? null : Number(defaultMargin),
+          ...(ratesCurrency || (tenant as { rates_currency?: string | null }).rates_currency
+            ? { rates_currency: ratesCurrency || null }
+            : {}),
         })
         .eq('id', tenant.id)
 
@@ -441,6 +449,29 @@ export default function TenantSettingsPage() {
             <p className="mt-1.5 text-[11px] text-gray-500">
               Hiding a workspace only tidies the sidebar. Every record stays reachable by link,
               in search and in reports.
+            </p>
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Rates currency
+            </label>
+            <select
+              value={ratesCurrency}
+              onChange={(e) => setRatesCurrency(e.target.value)}
+              disabled={!isAdmin}
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
+            >
+              <option value="">EUR (default)</option>
+              {SUPPORTED_CURRENCIES.filter(c => c !== 'EUR').map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-[11px] text-gray-500">
+              The currency all your stored rates are read in and pricing runs in. Individual
+              rates entered in another currency (the per-rate selector) are converted into
+              this one automatically. Changing this does NOT convert existing numbers — it
+              reinterprets them, so set it before entering rates.
             </p>
           </div>
         </div>
