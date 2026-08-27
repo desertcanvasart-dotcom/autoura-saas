@@ -1,8 +1,9 @@
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
-import { Plus, Edit, Save, X, Loader2, DollarSign } from 'lucide-react'
+import { Plus, Edit, Save, X, Loader2, DollarSign, Trash2 } from 'lucide-react'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface FixedCost {
   id: string
@@ -19,6 +20,7 @@ function FixedCostsContent() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ cost_type: '', cost_per_person_per_day: '', description: '', is_active: true })
   const [saving, setSaving] = useState(false)
+  const dialog = useConfirmDialog()
   // Which currency this cost is entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
 
@@ -50,6 +52,19 @@ function FixedCostsContent() {
         fetchCosts()
       }
     } catch {} finally { setSaving(false) }
+  }
+
+  const handleDelete = async (c: FixedCost) => {
+    const confirmed = await dialog.confirmDelete(c.cost_type)
+    if (!confirmed) return
+    try {
+      const res = await fetch('/api/rates/fixed-costs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: c.id }),
+      })
+      if (res.ok) fetchCosts()
+    } catch {}
   }
 
   const handleEdit = (c: FixedCost) => {
@@ -95,6 +110,7 @@ function FixedCostsContent() {
                     {c.is_active ? 'Active' : 'Inactive'}
                   </span>
                   <button onClick={() => handleEdit(c)} className="p-1.5 text-gray-400 hover:text-[#647C47]"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => handleDelete(c)} className="p-1.5 text-gray-400 hover:text-red-600" title="Delete"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
             ))}

@@ -117,3 +117,36 @@ export function isNameTaken(
     d => d.id !== ignoreId && d.name.trim().toLowerCase() === target
   )
 }
+
+// ============================================
+// Routable-type exclusivity (P6)
+// ============================================
+// Task routing picks the FIRST department whose service_types contains the
+// task's type (lib/ai/task-generation.ts) — two active departments claiming
+// the same type would route silently to whichever loads first. Creation and
+// update therefore refuse a claim another active department already holds.
+
+export interface ClaimCheckDept {
+  id: string
+  name: string
+  service_types?: string[] | null
+  is_active?: boolean | null
+}
+
+/** First conflicting (type, owner) between the requested types and OTHER
+ *  active departments' claims — or null when the claim set is clean. */
+export function findClaimConflict(
+  serviceTypes: string[],
+  otherDepartments: ClaimCheckDept[],
+  selfId?: string
+): { type: string; owner: string } | null {
+  for (const dept of otherDepartments) {
+    if (selfId && dept.id === selfId) continue
+    if (dept.is_active === false) continue
+    const claimed = dept.service_types || []
+    for (const type of serviceTypes) {
+      if (claimed.includes(type)) return { type, owner: dept.name }
+    }
+  }
+  return null
+}
