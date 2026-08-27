@@ -50,7 +50,159 @@ ${seg.rawContent}
 ───────────────────────────────────────`
   }).join('\n')
 
-  const prompt = `You are a DATA CONVERTER. Your ONLY task is to convert travel agent shorthand into JSON format.
+  const prompt = buildStructuredPrompt({
+    rawItinerary, dayMappingSection, expectedDays, language, tier, totalPax, packageType,
+  })
+
+  // In structured mode, only inject pricing + supplier memories (not client preferences)
+  const structuredMemoryBlock = memoryPromptBlock
+    ? memoryPromptBlock
+        .split('\n')
+        .filter(line =>
+          line.includes('PRICING PATTERNS') ||
+          line.includes('SUPPLIER PREFERENCES') ||
+          line.startsWith('•') ||
+          line.startsWith('═')
+        )
+        .join('\n')
+    : ''
+
+  const fullPrompt = structuredMemoryBlock
+    ? prompt + '\n\n' + structuredMemoryBlock
+    : prompt
+
+
+
+  const message = await getAnthropicClient().messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 16384,
+    messages: [
+      {
+        role: 'user',
+        content: fullPrompt
+      }
+    ]
+  })
+
+  const responseText = message.content
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+
+  // Parse JSON
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    console.error('❌ Failed to parse AI response:', responseText.substring(0, 500))
+    throw new Error('Failed to parse AI response as JSON')
+  }
+
+  const result = JSON.parse(jsonMatch[0])
+
+  // Validate day count
+  if (result.days && result.days.length < expectedDays) {
+    console.warn(`⚠️ AI returned ${result.days.length} days but expected ${expectedDays}`)
+  } else {
+
+  }
+
+  // Log first day for debugging
+  if (result.days && result.days[0]) {
+
+  }
+
+  return result
+}
+
+// ============================================
+// CREATIVE MODE: AI GENERATES ITINERARY
+// ============================================
+
+export async function generateCreativeItinerary(
+  params: {
+    clientName: string
+    tourName: string
+    durationDays: number
+    tier: ServiceTier
+    totalPax: number
+    numAdults: number
+    numChildren: number
+    language: string
+    cities: string[]
+    interests: string[]
+    specialRequests: string[]
+    startDate: string
+    effectiveCity: string
+    attractionNames: string[]
+    contentContext: string
+    writingContext: string
+    includeLunch: boolean
+    includeDinner: boolean
+    includeAccommodation: boolean
+    memoryPromptBlock?: string
+  }
+): Promise<any> {
+  const {
+    clientName, tourName, durationDays, tier, totalPax, numAdults, numChildren,
+    language, cities, interests, specialRequests, startDate, effectiveCity,
+    attractionNames, contentContext, writingContext, includeLunch, includeDinner, includeAccommodation,
+    memoryPromptBlock
+  } = params
+
+  const prompt = buildCreativePrompt({
+    clientName, tourName, durationDays, tier, numAdults, numChildren, language,
+    cities, interests, specialRequests, startDate, effectiveCity, attractionNames,
+    contentContext, writingContext, includeLunch, includeDinner, includeAccommodation,
+  })
+
+  // Append memory context if available
+  const fullPrompt = memoryPromptBlock
+    ? prompt + '\n\n' + memoryPromptBlock
+    : prompt
+
+  const message = await getAnthropicClient().messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 8192,
+    messages: [
+      {
+        role: 'user',
+        content: fullPrompt
+      }
+    ]
+  })
+
+  const responseText = message.content
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error('Failed to parse AI response as JSON')
+  }
+
+  return JSON.parse(jsonMatch[0])
+}
+
+// ============================================
+// PURE PROMPT BUILDERS — the golden-snapshot referee
+// ============================================
+// The template text is byte-identical to what the generate functions always
+// sent — extracted so tests can pin the exact prompt (see
+// __tests__/prompt-builder-golden.test.ts). Once pinned, no prompt byte can
+// move without a failing test saying so; the multi-destination port (plan in
+// docs/plans/) happens under these snapshots.
+
+export function buildStructuredPrompt(input: {
+  rawItinerary: string
+  dayMappingSection: string
+  expectedDays: number
+  language: string
+  tier: ServiceTier
+  totalPax: number
+  packageType?: PackageType
+}): string {
+  const { rawItinerary, dayMappingSection, expectedDays, language, tier, totalPax, packageType } = input
+  return `You are a DATA CONVERTER. Your ONLY task is to convert travel agent shorthand into JSON format.
 
 ⛔ THIS IS NOT A CREATIVE TASK ⛔
 You are NOT designing an itinerary. You are CONVERTING an existing one.
@@ -189,102 +341,30 @@ PACKAGE: ${packageType || 'cruise-land'}
 □ The last day with activities includes everything mentioned (not just "departure")
 
 NOW CONVERT THE ITINERARY TO JSON:`
-
-  // In structured mode, only inject pricing + supplier memories (not client preferences)
-  const structuredMemoryBlock = memoryPromptBlock
-    ? memoryPromptBlock
-        .split('\n')
-        .filter(line =>
-          line.includes('PRICING PATTERNS') ||
-          line.includes('SUPPLIER PREFERENCES') ||
-          line.startsWith('•') ||
-          line.startsWith('═')
-        )
-        .join('\n')
-    : ''
-
-  const fullPrompt = structuredMemoryBlock
-    ? prompt + '\n\n' + structuredMemoryBlock
-    : prompt
-
-
-
-  const message = await getAnthropicClient().messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 16384,
-    messages: [
-      {
-        role: 'user',
-        content: fullPrompt
-      }
-    ]
-  })
-
-  const responseText = message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map(block => block.text)
-    .join('')
-
-  // Parse JSON
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    console.error('❌ Failed to parse AI response:', responseText.substring(0, 500))
-    throw new Error('Failed to parse AI response as JSON')
-  }
-
-  const result = JSON.parse(jsonMatch[0])
-
-  // Validate day count
-  if (result.days && result.days.length < expectedDays) {
-    console.warn(`⚠️ AI returned ${result.days.length} days but expected ${expectedDays}`)
-  } else {
-
-  }
-
-  // Log first day for debugging
-  if (result.days && result.days[0]) {
-
-  }
-
-  return result
 }
 
-// ============================================
-// CREATIVE MODE: AI GENERATES ITINERARY
-// ============================================
-
-export async function generateCreativeItinerary(
-  params: {
-    clientName: string
-    tourName: string
-    durationDays: number
-    tier: ServiceTier
-    totalPax: number
-    numAdults: number
-    numChildren: number
-    language: string
-    cities: string[]
-    interests: string[]
-    specialRequests: string[]
-    startDate: string
-    effectiveCity: string
-    attractionNames: string[]
-    contentContext: string
-    writingContext: string
-    includeLunch: boolean
-    includeDinner: boolean
-    includeAccommodation: boolean
-    memoryPromptBlock?: string
-  }
-): Promise<any> {
-  const {
-    clientName, tourName, durationDays, tier, totalPax, numAdults, numChildren,
-    language, cities, interests, specialRequests, startDate, effectiveCity,
-    attractionNames, contentContext, writingContext, includeLunch, includeDinner, includeAccommodation,
-    memoryPromptBlock
-  } = params
-
-  const prompt = `Create a ${durationDays}-day Egypt itinerary.
+export function buildCreativePrompt(input: {
+  clientName: string
+  tourName: string
+  durationDays: number
+  tier: ServiceTier
+  numAdults: number
+  numChildren: number
+  language: string
+  cities: string[]
+  interests: string[]
+  specialRequests: string[]
+  startDate: string
+  effectiveCity: string
+  attractionNames: string[]
+  contentContext: string
+  writingContext: string
+  includeLunch: boolean
+  includeDinner: boolean
+  includeAccommodation: boolean
+}): string {
+  const { clientName, tourName, durationDays, tier, numAdults, numChildren, language, cities, interests, specialRequests, startDate, effectiveCity, attractionNames, contentContext, writingContext, includeLunch, includeDinner, includeAccommodation } = input
+  return `Create a ${durationDays}-day Egypt itinerary.
 
 ${EGYPT_TRAVEL_GLOSSARY}
 
@@ -342,32 +422,4 @@ Return ONLY valid JSON:
 }
 
 Use EXACT attraction names from the provided list. Set includes_hotel to false on the last day.`
-
-  // Append memory context if available
-  const fullPrompt = memoryPromptBlock
-    ? prompt + '\n\n' + memoryPromptBlock
-    : prompt
-
-  const message = await getAnthropicClient().messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 8192,
-    messages: [
-      {
-        role: 'user',
-        content: fullPrompt
-      }
-    ]
-  })
-
-  const responseText = message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map(block => block.text)
-    .join('')
-
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    throw new Error('Failed to parse AI response as JSON')
-  }
-
-  return JSON.parse(jsonMatch[0])
 }
