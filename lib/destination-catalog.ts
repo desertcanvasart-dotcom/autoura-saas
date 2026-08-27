@@ -81,29 +81,3 @@ export function citiesForDropdown(catalog: CatalogDestination[]): string[] {
   return rows.length === 0 ? [...EGYPT_CITIES] : rows.map(c => c.name)
 }
 
-/**
- * Glossary editing format (settings page): one "English = 日本語" pair per
- * line. Returns null when any non-blank line is malformed.
- */
-export function linesToGlossary(text: string): Record<string, string> | null {
-  const out: Record<string, string> = {}
-  for (const raw of text.split('\n')) {
-    const line = raw.trim()
-    if (!line) continue
-    const idx = line.indexOf('=')
-    if (idx <= 0) return null
-    const key = line.slice(0, idx).trim()
-    const value = line.slice(idx + 1).trim()
-    if (!key || !value) return null
-    out[key] = value
-  }
-  return out
-}
-
-/** Inverse of linesToGlossary, tolerant of any stored JSONB shape. */
-export function glossaryToLines(glossary: unknown): string {
-  if (!glossary || typeof glossary !== 'object' || Array.isArray(glossary)) return ''
-  return Object.entries(glossary as Record<string, unknown>)
-    .map(([k, v]) => `${k} = ${String(v)}`)
-    .join('\n')
-}

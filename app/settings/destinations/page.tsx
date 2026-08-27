@@ -4,7 +4,7 @@
 // Settings → Destinations
 // ============================================
 // P1b: which countries this tenant operates, which one is the default, and
-// the per-destination AI voice (generation brief + glossary). The catalog
+// the per-destination generation brief. The catalog
 // itself is GLOBAL and self-serve — a tenant can add a country or a city the
 // catalog does not know yet, and every other tenant can then select it.
 // Writes go through /api/destination-catalog/manage (admin-gated).
@@ -25,7 +25,6 @@ import {
 import { useRole } from '@/hooks/useRole'
 import type { CatalogDestination } from '@/hooks/useDestinationCities'
 import { clearDestinationCache } from '@/hooks/useDestinationCities'
-import { linesToGlossary, glossaryToLines } from '@/lib/destination-catalog'
 
 interface Notice {
   kind: 'success' | 'error' | 'warning'
@@ -40,14 +39,13 @@ export default function DestinationSettingsPage() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  // Brief/glossary drafts per catalog_id (glossary edited as "English = 日本語" lines)
+  // Generation-brief drafts per catalog_id
   const [briefDraft, setBriefDraft] = useState<Record<string, string>>({})
-  const [glossaryDraft, setGlossaryDraft] = useState<Record<string, string>>({})
 
   // Add-country / add-city form state
   const [showAddCountry, setShowAddCountry] = useState(false)
-  const [countryForm, setCountryForm] = useState({ country_code: '', name: '', name_ja: '' })
-  const [cityForms, setCityForms] = useState<Record<string, { name: string; name_ja: string }>>({})
+  const [countryForm, setCountryForm] = useState({ country_code: '', name: '' })
+  const [cityForms, setCityForms] = useState<Record<string, string>>({})
 
   const load = useCallback(async () => {
     try {
@@ -91,31 +89,23 @@ export default function DestinationSettingsPage() {
     }
   }
 
-  const saveVoice = async (d: CatalogDestination) => {
-    const glossaryText = glossaryDraft[d.id] ?? glossaryToLines(d.glossary)
-    const glossary = linesToGlossary(glossaryText)
-    if (glossary === null) {
-      setNotice({ kind: 'error', text: 'Glossary lines must look like: Cairo = カイロ' })
-      return
-    }
+  const saveBrief = async (d: CatalogDestination) => {
     await act(`voice-${d.id}`, {
       action: 'update_destination',
       catalog_id: d.id,
       generation_brief: briefDraft[d.id] ?? d.generation_brief ?? '',
-      glossary: Object.keys(glossary).length ? glossary : null,
     }, 'Saved')
   }
 
   const addCity = async (d: CatalogDestination) => {
-    const form = cityForms[d.id]
-    if (!form?.name.trim()) return
+    const name = (cityForms[d.id] ?? '').trim()
+    if (!name) return
     const ok = await act(`city-${d.id}`, {
       action: 'add_city',
       catalog_id: d.id,
-      name: form.name.trim(),
-      name_ja: form.name_ja.trim() || null,
-    }, `${form.name.trim()} added`)
-    if (ok) setCityForms(prev => ({ ...prev, [d.id]: { name: '', name_ja: '' } }))
+      name,
+    }, `${name} added`)
+    if (ok) setCityForms(prev => ({ ...prev, [d.id]: '' }))
   }
 
   const addCountry = async () => {
@@ -124,10 +114,9 @@ export default function DestinationSettingsPage() {
       action: 'add_country',
       country_code: countryForm.country_code.trim(),
       name: countryForm.name.trim(),
-      name_ja: countryForm.name_ja.trim() || null,
     }, `${countryForm.name.trim()} added and selected`)
     if (ok) {
-      setCountryForm({ country_code: '', name: '', name_ja: '' })
+      setCountryForm({ country_code: '', name: '' })
       setShowAddCountry(false)
     }
   }
@@ -204,7 +193,6 @@ export default function DestinationSettingsPage() {
                   >
                     {isOpen ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
                     <span className="font-medium text-gray-900">{d.name}</span>
-                    {d.name_ja && <span className="text-sm text-gray-400">{d.name_ja}</span>}
                     <span className="text-xs text-gray-400 uppercase">{d.country_code}</span>
                     <span className="text-xs text-gray-400">· {d.cities.length} {d.cities.length === 1 ? 'city' : 'cities'}</span>
                   </button>
@@ -238,20 +226,14 @@ export default function DestinationSettingsPage() {
                       {isAdmin && (
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <input
-                            value={cityForms[d.id]?.name ?? ''}
-                            onChange={e => setCityForms(prev => ({ ...prev, [d.id]: { name: e.target.value, name_ja: prev[d.id]?.name_ja ?? '' } }))}
+                            value={cityForms[d.id] ?? ''}
+                            onChange={e => setCityForms(prev => ({ ...prev, [d.id]: e.target.value }))}
                             placeholder="City name"
-                            className="px-2 py-1 text-sm border border-gray-300 rounded-md w-40"
-                          />
-                          <input
-                            value={cityForms[d.id]?.name_ja ?? ''}
-                            onChange={e => setCityForms(prev => ({ ...prev, [d.id]: { name: prev[d.id]?.name ?? '', name_ja: e.target.value } }))}
-                            placeholder="日本語名 (optional)"
                             className="px-2 py-1 text-sm border border-gray-300 rounded-md w-40"
                           />
                           <button
                             onClick={() => addCity(d)}
-                            disabled={busy !== null || !(cityForms[d.id]?.name ?? '').trim()}
+                            disabled={busy !== null || !(cityForms[d.id] ?? '').trim()}
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-sm text-white bg-[#647C47] rounded-md hover:bg-[#4f6238] disabled:opacity-50"
                           >
                             {busy === `city-${d.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
@@ -261,7 +243,7 @@ export default function DestinationSettingsPage() {
                       )}
                     </div>
 
-                    {/* AI voice — only meaningful for selected destinations */}
+                    {/* Generation brief — only meaningful for selected destinations */}
                     {d.selected && (
                       <div className="space-y-3">
                         <div>
@@ -277,27 +259,14 @@ export default function DestinationSettingsPage() {
                             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                           />
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">
-                            Glossary <span className="text-gray-400 font-normal">(one per line: English = 日本語)</span>
-                          </label>
-                          <textarea
-                            value={glossaryDraft[d.id] ?? glossaryToLines(d.glossary)}
-                            onChange={e => setGlossaryDraft(prev => ({ ...prev, [d.id]: e.target.value }))}
-                            disabled={!isAdmin}
-                            rows={4}
-                            placeholder={'Cairo = カイロ\nPetra = ペトラ'}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono"
-                          />
-                        </div>
                         {isAdmin && (
                           <button
-                            onClick={() => saveVoice(d)}
+                            onClick={() => saveBrief(d)}
                             disabled={busy !== null}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
                           >
                             {busy === `voice-${d.id}` && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                            Save brief & glossary
+                            Save brief
                           </button>
                         )}
                       </div>
@@ -332,15 +301,6 @@ export default function DestinationSettingsPage() {
                   onChange={e => setCountryForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="Jordan"
                   className="px-2 py-1.5 text-sm border border-gray-300 rounded-md w-44"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">日本語名 (optional)</label>
-                <input
-                  value={countryForm.name_ja}
-                  onChange={e => setCountryForm(f => ({ ...f, name_ja: e.target.value }))}
-                  placeholder="ヨルダン"
-                  className="px-2 py-1.5 text-sm border border-gray-300 rounded-md w-36"
                 />
               </div>
               <button
