@@ -9,48 +9,8 @@ import { useSearchParams } from 'next/navigation'
 import { Building2, Plus, Search, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
-// ============================================
-// EGYPTIAN CITIES - Complete List
-// ============================================
-const EGYPT_CITIES = [
-  'Alamein',
-  'Alexandria',
-  'Aswan',
-  'Asyut',
-  'Bahariya',
-  'Beni Suef',
-  'Cairo',
-  'Dahab',
-  'Dakhla',
-  'Edfu',
-  'El Arish',
-  'El Balyana',
-  'El Gouna',
-  'El Quseir',
-  'El Tor',
-  'Esna',
-  'Farafra',
-  'Fayoum',
-  'Giza',
-  'Hurghada',
-  'Kharga',
-  'Kom Ombo',
-  'Luxor',
-  'Marsa Alam',
-  'Minya',
-  'Nuweiba',
-  'Qena',
-  'Rafah',
-  'Rosetta (Rashid)',
-  'Safaga',
-  'Saint Catherine',
-  'Sharm El Sheikh',
-  'Sheikh Zuweid',
-  'Siwa',
-  'Sohag',
-  'Taba'
-]
 
 const TIER_OPTIONS = [
   { value: 'budget', label: 'Budget', color: 'bg-gray-100 text-gray-700' },
@@ -370,6 +330,8 @@ function Pagination({
 // ============================================
 
 export default function HotelsContent() {
+  // City vocabulary from the destination catalog (Egypt fallback pre-migration).
+  const { cities: cityOptions } = useDestinationCities()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dialog = useConfirmDialog()
@@ -1669,7 +1631,7 @@ export default function HotelsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
                     >
                       <option value="">Select City...</option>
-                      {EGYPT_CITIES.map(city => (
+                      {cityOptions.map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>

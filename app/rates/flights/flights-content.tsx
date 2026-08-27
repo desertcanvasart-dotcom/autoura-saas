@@ -5,8 +5,8 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useState, useEffect, useCallback } from 'react'
 import { Search, Plus, Edit2, Trash2, X, Plane, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Clock, Luggage, ArrowRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
 interface FlightRate {
   id: string
@@ -156,6 +156,8 @@ const POPULAR_ROUTES = [
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function FlightsContent() {
+  // City vocabulary from the destination catalog (Egypt fallback pre-migration).
+  const { cities: cityOptions } = useDestinationCities()
   const dialog = useConfirmDialog()
   const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
@@ -672,7 +674,7 @@ export default function FlightsContent() {
             className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
           >
             <option value="">From Any</option>
-            {EGYPT_CITIES.map(city => (
+            {cityOptions.map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -686,7 +688,7 @@ export default function FlightsContent() {
             className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
           >
             <option value="">To Any</option>
-            {EGYPT_CITIES.map(city => (
+            {cityOptions.map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -1107,7 +1109,7 @@ export default function FlightsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                     >
                       <option value="">Select departure city</option>
-                      {EGYPT_CITIES.map(city => (
+                      {cityOptions.map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>
@@ -1124,7 +1126,7 @@ export default function FlightsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                     >
                       <option value="">Select arrival city</option>
-                      {EGYPT_CITIES.filter(c => c !== formData.route_from).map(city => (
+                      {cityOptions.filter(c => c !== formData.route_from).map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>

@@ -8,15 +8,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Users, Plus, Search, Edit, Trash2, X, Check, Copy, Filter, Globe, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
-// Egyptian cities
-const EGYPT_CITIES = [
-  'Alamein', 'Alexandria', 'Aswan', 'Asyut', 'Bahariya', 'Beni Suef', 'Cairo',
-  'Dahab', 'Dakhla', 'Edfu', 'El Arish', 'El Balyana', 'El Gouna', 'El Quseir',
-  'El Tor', 'Esna', 'Farafra', 'Fayoum', 'Giza', 'Hurghada', 'Kharga', 'Kom Ombo',
-  'Luxor', 'Marsa Alam', 'Minya', 'Nuweiba', 'Qena', 'Rafah', 'Rosetta (Rashid)',
-  'Safaga', 'Saint Catherine', 'Sharm El Sheikh', 'Sheikh Zuweid', 'Siwa', 'Sohag', 'Taba'
-]
 
 const LANGUAGES = [
   'English', 'Arabic', 'French', 'German', 'Spanish', 'Italian',
@@ -73,6 +66,8 @@ interface GuideRate {
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function GuideRatesContent() {
+  // City vocabulary from the destination catalog (Egypt fallback pre-migration).
+  const { cities: cityOptions } = useDestinationCities()
   const searchParams = useSearchParams()
   const initialSupplierId = searchParams.get('supplier_id') || ''
 
@@ -716,7 +711,7 @@ export default function GuideRatesContent() {
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
           >
             <option value="">All Cities</option>
-            {EGYPT_CITIES.map(city => (
+            {cityOptions.map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -1192,7 +1187,7 @@ export default function GuideRatesContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     >
                       <option value="">Select City</option>
-                      {EGYPT_CITIES.map(city => (
+                      {cityOptions.map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>

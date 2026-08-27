@@ -3486,6 +3486,92 @@ export interface Database {
           },
         ]
       }
+      destination_catalog: {
+        Row: {
+          id: string
+          country_code: string
+          name: string
+          name_ja: string | null
+          is_active: boolean
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          country_code: string
+          name: string
+          name_ja?: string | null
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          country_code?: string
+          name?: string
+          name_ja?: string | null
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      destination_cities: {
+        Row: {
+          id: string
+          catalog_id: string
+          name: string
+          name_ja: string | null
+          aliases: string[] | null
+          lat: number | null
+          lng: number | null
+          airport_codes: string[] | null
+          timezone: string | null
+          sort_order: number
+          is_active: boolean
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          catalog_id: string
+          name: string
+          name_ja?: string | null
+          aliases?: string[] | null
+          lat?: number | null
+          lng?: number | null
+          airport_codes?: string[] | null
+          timezone?: string | null
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          catalog_id?: string
+          name?: string
+          name_ja?: string | null
+          aliases?: string[] | null
+          lat?: number | null
+          lng?: number | null
+          airport_codes?: string[] | null
+          timezone?: string | null
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "destination_cities_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "destination_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       destinations: {
         Row: {
           id: string
@@ -7921,6 +8007,57 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_destinations: {
+        Row: {
+          id: string
+          tenant_id: string
+          catalog_id: string
+          is_default: boolean
+          generation_brief: string | null
+          glossary: Json | null
+          is_active: boolean
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          catalog_id: string
+          is_default?: boolean
+          generation_brief?: string | null
+          glossary?: Json | null
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          catalog_id?: string
+          is_default?: boolean
+          generation_brief?: string | null
+          glossary?: Json | null
+          is_active?: boolean
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_destinations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_destinations_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "destination_catalog"
             referencedColumns: ["id"]
           },
         ]
