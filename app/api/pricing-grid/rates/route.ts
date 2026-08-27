@@ -7,6 +7,7 @@
 // authenticated user's tenant.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
@@ -25,18 +26,18 @@ export async function GET(request: NextRequest) {
 
     // Fetch all rate tables in parallel
     const [
-      { data: transportRates },
-      { data: guideRates },
-      { data: airportRates },
-      { data: hotelServiceRates },
-      { data: tippingRates },
-      { data: activityRates },
-      { data: accommodationRates },
-      { data: entranceFees },
-      { data: mealRates },
-      { data: cruiseRates },
-      { data: cruiseTransportPkgs },
-      { data: flightRates },
+      { data: rawTransportRates },
+      { data: rawGuideRates },
+      { data: rawAirportRates },
+      { data: rawHotelServiceRates },
+      { data: rawTippingRates },
+      { data: rawActivityRates },
+      { data: rawAccommodationRates },
+      { data: rawEntranceFees },
+      { data: rawMealRates },
+      { data: rawCruiseRates },
+      { data: rawCruiseTransportPkgs },
+      { data: rawFlightRates },
     ] = await Promise.all([
       supabase.from('transportation_rates').select('*').eq('is_active', true),
       supabase.from('guide_rates').select('*').eq('is_active', true),
@@ -50,6 +51,27 @@ export async function GET(request: NextRequest) {
       supabase.from('nile_cruises').select('*').eq('is_active', true).eq('tier', tier),
       supabase.from('b2b_transport_packages').select('*').eq('is_active', true),
       supabase.from('flight_rates').select('*').eq('is_active', true),
+    ])
+
+    // Per-rate currency (P3): rows priced in a contract currency are
+    // converted into the run currency on a copy at this fetch boundary.
+    const [
+      transportRates, guideRates, airportRates, hotelServiceRates,
+      tippingRates, activityRates, accommodationRates, entranceFees,
+      mealRates, cruiseRates, cruiseTransportPkgs, flightRates,
+    ] = await Promise.all([
+      normalizeRateRows(supabase, 'transportation_rates', rawTransportRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'guide_rates', rawGuideRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'airport_staff_rates', rawAirportRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'hotel_staff_rates', rawHotelServiceRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'tipping_rates', rawTippingRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'activity_rates', rawActivityRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'accommodation_rates', rawAccommodationRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'entrance_fees', rawEntranceFees as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'meal_rates', rawMealRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'nile_cruises', rawCruiseRates as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'b2b_transport_packages', rawCruiseTransportPkgs as Record<string, unknown>[]),
+      normalizeRateRows(supabase, 'flight_rates', rawFlightRates as Record<string, unknown>[]),
     ])
 
     // Map to RateOption format per slot. Transport tiering is built by

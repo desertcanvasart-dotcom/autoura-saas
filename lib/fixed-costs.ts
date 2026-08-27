@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { normalizeRateRows } from '@/lib/rates/rate-currency'
 
 // Lazy-initialized service-role client — the pricing engine reads fixed costs
 // server-side. Lazy init mirrors auto-pricing-service's getSupabaseAdmin()
@@ -43,10 +44,11 @@ export async function getFixedDailyCosts(): Promise<FixedDailyCosts> {
   }
 
   try {
-    const { data, error } = await getSupabaseAdmin()
+    const { data: rawData, error } = await getSupabaseAdmin()
       .from('fixed_daily_costs')
-      .select('cost_type, cost_per_person_per_day')
+      .select('*')
       .eq('is_active', true)
+    const data = await normalizeRateRows(getSupabaseAdmin(), 'fixed_daily_costs', rawData)
 
     if (error) {
       console.warn('[FixedCosts] DB query failed, using defaults:', error.message)

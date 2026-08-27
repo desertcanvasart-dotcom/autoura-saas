@@ -26,6 +26,7 @@
 // ============================================
 
 import { createClient } from '@supabase/supabase-js'
+import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
@@ -750,7 +751,8 @@ export async function getCruiseRates(
       query = query.ilike('embark_city', `%${embarkCity}%`)
     }
 
-    const { data: cruises, error } = await query.limit(1)
+    const { data: rawCruises, error } = await query.limit(1)
+    const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawCruises)
 
     if (error || !cruises || cruises.length === 0) {
       // No exact cruise rate for this tier — flag a hole, never guess.
@@ -889,7 +891,7 @@ export async function getHotelRates(
 
   try {
     // Primary: exact tier; city matched by ilike (substring).
-    const { data: hotels, error } = await getSupabaseAdmin()
+    const { data: rawHotels, error } = await getSupabaseAdmin()
       .from('accommodation_rates')
       .select('*')
       .or(catalogOrExpr(scope))
@@ -897,6 +899,7 @@ export async function getHotelRates(
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
       .limit(1)
+    const hotels = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawHotels)
 
     if (!error && hotels && hotels.length > 0) {
       const hotel = hotels[0] as any
@@ -908,13 +911,14 @@ export async function getHotelRates(
     }
 
     // Fallback: any tier for this city — wrong tier ⇒ fuzzy, never deliverable.
-    const { data: anyHotel } = await getSupabaseAdmin()
+    const { data: rawAnyHotel } = await getSupabaseAdmin()
       .from('accommodation_rates')
       .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
       .limit(1)
+    const anyHotel = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawAnyHotel)
 
     if (anyHotel && anyHotel.length > 0) {
       return mapRow(anyHotel[0], 'fuzzy')
@@ -939,7 +943,7 @@ export async function getEntranceFee(
   try {
     let { data: fees, error } = await getSupabaseAdmin()
       .from('entrance_fees')
-      .select('id, attraction_name, eur_rate, non_eur_rate')
+      .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .ilike('attraction_name', `%${attractionName}%`)
@@ -955,7 +959,7 @@ export async function getEntranceFee(
       for (const keyword of keywords) {
         const { data: keywordFees } = await getSupabaseAdmin()
           .from('entrance_fees')
-          .select('id, attraction_name, eur_rate, non_eur_rate')
+          .select('*')
           .or(catalogOrExpr(scope))
           .eq('is_active', true)
           .ilike('attraction_name', `%${keyword}%`)
@@ -972,6 +976,7 @@ export async function getEntranceFee(
       return null
     }
 
+    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees)
     const fee = fees[0] as any
 
     // `??`, not `||`. Since migration 278 the schema distinguishes the two
@@ -1014,13 +1019,14 @@ export async function getGuideRate(
   tier: ServiceTier
 ): Promise<{ id: string; name: string; dailyRate: number; source: RateSource } | null> {
   try {
-    const { data: guides, error } = await getSupabaseAdmin()
+    const { data: rawGuides, error } = await getSupabaseAdmin()
       .from('guides')
-      .select('id, name, daily_rate, languages, tier')
+      .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .contains('languages', [language])
       .order('is_preferred', { ascending: false })
+    const guides = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawGuides)
 
     if (!error && guides && guides.length > 0) {
       const tierMatch = (guides as any[]).find((g: any) => g.tier === tier)
@@ -1037,13 +1043,14 @@ export async function getGuideRate(
     }
 
     // Fallback: any guide regardless of language — approximate, never deliverable.
-    const { data: anyGuide } = await getSupabaseAdmin()
+    const { data: rawAnyGuide } = await getSupabaseAdmin()
       .from('guides')
-      .select('id, name, daily_rate')
+      .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .order('is_preferred', { ascending: false })
       .limit(1)
+    const anyGuide = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawAnyGuide)
 
     if (anyGuide && anyGuide.length > 0) {
       const g = anyGuide[0] as any
@@ -1072,12 +1079,13 @@ export async function getMealRates(
     // check below caught it, and this function has therefore returned null for
     // every call it has ever served. It failed SAFE (the caller records a hole
     // rather than fabricating) but meals could never be priced.
-    const { data: mealRows } = await getSupabaseAdmin()
+    const { data: rawMealRows } = await getSupabaseAdmin()
       .from('meal_rates')
-      .select('meal_type, base_rate_eur')
+      .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('tier', tier)
+    const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', rawMealRows)
 
     const rows = (mealRows ?? []) as Array<{
       meal_type?: string | null
@@ -1166,9 +1174,9 @@ export async function getAirportServiceRate(
   serviceType: AirportServiceType = 'meet_greet'
 ): Promise<number | null> {
   try {
-    const { data: rates } = await getSupabaseAdmin()
+    const { data: rawAirportRates } = await getSupabaseAdmin()
       .from('airport_staff_rates')
-      .select('rate_eur')
+      .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('airport_code', airportCode)
@@ -1186,6 +1194,7 @@ export async function getAirportServiceRate(
       // arbitrary one. Deterministic beats incidental.
       .order('rate_eur', { ascending: true })
       .limit(1)
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'airport_staff_rates', rawAirportRates)
 
     if (!rates || rates.length === 0) {
       return null
@@ -1209,9 +1218,9 @@ export async function getHotelServiceRate(
   try {
     const category = getTierCategory(tier)
 
-    const { data: rates } = await getSupabaseAdmin()
+    const { data: rawHotelStaffRates } = await getSupabaseAdmin()
       .from('hotel_staff_rates')
-      .select('rate_eur')
+      .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('service_type', serviceType)
@@ -1221,6 +1230,7 @@ export async function getHotelServiceRate(
       // second row is added.
       .order('rate_eur', { ascending: true })
       .limit(1)
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates)
 
     if (!rates || rates.length === 0) {
       return null
@@ -1238,11 +1248,12 @@ export async function getHotelServiceRate(
  */
 export async function getTippingRate(scope: CatalogScope, tier: ServiceTier): Promise<number | null> {
   try {
-    const { data: rates } = await getSupabaseAdmin()
+    const { data: rawTippingRates } = await getSupabaseAdmin()
       .from('tipping_rates')
-      .select('rate_eur, rate_unit')
+      .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', rawTippingRates)
 
     if (!rates || rates.length === 0) {
       return null
@@ -1307,11 +1318,12 @@ function expandWideTransportRow(row: any): any[] {
 }
 
 export async function buildTransportCache(scope: CatalogScope): Promise<Map<string, TransportRate>> {
-  const { data: allRates } = await getSupabaseAdmin()
+  const { data: rawAllRates } = await getSupabaseAdmin()
     .from('transportation_rates')
     .select('*')
     .or(catalogOrExpr(scope))
     .eq('is_active', true)
+  const allRates = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates)
 
   const cache = new Map<string, TransportRate>()
 

@@ -22,6 +22,7 @@ export interface Database {
     Tables: {
       accommodation_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string
           hotel_name: string | null
@@ -131,6 +132,7 @@ export interface Database {
           low_season_rate_non_eur: number | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id: string
           hotel_name?: string | null
@@ -240,6 +242,7 @@ export interface Database {
           low_season_rate_non_eur?: number | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string
           hotel_name?: string | null
@@ -367,6 +370,7 @@ export interface Database {
       }
       activity_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string
           activity_name: string
@@ -394,6 +398,7 @@ export interface Database {
           addon_note: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id: string
           activity_name: string
@@ -421,6 +426,7 @@ export interface Database {
           addon_note?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string
           activity_name?: string
@@ -654,6 +660,7 @@ export interface Database {
       }
       airport_staff_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -670,6 +677,7 @@ export interface Database {
           supplier_name: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -686,6 +694,7 @@ export interface Database {
           supplier_name?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -1183,6 +1192,7 @@ export interface Database {
       }
       b2b_transport_packages: {
         Row: {
+          rate_currency: string | null
           id: string
           package_code: string
           package_name: string
@@ -1209,6 +1219,7 @@ export interface Database {
           tenant_id: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           package_code: string
           package_name: string
@@ -1235,6 +1246,7 @@ export interface Database {
           tenant_id?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           package_code?: string
           package_name?: string
@@ -3965,6 +3977,7 @@ export interface Database {
       }
       entrance_fees: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -3989,6 +4002,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -4013,6 +4027,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -4264,6 +4279,7 @@ export interface Database {
       }
       fixed_daily_costs: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string | null
           cost_type: string
@@ -4274,6 +4290,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           cost_type: string
@@ -4284,6 +4301,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           cost_type?: string
@@ -4305,6 +4323,7 @@ export interface Database {
       }
       flight_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -4337,6 +4356,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -4369,6 +4389,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -4532,6 +4553,7 @@ export interface Database {
       }
       guide_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string
           guide_type: string | null
@@ -4553,6 +4575,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id: string
           guide_type?: string | null
@@ -4574,6 +4597,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string
           guide_type?: string | null
@@ -4613,6 +4637,7 @@ export interface Database {
       }
       guides: {
         Row: {
+          rate_currency: string | null
           id: string
           guide_code: string | null
           full_name: string
@@ -4645,6 +4670,7 @@ export interface Database {
           team_member_id: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           guide_code?: string | null
           full_name: string
@@ -4677,6 +4703,7 @@ export interface Database {
           team_member_id?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           guide_code?: string | null
           full_name?: string
@@ -4955,6 +4982,7 @@ export interface Database {
       }
       hotel_staff_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -4969,6 +4997,7 @@ export interface Database {
           destination: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -4983,6 +5012,7 @@ export interface Database {
           destination?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -5886,6 +5916,7 @@ export interface Database {
       }
       meal_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string
           restaurant_name: string | null
@@ -5913,6 +5944,7 @@ export interface Database {
           is_preferred: boolean | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id: string
           restaurant_name?: string | null
@@ -5940,6 +5972,7 @@ export interface Database {
           is_preferred?: boolean | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string
           restaurant_name?: string | null
@@ -6072,6 +6105,7 @@ export interface Database {
       }
       nile_cruises: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string
           ship_name: string
@@ -6160,6 +6194,7 @@ export interface Database {
           rate_peak_suite_non_eur: number | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id: string
           ship_name: string
@@ -6248,6 +6283,7 @@ export interface Database {
           rate_peak_suite_non_eur?: number | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string
           ship_name?: string
@@ -6956,6 +6992,7 @@ export interface Database {
       }
       sleeping_train_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -6981,6 +7018,7 @@ export interface Database {
           updated_at: string
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -7006,6 +7044,7 @@ export interface Database {
           updated_at?: string
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -8475,6 +8514,7 @@ export interface Database {
       }
       tipping_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -8489,6 +8529,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -8503,6 +8544,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -9443,6 +9485,7 @@ export interface Database {
       }
       train_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -9463,6 +9506,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -9483,6 +9527,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -9521,6 +9566,7 @@ export interface Database {
       }
       transportation_rates: {
         Row: {
+          rate_currency: string | null
           id: string
           tenant_id: string
           service_type: string | null
@@ -9561,6 +9607,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          rate_currency?: string | null
           id?: string
           tenant_id: string
           service_type?: string | null
@@ -9601,6 +9648,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          rate_currency?: string | null
           id?: string
           tenant_id?: string
           service_type?: string | null
