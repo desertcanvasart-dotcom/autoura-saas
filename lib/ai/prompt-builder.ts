@@ -4,7 +4,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { getAnthropicClient } from '@/lib/ai/anthropic-client'
-import { EGYPT_TRAVEL_GLOSSARY } from './egypt-glossary'
+import { egyptPromptContext, type DestinationPromptContext } from './destination-context'
 import type { ServiceTier, ExtractedDay, PackageType } from './parsing-utils'
 import { TIER_DESCRIPTIONS, calculateExpectedDays, preParseRawItinerary } from './parsing-utils'
 import type { WritingRule } from './content-library'
@@ -25,9 +25,10 @@ export async function generateFromStructuredInput(
     writingRules: WritingRule[]
     packageType?: PackageType
     memoryPromptBlock?: string
+    destination?: DestinationPromptContext
   }
 ): Promise<any> {
-  const { tier, totalPax, language, attractionNames, writingRules, packageType, memoryPromptBlock } = params
+  const { tier, totalPax, language, attractionNames, writingRules, packageType, memoryPromptBlock, destination } = params
   const writingContext = buildWritingRulesContext(writingRules)
 
   // Calculate expected number of days
@@ -51,6 +52,7 @@ ${seg.rawContent}
   }).join('\n')
 
   const prompt = buildStructuredPrompt({
+    destination,
     rawItinerary, dayMappingSection, expectedDays, language, tier, totalPax, packageType,
   })
 
@@ -139,16 +141,18 @@ export async function generateCreativeItinerary(
     includeDinner: boolean
     includeAccommodation: boolean
     memoryPromptBlock?: string
+    destination?: DestinationPromptContext
   }
 ): Promise<any> {
   const {
     clientName, tourName, durationDays, tier, totalPax, numAdults, numChildren,
     language, cities, interests, specialRequests, startDate, effectiveCity,
     attractionNames, contentContext, writingContext, includeLunch, includeDinner, includeAccommodation,
-    memoryPromptBlock
+    memoryPromptBlock, destination
   } = params
 
   const prompt = buildCreativePrompt({
+    destination,
     clientName, tourName, durationDays, tier, numAdults, numChildren, language,
     cities, interests, specialRequests, startDate, effectiveCity, attractionNames,
     contentContext, writingContext, includeLunch, includeDinner, includeAccommodation,
@@ -200,27 +204,29 @@ export function buildStructuredPrompt(input: {
   tier: ServiceTier
   totalPax: number
   packageType?: PackageType
+  destination?: DestinationPromptContext
 }): string {
   const { rawItinerary, dayMappingSection, expectedDays, language, tier, totalPax, packageType } = input
+  const d = input.destination ?? egyptPromptContext()
+  const briefBlock = d.brief
+    ? `\n═══════════════════════════════════════════════════════════════\n📌 DESTINATION BRIEF (this agency's voice — follow it)\n═══════════════════════════════════════════════════════════════\n${d.brief}\n`
+    : ''
   return `You are a DATA CONVERTER. Your ONLY task is to convert travel agent shorthand into JSON format.
 
 ⛔ THIS IS NOT A CREATIVE TASK ⛔
 You are NOT designing an itinerary. You are CONVERTING an existing one.
 
-${EGYPT_TRAVEL_GLOSSARY}
+${d.glossaryBlock}${briefBlock}
 
 ═══════════════════════════════════════════════════════════════
 ⛔ FORBIDDEN ACTIONS - VIOLATING THESE IS A CRITICAL ERROR ⛔
 ═══════════════════════════════════════════════════════════════
 
 1. FORBIDDEN: Adding attractions NOT in the input
-   - If Abu Simbel is not mentioned → DO NOT ADD IT
-   - If Unfinished Obelisk is not mentioned → DO NOT ADD IT
-   - If Grand Museum is not mentioned → DO NOT ADD IT
+${d.forbiddenAddExamples}
 
 2. FORBIDDEN: Removing or skipping activities from input
-   - If D1 says "Alexandria tour" → Day 1 MUST include Alexandria
-   - If D2 says "Pyramids & Museum" → Day 2 MUST include BOTH
+${d.forbiddenRemoveExamples}
 
 3. FORBIDDEN: Reordering days or activities
    - D1 content goes in day_number: 1
@@ -246,30 +252,7 @@ ${rawItinerary}
 🔍 DECODING RULES
 ═══════════════════════════════════════════════════════════════
 
-CITY CODES:
-CAI=Cairo, ALX=Alexandria, ASW=Aswan, LXR=Luxor, HRG=Hurghada, CRZ=Cruise
-
-MULTI-CITY PATTERN:
-"D1 CAI/ALX/CAI" = Day trip: Arrive Cairo → Visit Alexandria → Return Cairo
-This is NOT just "Arrival" - it's arrival PLUS a FULL DAY TOUR!
-
-ENTRANCE MARKERS:
-(INSIDE) = Entrance fee required → add to entrance_included[]
-(OUTSIDE) = Photo stop only → add to photo_stops[] (NO entrance fee)
-
-FREE DAYS:
-"D5 CRZ" with nothing else = Sailing day → is_free_day: true, is_sailing_day: true
-"D8 HRG" with nothing else = Free day → is_free_day: true
-
-MEALS:
-L = Lunch included
-D = Dinner included
-"Chinese Dinner" = Dinner at Chinese restaurant
-"Pigeon Lunch" = Lunch with Egyptian pigeon dish
-
-FLIGHTS:
-MS956@05:10 = EgyptAir flight 956 at 05:10
-"DEPARTED BY MS955@23:20" = Departure flight at 23:20
+${d.decodingRules}
 
 ═══════════════════════════════════════════════════════════════
 ⚙️ CONFIGURATION
@@ -285,7 +268,7 @@ PACKAGE: ${packageType || 'cruise-land'}
 ═══════════════════════════════════════════════════════════════
 
 {
-  "trip_name": "Egypt: Cairo, Nile Cruise & Hurghada",
+  "trip_name": "${d.exampleTripName}",
   "total_days": ${expectedDays},
   "days": [
     {
@@ -333,7 +316,7 @@ PACKAGE: ${packageType || 'cruise-land'}
 □ Day 1 contains ALL activities from D1 input (not just "arrival")
 □ Day 2 contains ALL activities from D2 input
 □ Each day's content matches ONLY what was in that day's input
-□ I did NOT add Abu Simbel, Unfinished Obelisk, or other sites not mentioned
+${d.verificationAddLine}
 □ Free/sailing days have is_free_day: true
 □ INSIDE attractions are in entrance_included (with fee)
 □ OUTSIDE attractions are in photo_stops (NO fee)
@@ -362,11 +345,16 @@ export function buildCreativePrompt(input: {
   includeLunch: boolean
   includeDinner: boolean
   includeAccommodation: boolean
+  destination?: DestinationPromptContext
 }): string {
   const { clientName, tourName, durationDays, tier, numAdults, numChildren, language, cities, interests, specialRequests, startDate, effectiveCity, attractionNames, contentContext, writingContext, includeLunch, includeDinner, includeAccommodation } = input
-  return `Create a ${durationDays}-day Egypt itinerary.
+  const d = input.destination ?? egyptPromptContext()
+  const briefBlock = d.brief
+    ? `\nDESTINATION BRIEF (this agency's voice — follow it):\n${d.brief}\n`
+    : ''
+  return `Create a ${durationDays}-day ${d.name} itinerary.
 
-${EGYPT_TRAVEL_GLOSSARY}
+${d.glossaryBlock}${briefBlock}
 
 CLIENT: ${clientName}
 TOUR: ${tourName}
@@ -405,10 +393,10 @@ Return ONLY valid JSON:
   "days": [
     {
       "day_number": 1,
-      "title": "Day 1: Arrival in Cairo",
+      "title": "Day 1: Arrival in ${d.defaultCity}",
       "description": "Professional 2-3 sentence description of the day",
-      "city": "Cairo",
-      "overnight_city": "Cairo",
+      "city": "${d.defaultCity}",
+      "overnight_city": "${d.defaultCity}",
       "is_arrival": true,
       "is_departure": false,
       "is_transfer_only": false,

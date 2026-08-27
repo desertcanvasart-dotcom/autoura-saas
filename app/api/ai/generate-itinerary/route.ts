@@ -29,6 +29,7 @@ import {
 } from '@/lib/ai/content-library'
 import { getUserPreferences } from '@/lib/ai/user-preferences'
 import { generateFromStructuredInput, generateCreativeItinerary } from '@/lib/ai/prompt-builder'
+import { loadDestinationPromptContext } from '@/lib/ai/destination-context'
 import { createCruiseItineraryServices } from '@/lib/ai/cruise-service-creation'
 import { createLandItineraryServices } from '@/lib/ai/service-creation'
 
@@ -388,6 +389,11 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     const userId = user?.id ?? null
 
+    // Destination context (P2): the tenant's default destination shapes the
+    // generation prompts. No selection, or any load failure → Egypt verbatim,
+    // proven byte-identical by the golden snapshots.
+    const destinationContext = await loadDestinationPromptContext(supabase)
+
     // ── Plan limits ──────────────────────────────────────────
     // This route consumes TWO metrics: it is an AI generation AND it creates
     // an itinerary row. Checking only the AI meter would let the annual
@@ -445,7 +451,7 @@ export async function POST(request: NextRequest) {
       budget_level = 'standard',
       tier: raw_tier = null,
       hotel_name,
-      city = 'Cairo',
+      city: requested_city = null,
       client_id = null,
       nationality = null,
       is_euro_passport = null,
@@ -471,7 +477,8 @@ export async function POST(request: NextRequest) {
       quote_type = 'none' // 'b2c' | 'b2b' | 'both' | 'none'
     } = body
 
-    const finalTourName = tour_requested || tour_name || 'Egypt Tour'
+    const city = requested_city || destinationContext.defaultCity
+    const finalTourName = tour_requested || tour_name || `${destinationContext.name} Tour`
     let finalLanguage = language !== 'English' ? language : (conversation_language || 'English')
     const tier: ServiceTier = raw_tier ? normalizeTier(raw_tier) : budget_level !== 'standard' ? normalizeTier(budget_level) : userPrefs.default_tier
 
@@ -1084,7 +1091,8 @@ export async function POST(request: NextRequest) {
           attractionNames,
           writingRules,
           packageType: effectivePackageType,
-          memoryPromptBlock: memoryResult.prompt_block
+          memoryPromptBlock: memoryResult.prompt_block,
+          destination: destinationContext
         }
       )
     } else {
@@ -1110,7 +1118,8 @@ export async function POST(request: NextRequest) {
         includeLunch: include_lunch,
         includeDinner: include_dinner,
         includeAccommodation: includeAccommodationFinal,
-        memoryPromptBlock: memoryResult.prompt_block
+        memoryPromptBlock: memoryResult.prompt_block,
+        destination: destinationContext
       })
     }
 
