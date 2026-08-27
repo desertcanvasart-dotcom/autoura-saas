@@ -18,6 +18,13 @@ DECLARE
   v_correct_experiences_id UUID;
   v_updated_count INTEGER;
 BEGIN
+  -- Prod-data repair for one specific tenant. On a database that does not
+  -- have that tenant (fresh install, other installs) there is nothing to
+  -- repair — and the inserts below would violate the tenants FK.
+  IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_correct_tenant_id) THEN
+    RAISE NOTICE 'tenant % not present — skipping content fix-up', v_correct_tenant_id;
+    RETURN;
+  END IF;
   -- Get the Experiences category ID for the CORRECT tenant
   SELECT id INTO v_correct_experiences_id
   FROM content_categories
