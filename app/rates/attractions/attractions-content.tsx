@@ -8,8 +8,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Search, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
 // ============================================
 // CONSTANTS
@@ -182,6 +182,8 @@ function Pagination({
 // ============================================
 
 export default function AttractionsContent() {
+  // City vocabulary from the destination catalog (Egypt fallback pre-migration).
+  const { cities: cityOptions } = useDestinationCities()
   const searchParams = useSearchParams()
   const dialog = useConfirmDialog()
   const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
@@ -1084,7 +1086,7 @@ export default function AttractionsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
                     >
                       <option value="">Select city...</option>
-                      {EGYPT_CITIES.map(city => (
+                      {cityOptions.map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>
