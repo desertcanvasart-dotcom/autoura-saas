@@ -22,6 +22,7 @@ import {
   Activity,
 } from 'lucide-react'
 import Image from 'next/image'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 
 const supabase = createClient()
 
@@ -462,9 +463,9 @@ export default function TenantSettingsPage() {
               className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
             >
               <option value="">EUR (default)</option>
-              <option value="USD">USD</option>
-              <option value="GBP">GBP</option>
-              <option value="EGP">EGP</option>
+              {SUPPORTED_CURRENCIES.filter(c => c !== 'EUR').map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
             <p className="mt-1.5 text-[11px] text-gray-500">
               The currency all your stored rates are read in and pricing runs in. Individual

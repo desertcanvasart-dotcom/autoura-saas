@@ -8,7 +8,9 @@
 // pre-migration row means. The pricing engine converts a copy at the fetch
 // boundary (lib/rates/rate-currency.ts); the stored amounts never change.
 
-export const RATE_CURRENCIES = ['EUR', 'USD', 'GBP', 'EGP'] as const
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+
+export const RATE_CURRENCIES = SUPPORTED_CURRENCIES
 
 /**
  * Build the save-payload fragment. The key is included ONLY when the user

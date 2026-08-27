@@ -24,7 +24,9 @@ const TIERS: { value: Tier; label: string }[] = [
   { value: 'luxury', label: 'Luxury' },
 ]
 
-const CURRENCIES = ['EUR', 'USD', 'GBP', 'EGP']
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+
+const CURRENCIES = SUPPORTED_CURRENCIES
 
 const DEFAULT_MARGINS: Record<ClientType, number> = {
   b2b: 10,

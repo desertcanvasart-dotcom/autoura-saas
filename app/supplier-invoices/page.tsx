@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Receipt, Plus, Search, Upload, Loader2, X, Sparkles } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 
 const SYM: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
 const money = (n: number, c = 'EUR') => `${SYM[c] || c + ' '}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -184,7 +185,7 @@ export default function SupplierInvoicesPage() {
               <div className="grid grid-cols-3 gap-3">
                 <Field label="Amount *"><input required type="number" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={inp} /></Field>
                 <Field label="Tax"><input type="number" step="0.01" value={form.tax_amount} onChange={e => setForm({ ...form, tax_amount: e.target.value })} className={inp} /></Field>
-                <Field label="Currency"><select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} className={inp}>{['EUR', 'USD', 'GBP', 'EGP'].map(c => <option key={c}>{c}</option>)}</select></Field>
+                <Field label="Currency"><select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} className={inp}>{SUPPORTED_CURRENCIES.map(c => <option key={c}>{c}</option>)}</select></Field>
               </div>
               <Field label="Description"><textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} className={inp} /></Field>
 

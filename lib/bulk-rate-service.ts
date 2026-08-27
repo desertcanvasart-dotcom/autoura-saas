@@ -1,3 +1,4 @@
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 /**
  * Bulk Rate Import/Export Service
  * Provides CSV import/export for all rate tables with validation and upsert.
@@ -541,8 +542,8 @@ export function validateImportData(
         rowValid = false
       } else if (parsed !== null) {
         // Per-rate currency: only the supported set; blank = EUR default.
-        if (colDef.name === 'rate_currency' && !['EUR', 'USD', 'GBP', 'EGP'].includes(String(parsed).toUpperCase())) {
-          errors.push({ row: rowNum, column: colDef.name, message: `Unsupported currency "${parsed}" — use EUR, USD, GBP or EGP (blank = EUR)` })
+        if (colDef.name === 'rate_currency' && !(SUPPORTED_CURRENCIES as readonly string[]).includes(String(parsed).toUpperCase())) {
+          errors.push({ row: rowNum, column: colDef.name, message: `Unsupported currency "${parsed}" — use one of ${SUPPORTED_CURRENCIES.join(', ')} (blank = default)` })
           rowValid = false
           continue
         }

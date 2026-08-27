@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { type WorkspaceMode } from '@/lib/workspace-mode'
+import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -59,9 +60,9 @@ export async function PATCH(request: NextRequest) {
     // read in. Changing it reinterprets stored numbers — the UI warns.
     if (rates_currency !== undefined) {
       const rc = rates_currency === null || rates_currency === '' ? null : String(rates_currency).toUpperCase()
-      if (rc !== null && !['EUR', 'USD', 'GBP', 'EGP'].includes(rc)) {
+      if (rc !== null && !(SUPPORTED_CURRENCIES as readonly string[]).includes(rc)) {
         return NextResponse.json(
-          { success: false, error: 'rates_currency must be EUR, USD, GBP or EGP' },
+          { success: false, error: `rates_currency must be one of ${SUPPORTED_CURRENCIES.join(', ')}` },
           { status: 400 }
         )
       }

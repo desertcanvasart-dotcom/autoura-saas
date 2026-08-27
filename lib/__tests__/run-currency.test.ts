@@ -98,3 +98,29 @@ describe('run currency through the conversion chain', () => {
     expect(result.untouched).toBe(1)
   })
 })
+
+describe('widened currency vocabulary (C3.4c)', () => {
+  it('one canonical list, MEA currencies included, symbols/names complete', async () => {
+    const { SUPPORTED_CURRENCIES, CURRENCY_SYMBOLS, CURRENCY_NAMES } = await import('../currency')
+    for (const c of ['EUR', 'USD', 'GBP', 'EGP', 'AED', 'SAR', 'JOD', 'MAD', 'TND', 'KES', 'TZS', 'ZAR']) {
+      expect(SUPPORTED_CURRENCIES).toContain(c)
+    }
+    for (const c of SUPPORTED_CURRENCIES) {
+      expect(CURRENCY_SYMBOLS[c], `symbol for ${c}`).toBeTruthy()
+      expect(CURRENCY_NAMES[c], `name for ${c}`).toBeTruthy()
+    }
+  })
+
+  it('a JOD-priced rate converts into a USD run currency via EUR legs', () => {
+    const rates = [
+      { base_currency: 'EUR', target_currency: 'JOD', rate: 0.8, is_active: true },
+      { base_currency: 'EUR', target_currency: 'USD', rate: 1.25, is_active: true },
+    ] as never[]
+    const { normalize } = createRateNormalizer(rates, 'USD')
+    const [out] = normalize('guides', [
+      { id: 'g', daily_rate: 80, rate_currency: 'JOD' } as never,
+    ]) as Array<Record<string, unknown>>
+    // 80 JOD → 100 EUR → 125 USD
+    expect(out.daily_rate).toBeCloseTo(125)
+  })
+})
