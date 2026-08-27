@@ -35,6 +35,8 @@ interface Tenant {
    * genuinely differ, and one already bills in USD.
    */
   default_currency: string | null
+  /** C3.4: the currency all stored rates are read in; null = EUR. */
+  rates_currency?: string | null
   company_phone: string | null
   company_website: string | null
   tagline: string | null

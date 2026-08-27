@@ -81,6 +81,16 @@ export function convertCurrency(
     return amount / reverseRate.rate
   }
 
+  // Cross rate via EUR legs: the exchange_rates table stores only EUR↔X
+  // pairs, so e.g. EGP→USD is EGP→EUR→USD (C3.4 — non-EUR run currencies).
+  if (fromCurrency !== 'EUR' && toCurrency !== 'EUR') {
+    const toEur = convertCurrency(amount, fromCurrency, 'EUR', rates)
+    if (toEur !== null) {
+      const crossed = convertCurrency(toEur, 'EUR', toCurrency, rates)
+      if (crossed !== null) return crossed
+    }
+  }
+
   console.warn(`No exchange rate found for ${fromCurrency} to ${toCurrency}`)
   return null
 }

@@ -37,6 +37,7 @@ export async function PATCH(request: NextRequest) {
       analytics_enabled,
       primary_color,
       secondary_color,
+      rates_currency,
     } = body
 
     // Update tenant basic info
@@ -54,6 +55,18 @@ export async function PATCH(request: NextRequest) {
       tenantUpdates.workspace_mode = resolvedMode
     }
     if (logo_url !== undefined) tenantUpdates.logo_url = logo_url
+    // Run currency (C3.4): the currency ALL this tenant's stored rates are
+    // read in. Changing it reinterprets stored numbers — the UI warns.
+    if (rates_currency !== undefined) {
+      const rc = rates_currency === null || rates_currency === '' ? null : String(rates_currency).toUpperCase()
+      if (rc !== null && !['EUR', 'USD', 'GBP', 'EGP'].includes(rc)) {
+        return NextResponse.json(
+          { success: false, error: 'rates_currency must be EUR, USD, GBP or EGP' },
+          { status: 400 }
+        )
+      }
+      tenantUpdates.rates_currency = rc
+    }
     // Branding is tenant identity — tenants table, same as the logo (mig 255).
     if (primary_color !== undefined) tenantUpdates.primary_color = primary_color
     if (secondary_color !== undefined) tenantUpdates.secondary_color = secondary_color

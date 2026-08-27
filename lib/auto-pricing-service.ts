@@ -27,6 +27,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
+import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
@@ -752,7 +753,7 @@ export async function getCruiseRates(
     }
 
     const { data: rawCruises, error } = await query.limit(1)
-    const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawCruises)
+    const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawCruises, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (error || !cruises || cruises.length === 0) {
       // No exact cruise rate for this tier — flag a hole, never guess.
@@ -899,7 +900,7 @@ export async function getHotelRates(
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
       .limit(1)
-    const hotels = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawHotels)
+    const hotels = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawHotels, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (!error && hotels && hotels.length > 0) {
       const hotel = hotels[0] as any
@@ -918,7 +919,7 @@ export async function getHotelRates(
       .eq('is_active', true)
       .ilike('city', `%${city}%`)
       .limit(1)
-    const anyHotel = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawAnyHotel)
+    const anyHotel = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawAnyHotel, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (anyHotel && anyHotel.length > 0) {
       return mapRow(anyHotel[0], 'fuzzy')
@@ -976,7 +977,7 @@ export async function getEntranceFee(
       return null
     }
 
-    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees)
+    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
     const fee = fees[0] as any
 
     // `??`, not `||`. Since migration 278 the schema distinguishes the two
@@ -1026,7 +1027,7 @@ export async function getGuideRate(
       .eq('is_active', true)
       .contains('languages', [language])
       .order('is_preferred', { ascending: false })
-    const guides = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawGuides)
+    const guides = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawGuides, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (!error && guides && guides.length > 0) {
       const tierMatch = (guides as any[]).find((g: any) => g.tier === tier)
@@ -1050,7 +1051,7 @@ export async function getGuideRate(
       .eq('is_active', true)
       .order('is_preferred', { ascending: false })
       .limit(1)
-    const anyGuide = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawAnyGuide)
+    const anyGuide = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawAnyGuide, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (anyGuide && anyGuide.length > 0) {
       const g = anyGuide[0] as any
@@ -1085,7 +1086,7 @@ export async function getMealRates(
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .eq('tier', tier)
-    const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', rawMealRows)
+    const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', rawMealRows, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     const rows = (mealRows ?? []) as Array<{
       meal_type?: string | null
@@ -1194,7 +1195,7 @@ export async function getAirportServiceRate(
       // arbitrary one. Deterministic beats incidental.
       .order('rate_eur', { ascending: true })
       .limit(1)
-    const rates = await normalizeRateRows(getSupabaseAdmin(), 'airport_staff_rates', rawAirportRates)
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'airport_staff_rates', rawAirportRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (!rates || rates.length === 0) {
       return null
@@ -1230,7 +1231,7 @@ export async function getHotelServiceRate(
       // second row is added.
       .order('rate_eur', { ascending: true })
       .limit(1)
-    const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates)
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (!rates || rates.length === 0) {
       return null
@@ -1253,7 +1254,7 @@ export async function getTippingRate(scope: CatalogScope, tier: ServiceTier): Pr
       .select('*')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
-    const rates = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', rawTippingRates)
+    const rates = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', rawTippingRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (!rates || rates.length === 0) {
       return null
@@ -1323,7 +1324,7 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
     .select('*')
     .or(catalogOrExpr(scope))
     .eq('is_active', true)
-  const allRates = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates)
+  const allRates = await normalizeRateRows(getSupabaseAdmin(), 'transportation_rates', rawAllRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
   const cache = new Map<string, TransportRate>()
 

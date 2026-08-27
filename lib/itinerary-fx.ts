@@ -13,6 +13,7 @@
 
 import { convertCurrency, type ExchangeRate } from '@/lib/currency'
 
+// Historical default; the tenant's run currency (C3.4) is passed in where known.
 export const FX_BASE = 'EUR'
 
 export interface FrozenRate {
@@ -23,7 +24,7 @@ export interface FrozenRate {
 }
 
 export interface FrozenFx {
-  base: typeof FX_BASE
+  base: string
   rates: FrozenRate[]
   frozen_at: string
   frozen_by: string | null
@@ -41,10 +42,11 @@ export function buildFrozenFx(
   exchangeRates: RateInput[],
   frozenBy: string | null,
   source: FrozenFx['source'],
-  at: string = new Date().toISOString()
+  at: string = new Date().toISOString(),
+  base: string = FX_BASE
 ): FrozenFx {
   return {
-    base: FX_BASE,
+    base,
     rates: exchangeRates
       .filter(r => r.is_active)
       .map(r => ({
@@ -99,7 +101,8 @@ export interface FxRepriceResult {
  */
 export function computeFxReprice(
   lines: ServiceLineForFx[],
-  rates: FrozenRate[]
+  rates: FrozenRate[],
+  base: string = FX_BASE
 ): FxRepriceResult {
   const patches: FxRepricePatch[] = []
   const skipped: FxRepriceResult['skipped'] = []
@@ -107,7 +110,7 @@ export function computeFxReprice(
 
   for (const line of lines) {
     const currency = line.supplier_currency
-    if (!currency || currency === FX_BASE) {
+    if (!currency || currency === base) {
       untouched++
       continue
     }
@@ -116,9 +119,9 @@ export function computeFxReprice(
       skipped.push({ id: line.id, reason: `priced in ${currency} but no supplier_cost_original recorded` })
       continue
     }
-    const unitCost = convertCurrency(original, currency, FX_BASE, rates as ExchangeRate[])
+    const unitCost = convertCurrency(original, currency, base, rates as ExchangeRate[])
     if (unitCost === null) {
-      skipped.push({ id: line.id, reason: `no usable exchange rate ${currency}→${FX_BASE}` })
+      skipped.push({ id: line.id, reason: `no usable exchange rate ${currency}→${base}` })
       continue
     }
     const quantity = line.quantity ?? 1

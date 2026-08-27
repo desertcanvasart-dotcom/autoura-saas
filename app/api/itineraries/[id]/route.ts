@@ -3,6 +3,7 @@ import { evaluateDeleteGuard } from '@/lib/delete-guard'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { validateAssignee, notifyTripAssignment } from '@/lib/trip-assignee'
 import { buildFrozenFx } from '@/lib/itinerary-fx'
+import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 
 /**
  * GET /api/itineraries/[id]
@@ -149,7 +150,10 @@ export async function PUT(
           .eq('is_active', true)
         if (fxRates && fxRates.length > 0) {
           const { data: { user: fxUser } } = await supabase.auth.getUser()
-          updateData.fx_frozen = buildFrozenFx(fxRates, fxUser?.id ?? null, 'confirm')
+          const fxBase = typeof row.tenant_id === 'string'
+            ? await getTenantRunCurrency(supabase, row.tenant_id)
+            : undefined
+          updateData.fx_frozen = buildFrozenFx(fxRates, fxUser?.id ?? null, 'confirm', undefined, fxBase)
         }
       }
     }

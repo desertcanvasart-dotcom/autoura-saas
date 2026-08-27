@@ -8427,6 +8427,7 @@ export interface Database {
       }
       tenants: {
         Row: {
+          rates_currency: string | null
           id: string
           company_name: string
           contact_email: string | null
@@ -8456,6 +8457,7 @@ export interface Database {
           default_margin_percent: number | null
         }
         Insert: {
+          rates_currency?: string | null
           id?: string
           company_name: string
           contact_email?: string | null
@@ -8485,6 +8487,7 @@ export interface Database {
           default_margin_percent?: number | null
         }
         Update: {
+          rates_currency?: string | null
           id?: string
           company_name?: string
           contact_email?: string | null

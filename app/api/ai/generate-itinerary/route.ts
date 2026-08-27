@@ -30,6 +30,7 @@ import {
 import { getUserPreferences } from '@/lib/ai/user-preferences'
 import { generateFromStructuredInput, generateCreativeItinerary } from '@/lib/ai/prompt-builder'
 import { loadDestinationPromptContext } from '@/lib/ai/destination-context'
+import { getTenantRunCurrency, DEFAULT_RUN_CURRENCY } from '@/lib/rates/run-currency'
 import { createCruiseItineraryServices } from '@/lib/ai/cruise-service-creation'
 import { createLandItineraryServices } from '@/lib/ai/service-creation'
 
@@ -459,7 +460,7 @@ export async function POST(request: NextRequest) {
       include_dinner = false,
       include_accommodation = true,
       margin_percent = userPrefs.default_margin_percent,
-      currency = userPrefs.default_currency,
+      currency: requested_currency = null,
       cost_mode = userPrefs.default_cost_mode,
       package_type: requested_package_type = 'land-package',
       // Harness: pricing is OPT-IN and safe-by-default. Conversations from
@@ -476,6 +477,13 @@ export async function POST(request: NextRequest) {
       // NEW: Quote type for Phase 1B
       quote_type = 'none' // 'b2c' | 'b2b' | 'both' | 'none'
     } = body
+
+    // Quote currency (C3.4): explicit request wins; a user pref someone
+    // actually changed wins next; otherwise the tenant's run currency — the
+    // engine's numbers are in that currency, so the label must match.
+    const tenantRunCurrency = await getTenantRunCurrency(supabase, tenant_id)
+    const currency = requested_currency
+      || (userPrefs.default_currency !== DEFAULT_RUN_CURRENCY ? userPrefs.default_currency : tenantRunCurrency)
 
     const city = requested_city || destinationContext.defaultCity
     const finalTourName = tour_requested || tour_name || `${destinationContext.name} Tour`

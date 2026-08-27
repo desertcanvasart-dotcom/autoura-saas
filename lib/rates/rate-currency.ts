@@ -203,14 +203,15 @@ async function loadExchangeRates(db: object): Promise<ExchangeRate[]> {
 export async function normalizeRateRows<T extends Record<string, unknown>>(
   db: object,
   table: string,
-  rows: T[] | null | undefined
+  rows: T[] | null | undefined,
+  runCurrency: string = RUN_CURRENCY
 ): Promise<T[]> {
   if (!rows || rows.length === 0) return rows ?? []
   // Fast path: nothing on this page of rows carries a foreign currency.
-  if (!rows.some(r => r.rate_currency && r.rate_currency !== RUN_CURRENCY)) return rows
+  if (!rows.some(r => r.rate_currency && r.rate_currency !== runCurrency)) return rows
 
   const exchangeRates = await loadExchangeRates(db)
-  const normalizer = createRateNormalizer(exchangeRates)
+  const normalizer = createRateNormalizer(exchangeRates, runCurrency)
   const out = normalizer.normalize(table, rows)
   for (const miss of normalizer.misses) {
     console.error(

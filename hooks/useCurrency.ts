@@ -9,6 +9,7 @@ import {
   getCurrencySymbol,
   createCurrencyConverter,
 } from '@/lib/currency'
+import { useTenant } from '@/app/contexts/TenantContext'
 
 interface UseCurrencyOptions {
   /**
@@ -89,7 +90,13 @@ interface UseCurrencyReturn {
  * ```
  */
 export function useCurrency(options: UseCurrencyOptions = {}): UseCurrencyReturn {
-  const { baseCurrency = 'EUR' } = options
+  // Base = the tenant's run currency (C3.4) unless the caller overrides.
+  // useTenant degrades to a no-op outside the provider, so this stays safe
+  // everywhere the hook is used.
+  const { tenant } = useTenant()
+  const baseCurrency =
+    options.baseCurrency ??
+    ((tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR')
 
   const [userCurrency, setUserCurrency] = useState<string>('EUR')
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([])
