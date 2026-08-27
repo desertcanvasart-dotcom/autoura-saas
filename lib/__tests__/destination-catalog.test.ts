@@ -71,3 +71,26 @@ describe('citiesForDropdown', () => {
     expect(citiesForDropdown(shaped(['jo']))).toEqual([...EGYPT_CITIES])
   })
 })
+
+describe('glossary line format', () => {
+  it('round-trips pairs', async () => {
+    const { linesToGlossary, glossaryToLines } = await import('../destination-catalog')
+    const obj = linesToGlossary('Cairo = カイロ\n\nPetra = ペトラ')
+    expect(obj).toEqual({ Cairo: 'カイロ', Petra: 'ペトラ' })
+    expect(glossaryToLines(obj)).toBe('Cairo = カイロ\nPetra = ペトラ')
+  })
+
+  it('rejects malformed lines instead of silently dropping them', async () => {
+    const { linesToGlossary } = await import('../destination-catalog')
+    expect(linesToGlossary('Cairo カイロ')).toBeNull()
+    expect(linesToGlossary('= カイロ')).toBeNull()
+    expect(linesToGlossary('Cairo =')).toBeNull()
+  })
+
+  it('tolerates non-object stored glossary shapes', async () => {
+    const { glossaryToLines } = await import('../destination-catalog')
+    expect(glossaryToLines(null)).toBe('')
+    expect(glossaryToLines('legacy string')).toBe('')
+    expect(glossaryToLines([1, 2])).toBe('')
+  })
+})
