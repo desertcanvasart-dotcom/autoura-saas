@@ -50,13 +50,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-COMMENT ON FUNCTION user_has_role IS 'Check if current user has one of the specified roles';
+-- Qualified: user_has_role(VARCHAR) from migration 002 coexists, so the
+-- bare name is ambiguous on a fresh from-scratch replay.
+COMMENT ON FUNCTION user_has_role(TEXT[]) IS 'Check if current user has one of the specified roles';
 
 -- =====================================================
 -- 1. TENANT INVITATIONS
 -- =====================================================
 
-CREATE TABLE tenant_invitations (
+CREATE TABLE IF NOT EXISTS tenant_invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   email VARCHAR(255) NOT NULL,
@@ -72,10 +74,10 @@ CREATE TABLE tenant_invitations (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_tenant_invitations_tenant ON tenant_invitations(tenant_id);
-CREATE INDEX idx_tenant_invitations_email ON tenant_invitations(email);
-CREATE INDEX idx_tenant_invitations_token ON tenant_invitations(invitation_token);
-CREATE INDEX idx_tenant_invitations_status ON tenant_invitations(status);
+CREATE INDEX IF NOT EXISTS idx_tenant_invitations_tenant ON tenant_invitations(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_invitations_email ON tenant_invitations(email);
+CREATE INDEX IF NOT EXISTS idx_tenant_invitations_token ON tenant_invitations(invitation_token);
+CREATE INDEX IF NOT EXISTS idx_tenant_invitations_status ON tenant_invitations(status);
 
 COMMENT ON TABLE tenant_invitations IS 'Stores pending invitations to join tenants';
 COMMENT ON COLUMN tenant_invitations.invitation_token IS 'Unique token for accepting invitation';
@@ -84,10 +86,12 @@ COMMENT ON COLUMN tenant_invitations.expires_at IS 'Invitation expires 7 days af
 -- RLS Policies for tenant_invitations
 ALTER TABLE tenant_invitations ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view invitations for their tenant" ON tenant_invitations;
 CREATE POLICY "Users can view invitations for their tenant"
   ON tenant_invitations FOR SELECT
   USING (tenant_id = get_user_tenant_id());
 
+DROP POLICY IF EXISTS "Admins can manage invitations" ON tenant_invitations;
 CREATE POLICY "Admins can manage invitations"
   ON tenant_invitations FOR ALL
   USING (
@@ -99,7 +103,7 @@ CREATE POLICY "Admins can manage invitations"
 -- 2. TENANT ACTIVITY LOGS
 -- =====================================================
 
-CREATE TABLE tenant_activity_logs (
+CREATE TABLE IF NOT EXISTS tenant_activity_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -112,11 +116,11 @@ CREATE TABLE tenant_activity_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_activity_logs_tenant ON tenant_activity_logs(tenant_id);
-CREATE INDEX idx_activity_logs_user ON tenant_activity_logs(user_id);
-CREATE INDEX idx_activity_logs_created ON tenant_activity_logs(created_at DESC);
-CREATE INDEX idx_activity_logs_action ON tenant_activity_logs(action_type);
-CREATE INDEX idx_activity_logs_resource ON tenant_activity_logs(resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_tenant ON tenant_activity_logs(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user ON tenant_activity_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON tenant_activity_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON tenant_activity_logs(action_type);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_resource ON tenant_activity_logs(resource_type, resource_id);
 
 COMMENT ON TABLE tenant_activity_logs IS 'Audit log of all tenant actions';
 COMMENT ON COLUMN tenant_activity_logs.action_type IS 'Action like user.invited, quote.created, settings.updated';
@@ -125,6 +129,7 @@ COMMENT ON COLUMN tenant_activity_logs.details IS 'JSON object with action-speci
 -- RLS Policies for tenant_activity_logs
 ALTER TABLE tenant_activity_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can view activity logs for their tenant" ON tenant_activity_logs;
 CREATE POLICY "Admins can view activity logs for their tenant"
   ON tenant_activity_logs FOR SELECT
   USING (
@@ -132,6 +137,7 @@ CREATE POLICY "Admins can view activity logs for their tenant"
     AND user_has_role(ARRAY['owner', 'admin'])
   );
 
+DROP POLICY IF EXISTS "System can insert activity logs" ON tenant_activity_logs;
 CREATE POLICY "System can insert activity logs"
   ON tenant_activity_logs FOR INSERT
   WITH CHECK (tenant_id = get_user_tenant_id());
@@ -172,7 +178,7 @@ COMMENT ON COLUMN tenants.settings IS 'JSON object for tenant-specific settings'
 -- 4. SUBSCRIPTION PLANS
 -- =====================================================
 
-CREATE TABLE subscription_plans (
+CREATE TABLE IF NOT EXISTS subscription_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
   slug VARCHAR(50) NOT NULL UNIQUE,
@@ -199,8 +205,8 @@ CREATE TABLE subscription_plans (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_subscription_plans_slug ON subscription_plans(slug);
-CREATE INDEX idx_subscription_plans_active ON subscription_plans(is_active);
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_slug ON subscription_plans(slug);
+CREATE INDEX IF NOT EXISTS idx_subscription_plans_active ON subscription_plans(is_active);
 
 COMMENT ON TABLE subscription_plans IS 'Available subscription plans with pricing and limits';
 COMMENT ON COLUMN subscription_plans.slug IS 'URL-friendly identifier (starter, professional, enterprise)';
@@ -251,13 +257,14 @@ INSERT INTO subscription_plans (
   NULL,
   NULL,
   '["dedicated_support", "unlimited_history", "custom_branding", "api_access", "advanced_analytics", "custom_integrations", "sla"]'::jsonb
-);
+)
+ON CONFLICT (slug) DO NOTHING;
 
 -- =====================================================
 -- 5. TENANT SUBSCRIPTIONS
 -- =====================================================
 
-CREATE TABLE tenant_subscriptions (
+CREATE TABLE IF NOT EXISTS tenant_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   plan_id UUID NOT NULL REFERENCES subscription_plans(id),
@@ -289,11 +296,11 @@ CREATE TABLE tenant_subscriptions (
   UNIQUE(tenant_id)
 );
 
-CREATE INDEX idx_subscriptions_tenant ON tenant_subscriptions(tenant_id);
-CREATE INDEX idx_subscriptions_stripe_customer ON tenant_subscriptions(stripe_customer_id);
-CREATE INDEX idx_subscriptions_stripe_subscription ON tenant_subscriptions(stripe_subscription_id);
-CREATE INDEX idx_subscriptions_status ON tenant_subscriptions(status);
-CREATE INDEX idx_subscriptions_plan ON tenant_subscriptions(plan_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant ON tenant_subscriptions(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_customer ON tenant_subscriptions(stripe_customer_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe_subscription ON tenant_subscriptions(stripe_subscription_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON tenant_subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_plan ON tenant_subscriptions(plan_id);
 
 COMMENT ON TABLE tenant_subscriptions IS 'Active subscriptions for tenants';
 COMMENT ON COLUMN tenant_subscriptions.status IS 'Stripe subscription status';
@@ -302,10 +309,12 @@ COMMENT ON COLUMN tenant_subscriptions.ends_at IS 'When subscription ends (for c
 -- RLS Policies for tenant_subscriptions
 ALTER TABLE tenant_subscriptions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their tenant subscription" ON tenant_subscriptions;
 CREATE POLICY "Users can view their tenant subscription"
   ON tenant_subscriptions FOR SELECT
   USING (tenant_id = get_user_tenant_id());
 
+DROP POLICY IF EXISTS "Owners can manage subscription" ON tenant_subscriptions;
 CREATE POLICY "Owners can manage subscription"
   ON tenant_subscriptions FOR ALL
   USING (
@@ -317,7 +326,7 @@ CREATE POLICY "Owners can manage subscription"
 -- 6. TENANT USAGE TRACKING
 -- =====================================================
 
-CREATE TABLE tenant_usage (
+CREATE TABLE IF NOT EXISTS tenant_usage (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   subscription_id UUID NOT NULL REFERENCES tenant_subscriptions(id) ON DELETE CASCADE,
@@ -342,10 +351,13 @@ CREATE TABLE tenant_usage (
   UNIQUE(tenant_id, period_start)
 );
 
-CREATE INDEX idx_usage_tenant ON tenant_usage(tenant_id);
-CREATE INDEX idx_usage_subscription ON tenant_usage(subscription_id);
-CREATE INDEX idx_usage_period ON tenant_usage(period_start, period_end);
-CREATE INDEX idx_usage_current ON tenant_usage(tenant_id, period_end) WHERE period_end > NOW();
+CREATE INDEX IF NOT EXISTS idx_usage_tenant ON tenant_usage(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_usage_subscription ON tenant_usage(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_usage_period ON tenant_usage(period_start, period_end);
+-- NOW() is not IMMUTABLE, so the original partial index (WHERE period_end >
+-- NOW()) was never creatable on ANY Postgres — prod included. Plain index
+-- instead; same lookups, no invalid predicate.
+CREATE INDEX IF NOT EXISTS idx_usage_current ON tenant_usage(tenant_id, period_end);
 
 COMMENT ON TABLE tenant_usage IS 'Usage metrics per billing period';
 COMMENT ON COLUMN tenant_usage.period_start IS 'Start of current billing period';
@@ -354,14 +366,17 @@ COMMENT ON COLUMN tenant_usage.period_end IS 'End of current billing period';
 -- RLS Policies for tenant_usage
 ALTER TABLE tenant_usage ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their tenant usage" ON tenant_usage;
 CREATE POLICY "Users can view their tenant usage"
   ON tenant_usage FOR SELECT
   USING (tenant_id = get_user_tenant_id());
 
+DROP POLICY IF EXISTS "System can update usage" ON tenant_usage;
 CREATE POLICY "System can update usage"
   ON tenant_usage FOR UPDATE
   USING (tenant_id = get_user_tenant_id());
 
+DROP POLICY IF EXISTS "System can insert usage" ON tenant_usage;
 CREATE POLICY "System can insert usage"
   ON tenant_usage FOR INSERT
   WITH CHECK (tenant_id = get_user_tenant_id());
@@ -370,7 +385,7 @@ CREATE POLICY "System can insert usage"
 -- 7. BILLING INVOICES
 -- =====================================================
 
-CREATE TABLE billing_invoices (
+CREATE TABLE IF NOT EXISTS billing_invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   subscription_id UUID NOT NULL REFERENCES tenant_subscriptions(id),
@@ -406,11 +421,11 @@ CREATE TABLE billing_invoices (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_invoices_tenant ON billing_invoices(tenant_id);
-CREATE INDEX idx_invoices_subscription ON billing_invoices(subscription_id);
-CREATE INDEX idx_invoices_stripe ON billing_invoices(stripe_invoice_id);
-CREATE INDEX idx_invoices_status ON billing_invoices(status);
-CREATE INDEX idx_invoices_date ON billing_invoices(invoice_date DESC);
+CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON billing_invoices(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_subscription ON billing_invoices(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_stripe ON billing_invoices(stripe_invoice_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON billing_invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_date ON billing_invoices(invoice_date DESC);
 
 COMMENT ON TABLE billing_invoices IS 'Invoice history from Stripe';
 COMMENT ON COLUMN billing_invoices.line_items IS 'JSON array of invoice line items from Stripe';
@@ -418,6 +433,7 @@ COMMENT ON COLUMN billing_invoices.line_items IS 'JSON array of invoice line ite
 -- RLS Policies for billing_invoices
 ALTER TABLE billing_invoices ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their tenant invoices" ON billing_invoices;
 CREATE POLICY "Users can view their tenant invoices"
   ON billing_invoices FOR SELECT
   USING (tenant_id = get_user_tenant_id());
@@ -643,6 +659,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_expire_invitations ON tenant_invitations;
 CREATE TRIGGER trigger_expire_invitations
 AFTER INSERT OR UPDATE ON tenant_invitations
 FOR EACH STATEMENT
@@ -657,26 +674,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_tenant_invitations_updated_at ON tenant_invitations;
 CREATE TRIGGER trigger_tenant_invitations_updated_at
 BEFORE UPDATE ON tenant_invitations
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trigger_subscription_plans_updated_at ON subscription_plans;
 CREATE TRIGGER trigger_subscription_plans_updated_at
 BEFORE UPDATE ON subscription_plans
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trigger_tenant_subscriptions_updated_at ON tenant_subscriptions;
 CREATE TRIGGER trigger_tenant_subscriptions_updated_at
 BEFORE UPDATE ON tenant_subscriptions
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trigger_tenant_usage_updated_at ON tenant_usage;
 CREATE TRIGGER trigger_tenant_usage_updated_at
 BEFORE UPDATE ON tenant_usage
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trigger_billing_invoices_updated_at ON billing_invoices;
 CREATE TRIGGER trigger_billing_invoices_updated_at
 BEFORE UPDATE ON billing_invoices
 FOR EACH ROW

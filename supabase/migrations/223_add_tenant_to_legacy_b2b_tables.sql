@@ -24,166 +24,191 @@
 -- =====================================================
 -- 1. tour_quotes  (backfill via tour_variations)
 -- =====================================================
-DO $$
+-- Fresh-replay guard: tour_quotes predates the migration files entirely
+-- (created by hand in early prod). On a database built from scratch it does
+-- not exist and never will — skip the whole section rather than fail.
+DO $mig223$
 BEGIN
+  IF to_regclass('public.tour_quotes') IS NULL THEN
+    RAISE NOTICE 'tour_quotes does not exist (fresh install) — skipping legacy section';
+    RETURN;
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'tour_quotes' AND column_name = 'tenant_id'
   ) THEN
     ALTER TABLE tour_quotes ADD COLUMN tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;
   END IF;
-END $$;
 
--- Backfill from the variation the quote was built from
-UPDATE tour_quotes q
-SET tenant_id = v.tenant_id
-FROM tour_variations v
-WHERE q.variation_id = v.id
-  AND q.tenant_id IS NULL;
+  -- Backfill from the variation the quote was built from
+  EXECUTE $q$
+    UPDATE tour_quotes q
+    SET tenant_id = v.tenant_id
+    FROM tour_variations v
+    WHERE q.variation_id = v.id
+      AND q.tenant_id IS NULL
+  $q$;
 
--- Any quote we still couldn't resolve (orphan variation_id) falls back to the
--- partner's tenant, if a partner is set.
-UPDATE tour_quotes q
-SET tenant_id = p.tenant_id
-FROM b2b_partners p
-WHERE q.partner_id = p.id
-  AND q.tenant_id IS NULL;
+  -- Any quote we still couldn't resolve (orphan variation_id) falls back to
+  -- the partner's tenant, if a partner is set.
+  EXECUTE $q$
+    UPDATE tour_quotes q
+    SET tenant_id = p.tenant_id
+    FROM b2b_partners p
+    WHERE q.partner_id = p.id
+      AND q.tenant_id IS NULL
+  $q$;
 
--- Report rows that remain unassigned instead of silently dropping isolation.
-DO $$
-DECLARE
-  orphan_count INTEGER;
-BEGIN
-  SELECT COUNT(*) INTO orphan_count FROM tour_quotes WHERE tenant_id IS NULL;
-  IF orphan_count > 0 THEN
-    RAISE WARNING 'tour_quotes: % row(s) could not be assigned a tenant_id (orphan variation_id and no partner). They remain NULL and are hidden by RLS until fixed manually.', orphan_count;
-  END IF;
-END $$;
+  -- Report rows that remain unassigned instead of silently dropping isolation.
+  DECLARE
+    orphan_count INTEGER;
+  BEGIN
+    EXECUTE 'SELECT COUNT(*) FROM tour_quotes WHERE tenant_id IS NULL' INTO orphan_count;
+    IF orphan_count > 0 THEN
+      RAISE WARNING 'tour_quotes: % row(s) could not be assigned a tenant_id (orphan variation_id and no partner). They remain NULL and are hidden by RLS until fixed manually.', orphan_count;
+    END IF;
+  END;
 
-CREATE INDEX IF NOT EXISTS idx_tour_quotes_tenant ON tour_quotes(tenant_id);
-ALTER TABLE tour_quotes ENABLE ROW LEVEL SECURITY;
+  CREATE INDEX IF NOT EXISTS idx_tour_quotes_tenant ON tour_quotes(tenant_id);
+  ALTER TABLE tour_quotes ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Users can view their tenant tour_quotes" ON tour_quotes;
-DROP POLICY IF EXISTS "Users can insert tour_quotes for their tenant" ON tour_quotes;
-DROP POLICY IF EXISTS "Users can update their tenant tour_quotes" ON tour_quotes;
-DROP POLICY IF EXISTS "Users can delete their tenant tour_quotes" ON tour_quotes;
+  DROP POLICY IF EXISTS "Users can view their tenant tour_quotes" ON tour_quotes;
+  DROP POLICY IF EXISTS "Users can insert tour_quotes for their tenant" ON tour_quotes;
+  DROP POLICY IF EXISTS "Users can update their tenant tour_quotes" ON tour_quotes;
+  DROP POLICY IF EXISTS "Users can delete their tenant tour_quotes" ON tour_quotes;
 
-CREATE POLICY "Users can view their tenant tour_quotes" ON tour_quotes
-  FOR SELECT USING (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can insert tour_quotes for their tenant" ON tour_quotes
-  FOR INSERT WITH CHECK (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can update their tenant tour_quotes" ON tour_quotes
-  FOR UPDATE USING (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can delete their tenant tour_quotes" ON tour_quotes
-  FOR DELETE USING (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can view their tenant tour_quotes" ON tour_quotes
+    FOR SELECT USING (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can insert tour_quotes for their tenant" ON tour_quotes
+    FOR INSERT WITH CHECK (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can update their tenant tour_quotes" ON tour_quotes
+    FOR UPDATE USING (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can delete their tenant tour_quotes" ON tour_quotes
+    FOR DELETE USING (tenant_id = get_user_tenant_id());
+END $mig223$;
 
 -- =====================================================
 -- 2. b2b_partner_pricing  (backfill via b2b_partners)
 -- =====================================================
 DO $$
 BEGIN
+  -- Fresh-replay guard: this legacy table predates the migration files.
+  IF to_regclass('public.b2b_partner_pricing') IS NULL THEN
+    RAISE NOTICE 'b2b_partner_pricing does not exist (fresh install) — skipping';
+    RETURN;
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'b2b_partner_pricing' AND column_name = 'tenant_id'
   ) THEN
     ALTER TABLE b2b_partner_pricing ADD COLUMN tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;
   END IF;
+
+  UPDATE b2b_partner_pricing pp
+  SET tenant_id = p.tenant_id
+  FROM b2b_partners p
+  WHERE pp.partner_id = p.id
+    AND pp.tenant_id IS NULL;
+
+  DECLARE
+    orphan_count INTEGER;
+  BEGIN
+    SELECT COUNT(*) INTO orphan_count FROM b2b_partner_pricing WHERE tenant_id IS NULL;
+    IF orphan_count > 0 THEN
+      RAISE WARNING 'b2b_partner_pricing: % row(s) could not be assigned a tenant_id (orphan partner_id). They remain NULL and are hidden by RLS until fixed manually.', orphan_count;
+    END IF;
+  END;
+
+  CREATE INDEX IF NOT EXISTS idx_b2b_partner_pricing_tenant ON b2b_partner_pricing(tenant_id);
+  ALTER TABLE b2b_partner_pricing ENABLE ROW LEVEL SECURITY;
+
+  DROP POLICY IF EXISTS "Users can view their tenant b2b_partner_pricing" ON b2b_partner_pricing;
+  DROP POLICY IF EXISTS "Users can insert b2b_partner_pricing for their tenant" ON b2b_partner_pricing;
+  DROP POLICY IF EXISTS "Users can update their tenant b2b_partner_pricing" ON b2b_partner_pricing;
+  DROP POLICY IF EXISTS "Users can delete their tenant b2b_partner_pricing" ON b2b_partner_pricing;
+
+  CREATE POLICY "Users can view their tenant b2b_partner_pricing" ON b2b_partner_pricing
+    FOR SELECT USING (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can insert b2b_partner_pricing for their tenant" ON b2b_partner_pricing
+    FOR INSERT WITH CHECK (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can update their tenant b2b_partner_pricing" ON b2b_partner_pricing
+    FOR UPDATE USING (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can delete their tenant b2b_partner_pricing" ON b2b_partner_pricing
+    FOR DELETE USING (tenant_id = get_user_tenant_id());
 END $$;
-
-UPDATE b2b_partner_pricing pp
-SET tenant_id = p.tenant_id
-FROM b2b_partners p
-WHERE pp.partner_id = p.id
-  AND pp.tenant_id IS NULL;
-
-DO $$
-DECLARE
-  orphan_count INTEGER;
-BEGIN
-  SELECT COUNT(*) INTO orphan_count FROM b2b_partner_pricing WHERE tenant_id IS NULL;
-  IF orphan_count > 0 THEN
-    RAISE WARNING 'b2b_partner_pricing: % row(s) could not be assigned a tenant_id (orphan partner_id). They remain NULL and are hidden by RLS until fixed manually.', orphan_count;
-  END IF;
-END $$;
-
-CREATE INDEX IF NOT EXISTS idx_b2b_partner_pricing_tenant ON b2b_partner_pricing(tenant_id);
-ALTER TABLE b2b_partner_pricing ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users can view their tenant b2b_partner_pricing" ON b2b_partner_pricing;
-DROP POLICY IF EXISTS "Users can insert b2b_partner_pricing for their tenant" ON b2b_partner_pricing;
-DROP POLICY IF EXISTS "Users can update their tenant b2b_partner_pricing" ON b2b_partner_pricing;
-DROP POLICY IF EXISTS "Users can delete their tenant b2b_partner_pricing" ON b2b_partner_pricing;
-
-CREATE POLICY "Users can view their tenant b2b_partner_pricing" ON b2b_partner_pricing
-  FOR SELECT USING (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can insert b2b_partner_pricing for their tenant" ON b2b_partner_pricing
-  FOR INSERT WITH CHECK (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can update their tenant b2b_partner_pricing" ON b2b_partner_pricing
-  FOR UPDATE USING (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can delete their tenant b2b_partner_pricing" ON b2b_partner_pricing
-  FOR DELETE USING (tenant_id = get_user_tenant_id());
 
 -- =====================================================
 -- 3. b2b_pricing_rules  (no FK; existing rows = shared legacy)
 -- =====================================================
 DO $$
 BEGIN
+  -- Fresh-replay guard: this legacy table predates the migration files.
+  IF to_regclass('public.b2b_pricing_rules') IS NULL THEN
+    RAISE NOTICE 'b2b_pricing_rules does not exist (fresh install) — skipping';
+    RETURN;
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'b2b_pricing_rules' AND column_name = 'tenant_id'
   ) THEN
     ALTER TABLE b2b_pricing_rules ADD COLUMN tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;
   END IF;
+
+  CREATE INDEX IF NOT EXISTS idx_b2b_pricing_rules_tenant ON b2b_pricing_rules(tenant_id);
+  ALTER TABLE b2b_pricing_rules ENABLE ROW LEVEL SECURITY;
+
+  DROP POLICY IF EXISTS "Users can view tenant or shared b2b_pricing_rules" ON b2b_pricing_rules;
+  DROP POLICY IF EXISTS "Users can insert b2b_pricing_rules for their tenant" ON b2b_pricing_rules;
+  DROP POLICY IF EXISTS "Users can update their tenant b2b_pricing_rules" ON b2b_pricing_rules;
+  DROP POLICY IF EXISTS "Users can delete their tenant b2b_pricing_rules" ON b2b_pricing_rules;
+
+  -- Read: own-tenant rows plus shared legacy (NULL) rows.
+  CREATE POLICY "Users can view tenant or shared b2b_pricing_rules" ON b2b_pricing_rules
+    FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id());
+  -- Write: only into your own tenant; legacy shared rows are immutable.
+  CREATE POLICY "Users can insert b2b_pricing_rules for their tenant" ON b2b_pricing_rules
+    FOR INSERT WITH CHECK (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can update their tenant b2b_pricing_rules" ON b2b_pricing_rules
+    FOR UPDATE USING (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can delete their tenant b2b_pricing_rules" ON b2b_pricing_rules
+    FOR DELETE USING (tenant_id = get_user_tenant_id());
 END $$;
-
-CREATE INDEX IF NOT EXISTS idx_b2b_pricing_rules_tenant ON b2b_pricing_rules(tenant_id);
-ALTER TABLE b2b_pricing_rules ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users can view tenant or shared b2b_pricing_rules" ON b2b_pricing_rules;
-DROP POLICY IF EXISTS "Users can insert b2b_pricing_rules for their tenant" ON b2b_pricing_rules;
-DROP POLICY IF EXISTS "Users can update their tenant b2b_pricing_rules" ON b2b_pricing_rules;
-DROP POLICY IF EXISTS "Users can delete their tenant b2b_pricing_rules" ON b2b_pricing_rules;
-
--- Read: own-tenant rows plus shared legacy (NULL) rows.
-CREATE POLICY "Users can view tenant or shared b2b_pricing_rules" ON b2b_pricing_rules
-  FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id());
--- Write: only into your own tenant; legacy shared rows are immutable.
-CREATE POLICY "Users can insert b2b_pricing_rules for their tenant" ON b2b_pricing_rules
-  FOR INSERT WITH CHECK (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can update their tenant b2b_pricing_rules" ON b2b_pricing_rules
-  FOR UPDATE USING (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can delete their tenant b2b_pricing_rules" ON b2b_pricing_rules
-  FOR DELETE USING (tenant_id = get_user_tenant_id());
 
 -- =====================================================
 -- 4. b2b_transport_packages  (no FK; existing rows = shared legacy)
 -- =====================================================
 DO $$
 BEGIN
+  -- Fresh-replay guard: this legacy table predates the migration files.
+  IF to_regclass('public.b2b_transport_packages') IS NULL THEN
+    RAISE NOTICE 'b2b_transport_packages does not exist (fresh install) — skipping';
+    RETURN;
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'b2b_transport_packages' AND column_name = 'tenant_id'
   ) THEN
     ALTER TABLE b2b_transport_packages ADD COLUMN tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;
   END IF;
+
+  CREATE INDEX IF NOT EXISTS idx_b2b_transport_packages_tenant ON b2b_transport_packages(tenant_id);
+  ALTER TABLE b2b_transport_packages ENABLE ROW LEVEL SECURITY;
+
+  DROP POLICY IF EXISTS "Users can view tenant or shared b2b_transport_packages" ON b2b_transport_packages;
+  DROP POLICY IF EXISTS "Users can insert b2b_transport_packages for their tenant" ON b2b_transport_packages;
+  DROP POLICY IF EXISTS "Users can update their tenant b2b_transport_packages" ON b2b_transport_packages;
+  DROP POLICY IF EXISTS "Users can delete their tenant b2b_transport_packages" ON b2b_transport_packages;
+
+  CREATE POLICY "Users can view tenant or shared b2b_transport_packages" ON b2b_transport_packages
+    FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can insert b2b_transport_packages for their tenant" ON b2b_transport_packages
+    FOR INSERT WITH CHECK (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can update their tenant b2b_transport_packages" ON b2b_transport_packages
+    FOR UPDATE USING (tenant_id = get_user_tenant_id());
+  CREATE POLICY "Users can delete their tenant b2b_transport_packages" ON b2b_transport_packages
+    FOR DELETE USING (tenant_id = get_user_tenant_id());
 END $$;
-
-CREATE INDEX IF NOT EXISTS idx_b2b_transport_packages_tenant ON b2b_transport_packages(tenant_id);
-ALTER TABLE b2b_transport_packages ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Users can view tenant or shared b2b_transport_packages" ON b2b_transport_packages;
-DROP POLICY IF EXISTS "Users can insert b2b_transport_packages for their tenant" ON b2b_transport_packages;
-DROP POLICY IF EXISTS "Users can update their tenant b2b_transport_packages" ON b2b_transport_packages;
-DROP POLICY IF EXISTS "Users can delete their tenant b2b_transport_packages" ON b2b_transport_packages;
-
-CREATE POLICY "Users can view tenant or shared b2b_transport_packages" ON b2b_transport_packages
-  FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can insert b2b_transport_packages for their tenant" ON b2b_transport_packages
-  FOR INSERT WITH CHECK (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can update their tenant b2b_transport_packages" ON b2b_transport_packages
-  FOR UPDATE USING (tenant_id = get_user_tenant_id());
-CREATE POLICY "Users can delete their tenant b2b_transport_packages" ON b2b_transport_packages
-  FOR DELETE USING (tenant_id = get_user_tenant_id());
 
 -- =====================================================
 -- 5. Single-tenant fallback claim
@@ -207,6 +232,9 @@ BEGIN
 
   FOREACH t IN ARRAY ARRAY['tour_quotes', 'b2b_partner_pricing', 'b2b_pricing_rules', 'b2b_transport_packages']
   LOOP
+    IF to_regclass('public.' || t) IS NULL THEN
+      CONTINUE; -- fresh install: the legacy table never existed
+    END IF;
     EXECUTE format('UPDATE %I SET tenant_id = $1 WHERE tenant_id IS NULL', t) USING the_tenant;
     GET DIAGNOSTICS n = ROW_COUNT;
     IF n > 0 THEN

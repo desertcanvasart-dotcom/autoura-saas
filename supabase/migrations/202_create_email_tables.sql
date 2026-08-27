@@ -56,6 +56,27 @@ CREATE TABLE IF NOT EXISTS email_messages (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Fresh-replay convergence: migration 125 created email_messages in its
+-- Gmail-sync shape first, so the CREATE above no-ops and the columns this
+-- migration relies on may be missing. Prod's live table is the UNION of both
+-- shapes; make a from-scratch replay produce the same union.
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS conversation_id UUID REFERENCES email_conversations(id) ON DELETE CASCADE;
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS message_id TEXT;
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS thread_id TEXT;
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS direction VARCHAR(10);
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS from_address TEXT;
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS to_addresses TEXT[] DEFAULT '{}';
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS cc_addresses TEXT[];
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS bcc_addresses TEXT[];
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS body_text TEXT;
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS body_html TEXT;
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS snippet TEXT;
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]';
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS is_starred BOOLEAN DEFAULT FALSE;
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS labels TEXT[];
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ;
+ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS received_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_email_msg_conv ON email_messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_email_msg_thread ON email_messages(thread_id);
 CREATE INDEX IF NOT EXISTS idx_email_msg_sent ON email_messages(sent_at DESC);
