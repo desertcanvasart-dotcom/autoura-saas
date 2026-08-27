@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newRate = {
+      ...rateCurrencyWriteField(body),
       tenant_id,
       service_code: body.service_code || `MEAL-${Date.now().toString(36).toUpperCase()}`,
       restaurant_name: body.restaurant_name,

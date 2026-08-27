@@ -7,6 +7,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 
@@ -161,6 +162,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('entrance_fees')
       .insert({
+        ...rateCurrencyWriteField(body),
         service_code: service_code || `ENT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         attraction_name,
         city,

@@ -9,6 +9,7 @@ import { useSearchParams } from 'next/navigation'
 import { Utensils, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Users, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 
 const MEAL_TYPES = [
@@ -126,6 +127,8 @@ export default function MealRatesContent() {
   // UI State
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<MealRate | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -261,6 +264,7 @@ export default function MealRatesContent() {
 
   const handleAddNew = () => {
     setEditingRate(null)
+    setRateCurrency('')
     setFormData({
       service_code: generateServiceCode(),
       restaurant_name: '',
@@ -288,6 +292,7 @@ export default function MealRatesContent() {
 
   const handleEdit = (rate: MealRate) => {
     setEditingRate(rate)
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: rate.service_code || '',
       restaurant_name: rate.restaurant_name || '',
@@ -315,6 +320,7 @@ export default function MealRatesContent() {
 
   const handleClone = (rate: MealRate) => {
     setEditingRate(null)
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: generateServiceCode(),
       restaurant_name: rate.restaurant_name || '',
@@ -353,7 +359,7 @@ export default function MealRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur })
+          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
         })
 
         const data = await response.json()
@@ -1357,6 +1363,7 @@ export default function MealRatesContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     />
                     <p className="text-xs text-gray-500 mt-1">Stored in EUR, displayed in your preferred currency</p>
+                    <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
                   <div>
                     <label className="flex items-center gap-2 cursor-pointer">

@@ -219,3 +219,20 @@ export async function normalizeRateRows<T extends Record<string, unknown>>(
   }
   return out
 }
+
+// --------------------------------------------
+// Write-side helper for the rate API routes
+// --------------------------------------------
+
+/**
+ * Include rate_currency in a write payload ONLY when the client sent the key
+ * (deploy-order safety: a form on an unmigrated database never names the
+ * column). Empty string means "clear back to the EUR default" → NULL.
+ */
+export function rateCurrencyWriteField(
+  body: Record<string, unknown> | null | undefined
+): { rate_currency?: string | null } {
+  if (!body || !('rate_currency' in body)) return {}
+  const v = body.rate_currency
+  return { rate_currency: typeof v === 'string' && v ? v : null }
+}

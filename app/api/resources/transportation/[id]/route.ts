@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { buildWideVehicleColumns } from '../route'
 
@@ -101,6 +102,7 @@ export async function PUT(
     // rate_valid_from/to, supplier fields and notes, none of which exist in
     // the live schema (PGRST204 on every update).
     const updateData = {
+      ...rateCurrencyWriteField(body),
       route_name: body.route_name || body.service_code || null,
       service_type: body.service_type,
       vehicle_type: isWide ? null : body.vehicle_type,

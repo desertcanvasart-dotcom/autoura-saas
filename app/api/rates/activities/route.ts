@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
 
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     const newRate: TablesInsert<'activity_rates'> = {
+      ...rateCurrencyWriteField(body),
       tenant_id,
       service_code: body.service_code || `ACT-${Date.now().toString(36).toUpperCase()}`,
       activity_name: body.activity_name,

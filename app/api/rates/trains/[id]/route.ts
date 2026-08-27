@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getCatalogScope, catalogOrExpr } from '@/lib/catalog-scope'
 
@@ -55,6 +56,7 @@ export async function PUT(
     const body = await request.json()
 
     const updateData: Record<string, any> = {}
+Object.assign(updateData, rateCurrencyWriteField(body))
 
     if (body.service_code !== undefined) updateData.service_code = body.service_code
     if (body.origin_city !== undefined) updateData.origin_city = body.origin_city || null

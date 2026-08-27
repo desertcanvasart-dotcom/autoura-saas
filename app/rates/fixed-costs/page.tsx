@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { Plus, Edit, Save, X, Loader2, DollarSign } from 'lucide-react'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 interface FixedCost {
   id: string
@@ -18,6 +19,8 @@ function FixedCostsContent() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ cost_type: '', cost_per_person_per_day: '', description: '', is_active: true })
   const [saving, setSaving] = useState(false)
+  // Which currency this cost is entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
 
   const fetchCosts = useCallback(async () => {
     try {
@@ -34,12 +37,15 @@ function FixedCostsContent() {
     try {
       const url = '/api/rates/fixed-costs'
       const method = editingId ? 'PUT' : 'POST'
-      const body = editingId ? { id: editingId, ...form, cost_per_person_per_day: parseFloat(form.cost_per_person_per_day) || 0 }
-        : { ...form, cost_per_person_per_day: parseFloat(form.cost_per_person_per_day) || 0 }
+      const editingRow = editingId ? costs.find(c => c.id === editingId) : null
+      const currencyPatch = rateCurrencyPatch(rateCurrency, (editingRow as { rate_currency?: string | null } | null | undefined)?.rate_currency)
+      const body = editingId ? { id: editingId, ...form, cost_per_person_per_day: parseFloat(form.cost_per_person_per_day) || 0, ...currencyPatch }
+        : { ...form, cost_per_person_per_day: parseFloat(form.cost_per_person_per_day) || 0, ...currencyPatch }
 
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       if (res.ok) {
         setShowForm(false); setEditingId(null)
+        setRateCurrency('')
         setForm({ cost_type: '', cost_per_person_per_day: '', description: '', is_active: true })
         fetchCosts()
       }
@@ -47,6 +53,7 @@ function FixedCostsContent() {
   }
 
   const handleEdit = (c: FixedCost) => {
+    setRateCurrency((c as { rate_currency?: string | null }).rate_currency || '')
     setForm({ cost_type: c.cost_type, cost_per_person_per_day: String(c.cost_per_person_per_day), description: c.description || '', is_active: c.is_active })
     setEditingId(c.id)
     setShowForm(true)
@@ -108,6 +115,7 @@ function FixedCostsContent() {
                 <input type="number" step="0.01" value={form.cost_per_person_per_day} onChange={e => setForm(f => ({ ...f, cost_per_person_per_day: e.target.value }))}
                   className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-[#647C47]" />
               </div>
+              <RateCurrencyField compact value={rateCurrency} onChange={setRateCurrency} />
               <div>
                 <label className="text-xs font-medium text-gray-500 mb-1 block">Description</label>
                 <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}

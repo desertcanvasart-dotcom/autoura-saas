@@ -10,6 +10,7 @@ import { Building2, Plus, Search, Edit, Trash2, X, Check, Copy, LayoutGrid, List
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 
 const TIER_OPTIONS = [
@@ -362,6 +363,8 @@ export default function HotelsContent() {
   const today = new Date().toISOString().split('T')[0]
   const nextYear = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
 
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [formData, setFormData] = useState({
     service_code: '',
     property_name: '',
@@ -522,6 +525,7 @@ export default function HotelsContent() {
   // Open modal for new rate
   const handleAddNew = () => {
     setEditingRate(null)
+    setRateCurrency('')
     setFormData({
       service_code: '',
       property_name: '',
@@ -655,6 +659,7 @@ export default function HotelsContent() {
     const deriveSingleSupp = (singleRate: number, ppd: number) => Math.max(0, singleRate - ppd)
     const deriveTripleRed = (tripleRate: number, ppd: number) => Math.max(0, ppd - (tripleRate / 3))
 
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: rate.service_code || '',
       property_name: rate.property_name || '',
@@ -733,6 +738,7 @@ export default function HotelsContent() {
       // Generate service code if empty and prepare data
       const dataToSubmit = {
         ...formData,
+        ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency),
         service_code: formData.service_code || generateServiceCode(formData.city),
         // Include calculated legacy room rates for backward compatibility
         single_rate_eur: lowRates.single,
@@ -825,6 +831,7 @@ export default function HotelsContent() {
   // Clone/Duplicate a hotel rate
   const handleClone = (rate: AccommodationRate) => {
     setEditingRate(null) // This is a new record
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: '', // Will be auto-generated
       property_name: rate.property_name,
@@ -1653,6 +1660,7 @@ export default function HotelsContent() {
                       <option value="camp">⛺ Camp</option>
                     </select>
                   </div>
+                  <RateCurrencyField compact value={rateCurrency} onChange={setRateCurrency} />
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Board Basis</label>
                     <select

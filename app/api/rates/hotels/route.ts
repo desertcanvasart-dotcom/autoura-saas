@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 import type { TablesInsert } from '@/types/database.types'
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
     // The trigger automatically sets tenant_id from the authenticated user's session
     // RLS policies enforce that users can only insert rates for their own tenant
     const newHotel: TablesInsert<'accommodation_rates'> = {
+      ...rateCurrencyWriteField(body),
       // Basic info
       tenant_id,
       service_code: body.service_code || `ACC-${Date.now().toString(36).toUpperCase()}`,

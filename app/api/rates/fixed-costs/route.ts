@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { clearFixedCostsCache } from '@/lib/fixed-costs'
 
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('fixed_daily_costs')
       .insert({
+        ...rateCurrencyWriteField(body),
         tenant_id,
         cost_type: body.cost_type,
         cost_per_person_per_day: parseFloat(body.cost_per_person_per_day) || 0,
@@ -69,6 +71,7 @@ export async function PUT(request: NextRequest) {
     if (!id) return NextResponse.json({ success: false, error: 'Missing id' }, { status: 400 })
 
     const updateData: Record<string, any> = {}
+Object.assign(updateData, rateCurrencyWriteField(updateFields))
     if (updateFields.cost_type !== undefined) updateData.cost_type = updateFields.cost_type
     if (updateFields.cost_per_person_per_day !== undefined) updateData.cost_per_person_per_day = parseFloat(updateFields.cost_per_person_per_day) || 0
     if (updateFields.description !== undefined) updateData.description = updateFields.description || null

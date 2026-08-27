@@ -6,6 +6,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
 
@@ -171,6 +172,7 @@ export async function POST(request: NextRequest) {
     // Note: suppliers has no specialties/daily_rate/hourly_rate columns —
     // guide rates live in guide_rates.
     const guideData: TablesInsert<'suppliers'> = {
+      ...rateCurrencyWriteField(body),
       tenant_id: authResult.tenant_id,
       type: 'guide',
       supplier_type: 'guide',

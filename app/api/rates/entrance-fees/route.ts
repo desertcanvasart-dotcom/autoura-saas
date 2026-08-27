@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newFee = {
+      ...rateCurrencyWriteField(body),
       tenant_id: authResult.tenant_id,
       service_code: body.service_code || `ENT-${Date.now().toString(36).toUpperCase()}`,
       attraction_name: body.attraction_name,

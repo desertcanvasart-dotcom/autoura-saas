@@ -63,6 +63,8 @@ function rateValidFrom(): ColumnDef { return col('rate_valid_from', 'Rate Valid 
 function rateValidTo(): ColumnDef { return col('rate_valid_to', 'Rate Valid To', 'date', false) }
 function supplierId(): ColumnDef { return col('supplier_id', 'Supplier ID', 'text', false) }
 function season(): ColumnDef { return col('season', 'Season', 'text', false) }
+// P3 per-rate currency: blank = EUR default; validated against the allowed set on import.
+function rateCurrency(): ColumnDef { return col('rate_currency', 'Rate Currency', 'text', false) }
 
 // ============================================
 // TABLE CONFIGS (14 tables)
@@ -123,6 +125,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('reservations_email', 'Reservations Email', 'text', false),
       col('reservations_phone', 'Reservations Phone', 'text', false),
       isActive(), createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 
@@ -167,6 +170,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('bus_capacity_min', 'Bus Cap Min', 'number', false),
       col('bus_capacity_max', 'Bus Cap Max', 'number', false),
       isActive(), createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 
@@ -184,6 +188,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('base_rate_non_eur', 'Rate Non-EUR', 'number', true),
       season(), rateValidFrom(), rateValidTo(),
       supplierId(), notes(), isActive(), createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 
@@ -210,6 +215,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       notes(), isActive(),
       col('is_preferred', 'Preferred', 'boolean', false),
       createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 
@@ -232,6 +238,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('addon_note', 'Add-on Note', 'text', false),
       season(), rateValidFrom(), rateValidTo(),
       supplierId(), notes(), isActive(), createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 
@@ -258,6 +265,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       supplierId(),
       col('supplier_name', 'Supplier Name', 'text', false),
       notes(), isActive(), createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 
@@ -282,6 +290,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       supplierId(),
       col('supplier_name', 'Supplier Name', 'text', false),
       notes(), isActive(), createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 
@@ -297,6 +306,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('rate_eur', 'Rate EUR', 'number', true),
       col('description', 'Description', 'text', false),
       notes(), isActive(),
+      rateCurrency(),
     ],
   },
 
@@ -312,6 +322,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('rate_eur', 'Rate EUR', 'number', true),
       col('description', 'Description', 'text', false),
       notes(), isActive(),
+      rateCurrency(),
     ],
   },
 
@@ -326,6 +337,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('rate_eur', 'Rate EUR', 'number', true),
       col('description', 'Description', 'text', false),
       notes(), isActive(),
+      rateCurrency(),
     ],
   },
 
@@ -387,6 +399,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('description', 'Description', 'text', false),
       notes(), isActive(),
       col('created_at', 'Created At', 'date', false, true),
+      rateCurrency(),
     ],
   },
 
@@ -407,6 +420,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       supplierId(),
       col('description', 'Description', 'text', false),
       notes(), isActive(), createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 
@@ -428,11 +442,12 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       supplierId(),
       col('description', 'Description', 'text', false),
       notes(), isActive(), createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 
   fixed_costs: {
-    tableName: 'fixed_costs',
+    tableName: 'fixed_daily_costs',
     displayName: 'Fixed Costs',
     uniqueKey: ['cost_type'],
     columns: [
@@ -441,6 +456,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('cost_per_person_per_day', 'Cost Per Person/Day', 'number', true),
       col('description', 'Description', 'text', false),
       isActive(), createdAt(), updatedAt(),
+      rateCurrency(),
     ],
   },
 }
@@ -524,7 +540,13 @@ export function validateImportData(
         errors.push({ row: rowNum, column: colDef.name, message: error })
         rowValid = false
       } else if (parsed !== null) {
-        parsedRow[colDef.name] = parsed
+        // Per-rate currency: only the supported set; blank = EUR default.
+        if (colDef.name === 'rate_currency' && !['EUR', 'USD', 'GBP', 'EGP'].includes(String(parsed).toUpperCase())) {
+          errors.push({ row: rowNum, column: colDef.name, message: `Unsupported currency "${parsed}" — use EUR, USD, GBP or EGP (blank = EUR)` })
+          rowValid = false
+          continue
+        }
+        parsedRow[colDef.name] = colDef.name === 'rate_currency' ? String(parsed).toUpperCase() : parsed
       }
     }
 

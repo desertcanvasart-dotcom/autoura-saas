@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { DollarSign, Plus, Search, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 // ============================================
 // CONSTANTS
@@ -172,6 +173,8 @@ export default function TippingPage() {
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<TippingRate | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // Bulk selection state
@@ -235,6 +238,7 @@ export default function TippingPage() {
   }
 
   const handleAddNew = () => {
+    setRateCurrency('')
     setEditingRate(null)
     setFormData({ 
       service_code: '', 
@@ -250,6 +254,7 @@ export default function TippingPage() {
   }
 
   const handleEdit = (rate: TippingRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(rate)
     setFormData({
       service_code: rate.service_code,
@@ -267,7 +272,7 @@ export default function TippingPage() {
   const { submitting, guard } = useSubmitGuard()
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    guard(async () => {  const submitData = { ...formData, service_code: formData.service_code || generateCode() }
+    guard(async () => {  const submitData = { ...formData, service_code: formData.service_code || generateCode(), ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) }
 
       try {
         const url = editingRate ? `/api/rates/tipping/${editingRate.id}` : '/api/rates/tipping'
@@ -317,6 +322,7 @@ export default function TippingPage() {
   }
 
   const handleClone = (rate: TippingRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(null)
     setFormData({
       service_code: '',
@@ -743,6 +749,7 @@ export default function TippingPage() {
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600" 
                   />
                 </div>
+                <RateCurrencyField compact value={rateCurrency} onChange={setRateCurrency} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>

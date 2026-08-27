@@ -21,19 +21,34 @@ export async function GET(request: NextRequest) {
 
     // Config keys are live table names; the guard above proves membership,
     // which the Record<string, ...> config type cannot express.
-    const tableName = table as keyof Database['public']['Tables']
+    // config.tableName, not the raw key: the fixed_costs config maps to the
+    // fixed_daily_costs table.
+    const tableName = config.tableName as keyof Database['public']['Tables']
 
-    // RLS automatically filters by tenant
-    const { data, error } = await supabase
-      .from(tableName)
-      .select(headers.join(','))
+    // RLS automatically filters by tenant.
+    // select('*') + header mapping, never select(headers.join(',')): naming a
+    // column the database does not have yet (e.g. rate_currency before
+    // migration 295) would 500 the whole export.
+    interface DynamicQuery {
+      select(columns: string): {
+        order(column: string, opts: { ascending: boolean }): PromiseLike<{
+          data: Record<string, unknown>[] | null
+          error: { message: string } | null
+        }>
+      }
+    }
+    const { data, error } = await (supabase.from(tableName) as unknown as DynamicQuery)
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    const csv = Papa.unparse(data || [], { columns: headers })
+    const rows = (data || []).map(row =>
+      Object.fromEntries(headers.map(h => [h, row[h] ?? '']))
+    )
+    const csv = Papa.unparse(rows, { columns: headers })
 
     return new NextResponse(csv, {
       status: 200,

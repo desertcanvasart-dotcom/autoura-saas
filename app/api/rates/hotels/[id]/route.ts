@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(
@@ -70,6 +71,7 @@ export async function PUT(
     const body = await request.json()
 
     const updateData = {
+      ...rateCurrencyWriteField(body),
       // Basic info
       service_code: body.service_code,
       property_name: body.property_name,
