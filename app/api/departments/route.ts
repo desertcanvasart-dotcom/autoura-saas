@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { validateDepartmentInput, isNameTaken } from '@/lib/departments'
+import { validateDepartmentInput, isNameTaken, findClaimConflict, type ClaimCheckDept } from '@/lib/departments'
 
 /** Roles allowed to change the department list (reads are open to any member). */
 const WRITE_ROLES = ['owner', 'admin', 'manager']
@@ -74,11 +74,21 @@ export async function POST(request: NextRequest) {
     // note on isNameTaken for why the DB's unique index isn't enough.
     const { data: existing } = await supabase
       .from('departments')
-      .select('id, name')
+      .select('id, name, service_types, is_active')
 
     if (isNameTaken(validated.value.name, (existing as { id: string; name: string }[]) || [])) {
       return NextResponse.json(
         { success: false, error: `A department named "${validated.value.name}" already exists` },
+        { status: 409 }
+      )
+    }
+
+    // One department per routable type: routing is first-match, so a double
+    // claim would silently win by load order (P6).
+    const conflict = findClaimConflict(validated.value.service_types ?? [], (existing as ClaimCheckDept[]) || [])
+    if (conflict) {
+      return NextResponse.json(
+        { success: false, error: `"${conflict.type}" is already handled by ${conflict.owner} — one department per service type` },
         { status: 409 }
       )
     }

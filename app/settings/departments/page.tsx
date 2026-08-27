@@ -96,6 +96,18 @@ export default function DepartmentsSettingsPage() {
     setShowModal(true)
   }
 
+  // A routable type claimed by another ACTIVE department: task routing is
+  // first-match, so double-claiming silently routes to one of them. The pill
+  // is disabled and says who owns it; the API rejects it too.
+  const claimedBy = (value: string): string | null => {
+    for (const dept of departments) {
+      if (editing && dept.id === editing.id) continue
+      if (dept.is_active === false) continue
+      if ((dept.service_types || []).includes(value)) return dept.name
+    }
+    return null
+  }
+
   const toggleServiceType = (value: string) => {
     setForm(prev => ({
       ...prev,
@@ -342,17 +354,26 @@ export default function DepartmentsSettingsPage() {
                   Tasks generated for these services route to this department.
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {ROUTABLE_SERVICE_TYPES.map(type => (
-                    <label key={type.value} className="flex items-center gap-2 text-sm text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={form.service_types.includes(type.value)}
-                        onChange={() => toggleServiceType(type.value)}
-                        className="rounded border-gray-300 text-[#647C47] focus:ring-[#647C47]"
-                      />
-                      {type.label}
-                    </label>
-                  ))}
+                  {ROUTABLE_SERVICE_TYPES.map(type => {
+                    const owner = form.service_types.includes(type.value) ? null : claimedBy(type.value)
+                    return (
+                      <label
+                        key={type.value}
+                        className={`flex items-center gap-2 text-sm ${owner ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700'}`}
+                        title={owner ? `Already handled by ${owner} — tasks route to one department per service type` : undefined}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={form.service_types.includes(type.value)}
+                          disabled={!!owner}
+                          onChange={() => toggleServiceType(type.value)}
+                          className="rounded border-gray-300 text-[#647C47] focus:ring-[#647C47] disabled:opacity-40"
+                        />
+                        {type.label}
+                        {owner && <span className="text-[10px] text-gray-400">· {owner}</span>}
+                      </label>
+                    )
+                  })}
                 </div>
 
                 <p className="text-xs text-gray-500 mt-3 mb-2">

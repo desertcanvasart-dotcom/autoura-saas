@@ -173,3 +173,29 @@ describe('isNameTaken', () => {
     expect(isNameTaken('Aviation', existing, 'tenant-1')).toBe(true)
   })
 })
+
+// P6: routable-type exclusivity. Routing is first-match, so a double claim
+// silently routes by load order — creation/update refuse it instead.
+import { findClaimConflict } from '../departments'
+
+describe('findClaimConflict', () => {
+  const others = [
+    { id: 'd1', name: 'Transport Desk', service_types: ['transportation'], is_active: true },
+    { id: 'd2', name: 'Dormant', service_types: ['guide'], is_active: false },
+  ]
+
+  it('flags a type an active department already holds, naming the owner', () => {
+    expect(findClaimConflict(['meal', 'transportation'], others))
+      .toEqual({ type: 'transportation', owner: 'Transport Desk' })
+  })
+
+  it('ignores inactive departments and the department being edited', () => {
+    expect(findClaimConflict(['guide'], others)).toBeNull()
+    expect(findClaimConflict(['transportation'], others, 'd1')).toBeNull()
+  })
+
+  it('clean claim set passes', () => {
+    expect(findClaimConflict(['meal'], others)).toBeNull()
+    expect(findClaimConflict([], others)).toBeNull()
+  })
+})

@@ -71,7 +71,7 @@ export async function PUT(request: NextRequest) {
     if (!id) return NextResponse.json({ success: false, error: 'Missing id' }, { status: 400 })
 
     const updateData: Record<string, any> = {}
-Object.assign(updateData, rateCurrencyWriteField(updateFields))
+    Object.assign(updateData, rateCurrencyWriteField(updateFields))
     if (updateFields.cost_type !== undefined) updateData.cost_type = updateFields.cost_type
     if (updateFields.cost_per_person_per_day !== undefined) updateData.cost_per_person_per_day = parseFloat(updateFields.cost_per_person_per_day) || 0
     if (updateFields.description !== undefined) updateData.description = updateFields.description || null
@@ -89,5 +89,32 @@ Object.assign(updateData, rateCurrencyWriteField(updateFields))
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}
+
+// P6: the page had no way to remove a cost at all — an obsolete fixed cost
+// could only be edited into irrelevance. Hard delete after an explicit
+// confirm in the UI; the engine caches clear so pricing reflects it at once.
+export async function DELETE(request: NextRequest) {
+  try {
+    const authResult = await requireAuth()
+    if (authResult.error !== null) return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
+    const { supabase } = authResult
+    if (!supabase) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
+
+    const body = await request.json().catch(() => ({}))
+    const id = body?.id
+    if (!id || typeof id !== 'string') return NextResponse.json({ success: false, error: 'Missing id' }, { status: 400 })
+
+    const { error } = await supabase
+      .from('fixed_daily_costs')
+      .delete()
+      .eq('id', id)
+    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    clearFixedCostsCache()
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Delete failed'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
