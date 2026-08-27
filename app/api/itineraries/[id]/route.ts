@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { evaluateDeleteGuard } from '@/lib/delete-guard'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { validateAssignee, notifyTripAssignment } from '@/lib/trip-assignee'
+import { buildFrozenFx } from '@/lib/itinerary-fx'
 
 /**
  * GET /api/itineraries/[id]
@@ -125,6 +126,31 @@ export async function PUT(
         }
         updateData.assigned_to = body.assigned_to
         newAssignee = body.assigned_to
+      }
+    }
+
+    // FX FREEZE (P4): at the FIRST transition to 'confirmed', stamp the
+    // active exchange-rate snapshot. Stamped once — a re-confirm or a later
+    // status bounce never restamps; only the explicit reprice endpoint may.
+    // Deploy-order safe: if the fx_frozen column does not exist yet
+    // (migration 296 unapplied), the current row has no such key and the
+    // freeze is skipped entirely.
+    if (body.status === 'confirmed') {
+      const { data: current } = await supabase
+        .from('itineraries')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+      const row = current as (Record<string, unknown> & { status?: string }) | null
+      if (row && 'fx_frozen' in row && row.fx_frozen == null && row.status !== 'confirmed') {
+        const { data: fxRates } = await supabase
+          .from('exchange_rates')
+          .select('base_currency, target_currency, rate, is_active')
+          .eq('is_active', true)
+        if (fxRates && fxRates.length > 0) {
+          const { data: { user: fxUser } } = await supabase.auth.getUser()
+          updateData.fx_frozen = buildFrozenFx(fxRates, fxUser?.id ?? null, 'confirm')
+        }
       }
     }
 

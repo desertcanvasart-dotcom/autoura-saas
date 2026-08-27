@@ -38,6 +38,7 @@ import {
 import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
 import { showToast } from '@/app/contexts/ToastContext'
+import { useRole } from '@/hooks/useRole'
 
 // ============================================
 // TYPES
@@ -428,17 +429,43 @@ export default function ItineraryEditorPage() {
     }
   }
 
+  const { isAdmin } = useRole()
+  const [repricingFx, setRepricingFx] = useState(false)
+
+  // Explicit, logged FX reprice (P4): restates supplier-side costs of lines
+  // priced in a foreign contract currency at today's rates. Client price
+  // never moves. Admin-only; the endpoint enforces it too.
+  const repriceFx = async () => {
+    if (!itinerary || repricingFx) return
+    setRepricingFx(true)
+    try {
+      const response = await fetch(`/api/itineraries/${itineraryId}/reprice-fx`, { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok || !data.success) throw new Error(data.error || 'Reprice failed')
+      const d = data.data
+      showToast('success', `FX repriced: ${d.repriced} line${d.repriced === 1 ? '' : 's'} restated${d.skipped?.length ? `, ${d.skipped.length} skipped` : ''}`)
+      await loadItinerary()
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Reprice failed')
+    } finally {
+      setRepricingFx(false)
+    }
+  }
+
   const updateStatus = async (newStatus: string) => {
     if (!itinerary) return
     setUpdatingStatus(true)
 
     try {
-      const { error } = await supabase
-        .from('itineraries')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq('id', itineraryId)
-
-      if (error) throw error
+      // Through the API, not a direct table write: the PUT route is where the
+      // FX-freeze snapshot is stamped on the first transition to 'confirmed'.
+      const response = await fetch(`/api/itineraries/${itineraryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+      const data = await response.json()
+      if (!response.ok || !data.success) throw new Error(data.error || 'Update failed')
       setItinerary({ ...itinerary, status: newStatus })
     } catch (error) {
       console.error('Error updating status:', error)
@@ -840,6 +867,18 @@ export default function ItineraryEditorPage() {
                 <option key={status.value} value={status.value}>{status.label}</option>
               ))}
             </select>
+
+            {/* FX reprice — confirmed trips only; supplier costs, never the client price */}
+            {isAdmin && itinerary.status === 'confirmed' && (
+              <button
+                onClick={repriceFx}
+                disabled={repricingFx}
+                title="Restate supplier costs of foreign-currency lines at today's exchange rates (logged; client price unchanged)"
+                className="px-2.5 py-1 rounded-md text-xs font-semibold border border-gray-200 text-gray-600 hover:text-[#647C47] hover:border-[#647C47]/40 disabled:opacity-50 flex-shrink-0"
+              >
+                {repricingFx ? 'Repricing…' : 'Reprice FX'}
+              </button>
+            )}
 
             {/* Itinerary Code */}
             <h1 className="text-lg font-bold text-gray-900 whitespace-nowrap">{itinerary.itinerary_code}</h1>

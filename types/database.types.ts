@@ -5286,6 +5286,7 @@ export interface Database {
       }
       itineraries: {
         Row: {
+          fx_frozen: Json | null
           id: string
           itinerary_code: string
           client_id: string | null
@@ -5359,6 +5360,7 @@ export interface Database {
           assigned_to: string | null
         }
         Insert: {
+          fx_frozen?: Json | null
           id?: string
           itinerary_code: string
           client_id?: string | null
@@ -5432,6 +5434,7 @@ export interface Database {
           assigned_to?: string | null
         }
         Update: {
+          fx_frozen?: Json | null
           id?: string
           itinerary_code?: string
           client_id?: string | null
