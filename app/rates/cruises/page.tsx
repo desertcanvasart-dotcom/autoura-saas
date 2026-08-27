@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { Ship, Plus, Search, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Crown, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 // ============================================
 // CONSTANTS
@@ -594,6 +595,8 @@ export default function CruisesPage() {
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingCruise, setEditingCruise] = useState<Cruise | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // Pagination state
@@ -730,12 +733,14 @@ export default function CruisesPage() {
   }
 
   const handleAddNew = () => {
+    setRateCurrency('')
     setEditingCruise(null)
     setFormData(getDefaultFormData())
     setShowModal(true)
   }
 
   const handleEdit = (cruise: Cruise) => {
+    setRateCurrency((cruise as { rate_currency?: string | null }).rate_currency || '')
     setEditingCruise(cruise)
     setFormData({
       cruise_code: cruise.cruise_code,
@@ -793,6 +798,7 @@ export default function CruisesPage() {
 
   // Clone/Duplicate a cruise
   const handleClone = (cruise: Cruise) => {
+    setRateCurrency((cruise as { rate_currency?: string | null }).rate_currency || '')
     setEditingCruise(null) // This is a new record
     setFormData({
       cruise_code: '', // Will be auto-generated
@@ -861,6 +867,7 @@ export default function CruisesPage() {
       const tripleEur = (formData.ppd_eur - formData.triple_reduction_eur) * 3
 
       const submitData = {
+        ...rateCurrencyPatch(rateCurrency, (editingCruise as { rate_currency?: string | null } | null)?.rate_currency),
         ...formData,
         cruise_code: formData.cruise_code || generateCode(),
         route_name: formData.route_name || `${formData.embark_city} to ${formData.disembark_city}`,
@@ -1493,6 +1500,8 @@ export default function CruisesPage() {
                   </label>
                 </div>
               </div>
+
+              <RateCurrencyField compact className="max-w-xs" value={rateCurrency} onChange={setRateCurrency} />
 
               {/* Section 6: Low Season Rates (PPD Model) */}
               <PPDSeasonalRateSection

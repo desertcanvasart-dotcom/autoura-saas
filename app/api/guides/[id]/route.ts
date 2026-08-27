@@ -8,6 +8,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(
@@ -86,6 +87,7 @@ export async function PUT(
 
     // Prepare update data (only include provided fields)
     const updateData: any = {}
+    Object.assign(updateData, rateCurrencyWriteField(body))
 
     if (body.name !== undefined) updateData.name = body.name
     if (body.email !== undefined) updateData.email = body.email

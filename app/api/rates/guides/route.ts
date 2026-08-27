@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 import type { TablesInsert } from '@/types/database.types'
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     const newRate: TablesInsert<'guide_rates'> = {
+      ...rateCurrencyWriteField(body),
       tenant_id,
       service_code: body.service_code || `GD-${Date.now().toString(36).toUpperCase()}`,
       guide_language: body.guide_language,

@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { ConciergeBell, Plus, Search, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 // ============================================
 // CONSTANTS
@@ -183,6 +184,8 @@ export default function HotelServicesPage() {
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<HotelStaffRate | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // Bulk selection state
@@ -247,6 +250,7 @@ export default function HotelServicesPage() {
   }
 
   const handleAddNew = () => {
+    setRateCurrency('')
     setEditingRate(null)
     setFormData({
       service_code: '',
@@ -261,6 +265,7 @@ export default function HotelServicesPage() {
   }
 
   const handleEdit = (rate: HotelStaffRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(rate)
     setFormData({
       service_code: rate.service_code,
@@ -277,7 +282,7 @@ export default function HotelServicesPage() {
   const { submitting, guard } = useSubmitGuard()
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    guard(async () => {  const submitData = { ...formData, service_code: formData.service_code || generateCode() }
+    guard(async () => {  const submitData = { ...formData, service_code: formData.service_code || generateCode(), ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) }
 
       try {
         const url = editingRate ? `/api/rates/hotel-services/${editingRate.id}` : '/api/rates/hotel-services'
@@ -302,6 +307,7 @@ export default function HotelServicesPage() {
   }
 
   const handleClone = (rate: HotelStaffRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(null)
     setFormData({
       service_code: '',
@@ -749,6 +755,7 @@ export default function HotelServicesPage() {
                     title="Rate in EUR"
                     className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
                   />
+                  <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Rates are stored in EUR and converted to your display currency</p>
               </div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 export async function GET(request: NextRequest) {
@@ -142,6 +143,7 @@ export async function POST(request: NextRequest) {
     // never successfully saved a rate. route_name is the real identifier
     // column (the grid's grouping key uses it).
     const newRate = {
+      ...rateCurrencyWriteField(body),
       tenant_id: authResult.tenant_id,
       route_name: body.route_name || serviceCode,
       service_type: body.service_type,

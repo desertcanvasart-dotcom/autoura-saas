@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(
@@ -67,6 +68,7 @@ export async function PUT(
     const body = await request.json()
 
     const updateData: Record<string, any> = {}
+Object.assign(updateData, rateCurrencyWriteField(body))
 
     if (body.service_code !== undefined) updateData.service_code = body.service_code
     if (body.guide_language !== undefined) updateData.guide_language = body.guide_language

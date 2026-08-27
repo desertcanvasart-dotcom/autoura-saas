@@ -7,6 +7,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
 // GET - Fetch single attraction
@@ -129,6 +130,7 @@ export async function PUT(
     
     // Build update object - only include fields that are provided
     const updateData: Record<string, any> = {
+      ...rateCurrencyWriteField(body),
       updated_at: new Date().toISOString()
     }
     

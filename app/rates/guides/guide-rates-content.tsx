@@ -9,6 +9,7 @@ import { useSearchParams } from 'next/navigation'
 import { Users, Plus, Search, Edit, Trash2, X, Check, Copy, Filter, Globe, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 
 const LANGUAGES = [
@@ -87,6 +88,8 @@ export default function GuideRatesContent() {
   // UI State
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<GuideRate | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -208,6 +211,7 @@ export default function GuideRatesContent() {
 
   const handleAddNew = () => {
     setEditingRate(null)
+    setRateCurrency('')
     setFormData({
       service_code: generateServiceCode(),
       guide_language: 'English',
@@ -228,6 +232,7 @@ export default function GuideRatesContent() {
 
   const handleEdit = (rate: GuideRate) => {
     setEditingRate(rate)
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: rate.service_code || '',
       guide_language: rate.guide_language || 'English',
@@ -249,6 +254,7 @@ export default function GuideRatesContent() {
   // Clone a rate - copy all fields, clear ID/code, open modal for new entry
   const handleClone = (rate: GuideRate) => {
     setEditingRate(null) // This will be a new record
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: generateServiceCode(), // Generate new code
       guide_language: rate.guide_language || 'English',
@@ -282,7 +288,7 @@ export default function GuideRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur })
+          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
         })
 
         const data = await response.json()
@@ -1252,6 +1258,7 @@ export default function GuideRatesContent() {
                         className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
                       />
                     </div>
+                    <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
                 </div>
               </div>

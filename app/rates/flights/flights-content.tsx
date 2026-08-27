@@ -7,6 +7,7 @@ import { Search, Plus, Edit2, Trash2, X, Plane, ChevronDown, ChevronLeft, Chevro
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 interface FlightRate {
   id: string
@@ -174,6 +175,8 @@ export default function FlightsContent() {
   const [showInactive, setShowInactive] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRate, setEditingRate] = useState<FlightRate | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -303,6 +306,7 @@ export default function FlightsContent() {
 
   const openAddModal = () => {
     setEditingRate(null)
+    setRateCurrency('')
     setFormData(initialFormData)
     setError(null)
     setIsModalOpen(true)
@@ -310,6 +314,7 @@ export default function FlightsContent() {
 
   const openEditModal = (rate: FlightRate) => {
     setEditingRate(rate)
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setError(null)
     setFormData({
       service_code: rate.service_code,
@@ -383,6 +388,7 @@ export default function FlightsContent() {
         ...formData,
         base_rate_non_eur: formData.base_rate_eur,
         tax_non_eur: formData.tax_eur,
+        ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency),
         supplier_id: formData.supplier_id || null,
         flight_number: formData.flight_number || null,
         departure_time: formData.departure_time || null,
@@ -504,6 +510,7 @@ export default function FlightsContent() {
   }
 
   const handleClone = (rate: FlightRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(null)
     setError(null)
     setFormData({
@@ -1278,6 +1285,7 @@ export default function FlightsContent() {
                         className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                       />
                     </div>
+                    <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
 
                   <div>

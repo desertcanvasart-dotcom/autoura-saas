@@ -10,6 +10,7 @@ import { Search, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, Chevro
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 // ============================================
 // CONSTANTS
@@ -198,6 +199,8 @@ export default function AttractionsContent() {
   const [showAddonsOnly, setShowAddonsOnly] = useState(false)  // NEW: Filter for add-ons
   const [showModal, setShowModal] = useState(false)
   const [editingAttraction, setEditingAttraction] = useState<Attraction | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [toasts, setToasts] = useState<Toast[]>([])
   const [togglingAddon, setTogglingAddon] = useState<string | null>(null)  // NEW: Track which row is toggling
 
@@ -351,6 +354,7 @@ export default function AttractionsContent() {
 
   // Open modal for new attraction
   const handleAddNew = () => {
+    setRateCurrency('')
     setEditingAttraction(null)
     setFormData({
       service_code: generateServiceCode(),
@@ -377,6 +381,7 @@ export default function AttractionsContent() {
 
   // Open modal for editing
   const handleEdit = (attraction: Attraction) => {
+    setRateCurrency((attraction as { rate_currency?: string | null }).rate_currency || '')
     setEditingAttraction(attraction)
     setFormData({
       service_code: attraction.service_code,
@@ -417,7 +422,8 @@ export default function AttractionsContent() {
         const submitData = {
           ...formData,
           non_eur_rate: formData.eur_rate,
-          supplier_id: formData.supplier_id || null
+          supplier_id: formData.supplier_id || null,
+          ...rateCurrencyPatch(rateCurrency, (editingAttraction as { rate_currency?: string | null } | null)?.rate_currency),
         }
       
         const response = await fetch(url, {
@@ -532,6 +538,7 @@ export default function AttractionsContent() {
 
   // Clone attraction
   const handleClone = (rate: Attraction) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingAttraction(null)
     setFormData({
       service_code: generateServiceCode(),
@@ -1162,6 +1169,7 @@ export default function AttractionsContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
                       placeholder="0.00"
                     />
+                    <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
 
                   <div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
 // ============================================
@@ -149,6 +150,7 @@ export async function POST(request: NextRequest) {
     // The trigger automatically sets tenant_id from the authenticated user's session
     // RLS policies enforce that users can only insert rates for their own tenant
     const newRate = {
+      ...rateCurrencyWriteField(body),
       service_code: serviceCode,
       route_from: body.route_from,
       route_to: body.route_to,

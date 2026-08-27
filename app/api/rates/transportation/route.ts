@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 
@@ -146,6 +147,7 @@ export async function POST(request: NextRequest) {
     // ✅ MULTI-TENANT: RLS policies enforce that users can only insert rates
     // for their own tenant
     const newRate = {
+      ...rateCurrencyWriteField(body),
       tenant_id,
       service_type: body.service_type,
       vehicle_type: body.vehicle_type,

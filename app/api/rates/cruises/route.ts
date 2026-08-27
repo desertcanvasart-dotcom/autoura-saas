@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
 
     // Include supplier_id in insert
     const newCruise = {
+      ...rateCurrencyWriteField(body),
       ...body,
       supplier_id: body.supplier_id || null
     }

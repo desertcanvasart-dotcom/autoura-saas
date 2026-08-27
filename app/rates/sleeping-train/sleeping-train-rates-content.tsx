@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation'
 import { useCurrency } from '@/hooks/useCurrency'
 import { BedDouble, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, Moon, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 // Sleeping train routes (Cairo-Luxor-Aswan corridor)
 const SLEEPER_CITIES = [
@@ -76,6 +77,8 @@ export default function SleepingTrainRatesContent() {
   // UI State
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<SleepingTrainRate | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -171,6 +174,7 @@ export default function SleepingTrainRatesContent() {
   }
 
   const handleAddNew = () => {
+    setRateCurrency('')
     setEditingRate(null)
     setFormData({
       service_code: generateServiceCode(),
@@ -193,6 +197,7 @@ export default function SleepingTrainRatesContent() {
   }
 
   const handleEdit = (rate: SleepingTrainRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(rate)
     setFormData({
       service_code: rate.service_code || '',
@@ -227,7 +232,7 @@ export default function SleepingTrainRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify({ ...formData, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency), })
         })
 
         const data = await response.json()
@@ -249,6 +254,7 @@ export default function SleepingTrainRatesContent() {
 
   // Clone a rate
   const handleClone = (rate: SleepingTrainRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(null)
     setFormData({
       service_code: generateServiceCode(),
@@ -1173,6 +1179,7 @@ export default function SleepingTrainRatesContent() {
                         className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
                       />
                     </div>
+                    <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
                   <div>
                     <label htmlFor="rate_roundtrip_eur" className="block text-xs font-medium text-gray-600 mb-1">Roundtrip Rate (EUR - base currency)</label>

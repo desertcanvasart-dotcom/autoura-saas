@@ -38,6 +38,14 @@ export async function POST(request: NextRequest) {
     if (dryRun) return NextResponse.json({ success: true, dryRun: true, ...preview })
     if (preview.invalidRows > 0) return NextResponse.json({ success: false, error: `${preview.invalidRows} rows have errors`, ...preview })
 
+    // The config's tableName is dynamic; the typed client cannot narrow it.
+    interface DynamicTable {
+      select(columns: string): { in(column: string, values: unknown[]): PromiseLike<{ data: Record<string, unknown>[] | null }> }
+      insert(rows: Record<string, unknown>[]): PromiseLike<{ error: { message: string } | null }>
+      update(row: Record<string, unknown>): { eq(c: string, v: unknown): { eq(c: string, v: unknown): PromiseLike<{ error: { message: string } | null }> } }
+    }
+    const dynTable = () => supabase.from(config.tableName as 'accommodation_rates') as unknown as DynamicTable
+
     const importableColumns = config.columns.filter(c => !c.exportOnly)
     const uniqueKeyColumn = config.uniqueKey[0]
 
@@ -50,7 +58,7 @@ export async function POST(request: NextRequest) {
         switch (colDef.type) {
           case 'number': record[colDef.name] = Number(raw); break
           case 'boolean': record[colDef.name] = ['true', '1', 'yes'].includes(raw.toLowerCase()); break
-          default: record[colDef.name] = raw
+          default: record[colDef.name] = colDef.name === 'rate_currency' ? raw.toUpperCase() : raw
         }
       }
       rowsToUpsert.push(record)
@@ -66,7 +74,7 @@ export async function POST(request: NextRequest) {
 
       let existingKeys = new Set<string>()
       if (keyValues.length > 0) {
-        const { data: existing } = await supabase.from(table).select(uniqueKeyColumn).in(uniqueKeyColumn, keyValues)
+        const { data: existing } = await dynTable().select(uniqueKeyColumn).in(uniqueKeyColumn, keyValues)
         if (existing) existingKeys = new Set(existing.map((r: any) => r[uniqueKeyColumn]))
       }
 
@@ -74,7 +82,7 @@ export async function POST(request: NextRequest) {
       const toUpdate = batch.filter(r => r[uniqueKeyColumn] && existingKeys.has(r[uniqueKeyColumn]))
 
       if (toInsert.length > 0) {
-        const { error } = await supabase.from(table).insert(toInsert)
+        const { error } = await dynTable().insert(toInsert)
         if (error) importErrors.push({ batch: Math.floor(i / BATCH_SIZE) + 1, operation: 'insert', message: error.message })
         else inserted += toInsert.length
       }
@@ -82,7 +90,7 @@ export async function POST(request: NextRequest) {
       for (const record of toUpdate) {
         const keyVal = record[uniqueKeyColumn]
         const updateData = { ...record }; delete updateData[uniqueKeyColumn]; delete updateData.tenant_id
-        const { error } = await supabase.from(table).update(updateData).eq(uniqueKeyColumn, keyVal).eq('tenant_id', tenant_id)
+        const { error } = await dynTable().update(updateData).eq(uniqueKeyColumn, keyVal).eq('tenant_id', tenant_id)
         if (error) importErrors.push({ row: `${uniqueKeyColumn}=${keyVal}`, message: error.message })
         else updated++
       }

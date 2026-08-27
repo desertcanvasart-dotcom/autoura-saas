@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Search, Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 interface TransportationRate {
   id: string
@@ -128,6 +129,8 @@ export default function TransportationContent() {
   const [showInactive, setShowInactive] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRate, setEditingRate] = useState<TransportationRate | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -260,6 +263,7 @@ export default function TransportationContent() {
 
   const openAddModal = () => {
     setEditingRate(null)
+    setRateCurrency('')
     setFormData(initialFormData)
     setError(null)
     setIsModalOpen(true)
@@ -267,6 +271,7 @@ export default function TransportationContent() {
 
   const openEditModal = (rate: TransportationRate) => {
     setEditingRate(rate)
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setError(null)
     setFormData({
       route_name: rate.route_name || '',
@@ -332,6 +337,7 @@ export default function TransportationContent() {
       // DB columns stay filled and nationality-based selection keeps working.
       const submitData = {
         ...formData,
+        ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency),
         vehicles: Object.fromEntries(
           Object.entries(formData.vehicles).map(([key, v]) => [key, { ...v, rate_non_eur: v.rate_eur }])
         ) as Record<VehicleClassKey, VehicleRateEntry>,
@@ -449,6 +455,7 @@ export default function TransportationContent() {
 
   // Clone a rate - copy all fields to form and open modal for new entry
   const handleClone = (rate: TransportationRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(null)
     setError(null)
     setFormData({
@@ -1003,6 +1010,8 @@ export default function TransportationContent() {
                   <h3 className="text-sm font-medium text-gray-700">Vehicle Rates</h3>
                   <span className="text-xs text-gray-400">EUR base · leave blank if a vehicle is not offered</span>
                 </div>
+
+                <RateCurrencyField compact className="mb-2 max-w-xs" value={rateCurrency} onChange={setRateCurrency} />
 
                 <div className="border border-gray-200 rounded-md overflow-hidden">
                   <table className="w-full">

@@ -9,6 +9,7 @@ import { useSearchParams } from 'next/navigation'
 import { Ticket, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, Users, AlertTriangle, CheckCircle, XCircle, Info, Ship, PersonStanding, Banknote } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 
 const ACTIVITY_CATEGORIES = [
@@ -134,6 +135,8 @@ export default function ActivityRatesContent() {
   // UI State
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<ActivityRate | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -261,6 +264,7 @@ export default function ActivityRatesContent() {
 
   const handleAddNew = () => {
     setEditingRate(null)
+    setRateCurrency('')
     setFormData({
       service_code: generateServiceCode(),
       activity_name: '',
@@ -287,6 +291,7 @@ export default function ActivityRatesContent() {
 
   const handleEdit = (rate: ActivityRate) => {
     setEditingRate(rate)
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: rate.service_code || '',
       activity_name: rate.activity_name || '',
@@ -324,7 +329,7 @@ export default function ActivityRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur })
+          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
         })
 
         const data = await response.json()
@@ -429,6 +434,7 @@ export default function ActivityRatesContent() {
   // Clone rate - copy all fields and open modal for new entry
   const handleClone = (rate: ActivityRate) => {
     setEditingRate(null)
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: generateServiceCode(),
       activity_name: `${rate.activity_name} (Copy)`,
@@ -1407,6 +1413,7 @@ export default function ActivityRatesContent() {
                       />
                     </div>
                     <p className="text-xs text-gray-400 mt-1">Stored in EUR for consistency</p>
+                    <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
                 </div>
               </div>

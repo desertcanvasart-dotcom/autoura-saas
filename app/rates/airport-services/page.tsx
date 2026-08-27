@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { Plane, Plus, Search, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
+import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 
 // ============================================
 // CONSTANTS
@@ -195,6 +196,8 @@ export default function AirportServicesPage() {
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<AirportStaffRate | null>(null)
+  // Which currency this rate's amounts are entered in ('' = EUR default)
+  const [rateCurrency, setRateCurrency] = useState('')
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // Bulk selection state
@@ -259,6 +262,7 @@ export default function AirportServicesPage() {
   }
 
   const handleAddNew = () => {
+    setRateCurrency('')
     setEditingRate(null)
     setFormData({
       service_code: '',
@@ -274,6 +278,7 @@ export default function AirportServicesPage() {
   }
 
   const handleEdit = (rate: AirportStaffRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(rate)
     setFormData({
       service_code: rate.service_code,
@@ -291,7 +296,7 @@ export default function AirportServicesPage() {
   const { submitting, guard } = useSubmitGuard()
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    guard(async () => {  const submitData = { ...formData, service_code: formData.service_code || generateCode() }
+    guard(async () => {  const submitData = { ...formData, service_code: formData.service_code || generateCode(), ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) }
 
       try {
         const url = editingRate ? `/api/rates/airport-services/${editingRate.id}` : '/api/rates/airport-services'
@@ -341,6 +346,7 @@ export default function AirportServicesPage() {
   }
 
   const handleClone = (rate: AirportStaffRate) => {
+    setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(null)
     setFormData({
       service_code: '',
@@ -784,6 +790,7 @@ export default function AirportServicesPage() {
                       title="Rate in EUR"
                       className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600"
                     />
+                    <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Stored in EUR, displayed in {userCurrency}</p>
                 </div>
