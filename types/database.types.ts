@@ -9777,6 +9777,7 @@ export interface Database {
       }
       trip_messages: {
         Row: {
+          notify_outcome: string | null
           id: string
           tenant_id: string
           itinerary_id: string
@@ -9789,6 +9790,7 @@ export interface Database {
           created_at: string
         }
         Insert: {
+          notify_outcome?: string | null
           id?: string
           tenant_id: string
           itinerary_id: string
@@ -9801,6 +9803,7 @@ export interface Database {
           created_at?: string
         }
         Update: {
+          notify_outcome?: string | null
           id?: string
           tenant_id?: string
           itinerary_id?: string

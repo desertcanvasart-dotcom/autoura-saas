@@ -95,8 +95,11 @@ vi.mock('@/lib/supabase-server', () => ({
     },
   }),
 }))
-vi.mock('@/lib/push', () => ({
-  sendPushToTenant: async (tenantId: string, payload: unknown) => { pushes.push({ tenantId, payload }) },
+vi.mock('@/lib/trip-message-notify', () => ({
+  notifyTripMessage: async (input: { tenantId: string }) => {
+    pushes.push({ tenantId: input.tenantId, payload: input })
+    return 'push_sent'
+  },
 }))
 
 import { GET, POST } from '@/app/api/share/[token]/messages/route'

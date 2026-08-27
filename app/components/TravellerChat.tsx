@@ -17,6 +17,16 @@ interface TripMessage {
   sender_name: string | null
   is_read: boolean
   created_at: string
+  /** P5: what the office notification for this inbound message actually did. */
+  notify_outcome?: string | null
+}
+
+// Outcomes that mean "nobody was told" — worth a visible marker so a silent
+// notification channel is diagnosed here, not months later.
+const NOTIFY_PROBLEM: Record<string, string> = {
+  failed: 'Office notification failed',
+  not_configured: 'No notification channel is configured',
+  no_recipients: 'No one is reachable — no push subscriptions and no contact email',
 }
 
 export default function TravellerChat({ itineraryId }: { itineraryId: string }) {
@@ -129,6 +139,9 @@ export default function TravellerChat({ itineraryId }: { itineraryId: string }) 
                   <p className="whitespace-pre-line break-words">{m.content}</p>
                   <p className={`mt-1 text-[10px] ${m.direction === 'outbound' ? 'text-white/70' : 'text-gray-500'}`}>
                     {m.sender_name ? `${m.sender_name} · ` : ''}{fmtTime(m.created_at)}
+                    {m.direction === 'inbound' && m.notify_outcome && NOTIFY_PROBLEM[m.notify_outcome] && (
+                      <span className="ml-1 text-amber-600" title={NOTIFY_PROBLEM[m.notify_outcome]}>⚠ not notified</span>
+                    )}
                   </p>
                 </div>
               </li>

@@ -16,6 +16,13 @@ export interface PushPayload {
   tag?: string
 }
 
+/** What a push attempt actually did — callers may ignore it (fire-and-forget
+ *  stays valid), but the trip-message notify path records it (P5). */
+export interface PushResult {
+  outcome: 'sent' | 'not_configured' | 'no_subscriptions' | 'failed'
+  delivered: number
+}
+
 export function isPushConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY &&
@@ -28,11 +35,11 @@ export function isPushConfigured(): boolean {
  * Notify every subscribed browser of a tenant. Dead endpoints (404/410 from
  * the push service) are pruned so the table tracks reality.
  */
-export async function sendPushToTenant(tenantId: string, payload: PushPayload): Promise<void> {
+export async function sendPushToTenant(tenantId: string, payload: PushPayload): Promise<PushResult> {
   try {
     if (!isPushConfigured()) {
       console.log('[push] not configured (VAPID env missing) — skipping')
-      return
+      return { outcome: 'not_configured', delivered: 0 }
     }
     webpush.setVapidDetails(
       process.env.VAPID_SUBJECT!,
@@ -46,8 +53,11 @@ export async function sendPushToTenant(tenantId: string, payload: PushPayload): 
       .select('id, endpoint, p256dh, auth')
       .eq('tenant_id', tenantId)
     if (error || !subs || subs.length === 0) {
-      if (error) console.error('[push] load subscriptions failed:', error.message)
-      return
+      if (error) {
+        console.error('[push] load subscriptions failed:', error.message)
+        return { outcome: 'failed', delivered: 0 }
+      }
+      return { outcome: 'no_subscriptions', delivered: 0 }
     }
 
     const body = JSON.stringify(payload)
@@ -72,7 +82,11 @@ export async function sendPushToTenant(tenantId: string, payload: PushPayload): 
       await supabase.from('push_subscriptions').delete().in('id', dead)
       console.log(`[push] pruned ${dead.length} dead subscription(s)`)
     }
+
+    const delivered = results.filter(r => r.status === 'fulfilled').length
+    return { outcome: delivered > 0 ? 'sent' : 'failed', delivered }
   } catch (err) {
     console.error('[push] unexpected:', err)
+    return { outcome: 'failed', delivered: 0 }
   }
 }

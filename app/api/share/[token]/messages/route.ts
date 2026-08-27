@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { isValidShareToken, toClientTripMessages, cleanClientText } from '@/lib/itinerary-share'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { sendPushToTenant } from '@/lib/push'
+import { notifyTripMessage } from '@/lib/trip-message-notify'
 
 /**
  * The trip thread, traveller side. Token-authenticated like the report
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         content,
         sender_name: name ?? itinerary?.client_name ?? null,
       })
-      .select('direction, content, sender_name, created_at')
+      .select('id, direction, content, sender_name, created_at')
       .single()
     if (insErr) {
       console.error('[share messages POST] insert failed:', insErr.message)
@@ -188,11 +188,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // trigger on trip_messages (mig 292) — the same rail whatsapp and email
     // ride. No app-side increments (the total_bookings_count lesson).
 
-    void sendPushToTenant(share.tenant_id, {
-      title: `${name ?? itinerary?.client_name ?? 'Traveller'} — ${itinerary?.trip_name ?? 'trip message'}`,
-      body: content.length > 120 ? `${content.slice(0, 117)}…` : content,
-      url: `/itineraries/${share.itinerary_id}`,
-      tag: `trip-msg-${share.itinerary_id}`,
+    // Outcome-recorded notify (P5): push first, email fallback, and the
+    // message row's notify_outcome says what actually happened — silence is
+    // diagnosable. Still fire-and-forget: the traveller's send never waits.
+    void notifyTripMessage({
+      tenantId: share.tenant_id,
+      itineraryId: share.itinerary_id,
+      messageId: (inserted as { id: string }).id,
+      senderName: name ?? itinerary?.client_name ?? 'Traveller',
+      tripName: itinerary?.trip_name ?? 'trip message',
+      content,
+      appUrl: process.env.NEXT_PUBLIC_APP_URL,
     })
 
     return NextResponse.json({

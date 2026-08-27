@@ -27,9 +27,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     // the window. Reading does NOT mark anything read — that is PATCH's job,
     // fired when a human actually has the thread in view (merely expanding
     // an /ops row must not clear the office's unread signal).
+    // select('*') + explicit projection, not a named column list: this is a
+    // staff-only view and notify_outcome (migration 297) must ride along
+    // when it exists without 500ing when it does not.
     const { data: rows, error } = await supabase
       .from('trip_messages')
-      .select('id, direction, content, sender_name, is_read, created_at')
+      .select('*')
       .eq('itinerary_id', itineraryId)
       .order('created_at', { ascending: false })
       .limit(200)
@@ -38,7 +41,16 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ success: false, error: 'Failed to load messages' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, messages: (rows ?? []).reverse() })
+    const projected = ((rows ?? []) as Record<string, unknown>[]).map(r => ({
+      id: r.id,
+      direction: r.direction,
+      content: r.content,
+      sender_name: r.sender_name,
+      is_read: r.is_read,
+      created_at: r.created_at,
+      notify_outcome: r.notify_outcome ?? null,
+    }))
+    return NextResponse.json({ success: true, messages: projected.reverse() })
   } catch (err) {
     console.error('[itinerary messages GET]', err)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
