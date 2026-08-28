@@ -9,6 +9,8 @@ import { Ship, Plus, Search, Edit, Trash2, X, Check, ChevronDown, AlertCircle, C
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
+import { parseSeasons, type RateSeason } from '@/lib/rates/rate-seasons'
 
 // ============================================
 // CONSTANTS
@@ -597,6 +599,9 @@ export default function CruisesPage() {
   const [editingCruise, setEditingCruise] = useState<Cruise | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Dated contract periods (C3.2). While any exist they price the cruise and
+  // the fixed season blocks below are only a fallback.
+  const [periods, setPeriods] = useState<RateSeason[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // Pagination state
@@ -734,6 +739,7 @@ export default function CruisesPage() {
 
   const handleAddNew = () => {
     setRateCurrency('')
+    setPeriods([])
     setEditingCruise(null)
     setFormData(getDefaultFormData())
     setShowModal(true)
@@ -741,6 +747,7 @@ export default function CruisesPage() {
 
   const handleEdit = (cruise: Cruise) => {
     setRateCurrency((cruise as { rate_currency?: string | null }).rate_currency || '')
+    setPeriods(parseSeasons((cruise as { seasons?: unknown }).seasons, 'cruise') ?? [])
     setEditingCruise(cruise)
     setFormData({
       cruise_code: cruise.cruise_code,
@@ -799,6 +806,7 @@ export default function CruisesPage() {
   // Clone/Duplicate a cruise
   const handleClone = (cruise: Cruise) => {
     setRateCurrency((cruise as { rate_currency?: string | null }).rate_currency || '')
+    setPeriods(parseSeasons((cruise as { seasons?: unknown }).seasons, 'cruise') ?? [])
     setEditingCruise(null) // This is a new record
     setFormData({
       cruise_code: '', // Will be auto-generated
@@ -868,6 +876,11 @@ export default function CruisesPage() {
 
       const submitData = {
         ...rateCurrencyPatch(rateCurrency, (editingCruise as { rate_currency?: string | null } | null)?.rate_currency),
+        // Dated periods (C3.2b) — named only when present or being cleared,
+        // so a database without migration 305 never sees the column.
+        ...(periods.length > 0 || (editingCruise as { seasons?: unknown } | null)?.seasons
+          ? { seasons: periods }
+          : {}),
         ...formData,
         cruise_code: formData.cruise_code || generateCode(),
         route_name: formData.route_name || `${formData.embark_city} to ${formData.disembark_city}`,
@@ -1502,6 +1515,13 @@ export default function CruisesPage() {
               </div>
 
               <RateCurrencyField compact className="max-w-xs" value={rateCurrency} onChange={setRateCurrency} />
+
+              <RatePeriodsEditor
+                entity="cruise"
+                periods={periods}
+                onChange={setPeriods}
+                currencyLabel={rateCurrency || 'EUR'}
+              />
 
               {/* Section 6: Low Season Rates (PPD Model) */}
               <PPDSeasonalRateSection
