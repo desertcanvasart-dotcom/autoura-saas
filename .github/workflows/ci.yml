@@ -85,6 +85,20 @@ jobs:
         # this step keeps it that way.
         run: NODE_OPTIONS=--max-old-space-size=4096 npx next build
 
+      - name: Install Playwright browser
+        # Chromium only: the smoke suite is one project, and the full
+        # `--with-deps` install of three engines costs minutes per run.
+        run: npx playwright install chromium --with-deps
+
+      - name: E2E smoke (auth boundary)
+        # Real requests against `next start`, so this catches what source-
+        # reading tests structurally cannot: a middleware that never ran for a
+        # path. Database-free and unauthenticated by design — placeholder
+        # Supabase env is enough, because every assertion here is about
+        # refusal. Authenticated journeys need a dedicated throwaway project;
+        # see docs/E2E.md.
+        run: npm run test:e2e
+
       - name: Bundle budget
         # Gzipped client-JS ceilings (scripts/check-bundle-budget.mjs) —
         # catches a heavy dependency landing in client chunks. On overage,

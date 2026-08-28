@@ -76,3 +76,9 @@ test-*.js
 test-*.sql
 verify-*.sql
 VERIFY-*.sql
+
+# Playwright (E2E smoke, C5)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
