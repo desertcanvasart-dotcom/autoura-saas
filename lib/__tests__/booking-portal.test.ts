@@ -51,7 +51,13 @@ describe('the confirmation-gate cookie', () => {
     const value = portalVerifyCookieValue(t)
     expect(value).not.toContain(t)
     expect(isPortalVerified(t, value)).toBe(true)
-    expect(isPortalVerified(t, value.slice(0, -1) + '0')).toBe(false)
+    // Flip the last character to one it certainly is not. Appending a fixed
+    // digit reconstructed the original whenever the digest already ended in
+    // it — a 1-in-16 flake that failed CI on 2026-08-28 and had been
+    // dismissed as noise once before.
+    const tampered = value.slice(0, -1) + (value.endsWith('0') ? '1' : '0')
+    expect(tampered).not.toBe(value)
+    expect(isPortalVerified(t, tampered)).toBe(false)
     expect(isPortalVerified(t, undefined)).toBe(false)
     expect(portalVerifyCookieName(t)).not.toBe(portalVerifyCookieName(generatePortalToken()))
   })
