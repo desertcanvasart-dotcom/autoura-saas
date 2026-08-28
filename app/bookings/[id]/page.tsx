@@ -123,6 +123,33 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     notes: ''
   })
 
+  // Traveller uploads (C1b): documents from the portal's private bucket,
+  // served as short-lived signed URLs.
+  interface TravellerDoc {
+    id: string
+    passenger_id: string
+    kind: string
+    label: string | null
+    original_filename: string | null
+    size_bytes: number
+    uploaded_at: string
+    purged_at: string | null
+    url: string | null
+  }
+  const [travellerDocs, setTravellerDocs] = useState<TravellerDoc[]>([])
+  const [travellerDocsLoaded, setTravellerDocsLoaded] = useState(false)
+  const fetchTravellerDocs = async () => {
+    try {
+      const res = await fetch(`/api/bookings/${resolvedParams.id}/traveller-documents`)
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.success) setTravellerDocs(data.documents)
+    } catch {} finally { setTravellerDocsLoaded(true) }
+  }
+  useEffect(() => {
+    if (activeTab === 'documents' && !travellerDocsLoaded) fetchTravellerDocs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
   // Customer portal (C1a): mint/reuse the booking-level link and copy it.
   const [mintingPortal, setMintingPortal] = useState(false)
   const mintPortalLink = async () => {
@@ -794,12 +821,54 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
         {/* Documents Tab */}
         {activeTab === 'documents' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-            <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Documents</h3>
-            <p className="text-sm text-gray-500">
-              Document management will be available soon
-            </p>
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-1.5"><FileText className="w-4 h-4 text-gray-400" />Traveller uploads</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Documents travellers submitted through the portal. Links are short-lived;
+                files are deleted automatically after the trip ends (the record of what was
+                held remains).
+              </p>
+              {!travellerDocsLoaded ? (
+                <p className="text-sm text-gray-400">Loading…</p>
+              ) : travellerDocs.length === 0 ? (
+                <p className="text-sm text-gray-400">Nothing uploaded yet.</p>
+              ) : (
+                <ul className="divide-y divide-gray-100">
+                  {travellerDocs.map(doc => {
+                    const pax = passengers.find(p => p.id === doc.passenger_id)
+                    const who = pax ? [pax.first_name, pax.last_name].filter(Boolean).join(' ') : 'Traveller'
+                    return (
+                      <li key={doc.id} className="py-2 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-800 truncate">
+                            {who} · <span className="uppercase text-[10px] tracking-wide text-gray-400">{doc.kind}</span>
+                            {doc.label ? ` · ${doc.label}` : ''}
+                          </p>
+                          <p className="text-[11px] text-gray-400">
+                            {doc.original_filename || 'document'} · {(doc.size_bytes / 1024 / 1024).toFixed(1)} MB ·{' '}
+                            {new Date(doc.uploaded_at).toLocaleDateString()}
+                            {doc.purged_at && ' · purged on schedule'}
+                          </p>
+                        </div>
+                        {doc.url ? (
+                          <a
+                            href={doc.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 px-2.5 py-1 text-xs font-medium text-[#647C47] border border-[#647C47]/40 rounded-md hover:bg-[#647C47]/5"
+                          >
+                            View
+                          </a>
+                        ) : (
+                          <span className="shrink-0 text-[11px] text-gray-400">unavailable</span>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
           </div>
         )}
       </div>

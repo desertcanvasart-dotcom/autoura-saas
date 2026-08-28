@@ -4,6 +4,7 @@
 // server's allow-list accepts (lib/booking-portal PASSENGER_WRITABLE_FIELDS).
 
 import { useState } from 'react'
+import TravellerDocuments from './TravellerDocuments'
 
 export interface PortalTraveller {
   id: string
@@ -140,6 +141,9 @@ export default function TravellerForm({
               </button>
             </div>
           )}
+          <div className="sm:col-span-2">
+            <TravellerDocuments token={token} passengerId={traveller.id} locked={locked} />
+          </div>
         </form>
       )}
     </div>

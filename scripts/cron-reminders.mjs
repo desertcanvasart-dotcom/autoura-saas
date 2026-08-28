@@ -121,4 +121,12 @@ const tasks = await run(
   }
 )
 
-process.exit(invoices && tasks ? 0 : 1)
+// Retention sweep for traveller-uploaded documents (C1b): same daily hour,
+// same service — the promise that a passport scan does not outlive the trip.
+const purge = await run(
+  'purge-traveller-documents',
+  '/api/cron/purge-traveller-documents',
+  (p) => ((p.failures?.length ?? 0) > 0 ? `${p.failures.length} purge failure(s): ${p.failures.join('; ')}` : null)
+)
+
+process.exit(invoices && tasks && purge ? 0 : 1)

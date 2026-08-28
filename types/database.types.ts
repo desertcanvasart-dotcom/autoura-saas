@@ -1481,6 +1481,79 @@ export interface Database {
           },
         ]
       }
+      booking_passenger_documents: {
+        Row: {
+          id: string
+          tenant_id: string
+          booking_id: string
+          passenger_id: string
+          kind: string
+          label: string | null
+          storage_path: string
+          mime_type: string
+          size_bytes: number
+          original_filename: string | null
+          uploaded_at: string
+          uploaded_via: string
+          purge_after: string | null
+          purged_at: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          booking_id: string
+          passenger_id: string
+          kind?: string
+          label?: string | null
+          storage_path: string
+          mime_type: string
+          size_bytes: number
+          original_filename?: string | null
+          uploaded_at?: string
+          uploaded_via?: string
+          purge_after?: string | null
+          purged_at?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          booking_id?: string
+          passenger_id?: string
+          kind?: string
+          label?: string | null
+          storage_path?: string
+          mime_type?: string
+          size_bytes?: number
+          original_filename?: string | null
+          uploaded_at?: string
+          uploaded_via?: string
+          purge_after?: string | null
+          purged_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_passenger_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_passenger_documents_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_passenger_documents_passenger_id_fkey"
+            columns: ["passenger_id"]
+            isOneToOne: false
+            referencedRelation: "booking_passengers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_passengers: {
         Row: {
           id: string
