@@ -373,6 +373,7 @@ export interface Database {
       }
       activity_rates: {
         Row: {
+          tiers: Json | null
           rate_currency: string | null
           id: string
           tenant_id: string
@@ -401,6 +402,7 @@ export interface Database {
           addon_note: string | null
         }
         Insert: {
+          tiers?: Json | null
           rate_currency?: string | null
           id?: string
           tenant_id: string
@@ -429,6 +431,7 @@ export interface Database {
           addon_note?: string | null
         }
         Update: {
+          tiers?: Json | null
           rate_currency?: string | null
           id?: string
           tenant_id?: string

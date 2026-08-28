@@ -10,6 +10,8 @@ import { Ticket, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, ChevronLeft
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import ActivityTiersEditor from '@/app/components/ActivityTiersEditor'
+import { parseTiers, type ActivityTier } from '@/lib/rates/activity-tiers'
 
 
 const ACTIVITY_CATEGORIES = [
@@ -137,6 +139,8 @@ export default function ActivityRatesContent() {
   const [editingRate, setEditingRate] = useState<ActivityRate | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Group-size bands (C3.3); used when pricing_type is 'tiered'.
+  const [tiers, setTiers] = useState<ActivityTier[]>([])
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -265,6 +269,7 @@ export default function ActivityRatesContent() {
   const handleAddNew = () => {
     setEditingRate(null)
     setRateCurrency('')
+    setTiers([])
     setFormData({
       service_code: generateServiceCode(),
       activity_name: '',
@@ -292,6 +297,7 @@ export default function ActivityRatesContent() {
   const handleEdit = (rate: ActivityRate) => {
     setEditingRate(rate)
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
+    setTiers(parseTiers((rate as { tiers?: unknown }).tiers) ?? [])
     setFormData({
       service_code: rate.service_code || '',
       activity_name: rate.activity_name || '',
@@ -329,7 +335,7 @@ export default function ActivityRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
+          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency), ...(tiers.length > 0 || (editingRate as { tiers?: unknown } | null)?.tiers ? { tiers } : {}) })
         })
 
         const data = await response.json()
@@ -435,6 +441,7 @@ export default function ActivityRatesContent() {
   const handleClone = (rate: ActivityRate) => {
     setEditingRate(null)
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
+    setTiers(parseTiers((rate as { tiers?: unknown }).tiers) ?? [])
     setFormData({
       service_code: generateServiceCode(),
       activity_name: `${rate.activity_name} (Copy)`,
@@ -1414,6 +1421,13 @@ export default function ActivityRatesContent() {
                     </div>
                     <p className="text-xs text-gray-400 mt-1">Stored in EUR for consistency</p>
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
+                    <div className="mt-3">
+                      <ActivityTiersEditor
+                        tiers={tiers}
+                        onChange={setTiers}
+                        currencyLabel={rateCurrency || 'EUR'}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
