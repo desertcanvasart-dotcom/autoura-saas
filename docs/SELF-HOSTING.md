@@ -96,6 +96,45 @@ new migration must apply cleanly to BOTH a fresh database and one at the
 previous release. Deploy order is free in either direction for exactly that
 reason.
 
+## When something goes wrong
+
+Run the doctor. It talks to Postgres directly and reads the migration files off
+disk, so it works whether or not the app is running — which matters, because
+the app not running is the case you most need it for.
+
+```bash
+npm run doctor                            # check, print findings
+npm run doctor -- --bundle                # also write support-bundle.json
+npm run doctor -- --logs /var/log/app.log # include that log, scrubbed
+npm run doctor -- --url https://your-app  # also probe the running app
+```
+
+It prints a pass/fail line per check and then plain-language findings — most
+problems are a missing environment variable or an unapplied migration, and it
+names both along with the command that fixes them.
+
+A running install can produce the same thing from the app: sign in as a
+super-admin and fetch `/api/support-bundle`. The script sees one thing the
+endpoint cannot — which migrations are PENDING, because that needs the
+migration files and those are not in a built image.
+
+### Sending it to support
+
+`support-bundle.json` is written for you to read before you send it. It
+contains:
+
+- environment variable **names** only — no value ever, not even a prefix
+- table **counts** only — no client names, emails, passports or any row content
+- error lines scrubbed of addresses, keys, tokens, ids and document numbers
+- only variables this product defines; your own are not reported at all
+
+Hostnames can appear, deliberately: a failure like `ENOTFOUND db.internal` keeps
+the host, because which host failed is the useful half of the message.
+
+**Nothing is sent anywhere by the script or the endpoint.** They print and write
+a file; emailing it is your decision. Support never needs your service-role key
+or your database password — anyone asking for either by email is not us.
+
 ## Releases
 
 - Tags: `vYYYY.MM.DD` (or semver if the cadence formalises). A release =

@@ -27,6 +27,7 @@
     "types:generate": "node scripts/generate-db-types.mjs",
     "types:check": "node scripts/generate-db-types.mjs --check",
     "migrate": "node scripts/migrate.mjs",
+    "doctor": "node scripts/doctor.mjs",
     "migrate:status": "node scripts/migrate.mjs --status",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
