@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { TRAVELLER_DOCS_BUCKET } from '@/lib/portal/traveller-documents'
+import { withJobRun } from '@/lib/support/job-runs'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ export const dynamic = 'force-dynamic'
  *  halfway and leave you unsure what happened. */
 const BATCH = 50
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
@@ -74,3 +75,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Purge failed' }, { status: 500 })
   }
 }
+
+// ============================================
+// Recorded, so the support bundle can answer "has this job ever run here?"
+// ============================================
+// On a self-hosted install the scheduler belongs to the customer, so the job
+// saying so is the only evidence there is. Fail-open: if the recording cannot
+// happen, the job still runs (lib/support/job-runs.ts).
+export const GET = withJobRun('purge-traveller-documents', () => createAdminClient(), getHandler)

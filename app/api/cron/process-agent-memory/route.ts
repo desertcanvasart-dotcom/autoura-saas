@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { processRunForMemory } from '@/lib/agent-memory'
+import { withJobRun } from '@/lib/support/job-runs'
 
 // Lazy-init admin client (same pattern as other cron routes)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -34,7 +35,7 @@ function getSupabaseAdmin() {
   return _supabaseAdmin
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   // Verify cron secret — same pattern as your existing cron routes
   const cronSecret = request.headers.get('x-cron-secret')
   if (cronSecret !== process.env.CRON_SECRET) {
@@ -142,3 +143,11 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(summary)
 }
+
+// ============================================
+// Recorded, so the support bundle can answer "has this job ever run here?"
+// ============================================
+// On a self-hosted install the scheduler belongs to the customer, so the job
+// saying so is the only evidence there is. Fail-open: if the recording cannot
+// happen, the job still runs (lib/support/job-runs.ts).
+export const POST = withJobRun('agent-memory', () => getSupabaseAdmin(), postHandler)

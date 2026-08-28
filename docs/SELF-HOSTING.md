@@ -96,6 +96,32 @@ new migration must apply cleanly to BOTH a fresh database and one at the
 previous release. Deploy order is free in either direction for exactly that
 reason.
 
+## Scheduled jobs
+
+Five jobs run on a schedule. **On a self-hosted install, running them is yours
+to arrange** — this app does not schedule anything itself. Point your scheduler
+(cron, systemd timers, your platform's job runner) at these, each authenticated
+with `CRON_SECRET`:
+
+| Job | Endpoint | Suggested schedule |
+|---|---|---|
+| Exchange rates | `POST /api/cron/refresh-exchange-rates` | daily, 01:00 |
+| Agent memory | `POST /api/cron/process-agent-memory` | daily, 02:00 |
+| Reminders | `GET /api/cron/send-reminders` | daily, 06:00 |
+| Task reminders | `GET /api/cron/task-reminders` | daily, 06:00 |
+| Document retention | `GET /api/cron/purge-traveller-documents` | daily, 03:45 |
+
+The bundled `scripts/cron-*.mjs` drivers call them for you and exit with the
+right code, so a scheduler records success or failure.
+
+**Exchange rates is the one to get right.** Without it, every historical
+conversion in the P&L and the financial reports silently falls back to today's
+rate. Nothing errors; the numbers just stop being true.
+
+Each run records itself in `job_runs`, so `npm run doctor` can tell you whether
+your scheduler is actually working — including a job that ran for months and
+then quietly stopped.
+
 ## When something goes wrong
 
 Run the doctor. It talks to Postgres directly and reads the migration files off

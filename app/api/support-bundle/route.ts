@@ -21,6 +21,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { requireSuperAdmin } from '@/lib/super-admin'
 import { buildBundle, bundleFindings, type SupportBundle } from '@/lib/support/bundle'
+import { latestJobRuns } from '@/lib/support/job-runs'
 import { version as appVersion } from '../../../package.json'
 
 export const dynamic = 'force-dynamic'
@@ -47,6 +48,7 @@ export async function GET() {
   }
 
   const counts: Record<string, number> = {}
+  let crons: SupportBundle['crons'] = []
   const integrations: SupportBundle['integrations'] = {
     supabase: 'unconfigured',
     anthropic: integrationState('ANTHROPIC_API_KEY'),
@@ -90,6 +92,11 @@ export async function GET() {
         const { count: n, error } = await admin.from(table).select('id', { head: true, count: 'exact' })
         if (!error && typeof n === 'number') counts[table] = n
       }
+
+      // "Have the scheduled jobs ever run on this box?" — the question a
+      // self-hosted install cannot otherwise answer, since the scheduler is
+      // the customer's own.
+      crons = await latestJobRuns(admin)
     }
   }
 
@@ -102,6 +109,7 @@ export async function GET() {
     database,
     env: process.env as Record<string, string | undefined>,
     integrations,
+    crons,
     counts,
     // No error store exists yet. scripts/doctor.mjs --logs <file> scrubs a log
     // the customer points it at, which is where these come from until there is
