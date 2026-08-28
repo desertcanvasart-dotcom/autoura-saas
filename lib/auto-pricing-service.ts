@@ -28,6 +28,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
+import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/season-uplift'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
@@ -2361,6 +2362,15 @@ export interface PricingResult {
   tourLeaderCost: number
   marginPercent: number
   marginAmount: number
+  /** Cost + margin, BEFORE the operator's seasonal premium. Kept so a quote
+   *  can show the premium as its own line rather than a price that silently
+   *  differs from the rate sheet (C3.1). */
+  sellingPriceBeforeSeason: number
+  /** The operator's demand premium, already inside `sellingPrice`. Zero on
+   *  an ordinary departure. */
+  seasonUplift: number
+  seasonName: string | null
+  seasonPercent: number
   sellingPrice: number
   pricePerPerson: number
   currency: string
@@ -2425,6 +2435,10 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
       tourLeaderCost: 0,
       marginPercent,
       marginAmount: 0,
+      sellingPriceBeforeSeason: 0,
+      seasonUplift: 0,
+      seasonName: null,
+      seasonPercent: 0,
       sellingPrice: 0,
       pricePerPerson: 0,
       currency: 'EUR',
@@ -2489,6 +2503,18 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     }
   }
 
+  // ---------- the operator's seasonal premium (C3.1) ----------
+  // AFTER margin, on the selling price, never on supplier cost: the
+  // supplier's own seasonality is already inside totalCost — it moved when
+  // the hotel's high-season rate was picked up — so applying this to cost as
+  // well would charge the customer twice for the same season.
+  const seasonWindows = await loadSeasonWindows(params.tenantId, params.travelDate)
+  const season = seasonForDate(seasonWindows, params.travelDate ?? null)
+  const uplift = computeUplift({ sellingPrice: pricing.sellingPrice, season })
+  const upliftAmount = Math.round(uplift.amount * 100) / 100
+  const sellingWithSeason = Math.round((pricing.sellingPrice + upliftAmount) * 100) / 100
+  const perPersonWithSeason = numPax > 0 ? Math.round((sellingWithSeason / numPax) * 100) / 100 : 0
+
   return {
     success: true,
     templateId: dayResult.templateId,
@@ -2513,8 +2539,12 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     tourLeaderCost: tourLeaderIncluded ? paxResult.withLeader.tourLeaderCost : 0,
     marginPercent: dayResult.marginPercent,
     marginAmount: pricing.marginAmount,
-    sellingPrice: pricing.sellingPrice,
-    pricePerPerson: pricing.pricePerPerson,
+    sellingPriceBeforeSeason: pricing.sellingPrice,
+    seasonUplift: upliftAmount,
+    seasonName: uplift.seasonName,
+    seasonPercent: uplift.percent,
+    sellingPrice: sellingWithSeason,
+    pricePerPerson: perPersonWithSeason,
     currency: dayResult.currency,
     ratesUsed,
     warnings: dayResult.warnings,
@@ -2597,3 +2627,67 @@ export async function getTemplatePriceRange(
 }
 
 export type MealPlan = 'none' | 'breakfast_only' | 'lunch_only' | 'dinner_only' | 'half_board' | 'full_board'
+
+/**
+ * The tenant's season windows that CONTAIN this departure date.
+ *
+ * Filtered in the query rather than in memory: the answer is at most a couple
+ * of rows, and a pricing call should not drag a year of calendar across the
+ * wire. A tenant without a calendar simply gets none, and the premium is
+ * zero — which is also exactly what happens on a database that does not have
+ * migration 304 yet.
+ */
+export async function loadSeasonWindows(
+  tenantId: string | undefined,
+  travelDate: string | undefined
+): Promise<SeasonWindow[]> {
+  if (!tenantId || !travelDate) return []
+  const on = travelDate.slice(0, 10)
+
+  // Two plain queries rather than a PostgREST embed: the join is trivial and
+  // an embed needs a generated relationship this module's untyped admin
+  // client cannot resolve. Dates are filtered in the query — a pricing call
+  // should not drag a year of calendar across the wire.
+  const { data: rawWindows, error } = await getSupabaseAdmin()
+    .from('pricing_season_dates')
+    .select('season_id, start_date, end_date')
+    .eq('tenant_id', tenantId)
+    .lte('start_date', on)
+    .gte('end_date', on)
+
+  // No calendar, or no migration 304 yet: no premium. Identical either way.
+  if (error || !rawWindows || rawWindows.length === 0) return []
+
+  const windows = rawWindows as unknown as Array<{
+    season_id: string
+    start_date: string
+    end_date: string
+  }>
+
+  const seasonIds = [...new Set(windows.map(w => w.season_id))]
+  const { data: rawSeasons } = await getSupabaseAdmin()
+    .from('pricing_seasons')
+    .select('id, name, uplift_percent, is_active')
+    .in('id', seasonIds)
+    .eq('is_active', true)
+
+  const seasons = (rawSeasons ?? []) as unknown as Array<{
+    id: string
+    name: string | null
+    uplift_percent: number | string | null
+  }>
+  const byId = new Map(seasons.map(s => [s.id, s]))
+
+  return windows.flatMap(w => {
+    const season = byId.get(w.season_id)
+    // An inactive season is a window the operator switched off, not a zero.
+    if (!season) return []
+    return [{
+      seasonId: String(w.season_id),
+      name: String(season.name ?? ''),
+      upliftPercent: Number(season.uplift_percent) || 0,
+      startDate: String(w.start_date),
+      endDate: String(w.end_date),
+    }]
+  })
+}

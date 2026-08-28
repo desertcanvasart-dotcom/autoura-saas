@@ -6851,6 +6851,95 @@ export interface Database {
           },
         ]
       }
+      pricing_season_dates: {
+        Row: {
+          id: string
+          tenant_id: string
+          season_id: string
+          start_date: string
+          end_date: string
+          label: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          season_id: string
+          start_date: string
+          end_date: string
+          label?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          season_id?: string
+          start_date?: string
+          end_date?: string
+          label?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_season_dates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pricing_season_dates_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_seasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pricing_seasons: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          uplift_percent: number
+          colour: string
+          display_order: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          uplift_percent?: number
+          colour?: string
+          display_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          name?: string
+          uplift_percent?: number
+          colour?: string
+          display_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_seasons_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_subscriptions: {
         Row: {
           id: string
