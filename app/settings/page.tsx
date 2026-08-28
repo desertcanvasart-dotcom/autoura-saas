@@ -828,6 +828,22 @@ function SettingsContent() {
         </Link>
       </div>
 
+      {/* The operator's own peak dates (C3.1) — distinct from supplier seasonality. */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-900">Demand calendar</p>
+          <p className="text-xs text-gray-500">
+            Your peak dates and the premium you charge on them, on top of margin.
+          </p>
+        </div>
+        <Link
+          href="/settings/seasons"
+          className="px-3 py-1.5 text-sm font-medium text-[#647C47] border border-[#647C47]/40 rounded-lg hover:bg-[#647C47]/5 transition-colors"
+        >
+          Manage seasons
+        </Link>
+      </div>
+
       {/* Cost Mode Setting */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-4">
