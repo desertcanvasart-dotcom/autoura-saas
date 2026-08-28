@@ -131,3 +131,41 @@ describe('normalizeRateRows (live wrapper)', () => {
     expect(await normalizeRateRows(dbWith(FX), 'guides', [])).toEqual([])
   })
 })
+
+describe('dated rate periods under a foreign contract currency (C3.2 × P3)', () => {
+  it('converts the rates INSIDE seasons, not just the flat columns', () => {
+    const { normalize } = createRateNormalizer(FX)
+    const [out] = normalize('accommodation_rates', [{
+      id: 'h1',
+      rate_currency: 'EGP',
+      ppd_eur: 5500,
+      seasons: [
+        { name: 'Christmas', from: '2026-12-20', to: '2027-01-05', rates: { ppd_eur: 11000, single_supplement_eur: 2750 } },
+      ],
+    } as never]) as Array<Record<string, unknown>>
+    expect(out.ppd_eur).toBeCloseTo(100)
+    const seasons = out.seasons as Array<{ rates: Record<string, number> }>
+    expect(seasons[0].rates.ppd_eur).toBeCloseTo(200)
+    expect(seasons[0].rates.single_supplement_eur).toBeCloseTo(50)
+  })
+
+  it('an unconvertible currency nulls the periods too — no priceable windows survive', () => {
+    const { normalize } = createRateNormalizer([])
+    const [out] = normalize('accommodation_rates', [{
+      id: 'h2',
+      rate_currency: 'EGP',
+      ppd_eur: 5500,
+      seasons: [{ name: 'X', from: '2026-12-20', to: '2027-01-05', rates: { ppd_eur: 11000 } }],
+    } as never]) as Array<Record<string, unknown>>
+    expect(out.ppd_eur).toBeNull()
+    expect(out.seasons).toBeNull()
+  })
+
+  it('leaves a non-array seasons value untouched rather than mangling it', () => {
+    const { normalize } = createRateNormalizer(FX)
+    const [out] = normalize('accommodation_rates', [
+      { id: 'h3', rate_currency: 'EGP', ppd_eur: 5500, seasons: null } as never,
+    ]) as Array<Record<string, unknown>>
+    expect(out.seasons).toBeNull()
+  })
+})

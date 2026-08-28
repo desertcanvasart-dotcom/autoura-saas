@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
+import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 
 export async function GET(request: NextRequest) {
   try {
@@ -81,7 +82,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Include supplier_id in insert
+    const parsedSeasons = 'seasons' in body ? sanitizeSeasons(body.seasons, 'cruise') : undefined
+    const seasonsPatch: Record<string, unknown> = parsedSeasons === undefined
+      ? {}
+      : { seasons: parsedSeasons, ...legacyColumnMirror(parsedSeasons, 'cruise') }
+
     const newCruise = {
+      // Dated rate periods (C3.2). Only named when the client sent them, so a
+      // database without migration 305 never sees the column; the first period
+      // is mirrored onto the base columns for date-less readers.
+      ...seasonsPatch,
       ...rateCurrencyWriteField(body),
       ...body,
       supplier_id: body.supplier_id || null

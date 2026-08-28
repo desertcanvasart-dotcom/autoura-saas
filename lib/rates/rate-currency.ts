@@ -136,6 +136,8 @@ export function createRateNormalizer(
         for (const col of columns) {
           if (col in copy) copy[col] = null
         }
+        // Periods too — an unconvertible row must not keep priceable windows.
+        if ('seasons' in copy) copy.seasons = null
         misses.push({
           table,
           rowId: typeof row.id === 'string' ? row.id : null,
@@ -148,6 +150,12 @@ export function createRateNormalizer(
           if (typeof value === 'number') {
             copy[col] = convertCurrency(value, from, runCurrency, exchangeRates)
           }
+        }
+        // Dated rate periods (C3.2) carry their own rate sets inside JSONB —
+        // converting only the flat columns would price a foreign-currency
+        // hotel's Christmas window at its raw contract number.
+        if ('seasons' in copy) {
+          copy.seasons = convertSeasons(copy.seasons, from, runCurrency, exchangeRates)
         }
       }
       // The copy is IN the run currency now; make that unambiguous downstream.
@@ -236,4 +244,35 @@ export function rateCurrencyWriteField(
   if (!body || !('rate_currency' in body)) return {}
   const v = body.rate_currency
   return { rate_currency: typeof v === 'string' && v ? v : null }
+}
+
+/**
+ * Convert the rate sets inside a `seasons` JSONB array (C3.2). Shape-
+ * tolerant: anything that is not the expected array of {rates:{...}} objects
+ * is returned untouched rather than mangled, and an unconvertible number
+ * becomes null — the same never-guess rule the flat columns follow.
+ */
+function convertSeasons(
+  value: unknown,
+  from: string,
+  runCurrency: string,
+  exchangeRates: ExchangeRate[]
+): unknown {
+  const list = typeof value === 'string' ? safeParse(value) : value
+  if (!Array.isArray(list)) return value
+  return list.map(entry => {
+    if (!entry || typeof entry !== 'object') return entry
+    const e = entry as Record<string, unknown>
+    if (!e.rates || typeof e.rates !== 'object') return entry
+    const rates = e.rates as Record<string, unknown>
+    const converted: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(rates)) {
+      converted[k] = typeof v === 'number' ? convertCurrency(v, from, runCurrency, exchangeRates) : v
+    }
+    return { ...e, rates: converted }
+  })
+}
+
+function safeParse(value: string): unknown {
+  try { return JSON.parse(value) } catch { return null }
 }
