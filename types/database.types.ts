@@ -2481,6 +2481,7 @@ export interface Database {
       }
       commissions: {
         Row: {
+          cost_amount: number | null
           id: string
           tenant_id: string
           itinerary_id: string | null
@@ -2506,6 +2507,7 @@ export interface Database {
           updated_at: string | null
         }
         Insert: {
+          cost_amount?: number | null
           id?: string
           tenant_id: string
           itinerary_id?: string | null
@@ -2531,6 +2533,7 @@ export interface Database {
           updated_at?: string | null
         }
         Update: {
+          cost_amount?: number | null
           id?: string
           tenant_id?: string
           itinerary_id?: string | null
@@ -5907,6 +5910,7 @@ export interface Database {
       }
       itinerary_services: {
         Row: {
+          sold_by_supplier_id: string | null
           id: string
           itinerary_id: string | null
           day_id: string | null
@@ -5948,6 +5952,7 @@ export interface Database {
           cost_per_unit: number | null
         }
         Insert: {
+          sold_by_supplier_id?: string | null
           id?: string
           itinerary_id?: string | null
           day_id?: string | null
@@ -5989,6 +5994,7 @@ export interface Database {
           cost_per_unit?: number | null
         }
         Update: {
+          sold_by_supplier_id?: string | null
           id?: string
           itinerary_id?: string | null
           day_id?: string | null
