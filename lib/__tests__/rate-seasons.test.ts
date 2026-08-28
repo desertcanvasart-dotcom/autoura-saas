@@ -174,3 +174,40 @@ describe('legacyColumnMirror', () => {
     expect(legacyColumnMirror(null, 'accommodation')).toEqual({})
   })
 })
+
+describe('editor round-trip (C3.2b)', () => {
+  // What the editor holds in state must survive the save/reload cycle
+  // unchanged, or a period silently changes meaning between edits.
+  it('an edited list round-trips through sanitize and back', () => {
+    const edited: RateSeason[] = [
+      { name: 'Christmas', from: '2026-12-20', to: '2027-01-05', rates: {
+        ppd_eur: 150, single_supplement_eur: 60, triple_reduction_eur: 20,
+        ppd_non_eur: 170, single_supplement_non_eur: 70, triple_reduction_non_eur: 25,
+      } },
+      { name: 'Summer', from: '2026-05-01', to: '2026-09-30', rates: {
+        ppd_eur: 80, single_supplement_eur: 30, triple_reduction_eur: 10,
+        ppd_non_eur: 90, single_supplement_non_eur: 35, triple_reduction_non_eur: 12,
+      } },
+    ]
+    const saved = sanitizeSeasons(edited, 'accommodation')!
+    const reloaded = parseSeasons(JSON.parse(JSON.stringify(saved)), 'accommodation')!
+    // Sorted by start date on the way in, and stable thereafter.
+    expect(reloaded.map(p => p.name)).toEqual(['Summer', 'Christmas'])
+    expect(reloaded).toEqual(saved)
+    expect(reloaded[1].rates.ppd_non_eur).toBe(170)
+  })
+
+  it('an editor row the operator has not finished is dropped, not saved half-priced', () => {
+    const withBlank: RateSeason[] = [
+      { name: 'New', from: '', to: '', rates: { ppd_eur: 0 } },
+      { name: 'Real', from: '2026-05-01', to: '2026-09-30', rates: { ppd_eur: 80 } },
+    ]
+    const saved = sanitizeSeasons(withBlank, 'accommodation')!
+    expect(saved).toHaveLength(1)
+    expect(saved[0].name).toBe('Real')
+  })
+
+  it('clearing every period reads as "no periods", so the base rates take over', () => {
+    expect(sanitizeSeasons([], 'accommodation')).toBeNull()
+  })
+})

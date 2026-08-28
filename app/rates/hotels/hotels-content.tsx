@@ -11,6 +11,8 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
+import { parseSeasons, type RateSeason } from '@/lib/rates/rate-seasons'
 
 
 const TIER_OPTIONS = [
@@ -365,6 +367,9 @@ export default function HotelsContent() {
 
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Dated contract periods (C3.2). While any exist, they price the rate and
+  // the fixed low/high/peak blocks below are only a fallback.
+  const [periods, setPeriods] = useState<RateSeason[]>([])
   const [formData, setFormData] = useState({
     service_code: '',
     property_name: '',
@@ -526,6 +531,7 @@ export default function HotelsContent() {
   const handleAddNew = () => {
     setEditingRate(null)
     setRateCurrency('')
+    setPeriods([])
     setFormData({
       service_code: '',
       property_name: '',
@@ -660,6 +666,7 @@ export default function HotelsContent() {
     const deriveTripleRed = (tripleRate: number, ppd: number) => Math.max(0, ppd - (tripleRate / 3))
 
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
+    setPeriods(parseSeasons((rate as { seasons?: unknown }).seasons, 'accommodation') ?? [])
     setFormData({
       service_code: rate.service_code || '',
       property_name: rate.property_name || '',
@@ -739,6 +746,12 @@ export default function HotelsContent() {
       const dataToSubmit = {
         ...formData,
         ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency),
+        // Dated periods (C3.2b). Sent only when the form has any or is
+        // clearing what a rate already had, so a database without migration
+        // 305 never sees the column named.
+        ...(periods.length > 0 || (editingRate as { seasons?: unknown } | null)?.seasons
+          ? { seasons: periods }
+          : {}),
         service_code: formData.service_code || generateServiceCode(formData.city),
         // Include calculated legacy room rates for backward compatibility
         single_rate_eur: lowRates.single,
@@ -832,6 +845,7 @@ export default function HotelsContent() {
   const handleClone = (rate: AccommodationRate) => {
     setEditingRate(null) // This is a new record
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
+    setPeriods(parseSeasons((rate as { seasons?: unknown }).seasons, 'accommodation') ?? [])
     setFormData({
       service_code: '', // Will be auto-generated
       property_name: rate.property_name,
@@ -1792,6 +1806,15 @@ export default function HotelsContent() {
 
               {/* SECTION 4: Low Season Rates - PPD Model */}
               <div className="mb-6">
+                <div className="mb-4">
+                  <RatePeriodsEditor
+                    entity="accommodation"
+                    periods={periods}
+                    onChange={setPeriods}
+                    currencyLabel={rateCurrency || 'EUR'}
+                  />
+                </div>
+
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">4</span>
                   Low Season Rates
