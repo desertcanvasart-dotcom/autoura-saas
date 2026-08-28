@@ -300,3 +300,59 @@ export async function markSentAndDeliver(
     return { sent: false }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Route gate — token + cookie + link state + passenger scope in one place
+// ---------------------------------------------------------------------------
+
+export type PortalGateResult =
+  | { ok: true; link: PortalLinkRow }
+  | { ok: false; status: number; body: { success: false; error: string } }
+
+/**
+ * The full portal gate for a passenger-scoped route: valid token shape, the
+ * verified-gate cookie, a usable link, and — decisive — the passenger must be
+ * the link's own on a PRIVATE link and must belong to the link's booking
+ * either way. `requireUnlocked` refuses writes on a form-locked link.
+ */
+export async function resolvePortalPassenger(
+  admin: object,
+  opts: {
+    token: string
+    passengerId: string
+    cookieValue: string | undefined | null
+    requireUnlocked?: boolean
+  }
+): Promise<PortalGateResult> {
+  const notFound: PortalGateResult = { ok: false, status: 404, body: { success: false, error: 'Not found' } }
+  if (!isValidPortalToken(opts.token)) return notFound
+  if (!isPortalVerified(opts.token, opts.cookieValue)) return notFound
+
+  const db = admin as PortalDb
+  const { data } = await db
+    .from('booking_portal_links')
+    .select('id, tenant_id, booking_id, passenger_id, revoked_at, expires_at, form_locked')
+    .eq('token', opts.token)
+    .maybeSingle()
+  const link = data as PortalLinkRow | null
+  if (!link || !portalLinkState(link).usable) return notFound
+
+  if (link.passenger_id && link.passenger_id !== opts.passengerId) return notFound
+
+  const { data: pax } = await db
+    .from('booking_passengers')
+    .select('id')
+    .eq('id', opts.passengerId)
+    .eq('booking_id', link.booking_id)
+    .maybeSingle()
+  if (!pax) return notFound
+
+  if (opts.requireUnlocked && link.form_locked) {
+    return {
+      ok: false,
+      status: 409,
+      body: { success: false, error: 'Details are confirmed and locked — contact your agency for changes.' },
+    }
+  }
+  return { ok: true, link }
+}
