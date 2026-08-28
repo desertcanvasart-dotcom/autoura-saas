@@ -22,6 +22,7 @@ export interface Database {
     Tables: {
       accommodation_rates: {
         Row: {
+          seasons: Json | null
           rate_currency: string | null
           id: string
           tenant_id: string
@@ -132,6 +133,7 @@ export interface Database {
           low_season_rate_non_eur: number | null
         }
         Insert: {
+          seasons?: Json | null
           rate_currency?: string | null
           id?: string
           tenant_id: string
@@ -242,6 +244,7 @@ export interface Database {
           low_season_rate_non_eur?: number | null
         }
         Update: {
+          seasons?: Json | null
           rate_currency?: string | null
           id?: string
           tenant_id?: string
@@ -6308,6 +6311,7 @@ export interface Database {
       }
       nile_cruises: {
         Row: {
+          seasons: Json | null
           rate_currency: string | null
           id: string
           tenant_id: string
@@ -6397,6 +6401,7 @@ export interface Database {
           rate_peak_suite_non_eur: number | null
         }
         Insert: {
+          seasons?: Json | null
           rate_currency?: string | null
           id?: string
           tenant_id: string
@@ -6486,6 +6491,7 @@ export interface Database {
           rate_peak_suite_non_eur?: number | null
         }
         Update: {
+          seasons?: Json | null
           rate_currency?: string | null
           id?: string
           tenant_id?: string

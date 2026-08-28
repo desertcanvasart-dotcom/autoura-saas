@@ -29,6 +29,7 @@ import { createClient } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/season-uplift'
+import { ratesForTravelDate } from '@/lib/rates/rate-seasons'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
@@ -770,7 +771,21 @@ export async function getCruiseRates(
     let tripleRedNight: number
     let season: 'low' | 'high' | 'peak' = 'low'
 
-    if (cruise.ppd_eur !== null && cruise.ppd_eur !== undefined) {
+    // C3.2: dated rate periods first. `seasons` (migration 305) is the
+    // operator's real contract windows, WITH years — the low/high/peak
+    // detection below compares month-day only, so a window entered for one
+    // contract year silently applied to every year after it. When no period
+    // covers the date (or none are entered), fall through to the legacy
+    // columns exactly as before.
+    const cruisePeriod = ratesForTravelDate(cruise, 'cruise', travelDate)
+    if (cruisePeriod) {
+      ppdNight = cruisePeriod.rates.ppd_eur
+      singleSuppNight = cruisePeriod.rates.single_supplement_eur
+      tripleRedNight = cruisePeriod.rates.triple_reduction_eur
+      // The old three-level label is kept for the result shape; a named
+      // period is reported as its own name by the caller.
+      season = 'low'
+    } else if (cruise.ppd_eur !== null && cruise.ppd_eur !== undefined) {
       // PPD model — pick the seasonal PPD for the travel date, falling back to
       // the base (low) PPD when a seasonal rate isn't set. No travelDate => low.
       season = travelDate ? detectCruiseSeason(cruise, travelDate) : 'low'
@@ -863,6 +878,21 @@ export async function getHotelRates(
   const cityNorm = city.trim().toLowerCase()
 
   const mapRow = (hotel: any, source: RateSource) => {
+    // C3.2: dated rate periods first — real contract windows with years.
+    // detectHotelSeason below compares month-day only, so a window entered
+    // for one contract year silently applied to every year after it.
+    const period = ratesForTravelDate(hotel, 'accommodation', travelDate)
+    if (period) {
+      return {
+        hotelName: hotel.property_name || hotel.name,
+        ppdNight: period.rates.ppd_eur,
+        singleSuppNight: Math.max(0, period.rates.single_supplement_eur),
+        tripleRedNight: Math.max(0, period.rates.triple_reduction_eur),
+        season: 'low' as const,
+        source,
+      }
+    }
+
     const season = travelDate ? detectHotelSeason(hotel, travelDate) : 'low'
 
     // Base (low season) PPD; legacy fields as last resort

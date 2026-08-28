@@ -3,6 +3,7 @@ import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 import type { TablesInsert } from '@/types/database.types'
+import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 
 export async function GET(request: NextRequest) {
   try {
@@ -93,7 +94,16 @@ export async function POST(request: NextRequest) {
     //   - 013_accommodation_rates_rls.sql (applies trigger to this table)
     // The trigger automatically sets tenant_id from the authenticated user's session
     // RLS policies enforce that users can only insert rates for their own tenant
+    const parsedSeasons = 'seasons' in body ? sanitizeSeasons(body.seasons, 'accommodation') : undefined
+    const seasonsPatch: Record<string, unknown> = parsedSeasons === undefined
+      ? {}
+      : { seasons: parsedSeasons, ...legacyColumnMirror(parsedSeasons, 'accommodation') }
+
     const newHotel: TablesInsert<'accommodation_rates'> = {
+      // Dated rate periods (C3.2). Only named when the client sent them, so a
+      // database without migration 305 never sees the column; the first period
+      // is mirrored onto the base columns for date-less readers.
+      ...seasonsPatch,
       ...rateCurrencyWriteField(body),
       // Basic info
       tenant_id,
