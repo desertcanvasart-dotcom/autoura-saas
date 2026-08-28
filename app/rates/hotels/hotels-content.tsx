@@ -13,6 +13,7 @@ import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
 import { parseSeasons, type RateSeason } from '@/lib/rates/rate-seasons'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 
 const TIER_OPTIONS = [
@@ -367,6 +368,8 @@ export default function HotelsContent() {
 
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   // Dated contract periods (C3.2). While any exist, they price the rate and
   // the fixed low/high/peak blocks below are only a fallback.
   const [periods, setPeriods] = useState<RateSeason[]>([])
@@ -1840,22 +1843,22 @@ export default function HotelsContent() {
                   <p className="text-xs font-medium text-gray-600 mb-2">EU Passport Holders</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD (€) *</label>
+                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol}) *</label>
                       <input type="number" name="ppd_eur" value={formData.ppd_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-blue-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent bg-white font-medium" placeholder="Per Person Double" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
                       <input type="number" name="single_supplement_eur" value={formData.single_supplement_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
                       <input type="number" name="triple_reduction_eur" value={formData.triple_reduction_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
                       <input type="number" name="suite_rate_eur" value={formData.suite_rate_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
@@ -1866,9 +1869,9 @@ export default function HotelsContent() {
                     <div className="mb-4 p-2 bg-blue-100 rounded-lg">
                       <p className="text-xs text-blue-700 font-medium mb-1">Calculated Room Rates (EU Passport):</p>
                       <div className="flex gap-4 text-xs text-blue-800">
-                        <span>Single: <strong>€{(formData.ppd_eur + formData.single_supplement_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>€{(formData.ppd_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>€{((formData.ppd_eur - formData.triple_reduction_eur) * 3).toFixed(2)}</strong></span>
+                        <span>Single: <strong>{rateSymbol}{(formData.ppd_eur + formData.single_supplement_eur).toFixed(2)}</strong></span>
+                        <span>Double: <strong>{rateSymbol}{(formData.ppd_eur * 2).toFixed(2)}</strong></span>
+                        <span>Triple: <strong>{rateSymbol}{((formData.ppd_eur - formData.triple_reduction_eur) * 3).toFixed(2)}</strong></span>
                       </div>
                     </div>
                   )}
@@ -1877,22 +1880,22 @@ export default function HotelsContent() {
                   <p className="text-xs font-medium text-gray-600 mb-2">Non-EU Passport Holders</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol})</label>
                       <input type="number" name="ppd_non_eur" value={formData.ppd_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
                       <input type="number" name="single_supplement_non_eur" value={formData.single_supplement_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
                       <input type="number" name="triple_reduction_non_eur" value={formData.triple_reduction_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
                       <input type="number" name="suite_rate_non_eur" value={formData.suite_rate_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
@@ -1903,9 +1906,9 @@ export default function HotelsContent() {
                     <div className="mt-3 p-2 bg-blue-100 rounded-lg">
                       <p className="text-xs text-blue-700 font-medium mb-1">Calculated Room Rates (Non-EU Passport):</p>
                       <div className="flex gap-4 text-xs text-blue-800">
-                        <span>Single: <strong>€{(formData.ppd_non_eur + formData.single_supplement_non_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>€{(formData.ppd_non_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>€{((formData.ppd_non_eur - formData.triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
+                        <span>Single: <strong>{rateSymbol}{(formData.ppd_non_eur + formData.single_supplement_non_eur).toFixed(2)}</strong></span>
+                        <span>Double: <strong>{rateSymbol}{(formData.ppd_non_eur * 2).toFixed(2)}</strong></span>
+                        <span>Triple: <strong>{rateSymbol}{((formData.ppd_non_eur - formData.triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
                       </div>
                     </div>
                   )}
@@ -1941,22 +1944,22 @@ export default function HotelsContent() {
                   <p className="text-xs font-medium text-gray-600 mb-2">EU Passport Holders</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol})</label>
                       <input type="number" name="high_season_ppd_eur" value={formData.high_season_ppd_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-orange-400 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent bg-white font-medium" placeholder="Per Person Double" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
                       <input type="number" name="high_season_single_supplement_eur" value={formData.high_season_single_supplement_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
                       <input type="number" name="high_season_triple_reduction_eur" value={formData.high_season_triple_reduction_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
                       <input type="number" name="high_season_suite_eur" value={formData.high_season_suite_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
@@ -1967,9 +1970,9 @@ export default function HotelsContent() {
                     <div className="mb-4 p-2 bg-orange-100 rounded-lg">
                       <p className="text-xs text-orange-700 font-medium mb-1">Calculated Room Rates (EU Passport):</p>
                       <div className="flex gap-4 text-xs text-orange-800">
-                        <span>Single: <strong>€{(formData.high_season_ppd_eur + formData.high_season_single_supplement_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>€{(formData.high_season_ppd_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>€{((formData.high_season_ppd_eur - formData.high_season_triple_reduction_eur) * 3).toFixed(2)}</strong></span>
+                        <span>Single: <strong>{rateSymbol}{(formData.high_season_ppd_eur + formData.high_season_single_supplement_eur).toFixed(2)}</strong></span>
+                        <span>Double: <strong>{rateSymbol}{(formData.high_season_ppd_eur * 2).toFixed(2)}</strong></span>
+                        <span>Triple: <strong>{rateSymbol}{((formData.high_season_ppd_eur - formData.high_season_triple_reduction_eur) * 3).toFixed(2)}</strong></span>
                       </div>
                     </div>
                   )}
@@ -1978,22 +1981,22 @@ export default function HotelsContent() {
                   <p className="text-xs font-medium text-gray-600 mb-2">Non-EU Passport Holders</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol})</label>
                       <input type="number" name="high_season_ppd_non_eur" value={formData.high_season_ppd_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
                       <input type="number" name="high_season_single_supplement_non_eur" value={formData.high_season_single_supplement_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
                       <input type="number" name="high_season_triple_reduction_non_eur" value={formData.high_season_triple_reduction_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
                       <input type="number" name="high_season_suite_non_eur" value={formData.high_season_suite_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
@@ -2004,9 +2007,9 @@ export default function HotelsContent() {
                     <div className="mt-3 p-2 bg-orange-100 rounded-lg">
                       <p className="text-xs text-orange-700 font-medium mb-1">Calculated Room Rates (Non-EU Passport):</p>
                       <div className="flex gap-4 text-xs text-orange-800">
-                        <span>Single: <strong>€{(formData.high_season_ppd_non_eur + formData.high_season_single_supplement_non_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>€{(formData.high_season_ppd_non_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>€{((formData.high_season_ppd_non_eur - formData.high_season_triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
+                        <span>Single: <strong>{rateSymbol}{(formData.high_season_ppd_non_eur + formData.high_season_single_supplement_non_eur).toFixed(2)}</strong></span>
+                        <span>Double: <strong>{rateSymbol}{(formData.high_season_ppd_non_eur * 2).toFixed(2)}</strong></span>
+                        <span>Triple: <strong>{rateSymbol}{((formData.high_season_ppd_non_eur - formData.high_season_triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
                       </div>
                     </div>
                   )}
@@ -2052,22 +2055,22 @@ export default function HotelsContent() {
                   <p className="text-xs font-medium text-gray-600 mb-2">EU Passport Holders</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD (€) *</label>
+                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol}) *</label>
                       <input type="number" name="peak_season_ppd_eur" value={formData.peak_season_ppd_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-red-400 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent bg-white font-medium" placeholder="Per Person Double" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
                       <input type="number" name="peak_season_single_supplement_eur" value={formData.peak_season_single_supplement_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
                       <input type="number" name="peak_season_triple_reduction_eur" value={formData.peak_season_triple_reduction_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
                       <input type="number" name="peak_season_suite_eur" value={formData.peak_season_suite_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
@@ -2078,9 +2081,9 @@ export default function HotelsContent() {
                     <div className="mb-4 p-2 bg-red-100 rounded-lg">
                       <p className="text-xs text-red-700 font-medium mb-1">Calculated Room Rates (EU Passport):</p>
                       <div className="flex gap-4 text-xs text-red-800">
-                        <span>Single: <strong>€{(formData.peak_season_ppd_eur + formData.peak_season_single_supplement_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>€{(formData.peak_season_ppd_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>€{((formData.peak_season_ppd_eur - formData.peak_season_triple_reduction_eur) * 3).toFixed(2)}</strong></span>
+                        <span>Single: <strong>{rateSymbol}{(formData.peak_season_ppd_eur + formData.peak_season_single_supplement_eur).toFixed(2)}</strong></span>
+                        <span>Double: <strong>{rateSymbol}{(formData.peak_season_ppd_eur * 2).toFixed(2)}</strong></span>
+                        <span>Triple: <strong>{rateSymbol}{((formData.peak_season_ppd_eur - formData.peak_season_triple_reduction_eur) * 3).toFixed(2)}</strong></span>
                       </div>
                     </div>
                   )}
@@ -2089,22 +2092,22 @@ export default function HotelsContent() {
                   <p className="text-xs font-medium text-gray-600 mb-2">Non-EU Passport Holders</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol})</label>
                       <input type="number" name="peak_season_ppd_non_eur" value={formData.peak_season_ppd_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
                       <input type="number" name="peak_season_single_supplement_non_eur" value={formData.peak_season_single_supplement_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
                       <input type="number" name="peak_season_triple_reduction_non_eur" value={formData.peak_season_triple_reduction_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite (€)</label>
+                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
                       <input type="number" name="peak_season_suite_non_eur" value={formData.peak_season_suite_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
@@ -2115,9 +2118,9 @@ export default function HotelsContent() {
                     <div className="mt-3 p-2 bg-red-100 rounded-lg">
                       <p className="text-xs text-red-700 font-medium mb-1">Calculated Room Rates (Non-EU Passport):</p>
                       <div className="flex gap-4 text-xs text-red-800">
-                        <span>Single: <strong>€{(formData.peak_season_ppd_non_eur + formData.peak_season_single_supplement_non_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>€{(formData.peak_season_ppd_non_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>€{((formData.peak_season_ppd_non_eur - formData.peak_season_triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
+                        <span>Single: <strong>{rateSymbol}{(formData.peak_season_ppd_non_eur + formData.peak_season_single_supplement_non_eur).toFixed(2)}</strong></span>
+                        <span>Double: <strong>{rateSymbol}{(formData.peak_season_ppd_non_eur * 2).toFixed(2)}</strong></span>
+                        <span>Triple: <strong>{rateSymbol}{((formData.peak_season_ppd_non_eur - formData.peak_season_triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
                       </div>
                     </div>
                   )}
@@ -2199,7 +2202,7 @@ export default function HotelsContent() {
                                   <p className="text-xs font-medium text-blue-700 mb-2">Low Season</p>
                                   <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-xs text-gray-500 mb-1">EU (€)</label>
+                                      <label className="block text-xs text-gray-500 mb-1">EU ({rateSymbol})</label>
                                       <input
                                         type="number"
                                         value={activeSupplement.low_season.eur}
@@ -2211,7 +2214,7 @@ export default function HotelsContent() {
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs text-gray-500 mb-1">Non-EU (€)</label>
+                                      <label className="block text-xs text-gray-500 mb-1">Non-EU ({rateSymbol})</label>
                                       <input
                                         type="number"
                                         value={activeSupplement.low_season.non_eur}
@@ -2230,7 +2233,7 @@ export default function HotelsContent() {
                                   <p className="text-xs font-medium text-orange-700 mb-2">High Season</p>
                                   <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-xs text-gray-500 mb-1">EU (€)</label>
+                                      <label className="block text-xs text-gray-500 mb-1">EU ({rateSymbol})</label>
                                       <input
                                         type="number"
                                         value={activeSupplement.high_season.eur}
@@ -2242,7 +2245,7 @@ export default function HotelsContent() {
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs text-gray-500 mb-1">Non-EU (€)</label>
+                                      <label className="block text-xs text-gray-500 mb-1">Non-EU ({rateSymbol})</label>
                                       <input
                                         type="number"
                                         value={activeSupplement.high_season.non_eur}
@@ -2261,7 +2264,7 @@ export default function HotelsContent() {
                                   <p className="text-xs font-medium text-red-700 mb-2">Peak Season</p>
                                   <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                      <label className="block text-xs text-gray-500 mb-1">EU (€)</label>
+                                      <label className="block text-xs text-gray-500 mb-1">EU ({rateSymbol})</label>
                                       <input
                                         type="number"
                                         value={activeSupplement.peak_season.eur}
@@ -2273,7 +2276,7 @@ export default function HotelsContent() {
                                       />
                                     </div>
                                     <div>
-                                      <label className="block text-xs text-gray-500 mb-1">Non-EU (€)</label>
+                                      <label className="block text-xs text-gray-500 mb-1">Non-EU ({rateSymbol})</label>
                                       <input
                                         type="number"
                                         value={activeSupplement.peak_season.non_eur}

@@ -10,6 +10,7 @@ import { Utensils, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Users, Ch
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 
 const MEAL_TYPES = [
@@ -129,6 +130,8 @@ export default function MealRatesContent() {
   const [editingRate, setEditingRate] = useState<MealRate | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -1350,7 +1353,7 @@ export default function MealRatesContent() {
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Base Rate (€) *</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Base Rate ({rateSymbol}) *</label>
                     <input
                       type="number"
                       name="base_rate_eur"

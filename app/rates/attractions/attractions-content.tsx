@@ -11,6 +11,7 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 // ============================================
 // CONSTANTS
@@ -201,6 +202,8 @@ export default function AttractionsContent() {
   const [editingAttraction, setEditingAttraction] = useState<Attraction | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [togglingAddon, setTogglingAddon] = useState<string | null>(null)  // NEW: Track which row is toggling
 
@@ -1156,7 +1159,7 @@ export default function AttractionsContent() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Rate (€) *
+                      Rate ({rateSymbol}) *
                     </label>
                     <input
                       type="number"
@@ -1174,7 +1177,7 @@ export default function AttractionsContent() {
 
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Egyptian Rate (€)
+                      Egyptian Rate ({rateSymbol})
                     </label>
                     <input
                       type="number"

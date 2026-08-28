@@ -8,6 +8,7 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 interface FlightRate {
   id: string
@@ -177,6 +178,8 @@ export default function FlightsContent() {
   const [editingRate, setEditingRate] = useState<FlightRate | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1274,7 +1277,7 @@ export default function FlightsContent() {
                       Base Rate (EUR) <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">€</span>
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">{rateSymbol}</span>
                       <input
                         type="number"
                         value={formData.base_rate_eur}
@@ -1294,7 +1297,7 @@ export default function FlightsContent() {
                     </label>
                     <div className="relative">
                       {/* tax_eur is EUR by definition — hard-coded symbol is correct here (euro-literal ratchet) */}
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">€</span>
+                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">{rateSymbol}</span>
                       <input
                         type="number"
                         value={formData.tax_eur}

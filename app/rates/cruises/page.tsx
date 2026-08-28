@@ -11,6 +11,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
 import { parseSeasons, type RateSeason } from '@/lib/rates/rate-seasons'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 // ============================================
 // CONSTANTS
@@ -389,7 +390,11 @@ function PPDSeasonalRateSection({
   onRateChange,
   showSecondPeriod = false,
   borderColor = 'border-gray-200',
-  bgColor = 'bg-white'
+  bgColor = 'bg-white',
+  // The symbol the amounts are actually in — the cruise's own currency, or
+  // the tenant's (C3.4b). Passed in rather than read here so the section
+  // stays a pure presentational block.
+  rateSymbol = '€'
 }: {
   title: string
   seasonNumber: number
@@ -413,6 +418,7 @@ function PPDSeasonalRateSection({
   showSecondPeriod?: boolean
   borderColor?: string
   bgColor?: string
+  rateSymbol?: string
 }) {
   return (
     <div className={`border ${borderColor} rounded-lg p-4 ${bgColor}`}>
@@ -482,7 +488,7 @@ function PPDSeasonalRateSection({
         <label className="block text-xs font-medium text-gray-500 mb-2">EUR Passport Holders</label>
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-blue-600 font-medium mb-1">PPD (€) *</label>
+            <label className="block text-xs text-blue-600 font-medium mb-1">PPD ({rateSymbol}) *</label>
             <input
               type="number"
               value={rates.ppd_eur}
@@ -494,7 +500,7 @@ function PPDSeasonalRateSection({
             />
           </div>
           <div>
-            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp (€)</label>
+            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp ({rateSymbol})</label>
             <input
               type="number"
               value={rates.single_supplement_eur}
@@ -506,7 +512,7 @@ function PPDSeasonalRateSection({
             />
           </div>
           <div>
-            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red (€)</label>
+            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red ({rateSymbol})</label>
             <input
               type="number"
               value={rates.triple_reduction_eur}
@@ -521,9 +527,9 @@ function PPDSeasonalRateSection({
         {/* Calculated rates display */}
         {rates.ppd_eur > 0 && (
           <div className="mt-2 text-xs text-gray-500 flex gap-4">
-            <span>Single: €{(rates.ppd_eur + rates.single_supplement_eur).toFixed(2)}</span>
-            <span>Double: €{(rates.ppd_eur * 2).toFixed(2)}</span>
-            <span>Triple: €{((rates.ppd_eur - rates.triple_reduction_eur) * 3).toFixed(2)}</span>
+            <span>Single: {rateSymbol}{(rates.ppd_eur + rates.single_supplement_eur).toFixed(2)}</span>
+            <span>Double: {rateSymbol}{(rates.ppd_eur * 2).toFixed(2)}</span>
+            <span>Triple: {rateSymbol}{((rates.ppd_eur - rates.triple_reduction_eur) * 3).toFixed(2)}</span>
           </div>
         )}
       </div>
@@ -533,7 +539,7 @@ function PPDSeasonalRateSection({
         <label className="block text-xs font-medium text-gray-500 mb-2">Non-EUR Passport Holders</label>
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-blue-600 font-medium mb-1">PPD (€) *</label>
+            <label className="block text-xs text-blue-600 font-medium mb-1">PPD ({rateSymbol}) *</label>
             <input
               type="number"
               value={rates.ppd_non_eur}
@@ -544,7 +550,7 @@ function PPDSeasonalRateSection({
             />
           </div>
           <div>
-            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp (€)</label>
+            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp ({rateSymbol})</label>
             <input
               type="number"
               value={rates.single_supplement_non_eur}
@@ -555,7 +561,7 @@ function PPDSeasonalRateSection({
             />
           </div>
           <div>
-            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red (€)</label>
+            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red ({rateSymbol})</label>
             <input
               type="number"
               value={rates.triple_reduction_non_eur}
@@ -569,9 +575,9 @@ function PPDSeasonalRateSection({
         {/* Calculated rates display */}
         {rates.ppd_non_eur > 0 && (
           <div className="mt-2 text-xs text-gray-500 flex gap-4">
-            <span>Single: €{(rates.ppd_non_eur + rates.single_supplement_non_eur).toFixed(2)}</span>
-            <span>Double: €{(rates.ppd_non_eur * 2).toFixed(2)}</span>
-            <span>Triple: €{((rates.ppd_non_eur - rates.triple_reduction_non_eur) * 3).toFixed(2)}</span>
+            <span>Single: {rateSymbol}{(rates.ppd_non_eur + rates.single_supplement_non_eur).toFixed(2)}</span>
+            <span>Double: {rateSymbol}{(rates.ppd_non_eur * 2).toFixed(2)}</span>
+            <span>Triple: {rateSymbol}{((rates.ppd_non_eur - rates.triple_reduction_non_eur) * 3).toFixed(2)}</span>
           </div>
         )}
       </div>
@@ -599,6 +605,8 @@ export default function CruisesPage() {
   const [editingCruise, setEditingCruise] = useState<Cruise | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   // Dated contract periods (C3.2). While any exist they price the cruise and
   // the fixed season blocks below are only a fallback.
   const [periods, setPeriods] = useState<RateSeason[]>([])
@@ -1525,6 +1533,7 @@ export default function CruisesPage() {
 
               {/* Section 6: Low Season Rates (PPD Model) */}
               <PPDSeasonalRateSection
+                rateSymbol={rateSymbol}
                 title="Low Season Rates"
                 seasonNumber={3}
                 startDate={formData.low_season_start}
@@ -1546,6 +1555,7 @@ export default function CruisesPage() {
 
               {/* Section 7: High Season Rates (PPD Model) */}
               <PPDSeasonalRateSection
+                rateSymbol={rateSymbol}
                 title="High Season Rates"
                 seasonNumber={4}
                 startDate={formData.high_season_start}
@@ -1567,6 +1577,7 @@ export default function CruisesPage() {
 
               {/* Section 8: Peak Season Rates (PPD Model) */}
               <PPDSeasonalRateSection
+                rateSymbol={rateSymbol}
                 title="Peak Season Rates"
                 seasonNumber={5}
                 startDate={formData.peak_season_1_start}

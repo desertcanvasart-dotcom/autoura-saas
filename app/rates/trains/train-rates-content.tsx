@@ -9,6 +9,7 @@ import { Train, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Clock, Chevr
 import { useCurrency } from '@/hooks/useCurrency'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 // Egyptian cities with train stations
 const TRAIN_CITIES = [
@@ -72,6 +73,8 @@ export default function TrainRatesContent() {
   const [editingRate, setEditingRate] = useState<TrainRate | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -1123,7 +1126,7 @@ export default function TrainRatesContent() {
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Rate in EUR (base currency) *</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">€</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{rateSymbol}</span>
                       <input
                         type="number"
                         name="rate_eur"

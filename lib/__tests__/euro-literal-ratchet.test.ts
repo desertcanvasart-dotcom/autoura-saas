@@ -9,9 +9,17 @@ import path from 'node:path'
 // already bills in USD. They cannot all be converted at once, and — importantly
 // — they SHOULD NOT be. The two kinds look identical and are not:
 //
-//   CORRECT   app/rates/hotels: `PPD (€)` labels a field bound to `ppd_eur`.
-//             The column is EUR by definition. Converting it would make the
-//             label lie.
+//   WAS CORRECT, NO LONGER   app/rates/hotels: `PPD (€)` labelling a field
+//             bound to `ppd_eur`. That reasoning held while the column was
+//             EUR by definition. Migration 298 (tenants.rates_currency) ended
+//             that: the *_eur NAME is historical, and the column now holds
+//             whatever currency the tenant keeps its rates in, with an
+//             individual rate free to override it (rate_currency, mig 295).
+//             For a USD tenant the € label states the wrong currency for the
+//             number beside it, so the rate forms were swept in C3.4b and
+//             read their symbol from useRateCurrency() instead. If you are
+//             about to cite this example to justify a new literal: check
+//             whether the value is EUR by DEFINITION or merely by default.
 //
 //   WRONG     app/invoices: `€{totalRevenue}` sums invoices that each carry
 //             their OWN `currency` column — hard-coded symbol AND different
@@ -68,8 +76,10 @@ describe('euro-literal ratchet', () => {
       grown,
       `Hard-coded € grew. This app is multi-tenant and one tenant already bills in USD.\n` +
         `Use lib/currency.ts (formatCurrency / getCurrencySymbol) with the record's own\n` +
-        `currency column. If the value is EUR by definition (a *_eur rate column), say so\n` +
-        `in a comment and raise the baseline deliberately.\n\n` +
+        `currency column. A *_eur column is NOT automatically EUR — since migration 298\n` +
+        `it holds the tenant's rates currency (see this file's header). If the value really\n` +
+        `is EUR by definition, say so in a comment and raise the baseline deliberately.\n` +
+        `\n` +
         grown.join('\n')
     ).toEqual([])
   })
