@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import { normalizeName, computePending, runPending, loadApplied } from '../migrate-core.mjs'
 
-// The self-hosted migration runner (plan §5), driven end-to-end against a
+// The migration runner, driven end-to-end against a
 // real Postgres (PGlite). The contract: apply unrecorded files in order,
 // record each, stop LOUDLY on the first failure without recording it, and
 // tolerate the two historical name spellings in schema_migrations.

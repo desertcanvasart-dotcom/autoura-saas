@@ -1,9 +1,9 @@
 // ============================================
 // Recording that a scheduled job ran
 // ============================================
-// S3 of docs/plans/self-hosted-support.md. On a self-hosted install the
-// scheduler is the customer's, so the only way to answer "have the jobs ever
-// run here?" is for the jobs themselves to say so.
+// S3 of docs/plans/self-hosted-support.md (read its correction header). The
+// scheduler lives outside the app, so the only way to answer "have the jobs
+// ever run here?" is for the jobs themselves to say so.
 //
 // FAIL-OPEN, ALWAYS. Losing a bookkeeping row must never fail the work it was
 // describing — a support feature that breaks exchange-rate refreshes would be

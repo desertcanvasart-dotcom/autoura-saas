@@ -1,9 +1,15 @@
-# Self-hosting Autoura
+# Operating an Autoura SaaS instance
 
-The self-hosted offering (productization plan §5): a customer runs the whole
-stack on their own accounts — their Supabase project, their host, their API
-keys — under a support contract. There is no entitlement code; this document
-plus tagged releases IS the product surface.
+How this application gets installed, upgraded and diagnosed. It is written for
+whoever operates the instance — today that is us, on Railway, and this is the
+runbook for that deployment.
+
+**This product is not self-hosted by customers.** `autoura-saas` is the
+multi-tenant SaaS: we run it, agencies sign up as tenants. Customer-installed
+Autoura is a different product in a different repository —
+`travel-ops-pro` — and its install story lives there, not here. See
+`docs/plans/self-hosted-support.md` for how that came to be confused, and why
+the procedures below are still the right ones for the instance we run.
 
 ## Prerequisites
 
@@ -118,7 +124,7 @@ What to do instead:
 1. Read the error. The runner stops on the first failure and prints the file and
    the message.
 2. Fix the cause — usually a permission, an extension the project does not have,
-   or a Supabase-managed surface (`docs/SELF-HOSTING.md` lists the seven
+   or a Supabase-managed surface ("First install" above lists the seven
    migrations that touch those).
 3. Re-run `node scripts/migrate.mjs`. It resumes from the file that failed,
    because that one was never recorded.
@@ -129,8 +135,8 @@ diagnosis.
 
 ## Scheduled jobs
 
-Five jobs run on a schedule. **On a self-hosted install, running them is yours
-to arrange** — this app does not schedule anything itself. Point your scheduler
+Five jobs run on a schedule. **This app does not schedule anything itself**, so
+arranging them belongs to whoever runs the instance. Point the scheduler
 (cron, systemd timers, your platform's job runner) at these, each authenticated
 with `CRON_SECRET`:
 
@@ -142,8 +148,11 @@ with `CRON_SECRET`:
 | Task reminders | `GET /api/cron/task-reminders` | daily, 06:00 |
 | Document retention | `GET /api/cron/purge-traveller-documents` | daily, 03:45 |
 
-The bundled `scripts/cron-*.mjs` drivers call them for you and exit with the
-right code, so a scheduler records success or failure.
+Three of the five have a bundled driver — `scripts/cron-exchange-rates.mjs`,
+`cron-reminders.mjs` and `cron-agent-memory.mjs` — which call the endpoint for
+you and exit with the right code, so a scheduler records success or failure.
+Task reminders and document retention have no driver; call their endpoints
+directly with `CRON_SECRET`.
 
 **Exchange rates is the one to get right.** Without it, every historical
 conversion in the P&L and the financial reports silently falls back to today's
@@ -208,23 +217,18 @@ the host, because which host failed is the useful half of the message.
 **Nothing is sent anywhere by the script or the endpoint.** They print and write
 a file; emailing it is your decision.
 
-### How support works
+### On the escalation ladder that used to be here
 
-In order, and it stops as soon as the problem is solved:
+This section described a vendor-to-customer support ladder — send the bundle,
+then a screen share, then time-boxed access. That was written for a
+customer-install model this repository does not have. The design is not lost:
+it is preserved in `docs/plans/self-hosted-support.md` §5, and it carries over
+to `travel-ops-pro` (T4), which is the product customers actually install.
 
-1. **You send the bundle.** Most issues end here — the answer is usually a
-   missing environment variable or an unapplied migration, and the findings name
-   both along with the command that fixes them.
-2. **A screen share, with you driving.** No credentials change hands and you see
-   every command run. This covers almost everything the bundle does not.
-3. **Time-boxed access you grant and revoke** — a read-only database role or a
-   temporary server account, created for the session and removed at the end. If
-   your support agreement does not describe this, it should, before you need it.
-
-**Support never needs your service-role key or your database password.** That
-key bypasses row-level security entirely; once it is in a mailbox it is in that
-mailbox forever, and in every backup of it. Anyone asking for either by email is
-not us.
+One rule from it applies to any instance, including ours, and is worth keeping
+in front of whoever operates this: **never send a service-role key or a database
+password by email or chat.** That key bypasses row-level security entirely; once
+it is in a mailbox it is in that mailbox forever, and in every backup of it.
 
 ## Releases
 
@@ -235,13 +239,11 @@ not us.
   migrations, anything operational. A migration that needs operator
   attention says so in its own header comment — the release notes point at
   it.
-- Self-hosters should track release tags, not `main`.
+- Deployments should track release tags, not `main`.
 
-## What the hosted product has that self-hosted doesn't
+## Optional integrations
 
-- Stripe billing (leave `STRIPE_*` unset; manage tenants in the super-admin
-  console instead).
-- Railway cron wiring — schedule the three cron scripts yourself
-  (`scripts/cron-exchange-rates.mjs`, `cron-reminders.mjs`,
-  `cron-agent-memory.mjs`) via your host's scheduler or system cron, and
-  protect `/api/cron/*` with `CRON_SECRET`. See `docs/CRON-JOBS.md`.
+- **Stripe billing.** Leave `STRIPE_*` unset to manage tenants by hand in the
+  super-admin console; set it to charge subscriptions.
+- **Cron wiring** is described under "Scheduled jobs" above, and in
+  `docs/CRON-JOBS.md` for the Railway deployment specifically.

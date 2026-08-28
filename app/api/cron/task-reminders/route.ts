@@ -317,7 +317,7 @@ function formatDate(dateStr: string): string {
 // ============================================
 // Recorded, so the support bundle can answer "has this job ever run here?"
 // ============================================
-// On a self-hosted install the scheduler belongs to the customer, so the job
-// saying so is the only evidence there is. Fail-open: if the recording cannot
+// Nothing in this app schedules itself — the scheduler is external, so the job
+// saying so is the only evidence it ever ran. Fail-open: if the recording cannot
 // happen, the job still runs (lib/support/job-runs.ts).
 export const GET = withJobRun('task-reminders', () => getSupabase(), getHandler)

@@ -228,7 +228,7 @@ describe('bundleFindings', () => {
 // ============================================
 // Scheduled jobs (S3)
 // ============================================
-// The question a self-hosted install cannot otherwise answer: has anything
+// The question nothing else can answer: has anything
 // actually run on this box? The findings have to distinguish "no scheduler at
 // all" from "one job stopped", because they are different conversations.
 

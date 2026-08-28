@@ -1,18 +1,19 @@
 // ============================================
 // GET /api/health/deep — is this install actually well?
 // ============================================
-// S2 of docs/plans/self-hosted-support.md. /api/health answers "is the process
-// up and can it reach the database", and is public, so it must stay
+// S2 of docs/plans/self-hosted-support.md (read its correction header).
+// /api/health answers "is the process up and can it reach the database", and
+// is public, so it must stay
 // secret-free and vague. This one is gated, so it can afford to say WHICH
 // dependency is unhappy and whether the scheduled jobs have stopped.
 //
-// It exists for a self-hosted customer's own monitoring: they have no platform
-// dashboard, and "the process is running" is not the failure they need to hear
-// about. Silent failures — a scheduler that stopped, so every historical
-// conversion falls back to today's rate — are what this catches.
+// It exists for uptime monitoring, because "the process is running" is not the
+// failure worth hearing about. Silent failures — a scheduler that stopped, so
+// every historical conversion falls back to today's rate — are what this
+// catches.
 //
 // TWO WAYS IN, because a monitor cannot hold a session:
-//   * a super-admin session (theirs, not ours), or
+//   * a super-admin session, or
 //   * Authorization: Bearer <CRON_SECRET>
 //
 // FAILS CLOSED. This route sits under the '/api/health' prefix, which

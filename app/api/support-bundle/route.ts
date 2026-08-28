@@ -1,7 +1,7 @@
 // ============================================
-// GET /api/support-bundle — what a self-hosted install can safely send us
+// GET /api/support-bundle — a redacted diagnostic snapshot of this instance
 // ============================================
-// S1 of docs/plans/self-hosted-support.md. On an install we do not run, this is
+// S1 of docs/plans/self-hosted-support.md (read its correction header). This is
 // the thing that crosses the gap: the customer's OWN super-admin generates it,
 // reads it, and emails it.
 //

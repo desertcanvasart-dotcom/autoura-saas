@@ -1,9 +1,9 @@
 // ============================================
-// MIGRATION RUNNER — core logic (self-hosted deliverable, plan §5)
+// MIGRATION RUNNER — core logic
 // ============================================
 // The repo's convention was hand-applying supabase/migrations/*.sql in the
 // Supabase SQL editor and recording each into schema_migrations (mig 233).
-// That does not survive self-hosting. This runner makes the same contract
+// That does not survive a second copy of the database. This runner makes the same contract
 // executable: apply every unrecorded file in name order, record it, stop
 // loudly on the first failure.
 //

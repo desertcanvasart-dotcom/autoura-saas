@@ -1,7 +1,7 @@
 // ============================================
 // The support bundle — typed surface
 // ============================================
-// S1 of docs/plans/self-hosted-support.md. When an install we do not run goes
+// S1 of docs/plans/self-hosted-support.md (read its correction header). When an install goes
 // wrong, this is what crosses the gap: one file the customer generates, reads,
 // and emails. Most "it's broken" reports are answered by two lines of it —
 // usually a missing environment variable or an unapplied migration.

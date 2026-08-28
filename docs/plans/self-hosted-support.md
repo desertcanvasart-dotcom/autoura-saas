@@ -1,6 +1,39 @@
 # Supporting a self-hosted install
 
-Status: **plan, not built.** Written 2026-08-28.
+Status: **built (S1–S3), but written on a mistaken premise.** Written
+2026-08-28. Corrected 2026-08-29.
+
+> ## Correction — read this before the plan
+>
+> **This plan was written into the wrong repository.** It assumes `autoura-saas`
+> is installed on customers' own servers. It is not. `autoura-saas` is the
+> multi-tenant SaaS that we host; agencies use it by signing up as tenants. The
+> product customers install on their own hardware is **`travel-ops-pro`**.
+>
+> Where the mistake came from: `docs/plans/productization-from-reference.md` §1
+> records the operator's answer of 2026-08-27, *"Self-hosted licensing = support
+> contract → build NO entitlement/license-key code."* That settled **how
+> licensing works**, not **which repository ships to customers**. Read inside a
+> plan about `autoura-saas`, it was taken to mean this product was the
+> self-hosted one. The licensing answer still stands — it attaches to
+> `travel-ops-pro`. Confirmed by the operator 2026-08-29.
+>
+> **What this means for the work already merged (#254–#257):**
+>
+> - The code is sound and is staying. `doctor.mjs`, the support bundle and its
+>   redaction rules, `job_runs`, and `/api/health/deep` all diagnose *this*
+>   instance, which we host and do need to diagnose. Only the framing was wrong.
+> - The reasoning below about **not owning the instance** (§1, §2, §5, §6) does
+>   not apply to `autoura-saas` and should not be used to argue about it.
+> - That reasoning is still correct **for `travel-ops-pro`**, where it becomes
+>   T4 of `travel-ops-pro/docs/plans/self-hosting.md`. Port it there rather than
+>   rewriting it — especially the redaction rules, which must not diverge.
+>
+> The plan is kept unedited below as the design record. `docs/SELF-HOSTING.md`,
+> which it references, is now `docs/OPERATIONS.md` and has been reframed as the
+> runbook for the instance we operate.
+
+---
 
 The self-hosted tier is sold under a support contract (`docs/SELF-HOSTING.md`).
 This is how that contract gets honoured when the thing you are supporting runs
