@@ -72,6 +72,10 @@ const SELF_AUTH_PROOF: Record<string, string[] | null> = {
   // design; the secret share token in the path IS the credential. The handler
   // validates its shape and looks up an unrevoked itinerary_shares row by it.
   '/api/share/': ['isValidShareToken', 'revoked_at'],
+  // Customer portal — the portal token in the path IS the credential. Every
+  // handler validates its shape and resolves an unrevoked, unexpired
+  // booking_portal_links row (portalLinkState) before touching anything.
+  '/api/portal/': ['isValidPortalToken', 'portalLinkState'],
 }
 
 /** All route.ts files under app/api, as URL paths with dummy dynamic params. */

@@ -1596,6 +1596,70 @@ export interface Database {
           },
         ]
       }
+      booking_portal_links: {
+        Row: {
+          id: string
+          tenant_id: string
+          booking_id: string
+          passenger_id: string | null
+          token: string
+          created_by: string | null
+          created_at: string
+          revoked_at: string | null
+          expires_at: string | null
+          last_sent_at: string | null
+          form_locked: boolean
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          booking_id: string
+          passenger_id?: string | null
+          token: string
+          created_by?: string | null
+          created_at?: string
+          revoked_at?: string | null
+          expires_at?: string | null
+          last_sent_at?: string | null
+          form_locked?: boolean
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          booking_id?: string
+          passenger_id?: string | null
+          token?: string
+          created_by?: string | null
+          created_at?: string
+          revoked_at?: string | null
+          expires_at?: string | null
+          last_sent_at?: string | null
+          form_locked?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_portal_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_portal_links_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_portal_links_passenger_id_fkey"
+            columns: ["passenger_id"]
+            isOneToOne: false
+            referencedRelation: "booking_passengers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_payments: {
         Row: {
           id: string

@@ -21,6 +21,10 @@ export const SELF_AUTH_API_PREFIXES = [
   // Traveller report endpoint on the share page: same shape — the unrevoked
   // share token in the path IS the auth. The route 404s anything else.
   '/api/share/',
+  // Customer portal endpoints (C1a): the portal token in the path IS the
+  // auth (isValidPortalToken + unrevoked/unexpired booking_portal_links row;
+  // mutating routes additionally demand the verified-gate cookie).
+  '/api/portal/',
   '/api/webhooks/',         // HMAC-verified inbound (e.g. concierge brief, departure mirror)
   '/api/integrations/',     // server-to-server feeds; verifies SAWA_SYNC_SECRET inside the handler
   '/api/auth/',             // login / signup / OAuth callbacks (no session yet)
@@ -165,6 +169,10 @@ export async function middleware(request: NextRequest) {
     // page 404s any token that does not resolve to an active staff_link
     // (app/staff/[token]/page.tsx).
     '/staff',
+    // Customer portal pages (C1a) — token-gated, service-role lookup, and a
+    // confirmation-gate cookie before any booking data renders
+    // (app/portal/[token]/page.tsx).
+    '/portal',
   ]
   // Exact match or a true sub-path ('/contact/foo'), never a shared prefix
   // (a protected route must NOT match public '/contact' just because it
