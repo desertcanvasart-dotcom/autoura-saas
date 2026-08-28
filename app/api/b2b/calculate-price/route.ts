@@ -3,6 +3,9 @@ import { calculateAutoPricing, ServiceTier } from '@/lib/auto-pricing-service'
 import { getEntranceFee as canonicalGetEntranceFee } from '@/lib/pricing/rate-resolution'
 import { getCatalogScope } from '@/lib/catalog-scope'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { getTieredActivityRate, applyActivityTiers } from '@/lib/rates/activity-tiers'
+import { getTenantRunCurrency } from '@/lib/rates/run-currency'
+import { getCurrencySymbol } from '@/lib/currency'
 
 // ============================================
 // B2B TOUR PRICE CALCULATOR - v6
@@ -571,7 +574,29 @@ export async function POST(request: NextRequest) {
       // STEP 1: Check for B2B pricing rules (tiered pricing like felucca)
       // ============================================
       if (service.rate_type === 'activity' && service.service_name) {
-        const b2bRule = await getB2BPricingRule(service.service_name, tenantId)
+        // Bands on the activity itself (C3.3) come first: they live in the
+        // catalog the rest of the app prices from, carry as many bands as the
+        // contract has, and are matched on the FULL service name. The
+        // b2b_pricing_rules path below stays as the fallback for anything
+        // already configured there.
+        const tiered = await getTieredActivityRate(
+          getSupabaseAdmin() as never,
+          service.service_name,
+          tenantId
+        )
+        if (tiered) {
+          // The note is shown to a human, so it carries the tenant's own
+          // currency symbol rather than a hardcoded one (C3.4).
+          const symbol = getCurrencySymbol(await getTenantRunCurrency(getSupabaseAdmin(), tenantId ?? ''))
+          const priceResult = applyActivityTiers(tiered.tiers, num_pax, is_eur_passport ?? true, symbol)
+          unitCost = priceResult.unitCost
+          lineTotal = priceResult.lineTotal
+          pricingNote = priceResult.pricingNote
+          effectiveQuantityMode = priceResult.quantityMode
+          rateSource = 'activity_tiers'
+        }
+
+        const b2bRule = tiered ? null : await getB2BPricingRule(service.service_name, tenantId)
 
         if (b2bRule) {
           const priceResult = applyB2BPricingRule(b2bRule, num_pax)

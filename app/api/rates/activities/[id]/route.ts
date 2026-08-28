@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { sanitizeTiers } from '@/lib/rates/activity-tiers'
+import type { Json } from '@/types/database.types'
 
 export async function GET(
   request: NextRequest,
@@ -83,6 +85,9 @@ export async function PUT(
       base_rate_non_eur: parseFloat(body.base_rate_non_eur) || 0,
       // Add-on pricing fields
       pricing_type: body.pricing_type || 'per_person',
+      // Group-size bands (C3.3). Named only when the client sent the key,
+      // so a database without migration 306 never sees the column.
+      ...('tiers' in body ? { tiers: sanitizeTiers(body.tiers) as unknown as Json } : {}),
       unit_label: body.unit_label || null,
       min_capacity: parseInt(body.min_capacity) || 1,
       max_capacity: parseInt(body.max_capacity) || 99,
