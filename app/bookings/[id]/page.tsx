@@ -123,6 +123,27 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     notes: ''
   })
 
+  // Customer portal (C1a): mint/reuse the booking-level link and copy it.
+  const [mintingPortal, setMintingPortal] = useState(false)
+  const mintPortalLink = async () => {
+    if (mintingPortal) return
+    setMintingPortal(true)
+    try {
+      const res = await fetch(`/api/bookings/${resolvedParams.id}/portal-link`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.success) {
+        try { await navigator.clipboard.writeText(data.url) } catch {}
+        showToast('success', `${data.created ? 'Portal link created' : 'Existing portal link'} — copied: ${data.url}`)
+      } else {
+        showToast('error', data.error || 'Could not create the portal link')
+      }
+    } catch {
+      showToast('error', 'Could not create the portal link')
+    } finally {
+      setMintingPortal(false)
+    }
+  }
+
   const showToast = (type: 'success' | 'error' | 'info', message: string) => {
     const id = Date.now().toString()
     setToasts(prev => [...prev, { id, type, message }])
@@ -470,6 +491,14 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               >
                 <Plus className="w-4 h-4" />
                 Add Passenger
+              </button>
+              <button
+                onClick={mintPortalLink}
+                disabled={mintingPortal}
+                title="Create (or copy) the traveller portal link — the lead fills in everyone's details and can invite each traveller with a private link"
+                className="px-4 py-2 text-[#647C47] border border-[#647C47]/40 rounded-lg hover:bg-[#647C47]/5 disabled:opacity-50"
+              >
+                {mintingPortal ? 'Creating…' : 'Portal link'}
               </button>
             </div>
 
