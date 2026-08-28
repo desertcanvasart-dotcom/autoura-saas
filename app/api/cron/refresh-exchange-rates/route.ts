@@ -28,6 +28,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { refreshExchangeRates } from '@/lib/exchange-rate-refresh'
+import { withJobRun } from '@/lib/support/job-runs'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,7 @@ function getSupabaseAdmin() {
   return _supabaseAdmin
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   // Verify cron secret — same pattern as the other cron routes.
   // Fails closed: with CRON_SECRET unset, `null !== undefined` rejects.
   const cronSecret = request.headers.get('x-cron-secret')
@@ -83,3 +84,11 @@ export async function POST(request: NextRequest) {
     ...(result.snapshotError ? { snapshotError: result.snapshotError } : {}),
   })
 }
+
+// ============================================
+// Recorded, so the support bundle can answer "has this job ever run here?"
+// ============================================
+// On a self-hosted install the scheduler belongs to the customer, so the job
+// saying so is the only evidence there is. Fail-open: if the recording cannot
+// happen, the job still runs (lib/support/job-runs.ts).
+export const POST = withJobRun('exchange-rates', () => getSupabaseAdmin(), postHandler)

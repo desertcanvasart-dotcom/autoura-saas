@@ -23,6 +23,7 @@ import fs from 'fs'
 import path from 'path'
 import pg from 'pg'
 import { computePending, loadApplied } from './migrate-core.mjs'
+import { JOB_NAMES } from '../lib/support/job-names.mjs'
 import {
   buildBundle,
   bundleFindings,
@@ -64,6 +65,7 @@ const database = {
   migrationsPending: null,
 }
 const counts = {}
+let crons = []
 const integrations = {
   supabase: env.NEXT_PUBLIC_SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY ? 'configured' : 'unconfigured',
   anthropic: env.ANTHROPIC_API_KEY ? 'configured' : 'unconfigured',
@@ -92,6 +94,26 @@ if (env.DATABASE_URL) {
     const applied = await loadApplied(client)
     database.migrationsApplied = applied.length
     if (files.length) database.migrationsPending = computePending(files, applied)
+
+    // Have the scheduled jobs ever run here? On a self-hosted install the
+    // scheduler is the customer's, so the jobs' own record is the only
+    // evidence — see supabase/migrations/307_job_runs.sql.
+    try {
+      const { rows } = await client.query(
+        `SELECT DISTINCT ON (job_name) job_name, started_at, outcome
+           FROM public.job_runs ORDER BY job_name, started_at DESC`
+      )
+      const seen = new Map(rows.map(r => [r.job_name, r]))
+      crons = JOB_NAMES.map(name => ({
+        name,
+        lastRun: seen.get(name)?.started_at?.toISOString?.() ?? seen.get(name)?.started_at ?? null,
+        lastOutcome: seen.get(name)?.outcome ?? (seen.has(name) ? 'unfinished' : null),
+      }))
+    } catch {
+      // Migration 307 not applied: every job reports as never run, which is
+      // true enough — nothing here has recorded one.
+      crons = JOB_NAMES.map(name => ({ name, lastRun: null, lastOutcome: null }))
+    }
 
     for (const table of ['tenants', 'itineraries', 'bookings', 'invoices', 'clients']) {
       try {
@@ -148,6 +170,7 @@ const bundle = buildBundle({
   database,
   env,
   integrations,
+  crons,
   counts,
   errors,
 })
@@ -176,6 +199,10 @@ console.log(`  ${tick(bundle.env.missingRequired.length === 0)} required setting
 console.log(`  ${tick(true)} optional settings    ${bundle.env.set.length} set, ${bundle.env.missing.length} unset`)
 for (const [name, state] of Object.entries(bundle.integrations)) {
   console.log(`  ${tick(state !== 'failed')} ${name.padEnd(20)} ${state}`)
+}
+for (const cron of bundle.crons) {
+  const when = cron.lastRun ? `last ran ${cron.lastRun} (${cron.lastOutcome})` : 'never run here'
+  console.log(`  ${tick(Boolean(cron.lastRun) && cron.lastOutcome !== 'failed')} job ${cron.name.padEnd(16)} ${when}`)
 }
 
 console.log('\nFindings:')

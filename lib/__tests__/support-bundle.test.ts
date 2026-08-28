@@ -217,10 +217,71 @@ describe('bundleFindings', () => {
 
   it('flags a job that has never run on this install', () => {
     const bundle = { ...healthy, crons: [{ name: 'exchange-rates', lastRun: null, lastOutcome: null }] }
-    expect(bundleFindings(bundle).join(' ')).toMatch(/never run/)
+    expect(bundleFindings(bundle).join(' ')).toMatch(/has ever run on this install/)
   })
 
   it('flags an unknown commit, because we cannot support a version we cannot name', () => {
     expect(bundleFindings({ ...healthy, app: { ...healthy.app, sha: 'unknown' } }).join(' ')).toMatch(/unknown/)
+  })
+})
+
+// ============================================
+// Scheduled jobs (S3)
+// ============================================
+// The question a self-hosted install cannot otherwise answer: has anything
+// actually run on this box? The findings have to distinguish "no scheduler at
+// all" from "one job stopped", because they are different conversations.
+
+describe('bundleFindings — scheduled jobs', () => {
+  const base = buildBundle({
+    generatedAt: '2026-08-28T18:00:00.000Z',
+    version: '2026.08.29', sha: 'ab39887', node: 'v20.11.1',
+    database: { reachable: true, latencyMs: 40, migrationsApplied: 189, migrationsPending: [] },
+    env: { NEXT_PUBLIC_SUPABASE_URL: 'u', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'a', SUPABASE_SERVICE_ROLE_KEY: 's' },
+  })
+  const recent = () => new Date(Date.now() - 3600_000).toISOString()
+  const old = () => new Date(Date.now() - 80 * 3600_000).toISOString()
+
+  it('says "no scheduler" once, not once per job', () => {
+    const bundle = { ...base, crons: [
+      { name: 'exchange-rates', lastRun: null, lastOutcome: null },
+      { name: 'reminders', lastRun: null, lastOutcome: null },
+    ] }
+    const jobFindings = bundleFindings(bundle).filter(f => /job|scheduler/i.test(f))
+    expect(jobFindings).toHaveLength(1)
+    expect(jobFindings[0]).toMatch(/No scheduled job has ever run/)
+  })
+
+  it('names the ones missing when only some have never run', () => {
+    const bundle = { ...base, crons: [
+      { name: 'exchange-rates', lastRun: recent(), lastOutcome: 'ok' },
+      { name: 'reminders', lastRun: null, lastOutcome: null },
+    ] }
+    expect(bundleFindings(bundle).join(' ')).toMatch(/never run here: reminders/)
+  })
+
+  it('explains what a missing exchange-rate job actually costs', () => {
+    // "A cron did not run" means nothing to the person reading it; "your
+    // historical conversions silently fall back to today's rate" does.
+    const bundle = { ...base, crons: [{ name: 'exchange-rates', lastRun: null, lastOutcome: null }] }
+    expect(bundleFindings(bundle).join(' ')).toMatch(/falls back to today's rate/)
+  })
+
+  it('flags a job that has gone quiet', () => {
+    const bundle = { ...base, crons: [{ name: 'reminders', lastRun: old(), lastOutcome: 'ok' }] }
+    expect(bundleFindings(bundle).join(' ')).toMatch(/last ran \d+ hours ago/)
+  })
+
+  it('says nothing about a job that ran recently and worked', () => {
+    const bundle = { ...base, crons: [{ name: 'reminders', lastRun: recent(), lastOutcome: 'ok' }] }
+    expect(bundleFindings(bundle)).toEqual(['No problems found by these checks.'])
+  })
+
+  it('reports a failed run and an unfinished one differently', () => {
+    const failed = { ...base, crons: [{ name: 'reminders', lastRun: recent(), lastOutcome: 'failed' }] }
+    expect(bundleFindings(failed).join(' ')).toMatch(/last run FAILED/)
+
+    const unfinished = { ...base, crons: [{ name: 'reminders', lastRun: recent(), lastOutcome: 'unfinished' }] }
+    expect(bundleFindings(unfinished).join(' ')).toMatch(/never reported back/)
   })
 })

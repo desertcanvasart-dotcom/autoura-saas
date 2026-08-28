@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendMail } from '@/lib/email-send'
 import { createClient } from '@supabase/supabase-js'
+import { withJobRun } from '@/lib/support/job-runs'
 
 // Lazy-initialized Supabase client (avoids build-time errors when env vars unavailable)
 let _supabase: ReturnType<typeof createClient> | null = null
@@ -22,7 +23,7 @@ function getSupabase() {
 // Vercel: Add to vercel.json crons
 // External: Use cron-job.org or similar service
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   // Verify cron secret. Fail closed: if no secret is configured, or the
   // header doesn't match, reject. Never run unauthenticated.
   const authHeader = request.headers.get('authorization')
@@ -312,3 +313,11 @@ function formatDate(dateStr: string): string {
     day: 'numeric' 
   })
 }
+
+// ============================================
+// Recorded, so the support bundle can answer "has this job ever run here?"
+// ============================================
+// On a self-hosted install the scheduler belongs to the customer, so the job
+// saying so is the only evidence there is. Fail-open: if the recording cannot
+// happen, the job still runs (lib/support/job-runs.ts).
+export const GET = withJobRun('task-reminders', () => getSupabase(), getHandler)

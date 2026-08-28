@@ -84,6 +84,10 @@ export const REQUIRED_ENV_KEYS: readonly string[] = core.REQUIRED_ENV_KEYS
 
 export const REDACTION_NOTICE: readonly string[] = core.REDACTION_NOTICE
 
+/** How long after a job's last run we call it stale. Defined beside the finding
+ *  that uses it, so the number and the message cannot drift apart. */
+export const STALE_AFTER_HOURS: number = core.STALE_AFTER_HOURS
+
 /** Which known variables are set. NEVER their values. */
 export const reportEnv: (env: Record<string, string | undefined>) => EnvReport = core.reportEnv
 

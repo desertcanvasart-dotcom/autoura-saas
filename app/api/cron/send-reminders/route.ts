@@ -3,6 +3,7 @@ import { daysOverdueOrNull } from '@/lib/invoice-dates'
 import { createAdminClient } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
+import { withJobRun } from '@/lib/support/job-runs'
 
 // Verify cron secret for security
 const CRON_SECRET = process.env.CRON_SECRET
@@ -93,7 +94,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
   return { subject, html }
 }
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   // Verify authorization. Fail closed: if no secret is configured, or the
   // header doesn't match, reject. Never run unauthenticated.
   const authHeader = request.headers.get('authorization')
@@ -242,4 +243,12 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-} 
+}
+
+// ============================================
+// Recorded, so the support bundle can answer "has this job ever run here?"
+// ============================================
+// On a self-hosted install the scheduler belongs to the customer, so the job
+// saying so is the only evidence there is. Fail-open: if the recording cannot
+// happen, the job still runs (lib/support/job-runs.ts).
+export const GET = withJobRun('reminders', () => createAdminClient(), getHandler)
