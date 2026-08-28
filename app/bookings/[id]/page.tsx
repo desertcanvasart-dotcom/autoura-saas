@@ -150,6 +150,60 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
+  // Change requests (C1c): what the lead asked for, and approve/reject.
+  interface ChangeRequest {
+    id: string
+    kind: string
+    requested_count: number
+    note: string | null
+    status: string
+    created_at: string
+  }
+  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([])
+  const [resolvingCR, setResolvingCR] = useState<string | null>(null)
+  const fetchChangeRequests = async () => {
+    try {
+      const res = await fetch(`/api/bookings/${resolvedParams.id}/change-requests`)
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.success) setChangeRequests(data.requests)
+    } catch {}
+  }
+  useEffect(() => {
+    fetchChangeRequests()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const resolveChangeRequest = async (cid: string, action: 'approve' | 'reject') => {
+    if (resolvingCR) return
+    setResolvingCR(cid)
+    try {
+      const res = await fetch(`/api/bookings/${resolvedParams.id}/change-requests/${cid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.success) {
+        if (action === 'approve') {
+          const r = data.reprice
+          showToast('success', r?.method === 'per_person'
+            ? `Approved — ${data.added} traveller(s) added, total now ${r.newTotal}`
+            : `Approved — ${data.added} traveller(s) added; reprice manually (no per-person base)`)
+        } else {
+          showToast('info', 'Request rejected')
+        }
+        fetchChangeRequests()
+        fetchBooking()
+        fetchPassengers()
+      } else {
+        showToast('error', data.error || 'Could not resolve the request')
+      }
+    } catch {
+      showToast('error', 'Could not resolve the request')
+    } finally {
+      setResolvingCR(null)
+    }
+  }
+
   // Customer portal (C1a): mint/reuse the booking-level link and copy it.
   const [mintingPortal, setMintingPortal] = useState(false)
   const mintPortalLink = async () => {
@@ -506,6 +560,39 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
         )}
 
         {/* Passengers Tab */}
+        {changeRequests.some(cr => cr.status === 'pending') && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+            {changeRequests.filter(cr => cr.status === 'pending').map(cr => (
+              <div key={cr.id} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-amber-900">
+                    The lead traveller asks to add {cr.requested_count} traveller{cr.requested_count === 1 ? '' : 's'}
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    {cr.note ? `“${cr.note}” · ` : ''}Approving extends the booking&rsquo;s per-person rate and seeds blank passenger rows for the portal to fill.
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => resolveChangeRequest(cr.id, 'approve')}
+                    disabled={resolvingCR !== null}
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-lg hover:bg-[#4f6238] disabled:opacity-50"
+                  >
+                    {resolvingCR === cr.id ? '…' : 'Approve'}
+                  </button>
+                  <button
+                    onClick={() => resolveChangeRequest(cr.id, 'reject')}
+                    disabled={resolvingCR !== null}
+                    className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {activeTab === 'passengers' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">

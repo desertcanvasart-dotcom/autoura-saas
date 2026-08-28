@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import TravellerForm, { type PortalTraveller } from './TravellerForm'
 import LeadCoordinator from './LeadCoordinator'
+import ChangeRequestForm from './ChangeRequestForm'
 
 export default function PortalContent({ token, scope }: { token: string; scope: 'traveller' | 'booking' }) {
   const [travellers, setTravellers] = useState<PortalTraveller[]>([])
@@ -54,6 +55,8 @@ export default function PortalContent({ token, scope }: { token: string; scope: 
       {scope === 'booking' && travellers.length > 1 && (
         <LeadCoordinator token={token} travellers={travellers} />
       )}
+
+      {scope === 'booking' && <ChangeRequestForm token={token} />}
     </div>
   )
 }
