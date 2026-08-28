@@ -7,6 +7,7 @@ import { Search, Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronR
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 interface TransportationRate {
   id: string
@@ -131,6 +132,8 @@ export default function TransportationContent() {
   const [editingRate, setEditingRate] = useState<TransportationRate | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1018,7 +1021,7 @@ export default function TransportationContent() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Vehicle</th>
-                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Rate (€)</th>
+                        <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Rate ({rateSymbol})</th>
                         <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Min Pax</th>
                         <th className="text-left text-xs font-medium text-gray-500 px-3 py-2">Max Pax</th>
                       </tr>

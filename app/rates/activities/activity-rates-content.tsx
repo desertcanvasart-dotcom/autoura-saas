@@ -12,6 +12,7 @@ import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import ActivityTiersEditor from '@/app/components/ActivityTiersEditor'
 import { parseTiers, type ActivityTier } from '@/lib/rates/activity-tiers'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 
 const ACTIVITY_CATEGORIES = [
@@ -139,6 +140,8 @@ export default function ActivityRatesContent() {
   const [editingRate, setEditingRate] = useState<ActivityRate | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   // Group-size bands (C3.3); used when pricing_type is 'tiered'.
   const [tiers, setTiers] = useState<ActivityTier[]>([])
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
@@ -1407,7 +1410,7 @@ export default function ActivityRatesContent() {
                       </span>
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">€</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{rateSymbol}</span>
                       <input
                         type="number"
                         name="base_rate_eur"

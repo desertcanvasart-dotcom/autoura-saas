@@ -10,6 +10,7 @@ import { Users, Plus, Search, Edit, Trash2, X, Check, Copy, Filter, Globe, MapPi
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 
 const LANGUAGES = [
@@ -90,6 +91,8 @@ export default function GuideRatesContent() {
   const [editingRate, setEditingRate] = useState<GuideRate | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -653,10 +656,10 @@ export default function GuideRatesContent() {
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-gray-400 font-bold">€</span>
+            <span className="text-gray-400 font-bold">{rateSymbol}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">€{avgRate}</p>
+          <p className="text-2xl font-bold text-gray-900">{rateSymbol}{avgRate}</p>
           <p className="text-xs text-gray-600">Avg. Daily Rate</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -1245,7 +1248,7 @@ export default function GuideRatesContent() {
                   <div>
                     <label htmlFor="base_rate_eur" className="block text-xs font-medium text-gray-600 mb-1">Rate (EUR) *</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">€</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{rateSymbol}</span>
                       <input
                         type="number"
                         id="base_rate_eur"

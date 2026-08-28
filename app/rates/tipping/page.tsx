@@ -9,6 +9,7 @@ import { DollarSign, Plus, Search, Edit, Trash2, X, Check, AlertCircle, CheckCir
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
 
 // ============================================
 // CONSTANTS
@@ -175,6 +176,8 @@ export default function TippingPage() {
   const [editingRate, setEditingRate] = useState<TippingRate | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
+  // Labels must name the currency the amounts are actually in (C3.4b).
+  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // Bulk selection state
@@ -737,7 +740,7 @@ export default function TippingPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Amount in EUR (€) *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Amount in EUR ({rateSymbol}) *</label>
                   <input 
                     type="number" 
                     name="rate_eur" 
