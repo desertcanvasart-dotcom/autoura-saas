@@ -1,179 +1,155 @@
+// ============================================
+// POST /api/itineraries/[id]/generate-commissions  (C2 rewrite)
+// ============================================
+// Thin shell over lib/commission-generation.ts — the direction-aware engine:
+// receivable = a share of the supplier's own price, payable = a share of OUR
+// PROFIT on the service, plus a second payable commission for a named seller
+// (sold_by_supplier_id). The previous math here computed everything off
+// `selling_price || cost` — the CLIENT price first, regardless of direction —
+// which over-claimed against every supplier by the size of our markup.
+//
+// Skips are reported per service with reasons: a correct run over unpriced
+// services yields zero rows, and that must be distinguishable from a broken
+// run.
+
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import type { TablesInsert } from '@/types/database.types'
+import {
+  buildCommissions,
+  summariseSkips,
+  type CommissionSourceService,
+  type CommissionSupplier,
+} from '@/lib/commission-generation'
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Require authentication
     const authResult = await requireAuth()
     if (authResult.error !== null) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
-      )
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
-
     const { supabase, tenant_id } = authResult
+    if (!supabase || !tenant_id) {
+      return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
+    }
     const { id: itineraryId } = await params
 
-    // Get itinerary details - RLS ensures tenant isolation.
-    // No FK links itineraries.client_id to clients, so a `client:clients(...)`
-    // embed is rejected by PostgREST — the row's own client_id is all we need.
     const { data: itinerary, error: itinError } = await supabase
       .from('itineraries')
       .select('*')
       .eq('id', itineraryId)
       .single()
-
     if (itinError || !itinerary) {
-      return NextResponse.json({ error: 'Itinerary not found' }, { status: 404 })
+      return NextResponse.json({ success: false, error: 'Itinerary not found' }, { status: 404 })
     }
 
-    // Get all services with suppliers for this itinerary
-    const { data: days, error: daysError } = await supabase
-      .from('itinerary_days')
-      .select('id')
-      .eq('itinerary_id', itineraryId)
-
-    if (daysError || !days) {
-      return NextResponse.json({ error: 'Failed to fetch itinerary days' }, { status: 500 })
-    }
-
-    const dayIds = days.map(d => d.id)
-
-    // `itinerary_day_services` does not exist — the table is `itinerary_services`,
-    // and it carries every column this route reads: day_id, supplier_id,
-    // commission_status, commission_rate, commission_percent, commission_amount.
-    // The wrong name made this route return 500 on every call, so commission
-    // generation has never worked. Likewise there is no FK from
-    // itinerary_services.supplier_id to suppliers, so a `supplier:suppliers(*)`
-    // embed is rejected by PostgREST — suppliers are fetched separately below.
+    // select('*') everywhere: sold_by_supplier_id (migration 303) must ride
+    // along when it exists without 500ing when it does not.
     const { data: services, error: servicesError } = await supabase
       .from('itinerary_services')
       .select('*')
-      .in('day_id', dayIds)
-      .not('supplier_id', 'is', null)
-
+      .eq('itinerary_id', itineraryId)
     if (servicesError) {
-      return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 })
+      return NextResponse.json({ success: false, error: 'Failed to fetch services' }, { status: 500 })
     }
 
-    // Filter services that haven't had commissions generated
-    const eligibleServices = (services || []).filter(
-      s => s.commission_status === 'pending' || !s.commission_status
-    )
-
-    if (eligibleServices.length === 0) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'No new commissions to generate',
-        generated: 0 
-      })
+    const rows = (services ?? []) as Array<Record<string, unknown>>
+    const withParty = rows.filter(s => s.supplier_id || s.sold_by_supplier_id)
+    if (withParty.length === 0) {
+      return NextResponse.json({ success: true, message: 'No services with a supplier', generated: 0, skipped: [] })
     }
 
-    const supplierIds = [...new Set(
-      eligibleServices
-        .map(s => s.supplier_id)
-        .filter((id): id is string => id !== null)
-    )]
-
+    // No FK from itinerary_services to suppliers — fetch the parties separately.
+    const partyIds = [
+      ...new Set(
+        withParty
+          .flatMap(s => [s.supplier_id, s.sold_by_supplier_id])
+          .filter((v): v is string => typeof v === 'string')
+      ),
+    ]
     const { data: suppliers, error: suppliersError } = await supabase
       .from('suppliers')
       .select('id, name, default_commission_rate, commission_type')
-      .in('id', supplierIds)
-
+      .in('id', partyIds)
     if (suppliersError) {
-      return NextResponse.json({ error: 'Failed to fetch suppliers' }, { status: 500 })
+      return NextResponse.json({ success: false, error: 'Failed to fetch suppliers' }, { status: 500 })
     }
+    const supplierById = new Map<string, CommissionSupplier>(
+      (suppliers ?? []).map(sup => [sup.id, sup as CommissionSupplier])
+    )
 
-    const supplierById = new Map((suppliers || []).map(sup => [sup.id, sup]))
+    const sources: CommissionSourceService[] = withParty.map(s => ({
+      id: s.id as string,
+      service_type: (s.service_type as string) ?? null,
+      service_name: (s.service_name as string) ?? null,
+      client_price: (s.client_price as number) ?? (s.selling_price as number) ?? null,
+      total_cost: (s.total_cost as number) ?? null,
+      supplier_id: (s.supplier_id as string) ?? null,
+      commission_rate: (s.commission_rate as number) ?? null,
+      commission_status: (s.commission_status as string) ?? null,
+      supplier: s.supplier_id ? supplierById.get(s.supplier_id as string) ?? null : null,
+      sold_by_supplier_id: (s.sold_by_supplier_id as string) ?? null,
+      seller: s.sold_by_supplier_id ? supplierById.get(s.sold_by_supplier_id as string) ?? null : null,
+    }))
 
-    // Map service types to commission categories
-    const typeToCategory: Record<string, string> = {
-      hotel: 'hotel',
-      transport: 'transport',
-      restaurant: 'restaurant',
-      cruise: 'cruise',
-      entrance: 'attraction',
-      activity: 'activity',
-      shopping: 'shopping',
-      other: 'other'
-    }
-
-    // Generate commission records
-    const commissionsToCreate = eligibleServices.flatMap((s): TablesInsert<'commissions'>[] => {
-      const supplier = s.supplier_id ? supplierById.get(s.supplier_id) : undefined
-      if (!supplier || !(s.commission_rate || supplier.default_commission_rate)) return []
-
-      const rate = s.commission_rate || supplier.default_commission_rate || 0
-      const baseAmount = Number(s.selling_price || s.cost || 0)
-      const commissionAmount = (baseAmount * rate) / 100
-
-      return [{
-        tenant_id,
-        itinerary_id: itineraryId,
-        supplier_id: s.supplier_id,
-        client_id: itinerary.client_id,
-        commission_type: supplier.commission_type || 'receivable',
-        category: (s.service_type && typeToCategory[s.service_type]) || 'other',
-        source_name: supplier.name,
-        description: `${s.description || s.service_type} - ${itinerary.itinerary_code}`,
-        base_amount: baseAmount,
-        commission_rate: rate,
-        commission_amount: commissionAmount,
-        currency: 'EUR',
-        status: 'pending',
-        transaction_date: itinerary.start_date || new Date().toISOString().split('T')[0],
-        notes: `Auto-generated from itinerary ${itinerary.itinerary_code}`
-      }]
+    const { pairs, skipped } = buildCommissions(sources, {
+      tenantId: tenant_id,
+      itineraryId,
+      itineraryCode: (itinerary.itinerary_code as string) || itineraryId.slice(0, 8),
+      clientId: itinerary.client_id,
+      startDate: itinerary.start_date,
+      currency: itinerary.currency,
     })
 
-    if (commissionsToCreate.length === 0) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'No services with commission rates found',
-        generated: 0 
+    if (pairs.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No commissions to generate',
+        generated: 0,
+        skipped,
+        skip_summary: summariseSkips(skipped),
       })
     }
 
-    // Insert commissions
-    const { data: createdCommissions, error: createError } = await supabase
+    // Insert. cost_amount is migration 303; on a database without it,
+    // PostgREST rejects the column by name — strip it and retry so deploy
+    // and migration can land in either order.
+    let toInsert = pairs.map(p => ({ ...p.commission })) as Array<Record<string, unknown>>
+    let { data: created, error: createError } = await supabase
       .from('commissions')
-      .insert(commissionsToCreate)
-      .select()
-
+      .insert(toInsert as never)
+      .select('id')
+    if (createError && /cost_amount/.test(createError.message)) {
+      toInsert = toInsert.map(row => Object.fromEntries(Object.entries(row).filter(([k]) => k !== 'cost_amount')))
+      ;({ data: created, error: createError } = await supabase
+        .from('commissions')
+        .insert(toInsert as never)
+        .select('id'))
+    }
     if (createError) {
       console.error('Error creating commissions:', createError)
-      return NextResponse.json({ error: 'Failed to create commissions' }, { status: 500 })
+      return NextResponse.json({ success: false, error: 'Failed to create commissions' }, { status: 500 })
     }
 
-    // Update services to mark commissions as generated
-    const serviceIds = eligibleServices
-      .filter(s => {
-        const supplier = s.supplier_id ? supplierById.get(s.supplier_id) : undefined
-        return supplier && (s.commission_rate || supplier.default_commission_rate)
-      })
-      .map(s => s.id)
-
-    if (serviceIds.length > 0) {
-      await supabase
-        .from('itinerary_services')
-        .update({ commission_status: 'generated' })
-        .in('id', serviceIds)
-    }
+    // Claim exactly the services that produced a row — BY ID from the pairs,
+    // never by re-running a filter that could drift from the engine's.
+    const claimedIds = [...new Set(pairs.map(p => p.serviceId))]
+    await supabase
+      .from('itinerary_services')
+      .update({ commission_status: 'generated' })
+      .in('id', claimedIds)
 
     return NextResponse.json({
       success: true,
-      message: `Generated ${createdCommissions?.length || 0} commission records`,
-      generated: createdCommissions?.length || 0,
-      commissions: createdCommissions
+      message: `Generated ${created?.length ?? pairs.length} commission record(s)`,
+      generated: created?.length ?? pairs.length,
+      skipped,
+      skip_summary: summariseSkips(skipped),
     })
-
   } catch (error) {
     console.error('Error generating commissions:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }

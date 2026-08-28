@@ -513,6 +513,12 @@ export default function SuppliersContent() {
       // Location
       { name: 'City', key: 'city', type: 'select', options: EGYPTIAN_CITIES },
       { name: 'Address', key: 'address', type: 'textarea' },
+      // Commissions (C2): the direction decides the engine's base —
+      // receivable = % of THEIR price, payable = % of OUR profit.
+      { name: 'Commission direction', key: 'commission_type', type: 'select', options: ['receivable', 'payable'],
+        description: 'Receivable = they owe us a share of their sale. Payable = we pay them a share of our profit.' },
+      { name: 'Commission rate (%)', key: 'default_commission_rate', type: 'number',
+        description: 'Used when a service has no rate of its own. 0 or blank = no commission.' },
       // Housekeeping
       { name: 'Status', key: 'status', type: 'select', options: ['active', 'inactive', 'pending'] },
       { name: 'Notes', key: 'notes', type: 'textarea' },
