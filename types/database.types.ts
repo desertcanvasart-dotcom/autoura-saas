@@ -1481,6 +1481,63 @@ export interface Database {
           },
         ]
       }
+      booking_change_requests: {
+        Row: {
+          id: string
+          tenant_id: string
+          booking_id: string
+          kind: string
+          requested_count: number
+          note: string | null
+          requested_via: string
+          status: string
+          created_at: string
+          resolved_at: string | null
+          resolved_by: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          booking_id: string
+          kind?: string
+          requested_count: number
+          note?: string | null
+          requested_via?: string
+          status?: string
+          created_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          booking_id?: string
+          kind?: string
+          requested_count?: number
+          note?: string | null
+          requested_via?: string
+          status?: string
+          created_at?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_change_requests_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_change_requests_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_passenger_documents: {
         Row: {
           id: string
