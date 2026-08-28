@@ -83,18 +83,49 @@ applies just the new files.
 
 ## Upgrading
 
+Read the release notes first: they list new environment variables and anything
+that needs a decision. Then, in order:
+
 ```bash
 git fetch --tags && git checkout <new release tag>
 npm ci
+DATABASE_URL=postgres://... node scripts/migrate.mjs --dry-run   # read this
 DATABASE_URL=postgres://... node scripts/migrate.mjs
 npm run build && restart
+npm run doctor                                                    # prove it
 ```
+
+The `--dry-run` step is not ceremony: it lists exactly which files are about to
+run, which is your last chance to notice you are further behind than you thought.
+The `doctor` step at the end is what tells you the upgrade actually took.
 
 Migration doctrine (enforced by the replay test in CI): files are
 **append-only** — a released migration's meaning never changes — and every
 new migration must apply cleanly to BOTH a fresh database and one at the
 previous release. Deploy order is free in either direction for exactly that
 reason.
+
+### When a migration fails
+
+**Do not restore a database snapshot.** The runner applies files one at a time
+and records each only after it succeeds, so a failure leaves the database at the
+last good migration and nothing half-applied. Restoring a snapshot would throw
+away every booking taken since it was made, to fix a problem that has already
+stopped by itself.
+
+What to do instead:
+
+1. Read the error. The runner stops on the first failure and prints the file and
+   the message.
+2. Fix the cause — usually a permission, an extension the project does not have,
+   or a Supabase-managed surface (`docs/SELF-HOSTING.md` lists the seven
+   migrations that touch those).
+3. Re-run `node scripts/migrate.mjs`. It resumes from the file that failed,
+   because that one was never recorded.
+
+If you cannot get past it, run `npm run doctor -- --bundle` and send the file —
+`support-bundle.json` names the pending migration, which is usually the whole
+diagnosis.
 
 ## Scheduled jobs
 
@@ -144,6 +175,23 @@ super-admin and fetch `/api/support-bundle`. The script sees one thing the
 endpoint cannot — which migrations are PENDING, because that needs the
 migration files and those are not in a built image.
 
+### A running install's own monitoring
+
+`GET /api/health` is public and answers one question: is the process up and can
+it reach the database. Point an uptime monitor at it.
+
+`GET /api/health/deep` answers the more useful question — is anything degraded —
+and is therefore gated. Two ways in, because a monitor cannot hold a session:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://your-app/api/health/deep
+```
+
+or a super-admin session in a browser. It returns 503 when a dependency is
+actually down, so a monitor pages; a scheduler that has stopped is REPORTED but
+does not page, because it is a real problem and it is not an outage, and a
+monitor that cries wolf gets muted.
+
 ### Sending it to support
 
 `support-bundle.json` is written for you to read before you send it. It
@@ -158,8 +206,25 @@ Hostnames can appear, deliberately: a failure like `ENOTFOUND db.internal` keeps
 the host, because which host failed is the useful half of the message.
 
 **Nothing is sent anywhere by the script or the endpoint.** They print and write
-a file; emailing it is your decision. Support never needs your service-role key
-or your database password — anyone asking for either by email is not us.
+a file; emailing it is your decision.
+
+### How support works
+
+In order, and it stops as soon as the problem is solved:
+
+1. **You send the bundle.** Most issues end here — the answer is usually a
+   missing environment variable or an unapplied migration, and the findings name
+   both along with the command that fixes them.
+2. **A screen share, with you driving.** No credentials change hands and you see
+   every command run. This covers almost everything the bundle does not.
+3. **Time-boxed access you grant and revoke** — a read-only database role or a
+   temporary server account, created for the session and removed at the end. If
+   your support agreement does not describe this, it should, before you need it.
+
+**Support never needs your service-role key or your database password.** That
+key bypasses row-level security entirely; once it is in a mailbox it is in that
+mailbox forever, and in every backup of it. Anyone asking for either by email is
+not us.
 
 ## Releases
 

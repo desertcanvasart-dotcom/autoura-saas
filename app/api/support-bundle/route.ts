@@ -18,19 +18,12 @@
 //     matters most. The script answers both.
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { requireSuperAdmin } from '@/lib/super-admin'
-import { buildBundle, bundleFindings, type SupportBundle } from '@/lib/support/bundle'
-import { latestJobRuns } from '@/lib/support/job-runs'
+import { buildBundle, bundleFindings } from '@/lib/support/bundle'
+import { collectState } from '@/lib/support/collect'
 import { version as appVersion } from '../../../package.json'
 
 export const dynamic = 'force-dynamic'
-
-/** Configured-but-unprobed is its own answer: a support check must not spend
- *  money or take seconds calling a vendor's API. */
-function integrationState(...keys: string[]): 'configured' | 'unconfigured' {
-  return keys.every(k => (process.env[k] ?? '').trim() !== '') ? 'configured' : 'unconfigured'
-}
 
 export async function GET() {
   const auth = await requireSuperAdmin()
@@ -38,67 +31,9 @@ export async function GET() {
     return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
 
-  const database: SupportBundle['database'] = {
-    reachable: false,
-    latencyMs: null,
-    migrationsApplied: null,
-    // Needs the migration FILES, which are not in the built image — see the
-    // header. Null means "not measured here", and bundleFindings skips it.
-    migrationsPending: null,
-  }
-
-  const counts: Record<string, number> = {}
-  let crons: SupportBundle['crons'] = []
-  const integrations: SupportBundle['integrations'] = {
-    supabase: 'unconfigured',
-    anthropic: integrationState('ANTHROPIC_API_KEY'),
-    stripe: integrationState('STRIPE_SECRET_KEY'),
-    resend: integrationState('RESEND_API_KEY'),
-    google: integrationState('GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'),
-    whatsapp:
-      integrationState('TWILIO_ACCOUNT_SID') === 'configured'
-        ? 'configured'
-        : integrationState('META_WHATSAPP_ACCESS_TOKEN'),
-  }
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (url && key) {
-    const admin = createClient(url, key, { auth: { persistSession: false } })
-    const started = Date.now()
-    try {
-      const { count, error } = await admin
-        .from('schema_migrations')
-        .select('name', { head: true, count: 'exact' })
-      database.latencyMs = Date.now() - started
-      if (error) {
-        database.error = error.message
-        integrations.supabase = 'failed'
-      } else {
-        database.reachable = true
-        database.migrationsApplied = count ?? null
-        integrations.supabase = 'ok'
-      }
-    } catch (err) {
-      database.latencyMs = Date.now() - started
-      database.error = err instanceof Error ? err.message : 'unreachable'
-      integrations.supabase = 'failed'
-    }
-
-    if (database.reachable) {
-      // COUNTS, NEVER ROWS. head:true returns no data at all, so there is
-      // nothing here to leak even by accident.
-      for (const table of ['tenants', 'itineraries', 'bookings', 'invoices', 'clients']) {
-        const { count: n, error } = await admin.from(table).select('id', { head: true, count: 'exact' })
-        if (!error && typeof n === 'number') counts[table] = n
-      }
-
-      // "Have the scheduled jobs ever run on this box?" — the question a
-      // self-hosted install cannot otherwise answer, since the scheduler is
-      // the customer's own.
-      crons = await latestJobRuns(admin)
-    }
-  }
+  // The same collector the deep health probe uses, so the two can never
+  // disagree about whether this install is well.
+  const state = await collectState()
 
   const bundle = buildBundle({
     generatedAt: new Date().toISOString(),
@@ -106,11 +41,11 @@ export async function GET() {
     sha: process.env.GIT_SHA || 'unknown',
     node: process.version,
     uptimeSeconds: Math.round(process.uptime()),
-    database,
+    database: state.database,
     env: process.env as Record<string, string | undefined>,
-    integrations,
-    crons,
-    counts,
+    integrations: state.integrations,
+    crons: state.crons,
+    counts: state.counts,
     // No error store exists yet. scripts/doctor.mjs --logs <file> scrubs a log
     // the customer points it at, which is where these come from until there is
     // somewhere to keep them.
