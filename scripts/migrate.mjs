@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ============================================
-// MIGRATION RUNNER — CLI (self-hosted deliverable, plan §5)
+// MIGRATION RUNNER — CLI
 // ============================================
 // Usage (DATABASE_URL = the Postgres connection string of your Supabase
 // project — Dashboard → Settings → Database → Connection string):

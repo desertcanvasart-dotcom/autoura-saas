@@ -4,9 +4,9 @@ import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 
 // ============================================
-// FROM-SCRATCH MIGRATION REPLAY (self-hosted doctrine, plan §5)
+// FROM-SCRATCH MIGRATION REPLAY
 // ============================================
-// A self-hosted install is built by replaying supabase/migrations/*.sql in
+// A fresh database is built by replaying supabase/migrations/*.sql in
 // order against a fresh database (scripts/migrate.mjs). This test IS that
 // install, run in-process against real Postgres (PGlite) with the Supabase
 // environment stubbed. Every migration must apply cleanly from scratch —
@@ -68,7 +68,7 @@ describe('migration replay from scratch', () => {
 
     expect(
       unexpected,
-      `Migrations that fail a from-scratch replay (a fresh self-hosted install would break here):\n` +
+      `Migrations that fail a from-scratch replay (building a fresh database would break here):\n` +
         unexpected.map(u => `  ${u.file}: ${u.message}`).join('\n')
     ).toEqual([])
 

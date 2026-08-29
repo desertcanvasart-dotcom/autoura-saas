@@ -18,6 +18,12 @@ themselves there, then port here as designs. This file is self-contained.
   No SaaS infrastructure (billing/tenancy) gets built in travel-ops-pro.
 - **Operator's answers to the open questions (2026-08-27):**
   1. Self-hosted licensing = **support contract** → build NO entitlement/license-key code.
+     > **Clarified 2026-08-29:** this answer is about *how licensing works*, not about
+     > *which repo customers install*. It was read here as "autoura-saas is the
+     > self-hosted product" — **that reading was wrong.** autoura-saas is the hosted
+     > multi-tenant SaaS; the product customers install on their own servers is
+     > **travel-ops-pro**. The support-contract model still holds, and applies there.
+     > See `travel-ops-pro/docs/plans/self-hosting.md`.
   2. Global destination catalog = **self-serve** (tenants add countries/cities themselves).
   3. Sibling is **live on Railway with 6 tenants created, ALL EMPTY** → pre-launch
      data-wise; schema restructuring is safe; keep the 6 tenant rows.
@@ -207,6 +213,15 @@ single-price-per-vehicle; bulk export `select('*')` + header mapping
 (deploy-order safety — check whether its bulk export names columns).
 
 ## 7. Self-hosted deliverables (support-contract model — no entitlement code)
+
+> **Correction, 2026-08-29.** This section was built (PR #239) on the mistaken
+> reading of §1 corrected above. Customers do not install `autoura-saas`, so
+> there is no self-hosted deliverable *here*. What was built is still worth
+> having and is staying — the migration runner, the tracker and the from-scratch
+> replay are correct for any deployment including our own, and the replay found
+> six real defects in historical migrations. The *install path* and *releases*
+> items belong to `travel-ops-pro` (T1–T5 of its `docs/plans/self-hosting.md`),
+> and `scripts/migrate.mjs` + `migrate-core.mjs` here are the port source.
 
 - **Migration runner**: a script applying `supabase/migrations/*.sql` in order against
   a fresh Postgres and recording into `schema_migrations` — the hand-in-SQL-editor

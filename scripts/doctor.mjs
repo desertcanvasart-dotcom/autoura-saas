@@ -2,7 +2,8 @@
 // ============================================
 // doctor — what is wrong with this install
 // ============================================
-// S1 of docs/plans/self-hosted-support.md. The half of the support bundle that
+// S1 of docs/plans/self-hosted-support.md (read its correction header). The
+// half of the support bundle that
 // works when the app does NOT, which is exactly when it matters: it talks to
 // Postgres directly and reads the migration files off disk, so it needs neither
 // a running server nor anything we host.
@@ -15,9 +16,9 @@
 // Reads DATABASE_URL and the Supabase variables from the environment or
 // .env.local.
 //
-// IT SENDS NOTHING ANYWHERE. It prints, and optionally writes a file the
-// customer reads and then chooses to email. A support tool that phoned home
-// would undermine exactly what the self-hosted tier is sold on.
+// IT SENDS NOTHING ANYWHERE. It prints, and optionally writes a file whoever
+// runs it reads first and then chooses to send. A diagnostic tool that phoned
+// home on its own would be a surprise, and surprises here are security bugs.
 
 import fs from 'fs'
 import path from 'path'
@@ -95,9 +96,9 @@ if (env.DATABASE_URL) {
     database.migrationsApplied = applied.length
     if (files.length) database.migrationsPending = computePending(files, applied)
 
-    // Have the scheduled jobs ever run here? On a self-hosted install the
-    // scheduler is the customer's, so the jobs' own record is the only
-    // evidence — see supabase/migrations/307_job_runs.sql.
+    // Have the scheduled jobs ever run here? The scheduler is external, so the
+    // jobs' own record is the only evidence — see
+    // supabase/migrations/307_job_runs.sql.
     try {
       const { rows } = await client.query(
         `SELECT DISTINCT ON (job_name) job_name, started_at, outcome

@@ -101,8 +101,8 @@ export async function collectState(env: NodeJS.ProcessEnv = process.env): Promis
     if (!error && typeof count === 'number') counts[table] = count
   }
 
-  // "Have the scheduled jobs ever run on this box?" — the question a
-  // self-hosted install cannot otherwise answer, since the scheduler is theirs.
+  // "Have the scheduled jobs ever run on this box?" — unanswerable any other
+  // way, because the scheduler lives outside the app.
   crons = await latestJobRuns(admin)
 
   return { database, integrations, counts, crons }

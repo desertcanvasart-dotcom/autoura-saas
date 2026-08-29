@@ -1,13 +1,13 @@
 -- ============================================
 -- job_runs — proof that a scheduled job actually ran
 -- ============================================
--- S3 of docs/plans/self-hosted-support.md.
+-- S3 of docs/plans/self-hosted-support.md (read its correction header).
 --
 -- Nothing in this product recorded that a cron ever ran. docs/CRON-JOBS.md
--- describes three jobs configured in the RAILWAY DASHBOARD — which a
--- self-hosted customer does not have. On their server the jobs are whatever
--- their own scheduler does, and there was no way to tell from inside the app
--- whether exchange rates had refreshed since the day of install.
+-- describes three jobs configured in the RAILWAY DASHBOARD, but the dashboard
+-- is not the app: whatever the external scheduler does or fails to do, there
+-- was no way to tell from inside the app whether exchange rates had refreshed
+-- since the day of install.
 --
 -- That matters beyond tidiness: without refresh-exchange-rates, every historical
 -- conversion in the P&L silently falls back to today's rate. The report does not
