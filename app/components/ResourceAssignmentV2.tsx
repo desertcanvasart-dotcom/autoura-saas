@@ -115,7 +115,7 @@ const RESOURCE_TYPES = [
     label: 'Vehicles', 
     icon: Truck, 
     color: 'green',
-    apiEndpoint: '/api/vehicles',
+    apiEndpoint: '/api/resources/vehicles',
     nameField: 'name',
     phoneField: 'default_driver_phone',
     displayField: (r: any) => `${r.name || r.vehicle_type || 'Vehicle'} - ${r.city || 'N/A'} (${r.passenger_capacity || '?'} pax)`,

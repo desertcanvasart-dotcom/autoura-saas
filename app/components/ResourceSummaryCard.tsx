@@ -63,7 +63,7 @@ export default function ResourceSummaryCard({
 
       // Fetch vehicle details
       if (vehicleId) {
-        const vehicleResponse = await fetch(`/api/vehicles/${vehicleId}`)
+        const vehicleResponse = await fetch(`/api/resources/vehicles/${vehicleId}`)
         const vehicleData = await vehicleResponse.json()
         if (vehicleData.success) {
           setVehicle(vehicleData.data)

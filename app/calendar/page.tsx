@@ -176,7 +176,7 @@ export default function CalendarPage() {
         fetch('/api/itineraries'),
         fetch('/api/itinerary-resources'),
         fetch('/api/guides?is_active=true'),
-        fetch('/api/vehicles?is_active=true'),
+        fetch('/api/resources/vehicles?is_active=true'),
       ])
 
       const [bookingsData, resourcesData, guidesData, vehiclesData] = await Promise.all([
