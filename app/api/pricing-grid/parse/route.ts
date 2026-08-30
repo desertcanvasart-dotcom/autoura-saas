@@ -450,8 +450,9 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
     // components empty; this GUARANTEES it. A model that adds a hotel to a
     // tours-only trip anyway gets it removed here, deterministically, before
     // anything is priced or saved.
-    const clearSlot = (day: any, slotId: string) => {
-      const slot = day.slots.find((sl: any) => sl.slotId === slotId)
+    type ScrubbableSlot = { slotId: string; selectedItems?: unknown[]; customAmount?: number }
+    const clearSlot = (day: { slots: ScrubbableSlot[] }, slotId: string) => {
+      const slot = day.slots.find(sl => sl.slotId === slotId)
       if (!slot) return
       slot.selectedItems = []
       slot.customAmount = 0
