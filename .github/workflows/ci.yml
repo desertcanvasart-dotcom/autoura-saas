@@ -44,6 +44,14 @@ jobs:
     env:
       # Tests/tsc don't use Puppeteer's bundled browser — skip the slow download.
       PUPPETEER_SKIP_DOWNLOAD: 'true'
+      # Credentials for the writing E2E journey. Declared at job level on
+      # purpose: `secrets` is NOT an available context in a step-level `if`,
+      # but `env` is — so the presence check below has to read these, not the
+      # secrets directly. Absent secrets expand to '', and the journey steps
+      # skip. See docs/E2E.md.
+      E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+      E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+      E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -98,6 +106,25 @@ jobs:
         # refusal. Authenticated journeys need a dedicated throwaway project;
         # see docs/E2E.md.
         run: npm run test:e2e
+
+      - name: Seed the E2E fixture tenant
+        # Skipped until the throwaway project's secrets exist (docs/E2E.md).
+        # The script refuses to seed a project that holds non-fixture tenants,
+        # and marks the tenant settings.e2e_fixture — which the journey spec
+        # then requires. Without that marker the spec will not write anywhere.
+        id: e2e_tenant
+        if: env.E2E_SUPABASE_URL != ''
+        run: echo "tenant_id=$(node scripts/seed-e2e-tenant.mjs)" >> "$GITHUB_OUTPUT"
+
+      - name: E2E portal journey (writes — fixture tenant only)
+        # The customer-facing surfaces proven end to end: confirmation gate,
+        # traveller details, per-traveller private links, document upload into
+        # the private bucket, change requests, and the share-page chat landing
+        # in a staff conversation. Skips itself when the secrets are absent.
+        if: env.E2E_SUPABASE_URL != ''
+        env:
+          E2E_TENANT_ID: ${{ steps.e2e_tenant.outputs.tenant_id }}
+        run: npx playwright test e2e/portal-journey.spec.ts
 
       - name: Bundle budget
         # Gzipped client-JS ceilings (scripts/check-bundle-budget.mjs) —
