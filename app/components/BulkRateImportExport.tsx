@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { todayLocal } from '@/lib/today'
 import { Download, Upload, FileText, AlertCircle, CheckCircle, X, Loader2 } from 'lucide-react'
 
 import { showToast } from '@/app/contexts/ToastContext'
@@ -58,7 +59,7 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${tableName}_export_${new Date().toISOString().split('T')[0]}.csv`
+      a.download = `${tableName}_export_${todayLocal()}.csv`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

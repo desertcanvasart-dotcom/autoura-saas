@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef } from 'react'
+import { todayLocal } from '@/lib/today'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -182,7 +183,7 @@ export default function RestaurantsContent() {
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [toasts, setToasts] = useState<Toast[]>([])
   
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayLocal()
   const nextYear = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
   
   const [formData, setFormData] = useState({
@@ -460,7 +461,7 @@ export default function RestaurantsContent() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `restaurants_export_${new Date().toISOString().split('T')[0]}.csv`
+    link.download = `restaurants_export_${todayLocal()}.csv`
     link.click()
     
     showToast('success', `Exported ${filteredRestaurants.length} restaurants to CSV`)

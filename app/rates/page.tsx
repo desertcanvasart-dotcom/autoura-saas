@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { todayLocal } from '@/lib/today'
+import { RATES_TAB_ORDER, firstTabWithData, type RatesTab } from '@/lib/rates/first-tab-with-data'
 import Link from 'next/link'
 import { useCurrency } from '@/hooks/useCurrency'
 
@@ -285,6 +287,18 @@ export default function RatesPage() {
         }
 
         setRates(combinedData)
+
+        // Open on a tab that HAS something — the hub always opened on
+        // Transportation, so an account whose only rates lived elsewhere
+        // saw "No rates found" under counters that said otherwise (ported
+        // from travel-ops-pro, AUT-M01).
+        const firstWithData = firstTabWithData(
+          Object.fromEntries(
+            RATES_TAB_ORDER.map(tab => [tab, (combinedData as unknown as Record<string, unknown[]>)[tab]?.length ?? 0])
+          ) as Record<RatesTab, number>
+        )
+        if (firstWithData) setActiveTab(firstWithData)
+
         setLoading(false)
       } catch (err) {
         console.error('Error loading rates:', err)
@@ -461,7 +475,7 @@ export default function RatesPage() {
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
     link.setAttribute('href', url)
-    link.setAttribute('download', `autoura_${activeTab}_rates_${new Date().toISOString().split('T')[0]}.csv`)
+    link.setAttribute('download', `autoura_${activeTab}_rates_${todayLocal()}.csv`)
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -1526,7 +1540,7 @@ export default function RatesPage() {
 
         {/* Footer */}
         <div className="mt-6 text-center text-xs text-gray-500 print:hidden">
-          <p>© 2024 Autoura Operations System</p>
+          <p>© {new Date().getFullYear()} Autoura Operations System</p>
         </div>
       </main>
     </div>

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { Clock, Eye, Send, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -82,6 +83,11 @@ export default function StatusManager({
   const dialog = useConfirmDialog()
   const [isChanging, setIsChanging] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  // No backdrop: the old fixed-inset-0 layer closed the popover by EATING
+  // the click — the first press on a button elsewhere did nothing but close
+  // it. See lib/use-dismiss-on-outside.ts (ported from travel-ops-pro, AUT-W02).
+  useDismissOnOutside(showDropdown, dropdownRef, () => setShowDropdown(false))
   const [error, setError] = useState<string | null>(null)
 
   const availableStatuses = quoteType === 'b2c' ? B2C_STATUSES : B2B_STATUSES
@@ -142,7 +148,7 @@ export default function StatusManager({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       {/* Current Status Badge */}
       <button
         onClick={() => setShowDropdown(!showDropdown)}
@@ -173,11 +179,6 @@ export default function StatusManager({
       {/* Dropdown Menu */}
       {showDropdown && (
         <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setShowDropdown(false)}
-          />
 
           {/* Dropdown */}
           <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-20 overflow-hidden">

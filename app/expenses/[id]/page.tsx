@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
+import { todayLocal } from '@/lib/today'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -158,7 +159,7 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
     try {
       const updateData: any = { status: newStatus }
       if (newStatus === 'paid' && !expense.payment_date) {
-        updateData.payment_date = new Date().toISOString().split('T')[0]
+        updateData.payment_date = todayLocal()
       }
 
       const response = await fetch(`/api/expenses/${expense.id}`, {

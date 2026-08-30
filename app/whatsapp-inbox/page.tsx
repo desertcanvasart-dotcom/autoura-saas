@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -146,9 +147,13 @@ function AgentSelector({
   isLoading: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // No backdrop: the old fixed-inset-0 layer swallowed the press that closed
+  // it — see lib/use-dismiss-on-outside.ts (ported, AUT-W02).
+  useDismissOnOutside(isOpen, rootRef, () => setIsOpen(false))
 
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={isLoading}
@@ -172,7 +177,6 @@ function AgentSelector({
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
             {/* Claim Button */}
             <button

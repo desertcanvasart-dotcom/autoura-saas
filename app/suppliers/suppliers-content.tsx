@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { todayLocal } from '@/lib/today'
+import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { 
   Search, Plus, MoreHorizontal, Building2, Car, Compass, Ship, Ticket, Utensils, 
@@ -113,9 +115,14 @@ function MultiSelect({ options, value, onChange, placeholder }: {
   options: string[]; value: string[]; onChange: (v: string[]) => void; placeholder: string 
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const dismissRootRef = useRef<HTMLDivElement>(null)
+  // No backdrop: the old fixed-inset-0 layer closed the popover by EATING
+  // the click — the first press on a button elsewhere did nothing but close
+  // it. See lib/use-dismiss-on-outside.ts (ported from travel-ops-pro, AUT-W02).
+  useDismissOnOutside(isOpen, dismissRootRef, () => setIsOpen(false))
   
   return (
-    <div className="relative">
+    <div className="relative" ref={dismissRootRef}>
       <div
         role="button"
         tabIndex={0}
@@ -147,7 +154,6 @@ function MultiSelect({ options, value, onChange, placeholder }: {
       </div>
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
             {options.map(option => (
               <div
@@ -211,6 +217,9 @@ export default function SuppliersContent() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const rowMenuRef = useRef<HTMLDivElement>(null)
+  // Same swallowed-click backdrop, one level up (AUT-W02).
+  useDismissOnOutside(openMenuId !== null, rowMenuRef, () => setOpenMenuId(null))
   
   // View modal tabs
   const [viewTab, setViewTab] = useState<'details' | 'rates' | 'properties' | 'documents'>('details')
@@ -485,7 +494,7 @@ export default function SuppliersContent() {
     const blob = new Blob([csv], { type: 'text/csv' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `suppliers-${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `suppliers-${todayLocal()}.csv`
     a.click()
   }
 
@@ -987,7 +996,6 @@ export default function SuppliersContent() {
         )}
       </div>
 
-      {openMenuId && <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />}
 
       {/* Add/Edit Modal */}
       {(showAddModal || showEditModal) && (

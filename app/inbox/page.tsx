@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useAuth } from '@/app/contexts/AuthContext'
 import Link from 'next/link'
 import RichTextEditor from '@/components/email/RichTextEditor'
@@ -192,6 +193,9 @@ export default function InboxPage() {
   const [customLabels, setCustomLabels] = useState<GmailLabel[]>([])
   const [showLabelModal, setShowLabelModal] = useState(false)
   const [showMoveMenu, setShowMoveMenu] = useState<string | null>(null)
+  const moveMenuRef = useRef<HTMLDivElement>(null)
+  // No backdrop — see lib/use-dismiss-on-outside.ts (ported, AUT-W02).
+  useDismissOnOutside(showMoveMenu !== null, moveMenuRef, () => setShowMoveMenu(null))
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set())
   const [actionLoading, setActionLoading] = useState(false)
 
@@ -1033,7 +1037,7 @@ ${bodyText}`
                       <MailOpen className="w-4 h-4 text-gray-500" />
                     </button>
 
-                    <div className="relative">
+                    <div className="relative" ref={showMoveMenu === 'bulk' ? moveMenuRef : undefined}>
                       <button
                         onClick={() => setShowMoveMenu(showMoveMenu ? null : 'bulk')}
                         disabled={actionLoading || customLabels.length === 0}
@@ -1249,7 +1253,7 @@ ${bodyText}`
                   </button>
 
                   {customLabels.length > 0 && (
-                    <div className="relative">
+                    <div className="relative" ref={showMoveMenu === 'detail' ? moveMenuRef : undefined}>
                       <button 
                         onClick={() => setShowMoveMenu(showMoveMenu === 'detail' ? null : 'detail')}
                         disabled={actionLoading}
@@ -1561,13 +1565,6 @@ ${bodyText}`
         />
       )}
 
-      {/* Click outside to close move menu */}
-      {showMoveMenu && (
-        <div 
-          className="fixed inset-0 z-10" 
-          onClick={() => setShowMoveMenu(null)}
-        />
-      )}
     </div>
   )
 }
@@ -1621,6 +1618,12 @@ function ComposeModal({
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [showSignatureDropdown, setShowSignatureDropdown] = useState(false)
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false)
+  const signatureDropdownRef = useRef<HTMLDivElement>(null)
+  const templateDropdownRef = useRef<HTMLDivElement>(null)
+  // The old layer was z-0 — UNDER most of the modal — so it half-worked at
+  // best. See lib/use-dismiss-on-outside.ts (ported, AUT-W02).
+  useDismissOnOutside(showSignatureDropdown, signatureDropdownRef, () => setShowSignatureDropdown(false))
+  useDismissOnOutside(showTemplateDropdown, templateDropdownRef, () => setShowTemplateDropdown(false))
 
   // State for template placeholder modal
   const [showPlaceholderModal, setShowPlaceholderModal] = useState(false)
@@ -1980,7 +1983,7 @@ function ComposeModal({
                {/* Templates & Signatures */}
 <div className="flex items-center justify-end gap-1 px-4 py-2 border-b border-gray-100 bg-gray-50/50">
 {templates.length > 0 && (
-  <div className="relative">
+  <div className="relative" ref={templateDropdownRef}>
     <button 
       onClick={() => setShowTemplateDropdown(!showTemplateDropdown)} 
       className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
@@ -2041,7 +2044,7 @@ function ComposeModal({
 )}
 
         {signatures.length > 0 && (
-              <div className="relative">
+              <div className="relative" ref={signatureDropdownRef}>
                 <button 
                   onClick={() => setShowSignatureDropdown(!showSignatureDropdown)} 
                   className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
@@ -2180,17 +2183,6 @@ function ComposeModal({
           </div>
         </div>
       </div>
-
-      {/* Click outside to close dropdowns */}
-      {(showSignatureDropdown || showTemplateDropdown) && (
-        <div 
-          className="fixed inset-0 z-0" 
-          onClick={() => { 
-            setShowSignatureDropdown(false)
-            setShowTemplateDropdown(false) 
-          }} 
-        />
-      )}
 
       {/* Placeholder Modal with CLIENT + PARTNER tabs */}
       {showPlaceholderModal && selectedTemplate && (

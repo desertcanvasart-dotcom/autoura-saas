@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { todayLocal } from '@/lib/today'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { GridConfig, GridDay, AllRates, SlotValue, GridTotals } from './types'
 import { SLOT_DEFINITIONS } from './types'
@@ -52,7 +53,7 @@ const DEFAULT_CONFIG: GridConfig = {
   currency: 'EUR',
   marginPercent: 25,
   exchangeRate: null,
-  startDate: new Date().toISOString().split('T')[0],
+  startDate: todayLocal(),
   clientName: '',
   clientEmail: '',
   clientPhone: '',

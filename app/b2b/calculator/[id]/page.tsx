@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { todayLocal } from '@/lib/today'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText, XCircle } from 'lucide-react'
@@ -86,7 +87,7 @@ export default function TourPriceCalculator() {
 
   // Form state
   const [numPax, setNumPax] = useState(2)
-  const [travelDate, setTravelDate] = useState(new Date().toISOString().split('T')[0])
+  const [travelDate, setTravelDate] = useState(todayLocal())
   const [isEurPassport, setIsEurPassport] = useState(true)
   const [marginPercent, setMarginPercent] = useState(25)
   const [includeOptionals, setIncludeOptionals] = useState(false)

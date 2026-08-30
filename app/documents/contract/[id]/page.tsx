@@ -1,6 +1,7 @@
 'use client'
 
 import { identityFromTenant } from '@/lib/company-identity'
+import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
@@ -63,7 +64,7 @@ export default function ContractPage() {
 
   const [contractData, setContractData] = useState<ContractData>({
     contractNumber: '',
-    contractDate: new Date().toISOString().split('T')[0],
+    contractDate: todayLocal(),
     serviceProvider: tenant?.company_name || '',
     providerWebsite: 'https://travel2egypt.org/',
     providerLocation: 'Cairo, Egypt',

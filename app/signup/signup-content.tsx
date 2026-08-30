@@ -180,7 +180,7 @@ export default function SignupContent() {
         </div>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          © 2026 Autoura by Online Era. All rights reserved.
+          © {new Date().getFullYear()} Autoura by Online Era. All rights reserved.
         </p>
       </div>
     </div>

@@ -91,11 +91,15 @@ export default function NewClientPage() {
         .single()
 
       if (insertError) throw insertError
+            // Keep the button in its saving state THROUGH the navigation:
+      // router.push() does not await the destination, so a finally{} here
+      // re-enabled the submit button while this page was still on screen —
+      // a dead window with a live button, inviting the double submit
+      // (ported from travel-ops-pro, AUT-W05). The page unmounts on success.
       router.push(`/clients/${data.id}`)
     } catch (err: any) {
       console.error('Error creating client:', err)
       setError(err.message || 'Failed to create client')
-    } finally {
       setLoading(false)
     }
   }

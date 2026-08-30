@@ -1,9 +1,10 @@
 'use client'
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Ship, Plus, Search, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Crown, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
@@ -189,6 +190,11 @@ function DurationMultiSelect({
   onChange: (v: number[]) => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const dismissRootRef = useRef<HTMLDivElement>(null)
+  // No backdrop: the old fixed-inset-0 layer closed the popover by EATING
+  // the click — the first press on a button elsewhere did nothing but close
+  // it. See lib/use-dismiss-on-outside.ts (ported from travel-ops-pro, AUT-W02).
+  useDismissOnOutside(isOpen, dismissRootRef, () => setIsOpen(false))
 
   const toggleDuration = (nights: number) => {
     if (value.includes(nights)) {
@@ -199,7 +205,7 @@ function DurationMultiSelect({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dismissRootRef}>
       <div
         role="button"
         tabIndex={0}
@@ -233,7 +239,6 @@ function DurationMultiSelect({
       </div>
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
             {DURATION_OPTIONS.map(nights => (
               <div
