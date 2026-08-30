@@ -27,13 +27,17 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Find invitation by token
-    const { data: invitation, error } = await (getSupabase() as any)
+    // Find invitation by token.
+    //
+    // The inviter is fetched separately rather than embedded. The embed
+    // `inviter:user_profiles!invited_by` requires a foreign key that does not
+    // exist, so PostgREST answered PGRST200 and this route treated the failure
+    // as `error` — telling every invited person their valid link was an
+    // "Invalid invitation token". Nobody could accept an invitation.
+    const db = getSupabase() as any
+    const { data: invitation, error } = await db
       .from('tenant_invitations')
-      .select(`
-        *,
-        inviter:user_profiles!invited_by(full_name, email)
-      `)
+      .select('*')
       .eq('invitation_token', token)
       .single()
 
@@ -60,12 +64,22 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    let inviter: { full_name?: string; email?: string } | null = null
+    if (invitation.invited_by) {
+      const { data: profile } = await db
+        .from('user_profiles')
+        .select('full_name, email')
+        .eq('id', invitation.invited_by)
+        .maybeSingle()
+      inviter = profile ?? null
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         email: invitation.email,
         role: invitation.role,
-        inviter: invitation.inviter,
+        inviter,
         expires_at: invitation.expires_at
       }
     })
