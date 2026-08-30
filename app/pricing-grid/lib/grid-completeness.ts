@@ -22,6 +22,7 @@
 // SelectedItem shape. See docs/PRICING-CONSOLIDATION-PLAN.md (Phase B) and the
 // migration 20260627_itinerary_days_day_type_components.sql.
 
+import { PACKAGE_TYPE_CONFIGS, type PackageType } from '@/lib/package-types'
 import type {
   GridDay,
   GridConfig,
@@ -76,8 +77,45 @@ const SEG_LABEL: Record<string, string> = {
 }
 
 /** Explicit day flags override the day-type preset defaults. */
-export function resolveComponents(day: GridDay): DayComponents {
-  const base = DAY_TYPE_DEFAULTS[day.dayType ?? DEFAULT_DAY_TYPE]
+/**
+ * What the PACKAGE removes from a day's default requirements.
+ *
+ * The presets in DAY_TYPE_DEFAULTS describe a FULL PACKAGE day ('arrival'
+ * means airport pickup + hotel check-in), and until this mask existed the
+ * gate enforced them for every product: a tours-only trip — no hotels, no
+ * airport transfers sold — was BLOCKED for having no accommodation priced
+ * on days the customer sleeps in a hotel we did not sell them. The mask
+ * turns a package's includes (lib/package-types.ts) into "this component is
+ * not part of the product, so its preset default is off".
+ *
+ * PRECEDENCE: preset default → package mask → the operator's explicit
+ * per-day flag. The override wins over the mask on purpose: "this
+ * tours-only trip does include one airport pickup, we agreed it specially"
+ * is a real sale, and the operator saying so beats the product definition.
+ */
+function packageMask(packageType: PackageType | undefined): Partial<DayComponents> {
+  const cfg = PACKAGE_TYPE_CONFIGS.find(p => p.slug === (packageType ?? 'full-package'))
+  if (!cfg) return {}
+  const mask: Partial<DayComponents> = {}
+  if (!cfg.includes.accommodation) {
+    mask.overnight = false
+    // No accommodation sold → no hotel check-in/out services to price either.
+    mask.hotelCheckIn = false
+    mask.hotelCheckOut = false
+  }
+  if (!cfg.includes.airportTransfers) {
+    mask.airportArrival = false
+    mask.airportDeparture = false
+  }
+  if (!cfg.includes.internalTransfers) {
+    mask.intercity = 'none'
+  }
+  return mask
+}
+
+/** Preset defaults, masked by the package, overridden by explicit day flags. */
+export function resolveComponents(day: GridDay, packageType?: PackageType): DayComponents {
+  const base = { ...DAY_TYPE_DEFAULTS[day.dayType ?? DEFAULT_DAY_TYPE], ...packageMask(packageType) }
   return {
     overnight: day.overnight ?? base.overnight,
     hasSightseeing: day.hasSightseeing ?? base.hasSightseeing,
@@ -122,7 +160,7 @@ export function gridCompleteness(
   }
 
   for (const day of dayList) {
-    const c = resolveComponents(day)
+    const c = resolveComponents(day, config?.packageType)
     const dn = day.dayNumber
 
     // --- Sleep (every overnight day) ---

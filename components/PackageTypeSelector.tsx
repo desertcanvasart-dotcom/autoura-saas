@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { PACKAGE_TYPE_CONFIGS, type PackageType, type PackageTypeConfig } from '@/lib/package-types'
 import { 
   Sun, 
   Map, 
@@ -17,129 +18,30 @@ import {
   X
 } from 'lucide-react'
 
-export type PackageType = 
-  | 'day-trips'
-  | 'tours-only'
-  | 'land-package'
-  | 'full-package'
-  | 'cruise-land'
-  | 'shore-excursions'
 
-interface PackageTypeOption {
-  slug: PackageType
-  name: string
-  description: string
+interface PackageTypeOption extends PackageTypeConfig {
   icon: React.ElementType
   color: string
   bgColor: string
   borderColor: string
-  includes: {
-    accommodation: boolean
-    airportTransfers: boolean
-    internalTransfers: boolean
-    tours: boolean
-    meals: 'none' | 'optional' | 'per-hotel'
-  }
 }
 
-const PACKAGE_TYPES: PackageTypeOption[] = [
-  {
-    slug: 'day-trips',
-    name: 'Day Trips',
-    description: 'Single or multiple day excursions from a base location',
-    icon: Sun,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50',
-    borderColor: 'border-amber-200',
-    includes: {
-      accommodation: false,
-      airportTransfers: false,
-      internalTransfers: true,
-      tours: true,
-      meals: 'optional'
-    }
-  },
-  {
-    slug: 'tours-only',
-    name: 'Tours Only',
-    description: 'Guided tours and activities. Client arranges own hotels.',
-    icon: Map,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
-    borderColor: 'border-blue-200',
-    includes: {
-      accommodation: false,
-      airportTransfers: false,
-      internalTransfers: true,
-      tours: true,
-      meals: 'optional'
-    }
-  },
-  {
-    slug: 'land-package',
-    name: 'Land Package',
-    description: 'Hotels, tours, and internal transfers. No airport pickup.',
-    icon: Building2,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
-    borderColor: 'border-emerald-200',
-    includes: {
-      accommodation: true,
-      airportTransfers: false,
-      internalTransfers: true,
-      tours: true,
-      meals: 'per-hotel'
-    }
-  },
-  {
-    slug: 'full-package',
-    name: 'Full Package',
-    description: 'Everything included: hotels, all transfers, tours.',
-    icon: Package,
-    color: 'text-primary-600',
-    bgColor: 'bg-primary-50',
-    borderColor: 'border-primary-200',
-    includes: {
-      accommodation: true,
-      airportTransfers: true,
-      internalTransfers: true,
-      tours: true,
-      meals: 'per-hotel'
-    }
-  },
-  {
-    slug: 'cruise-land',
-    name: 'Cruise + Land',
-    description: 'Nile cruise combined with hotels and land tours.',
-    icon: Ship,
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-50',
-    borderColor: 'border-indigo-200',
-    includes: {
-      accommodation: true,
-      airportTransfers: true,
-      internalTransfers: true,
-      tours: true,
-      meals: 'per-hotel'
-    }
-  },
-  {
-    slug: 'shore-excursions',
-    name: 'Shore Excursions',
-    description: 'Port-based day tours for cruise ship passengers.',
-    icon: Anchor,
-    color: 'text-cyan-600',
-    bgColor: 'bg-cyan-50',
-    borderColor: 'border-cyan-200',
-    includes: {
-      accommodation: false,
-      airportTransfers: false,
-      internalTransfers: true,
-      tours: true,
-      meals: 'optional'
-    }
-  }
-]
+/** Presentation only — the DATA (slug/name/description/includes) comes from
+ *  lib/package-types.ts so server code can read the same vocabulary. */
+const PACKAGE_TYPE_UI: Record<PackageType, { icon: React.ElementType; color: string; bgColor: string; borderColor: string }> = {
+
+  'day-trips': { icon: Sun, color: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
+  'tours-only': { icon: Map, color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
+  'land-package': { icon: Building2, color: 'text-emerald-600', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200' },
+  'full-package': { icon: Package, color: 'text-primary-600', bgColor: 'bg-primary-50', borderColor: 'border-primary-200' },
+  'cruise-land': { icon: Ship, color: 'text-indigo-600', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200' },
+  'shore-excursions': { icon: Anchor, color: 'text-cyan-600', bgColor: 'bg-cyan-50', borderColor: 'border-cyan-200' },
+}
+
+const PACKAGE_TYPES: PackageTypeOption[] = PACKAGE_TYPE_CONFIGS.map(cfg => ({
+  ...cfg,
+  ...PACKAGE_TYPE_UI[cfg.slug],
+}))
 
 interface InclusionBadgeProps {
   included: boolean
@@ -254,4 +156,5 @@ export default function PackageTypeSelector({
 
 // Export the package types for use elsewhere
 export { PACKAGE_TYPES }
+export type { PackageType }
 export type { PackageTypeOption }

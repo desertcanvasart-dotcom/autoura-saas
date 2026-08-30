@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { PACKAGE_TYPE_CONFIGS, type PackageType } from '@/lib/package-types'
 import { Plus, FileText, Upload, Loader2, Trash2, X, File, Image, FileSpreadsheet } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -54,9 +55,15 @@ interface InputPanelProps {
   onClearAll?: () => void
   isParsing: boolean
   hasDays?: boolean
+  /** What the customer is buying. Lives HERE, above Paste/Upload/Load, so it
+   *  is chosen before any text reaches the AI — the parser is told what the
+   *  package excludes, the completeness gate stops demanding components the
+   *  product does not sell, and the value is saved onto the itinerary. */
+  packageType: PackageType
+  onPackageTypeChange: (p: PackageType) => void
 }
 
-export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onClearAll, isParsing, hasDays }: InputPanelProps) {
+export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onClearAll, isParsing, hasDays, packageType, onPackageTypeChange }: InputPanelProps) {
   const [text, setText] = useState('')
   const [showPaste, setShowPaste] = useState(false)
   const [itineraryId, setItineraryId] = useState('')
@@ -174,6 +181,33 @@ export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onC
           </button>
         </div>
       )}
+
+      {/* Package Type — pick the product BEFORE pasting anything. The parse
+          prompt, the scrub and the completeness gate all read it; Full
+          Package is the grid's historical behaviour. */}
+      <div className="px-4 pt-3 pb-2.5 border-b border-gray-100">
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Package Type</div>
+          <div className="text-[11px] text-gray-400">— decides what each day must include</div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {PACKAGE_TYPE_CONFIGS.map(pkg => (
+            <button
+              key={pkg.slug}
+              type="button"
+              onClick={() => onPackageTypeChange(pkg.slug)}
+              title={pkg.description}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                packageType === pkg.slug
+                  ? 'bg-[#647C47] border-[#4a5c35] text-white shadow-sm'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {pkg.name}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Action Bar — three modes */}
       <div className="flex items-stretch divide-x divide-gray-200">
