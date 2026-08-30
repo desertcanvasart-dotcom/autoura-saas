@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { todayLocal } from '@/lib/today'
 import { CurrencyTotals, formatTotals, currencySymbol as ctSymbol } from '@/lib/currency-totals'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -184,7 +185,7 @@ export default function AccountsPayablePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           status: 'paid', 
-          payment_date: new Date().toISOString().split('T')[0]
+          payment_date: todayLocal()
         })
       })
       if (response.ok) {
@@ -951,7 +952,7 @@ export default function AccountsPayablePage() {
 
       {/* Footer */}
       <div className="text-center pt-4">
-        <p className="text-xs text-gray-400">© 2024 Autoura Operations System</p>
+        <p className="text-xs text-gray-400">© {new Date().getFullYear()} Autoura Operations System</p>
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { todayLocal } from '@/lib/today'
 import Link from 'next/link'
 import { 
   Search,
@@ -438,7 +439,7 @@ export default function TasksPage() {
 
   const isDueToday = (task: Task) => {
     if (!task.due_date) return false
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayLocal()
     return task.due_date === today
   }
 
@@ -1646,7 +1647,7 @@ export default function TasksPage() {
 
       {/* Footer */}
       <div className="text-center pt-4">
-        <p className="text-xs text-gray-400">© 2024 Autoura Operations System</p>
+        <p className="text-xs text-gray-400">© {new Date().getFullYear()} Autoura Operations System</p>
       </div>
     </div>
   )

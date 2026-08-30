@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { todayLocal } from '@/lib/today'
 import { sumByCurrency, formatTotals, currencySymbol } from '@/lib/currency-totals'
 import { 
   Search, 
@@ -111,7 +112,7 @@ const initialFormData: FormData = {
   discount_amount: 0,
   total_amount: 0,
   currency: 'EUR',
-  issue_date: new Date().toISOString().split('T')[0],
+  issue_date: todayLocal(),
   due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
   notes: '',
   payment_terms: 'Payment due within 14 days',

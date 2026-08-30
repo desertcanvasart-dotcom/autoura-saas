@@ -6,6 +6,7 @@
 // ============================================
 
 import { useEffect, useState } from 'react'
+import { todayLocal } from '@/lib/today'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -541,7 +542,7 @@ export default function TourDetailPage() {
                 type="date"
                 value={travelDate}
                 onChange={(e) => setTravelDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={todayLocal()}
                 className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none"
               />
             </div>

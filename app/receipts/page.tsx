@@ -264,6 +264,15 @@ export default function ReceiptsPage() {
 
   // Stats
   const totalReceipts = filteredPayments.length
+  // This month, measured — this tile was a hardcoded "100% Completed
+  // Payments", a perfect score over zero records on an empty account. A
+  // receipt IS a completed payment, so the ratio says nothing by
+  // definition (ported from travel-ops-pro, AUT-L06).
+  const nowD = new Date()
+  const receiptsThisMonth = filteredPayments.filter(p => {
+    const d = new Date(p.payment_date || p.created_at)
+    return d.getFullYear() === nowD.getFullYear() && d.getMonth() === nowD.getMonth()
+  }).length
   const totalAmount = filteredPayments.reduce((sum, p) => sum + p.amount, 0)
   const mainCurrency = filteredPayments[0]?.currency || 'EUR'
 
@@ -324,8 +333,8 @@ export default function ReceiptsPage() {
                 <Check className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">100%</p>
-                <p className="text-xs text-gray-500">Completed Payments</p>
+                <p className="text-2xl font-bold text-gray-900">{receiptsThisMonth}</p>
+                <p className="text-xs text-gray-500">Received This Month</p>
               </div>
             </div>
           </div>

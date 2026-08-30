@@ -172,7 +172,7 @@ export default function B2CQuoteEmail({
               📧 hello@getautoura.net | 📱 +20 10 8091 6066
             </Text>
             <Text style={footerTextSmall}>
-              © 2026 Autoura by Online Era. All rights reserved.
+              © {new Date().getFullYear()} Autoura by Online Era. All rights reserved.
             </Text>
           </Section>
         </Container>

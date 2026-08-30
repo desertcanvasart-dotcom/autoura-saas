@@ -1,6 +1,7 @@
 'use client'
 
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
+import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
@@ -155,7 +156,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     amount: 0,
     currency: 'EUR',
     payment_method: 'bank_transfer',
-    payment_date: new Date().toISOString().split('T')[0],
+    payment_date: todayLocal(),
     transaction_reference: '',
     notes: ''
   })
@@ -249,7 +250,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           amount: 0,
           currency: invoice?.currency || 'EUR',
           payment_method: 'bank_transfer',
-          payment_date: new Date().toISOString().split('T')[0],
+          payment_date: todayLocal(),
           transaction_reference: '',
           notes: ''
         })
@@ -389,7 +390,7 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           subtotal: balanceAmount,
           total_amount: balanceAmount,
           currency: invoice.currency,
-          issue_date: new Date().toISOString().split('T')[0],
+          issue_date: todayLocal(),
           due_date: null,
           payment_terms: 'Balance payable in cash upon arrival or before first day of service.',
           notes: `Related Deposit Invoice: ${invoice.invoice_number}`

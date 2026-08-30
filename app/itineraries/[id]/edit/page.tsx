@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { todayLocal } from '@/lib/today'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/app/supabase'
@@ -781,11 +782,15 @@ export default function ItineraryEditorPage() {
         return
       }
 
+            // Keep the button in its saving state THROUGH the navigation:
+      // router.push() does not await the destination, so a finally{} here
+      // re-enabled the submit button while this page was still on screen —
+      // a dead window with a live button, inviting the double submit
+      // (ported from travel-ops-pro, AUT-W05). The page unmounts on success.
       router.push(`/pricing-grid?itinerary=${itineraryId}`)
     } catch (error: any) {
       console.error('❌ Error opening pricing grid:', error)
       showToast('error', `Failed to open pricing grid: ${error.message || 'Unknown error'}`)
-    } finally {
       setCalculating(false)
     }
   }
@@ -932,7 +937,7 @@ export default function ItineraryEditorPage() {
                       subtotal: itinerary.total_cost,
                       total_amount: itinerary.total_cost,
                       currency: itinerary.currency || 'EUR',
-                      issue_date: new Date().toISOString().split('T')[0],
+                      issue_date: todayLocal(),
                       due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
                     })
                   })

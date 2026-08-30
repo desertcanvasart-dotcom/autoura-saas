@@ -174,24 +174,33 @@ export default function ToursBrowsePage() {
             {tours.filter(t => t.uses_day_builder || t.pricing_mode === 'auto').length}
           </p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">🏷️</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+        {/* Optional-metadata tiles appear once the data exists — headline
+            "Categories 0" / "Starting From —" above a populated list reads
+            as a broken page (ported from travel-ops-pro, AUT-L03). Also
+            fixes the || 9999 fallback: a list with no starting_from used to
+            show 9,999 as its cheapest trip. */}
+        {uniqueCategories.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">🏷️</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+            </div>
+            <p className="text-xs text-gray-500 mb-1">Categories</p>
+            <p className="text-2xl font-semibold text-gray-900">{uniqueCategories.length}</p>
           </div>
-          <p className="text-xs text-gray-500 mb-1">Categories</p>
-          <p className="text-2xl font-semibold text-gray-900">{uniqueCategories.length}</p>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-lg">💶</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+        )}
+        {tours.some(t => t.starting_from) && (
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">💶</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            </div>
+            <p className="text-xs text-gray-500 mb-1">Starting From</p>
+            <p className="text-2xl font-semibold text-gray-900">
+              €{Math.min(...tours.filter(t => t.starting_from).map(t => t.starting_from as number)).toLocaleString()}
+            </p>
           </div>
-          <p className="text-xs text-gray-500 mb-1">Starting From</p>
-          <p className="text-2xl font-semibold text-gray-900">
-            €{tours.length > 0 ? Math.min(...tours.map(t => t.starting_from || 9999)).toLocaleString() : '—'}
-          </p>
-        </div>
+        )}
       </div>
 
       {/* Search & Filters */}
@@ -364,7 +373,7 @@ export default function ToursBrowsePage() {
 
       {/* Footer */}
       <div className="mt-8 text-center">
-        <p className="text-xs text-gray-400">© 2026 Autoura Operations System</p>
+        <p className="text-xs text-gray-400">© {new Date().getFullYear()} Autoura Operations System</p>
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { todayLocal } from '@/lib/today'
 import { CurrencyTotals, sumByCurrency, formatTotals } from '@/lib/currency-totals'
 import { 
   Search, 
@@ -84,7 +85,7 @@ const initialFormData: FormData = {
   description: '',
   amount: 0,
   currency: 'EUR',
-  expense_date: new Date().toISOString().split('T')[0],
+  expense_date: todayLocal(),
   supplier_name: '',
   supplier_type: '',
   receipt_url: '',
@@ -292,7 +293,7 @@ export default function ExpensesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           status: 'paid', 
-          payment_date: new Date().toISOString().split('T')[0]
+          payment_date: todayLocal()
         })
       })
       if (response.ok) {
@@ -344,7 +345,7 @@ export default function ExpensesPage() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `expenses_${new Date().toISOString().split('T')[0]}.csv`
+    link.download = `expenses_${todayLocal()}.csv`
     link.click()
   }
 
@@ -1176,7 +1177,7 @@ export default function ExpensesPage() {
 
       {/* Footer */}
       <div className="text-center pt-4">
-        <p className="text-xs text-gray-400">© 2024 Autoura Operations System</p>
+        <p className="text-xs text-gray-400">© {new Date().getFullYear()} Autoura Operations System</p>
       </div>
     </div>
   )

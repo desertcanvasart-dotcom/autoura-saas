@@ -1,6 +1,7 @@
 'use client'
 
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
+import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -415,7 +416,7 @@ export default function ViewItineraryPage() {
           discount_amount: 0,
           total_amount: effectiveTotalCost,
           currency: itinerary.currency || 'EUR',
-          issue_date: new Date().toISOString().split('T')[0],
+          issue_date: todayLocal(),
           due_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           payment_terms: 'Payment due within 14 days',
           notes: `Trip dates: ${new Date(itinerary.start_date).toLocaleDateString()} - ${new Date(itinerary.end_date).toLocaleDateString()}`

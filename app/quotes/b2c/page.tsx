@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { todayLocal } from '@/lib/today'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import {
@@ -368,7 +369,7 @@ export default function B2CQuotesPage() {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `b2c-quotes-${new Date().toISOString().split('T')[0]}.csv`
+    a.download = `b2c-quotes-${todayLocal()}.csv`
     a.click()
     window.URL.revokeObjectURL(url)
   }

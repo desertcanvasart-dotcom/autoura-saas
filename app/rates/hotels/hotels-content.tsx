@@ -1,6 +1,7 @@
 'use client'
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState, useRef } from 'react'
@@ -363,7 +364,7 @@ export default function HotelsContent() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayLocal()
   const nextYear = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
 
   // Which currency this rate's amounts are entered in ('' = EUR default)

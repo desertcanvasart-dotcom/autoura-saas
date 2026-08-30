@@ -193,11 +193,15 @@ export default function EditClientPage() {
 
       if (updateError) throw updateError
 
+            // Keep the button in its saving state THROUGH the navigation:
+      // router.push() does not await the destination, so a finally{} here
+      // re-enabled the submit button while this page was still on screen —
+      // a dead window with a live button, inviting the double submit
+      // (ported from travel-ops-pro, AUT-W05). The page unmounts on success.
       router.push(`/clients/${clientId}`)
     } catch (err) {
       console.error('Error updating client:', err)
       setError('Failed to update client. Please try again.')
-    } finally {
       setSaving(false)
     }
   }

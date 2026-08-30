@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { todayLocal } from '@/lib/today'
 import { 
   Plus, 
   Search, 
@@ -141,7 +142,7 @@ const initialFormData: FormData = {
   commission_amount: 0,
   currency: 'EUR',
   status: 'pending',
-  transaction_date: new Date().toISOString().split('T')[0],
+  transaction_date: todayLocal(),
   due_date: '',
   notes: ''
 }

@@ -1,6 +1,7 @@
 'use client'
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
+import { todayLocal } from '@/lib/today'
 
 import { useState, useEffect, useCallback } from 'react'
 import { Search, Plus, Edit2, Trash2, X, Plane, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Clock, Luggage, ArrowRight, Copy } from 'lucide-react'
@@ -90,7 +91,7 @@ const initialFormData: FormData = {
   duration_minutes: 0,
   frequency: 'daily',
   season: '',
-  rate_valid_from: new Date().toISOString().split('T')[0],
+  rate_valid_from: todayLocal(),
   rate_valid_to: '2099-12-31',
   supplier_id: '',
   supplier_name: '',

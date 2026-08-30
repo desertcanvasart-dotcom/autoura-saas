@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { todayLocal } from '@/lib/today'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, FileText, MapPin, DollarSign } from 'lucide-react'
@@ -51,7 +52,7 @@ export default function RecordPaymentPage() {
     payment_method: 'bank_transfer',
     payment_status: 'completed',
     transaction_reference: '',
-    payment_date: new Date().toISOString().split('T')[0],
+    payment_date: todayLocal(),
     due_date: '',
     notes: ''
   })

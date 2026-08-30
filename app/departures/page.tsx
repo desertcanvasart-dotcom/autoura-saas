@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { todayLocal } from '@/lib/today'
 import Link from 'next/link'
 import {
   Calendar,
@@ -561,7 +562,7 @@ export default function DeparturesPage() {
                   type="date"
                   value={newDeparture.start_date}
                   onChange={(e) => setNewDeparture(prev => ({ ...prev, start_date: e.target.value }))}
-                  min={new Date().toISOString().split('T')[0]}
+                  min={todayLocal()}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]"
                 />
               </div>
