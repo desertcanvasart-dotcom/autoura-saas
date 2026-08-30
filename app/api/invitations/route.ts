@@ -36,12 +36,24 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') // pending, accepted, expired, all
 
-    let query = (createAdminClient() as any)
+    // No PostgREST embed here on purpose. `inviter:user_profiles!invited_by`
+    // needs a FOREIGN KEY between tenant_invitations.invited_by and
+    // user_profiles.id for PostgREST to resolve the relationship, and that
+    // constraint was never created: the request came back
+    //   PGRST200 — "Could not find a relationship … using the hint
+    //   'invited_by'"
+    // so this route 500'd on EVERY call, in every tenant, since it was
+    // written. The page swallowed the failure and rendered "No pending
+    // invitations", which is how an invitation could be invisible in the list
+    // and still block a re-invite as a duplicate.
+    //
+    // Migration 308 adds the constraint, but the join is fetched separately
+    // regardless: a list of invitations must not stop working because of a
+    // missing foreign key.
+    const admin = createAdminClient() as any
+    let query = admin
       .from('tenant_invitations')
-      .select(`
-        *,
-        inviter:user_profiles!invited_by(id, full_name, email)
-      `)
+      .select('*')
       .eq('tenant_id', authResult.tenant_id)
       .order('created_at', { ascending: false })
 
@@ -57,9 +69,25 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
+    const invitations = (data ?? []) as Array<Record<string, unknown>>
+    const inviterIds = [...new Set(invitations.map((i) => i.invited_by).filter(Boolean))]
+    let inviters: Record<string, unknown> = {}
+    if (inviterIds.length > 0) {
+      const { data: profiles } = await admin
+        .from('user_profiles')
+        .select('id, full_name, email')
+        .in('id', inviterIds)
+      inviters = Object.fromEntries(
+        ((profiles ?? []) as Array<{ id: string }>).map((p) => [p.id, p])
+      )
+    }
+
     return NextResponse.json({
       success: true,
-      data
+      data: invitations.map((i) => ({
+        ...i,
+        inviter: i.invited_by ? inviters[i.invited_by as string] ?? null : null,
+      })),
     })
   } catch (error) {
     console.error('Error fetching invitations:', error)

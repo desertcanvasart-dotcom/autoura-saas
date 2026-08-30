@@ -81,6 +81,7 @@ export default function UserManagementPage() {
   const [activeTab, setActiveTab] = useState<'users' | 'invitations'>('users')
   const [members, setMembers] = useState<TeamMember[]>([])
   const [invitations, setInvitations] = useState<Invitation[]>([])
+  const [invitationsError, setInvitationsError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -114,12 +115,20 @@ export default function UserManagementPage() {
   const fetchInvitations = async () => {
     try {
       const response = await fetch('/api/invitations')
-      if (response.ok) {
-        const data = await response.json()
+      const data = await response.json().catch(() => ({}))
+      if (response.ok && data.success) {
         setInvitations(data.data || [])
+        setInvitationsError(null)
+        return
       }
+      // A failed load must not read as "there are none". This route 500'd on
+      // every call for a long time (a PostgREST embed with no foreign key
+      // behind it) and the empty state hid it completely: the list showed no
+      // invitations while a re-invite was refused as a duplicate.
+      setInvitationsError(data.error || 'Could not load invitations. Please refresh.')
     } catch (error) {
       console.error('Error fetching invitations:', error)
+      setInvitationsError('Could not load invitations. Please refresh.')
     }
   }
 
@@ -497,6 +506,16 @@ export default function UserManagementPage() {
         {/* Invitations Tab */}
         {activeTab === 'invitations' && (
           <div className="space-y-6">
+            {/* A load failure is shown, never rendered as an empty list --
+                "No pending invitations" alongside a duplicate-invite refusal
+                is the exact contradiction this page used to produce. */}
+            {invitationsError && (
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                <p className="text-sm text-red-700">{invitationsError}</p>
+              </div>
+            )}
+
             {/* Pending Invitations */}
             <div>
               <h3 className="text-sm font-medium text-gray-700 mb-3">Pending ({pendingInvitations.length})</h3>

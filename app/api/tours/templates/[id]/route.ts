@@ -55,12 +55,37 @@ export async function GET(
           transportation:transportation_rates(id, vehicle_type, city)
         ),
         accommodation:hotel_contacts(id, name, city),
-        lunch_meal:restaurant_contacts!lunch_meal_id(id, name, city),
-        dinner_meal:restaurant_contacts!dinner_meal_id(id, name, city),
         guide:guides(id, name, languages)
       `)
       .eq('tour_id', id)
       .order('day_number', { ascending: true })
+
+    // Meals are resolved with a second read rather than a PostgREST embed.
+    // `lunch_meal:restaurant_contacts!lunch_meal_id` is a COLUMN-name hint,
+    // which PostgREST can only resolve through a foreign key -- and there is
+    // none between tour_days and restaurant_contacts, so the whole day query
+    // failed with PGRST200 and this route returned a tour with NO DAYS. The
+    // result was never error-checked, so it degraded silently.
+    const mealIds = [
+      ...new Set(
+        (days ?? [])
+          .flatMap((d: Record<string, unknown>) => [d.lunch_meal_id, d.dinner_meal_id])
+          .filter((v): v is string => typeof v === 'string')
+      ),
+    ]
+    let restaurants: Record<string, unknown> = {}
+    if (mealIds.length > 0) {
+      const { data: rows } = await supabase
+        .from('restaurant_contacts')
+        .select('id, name, city')
+        .in('id', mealIds)
+      restaurants = Object.fromEntries(((rows ?? []) as Array<{ id: string }>).map((r) => [r.id, r]))
+    }
+    const daysWithMeals = (days ?? []).map((d: Record<string, unknown>) => ({
+      ...d,
+      lunch_meal: d.lunch_meal_id ? restaurants[d.lunch_meal_id as string] ?? null : null,
+      dinner_meal: d.dinner_meal_id ? restaurants[d.dinner_meal_id as string] ?? null : null,
+    }))
 
     // Get pricing (RLS filters to tenant's pricing only)
     const { data: pricing } = await supabase
@@ -74,7 +99,7 @@ export async function GET(
       data: {
         ...template,
         variations: variations || [],
-        days: days || [],
+        days: daysWithMeals,
         pricing: pricing || []
       }
     })
