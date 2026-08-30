@@ -161,12 +161,15 @@ export default function ResourcesPage() {
         airportStaffRes,
         hotelStaffRes
       ] = await Promise.all([
-        fetch('/api/resources?type=guides'),
-        fetch('/api/resources?type=vehicles'),
-        fetch('/api/resources?type=hotels'),
-        fetch('/api/resources?type=restaurants'),
-        fetch('/api/resources?type=airport_staff'),
-        fetch('/api/resources?type=hotel_staff')
+        // These are the real routes. /api/resources?type=... was never one:
+        // there is no app/api/resources/route.ts, so all six 404'd and the
+        // .json() below threw, leaving this page permanently empty.
+        fetch('/api/guides'),
+        fetch('/api/resources/vehicles'),
+        fetch('/api/resources/hotels'),
+        fetch('/api/resources/restaurants'),
+        fetch('/api/resources/airport-staff'),
+        fetch('/api/resources/hotel-staff')
       ])
 
       const [
@@ -745,7 +748,7 @@ export default function ResourcesPage() {
                           <button
                             onClick={async () => {
                               if (await dialog.confirm({ message: `Delete ${guide.name}?`, variant: 'danger', confirmText: 'Delete' })) {
-                                fetch(`/api/resources/guides/${guide.id}`, { method: 'DELETE' })
+                                fetch(`/api/guides/${guide.id}`, { method: 'DELETE' })
                                   .then(res => res.json())
                                   .then(data => {
                                     if (data.success) {
@@ -839,7 +842,7 @@ export default function ResourcesPage() {
                           <button
                             onClick={async () => {
                               if (await dialog.confirm({ message: `Delete ${vehicle.name}?`, variant: 'danger', confirmText: 'Delete' })) {
-                                fetch(`/api/resources/vehicles/${vehicle.id}`, { method: 'DELETE' })
+                                fetch(`/api/suppliers/${vehicle.id}`, { method: 'DELETE' })
                                   .then(res => res.json())
                                   .then(data => {
                                     if (data.success) {

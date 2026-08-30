@@ -53,7 +53,9 @@ import {
   Tags,
   Grid3x3,
   Sparkles,
-  PenLine
+  PenLine,
+  CalendarRange,
+  Globe,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -183,6 +185,10 @@ const navigation: NavSection[] = [
       { label: 'Hotel Services', href: '/rates/hotel-services', icon: ConciergeBell },
       { label: 'Tipping', href: '/rates/tipping', icon: DollarSign },
       { label: 'Fixed Costs', href: '/rates/fixed-costs', icon: DollarSign },
+      // Built long before it was linked: the season-uplift engine
+      // (lib/pricing/season-uplift.ts) was already wired into auto-pricing,
+      // but the editor was reachable only from the Settings page.
+      { label: 'Seasonal Premiums', href: '/settings/seasons', icon: CalendarRange },
     ]
   },
   {
@@ -243,6 +249,7 @@ const navigation: NavSection[] = [
       { label: 'Organization', href: '/settings/tenant', icon: Building },
       // 'Team Management' (/settings/team) consolidated into User Management
       // (/users) below; the old route redirects there.
+      { label: 'Destinations', href: '/settings/destinations', icon: Globe },
       { label: 'Departments', href: '/settings/departments', icon: Building },
       { label: 'WhatsApp', href: '/settings/whatsapp', icon: MessageSquare },
       { label: 'Capacity', href: '/settings/capacity', icon: Calendar },

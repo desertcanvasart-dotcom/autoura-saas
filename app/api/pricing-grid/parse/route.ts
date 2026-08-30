@@ -9,6 +9,8 @@ import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { packageRules } from '@/lib/ai/package-prompt-rules'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
+import { normalizeRateRows } from '@/lib/rates/rate-currency'
+import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
 // Lazy-initialized clients
@@ -55,33 +57,50 @@ async function fetchAllRates(tenantId: string, tier: string) {
     activityRes, accommodationRes, entranceRes, flightRes, mealRes,
     cruiseRes, sleepingTrainRes,
   ] = await Promise.all([
-    admin.from('transportation_rates').select('id, service_type, vehicle_type, origin_city, destination_city, city, base_rate_eur, capacity_min, capacity_max').eq('tenant_id', tenantId).eq('is_active', true),
-    admin.from('guide_rates').select('id, guide_type, guide_language, city, full_day_rate, half_day_rate, base_rate_eur').eq('tenant_id', tenantId),
-    admin.from('airport_staff_rates').select('id, service_type, airport_code, direction, rate_eur').eq('tenant_id', tenantId).eq('is_active', true),
-    admin.from('hotel_staff_rates').select('id, service_type, hotel_category, rate_eur').eq('tenant_id', tenantId).eq('is_active', true),
-    admin.from('tipping_rates').select('id, role_type, context, rate_unit, rate_eur').eq('tenant_id', tenantId).eq('is_active', true),
-    admin.from('activity_rates').select('id, activity_name, activity_category, city, base_rate_eur, base_rate_non_eur').eq('tenant_id', tenantId),
-    admin.from('accommodation_rates').select('id, hotel_name, city, room_type, tier, rate_low_season_dbl, rate_high_season_dbl, rate_low_season_sgl, rate_high_season_sgl').eq('tenant_id', tenantId).eq('tier', tier),
-    admin.from('entrance_fees').select('id, attraction_name, city, eur_rate, non_eur_rate, category').eq('tenant_id', tenantId),
-    admin.from('flight_rates').select('id, route_from, route_to, route_name, airline, base_rate_eur, base_rate_non_eur').eq('tenant_id', tenantId).eq('is_active', true),
-    admin.from('meal_rates').select('id, restaurant_name, meal_type, city, base_rate_eur, base_rate_non_eur').eq('tenant_id', tenantId),
-    admin.from('nile_cruises').select('id, ship_name, cabin_type, tier, route_name, embark_city, disembark_city, ppd_eur, ppd_non_eur, single_supplement_eur, duration_nights, meals_included, sightseeing_included').eq('tenant_id', tenantId).eq('is_active', true).eq('tier', tier),
-    admin.from('sleeping_train_rates').select('id, origin_city, destination_city, cabin_type, rate_oneway_eur, operator_name').eq('tenant_id', tenantId).eq('is_active', true),
+    admin.from('transportation_rates').select('id, service_type, vehicle_type, origin_city, destination_city, city, base_rate_eur, capacity_min, capacity_max, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
+    admin.from('guide_rates').select('id, guide_type, guide_language, city, full_day_rate, half_day_rate, base_rate_eur, rate_currency').eq('tenant_id', tenantId),
+    admin.from('airport_staff_rates').select('id, service_type, airport_code, direction, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
+    admin.from('hotel_staff_rates').select('id, service_type, hotel_category, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
+    admin.from('tipping_rates').select('id, role_type, context, rate_unit, rate_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
+    admin.from('activity_rates').select('id, activity_name, activity_category, city, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId),
+    admin.from('accommodation_rates').select('id, hotel_name, city, room_type, tier, rate_low_season_dbl, rate_high_season_dbl, rate_low_season_sgl, rate_high_season_sgl, rate_currency').eq('tenant_id', tenantId).eq('tier', tier),
+    admin.from('entrance_fees').select('id, attraction_name, city, eur_rate, non_eur_rate, category, rate_currency').eq('tenant_id', tenantId),
+    admin.from('flight_rates').select('id, route_from, route_to, route_name, airline, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
+    admin.from('meal_rates').select('id, restaurant_name, meal_type, city, base_rate_eur, base_rate_non_eur, rate_currency').eq('tenant_id', tenantId),
+    admin.from('nile_cruises').select('id, ship_name, cabin_type, tier, route_name, embark_city, disembark_city, ppd_eur, ppd_non_eur, single_supplement_eur, duration_nights, meals_included, sightseeing_included, rate_currency').eq('tenant_id', tenantId).eq('is_active', true).eq('tier', tier),
+    admin.from('sleeping_train_rates').select('id, origin_city, destination_city, cabin_type, rate_oneway_eur, operator_name, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
+  ])
+
+  // Per-rate currency: a row priced in a contract currency (EGP, USD, JPY)
+  // is converted into the tenant's run currency on a copy at this fetch
+  // boundary -- the same treatment /api/pricing-grid/rates gives the
+  // dropdown rows. Without it an AI-prefilled slot would carry the raw
+  // number, and "600" in EGP would price as 600 in the run currency.
+  const runCurrency = await getTenantRunCurrency(admin, tenantId)
+  const norm = (table: string, rows: unknown) =>
+    normalizeRateRows(admin, table, (rows || []) as Record<string, unknown>[], runCurrency)
+
+  const [
+    transportation, guides, airport_staff, hotel_staff, tipping, activities,
+    accommodation, entrance_fees, flights, meals, cruises, sleeping_trains,
+  ] = await Promise.all([
+    norm('transportation_rates', transportRes.data),
+    norm('guide_rates', guideRes.data),
+    norm('airport_staff_rates', airportRes.data),
+    norm('hotel_staff_rates', hotelStaffRes.data),
+    norm('tipping_rates', tippingRes.data),
+    norm('activity_rates', activityRes.data),
+    norm('accommodation_rates', accommodationRes.data),
+    norm('entrance_fees', entranceRes.data),
+    norm('flight_rates', flightRes.data),
+    norm('meal_rates', mealRes.data),
+    norm('nile_cruises', cruiseRes.data),
+    norm('sleeping_train_rates', sleepingTrainRes.data),
   ])
 
   return {
-    transportation: transportRes.data || [],
-    guides: guideRes.data || [],
-    airport_staff: airportRes.data || [],
-    hotel_staff: hotelStaffRes.data || [],
-    tipping: tippingRes.data || [],
-    activities: activityRes.data || [],
-    accommodation: accommodationRes.data || [],
-    entrance_fees: entranceRes.data || [],
-    flights: flightRes.data || [],
-    meals: mealRes.data || [],
-    cruises: cruiseRes.data || [],
-    sleeping_trains: sleepingTrainRes.data || [],
+    transportation, guides, airport_staff, hotel_staff, tipping, activities,
+    accommodation, entrance_fees, flights, meals, cruises, sleeping_trains,
   }
 }
 

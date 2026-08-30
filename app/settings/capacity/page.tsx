@@ -201,7 +201,7 @@ export default function CapacityPage() {
 
   const loadTourTemplates = async () => {
     try {
-      const response = await fetch('/api/tour-templates')
+      const response = await fetch('/api/tours/templates')
       if (response.ok) {
         const result = await response.json()
         if (result.success) {
