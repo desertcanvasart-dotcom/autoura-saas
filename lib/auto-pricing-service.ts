@@ -26,6 +26,7 @@
 // ============================================
 
 import { createClient } from '@supabase/supabase-js'
+import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/season-uplift'
@@ -131,6 +132,10 @@ export interface ItineraryDay {
 // Pricing parameters
 export interface DayPricingParams {
   templateId: string
+  /** What the customer is buying (lib/package-types.ts). Templates carry no
+   *  package column yet, so callers usually omit this — full-package, the
+   *  historical assumption. */
+  packageType?: string
   /** Whose rates to price from. Scopes every rate lookup to this tenant's
    * rows (merged with the global catalog when the tenant's
    * use_global_catalog flag is on — see lib/catalog-scope.ts). */
@@ -463,7 +468,15 @@ export function determineTransportNeeds(
 /**
  * Parse itinerary JSONB - handles both old and new formats
  */
-export function parseItinerary(itineraryData: any): ItineraryDay[] {
+export function parseItinerary(itineraryData: any, opts?: {
+  /** What the customer is buying. Gates the DEFAULT service flags below the
+   *  same way the grid's completeness mask does (lib/package-types.ts): a
+   *  product with no airport transfers must not default them onto days, and
+   *  a product with no accommodation has no hotel check-ins to price.
+   *  EXPLICIT day.services always win — same precedence as the grid.
+   *  Omitted = full-package, the engine's historical assumption. */
+  packageType?: string
+}): ItineraryDay[] {
   if (!itineraryData || !Array.isArray(itineraryData)) {
     return []
   }
@@ -499,11 +512,24 @@ export function parseItinerary(itineraryData: any): ItineraryDay[] {
     const hasAttractions = (day.attractions && day.attractions.length > 0) ||
                           (day.title && /temple|pyramid|museum|valley|tomb/i.test(day.title))
 
+    // The defaults describe a FULL PACKAGE, so they are gated on what the
+    // product actually includes. Two latent bugs lived here: a SINGLE-day
+    // template with no explicit services defaulted airport arrival AND
+    // departure AND hotel check-in AND check-out onto its one day — a day
+    // tour priced like a whole package — and no product ever escaped the
+    // full-package assumption. Explicit day.services still win.
+    const pkgIncludes = PACKAGE_TYPE_CONFIGS.find(
+      p => p.slug === (opts?.packageType ?? 'full-package')
+    )?.includes ?? PACKAGE_TYPE_CONFIGS.find(p => p.slug === 'full-package')!.includes
+    const isSingleDay = itineraryData.length === 1
+
     const services = day.services || {
-      airport_arrival: isFirstDay,
-      airport_departure: isLastDay,
-      hotel_checkin: isFirstDay,
-      hotel_checkout: isLastDay,
+      airport_arrival: pkgIncludes.airportTransfers && isFirstDay,
+      airport_departure: pkgIncludes.airportTransfers && isLastDay,
+      // A single-day trip has no overnight, so there is no hotel to check
+      // into whatever the package says — day-use is an explicit flag.
+      hotel_checkin: pkgIncludes.accommodation && !isSingleDay && isFirstDay,
+      hotel_checkout: pkgIncludes.accommodation && !isSingleDay && isLastDay,
       guide_required: hasAttractions
     }
 
@@ -1555,7 +1581,17 @@ export async function calculateDayBasedPricing(
   const t = template as any
 
 
-  const itinerary = parseItinerary(t.itinerary)
+  // The template's own tour_type is a package signal the engine always
+  // SELECTed and never read: a 'day_tour' (or half_day / stopover) is by
+  // definition a day trip — no accommodation, no airport transfers sold —
+  // yet it priced full-package shaped. An explicit packageType from the
+  // caller still wins.
+  const SINGLE_DAY_TOUR_TYPES = ['day_tour', 'half_day', 'stopover']
+  const effectivePackageType =
+    (params as { packageType?: string }).packageType ??
+    (SINGLE_DAY_TOUR_TYPES.includes(t.tour_type ?? '') ? 'day-trips' : undefined)
+
+  const itinerary = parseItinerary(t.itinerary, { packageType: effectivePackageType })
   const totalDays = itinerary.length || t.duration_days || 1
 
   if (itinerary.length === 0) {
@@ -2360,6 +2396,10 @@ export function formatPricingTable(result: DayPricingResult): string[][] {
 
 export interface PricingParams {
   templateId: string
+  /** What the customer is buying (lib/package-types.ts). Templates carry no
+   *  package column yet, so callers usually omit this — full-package, the
+   *  historical assumption. */
+  packageType?: string
   /** Whose rates to price from — see DayPricingParams.tenantId. */
   tenantId: string
   tier: ServiceTier

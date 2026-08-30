@@ -237,3 +237,45 @@ describe('gridCompleteness — rich gate (consolidation Phase B)', () => {
     expect(Array.isArray(r.warningMessages)).toBe(true)
   })
 })
+
+describe('gridCompleteness — package-aware requirements (ported from travel-ops-pro)', () => {
+  // Until the mask existed the gate enforced the FULL-PACKAGE shape on every
+  // product: a tours-only trip — no hotels, no airport transfers sold — was
+  // BLOCKED for having no accommodation priced on days the customer sleeps
+  // in a hotel that was never ours to sell. This app additionally stamped
+  // every grid-saved itinerary 'land-package' whatever it was.
+
+  it('tours-only: an overnight-preset day needs no accommodation, hotel or airport services', () => {
+    const d = day(1, [pricedSlot('guide'), pricedSlot('vehicle')], { dayType: 'arrival' })
+    const r = gridCompleteness([d], cfg({ packageType: 'tours-only' }))
+    expect(r.issues.map(i => i.code)).not.toContain('missing-sleep')
+    expect(r.issues.map(i => i.code)).not.toContain('missing-hotel_services')
+    expect(r.issues.map(i => i.code)).not.toContain('missing-airport_services')
+  })
+
+  it('land-package: hotels required, airport pickup not', () => {
+    const d = day(1, [emptySlot('accommodation'), emptySlot('airport_services')], { dayType: 'arrival' })
+    const r = gridCompleteness([d], cfg({ packageType: 'land-package' }))
+    expect(r.issues.map(i => i.code)).toContain('missing-sleep')
+    expect(r.issues.map(i => i.code)).not.toContain('missing-airport_services')
+  })
+
+  it("the operator's explicit day flag beats the package mask", () => {
+    // "This tours-only trip DOES include one airport pickup, we agreed it
+    // specially" — a real sale; saying so re-arms the requirement.
+    const d = day(1, [emptySlot('airport_services'), pricedSlot('guide')], {
+      dayType: 'arrival',
+      airportArrival: true,
+    })
+    const r = gridCompleteness([d], cfg({ packageType: 'tours-only' }))
+    expect(r.issues.map(i => i.code)).toContain('missing-airport_services')
+  })
+
+  it('no packageType (older saved configs) behaves exactly like full-package', () => {
+    const d = day(1, [emptySlot('accommodation')], { dayType: 'arrival' })
+    const bare = gridCompleteness([d], cfg())
+    const full = gridCompleteness([d], cfg({ packageType: 'full-package' }))
+    expect(bare.issues.map(i => i.code)).toEqual(full.issues.map(i => i.code))
+    expect(bare.issues.map(i => i.code)).toContain('missing-sleep')
+  })
+})

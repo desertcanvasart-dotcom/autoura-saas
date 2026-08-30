@@ -106,7 +106,12 @@ export async function POST(request: NextRequest) {
       num_adults: pax,
       num_children: 0,
       tier: config.tier || 'standard',
-      package_type: 'land-package',
+      // Was hardcoded 'land-package' — EVERY grid-saved itinerary was
+      // stamped a land package whatever it actually was, and anything
+      // reading the field downstream believed it. The grid is told the
+      // product now; missing (older clients) means full-package, the shape
+      // the gate always assumed.
+      package_type: config.packageType || 'full-package',
       total_cost: finalSellingTotal,
       selling_price: finalSellingTotal,
       // The SAME resolved value the price was computed from above.

@@ -5,6 +5,8 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
+import { packageRules } from '@/lib/ai/package-prompt-rules'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { requireAuth } from '@/lib/supabase-server'
@@ -239,7 +241,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { text, tier = 'standard', pax = 2, mode = 'full' } = body
+    const { text, tier = 'standard', pax = 2, mode = 'full', package_type } = body
+    // What the customer is buying. Decides what the AI is TOLD to include and
+    // what the scrub allows — until this existed the parser built every trip
+    // full-package shaped, and the save stamped them all 'land-package'.
+    const pkg = PACKAGE_TYPE_CONFIGS.find(c => c.slug === package_type) ??
+      PACKAGE_TYPE_CONFIGS.find(c => c.slug === 'full-package')!
 
     if (!text || typeof text !== 'string' || text.trim().length < 10) {
       return NextResponse.json({ success: false, error: 'Text input is required (min 10 chars)' }, { status: 400 })
@@ -268,6 +275,7 @@ export async function POST(request: NextRequest) {
     const systemPrompt = `You are an Egypt travel itinerary parser for a tour operator pricing system.
 
 Given a text input (WhatsApp message, email, booking request, or itinerary), extract a structured day-by-day itinerary.
+${packageRules(pkg)}
 
 ${EGYPT_GLOSSARY}
 
@@ -380,6 +388,7 @@ Match the origin_city and destination_city of each transport entry to the day's 
       generationMode = 'generated'
       try {
         const genPrompt = `You are an Egypt travel expert. The user sent a vague inquiry. Generate a suggested ${pax}-person itinerary.
+${packageRules(pkg)}
 
 ${EGYPT_GLOSSARY}
 
@@ -436,6 +445,26 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
         slots,
       }
     })
+
+    // 4b. THE PACKAGE SCRUB — the prompt above ASKS the AI to leave excluded
+    // components empty; this GUARANTEES it. A model that adds a hotel to a
+    // tours-only trip anyway gets it removed here, deterministically, before
+    // anything is priced or saved.
+    type ScrubbableSlot = { slotId: string; selectedItems?: unknown[]; customAmount?: number }
+    const clearSlot = (day: { slots: ScrubbableSlot[] }, slotId: string) => {
+      const slot = day.slots.find(sl => sl.slotId === slotId)
+      if (!slot) return
+      slot.selectedItems = []
+      slot.customAmount = 0
+    }
+    for (const day of days) {
+      if (!pkg.includes.accommodation) {
+        clearSlot(day, 'accommodation')
+        clearSlot(day, 'hotel_services')
+      }
+      if (!pkg.includes.airportTransfers) clearSlot(day, 'airport_services')
+      if (pkg.includes.meals === 'none') clearSlot(day, 'meals')
+    }
 
     // 5. Auto-fill water on days that don't have it
     for (const day of days) {
