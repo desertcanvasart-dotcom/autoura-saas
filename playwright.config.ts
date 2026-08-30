@@ -33,9 +33,15 @@ const BASE_URL = `http://127.0.0.1:${PORT}`
 
 // Real values when CI provides them; otherwise syntactically valid
 // placeholders so the server boots and every auth check simply finds nobody.
-const supabaseUrl = process.env.E2E_SUPABASE_URL ?? 'https://placeholder.supabase.co'
-const supabaseAnon = process.env.E2E_SUPABASE_ANON_KEY ?? 'placeholder-anon-key'
-const supabaseService = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY ?? 'placeholder-service-key'
+//
+// `||`, NOT `??`. A GitHub Actions job that declares `env: FOO: ${{ secrets.FOO }}`
+// for a secret that is not set exports FOO as the EMPTY STRING, not undefined --
+// so `??` keeps '' and the placeholder never applies. The server then boots with
+// no Supabase env and the edge middleware dies with "Your project's URL and Key
+// are required", timing out webServer. Caught in CI on 2026-08-31.
+const supabaseUrl = process.env.E2E_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnon = process.env.E2E_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+const supabaseService = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
 
 export default defineConfig({
   testDir: './e2e',
@@ -67,7 +73,7 @@ export default defineConfig({
       // The portal journey drives routes that read the service key from the
       // SERVER; without it the app under test would be talking to a
       // different database than the spec's own client.
-      E2E_TENANT_ID: process.env.E2E_TENANT_ID ?? '',
+      E2E_TENANT_ID: process.env.E2E_TENANT_ID || '',
     },
   },
 })
