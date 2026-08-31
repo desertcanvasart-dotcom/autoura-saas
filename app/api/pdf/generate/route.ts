@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { escapeHtml, safeUrl } from '@/lib/html-escape'
 import puppeteer from 'puppeteer'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
+import { fetchLogoBytes } from '@/lib/company-identity'
 
 interface Itinerary {
   itinerary_code: string
@@ -644,10 +645,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate HTML
-    const html = generateHTML(itinerary, days || [], company || { name: '' })
+    // SSRF: the logo URL is tenant-controlled and would otherwise be fetched
+    // by Chromium from inside the server. Resolve and validate it here, then
+    // inline the bytes as a data URI so the browser never makes that request
+    // at all. A logo that fails the check is dropped, not fatal.
+    const companyIn = company || { name: '' }
+    let safeCompany = companyIn
+    if (companyIn.logoUrl) {
+      const logo = await fetchLogoBytes(companyIn.logoUrl)
+      safeCompany = {
+        ...companyIn,
+        logoUrl: logo
+          ? `data:image/${logo.format};base64,${Buffer.from(logo.bytes).toString('base64')}`
+          : null,
+      }
+    }
 
-    // Launch Puppeteer
+    // Generate HTML
+    const html = generateHTML(itinerary, days || [], safeCompany)
+
+    // Launch Puppeteer. --no-sandbox is retained deliberately: the container
+    // hosts we deploy to do not grant the user-namespace the Chromium sandbox
+    // needs, and without it the browser fails to start. The SSRF vector it
+    // would otherwise expose is closed above (no caller URL reaches Chromium)
+    // and by the request filter below.
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -658,41 +679,52 @@ export async function POST(request: NextRequest) {
       ]
     })
     
-    const page = await browser.newPage()
-    
-    // Set content and wait for fonts to load.
-    // 'load' — not 'networkidle0'. Puppeteer excludes the networkidle events
-    // from setContent's options because they describe a NAVIGATION settling,
-    // and setContent does not navigate. 'load' is the strongest event that
-    // applies here and still waits for images and stylesheets in the markup;
-    // fonts are gated separately by document.fonts.ready below.
-    await page.setContent(html, {
-      waitUntil: 'load'
-    })
-    
-    // Wait a bit for fonts to fully load
-    await page.evaluateHandle('document.fonts.ready')
-    
-    // Generate PDF
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: {
-        top: '10mm',
-        right: '10mm',
-        bottom: '15mm',
-        left: '10mm'
-      },
-      displayHeaderFooter: true,
-      headerTemplate: '<div></div>',
-      footerTemplate: `
-        <div style="width: 100%; font-size: 8pt; color: #9ca3af; text-align: center; padding: 5mm 0;">
-          Page <span class="pageNumber"></span> of <span class="totalPages"></span>
-        </div>
-      `
-    })
-    
-    await browser.close()
+    // try/finally so a throw in setContent/pdf can never leak the browser
+    // process. Before this, an error between launch() and close() left a
+    // Chromium orphaned on every failed request.
+    let pdf: Uint8Array
+    try {
+      const page = await browser.newPage()
+      // A hard ceiling on every page op, so a hung render cannot pin a browser
+      // open indefinitely.
+      page.setDefaultTimeout(20_000)
+
+      // Belt-and-braces network filter: the only outbound requests a PDF needs
+      // are Google Fonts. The logo is already inlined as a data URI, so nothing
+      // caller-controlled should reach here — abort anything that is not a font
+      // host or a data URI.
+      await page.setRequestInterception(true)
+      page.on('request', (req) => {
+        const url = req.url()
+        if (
+          url.startsWith('data:') ||
+          url.startsWith('https://fonts.googleapis.com/') ||
+          url.startsWith('https://fonts.gstatic.com/')
+        ) {
+          req.continue()
+        } else {
+          req.abort()
+        }
+      })
+
+      await page.setContent(html, { waitUntil: 'load' })
+      await page.evaluateHandle('document.fonts.ready')
+
+      pdf = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '10mm', right: '10mm', bottom: '15mm', left: '10mm' },
+        displayHeaderFooter: true,
+        headerTemplate: '<div></div>',
+        footerTemplate: `
+          <div style="width: 100%; font-size: 8pt; color: #9ca3af; text-align: center; padding: 5mm 0;">
+            Page <span class="pageNumber"></span> of <span class="totalPages"></span>
+          </div>
+        `,
+      })
+    } finally {
+      await browser.close()
+    }
 
     // Return PDF
     return new NextResponse(Buffer.from(pdf), {
