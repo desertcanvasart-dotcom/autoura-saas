@@ -71,8 +71,9 @@ describe('SSRF guard placement', () => {
     expect(code).not.toMatch(/from '@\/lib\/ssrf-guard'/)
   })
   it('every server route that fetches a tenant logo validates it first', () => {
+    // The Puppeteer PDF route that also fetched a logo was removed with the
+    // dependency; these are the remaining live logo sinks.
     for (const p of [
-      'app/api/pdf/generate/route.ts',
       'app/api/whatsapp/send-invoice/route.ts',
       'app/api/whatsapp/send-contract/route.ts',
     ]) {

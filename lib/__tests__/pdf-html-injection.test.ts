@@ -2,14 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { escapeHtml, safeUrl } from '@/lib/html-escape'
 
 // ============================================================================
-// The two PDF routes build HTML by hand and give it to Puppeteer running
-// --no-sandbox. This asserts the composed markup — the exact expressions the
-// templates now contain — cannot be broken out of by tenant-controlled text.
-//
-// Kept at the composition level rather than importing the routes: those pull
-// in puppeteer and a live Supabase client at module load. What matters is
-// that the *shape* the templates use is proven safe, and the shape is
-// verified against the source below.
+// escapeHtml / safeUrl are the two primitives any hand-composed HTML must run
+// tenant text through. The Puppeteer PDF route that once relied on them is
+// gone (removed with the dependency), but the helpers remain the guard for any
+// future markup built by hand, so their breakout resistance is pinned here:
+// tenant-controlled text must not escape an attribute or element context, and
+// a logo URL must not smuggle a javascript:/data: scheme or an SSRF target.
 // ============================================================================
 
 const BREAKOUT = `x" onerror="fetch('http://169.254.169.254/latest/meta-data/')`
