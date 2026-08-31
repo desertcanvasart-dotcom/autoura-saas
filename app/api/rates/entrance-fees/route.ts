@@ -84,12 +84,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // NOT NULL columns: `|| null` used to coerce a blank one, and the insert
+    // then died on a Postgres constraint message the user could not act on.
+    if (!body.city) {
+      return NextResponse.json(
+        { success: false, error: 'Required: city' },
+        { status: 400 }
+      )
+    }
+
+
     const newFee = {
       ...rateCurrencyWriteField(body),
       tenant_id: authResult.tenant_id,
       service_code: body.service_code || `ENT-${Date.now().toString(36).toUpperCase()}`,
       attraction_name: body.attraction_name,
-      city: body.city || null,
+      city: body.city,
       fee_type: body.fee_type || 'standard',
       eur_rate: parseFloat(body.eur_rate) || 0,
       non_eur_rate: parseFloat(body.non_eur_rate) || 0,
