@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { getCatalogScope, catalogOrExpr } from '@/lib/catalog-scope'
 
 export async function GET(request: NextRequest) {
@@ -60,6 +61,17 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
+    // Optional explicit link to one of the supplier's trains (Phase 3);
+    // a stale id resolves to null, and null is omitted so an unmigrated
+    // database still saves.
+    const trainProp = await resolveRateProperty(createAdminClient(), {
+      tenantId: authResult.tenant_id!,
+      propertyType: 'train',
+      supplierId: body.supplier_id || null,
+      name: null,
+      propertyId: body.property_id,
+    })
+
     const newRate = {
       ...rateCurrencyWriteField(body),
       tenant_id: authResult.tenant_id,
@@ -73,6 +85,7 @@ export async function POST(request: NextRequest) {
       rate_valid_to: body.rate_valid_to || null,
       operator_name: body.operator_name || null,
       supplier_id: body.supplier_id || null,
+      ...(trainProp.property_id ? { property_id: trainProp.property_id } : {}),
       departure_times: body.departure_times || null,
       description: body.description || null,
       notes: body.notes || null,

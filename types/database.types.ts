@@ -7340,6 +7340,7 @@ export interface Database {
       }
       sleeping_train_rates: {
         Row: {
+          property_id: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -7366,6 +7367,7 @@ export interface Database {
           rate_currency: string | null
         }
         Insert: {
+          property_id?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -7392,6 +7394,7 @@ export interface Database {
           rate_currency?: string | null
         }
         Update: {
+          property_id?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -9889,6 +9892,7 @@ export interface Database {
       }
       train_rates: {
         Row: {
+          property_id: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -9910,6 +9914,7 @@ export interface Database {
           rate_currency: string | null
         }
         Insert: {
+          property_id?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -9931,6 +9936,7 @@ export interface Database {
           rate_currency?: string | null
         }
         Update: {
+          property_id?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
