@@ -10,6 +10,78 @@
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { NextRequest, NextResponse } from 'next/server'
 
+// Minimal shape the overlap logic needs. The DB row carries more columns;
+// only these participate in conflict detection.
+interface ResourceRow {
+  resource_type: string
+  resource_id: string
+  resource_name?: string | null
+  start_date: string
+  end_date: string | null
+  itinerary_id?: string
+  itineraries?: { itinerary_code?: string | null } | null
+}
+
+export interface ConflictRow {
+  resource_id: string
+  resource_name: string | null | undefined
+  conflicting_itinerary: string
+  dates: string
+}
+
+/**
+ * Match this itinerary's confirmed resources against every candidate
+ * assignment on OTHER itineraries, in memory.
+ *
+ * Pure, so the overlap rule is unit-tested without a database. `candidates`
+ * must already be scoped to confirmed assignments on other itineraries (the
+ * caller does that in one query); this only decides overlap and shapes output.
+ *
+ * Overlap rule, kept byte-for-byte identical to the previous per-resource SQL:
+ *   candidate.start_date <= (resource.end_date || resource.start_date)
+ *   AND candidate.end_date >= resource.start_date
+ * A candidate with a null end_date is excluded, exactly as `.gte('end_date',…)`
+ * dropped it in SQL (`null >= x` is null → filtered). ISO date strings compare
+ * correctly with `<=`/`>=`, so no Date parsing is needed.
+ */
+export function computeConflicts(
+  resources: ResourceRow[],
+  candidates: ResourceRow[]
+): ConflictRow[] {
+  // Group candidates by resource identity so each resource scans only its own,
+  // turning an O(resources × candidates) scan into O(resources + candidates).
+  const byKey = new Map<string, ResourceRow[]>()
+  const key = (r: ResourceRow) => `${r.resource_type} ${r.resource_id}`
+  for (const c of candidates) {
+    const k = key(c)
+    const list = byKey.get(k)
+    if (list) list.push(c)
+    else byKey.set(k, [c])
+  }
+
+  const conflicts: ConflictRow[] = []
+  // Outer loop over resources, inner over matching candidates — the same order
+  // the previous implementation produced, so the response is unchanged.
+  for (const resource of resources) {
+    const resourceEnd = resource.end_date || resource.start_date
+    for (const c of byKey.get(key(resource)) ?? []) {
+      if (
+        c.end_date != null &&
+        c.start_date <= resourceEnd &&
+        c.end_date >= resource.start_date
+      ) {
+        conflicts.push({
+          resource_id: resource.resource_id,
+          resource_name: resource.resource_name,
+          conflicting_itinerary: c.itineraries?.itinerary_code || c.itinerary_id || '',
+          dates: `${c.start_date} - ${c.end_date || c.start_date}`,
+        })
+      }
+    }
+  }
+  return conflicts
+}
+
 /**
  * GET /api/itinerary-resources/conflicts?itinerary_id=xxx
  * Detect resource conflicts for a specific itinerary
@@ -36,7 +108,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Manual conflict detection (RLS will filter to tenant's resources only).
+    // This itinerary's confirmed assignments (RLS scopes to tenant).
     // A `resource_conflicts` view was once queried first, but it does not exist
     // in the live schema — that query failed on every request and always fell
     // through to this path.
@@ -55,40 +127,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: [] })
     }
 
-    // Check each resource for conflicts with other itineraries
-    // RLS ensures we only see conflicts within same tenant
-    const conflicts: any[] = []
+    // ONE query for every candidate, instead of one per resource. Was N+1:
+    // an itinerary with 20 confirmed resources issued 20 sequential overlap
+    // queries, so latency grew linearly. RLS keeps this tenant-scoped; the
+    // exact (type, id) pairing and the date overlap are decided in memory by
+    // computeConflicts. resource_id narrows the fetch; resource_type is matched
+    // in the grouping key.
+    const resourceIds = [...new Set((resources as ResourceRow[]).map(r => r.resource_id))]
 
-    for (const resource of resources) {
-      // Find overlapping resource assignments
-      // RLS policy will automatically filter to same tenant
-      const { data: conflicting, error: conflictError } = await supabase
-        .from('itinerary_resources')
-        .select(`
-          *,
-          itineraries!inner (
-            itinerary_code,
-            client_name
-          )
-        `)
-        .eq('resource_type', resource.resource_type)
-        .eq('resource_id', resource.resource_id)
-        .eq('status', 'confirmed')
-        .neq('itinerary_id', itineraryId)
-        .lte('start_date', resource.end_date || resource.start_date)
-        .gte('end_date', resource.start_date)
+    const { data: candidates, error: conflictError } = await supabase
+      .from('itinerary_resources')
+      .select(`
+        resource_type,
+        resource_id,
+        start_date,
+        end_date,
+        itinerary_id,
+        itineraries!inner (
+          itinerary_code
+        )
+      `)
+      .in('resource_id', resourceIds)
+      .eq('status', 'confirmed')
+      .neq('itinerary_id', itineraryId)
 
-      if (!conflictError && conflicting && conflicting.length > 0) {
-        conflicting.forEach((c: any) => {
-          conflicts.push({
-            resource_id: resource.resource_id,
-            resource_name: resource.resource_name,
-            conflicting_itinerary: c.itineraries?.itinerary_code || c.itinerary_id,
-            dates: `${c.start_date} - ${c.end_date || c.start_date}`
-          })
-        })
-      }
+    if (conflictError) {
+      console.error('❌ Error fetching candidate assignments:', conflictError)
+      throw conflictError
     }
+
+    const conflicts = computeConflicts(
+      resources as ResourceRow[],
+      (candidates ?? []) as unknown as ResourceRow[]
+    )
 
     return NextResponse.json({ success: true, data: conflicts })
   } catch (error: any) {
