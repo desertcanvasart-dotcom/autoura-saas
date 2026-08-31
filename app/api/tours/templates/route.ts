@@ -130,7 +130,11 @@ export async function POST(request: NextRequest) {
       category_id: body.category_id || null,
       tour_type: body.tour_type,
       duration_days: body.duration_days || 1,
-      duration_nights: body.duration_nights || null,
+      // `|| null` swallowed the wizard's legitimate 0 (a day tour has zero
+      // nights) and the column is NOT NULL — so creating any day-tour
+      // template failed with a not-null violation (operator, 1 Sep). `??`
+      // keeps 0; absent still defaults sensibly to days − 1.
+      duration_nights: body.duration_nights ?? Math.max(0, (body.duration_days || 1) - 1),
       primary_destination_id: body.primary_destination_id || null,
       destinations_covered: body.destinations_covered || [],
       cities_covered: body.cities_covered || [],

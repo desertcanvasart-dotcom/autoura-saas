@@ -72,12 +72,22 @@ export async function POST(request: NextRequest) {
       propertyId: body.property_id,
     })
 
+    // NOT NULL columns: `|| null` used to coerce a blank one, and the insert
+    // then died on a Postgres constraint message the user could not act on.
+    if (!body.origin_city || !body.destination_city) {
+      return NextResponse.json(
+        { success: false, error: 'Required: origin_city, destination_city' },
+        { status: 400 }
+      )
+    }
+
+
     const newRate = {
       ...rateCurrencyWriteField(body),
       tenant_id: authResult.tenant_id,
       service_code: body.service_code || `TRN-${Date.now().toString(36).toUpperCase()}`,
-      origin_city: body.origin_city || null,
-      destination_city: body.destination_city || null,
+      origin_city: body.origin_city,
+      destination_city: body.destination_city,
       class_type: body.class_type || null,
       rate_eur: parseFloat(body.rate_eur) || 0,
       duration_hours: body.duration_hours ? parseFloat(body.duration_hours) : null,
