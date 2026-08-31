@@ -30,13 +30,10 @@ const VERIFIED_EMBEDS = new Set([
   'itinerary_services!itinerary_services_day_id_fkey',
 ])
 
-// Known broken, left in place because fixing them is a schema decision rather
-// than a mechanical one. whatsapp_conversations has no assignment column at
-// all in the deployed schema, so the embed cannot be repointed — the column
-// and its key have to be added first.
-const KNOWN_BROKEN = new Set([
-  'team_members!whatsapp_conversations_assigned_team_member_id_fkey',
-])
+// Was: team_members!whatsapp_conversations_assigned_team_member_id_fkey.
+// Migration 309 added the assignment columns and that key, and the route now
+// reads the assignee separately anyway, so nothing is knowingly broken.
+const KNOWN_BROKEN = new Set<string>([])
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

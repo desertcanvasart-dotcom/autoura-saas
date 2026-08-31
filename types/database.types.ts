@@ -8148,6 +8148,8 @@ export interface Database {
           staff_type: string
           whatsapp: string | null
           photo_url: string | null
+          is_available: boolean
+          max_conversations: number
         }
         Insert: {
           id?: string
@@ -8165,6 +8167,8 @@ export interface Database {
           staff_type?: string
           whatsapp?: string | null
           photo_url?: string | null
+          is_available?: boolean
+          max_conversations?: number
         }
         Update: {
           id?: string
@@ -8182,6 +8186,8 @@ export interface Database {
           staff_type?: string
           whatsapp?: string | null
           photo_url?: string | null
+          is_available?: boolean
+          max_conversations?: number
         }
         Relationships: [
           {
@@ -10753,6 +10759,11 @@ export interface Database {
           status: string
           created_at: string | null
           updated_at: string | null
+          assigned_team_member_id: string | null
+          assigned_at: string | null
+          is_hidden: boolean
+          hidden_at: string | null
+          hidden_by: string | null
         }
         Insert: {
           id?: string
@@ -10766,6 +10777,11 @@ export interface Database {
           status?: string
           created_at?: string | null
           updated_at?: string | null
+          assigned_team_member_id?: string | null
+          assigned_at?: string | null
+          is_hidden?: boolean
+          hidden_at?: string | null
+          hidden_by?: string | null
         }
         Update: {
           id?: string
@@ -10779,6 +10795,11 @@ export interface Database {
           status?: string
           created_at?: string | null
           updated_at?: string | null
+          assigned_team_member_id?: string | null
+          assigned_at?: string | null
+          is_hidden?: boolean
+          hidden_at?: string | null
+          hidden_by?: string | null
         }
         Relationships: [
           {

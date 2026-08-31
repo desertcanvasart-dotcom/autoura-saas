@@ -18,9 +18,11 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active_only') !== 'false'
     const availableOnly = searchParams.get('available_only') === 'true'
 
+    // `avatar_url:photo_url` is an alias, not a column. team_members.photo_url
+    // already holds this; the API keeps the name the UI reads.
     let query = supabase
       .from('team_members')
-      .select('id, name, email, phone, avatar_url, role, is_active, is_available, max_conversations, current_conversations, last_assigned_at, created_at, updated_at')
+      .select('id, name, email, phone, avatar_url:photo_url, role, is_active, is_available, max_conversations, created_at, updated_at')
       .order('name', { ascending: true })
 
     if (activeOnly) {
@@ -35,10 +37,30 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
+    // current_conversations is COUNTED, never stored. A stored counter drifts
+    // the moment an assignment changes by any path that forgets to adjust it;
+    // this is the same rule the conversation counters follow (recomputed from
+    // source, no app-side increments).
+    const agents = (data ?? []) as Array<Record<string, unknown>>
+    const counts = new Map<string, number>()
+    if (agents.length > 0) {
+      const { data: open } = await supabase
+        .from('whatsapp_conversations')
+        .select('assigned_team_member_id')
+        .eq('status', 'active')
+        .not('assigned_team_member_id', 'is', null)
+      for (const row of (open ?? []) as Array<{ assigned_team_member_id: string }>) {
+        counts.set(row.assigned_team_member_id, (counts.get(row.assigned_team_member_id) ?? 0) + 1)
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      agents: data || [],
-      count: data?.length || 0
+      agents: agents.map((a) => ({
+        ...a,
+        current_conversations: counts.get(a.id as string) ?? 0,
+      })),
+      count: agents.length
     })
   } catch (error: any) {
     console.error('Error fetching agents:', error)
