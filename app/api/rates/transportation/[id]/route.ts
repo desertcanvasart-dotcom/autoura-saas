@@ -32,10 +32,9 @@ export async function GET(
 
     const { data, error } = await supabase
       .from('transportation_rates')
-      .select(`
-        *,
-        supplier:suppliers(id, name, city, contact_phone, contact_email)
-      `)
+      // See the list route: transportation_rates has no supplier_id, so this
+      // embed made the query 400 rather than returning the rate.
+      .select('*')
       .eq('id', id)
       .single()
 
