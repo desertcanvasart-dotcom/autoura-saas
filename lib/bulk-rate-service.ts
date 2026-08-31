@@ -21,6 +21,15 @@ export interface ColumnDef {
   type: 'text' | 'number' | 'boolean' | 'date'
   required: boolean
   exportOnly?: boolean     // e.g., id, created_at — included in export but not required for import
+  // A column the FORM no longer asks for, kept so old files still import and
+  // exports still round-trip, but left out of the template so nobody fills in
+  // a field the UI cannot show them afterwards.
+  legacy?: boolean
+  // When this column is absent on import, copy that column's value into it.
+  // Every rate form here already mirrors one price into both passport columns
+  // on save; an import through the slimmed template has to do the same, or it
+  // writes a row priced for one passport and blank for the other.
+  mirrorFrom?: string
 }
 
 export interface ValidationError {
@@ -52,6 +61,18 @@ export interface ImportPreview {
 
 function col(name: string, label: string, type: ColumnDef['type'], required: boolean, exportOnly = false): ColumnDef {
   return { name, label, type, required, exportOnly }
+}
+
+/**
+ * A passport-split rate column the form stopped collecting. Out of the
+ * template, never required, still imported when present, and mirrored from the
+ * primary rate when it is not.
+ *
+ * The split is real for exactly two things — hotels and Nile cruises, where a
+ * room carries two contracted prices. Everything else is one price.
+ */
+function legacyRate(name: string, label: string, mirrorFrom: string): ColumnDef {
+  return { name, label, type: 'number', required: false, legacy: true, mirrorFrom }
 }
 
 function id(): ColumnDef { return col('id', 'ID', 'text', false, true) }
@@ -150,24 +171,24 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('area', 'Area', 'text', false),
       col('includes', 'Includes', 'text', false),
       // Vehicle rates
-      col('sedan_rate_eur', 'Sedan EUR', 'number', false),
-      col('sedan_rate_non_eur', 'Sedan Non-EUR', 'number', false),
+      col('sedan_rate_eur', 'Sedan Rate', 'number', false),
+      legacyRate('sedan_rate_non_eur', 'Sedan Non-EUR (legacy)', 'sedan_rate_eur'),
       col('sedan_capacity_min', 'Sedan Cap Min', 'number', false),
       col('sedan_capacity_max', 'Sedan Cap Max', 'number', false),
-      col('minivan_rate_eur', 'Minivan EUR', 'number', false),
-      col('minivan_rate_non_eur', 'Minivan Non-EUR', 'number', false),
+      col('minivan_rate_eur', 'Minivan Rate', 'number', false),
+      legacyRate('minivan_rate_non_eur', 'Minivan Non-EUR (legacy)', 'minivan_rate_eur'),
       col('minivan_capacity_min', 'Minivan Cap Min', 'number', false),
       col('minivan_capacity_max', 'Minivan Cap Max', 'number', false),
-      col('van_rate_eur', 'Van EUR', 'number', false),
-      col('van_rate_non_eur', 'Van Non-EUR', 'number', false),
+      col('van_rate_eur', 'Van Rate', 'number', false),
+      legacyRate('van_rate_non_eur', 'Van Non-EUR (legacy)', 'van_rate_eur'),
       col('van_capacity_min', 'Van Cap Min', 'number', false),
       col('van_capacity_max', 'Van Cap Max', 'number', false),
-      col('minibus_rate_eur', 'Minibus EUR', 'number', false),
-      col('minibus_rate_non_eur', 'Minibus Non-EUR', 'number', false),
+      col('minibus_rate_eur', 'Minibus Rate', 'number', false),
+      legacyRate('minibus_rate_non_eur', 'Minibus Non-EUR (legacy)', 'minibus_rate_eur'),
       col('minibus_capacity_min', 'Minibus Cap Min', 'number', false),
       col('minibus_capacity_max', 'Minibus Cap Max', 'number', false),
-      col('bus_rate_eur', 'Bus EUR', 'number', false),
-      col('bus_rate_non_eur', 'Bus Non-EUR', 'number', false),
+      col('bus_rate_eur', 'Bus Rate', 'number', false),
+      legacyRate('bus_rate_non_eur', 'Bus Non-EUR (legacy)', 'bus_rate_eur'),
       col('bus_capacity_min', 'Bus Cap Min', 'number', false),
       col('bus_capacity_max', 'Bus Cap Max', 'number', false),
       isActive(), createdAt(), updatedAt(),
@@ -185,8 +206,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('guide_type', 'Guide Type', 'text', true),
       col('city', 'City', 'text', false),
       col('tour_duration', 'Tour Duration', 'text', true),
-      col('base_rate_eur', 'Rate EUR', 'number', true),
-      col('base_rate_non_eur', 'Rate Non-EUR', 'number', true),
+      col('base_rate_eur', 'Rate', 'number', true),
+      legacyRate('base_rate_non_eur', 'Rate Non-EUR (legacy)', 'base_rate_eur'),
       season(), rateValidFrom(), rateValidTo(),
       supplierId(), notes(), isActive(), createdAt(), updatedAt(),
       rateCurrency(),
@@ -204,8 +225,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('cuisine_type', 'Cuisine Type', 'text', false),
       col('restaurant_type', 'Restaurant Type', 'text', false),
       col('city', 'City', 'text', false),
-      col('base_rate_eur', 'Rate EUR', 'number', true),
-      col('base_rate_non_eur', 'Rate Non-EUR', 'number', true),
+      col('base_rate_eur', 'Rate', 'number', true),
+      legacyRate('base_rate_non_eur', 'Rate Non-EUR (legacy)', 'base_rate_eur'),
       col('tier', 'Tier', 'text', false),
       col('meal_category', 'Meal Category', 'text', false),
       col('per_person_rate', 'Per Person', 'boolean', false),
@@ -229,8 +250,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('attraction_name', 'Attraction Name', 'text', true),
       col('city', 'City', 'text', true),
       col('fee_type', 'Fee Type', 'text', false),
-      col('eur_rate', 'EUR Rate', 'number', true),
-      col('non_eur_rate', 'Non-EUR Rate', 'number', true),
+      col('eur_rate', 'Rate', 'number', true),
+      legacyRate('non_eur_rate', 'Non-EUR Rate (legacy)', 'eur_rate'),
       col('egyptian_rate', 'Egyptian Rate', 'number', false),
       col('student_discount_percentage', 'Student Discount %', 'number', false),
       col('child_discount_percent', 'Child Discount %', 'number', false),
@@ -255,8 +276,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('flight_number', 'Flight Number', 'text', false),
       col('flight_type', 'Flight Type', 'text', false),
       col('cabin_class', 'Cabin Class', 'text', false),
-      col('base_rate_eur', 'Rate EUR', 'number', true),
-      col('base_rate_non_eur', 'Rate Non-EUR', 'number', true),
+      col('base_rate_eur', 'Rate', 'number', true),
+      legacyRate('base_rate_non_eur', 'Rate Non-EUR (legacy)', 'base_rate_eur'),
       col('baggage_kg', 'Baggage (kg)', 'number', false),
       col('departure_time', 'Departure Time', 'text', false),
       col('arrival_time', 'Arrival Time', 'text', false),
@@ -281,8 +302,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('activity_type', 'Activity Type', 'text', false),
       col('duration', 'Duration', 'text', false),
       col('city', 'City', 'text', false),
-      col('base_rate_eur', 'Rate EUR', 'number', true),
-      col('base_rate_non_eur', 'Rate Non-EUR', 'number', true),
+      col('base_rate_eur', 'Rate', 'number', true),
+      legacyRate('base_rate_non_eur', 'Rate Non-EUR (legacy)', 'base_rate_eur'),
       col('pricing_type', 'Pricing Type', 'text', false),
       col('unit_label', 'Unit Label', 'text', false),
       col('min_capacity', 'Min Capacity', 'number', false),
@@ -304,7 +325,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('role_type', 'Role Type', 'text', true),
       col('context', 'Context', 'text', false),
       col('rate_unit', 'Rate Unit', 'text', true),
-      col('rate_eur', 'Rate EUR', 'number', true),
+      col('rate_eur', 'Rate', 'number', true),
       col('description', 'Description', 'text', false),
       notes(), isActive(),
       rateCurrency(),
@@ -320,7 +341,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('airport_code', 'Airport Code', 'text', true),
       col('service_type', 'Service Type', 'text', true),
       col('direction', 'Direction', 'text', true),
-      col('rate_eur', 'Rate EUR', 'number', true),
+      col('rate_eur', 'Rate', 'number', true),
       col('description', 'Description', 'text', false),
       notes(), isActive(),
       rateCurrency(),
@@ -335,7 +356,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       id(), serviceCode(),
       col('service_type', 'Service Type', 'text', true),
       col('hotel_category', 'Hotel Category', 'text', true),
-      col('rate_eur', 'Rate EUR', 'number', true),
+      col('rate_eur', 'Rate', 'number', true),
       col('description', 'Description', 'text', false),
       notes(), isActive(),
       rateCurrency(),
@@ -413,7 +434,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('origin_city', 'Origin City', 'text', true),
       col('destination_city', 'Destination City', 'text', true),
       col('class_type', 'Class Type', 'text', true),
-      col('rate_eur', 'Rate EUR', 'number', true),
+      col('rate_eur', 'Rate', 'number', true),
       col('duration_hours', 'Duration (hours)', 'number', false),
       col('operator_name', 'Operator', 'text', false),
       col('departure_times', 'Departure Times', 'text', false),
@@ -551,6 +572,16 @@ export function validateImportData(
       }
     }
 
+    // Mirror before accepting: a file written from the current template has no
+    // non-EU column at all, and a consumer that reads it without falling back
+    // would price that traveller at zero.
+    for (const colDef of importableColumns) {
+      if (!colDef.mirrorFrom) continue
+      if (parsedRow[colDef.name] == null && parsedRow[colDef.mirrorFrom] != null) {
+        parsedRow[colDef.name] = parsedRow[colDef.mirrorFrom]
+      }
+    }
+
     if (rowValid) {
       validRows.push(parsedRow)
     }
@@ -570,6 +601,142 @@ export function validateImportData(
  */
 export function getExportHeaders(config: RateTableConfig): string[] {
   return config.columns.map(c => c.name)
+}
+
+// The example row carries EXAMPLE_ROW_KEY in the unique-key column and the
+// importer SKIPS it, so the classic mistake — filling in the sheet underneath
+// and importing the sample along with it — cannot land a junk rate.
+
+export const EXAMPLE_ROW_KEY = 'EXAMPLE-DELETE-THIS-ROW'
+
+/** Is this the untouched sample row from a downloaded template? */
+export function isExampleRow(value: unknown): boolean {
+  return String(value ?? '').trim().toUpperCase() === EXAMPLE_ROW_KEY
+}
+
+/** A coherent sample calendar. A template whose every date is the same day
+ *  teaches nothing about which column is a start and which an end, and a
+ *  season list where low, high and peak share a window is not a rate card
+ *  anyone would recognise. */
+const SAMPLE_DATES: Record<string, [string, string]> = {
+  low:      ['2026-05-01', '2026-09-30'],
+  high:     ['2026-10-01', '2026-12-19'],
+  peak:     ['2026-12-20', '2027-01-05'],
+  peak_2:   ['2027-03-20', '2027-03-28'],
+  validity: ['2026-04-01', '2027-03-31'],
+  other:    ['2026-05-01', '2026-09-30'],
+}
+
+/** Which pair of dates a column belongs to, and whether it is the start. */
+function sampleDate(name: string): string {
+  const isEnd = /(_to|_end)$/.test(name)
+  const band =
+    /peak_season_2|peak_2/.test(name) ? 'peak_2'
+    : /peak/.test(name) ? 'peak'
+    : /high/.test(name) ? 'high'
+    : /valid/.test(name) ? 'validity'
+    : /low/.test(name) ? 'low'
+    : 'other'
+  return SAMPLE_DATES[band][isEnd ? 1 : 0]
+}
+
+/** Sample money. A row where every number is 100 does not show which column is
+ *  the headline rate and which is a supplement — and a rate card where peak
+ *  costs the same as low is not one either. */
+// The per-vehicle bands lib/transport-rate-utils.ts falls back to. The sample
+// must agree with them: a template that put 100 in every capacity column
+// taught agencies that every vehicle seats exactly 100, and because
+// getTransportRateForPax() matches a band and then falls back to the first
+// tier whose max fits, EVERY group -- a couple or forty people -- came out
+// priced as a sedan.
+const SAMPLE_CAPACITY: Record<string, [number, number]> = {
+  sedan: [1, 2],
+  minivan: [3, 7],
+  van: [8, 12],
+  minibus: [13, 20],
+  bus: [21, 45],
+}
+
+function sampleNumber(name: string): string {
+  // Capacities are counts of people, not money.
+  const cap = name.match(/^([a-z]+)_capacity_(min|max)$/)
+  if (cap) {
+    const band = SAMPLE_CAPACITY[cap[1]]
+    if (band) return String(cap[2] === 'min' ? band[0] : band[1])
+    return cap[2] === 'min' ? '1' : '45'
+  }
+  if (/_capacity$|^capacity_/.test(name)) return '4'
+
+  // Percentages are not money either. 100 in a discount column reads as
+  // "everything is free".
+  if (/(percent|percentage)$/.test(name)) {
+    if (/child|infant/.test(name)) return '15'
+    if (/student/.test(name)) return '50'
+    return '10'
+  }
+
+  // Supplements and reductions are a fraction of the rate they attach to.
+  const role =
+    /supp/.test(name) ? 0.5
+    : /(red|reduction|child|infant)/.test(name) ? 0.15
+    : 1
+  const season =
+    /peak/.test(name) ? 1.8
+    : /high/.test(name) ? 1.35
+    : 1
+  const base = /single/.test(name) && !/supp/.test(name) ? 140 : 100
+  return String(Math.round(base * role * season))
+}
+
+/** Plausible sample values, so the row reads as a real rate rather than as
+ *  filler. Matched on the column name first, then the declared type. */
+function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
+  if (config.uniqueKey.includes(colDef.name)) return EXAMPLE_ROW_KEY
+
+  const name = colDef.name
+  if (/(^|_)(email)/.test(name)) return 'reservations@example-hotel.com'
+  if (/(^|_)(phone|fax|mobile)/.test(name)) return '+20 100 000 0000'
+  if (/(^|_)city$/.test(name) || name === 'embark_city' || name === 'disembark_city') return 'Cairo'
+  if (/country/.test(name)) return 'Egypt'
+  if (name === 'property_type') return 'hotel'
+  if (name === 'board_basis') return 'BB'
+  if (name === 'tier') return 'standard'
+  if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
+    return 'Example Name'
+  }
+  if (/notes|description|remarks/.test(name)) return 'Optional free text'
+
+  switch (colDef.type) {
+    case 'date':
+      // ISO. The importer also accepts DD/MM/YYYY because Excel rewrites dates
+      // on save, but the sample should show the form that always works.
+      return sampleDate(name)
+    case 'number':
+      // Never 0: a blank or zero rate means "unpriced" in this system, and a
+      // sample that teaches otherwise is a sample that causes holes.
+      return sampleNumber(name)
+    case 'boolean':
+      return 'true'
+    default:
+      return colDef.required ? 'Required' : ''
+  }
+}
+
+/** Headers for a template: everything the importer reads, and nothing it
+ *  ignores — id and the timestamps are export-only and would just be noise on
+ *  a sheet somebody is filling in by hand. */
+export function getTemplateHeaders(config: RateTableConfig): string[] {
+  return config.columns.filter(c => !c.exportOnly && !c.legacy).map(c => c.name)
+}
+
+/** The single example row, keyed by column name. */
+export function buildTemplateRow(config: RateTableConfig): Record<string, string> {
+  const row: Record<string, string> = {}
+  for (const colDef of config.columns) {
+    if (colDef.exportOnly || colDef.legacy) continue
+    row[colDef.name] = exampleValue(colDef, config)
+  }
+  return row
 }
 
 /**

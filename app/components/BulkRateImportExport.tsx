@@ -45,10 +45,15 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
   // EXPORT
   // ============================================
 
-  const handleExport = async () => {
+  // `template` fetches the headers plus one filled-in example row instead of
+  // the data. It is the answer to the empty-table problem: exporting a table
+  // with no rows yields a completely blank file, so the one moment somebody
+  // most needs to know the format is the moment the export tells them nothing.
+  const handleExport = async (mode: 'export' | 'template' = 'export') => {
     setExporting(true)
     try {
-      const res = await fetch(`/api/rates/bulk/export?table=${tableName}`)
+      const qs = mode === 'template' ? `table=${tableName}&template=1` : `table=${tableName}`
+      const res = await fetch(`/api/rates/bulk/export?${qs}`)
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.error || 'Export failed')
@@ -59,7 +64,9 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${tableName}_export_${todayLocal()}.csv`
+      a.download = mode === 'template'
+        ? `${tableName}_template.csv`
+        : `${tableName}_export_${todayLocal()}.csv`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -194,7 +201,7 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
       {/* Buttons */}
       <div className="flex items-center gap-2">
         <button
-          onClick={handleExport}
+          onClick={() => handleExport('export')}
           disabled={exporting}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
           title="Export all rates as CSV"
@@ -205,6 +212,16 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
             <Download className="w-3.5 h-3.5" />
           )}
           Export CSV
+        </button>
+
+        <button
+          onClick={() => handleExport('template')}
+          disabled={exporting}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          title="Download a sample CSV: the columns plus one filled-in example row"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Sample CSV
         </button>
 
         <button
