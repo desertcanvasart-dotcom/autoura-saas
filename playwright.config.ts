@@ -18,20 +18,30 @@ import { defineConfig, devices } from '@playwright/test'
 // the sweep caught a route that authenticated itself but was unreachable, and
 // only a real request can catch middleware that never ran.
 //
-// NO DATABASE. Placeholder Supabase env is enough for these paths: the app's
-// build-safe convention keeps clients lazy, an anonymous getUser() simply
-// yields no user, and every assertion here is about refusal. Authenticated
-// journeys (create a rate → quote → book) need a dedicated throwaway project
-// and are deliberately NOT in this suite — see docs/E2E.md.
+// The auth-boundary spec needs NO DATABASE. Placeholder Supabase env is
+// enough for those paths: the app's build-safe convention keeps clients lazy,
+// an anonymous getUser() simply yields no user, and every assertion there is
+// about refusal.
+//
+// portal-journey.spec.ts is the exception — it WRITES. It runs only when a
+// throwaway project's credentials AND a tenant marked settings.e2e_fixture
+// are supplied, and skips itself otherwise, so this config stays safe to run
+// anywhere by default. See docs/E2E.md.
 
 const PORT = process.env.E2E_PORT ?? '3111'
 const BASE_URL = `http://127.0.0.1:${PORT}`
 
 // Real values when CI provides them; otherwise syntactically valid
 // placeholders so the server boots and every auth check simply finds nobody.
-const supabaseUrl = process.env.E2E_SUPABASE_URL ?? 'https://placeholder.supabase.co'
-const supabaseAnon = process.env.E2E_SUPABASE_ANON_KEY ?? 'placeholder-anon-key'
-const supabaseService = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY ?? 'placeholder-service-key'
+//
+// `||`, NOT `??`. A GitHub Actions job that declares `env: FOO: ${{ secrets.FOO }}`
+// for a secret that is not set exports FOO as the EMPTY STRING, not undefined --
+// so `??` keeps '' and the placeholder never applies. The server then boots with
+// no Supabase env and the edge middleware dies with "Your project's URL and Key
+// are required", timing out webServer. Caught in CI on 2026-08-31.
+const supabaseUrl = process.env.E2E_SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnon = process.env.E2E_SUPABASE_ANON_KEY || 'placeholder-anon-key'
+const supabaseService = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-key'
 
 export default defineConfig({
   testDir: './e2e',
@@ -60,6 +70,10 @@ export default defineConfig({
       SUPABASE_SERVICE_ROLE_KEY: supabaseService,
       NEXT_PUBLIC_APP_URL: BASE_URL,
       NODE_ENV: 'production',
+      // The portal journey drives routes that read the service key from the
+      // SERVER; without it the app under test would be talking to a
+      // different database than the spec's own client.
+      E2E_TENANT_ID: process.env.E2E_TENANT_ID || '',
     },
   },
 })
