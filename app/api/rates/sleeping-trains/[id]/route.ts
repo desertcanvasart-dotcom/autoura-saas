@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { getCatalogScope, catalogOrExpr } from '@/lib/catalog-scope'
 
 export async function GET(
@@ -71,6 +72,16 @@ Object.assign(updateData, rateCurrencyWriteField(body))
     if (body.season !== undefined) updateData.season = body.season || null
     if (body.operator_name !== undefined) updateData.operator_name = body.operator_name || null
     if (body.supplier_id !== undefined) updateData.supplier_id = body.supplier_id || null
+    if (body.property_id !== undefined) {
+      const trainProp = await resolveRateProperty(createAdminClient(), {
+        tenantId: authResult.tenant_id!,
+        propertyType: 'train',
+        supplierId: body.supplier_id || null,
+        name: null,
+        propertyId: body.property_id,
+      })
+      updateData.property_id = trainProp.property_id
+    }
     if (body.description !== undefined) updateData.description = body.description || null
     if (body.notes !== undefined) updateData.notes = body.notes || null
     if (body.is_active !== undefined) updateData.is_active = body.is_active
