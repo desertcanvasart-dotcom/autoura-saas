@@ -1,6 +1,6 @@
 {
   "totals": {
-    "errors": 1549,
+    "errors": 1545,
     "warnings": 576
   },
   "rules": {
@@ -13,7 +13,7 @@
       "warnings": 12
     },
     "@typescript-eslint/no-explicit-any": {
-      "errors": 1418,
+      "errors": 1415,
       "warnings": 0
     },
     "@typescript-eslint/no-require-imports": {
@@ -41,7 +41,7 @@
       "warnings": 3
     },
     "prefer-const": {
-      "errors": 23,
+      "errors": 22,
       "warnings": 0
     },
     "react-hooks/exhaustive-deps": {
