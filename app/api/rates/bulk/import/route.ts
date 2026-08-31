@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { RATE_TABLE_CONFIGS, validateImportData } from '@/lib/bulk-rate-service'
+import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow } from '@/lib/bulk-rate-service'
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 
@@ -50,7 +50,16 @@ export async function POST(request: NextRequest) {
     const uniqueKeyColumn = config.uniqueKey[0]
 
     const rowsToUpsert: Record<string, any>[] = []
+    let exampleRowsSkipped = 0
     for (const row of rows) {
+      // The downloaded template ships one filled-in example row. Skip it, so
+      // the classic mistake -- filling in the sheet underneath and importing
+      // the sample along with it -- cannot land a junk rate.
+      if (isExampleRow(row[uniqueKeyColumn])) {
+        exampleRowsSkipped++
+        continue
+      }
+
       const record: Record<string, any> = { tenant_id }
       for (const colDef of importableColumns) {
         const raw = (row[colDef.name] ?? '').trim()
@@ -61,6 +70,18 @@ export async function POST(request: NextRequest) {
           default: record[colDef.name] = colDef.name === 'rate_currency' ? raw.toUpperCase() : raw
         }
       }
+
+      // The passport-split columns are no longer in the template, and this
+      // route builds its own records rather than reusing validateImportData --
+      // so the mirror has to happen HERE too, or a file written from the
+      // current template lands priced for one passport and blank for the other.
+      for (const colDef of importableColumns) {
+        if (!colDef.mirrorFrom) continue
+        if (record[colDef.name] == null && record[colDef.mirrorFrom] != null) {
+          record[colDef.name] = record[colDef.mirrorFrom]
+        }
+      }
+
       rowsToUpsert.push(record)
     }
 
@@ -96,7 +117,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, errors: importErrors })
+    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, exampleRowsSkipped, errors: importErrors })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { RATE_TABLE_CONFIGS, getExportHeaders } from '@/lib/bulk-rate-service'
+import { RATE_TABLE_CONFIGS, getExportHeaders, getTemplateHeaders, buildTemplateRow } from '@/lib/bulk-rate-service'
 import type { Database } from '@/types/database.types'
 import Papa from 'papaparse'
 
@@ -17,6 +17,25 @@ export async function GET(request: NextRequest) {
     }
 
     const config = RATE_TABLE_CONFIGS[table]
+    // `template=1` returns the headers plus one filled-in example row.
+    // Without it, exporting an EMPTY rate table produced a completely blank
+    // file — Papa returns "" for zero rows, headers and all — so the one
+    // moment somebody most needs to know the format (their first import,
+    // before any data exists) was the moment the system told them nothing.
+    if (request.nextUrl.searchParams.get('template') === '1') {
+      const csv = Papa.unparse({
+        fields: getTemplateHeaders(config),
+        data: [buildTemplateRow(config)],
+      })
+      return new NextResponse(csv, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${table}_template.csv"`,
+        },
+      })
+    }
+
     const headers = getExportHeaders(config)
 
     // Config keys are live table names; the guard above proves membership,
