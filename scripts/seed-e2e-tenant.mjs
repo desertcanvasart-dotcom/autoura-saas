@@ -100,5 +100,45 @@ if (!existing) {
   console.error(`Bucket ${DOCS_BUCKET} was public — set to private`)
 }
 
+// ---------------------------------------------------------------------------
+// A login for the authed crawl. The portal journey never signs in (it is all
+// token links), but the console-error crawl walks the STAFF app, which needs
+// a session. Idempotent: reuses the user when it exists, resets the password
+// so the secret in CI is always the one that works.
+// ---------------------------------------------------------------------------
+export const E2E_USER_EMAIL = 'e2e-crawler@example.invalid'
+const E2E_USER_PASSWORD = process.env.E2E_USER_PASSWORD
+
+if (E2E_USER_PASSWORD) {
+  const { createClient } = await import('@supabase/supabase-js')
+  const admin = createClient(URL, KEY, { auth: { persistSession: false } })
+  const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 })
+  let user = list?.users?.find((x) => x.email === E2E_USER_EMAIL)
+  if (!user) {
+    const { data: created, error } = await admin.auth.admin.createUser({
+      email: E2E_USER_EMAIL,
+      password: E2E_USER_PASSWORD,
+      email_confirm: true,
+    })
+    if (error) { console.error('crawler user create failed:', error.message); process.exit(1) }
+    user = created.user
+    console.error(`created crawler user ${user.id}`)
+  } else {
+    await admin.auth.admin.updateUserById(user.id, { password: E2E_USER_PASSWORD })
+    console.error(`reusing crawler user ${user.id} (password reset)`)
+  }
+  // Membership + profile, so requireAuth resolves a tenant for the session.
+  await db.from('user_profiles').upsert(
+    { id: user.id, email: E2E_USER_EMAIL, full_name: 'E2E Crawler', role: 'owner' },
+    { onConflict: 'id' }
+  )
+  await db.from('tenant_members').upsert(
+    { tenant_id: tenantId, user_id: user.id, role: 'owner', status: 'active' },
+    { onConflict: 'tenant_id,user_id' }
+  )
+} else {
+  console.error('E2E_USER_PASSWORD not set — skipping crawler-user seed (portal journey needs no login).')
+}
+
 // stdout is the tenant id alone, so CI can capture it.
 console.log(tenantId)

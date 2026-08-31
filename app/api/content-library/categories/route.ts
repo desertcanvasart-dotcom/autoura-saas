@@ -114,7 +114,6 @@ export async function POST(request: NextRequest) {
       .insert({
         name,
         slug: finalSlug,
-        description: description || null,
         icon: icon || null,
         sort_order: sort_order || 0
       })

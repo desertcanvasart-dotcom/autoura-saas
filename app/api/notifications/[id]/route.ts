@@ -28,7 +28,7 @@ export async function PUT(
 
     const { data, error } = await (createAdminClient() as any)
       .from('notifications')
-      .update({ is_read, updated_at: new Date().toISOString() })
+      .update({ is_read })
       .eq('id', id)
       .eq('team_member_id', teamMemberId)
       .select()

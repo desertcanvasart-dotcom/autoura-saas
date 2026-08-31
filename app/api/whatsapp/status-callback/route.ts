@@ -81,11 +81,15 @@ export async function POST(request: NextRequest) {
     // status code, so the two cases are separated and each is greppable.
     const { data: updated, error } = await (getSupabaseAdmin() as any)
       .from('whatsapp_messages')
+      // whatsapp_messages has no error_code/error_message/updated_at columns —
+      // every status update carrying them 400'd. Errors ride the metadata
+      // JSONB instead (set only on failure, so successful-status updates never
+      // clobber existing metadata).
       .update({
         status: messageStatus,
-        error_code: errorCode,
-        error_message: errorMessage,
-        updated_at: new Date().toISOString()
+        ...(errorCode || errorMessage
+          ? { metadata: { error_code: errorCode ?? null, error_message: errorMessage ?? null } }
+          : {})
       })
       .eq('message_sid', messageSid)
       .select('id')
