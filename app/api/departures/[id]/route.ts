@@ -218,7 +218,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     // Check if departure has bookings
     const { count } = await supabase
       .from('departure_bookings')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('departure_id', id)
       .in('status', ['pending', 'confirmed'])
 

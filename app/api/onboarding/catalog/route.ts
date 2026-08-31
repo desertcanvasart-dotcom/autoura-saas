@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       for (const table of CATALOG_TABLES) {
         const { count, error } = await admin
           .from(table)
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq('tenant_id', tenant_id)
         if (error) {
           return NextResponse.json(

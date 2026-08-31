@@ -35,7 +35,7 @@ export async function GET() {
     // Get total templates count
     const { count: totalTemplates } = await supabase
       .from('message_templates')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenant_id)
       .eq('is_active', true)
 
@@ -106,7 +106,7 @@ export async function GET() {
     // Get scheduled sends count
     const { count: pendingScheduled } = await supabase
       .from('scheduled_sends')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenant_id)
       .eq('status', 'pending')
 
