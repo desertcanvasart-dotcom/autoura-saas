@@ -52,6 +52,7 @@ jobs:
       E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
       E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
       E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
+      E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -125,6 +126,15 @@ jobs:
         env:
           E2E_TENANT_ID: ${{ steps.e2e_tenant.outputs.tenant_id }}
         run: npx playwright test e2e/portal-journey.spec.ts
+
+      - name: E2E console-error crawl (writes nothing — needs the crawler login)
+        # Signs in as the seeded crawler and walks every sidebar destination,
+        # failing on console errors, 5xx responses, and literal "null" text.
+        # Skips until E2E_USER_PASSWORD joins the throwaway-project secrets.
+        if: env.E2E_SUPABASE_URL != '' && env.E2E_USER_PASSWORD != ''
+        env:
+          E2E_TENANT_ID: ${{ steps.e2e_tenant.outputs.tenant_id }}
+        run: npx playwright test e2e/crawl.authed.spec.ts
 
       - name: Bundle budget
         # Gzipped client-JS ceilings (scripts/check-bundle-budget.mjs) —

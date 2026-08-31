@@ -194,9 +194,9 @@ async function applyMetaStatuses(statuses: MetaStatusUpdate[]) {
       .from('whatsapp_messages')
       .update({
         status: s.status,
-        error_code: s.errorCode ?? null,
-        error_message: s.errorMessage ?? null,
-        updated_at: new Date().toISOString()
+        ...(s.errorCode || s.errorMessage
+          ? { metadata: { error_code: s.errorCode ?? null, error_message: s.errorMessage ?? null } }
+          : {})
       })
       .eq('message_sid', s.messageSid)
     if (error) {
