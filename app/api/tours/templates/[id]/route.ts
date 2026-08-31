@@ -57,7 +57,7 @@ export async function GET(
         accommodation:hotel_contacts(id, name, city),
         guide:guides(id, name, languages)
       `)
-      .eq('tour_id', id)
+      .eq('template_id', id)
       .order('day_number', { ascending: true })
 
     // Meals are resolved with a second read rather than a PostgREST embed.
@@ -244,11 +244,15 @@ export async function DELETE(
       )
     }
 
-    // Get all days first (RLS filters to tenant's days only)
+    // tour_days is keyed by template_id, not tour_id. The route filtered on
+    // tour_id in all three places it touched the table — a column that does
+    // not exist — so PostgREST 400'd, failStep aborted, and NO template could
+    // ever be deleted (operator, 1 Sep). tour_pricing genuinely uses tour_id
+    // and is left alone.
     const { data: days } = await supabase
       .from('tour_days')
       .select('id')
-      .eq('tour_id', id)
+      .eq('template_id', id)
 
     // Every child delete below is CHECKED, and any failure aborts before the
     // template itself is removed.
@@ -281,7 +285,7 @@ export async function DELETE(
     const { error: daysErr } = await supabase
       .from('tour_days')
       .delete()
-      .eq('tour_id', id)
+      .eq('template_id', id)
     if (daysErr) return failStep('days', daysErr.message)
 
     // Delete variation services first (RLS filters to tenant's variations only)
