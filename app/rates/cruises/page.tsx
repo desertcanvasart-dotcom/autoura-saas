@@ -113,6 +113,9 @@ interface Toast {
 // FORM DATA INTERFACE
 // ============================================
 
+// Ship picker option that reveals the free-text input for a new ship.
+const NEW_SHIP = '__new__'
+
 interface CruiseFormData {
   cruise_code: string
   ship_name: string
@@ -166,6 +169,8 @@ interface CruiseFormData {
   tier: string
   is_preferred: boolean
   supplier_id: string
+  /** The ship this rate belongs to (supplier_properties). '' = resolve by name on save. */
+  property_id: string
 }
 
 // ============================================
@@ -674,10 +679,12 @@ export default function CruisesPage() {
     is_active: true,
     tier: 'standard',
     is_preferred: false,
-    supplier_id: ''
+    supplier_id: '',
+    property_id: ''
   })
 
   const [formData, setFormData] = useState<CruiseFormData>(getDefaultFormData())
+  const [ships, setShips] = useState<{ id: string; name: string; category: string | null }[]>([])
 
   const showToast = (type: 'success' | 'error', message: string) => {
     const id = Date.now().toString()
@@ -735,11 +742,33 @@ export default function CruisesPage() {
   }
 
   const handleSupplierChange = (supplierId: string) => {
-    const supplier = suppliers.find(s => s.id === supplierId)
+    setFormData(prev => ({ ...prev, supplier_id: supplierId, property_id: '' }))
+    void loadShips(supplierId)
+  }
+
+  // The supplier's fleet, for the ship picker. Empty for "no supplier".
+  const loadShips = async (supplierId: string) => {
+    if (!supplierId) { setShips([]); return }
+    try {
+      const res = await fetch(`/api/suppliers/${supplierId}/properties?type=ship&active_only=true`)
+      const data = await res.json().catch(() => ({}))
+      setShips(res.ok && data.success ? data.data : [])
+    } catch { setShips([]) }
+  }
+
+  const handleShipPick = (value: string) => {
+    if (value === NEW_SHIP) {
+      setFormData(prev => ({ ...prev, property_id: '', ship_name: '' }))
+      return
+    }
+    const ship = ships.find(sh => sh.id === value)
     setFormData(prev => ({
       ...prev,
-      supplier_id: supplierId,
-      ship_name: supplier?.name || prev.ship_name
+      property_id: value,
+      ship_name: ship?.name || prev.ship_name,
+      ...(ship?.category && ['standard', 'deluxe', 'luxury'].includes(ship.category)
+        ? { ship_category: ship.category as CruiseFormData['ship_category'] }
+        : {}),
     }))
   }
 
@@ -811,8 +840,10 @@ export default function CruisesPage() {
       is_active: cruise.is_active,
       tier: cruise.tier || 'standard',
       is_preferred: cruise.is_preferred || false,
-      supplier_id: cruise.supplier_id || ''
+      supplier_id: cruise.supplier_id || '',
+      property_id: (cruise as { property_id?: string | null }).property_id || ''
     })
+    void loadShips(cruise.supplier_id || '')
     setShowModal(true)
   }
 
@@ -870,8 +901,10 @@ export default function CruisesPage() {
       is_active: cruise.is_active,
       tier: cruise.tier || 'standard',
       is_preferred: cruise.is_preferred || false,
-      supplier_id: cruise.supplier_id || ''
+      supplier_id: cruise.supplier_id || '',
+      property_id: (cruise as { property_id?: string | null }).property_id || ''
     })
+    void loadShips(cruise.supplier_id || '')
     setShowModal(true)
     showToast('success', 'Cruise duplicated - modify and save as new')
   }
@@ -902,6 +935,7 @@ export default function CruisesPage() {
         rate_double_eur: doubleEur,
         rate_triple_eur: tripleEur > 0 ? tripleEur : null,
         supplier_id: formData.supplier_id || null,
+        property_id: formData.property_id || null,
         // Convert empty date strings to null (PostgreSQL requires null, not empty strings for DATE fields)
         low_season_start: formData.low_season_start || null,
         low_season_end: formData.low_season_end || null,
@@ -1399,15 +1433,45 @@ export default function CruisesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Ship Name *</label>
-                  <input
-                    type="text"
-                    name="ship_name"
-                    value={formData.ship_name}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-                    placeholder="MS Sonesta St. George"
-                  />
+                  {/* Supplier-HAS-properties: with a supplier chosen, the ship
+                      comes from that supplier's fleet (Suppliers → Properties).
+                      Typing a new name still works — the API creates the ship
+                      under the supplier on save. */}
+                  {ships.length > 0 && formData.supplier_id ? (
+                    <>
+                      <select
+                        value={formData.property_id || NEW_SHIP}
+                        onChange={(e) => handleShipPick(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+                      >
+                        <option value={NEW_SHIP}>+ New ship…</option>
+                        {ships.map(ship => (
+                          <option key={ship.id} value={ship.id}>{ship.name}{ship.category ? ` (${ship.category})` : ''}</option>
+                        ))}
+                      </select>
+                      {!formData.property_id && (
+                        <input
+                          type="text"
+                          name="ship_name"
+                          value={formData.ship_name}
+                          onChange={handleChange}
+                          required
+                          className="w-full px-3 py-2 mt-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+                          placeholder="MS Sonesta St. George"
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <input
+                      type="text"
+                      name="ship_name"
+                      value={formData.ship_name}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
+                      placeholder="MS Sonesta St. George"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Ship Category *</label>

@@ -12,7 +12,6 @@ const VALID_FIELDS = [
   'languages', 'vehicle_types', 'star_rating', 'property_type',
   'cuisine_types', 'routes', 'ship_name', 'cabin_count', 'capacity',
   // Hierarchical fields (company -> property relationship)
-  'is_property', 'parent_supplier_id'
 ]
 
 // Filter object to only include valid fields
@@ -31,8 +30,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const type = searchParams.get('type')
     const status = searchParams.get('status')
-    const isProperty = searchParams.get('is_property')
-    const parentId = searchParams.get('parent_supplier_id')
 
     // Use authenticated client - RLS automatically filters by tenant_id
     const supabase = await createAuthenticatedClient()
@@ -65,17 +62,9 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status)
     }
 
-    // Filter by is_property (true = individual properties, false = parent companies)
-    if (isProperty === 'true') {
-      query = query.eq('is_property', true)
-    } else if (isProperty === 'false') {
-      query = query.eq('is_property', false)
-    }
-
-    // Filter by parent supplier (get all properties under a specific company)
-    if (parentId) {
-      query = query.eq('parent_supplier_id', parentId)
-    }
+    // The is_property / parent_supplier_id filters are gone with the columns
+    // (the supplier-IS-a-property model retired by migration 311); a
+    // supplier's assets now live in supplier_properties.
 
     const { data, error } = await query
 
@@ -125,9 +114,7 @@ export async function POST(request: NextRequest) {
       // company_name is NOT NULL in the DB; mirror the legacy name column
       company_name: body.name,
       country: body.country || 'Egypt',
-      status: body.status || 'active',
-      is_property: body.is_property || false,
-      parent_supplier_id: body.parent_supplier_id || null
+      status: body.status || 'active'
     }
 
     const { data, error } = await supabase

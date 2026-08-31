@@ -11,7 +11,6 @@ const VALID_FIELDS = [
   'languages', 'vehicle_types', 'star_rating', 'property_type',
   'cuisine_types', 'routes', 'ship_name', 'cabin_count', 'capacity',
   // Hierarchical fields
-  'is_property', 'parent_supplier_id'
 ]
 
 // Filter object to only include valid fields

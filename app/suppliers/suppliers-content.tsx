@@ -9,8 +9,10 @@ import {
   ShoppingBag, MapPin, Users, Briefcase, X, Edit, Trash2, Eye, Loader2, AlertCircle,
   Phone, Mail, MessageCircle, Percent, LayoutGrid, List, Table2, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, Download,
-  Star, Globe, DollarSign, FileText, Calendar, Check, Link2, Building
+  Star, Globe, DollarSign, FileText, Calendar, Check
 } from 'lucide-react'
+import SupplierPropertiesPanel from '@/components/SupplierPropertiesPanel'
+import { propertyTypesForRoles } from '@/lib/supplier-properties'
 
 // Types
 interface Supplier {
@@ -35,15 +37,11 @@ interface Supplier {
   languages?: string[]
   vehicle_types?: string[]
   star_rating?: string
-  property_type?: string
   cuisine_types?: string[]
   routes?: string[]
-  ship_name?: string
   cabin_count?: number
   capacity?: number
   // Hierarchical fields
-  parent_supplier_id?: string | null
-  is_property?: boolean
   parent_supplier?: { id: string; name: string } | null
   children_count?: number
   created_at: string
@@ -107,8 +105,6 @@ const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-700'
 }
 
-// Types that support hierarchy (company -> properties)
-const HIERARCHICAL_TYPES = ['hotel', 'restaurant', 'cruise']
 
 // Multi-select component
 function MultiSelect({ options, value, onChange, placeholder }: { 
@@ -199,8 +195,6 @@ export default function SuppliersContent() {
   
   const [selectedType, setSelectedType] = useState<string>('all')
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
-  const [showPropertiesOnly, setShowPropertiesOnly] = useState(false)
-  const [showCompaniesOnly, setShowCompaniesOnly] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -224,7 +218,6 @@ export default function SuppliersContent() {
   // View modal tabs
   const [viewTab, setViewTab] = useState<'details' | 'rates' | 'properties' | 'documents'>('details')
   const [supplierRates, setSupplierRates] = useState<TransportRate[]>([])
-  const [childProperties, setChildProperties] = useState<Supplier[]>([])
   const [loadingRates, setLoadingRates] = useState(false)
 
   useEffect(() => {
@@ -275,24 +268,7 @@ export default function SuppliersContent() {
     }
   }
 
-  const fetchChildProperties = async (parentId: string) => {
-    try {
-      const children = suppliers.filter(s => s.parent_supplier_id === parentId)
-      setChildProperties(children)
-    } catch (error) {
-      console.error('Error fetching child properties:', error)
-      setChildProperties([])
-    }
-  }
 
-  // Get potential parent companies for a given type
-  const getParentCompanies = (type: string) => {
-    return suppliers.filter(s => 
-      s.type === type && 
-      !s.is_property && 
-      !s.parent_supplier_id
-    )
-  }
 
   // Filter and sort
   const filteredSuppliers = suppliers
@@ -304,9 +280,7 @@ export default function SuppliersContent() {
         supplier.contact_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         supplier.contact_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         supplier.city?.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesPropertyFilter = !showPropertiesOnly || supplier.is_property
-      const matchesCompanyFilter = !showCompaniesOnly || (!supplier.is_property && !supplier.parent_supplier_id)
-      return matchesType && matchesStatus && matchesSearch && matchesPropertyFilter && matchesCompanyFilter
+      return matchesType && matchesStatus && matchesSearch
     })
     .sort((a, b) => {
       let aVal = '', bVal = ''
@@ -327,14 +301,13 @@ export default function SuppliersContent() {
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedSuppliers = filteredSuppliers.slice(startIndex, startIndex + itemsPerPage)
 
-  useEffect(() => { setCurrentPage(1) }, [searchQuery, selectedType, selectedStatus, itemsPerPage, showPropertiesOnly, showCompaniesOnly])
+  useEffect(() => { setCurrentPage(1) }, [searchQuery, selectedType, selectedStatus, itemsPerPage])
 
   const stats = suppliers.reduce((acc, s) => {
     acc[s.type] = (acc[s.type] || 0) + 1
     acc.all = (acc.all || 0) + 1
-    if (s.is_property) acc.properties = (acc.properties || 0) + 1
     return acc
-  }, { all: 0, properties: 0 } as Record<string, number>)
+  }, { all: 0 } as Record<string, number>)
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -352,53 +325,32 @@ export default function SuppliersContent() {
 
   const getTypeConfig = (type: string) => TYPE_CONFIG[type] || TYPE_CONFIG.other
 
-  // Get parent supplier name
-  const getParentName = (parentId: string | null | undefined) => {
-    if (!parentId) return null
-    const parent = suppliers.find(s => s.id === parentId)
-    return parent?.name || null
-  }
 
   const handleAdd = () => {
     const defaultType = selectedType !== 'all' ? selectedType : 'hotel'
-    setFormData({ 
-      status: 'active', 
-      type: defaultType,
-      is_property: false,
-      parent_supplier_id: null
-    })
+    setFormData({ status: 'active', type: defaultType })
     setError(null)
     setShowAddModal(true)
   }
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier)
-    setFormData({ 
-      ...supplier,
-      is_property: supplier.is_property || false,
-      parent_supplier_id: supplier.parent_supplier_id || null
-    })
+    setFormData({ ...supplier })
     setError(null)
     setShowEditModal(true)
     setOpenMenuId(null)
   }
 
-  const handleView = (supplier: Supplier) => {
+  const handleView = (supplier: Supplier, tab: 'details' | 'properties' = 'details') => {
     setSelectedSupplier(supplier)
-    setViewTab('details')
+    setViewTab(tab)
     setSupplierRates([])
-    setChildProperties([])
     setShowViewModal(true)
     setOpenMenuId(null)
-    
+
     // Fetch rates for transport companies
     if (['transport_company', 'transport', 'driver'].includes(supplier.type)) {
       fetchSupplierRates(supplier.id)
-    }
-    
-    // Fetch child properties if this is a parent company
-    if (!supplier.is_property && !supplier.parent_supplier_id && HIERARCHICAL_TYPES.includes(supplier.type)) {
-      fetchChildProperties(supplier.id)
     }
   }
 
@@ -415,16 +367,19 @@ export default function SuppliersContent() {
       const response = await fetch('/api/suppliers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          parent_supplier_id: formData.parent_supplier_id || null,
-          is_property: formData.is_property || false
-        })
+        body: JSON.stringify(formData)
       })
-      if (!response.ok) throw new Error((await response.json()).error || 'Failed to create')
+      const created = await response.json()
+      if (!response.ok) throw new Error(created.error || 'Failed to create')
       setShowAddModal(false)
       setFormData({})
       fetchSuppliers()
+      // A cruise line or hotel was just created — open it on its Properties
+      // tab so the fleet can be added right away.
+      const row: Supplier | undefined = created.data
+      if (row?.id && propertyTypesForRoles([row.type]).length > 0) {
+        handleView(row, 'properties')
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -440,11 +395,7 @@ export default function SuppliersContent() {
       const response = await fetch(`/api/suppliers/${selectedSupplier.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          parent_supplier_id: formData.parent_supplier_id || null,
-          is_property: formData.is_property || false
-        })
+        body: JSON.stringify(formData)
       })
       if (!response.ok) throw new Error((await response.json()).error || 'Failed to update')
       setShowEditModal(false)
@@ -477,12 +428,10 @@ export default function SuppliersContent() {
 
   const handleExport = () => {
     const csv = [
-      ['Name', 'Type', 'Is Property', 'Parent Company', 'Contact', 'Email', 'Phone', 'City', 'Commission', 'Status'].join(','),
+      ['Name', 'Type', 'Contact', 'Email', 'Phone', 'City', 'Commission', 'Status'].join(','),
       ...filteredSuppliers.map(s => [
         s.name, 
         s.type, 
-        s.is_property ? 'Yes' : 'No',
-        getParentName(s.parent_supplier_id) || '',
         s.contact_name, 
         s.contact_email, 
         s.contact_phone, 
@@ -537,62 +486,6 @@ export default function SuppliersContent() {
   const renderFormField = (field: any) => {
     const value = formData[field.key]
     
-    // Parent company selector
-    if (field.type === 'parent_select') {
-      const parentCompanies = getParentCompanies(formData.type || 'hotel')
-      const isDisabled = !formData.is_property
-      
-      return (
-        <div>
-          <select
-            value={value || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, [field.key]: e.target.value || null }))}
-            disabled={isDisabled}
-            className={`w-full h-10 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <option value="">No parent (standalone)</option>
-            {parentCompanies.map(company => (
-              <option key={company.id} value={company.id}>
-                {company.name} {company.city && `(${company.city})`}
-              </option>
-            ))}
-          </select>
-          {isDisabled && (
-            <p className="text-xs text-gray-500 mt-1">Enable "Is Property" to link to a parent company</p>
-          )}
-        </div>
-      )
-    }
-    
-    // Checkbox for is_property
-    if (field.type === 'checkbox') {
-      return (
-        <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <input
-            type="checkbox"
-            checked={value || false}
-            onChange={(e) => {
-              setFormData(prev => ({ 
-                ...prev, 
-                [field.key]: e.target.checked,
-                // Clear parent if unchecking
-                parent_supplier_id: e.target.checked ? prev.parent_supplier_id : null
-              }))
-            }}
-            className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mt-0.5"
-          />
-          <div>
-            <span className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
-              <Building className="w-4 h-4 text-blue-600" />
-              This is an individual property
-            </span>
-            {field.description && (
-              <p className="text-xs text-gray-600 mt-0.5">{field.description}</p>
-            )}
-          </div>
-        </div>
-      )
-    }
     
     if (field.type === 'multiselect') {
       return (
@@ -741,25 +634,6 @@ export default function SuppliersContent() {
             <option value="pending">Pending</option>
           </select>
           
-          {/* Property/Company filter - only show for hierarchical types */}
-          {HIERARCHICAL_TYPES.includes(selectedType) && (
-            <>
-              <button
-                onClick={() => { setShowPropertiesOnly(!showPropertiesOnly); setShowCompaniesOnly(false) }}
-                className={`h-10 px-3 text-sm rounded-lg font-medium transition-colors ${showPropertiesOnly ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-              >
-                <Building className="w-4 h-4 inline mr-1.5" />
-                Properties Only
-              </button>
-              <button
-                onClick={() => { setShowCompaniesOnly(!showCompaniesOnly); setShowPropertiesOnly(false) }}
-                className={`h-10 px-3 text-sm rounded-lg font-medium transition-colors ${showCompaniesOnly ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-              >
-                <Briefcase className="w-4 h-4 inline mr-1.5" />
-                Companies Only
-              </button>
-            </>
-          )}
         </div>
       </div>
 
@@ -785,7 +659,6 @@ export default function SuppliersContent() {
                 {paginatedSuppliers.map((supplier) => {
                   const config = getTypeConfig(supplier.type)
                   const Icon = config.icon
-                  const parentName = getParentName(supplier.parent_supplier_id)
                   return (
                     <div key={supplier.id} className={`bg-white rounded-lg border ${config.borderColor} p-4 hover:shadow-md transition-all cursor-pointer group`} onClick={() => handleView(supplier)}>
                       <div className="flex items-start justify-between mb-3">
@@ -796,19 +669,10 @@ export default function SuppliersContent() {
                           <div>
                             <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
                               {supplier.name}
-                              {supplier.is_property && (
-                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px] font-medium">Property</span>
-                              )}
                             </h3>
                             <p className="text-xs text-gray-500">
                               {config.singular}{supplier.city && ` • ${supplier.city}`}
                             </p>
-                            {parentName && (
-                              <p className="text-xs text-purple-600 flex items-center gap-1 mt-0.5">
-                                <Link2 className="w-3 h-3" />
-                                {parentName}
-                              </p>
-                            )}
                           </div>
                         </div>
                         <div className="relative">
@@ -818,6 +682,9 @@ export default function SuppliersContent() {
                           {openMenuId === supplier.id && (
                             <div className="absolute right-0 top-8 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
                               <button onClick={(e) => { e.stopPropagation(); handleView(supplier) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"><Eye className="w-3.5 h-3.5" /> View</button>
+                              {propertyTypesForRoles([supplier.type]).length > 0 && (
+                                <button onClick={(e) => { e.stopPropagation(); handleView(supplier, 'properties') }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"><Ship className="w-3.5 h-3.5" /> Properties</button>
+                              )}
                               <button onClick={(e) => { e.stopPropagation(); handleEdit(supplier) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"><Edit className="w-3.5 h-3.5" /> Edit</button>
                               <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(supplier) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
                             </div>
@@ -879,7 +746,6 @@ export default function SuppliersContent() {
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="text-left px-4 py-3"><button onClick={() => handleSort('name')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">Name <SortIcon field="name" /></button></th>
                       <th className="text-left px-4 py-3"><button onClick={() => handleSort('type')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">Type <SortIcon field="type" /></button></th>
-                      <th className="text-left px-4 py-3"><span className="text-xs font-semibold text-gray-600">Parent</span></th>
                       <th className="text-left px-4 py-3"><button onClick={() => handleSort('city')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">City <SortIcon field="city" /></button></th>
                       <th className="text-left px-4 py-3"><span className="text-xs font-semibold text-gray-600">Contact</span></th>
                       <th className="text-left px-4 py-3"><button onClick={() => handleSort('status')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">Status <SortIcon field="status" /></button></th>
@@ -890,7 +756,6 @@ export default function SuppliersContent() {
                     {paginatedSuppliers.map((supplier) => {
                       const config = getTypeConfig(supplier.type)
                       const Icon = config.icon
-                      const parentName = getParentName(supplier.parent_supplier_id)
                       return (
                         <tr key={supplier.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => handleView(supplier)}>
                           <td className="px-4 py-3">
@@ -899,24 +764,11 @@ export default function SuppliersContent() {
                               <div>
                                 <span className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
                                   {supplier.name}
-                                  {supplier.is_property && (
-                                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-[10px]">Property</span>
-                                  )}
                                 </span>
                               </div>
                             </div>
                           </td>
                           <td className="px-4 py-3"><span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${config.color}`}>{config.label}</span></td>
-                          <td className="px-4 py-3">
-                            {parentName ? (
-                              <span className="text-xs text-purple-600 flex items-center gap-1">
-                                <Link2 className="w-3 h-3" />
-                                {parentName}
-                              </span>
-                            ) : (
-                              <span className="text-sm text-gray-400">—</span>
-                            )}
-                          </td>
                           <td className="px-4 py-3"><span className="text-sm text-gray-600">{supplier.city || '—'}</span></td>
                           <td className="px-4 py-3">{supplier.contact_email ? <a href={`mailto:${supplier.contact_email}`} onClick={(e) => e.stopPropagation()} className="text-sm text-primary-600 hover:underline">{supplier.contact_email}</a> : <span className="text-sm text-gray-400">—</span>}</td>
                           <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLORS[supplier.status]}`}>{supplier.status}</span></td>
@@ -940,7 +792,6 @@ export default function SuppliersContent() {
                 {paginatedSuppliers.map((supplier) => {
                   const config = getTypeConfig(supplier.type)
                   const Icon = config.icon
-                  const parentName = getParentName(supplier.parent_supplier_id)
                   return (
                     <div key={supplier.id} className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 cursor-pointer group" onClick={() => handleView(supplier)}>
                       <div className={`w-10 h-10 rounded-lg ${config.color} flex items-center justify-center flex-shrink-0`}><Icon className="w-5 h-5" /></div>
@@ -948,10 +799,8 @@ export default function SuppliersContent() {
                         <div>
                           <p className="text-sm font-medium text-gray-900 truncate flex items-center gap-1.5">
                             {supplier.name}
-                            {supplier.is_property && <Building className="w-3 h-3 text-blue-500" />}
                           </p>
                           <p className="text-xs text-gray-500">{config.label}</p>
-                          {parentName && <p className="text-xs text-purple-600 truncate">{parentName}</p>}
                         </div>
                         <div className="flex items-center gap-1.5 text-sm text-gray-600">{supplier.city && <><MapPin className="w-3.5 h-3.5 text-gray-400" />{supplier.city}</>}</div>
                         <div>{supplier.contact_email && <a href={`mailto:${supplier.contact_email}`} onClick={(e) => e.stopPropagation()} className="text-sm text-gray-600 hover:text-primary-600 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-gray-400" /><span className="truncate">{supplier.contact_email}</span></a>}</div>
@@ -1024,7 +873,7 @@ export default function SuppliersContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {getFormFields().map((field) => (
-                  <div key={field.key} className={field.type === 'textarea' || field.key === 'is_property' || field.key === 'parent_supplier_id' ? 'md:col-span-2' : ''}>
+                  <div key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
                     {field.type !== 'checkbox' && (
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         {field.name} {field.required && <span className="text-red-500">*</span>}
@@ -1066,17 +915,8 @@ export default function SuppliersContent() {
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                     {selectedSupplier.name}
-                    {selectedSupplier.is_property && (
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-xs font-medium">Property</span>
-                    )}
                   </h2>
                   <p className="text-sm text-gray-500">{getTypeConfig(selectedSupplier.type).singular}</p>
-                  {selectedSupplier.parent_supplier_id && (
-                    <p className="text-xs text-purple-600 flex items-center gap-1 mt-0.5">
-                      <Link2 className="w-3 h-3" />
-                      Part of {getParentName(selectedSupplier.parent_supplier_id)}
-                    </p>
-                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1094,10 +934,8 @@ export default function SuppliersContent() {
                     Rates {supplierRates.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-gray-100 rounded text-xs">{supplierRates.length}</span>}
                   </button>
                 )}
-                {!selectedSupplier.is_property && !selectedSupplier.parent_supplier_id && HIERARCHICAL_TYPES.includes(selectedSupplier.type) && (
-                  <button onClick={() => { setViewTab('properties'); fetchChildProperties(selectedSupplier.id) }} className={`py-3 text-sm font-medium border-b-2 transition-colors ${viewTab === 'properties' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                    Properties {childProperties.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-xs">{childProperties.length}</span>}
-                  </button>
+                {propertyTypesForRoles([selectedSupplier.type]).length > 0 && (
+                  <button onClick={() => setViewTab('properties')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${viewTab === 'properties' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Properties</button>
                 )}
                 <button onClick={() => setViewTab('documents')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${viewTab === 'documents' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Documents</button>
               </div>
@@ -1161,70 +999,10 @@ export default function SuppliersContent() {
               )}
 
               {viewTab === 'properties' && (
-                <div>
-                  {childProperties.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Building className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                      <p>No properties linked to this company</p>
-                      <button 
-                        onClick={() => { 
-                          setShowViewModal(false)
-                          setFormData({ 
-                            status: 'active', 
-                            type: selectedSupplier.type,
-                            is_property: true,
-                            parent_supplier_id: selectedSupplier.id
-                          })
-                          setShowAddModal(true)
-                        }} 
-                        className="mt-3 text-sm text-primary-600 hover:underline"
-                      >
-                        + Add a property
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {childProperties.map(property => {
-                        const config = getTypeConfig(property.type)
-                        const Icon = config.icon
-                        return (
-                          <div 
-                            key={property.id} 
-                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
-                            onClick={() => {
-                              setSelectedSupplier(property)
-                              setViewTab('details')
-                            }}
-                          >
-                            <div className={`w-8 h-8 rounded-lg ${config.color} flex items-center justify-center`}>
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-gray-900">{property.name}</p>
-                              <p className="text-xs text-gray-500">{property.city || 'No city'} • {property.contact_email || 'No email'}</p>
-                            </div>
-                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLORS[property.status]}`}>{property.status}</span>
-                          </div>
-                        )
-                      })}
-                      <button 
-                        onClick={() => { 
-                          setShowViewModal(false)
-                          setFormData({ 
-                            status: 'active', 
-                            type: selectedSupplier.type,
-                            is_property: true,
-                            parent_supplier_id: selectedSupplier.id
-                          })
-                          setShowAddModal(true)
-                        }} 
-                        className="w-full p-3 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-primary-300 hover:text-primary-600 transition-colors"
-                      >
-                        + Add another property
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <SupplierPropertiesPanel
+                  supplierId={selectedSupplier.id}
+                  supplierRoles={[selectedSupplier.type]}
+                />
               )}
 
               {viewTab === 'documents' && (

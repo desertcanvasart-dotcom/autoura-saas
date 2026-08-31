@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { resolveShipProperty } from '@/lib/suppliers/resolve-property'
 import { validateRatePayload } from '@/lib/rate-validation'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 
@@ -89,6 +90,16 @@ export async function POST(request: NextRequest) {
       ? {}
       : { seasons: parsedSeasons, ...legacyColumnMirror(parsedSeasons, 'cruise') }
 
+    // Supplier-HAS-properties (Phase 1): link the rate to its ship, creating
+    // the property under the supplier when it does not exist yet. The
+    // property's canonical name wins over the payload spelling.
+    const ship = await resolveShipProperty(supabase, {
+      tenantId: authResult.tenant_id!,
+      supplierId: body.supplier_id || null,
+      shipName: body.ship_name,
+      propertyId: body.property_id,
+    })
+
     const newCruise = {
       // Dated rate periods (C3.2). Only named when the client sent them, so a
       // database without migration 305 never sees the column; the first period
@@ -96,7 +107,9 @@ export async function POST(request: NextRequest) {
       ...seasonsPatch,
       ...rateCurrencyWriteField(body),
       ...body,
-      supplier_id: body.supplier_id || null
+      supplier_id: body.supplier_id || null,
+      property_id: ship.property_id,
+      ...(ship.ship_name ? { ship_name: ship.ship_name } : {})
     }
 
     const { data, error } = await supabase
