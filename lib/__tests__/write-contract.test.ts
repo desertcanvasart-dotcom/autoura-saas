@@ -159,6 +159,35 @@ describe('database write contract', () => {
     expect(violations, 'These coerce falsy values to null into NOT NULL columns — use ?? or a real default').toEqual([])
   })
 
+  it('every .eq()/.in() filter column exists in the live schema', () => {
+    // Writes were guarded; FILTERS were not — and a filter on a missing
+    // column 400s just as hard. app/api/tours/templates/[id] filtered
+    // tour_days by tour_id (the column is template_id) in three places, so
+    // no tour template could ever be DELETED while the GET beside it worked.
+    const violations: string[] = []
+    for (const dir of ['app', 'lib']) {
+      for (const file of walk(join(ROOT, dir))) {
+        const src = readFileSync(file, 'utf8')
+        const re = /\.from\(\s*'([a-z_0-9]+)'\s*\)((?:(?!\.from\()[\s\S]){0,400}?)\.(?:eq|neq|in|gt|gte|lt|lte|like|ilike|is)\(\s*'([a-z_0-9]+)'/g
+        let m: RegExpExecArray | null
+        while ((m = re.exec(src)) !== null) {
+          const cols = columns.get(m[1])
+          if (!cols) continue
+          // Embedded-resource filters (`table.column`) and rpc args are not
+          // plain columns of this table.
+          if (m[3].includes('.')) continue
+          if (!cols.has(m[3])) {
+            violations.push(`${file.replace(ROOT + '/', '')}: filters ${m[1]}.${m[3]} — column does not exist`)
+          }
+        }
+      }
+    }
+    expect(
+      violations,
+      'These filter on columns the live schema does not have — the query 400s at runtime.'
+    ).toEqual([])
+  })
+
   it('every literal insert/update key exists in the live schema', () => {
     const violations: string[] = []
     for (const dir of ['app', 'lib']) {
