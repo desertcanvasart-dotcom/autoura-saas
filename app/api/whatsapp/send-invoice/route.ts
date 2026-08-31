@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { brandColorRgb, fetchLogoBytes } from '@/lib/company-identity'
+import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
 
 // Generate Invoice PDF
 async function generateInvoicePDF(
@@ -40,7 +41,10 @@ async function generateInvoicePDF(
   // Header — logo left of the name when the tenant uploaded one (best-effort),
   // matching the jsPDF letterhead in lib/invoice-pdf-generator.ts.
   let nameX = margin
-  const logo = await fetchLogoBytes(company.logoUrl)
+  // SSRF: validate the tenant logo URL before the server fetches it.
+  const logo = (company.logoUrl && (await checkPublicHttpUrl(company.logoUrl)).ok)
+    ? await fetchLogoBytes(company.logoUrl)
+    : undefined
   if (logo) {
     try {
       const img = logo.format === 'png' ? await pdfDoc.embedPng(logo.bytes) : await pdfDoc.embedJpg(logo.bytes)

@@ -56,3 +56,27 @@ describe('checkPublicHttpUrl', () => {
     expect(r.ok).toBe(true)
   })
 })
+
+// The isomorphic logo module (lib/company-identity) must NOT import the guard
+// — it also runs in the browser, where node:dns cannot be bundled (this is
+// what broke the production build once). The guard lives in the server routes
+// that fetch a logo instead.
+import { readFileSync } from 'fs'
+import { join } from 'path'
+describe('SSRF guard placement', () => {
+  const root = join(__dirname, '..', '..')
+  it('the isomorphic logo module does not import the node-only guard', () => {
+    const src = readFileSync(join(root, 'lib', 'company-identity.ts'), 'utf8')
+    const code = src.split('\n').filter(l => !/^\s*(\/\/|\*)/.test(l)).join('\n')
+    expect(code).not.toMatch(/from '@\/lib\/ssrf-guard'/)
+  })
+  it('every server route that fetches a tenant logo validates it first', () => {
+    for (const p of [
+      'app/api/pdf/generate/route.ts',
+      'app/api/whatsapp/send-invoice/route.ts',
+      'app/api/whatsapp/send-contract/route.ts',
+    ]) {
+      expect(readFileSync(join(root, p), 'utf8'), p).toContain('checkPublicHttpUrl')
+    }
+  })
+})

@@ -3,6 +3,7 @@ import { escapeHtml, safeUrl } from '@/lib/html-escape'
 import puppeteer from 'puppeteer'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { fetchLogoBytes } from '@/lib/company-identity'
+import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
 
 interface Itinerary {
   itinerary_code: string
@@ -651,8 +652,18 @@ export async function POST(request: NextRequest) {
     // at all. A logo that fails the check is dropped, not fatal.
     const companyIn = company || { name: '' }
     let safeCompany = companyIn
+    // SSRF gate: the logo URL is tenant-controlled and about to be fetched by
+    // the server. Validate it here (private/link-local/metadata addresses
+    // rejected) and only then fetch + inline as a data URI, so Chromium never
+    // sees a caller URL. A logo that fails the check is dropped, not fatal.
     if (companyIn.logoUrl) {
-      const logo = await fetchLogoBytes(companyIn.logoUrl)
+      const logoSafe = await checkPublicHttpUrl(companyIn.logoUrl)
+      const logo = logoSafe.ok ? await fetchLogoBytes(companyIn.logoUrl) : undefined
+      if (!logoSafe.ok) {
+        console.warn(`PDF: refusing logo URL (${logoSafe.reason})`)
+      }
+      // Either way the caller URL is removed: inlined as a data URI when it
+      // passed, nulled when it did not. Chromium never receives a bare URL.
       safeCompany = {
         ...companyIn,
         logoUrl: logo

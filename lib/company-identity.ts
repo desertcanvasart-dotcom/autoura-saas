@@ -13,8 +13,6 @@
 // name on your invoice is not. There is no non-tenant default identity, and
 // there must never be one.
 
-import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
-
 export interface CompanyIdentity {
   name: string
   email?: string
@@ -90,14 +88,10 @@ export async function fetchLogoDataUrl(
   logoUrl: string | null | undefined
 ): Promise<string | undefined> {
   if (!logoUrl) return undefined
-  // SSRF: this URL comes from tenant-controlled data and is fetched by the
-  // server. Reject anything resolving to a private/link-local/metadata
-  // address before making the request.
-  const safe = await checkPublicHttpUrl(logoUrl)
-  if (!safe.ok) {
-    console.warn(`fetchLogoBytes: refusing logo URL (${safe.reason})`)
-    return undefined
-  }
+  // NOTE: SSRF validation lives in the SERVER routes that call this (see
+  // lib/ssrf-guard.ts). This module is isomorphic — it also runs in the
+  // browser for client-side jsPDF/pdf-lib generation, where a fetch is the
+  // user's own and node:dns cannot be bundled — so the guard cannot live here.
   try {
     const res = await fetch(logoUrl)
     if (!res.ok) return undefined

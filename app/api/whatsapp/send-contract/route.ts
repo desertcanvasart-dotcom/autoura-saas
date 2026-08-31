@@ -3,6 +3,7 @@ import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
 import { generateContractPDF } from '@/lib/contract-pdf-generator'
+import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
 
 export async function POST(request: NextRequest) {
   try {
@@ -77,7 +78,13 @@ export async function POST(request: NextRequest) {
         phone: senderTenant?.company_phone || null,
         website: senderTenant?.company_website || null,
         primaryColor: senderTenant?.primary_color || null,
-        logoUrl: senderTenant?.logo_url || null,
+        // SSRF: the generator will fetch this URL server-side, so validate it
+        // first and drop anything resolving to a private/metadata address.
+        logoUrl:
+          senderTenant?.logo_url &&
+          (await checkPublicHttpUrl(senderTenant.logo_url)).ok
+            ? senderTenant.logo_url
+            : null,
       },
       contractNumber: `TC-2025-${itineraryId.slice(0, 8).toUpperCase()}`,
       contractDate: new Date().toISOString(),
