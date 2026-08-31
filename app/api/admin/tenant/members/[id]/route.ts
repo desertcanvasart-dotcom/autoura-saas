@@ -199,7 +199,7 @@ export async function DELETE(
     if ((targetMember as any).role === 'owner') {
       const { count } = await supabase
         .from('tenant_members')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenant_id)
         .eq('role', 'owner')
 

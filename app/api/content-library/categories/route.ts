@@ -209,7 +209,7 @@ export async function DELETE(request: NextRequest) {
     // Check if category has content
     const { count } = await supabase
       .from('content_library')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('category_id', id)
 
     if (count && count > 0) {
