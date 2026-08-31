@@ -218,6 +218,10 @@ export default function CalendarPage() {
             return {
               ...b,
               resources,
+              // A null payment status used to flow through as the literal
+              // string "null" — object keys coerce — showing "1 null" in the
+              // Payment Status Breakdown and "null" chips on events (GET-M01).
+              payment_status: b.payment_status || 'not_paid',
               guide_name: guide?.resource_name || null,
               vehicle_name: vehicle?.resource_name || null,
             }

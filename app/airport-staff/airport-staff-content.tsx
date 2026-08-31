@@ -8,7 +8,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { Crown, Star } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
-import { useModal } from '@/app/contexts/ModalContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { showToast } from '@/app/contexts/ToastContext'
 
 // ============================================
@@ -66,7 +66,7 @@ export default function AirportStaffContent() {
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   const { tenant, loading: tenantLoading, isManager, canManagePartners, showsB2cWorkspace, showsB2bWorkspace } = useTenant()
-  const modal = useModal()
+  const dialog = useConfirmDialog()
 
   const [staff, setStaff] = useState<AirportStaff[]>([])
   const [loading, setLoading] = useState(true)
@@ -239,11 +239,12 @@ export default function AirportStaffContent() {
       return
     }
 
-    const confirmed = await modal.confirmDestructive(
-      'Delete Staff Member',
-      `Are you sure you want to delete ${name}? This action cannot be undone.`,
-      { confirmText: 'Delete', cancelText: 'Cancel' }
-    )
+    const confirmed = await dialog.confirm({
+      title: 'Delete Staff Member',
+      message: `Are you sure you want to delete ${name}? This action cannot be undone.`,
+      variant: 'danger',
+      confirmText: 'Delete',
+    })
     if (!confirmed) return
 
     try {

@@ -843,8 +843,10 @@ export default function RatesPage() {
         </div>
       </div>
 
-      {/* Main Content - Tables */}
-      <main className="container mx-auto px-4 lg:px-6 pb-6">
+      {/* Main content — a <section>, not <main>: ClientShell already renders
+          the page's one <main> landmark, and nesting a second broke landmark
+          navigation (GET-M05). */}
+      <section className="container mx-auto px-4 lg:px-6 pb-6">
         <div className="bg-white rounded-b-lg shadow-md border border-gray-200 border-t-0 overflow-hidden print:shadow-none print:rounded-none">
           {/* Currency indicator */}
           <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
@@ -1542,7 +1544,7 @@ export default function RatesPage() {
         <div className="mt-6 text-center text-xs text-gray-500 print:hidden">
           <p>© {new Date().getFullYear()} Autoura Operations System</p>
         </div>
-      </main>
+      </section>
     </div>
   )
 }
