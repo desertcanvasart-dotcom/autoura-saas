@@ -88,6 +88,10 @@ export async function fetchLogoDataUrl(
   logoUrl: string | null | undefined
 ): Promise<string | undefined> {
   if (!logoUrl) return undefined
+  // NOTE: SSRF validation lives in the SERVER routes that call this (see
+  // lib/ssrf-guard.ts). This module is isomorphic — it also runs in the
+  // browser for client-side jsPDF/pdf-lib generation, where a fetch is the
+  // user's own and node:dns cannot be bundled — so the guard cannot live here.
   try {
     const res = await fetch(logoUrl)
     if (!res.ok) return undefined
