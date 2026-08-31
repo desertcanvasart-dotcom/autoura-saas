@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 128
+ * Tables: 137
  */
 
 export type Json =
@@ -22,8 +22,6 @@ export interface Database {
     Tables: {
       accommodation_rates: {
         Row: {
-          seasons: Json | null
-          rate_currency: string | null
           id: string
           tenant_id: string
           hotel_name: string | null
@@ -131,10 +129,10 @@ export interface Database {
           high_season_rate_non_eur: number | null
           low_season_rate_eur: number | null
           low_season_rate_non_eur: number | null
+          rate_currency: string | null
+          seasons: Json | null
         }
         Insert: {
-          seasons?: Json | null
-          rate_currency?: string | null
           id?: string
           tenant_id: string
           hotel_name?: string | null
@@ -242,10 +240,10 @@ export interface Database {
           high_season_rate_non_eur?: number | null
           low_season_rate_eur?: number | null
           low_season_rate_non_eur?: number | null
+          rate_currency?: string | null
+          seasons?: Json | null
         }
         Update: {
-          seasons?: Json | null
-          rate_currency?: string | null
           id?: string
           tenant_id?: string
           hotel_name?: string | null
@@ -353,6 +351,8 @@ export interface Database {
           high_season_rate_non_eur?: number | null
           low_season_rate_eur?: number | null
           low_season_rate_non_eur?: number | null
+          rate_currency?: string | null
+          seasons?: Json | null
         }
         Relationships: [
           {
@@ -373,8 +373,6 @@ export interface Database {
       }
       activity_rates: {
         Row: {
-          tiers: Json | null
-          rate_currency: string | null
           id: string
           tenant_id: string
           activity_name: string
@@ -400,10 +398,10 @@ export interface Database {
           updated_at: string | null
           is_addon: boolean | null
           addon_note: string | null
+          rate_currency: string | null
+          tiers: Json | null
         }
         Insert: {
-          tiers?: Json | null
-          rate_currency?: string | null
           id?: string
           tenant_id: string
           activity_name: string
@@ -429,10 +427,10 @@ export interface Database {
           updated_at?: string | null
           is_addon?: boolean | null
           addon_note?: string | null
+          rate_currency?: string | null
+          tiers?: Json | null
         }
         Update: {
-          tiers?: Json | null
-          rate_currency?: string | null
           id?: string
           tenant_id?: string
           activity_name?: string
@@ -458,6 +456,8 @@ export interface Database {
           updated_at?: string | null
           is_addon?: boolean | null
           addon_note?: string | null
+          rate_currency?: string | null
+          tiers?: Json | null
         }
         Relationships: [
           {
@@ -666,7 +666,6 @@ export interface Database {
       }
       airport_staff_rates: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -681,9 +680,9 @@ export interface Database {
           updated_at: string | null
           airport_name: string | null
           supplier_name: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -698,9 +697,9 @@ export interface Database {
           updated_at?: string | null
           airport_name?: string | null
           supplier_name?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -715,6 +714,7 @@ export interface Database {
           updated_at?: string | null
           airport_name?: string | null
           supplier_name?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -1198,7 +1198,6 @@ export interface Database {
       }
       b2b_transport_packages: {
         Row: {
-          rate_currency: string | null
           id: string
           package_code: string
           package_name: string
@@ -1223,9 +1222,9 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           tenant_id: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           package_code: string
           package_name: string
@@ -1250,9 +1249,9 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           tenant_id?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           package_code?: string
           package_name?: string
@@ -1277,6 +1276,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           tenant_id?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -1732,70 +1732,6 @@ export interface Database {
           },
         ]
       }
-      booking_portal_links: {
-        Row: {
-          id: string
-          tenant_id: string
-          booking_id: string
-          passenger_id: string | null
-          token: string
-          created_by: string | null
-          created_at: string
-          revoked_at: string | null
-          expires_at: string | null
-          last_sent_at: string | null
-          form_locked: boolean
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          booking_id: string
-          passenger_id?: string | null
-          token: string
-          created_by?: string | null
-          created_at?: string
-          revoked_at?: string | null
-          expires_at?: string | null
-          last_sent_at?: string | null
-          form_locked?: boolean
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          booking_id?: string
-          passenger_id?: string | null
-          token?: string
-          created_by?: string | null
-          created_at?: string
-          revoked_at?: string | null
-          expires_at?: string | null
-          last_sent_at?: string | null
-          form_locked?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "booking_portal_links_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "booking_portal_links_booking_id_fkey"
-            columns: ["booking_id"]
-            isOneToOne: false
-            referencedRelation: "bookings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "booking_portal_links_passenger_id_fkey"
-            columns: ["passenger_id"]
-            isOneToOne: false
-            referencedRelation: "booking_passengers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       booking_payments: {
         Row: {
           id: string
@@ -1882,6 +1818,70 @@ export interface Database {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_portal_links: {
+        Row: {
+          id: string
+          tenant_id: string
+          booking_id: string
+          passenger_id: string | null
+          token: string
+          created_by: string | null
+          created_at: string
+          revoked_at: string | null
+          expires_at: string | null
+          last_sent_at: string | null
+          form_locked: boolean
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          booking_id: string
+          passenger_id?: string | null
+          token: string
+          created_by?: string | null
+          created_at?: string
+          revoked_at?: string | null
+          expires_at?: string | null
+          last_sent_at?: string | null
+          form_locked?: boolean
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          booking_id?: string
+          passenger_id?: string | null
+          token?: string
+          created_by?: string | null
+          created_at?: string
+          revoked_at?: string | null
+          expires_at?: string | null
+          last_sent_at?: string | null
+          form_locked?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_portal_links_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_portal_links_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_portal_links_passenger_id_fkey"
+            columns: ["passenger_id"]
+            isOneToOne: false
+            referencedRelation: "booking_passengers"
             referencedColumns: ["id"]
           },
         ]
@@ -2487,7 +2487,6 @@ export interface Database {
       }
       commissions: {
         Row: {
-          cost_amount: number | null
           id: string
           tenant_id: string
           itinerary_id: string | null
@@ -2511,9 +2510,9 @@ export interface Database {
           notes: string | null
           created_at: string | null
           updated_at: string | null
+          cost_amount: number | null
         }
         Insert: {
-          cost_amount?: number | null
           id?: string
           tenant_id: string
           itinerary_id?: string | null
@@ -2537,9 +2536,9 @@ export interface Database {
           notes?: string | null
           created_at?: string | null
           updated_at?: string | null
+          cost_amount?: number | null
         }
         Update: {
-          cost_amount?: number | null
           id?: string
           tenant_id?: string
           itinerary_id?: string | null
@@ -2563,6 +2562,7 @@ export interface Database {
           notes?: string | null
           created_at?: string | null
           updated_at?: string | null
+          cost_amount?: number | null
         }
         Relationships: [
           {
@@ -3708,8 +3708,8 @@ export interface Database {
           name: string
           name_ja: string | null
           is_active: boolean
-          created_at: string | null
-          updated_at: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
@@ -3717,8 +3717,8 @@ export interface Database {
           name: string
           name_ja?: string | null
           is_active?: boolean
-          created_at?: string | null
-          updated_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -3726,8 +3726,8 @@ export interface Database {
           name?: string
           name_ja?: string | null
           is_active?: boolean
-          created_at?: string | null
-          updated_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3737,45 +3737,42 @@ export interface Database {
           catalog_id: string
           name: string
           name_ja: string | null
-          aliases: string[] | null
+          aliases: string[]
           lat: number | null
           lng: number | null
-          airport_codes: string[] | null
+          airport_codes: string[]
           timezone: string | null
-          sort_order: number
           is_active: boolean
-          created_at: string | null
-          updated_at: string | null
+          sort_order: number
+          created_at: string
         }
         Insert: {
           id?: string
           catalog_id: string
           name: string
           name_ja?: string | null
-          aliases?: string[] | null
+          aliases: string[]
           lat?: number | null
           lng?: number | null
-          airport_codes?: string[] | null
+          airport_codes: string[]
           timezone?: string | null
-          sort_order?: number
           is_active?: boolean
-          created_at?: string | null
-          updated_at?: string | null
+          sort_order?: number
+          created_at?: string
         }
         Update: {
           id?: string
           catalog_id?: string
           name?: string
           name_ja?: string | null
-          aliases?: string[] | null
+          aliases?: string[]
           lat?: number | null
           lng?: number | null
-          airport_codes?: string[] | null
+          airport_codes?: string[]
           timezone?: string | null
-          sort_order?: number
           is_active?: boolean
-          created_at?: string | null
-          updated_at?: string | null
+          sort_order?: number
+          created_at?: string
         }
         Relationships: [
           {
@@ -4180,7 +4177,6 @@ export interface Database {
       }
       entrance_fees: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -4203,9 +4199,9 @@ export interface Database {
           supplier_id: string | null
           created_at: string | null
           updated_at: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -4228,9 +4224,9 @@ export interface Database {
           supplier_id?: string | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -4253,6 +4249,7 @@ export interface Database {
           supplier_id?: string | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -4482,7 +4479,6 @@ export interface Database {
       }
       fixed_daily_costs: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string | null
           cost_type: string
@@ -4491,9 +4487,9 @@ export interface Database {
           is_active: boolean | null
           created_at: string | null
           updated_at: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           cost_type: string
@@ -4502,9 +4498,9 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           cost_type?: string
@@ -4513,6 +4509,7 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -4526,7 +4523,6 @@ export interface Database {
       }
       flight_rates: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -4557,9 +4553,9 @@ export interface Database {
           is_active: boolean | null
           created_at: string | null
           updated_at: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -4590,9 +4586,9 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -4623,6 +4619,7 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -4756,7 +4753,6 @@ export interface Database {
       }
       guide_rates: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string
           guide_type: string | null
@@ -4776,9 +4772,9 @@ export interface Database {
           notes: string | null
           is_active: boolean | null
           updated_at: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id: string
           guide_type?: string | null
@@ -4798,9 +4794,9 @@ export interface Database {
           notes?: string | null
           is_active?: boolean | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string
           guide_type?: string | null
@@ -4820,6 +4816,7 @@ export interface Database {
           notes?: string | null
           is_active?: boolean | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -4840,7 +4837,6 @@ export interface Database {
       }
       guides: {
         Row: {
-          rate_currency: string | null
           id: string
           guide_code: string | null
           full_name: string
@@ -4871,9 +4867,9 @@ export interface Database {
           is_preferred: boolean | null
           city: string | null
           team_member_id: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           guide_code?: string | null
           full_name: string
@@ -4904,9 +4900,9 @@ export interface Database {
           is_preferred?: boolean | null
           city?: string | null
           team_member_id?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           guide_code?: string | null
           full_name?: string
@@ -4937,6 +4933,7 @@ export interface Database {
           is_preferred?: boolean | null
           city?: string | null
           team_member_id?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -5185,7 +5182,6 @@ export interface Database {
       }
       hotel_staff_rates: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -5198,9 +5194,9 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           destination: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -5213,9 +5209,9 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           destination?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -5228,6 +5224,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           destination?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -5489,7 +5486,6 @@ export interface Database {
       }
       itineraries: {
         Row: {
-          fx_frozen: Json | null
           id: string
           itinerary_code: string
           client_id: string | null
@@ -5561,9 +5557,9 @@ export interface Database {
           generation_warnings: Json | null
           thread_id: string | null
           assigned_to: string | null
+          fx_frozen: Json | null
         }
         Insert: {
-          fx_frozen?: Json | null
           id?: string
           itinerary_code: string
           client_id?: string | null
@@ -5635,9 +5631,9 @@ export interface Database {
           generation_warnings?: Json | null
           thread_id?: string | null
           assigned_to?: string | null
+          fx_frozen?: Json | null
         }
         Update: {
-          fx_frozen?: Json | null
           id?: string
           itinerary_code?: string
           client_id?: string | null
@@ -5709,6 +5705,7 @@ export interface Database {
           generation_warnings?: Json | null
           thread_id?: string | null
           assigned_to?: string | null
+          fx_frozen?: Json | null
         }
         Relationships: [
           {
@@ -5916,7 +5913,6 @@ export interface Database {
       }
       itinerary_services: {
         Row: {
-          sold_by_supplier_id: string | null
           id: string
           itinerary_id: string | null
           day_id: string | null
@@ -5956,9 +5952,9 @@ export interface Database {
           supplier_cost_original: number | null
           exchange_rate_used: number | null
           cost_per_unit: number | null
+          sold_by_supplier_id: string | null
         }
         Insert: {
-          sold_by_supplier_id?: string | null
           id?: string
           itinerary_id?: string | null
           day_id?: string | null
@@ -5998,9 +5994,9 @@ export interface Database {
           supplier_cost_original?: number | null
           exchange_rate_used?: number | null
           cost_per_unit?: number | null
+          sold_by_supplier_id?: string | null
         }
         Update: {
-          sold_by_supplier_id?: string | null
           id?: string
           itinerary_id?: string | null
           day_id?: string | null
@@ -6040,6 +6036,7 @@ export interface Database {
           supplier_cost_original?: number | null
           exchange_rate_used?: number | null
           cost_per_unit?: number | null
+          sold_by_supplier_id?: string | null
         }
         Relationships: [
           {
@@ -6068,6 +6065,13 @@ export interface Database {
             columns: ["itinerary_day_id"]
             isOneToOne: false
             referencedRelation: "itinerary_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itinerary_services_sold_by_supplier_id_fkey"
+            columns: ["sold_by_supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -6123,9 +6127,38 @@ export interface Database {
           },
         ]
       }
+      job_runs: {
+        Row: {
+          id: string
+          job_name: string
+          started_at: string
+          finished_at: string | null
+          outcome: string | null
+          detail: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          job_name: string
+          started_at?: string
+          finished_at?: string | null
+          outcome?: string | null
+          detail?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          job_name?: string
+          started_at?: string
+          finished_at?: string | null
+          outcome?: string | null
+          detail?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       meal_rates: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string
           restaurant_name: string | null
@@ -6151,9 +6184,9 @@ export interface Database {
           is_active: boolean | null
           updated_at: string | null
           is_preferred: boolean | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id: string
           restaurant_name?: string | null
@@ -6179,9 +6212,9 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           is_preferred?: boolean | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string
           restaurant_name?: string | null
@@ -6207,6 +6240,7 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           is_preferred?: boolean | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -6314,8 +6348,6 @@ export interface Database {
       }
       nile_cruises: {
         Row: {
-          seasons: Json | null
-          rate_currency: string | null
           id: string
           tenant_id: string
           ship_name: string
@@ -6402,10 +6434,10 @@ export interface Database {
           rate_peak_double_non_eur: number | null
           rate_peak_triple_non_eur: number | null
           rate_peak_suite_non_eur: number | null
+          rate_currency: string | null
+          seasons: Json | null
         }
         Insert: {
-          seasons?: Json | null
-          rate_currency?: string | null
           id?: string
           tenant_id: string
           ship_name: string
@@ -6492,10 +6524,10 @@ export interface Database {
           rate_peak_double_non_eur?: number | null
           rate_peak_triple_non_eur?: number | null
           rate_peak_suite_non_eur?: number | null
+          rate_currency?: string | null
+          seasons?: Json | null
         }
         Update: {
-          seasons?: Json | null
-          rate_currency?: string | null
           id?: string
           tenant_id?: string
           ship_name?: string
@@ -6582,6 +6614,8 @@ export interface Database {
           rate_peak_double_non_eur?: number | null
           rate_peak_triple_non_eur?: number | null
           rate_peak_suite_non_eur?: number | null
+          rate_currency?: string | null
+          seasons?: Json | null
         }
         Relationships: [
           {
@@ -6795,71 +6829,6 @@ export interface Database {
           },
         ]
       }
-      prompt_templates: {
-        Row: {
-          id: string
-          tenant_id: string
-          name: string
-          purpose: string
-          description: string | null
-          system_prompt: string | null
-          user_prompt_template: string
-          variables: Json
-          model: string
-          temperature: number | null
-          max_tokens: number
-          is_default: boolean
-          is_active: boolean
-          created_by: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          name: string
-          purpose: string
-          description?: string | null
-          system_prompt?: string | null
-          user_prompt_template: string
-          variables: Json
-          model?: string
-          temperature?: number | null
-          max_tokens?: number
-          is_default?: boolean
-          is_active?: boolean
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          name?: string
-          purpose?: string
-          description?: string | null
-          system_prompt?: string | null
-          user_prompt_template?: string
-          variables?: Json
-          model?: string
-          temperature?: number | null
-          max_tokens?: number
-          is_default?: boolean
-          is_active?: boolean
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "prompt_templates_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       pricing_season_dates: {
         Row: {
           id: string
@@ -6942,6 +6911,71 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "pricing_seasons_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prompt_templates: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          purpose: string
+          description: string | null
+          system_prompt: string | null
+          user_prompt_template: string
+          variables: Json
+          model: string
+          temperature: number | null
+          max_tokens: number
+          is_default: boolean
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          purpose: string
+          description?: string | null
+          system_prompt?: string | null
+          user_prompt_template: string
+          variables: Json
+          model?: string
+          temperature?: number | null
+          max_tokens?: number
+          is_default?: boolean
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          name?: string
+          purpose?: string
+          description?: string | null
+          system_prompt?: string | null
+          user_prompt_template?: string
+          variables?: Json
+          model?: string
+          temperature?: number | null
+          max_tokens?: number
+          is_default?: boolean
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_templates_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -7293,7 +7327,6 @@ export interface Database {
       }
       sleeping_train_rates: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -7317,9 +7350,9 @@ export interface Database {
           is_active: boolean
           created_at: string
           updated_at: string
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -7343,9 +7376,9 @@ export interface Database {
           is_active?: boolean
           created_at?: string
           updated_at?: string
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -7369,6 +7402,7 @@ export interface Database {
           is_active?: boolean
           created_at?: string
           updated_at?: string
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -8366,8 +8400,8 @@ export interface Database {
           generation_brief: string | null
           glossary: Json | null
           is_active: boolean
-          created_at: string | null
-          updated_at: string | null
+          created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
@@ -8377,8 +8411,8 @@ export interface Database {
           generation_brief?: string | null
           glossary?: Json | null
           is_active?: boolean
-          created_at?: string | null
-          updated_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -8388,8 +8422,8 @@ export interface Database {
           generation_brief?: string | null
           glossary?: Json | null
           is_active?: boolean
-          created_at?: string | null
-          updated_at?: string | null
+          created_at?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -8731,7 +8765,6 @@ export interface Database {
       }
       tenants: {
         Row: {
-          rates_currency: string | null
           id: string
           company_name: string
           contact_email: string | null
@@ -8759,9 +8792,9 @@ export interface Database {
           email_domain_status: string
           email_domain_verified_at: string | null
           default_margin_percent: number | null
+          rates_currency: string | null
         }
         Insert: {
-          rates_currency?: string | null
           id?: string
           company_name: string
           contact_email?: string | null
@@ -8789,9 +8822,9 @@ export interface Database {
           email_domain_status?: string
           email_domain_verified_at?: string | null
           default_margin_percent?: number | null
+          rates_currency?: string | null
         }
         Update: {
-          rates_currency?: string | null
           id?: string
           company_name?: string
           contact_email?: string | null
@@ -8819,12 +8852,12 @@ export interface Database {
           email_domain_status?: string
           email_domain_verified_at?: string | null
           default_margin_percent?: number | null
+          rates_currency?: string | null
         }
         Relationships: []
       }
       tipping_rates: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -8837,9 +8870,9 @@ export interface Database {
           is_active: boolean | null
           created_at: string | null
           updated_at: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -8852,9 +8885,9 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -8867,6 +8900,7 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -9795,7 +9829,6 @@ export interface Database {
       }
       train_rates: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -9814,9 +9847,9 @@ export interface Database {
           is_active: boolean | null
           created_at: string | null
           updated_at: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -9835,9 +9868,9 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -9856,6 +9889,7 @@ export interface Database {
           is_active?: boolean | null
           created_at?: string | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -9876,7 +9910,6 @@ export interface Database {
       }
       transportation_rates: {
         Row: {
-          rate_currency: string | null
           id: string
           tenant_id: string
           service_type: string | null
@@ -9915,9 +9948,9 @@ export interface Database {
           bus_capacity_max: number | null
           is_active: boolean | null
           updated_at: string | null
+          rate_currency: string | null
         }
         Insert: {
-          rate_currency?: string | null
           id?: string
           tenant_id: string
           service_type?: string | null
@@ -9956,9 +9989,9 @@ export interface Database {
           bus_capacity_max?: number | null
           is_active?: boolean | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Update: {
-          rate_currency?: string | null
           id?: string
           tenant_id?: string
           service_type?: string | null
@@ -9997,6 +10030,7 @@ export interface Database {
           bus_capacity_max?: number | null
           is_active?: boolean | null
           updated_at?: string | null
+          rate_currency?: string | null
         }
         Relationships: [
           {
@@ -10084,7 +10118,6 @@ export interface Database {
       }
       trip_messages: {
         Row: {
-          notify_outcome: string | null
           id: string
           tenant_id: string
           itinerary_id: string
@@ -10095,9 +10128,9 @@ export interface Database {
           team_member_id: string | null
           is_read: boolean
           created_at: string
+          notify_outcome: string | null
         }
         Insert: {
-          notify_outcome?: string | null
           id?: string
           tenant_id: string
           itinerary_id: string
@@ -10108,9 +10141,9 @@ export interface Database {
           team_member_id?: string | null
           is_read?: boolean
           created_at?: string
+          notify_outcome?: string | null
         }
         Update: {
-          notify_outcome?: string | null
           id?: string
           tenant_id?: string
           itinerary_id?: string
@@ -10121,6 +10154,7 @@ export interface Database {
           team_member_id?: string | null
           is_read?: boolean
           created_at?: string
+          notify_outcome?: string | null
         }
         Relationships: [
           {
@@ -10814,6 +10848,13 @@ export interface Database {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_conversations_assigned_team_member_id_fkey"
+            columns: ["assigned_team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
             referencedColumns: ["id"]
           },
         ]

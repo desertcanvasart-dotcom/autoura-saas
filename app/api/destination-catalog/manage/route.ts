@@ -189,7 +189,12 @@ export async function POST(request: NextRequest) {
             catalog_id: catalogId,
             name,
             name_ja: body.name_ja || null,
-            aliases: Array.isArray(body.aliases) && body.aliases.length ? body.aliases : null,
+            // aliases and airport_codes are NOT NULL with a '{}' default. A
+            // default only applies when a column is OMITTED -- passing null
+            // explicitly is a not-null violation, so a city with no aliases
+            // could not be created. Empty arrays, not null.
+            aliases: Array.isArray(body.aliases) ? body.aliases : [],
+            airport_codes: Array.isArray(body.airport_codes) ? body.airport_codes : [],
             sort_order: (maxRow?.sort_order ?? 0) + 1,
           })
           .select('id')
