@@ -6348,6 +6348,7 @@ export interface Database {
       }
       nile_cruises: {
         Row: {
+          property_id: string | null
           id: string
           tenant_id: string
           ship_name: string
@@ -6438,6 +6439,7 @@ export interface Database {
           seasons: Json | null
         }
         Insert: {
+          property_id?: string | null
           id?: string
           tenant_id: string
           ship_name: string
@@ -6528,6 +6530,7 @@ export interface Database {
           seasons?: Json | null
         }
         Update: {
+          property_id?: string | null
           id?: string
           tenant_id?: string
           ship_name?: string
@@ -7859,6 +7862,72 @@ export interface Database {
           },
         ]
       }
+      supplier_properties: {
+        Row: {
+          id: string
+          tenant_id: string
+          supplier_id: string
+          property_type: string
+          name: string
+          city: string | null
+          category: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          contact_email: string | null
+          notes: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          supplier_id: string
+          property_type: string
+          name: string
+          city?: string | null
+          category?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_email?: string | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          supplier_id?: string
+          property_type?: string
+          name?: string
+          city?: string | null
+          category?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_email?: string | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_properties_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_properties_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           id: string
@@ -7888,14 +7957,10 @@ export interface Database {
           languages: string[] | null
           vehicle_types: string[] | null
           star_rating: string | null
-          property_type: string | null
           cuisine_types: string[] | null
           routes: string[] | null
-          ship_name: string | null
           cabin_count: number | null
           capacity: number | null
-          is_property: boolean | null
-          parent_supplier_id: string | null
           name: string | null
           type: string | null
           status: string | null
@@ -7929,14 +7994,10 @@ export interface Database {
           languages?: string[] | null
           vehicle_types?: string[] | null
           star_rating?: string | null
-          property_type?: string | null
           cuisine_types?: string[] | null
           routes?: string[] | null
-          ship_name?: string | null
           cabin_count?: number | null
           capacity?: number | null
-          is_property?: boolean | null
-          parent_supplier_id?: string | null
           name?: string | null
           type?: string | null
           status?: string | null
@@ -7970,14 +8031,10 @@ export interface Database {
           languages?: string[] | null
           vehicle_types?: string[] | null
           star_rating?: string | null
-          property_type?: string | null
           cuisine_types?: string[] | null
           routes?: string[] | null
-          ship_name?: string | null
           cabin_count?: number | null
           capacity?: number | null
-          is_property?: boolean | null
-          parent_supplier_id?: string | null
           name?: string | null
           type?: string | null
           status?: string | null
