@@ -68,7 +68,8 @@ export async function POST(request: NextRequest) {
     // Update conversation - use new assigned_team_member_id column primarily
     const updateData: Record<string, any> = {
       assigned_team_member_id: newAssigneeId,
-      assigned_agent_id: newAssigneeId,
+      // assigned_agent_id used to be written here too -- a second column
+      // holding the same id, with nothing reading it. One owner per fact.
       assigned_at: newAssigneeId ? new Date().toISOString() : null,
       updated_at: new Date().toISOString()
     }

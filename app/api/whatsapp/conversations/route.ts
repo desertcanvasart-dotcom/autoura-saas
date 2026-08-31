@@ -2,6 +2,44 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // GET /api/whatsapp/conversations - List all conversations
+
+// The assigned agent is attached with a second read rather than a PostgREST
+// embed. The embed also asked for team_members.avatar_url, which does not
+// exist (photo_url does), so even with migration 309's foreign key in place
+// the original query would still have failed. Reading separately also means
+// this route works against a database that has not run 309 yet: the
+// conversations load, they simply carry no assignee.
+type WithAssignee = Record<string, unknown> & { assigned_team_member_id?: string | null }
+
+// Structural, so this works with either Supabase client the route holds
+// without dragging the full generated query-builder types through.
+interface TeamMemberReader {
+  from(table: string): {
+    select(columns: string): {
+      in(column: string, values: string[]): PromiseLike<{ data: Array<{ id: string }> | null }>
+    }
+  }
+}
+
+async function attachAssignees<T extends WithAssignee>(
+  db: unknown,
+  rows: T[]
+): Promise<Array<T & { assigned_agent: unknown }>> {
+  const ids = [...new Set(rows.map((r) => r.assigned_team_member_id).filter(Boolean))] as string[]
+  let byId: Record<string, unknown> = {}
+  if (ids.length > 0) {
+    const { data } = await (db as TeamMemberReader)
+      .from('team_members')
+      .select('id, name, email, avatar_url:photo_url, is_available')
+      .in('id', ids)
+    byId = Object.fromEntries((data ?? []).map((m) => [m.id, m]))
+  }
+  return rows.map((r) => ({
+    ...r,
+    assigned_agent: r.assigned_team_member_id ? byId[r.assigned_team_member_id] ?? null : null,
+  }))
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createAuthenticatedClient()
@@ -31,13 +69,6 @@ export async function GET(request: NextRequest) {
           last_name,
           email,
           client_code
-        ),
-        assigned_agent:team_members!whatsapp_conversations_assigned_team_member_id_fkey (
-          id,
-          name,
-          email,
-          avatar_url,
-          is_available
         )
       `)
       .eq('status', status)
@@ -75,7 +106,7 @@ export async function GET(request: NextRequest) {
       } : null
     }))
 
-    return NextResponse.json({ conversations })
+    return NextResponse.json({ conversations: await attachAssignees(supabase, conversations) })
   } catch (error: any) {
     console.error('Error fetching conversations:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -124,16 +155,15 @@ export async function POST(request: NextRequest) {
           .from('whatsapp_conversations')
           .update(updates)
           .eq('id', existing.id)
-          .select(`
-            *,
-            assigned_agent:team_members!whatsapp_conversations_assigned_team_member_id_fkey (*)
-          `)
+          .select('*')
           .single()
 
         if (error) throw error
-        return NextResponse.json({ conversation: updated, created: false })
+        const [withAgent] = await attachAssignees(supabase, [updated])
+        return NextResponse.json({ conversation: withAgent, created: false })
       }
-      return NextResponse.json({ conversation: existing, created: false })
+      const [existingWithAgent] = await attachAssignees(supabase, [existing])
+      return NextResponse.json({ conversation: existingWithAgent, created: false })
     }
 
     // Create new conversation
@@ -164,10 +194,7 @@ export async function POST(request: NextRequest) {
         client_name: client_name || null,
         client_id: client_id || null
       })
-      .select(`
-        *,
-        assigned_agent:team_members!whatsapp_conversations_assigned_team_member_id_fkey (*)
-      `)
+      .select('*')
       .single()
 
     if (error) throw error
@@ -185,7 +212,8 @@ export async function POST(request: NextRequest) {
         })
     }
 
-    return NextResponse.json({ conversation: newConversation, created: true })
+    const [createdWithAgent] = await attachAssignees(supabase, [newConversation])
+    return NextResponse.json({ conversation: createdWithAgent, created: true })
   } catch (error: any) {
     console.error('Error creating conversation:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -232,10 +260,7 @@ export async function PATCH(request: NextRequest) {
       .from('whatsapp_conversations')
       .update(updateData)
       .eq('id', conversation_id)
-      .select(`
-        *,
-        assigned_agent:team_members!whatsapp_conversations_assigned_team_member_id_fkey (*)
-      `)
+      .select('*')
       .single()
 
     if (error) throw error
@@ -253,7 +278,8 @@ export async function PATCH(request: NextRequest) {
         })
     }
 
-    return NextResponse.json({ conversation: data })
+    const [updatedWithAgent] = await attachAssignees(supabase, [data])
+    return NextResponse.json({ conversation: updatedWithAgent })
   } catch (error: any) {
     console.error('Error updating conversation:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
