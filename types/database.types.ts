@@ -22,7 +22,6 @@ export interface Database {
     Tables: {
       accommodation_rates: {
         Row: {
-          property_id: string | null
           id: string
           tenant_id: string
           hotel_name: string | null
@@ -132,9 +131,9 @@ export interface Database {
           low_season_rate_non_eur: number | null
           rate_currency: string | null
           seasons: Json | null
+          property_id: string | null
         }
         Insert: {
-          property_id?: string | null
           id?: string
           tenant_id: string
           hotel_name?: string | null
@@ -244,9 +243,9 @@ export interface Database {
           low_season_rate_non_eur?: number | null
           rate_currency?: string | null
           seasons?: Json | null
+          property_id?: string | null
         }
         Update: {
-          property_id?: string | null
           id?: string
           tenant_id?: string
           hotel_name?: string | null
@@ -356,6 +355,7 @@ export interface Database {
           low_season_rate_non_eur?: number | null
           rate_currency?: string | null
           seasons?: Json | null
+          property_id?: string | null
         }
         Relationships: [
           {
@@ -370,6 +370,13 @@ export interface Database {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accommodation_rates_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_properties"
             referencedColumns: ["id"]
           },
         ]
