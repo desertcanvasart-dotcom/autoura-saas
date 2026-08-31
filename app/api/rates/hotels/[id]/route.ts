@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 
 export async function GET(
@@ -75,6 +76,14 @@ export async function PUT(
     const seasonsPatch: Record<string, unknown> = parsedSeasons === undefined
       ? {}
       : { seasons: parsedSeasons, ...legacyColumnMirror(parsedSeasons, 'accommodation') }
+    const hotelProp = await resolveRateProperty(supabase, {
+      tenantId: authResult.tenant_id!,
+      propertyType: 'hotel',
+      supplierId: body.supplier_id || null,
+      name: body.property_name,
+      propertyId: body.property_id,
+    })
+
 
     const updateData = {
       // Dated rate periods (C3.2). Only named when the client sent them, so a
@@ -84,7 +93,8 @@ export async function PUT(
       ...rateCurrencyWriteField(body),
       // Basic info
       service_code: body.service_code,
-      property_name: body.property_name,
+      property_name: hotelProp.name || body.property_name,
+      ...(hotelProp.property_id ? { property_id: hotelProp.property_id } : {}),
       property_type: body.property_type || 'hotel',
       city: body.city || null,
       board_basis: body.board_basis || 'BB',

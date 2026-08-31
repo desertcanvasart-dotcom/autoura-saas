@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
-import { resolveShipProperty } from '@/lib/suppliers/resolve-property'
+import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { validateRatePayload } from '@/lib/rate-validation'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 
@@ -93,10 +93,11 @@ export async function POST(request: NextRequest) {
     // Supplier-HAS-properties (Phase 1): link the rate to its ship, creating
     // the property under the supplier when it does not exist yet. The
     // property's canonical name wins over the payload spelling.
-    const ship = await resolveShipProperty(supabase, {
+    const ship = await resolveRateProperty(supabase, {
       tenantId: authResult.tenant_id!,
+      propertyType: 'ship',
       supplierId: body.supplier_id || null,
-      shipName: body.ship_name,
+      name: body.ship_name,
       propertyId: body.property_id,
     })
 
@@ -108,8 +109,10 @@ export async function POST(request: NextRequest) {
       ...rateCurrencyWriteField(body),
       ...body,
       supplier_id: body.supplier_id || null,
-      property_id: ship.property_id,
-      ...(ship.ship_name ? { ship_name: ship.ship_name } : {})
+      // Omitted when null so a database that has not run the migration yet
+      // (an install mid-upgrade) still saves the rate.
+      ...(ship.property_id ? { property_id: ship.property_id } : {}),
+      ...(ship.name ? { ship_name: ship.name } : {})
     }
 
     const { data, error } = await supabase

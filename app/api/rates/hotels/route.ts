@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { validateRatePayload } from '@/lib/rate-validation'
 import type { TablesInsert } from '@/types/database.types'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
@@ -98,6 +99,16 @@ export async function POST(request: NextRequest) {
     const seasonsPatch: Record<string, unknown> = parsedSeasons === undefined
       ? {}
       : { seasons: parsedSeasons, ...legacyColumnMirror(parsedSeasons, 'accommodation') }
+    // Supplier-HAS-properties (Phase 2): link the rate to its hotel, creating
+    // the property under the supplier when needed; canonical spelling wins.
+    const hotelProp = await resolveRateProperty(supabase, {
+      tenantId: authResult.tenant_id!,
+      propertyType: 'hotel',
+      supplierId: body.supplier_id || null,
+      name: body.property_name,
+      propertyId: body.property_id,
+    })
+
 
     const newHotel: TablesInsert<'accommodation_rates'> = {
       // Dated rate periods (C3.2). Only named when the client sent them, so a
@@ -108,7 +119,8 @@ export async function POST(request: NextRequest) {
       // Basic info
       tenant_id,
       service_code: body.service_code || `ACC-${Date.now().toString(36).toUpperCase()}`,
-      property_name: body.property_name,
+      property_name: hotelProp.name || body.property_name,
+      ...(hotelProp.property_id ? { property_id: hotelProp.property_id } : {}),
       property_type: body.property_type || 'hotel',
       city: body.city || null,
       board_basis: body.board_basis || 'BB',

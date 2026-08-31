@@ -48,6 +48,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if ('name' in record && data.property_type === 'ship') {
       await supabase.from('nile_cruises').update({ ship_name: data.name }).eq('property_id', propertyId)
     }
+    if ('name' in record && data.property_type === 'hotel') {
+      await supabase.from('accommodation_rates').update({ property_name: data.name }).eq('property_id', propertyId)
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (error) {
@@ -70,13 +73,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     // Refuse while rates still reference it: deleting the ship under priced
     // rows would null property_id silently and strand them. Deactivate
     // instead, or delete the rates first.
-    const { count } = await supabase
-      .from('nile_cruises')
-      .select('id', { count: 'exact', head: true })
-      .eq('property_id', propertyId)
-    if ((count ?? 0) > 0) {
+    const [{ count: cruiseCount }, { count: hotelCount }] = await Promise.all([
+      supabase.from('nile_cruises').select('id', { count: 'exact', head: true }).eq('property_id', propertyId),
+      supabase.from('accommodation_rates').select('id', { count: 'exact', head: true }).eq('property_id', propertyId),
+    ])
+    const inUse = (cruiseCount ?? 0) + (hotelCount ?? 0)
+    if (inUse > 0) {
       return NextResponse.json(
-        { success: false, error: `${count} cruise rate(s) still use this property. Delete those rates first, or mark the property inactive.` },
+        { success: false, error: `${inUse} rate(s) still use this property. Delete those rates first, or mark the property inactive.` },
         { status: 409 }
       )
     }
