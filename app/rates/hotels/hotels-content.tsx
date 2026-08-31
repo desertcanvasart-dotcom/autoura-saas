@@ -4,6 +4,9 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { todayLocal } from '@/lib/today'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
+// Hotel picker option that reveals the free-text input for a new hotel.
+const NEW_PROPERTY = '__new__'
+
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -374,9 +377,11 @@ export default function HotelsContent() {
   // Dated contract periods (C3.2). While any exist, they price the rate and
   // the fixed low/high/peak blocks below are only a fallback.
   const [periods, setPeriods] = useState<RateSeason[]>([])
+  const [hotelProps, setHotelProps] = useState<{ id: string; name: string; city: string | null }[]>([])
   const [formData, setFormData] = useState({
     service_code: '',
     property_name: '',
+    property_id: '',
     property_type: 'hotel',
     city: '',
     board_basis: 'BB',
@@ -504,13 +509,39 @@ export default function HotelsContent() {
   }
 
   // Handle supplier selection - only sets supplier info, NOT hotel name
+  // The supplier's hotels, for the property picker. Empty for "no supplier".
+  const loadHotelProperties = async (supplierId: string) => {
+    if (!supplierId) { setHotelProps([]); return }
+    try {
+      const res = await fetch(`/api/suppliers/${supplierId}/properties?type=hotel&active_only=true`)
+      const data = await res.json().catch(() => ({}))
+      setHotelProps(res.ok && data.success ? data.data : [])
+    } catch { setHotelProps([]) }
+  }
+
+  const handleHotelPick = (value: string) => {
+    if (value === NEW_PROPERTY) {
+      setFormData(prev => ({ ...prev, property_id: '', property_name: '' }))
+      return
+    }
+    const prop = hotelProps.find(hp => hp.id === value)
+    setFormData(prev => ({
+      ...prev,
+      property_id: value,
+      property_name: prop?.name || prev.property_name,
+      ...(prop?.city ? { city: prev.city || prop.city } : {}),
+    }))
+  }
+
   const handleSupplierSelect = (supplierId: string) => {
     const supplier = suppliers.find(s => s.id === supplierId)
     setFormData(prev => ({
       ...prev,
       supplier_id: supplierId,
+      property_id: '',
       supplier_name: supplier?.name || ''
     }))
+    void loadHotelProperties(supplierId)
   }
 
   // Handle city change - update service code if empty
@@ -539,6 +570,7 @@ export default function HotelsContent() {
     setFormData({
       service_code: '',
       property_name: '',
+    property_id: '',
       property_type: 'hotel',
       city: '',
       board_basis: 'BB',
@@ -674,6 +706,7 @@ export default function HotelsContent() {
     setFormData({
       service_code: rate.service_code || '',
       property_name: rate.property_name || '',
+      property_id: (rate as { property_id?: string | null }).property_id || '',
       property_type: rate.property_type || 'hotel',
       city: rate.city || '',
       board_basis: rate.board_basis || 'BB',
@@ -730,6 +763,7 @@ export default function HotelsContent() {
       is_active: rate.is_active
     })
     setActiveSupplementTab(rate.supplements && rate.supplements.length > 0 ? rate.supplements[0].type : null)
+    void loadHotelProperties(rate.supplier_id || '')
     setShowModal(true)
   }
 
@@ -749,6 +783,7 @@ export default function HotelsContent() {
       // Generate service code if empty and prepare data
       const dataToSubmit = {
         ...formData,
+        property_id: formData.property_id || null,
         ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency),
         // Dated periods (C3.2b). Sent only when the form has any or is
         // clearing what a rate already had, so a database without migration
@@ -853,6 +888,7 @@ export default function HotelsContent() {
     setFormData({
       service_code: '', // Will be auto-generated
       property_name: rate.property_name,
+      property_id: (rate as { property_id?: string | null }).property_id || '',
       property_type: rate.property_type || 'hotel',
       city: rate.city || '',
       board_basis: rate.board_basis || 'BB',
@@ -1607,15 +1643,45 @@ export default function HotelsContent() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Hotel Name *</label>
-                    <input
-                      type="text"
-                      name="property_name"
-                      value={formData.property_name}
-                      onChange={handleChange}
-                      required
-                      placeholder="e.g., Hilton Cairo Heliopolis"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                    />
+                    {/* Supplier-HAS-properties: with a supplier chosen, the
+                        hotel comes from that supplier's properties (Suppliers →
+                        Properties). Typing a new name still works — the API
+                        creates the hotel under the supplier on save. */}
+                    {hotelProps.length > 0 && formData.supplier_id ? (
+                      <>
+                        <select
+                          value={formData.property_id || NEW_PROPERTY}
+                          onChange={(e) => handleHotelPick(e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
+                        >
+                          <option value={NEW_PROPERTY}>+ New hotel…</option>
+                          {hotelProps.map(hp => (
+                            <option key={hp.id} value={hp.id}>{hp.name}{hp.city ? ` (${hp.city})` : ''}</option>
+                          ))}
+                        </select>
+                        {!formData.property_id && (
+                          <input
+                            type="text"
+                            name="property_name"
+                            value={formData.property_name}
+                            onChange={handleChange}
+                            required
+                            placeholder="e.g., Hilton Cairo Heliopolis"
+                            className="w-full px-3 py-2 mt-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <input
+                        type="text"
+                        name="property_name"
+                        value={formData.property_name}
+                        onChange={handleChange}
+                        required
+                        placeholder="e.g., Hilton Cairo Heliopolis"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
+                      />
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Service Code</label>

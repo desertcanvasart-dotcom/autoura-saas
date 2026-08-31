@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 137
+ * Tables: 138
  */
 
 export type Json =
@@ -22,6 +22,7 @@ export interface Database {
     Tables: {
       accommodation_rates: {
         Row: {
+          property_id: string | null
           id: string
           tenant_id: string
           hotel_name: string | null
@@ -133,6 +134,7 @@ export interface Database {
           seasons: Json | null
         }
         Insert: {
+          property_id?: string | null
           id?: string
           tenant_id: string
           hotel_name?: string | null
@@ -244,6 +246,7 @@ export interface Database {
           seasons?: Json | null
         }
         Update: {
+          property_id?: string | null
           id?: string
           tenant_id?: string
           hotel_name?: string | null
@@ -6348,7 +6351,6 @@ export interface Database {
       }
       nile_cruises: {
         Row: {
-          property_id: string | null
           id: string
           tenant_id: string
           ship_name: string
@@ -6437,9 +6439,9 @@ export interface Database {
           rate_peak_suite_non_eur: number | null
           rate_currency: string | null
           seasons: Json | null
+          property_id: string | null
         }
         Insert: {
-          property_id?: string | null
           id?: string
           tenant_id: string
           ship_name: string
@@ -6528,9 +6530,9 @@ export interface Database {
           rate_peak_suite_non_eur?: number | null
           rate_currency?: string | null
           seasons?: Json | null
+          property_id?: string | null
         }
         Update: {
-          property_id?: string | null
           id?: string
           tenant_id?: string
           ship_name?: string
@@ -6619,6 +6621,7 @@ export interface Database {
           rate_peak_suite_non_eur?: number | null
           rate_currency?: string | null
           seasons?: Json | null
+          property_id?: string | null
         }
         Relationships: [
           {
@@ -6633,6 +6636,13 @@ export interface Database {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nile_cruises_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_properties"
             referencedColumns: ["id"]
           },
         ]
@@ -7913,17 +7923,17 @@ export interface Database {
         }
         Relationships: [
           {
-            foreignKeyName: "supplier_properties_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "supplier_properties_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_properties_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -8041,13 +8051,6 @@ export interface Database {
           tenant_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "suppliers_parent_supplier_id_fkey"
-            columns: ["parent_supplier_id"]
-            isOneToOne: false
-            referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "suppliers_tenant_id_fkey"
             columns: ["tenant_id"]
