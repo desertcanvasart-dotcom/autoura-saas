@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
 
     if (supplierId) query = query.eq('supplier_id', supplierId)
     if (shipName) query = query.ilike('ship_name', `%${shipName}%`)
-    if (route) query = query.eq('route', route)
+    // Column is route_name; `route` does not exist, so any request carrying
+    // the route filter 400'd on a nonexistent column.
+    if (route) query = query.eq('route_name', route)
     if (activeOnly) query = query.eq('is_active', true)
 
     const { data, error } = await query

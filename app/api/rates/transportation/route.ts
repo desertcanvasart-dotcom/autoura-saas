@@ -59,7 +59,6 @@ export async function GET(request: NextRequest) {
     const vehicleType = searchParams.get('vehicle_type')
     const originCity = searchParams.get('origin_city')
     const destinationCity = searchParams.get('destination_city')
-    const supplierId = searchParams.get('supplier_id')
     const activeOnly = searchParams.get('active_only') !== 'false' // Default true
 
     // ✅ MULTI-TENANT: RLS policies automatically filter by tenant_id
@@ -67,10 +66,13 @@ export async function GET(request: NextRequest) {
     // Only returns rates belonging to authenticated user's tenant
     let query = supabase
       .from('transportation_rates')
-      .select(`
-        *,
-        supplier:suppliers(id, name, city, contact_phone, contact_email)
-      `)
+      // No supplier embed: transportation_rates is the one rate table with no
+      // supplier_id column (every other has it), so `supplier:suppliers` and
+      // the supplier_id filter both made PostgREST reject the whole query with
+      // PGRST200/42703 -- the transport-rates list returned nothing at all.
+      // Nothing writes a supplier to this table (not the POST, form, or CSV),
+      // so there is no relationship to embed.
+      .select('*')
       .order('city')
       .order('service_type')
       .order('duration')
@@ -85,7 +87,6 @@ export async function GET(request: NextRequest) {
     if (vehicleType) query = query.eq('vehicle_type', vehicleType)
     if (originCity) query = query.ilike('origin_city', `%${originCity}%`)
     if (destinationCity) query = query.ilike('destination_city', `%${destinationCity}%`)
-    if (supplierId) query = query.eq('supplier_id', supplierId)
     if (activeOnly) query = query.eq('is_active', true)
 
     const { data, error } = await query
