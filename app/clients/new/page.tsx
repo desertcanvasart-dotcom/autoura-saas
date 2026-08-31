@@ -316,6 +316,7 @@ export default function NewClientPage() {
                   <option value="Arabic">Arabic</option>
                   <option value="Russian">Russian</option>
                   <option value="Chinese">Chinese</option>
+                  <option value="Japanese">Japanese</option>
                 </select>
               </div>
             </div>

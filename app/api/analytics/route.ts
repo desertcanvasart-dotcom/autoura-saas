@@ -203,12 +203,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Calculate booking stats
-    const bookingStats = {
-      total: itineraries.length,
+    // GET-H02: "Total Bookings" counted EVERY itinerary, drafts included, so
+    // the card said 1 while its own breakdown said 0 confirmed + 0 pending
+    // and the Bookings module said 0. A draft is not a booking: total is now
+    // the sum of the real booking states, so the card always equals its
+    // breakdown.
+    const bookingCounts = {
       confirmed: itineraries.filter(i => i.status === 'confirmed').length,
       pending: itineraries.filter(i => i.status === 'pending' || i.status === 'quoted').length,
       cancelled: itineraries.filter(i => i.status === 'cancelled').length,
       completed: itineraries.filter(i => i.status === 'completed').length
+    }
+    const bookingStats = {
+      total: bookingCounts.confirmed + bookingCounts.pending + bookingCounts.cancelled + bookingCounts.completed,
+      ...bookingCounts
     }
 
     // Calculate revenue
@@ -222,9 +230,11 @@ export async function GET(request: NextRequest) {
     const newClients = clients.filter(c => c.status === 'lead' || c.status === 'prospect').length
     const returningClients = clients.filter(c => c.status === 'customer').length
 
-    // Calculate conversion rate (confirmed / total inquiries)
-    const conversionRate = bookingStats.total > 0
-      ? (bookingStats.confirmed / bookingStats.total) * 100
+    // Calculate conversion rate (confirmed / total inquiries). Denominator
+    // stays every trip started, drafts included — excluding drafts from the
+    // bookings CARD must not quietly inflate conversion.
+    const conversionRate = itineraries.length > 0
+      ? (bookingStats.confirmed / itineraries.length) * 100
       : 0
 
     // Calculate average deal size

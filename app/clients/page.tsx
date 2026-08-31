@@ -209,6 +209,10 @@ export default function ClientsPage() {
       
       closeDeleteModal()
       fetchClients()
+      // Stat cards fetched "only once on mount" went stale the moment a
+      // client was deleted (GET-M03): Total kept its old count until a
+      // manual reload.
+      fetchStats()
     } catch (error) {
       console.error('Error deleting client:', error)
       showToast('error', 'Failed to delete client. Please try again.')
@@ -297,15 +301,27 @@ export default function ClientsPage() {
       <div className="min-h-screen bg-gray-50">
       {/* Delete Confirmation Modal */}
       {deleteModal.isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => !deleting && closeDeleteModal()}
+        >
+          {/* GET-H03: the dialog was invisible to the accessibility tree — a
+              bare div with no role, no aria-modal, no name — and the backdrop
+              swallowed clicks without closing. */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-client-title"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6">
               <div className="flex items-center gap-4 mb-4">
                 <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
                   <AlertCircle className="w-6 h-6 text-red-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Delete Client</h3>
+                  <h3 id="delete-client-title" className="text-lg font-semibold text-gray-900">Delete Client</h3>
                   <p className="text-sm text-gray-500">This action cannot be undone</p>
                 </div>
               </div>

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
-import { useModal } from '@/app/contexts/ModalContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // ============================================
 // B2B PRICING RULES MANAGEMENT
@@ -192,7 +192,7 @@ export default function B2BPricingRulesPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const { tenant, loading: tenantLoading, isAdmin } = useTenant()
-  const modal = useModal()
+  const dialog = useConfirmDialog()
 
   const [pricingRules, setPricingRules] = useState<PricingRule[]>([])
   const [transportPackages, setTransportPackages] = useState<TransportPackage[]>([])
@@ -344,11 +344,12 @@ export default function B2BPricingRulesPage() {
       return
     }
 
-    const confirmed = await modal.confirmDestructive(
-      'Delete Pricing Rule',
-      `Are you sure you want to delete the pricing rule for "${rule.service_name}"?`,
-      { confirmText: 'Delete Rule', cancelText: 'Cancel' }
-    )
+    const confirmed = await dialog.confirm({
+      title: 'Delete Pricing Rule',
+      message: `Are you sure you want to delete the pricing rule for "${rule.service_name}"?`,
+      variant: 'danger',
+      confirmText: 'Delete Rule',
+    })
     if (!confirmed) return
 
     try {
@@ -443,11 +444,12 @@ export default function B2BPricingRulesPage() {
       return
     }
 
-    const confirmed = await modal.confirmDestructive(
-      'Delete Transport Package',
-      `Are you sure you want to delete the transport package "${pkg.package_name}"?`,
-      { confirmText: 'Delete Package', cancelText: 'Cancel' }
-    )
+    const confirmed = await dialog.confirm({
+      title: 'Delete Transport Package',
+      message: `Are you sure you want to delete the transport package "${pkg.package_name}"?`,
+      variant: 'danger',
+      confirmText: 'Delete Package',
+    })
     if (!confirmed) return
 
     try {

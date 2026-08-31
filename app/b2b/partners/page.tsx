@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
-import { useModal } from '@/app/contexts/ModalContext'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 import RequireFeature from '@/components/RequireFeature'
 
 // ============================================
@@ -54,7 +54,7 @@ export default function B2BPartnersPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const { tenant, loading: tenantLoading, isManager, canManagePartners } = useTenant()
-  const modal = useModal()
+  const dialog = useConfirmDialog()
 
   const [partners, setPartners] = useState<B2BPartner[]>([])
   const [loading, setLoading] = useState(true)
@@ -154,11 +154,12 @@ export default function B2BPartnersPage() {
       return
     }
 
-    const confirmed = await modal.confirmDestructive(
-      'Delete Partner',
-      `Are you sure you want to delete ${partner.company_name}? This will remove all associated data.`,
-      { confirmText: 'Delete Partner', cancelText: 'Cancel' }
-    )
+    const confirmed = await dialog.confirm({
+      title: 'Delete Partner',
+      message: `Are you sure you want to delete ${partner.company_name}? This will remove all associated data.`,
+      variant: 'danger',
+      confirmText: 'Delete Partner',
+    })
     if (!confirmed) return
 
     try {
@@ -326,8 +327,8 @@ export default function B2BPartnersPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-1">
-                    <button onClick={() => handleEdit(partner)} className="p-1.5 hover:bg-[#647C47]/10 rounded"><Edit className="w-4 h-4 text-gray-500" /></button>
-                    <button onClick={() => handleDelete(partner)} className="p-1.5 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4 text-gray-500" /></button>
+                    <button onClick={() => handleEdit(partner)} aria-label={`Edit ${partner.company_name}`} className="p-1.5 hover:bg-[#647C47]/10 rounded"><Edit className="w-4 h-4 text-gray-500" /></button>
+                    <button onClick={() => handleDelete(partner)} aria-label={`Delete ${partner.company_name}`} className="p-1.5 hover:bg-red-50 rounded"><Trash2 className="w-4 h-4 text-gray-500" /></button>
                   </div>
                 </td>
               </tr>
