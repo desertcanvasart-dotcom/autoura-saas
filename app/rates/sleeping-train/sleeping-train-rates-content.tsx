@@ -804,6 +804,7 @@ export default function SleepingTrainRatesContent() {
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Route</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Operator</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Train</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Cabin</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Schedule</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">One-way ({userCurrency})</th>
@@ -837,12 +838,14 @@ export default function SleepingTrainRatesContent() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {/* Operator, and WHICH of its trains this rate prices.
-                          This list showed neither — a sleeping-train rate could
-                          be fully linked and read as belonging to nobody. */}
                       <span className="text-sm text-gray-600">{rate.operator_name || '—'}</span>
-                      {rate.property_name && (
-                        <span className="block text-xs text-gray-400">{rate.property_name}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {/* The train, as its own labelled column. */}
+                      {rate.property_name ? (
+                        <span className="text-sm text-gray-700">{rate.property_name}</span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
