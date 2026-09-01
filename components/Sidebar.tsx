@@ -154,9 +154,26 @@ const navigation: NavSection[] = [
       { label: 'Tasks', href: '/tasks', icon: CheckSquare, roles: ['admin', 'manager'] },
     ]
   },
+  // 'Tours' sits directly under Operations (renamed from 'B2B' and moved up
+  // from near the bottom). Still gated to B2B-workspace tenants — the key
+  // stays 'b2b', which the visibility filter and collapse state key on.
+  {
+    title: 'Tours',
+    key: 'b2b',
+    roles: ['admin', 'manager'],
+    items: [
+      { label: 'Tour Manager', href: '/tours/manage', icon: LayoutTemplate },
+      { label: 'Tour Inventory', href: '/tours', icon: Package },
+      { label: 'Partners', href: '/b2b/partners', icon: Handshake },
+      // Single B2B quote store since migration 270 — calculator and
+      // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.
+      { label: 'Quotes', href: '/quotes/b2b', icon: FileText },
+      { label: 'Pricing Rules', href: '/b2b/pricing-rules', icon: Tags },
+    ]
+  },
   // There is deliberately no 'Quotes' group: New Quote and B2C Quotes live
   // under Operations; the single B2B quotes list (b2b_quotes, /quotes/b2b)
-  // lives under B2B.
+  // lives under the Tours section.
   {
     title: 'Bookings',
     key: 'bookings',
@@ -225,20 +242,6 @@ const navigation: NavSection[] = [
     roles: ['admin', 'manager'],
     items: [
       { label: 'Reports', href: '/financial-reports', icon: BarChart3 },
-    ]
-  },
-  {
-    title: 'B2B',
-    key: 'b2b',
-    roles: ['admin', 'manager'],
-    items: [
-      { label: 'Tour Builder', href: '/tours/manage', icon: LayoutTemplate },
-      { label: 'Ready Made Packages', href: '/tours', icon: Package },
-      { label: 'Partners', href: '/b2b/partners', icon: Handshake },
-      // Single B2B quote store since migration 270 — calculator and
-      // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.
-      { label: 'Quotes', href: '/quotes/b2b', icon: FileText },
-      { label: 'Pricing Rules', href: '/b2b/pricing-rules', icon: Tags },
     ]
   },
   {

@@ -142,7 +142,7 @@ export default function ToursBrowsePage() {
             🗺️
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Ready Made Packages</h1>
+            <h1 className="text-xl font-semibold text-gray-900">Tour Inventory</h1>
             <p className="text-sm text-gray-500">Browse available tours and pricing</p>
           </div>
         </div>
