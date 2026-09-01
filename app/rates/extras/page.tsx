@@ -7,10 +7,16 @@
 // only way to offer one was to invent an attraction in the rates table, which
 // polluted the entrance-fee catalogue and mispriced the day (operator, 1 Sep).
 //
+// Priced at QUOTE time through the engine, like optional services: an extra
+// picked in the B2B calculator joins the quote at cost + the quote's margin,
+// or at the price set here (as-is, never margin-stacked). No cost and no
+// price is a hole, not a free line. See lib/pricing/extras-pricing.ts.
+//
 // Deliberately NOT where programme upgrades live: an upgrade that belongs to
-// one package is authored on its variation (Tours → Options), because a
-// Standard and a Deluxe trip sell different upgrades at different prices.
-// These are the extras that go with any booking.
+// one package is authored on its variation (Tour Manager → variation →
+// Options, tour_variation_options / migration 319), because a Standard and a
+// Deluxe trip sell different upgrades at different prices. Same money model,
+// same pricing helper. These are the extras that go with any quote.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Pencil, Plus, Trash2, X, Sparkles } from 'lucide-react'
@@ -117,7 +123,7 @@ export default function ExtrasPage() {
           </button>
         )}
       </div>
-      <p className="text-sm text-gray-500 mb-6">Paid extras you can add to any booking — airport fast-track, extra luggage, a late check-out. Upgrades that belong to one programme are set on its variation, under Tours → Options.</p>
+      <p className="text-sm text-gray-500 mb-6">Paid extras you can add to any quote — airport fast-track, extra luggage, a late check-out. Pick them in the B2B calculator: each is priced from its cost plus the quote&apos;s margin, or at the price you set here. Upgrades that belong to one programme are set on its variation, under Tour Manager → Options.</p>
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
 

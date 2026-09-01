@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { optionsTable } from '@/lib/tours/variation-options'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 // ============================================
@@ -111,6 +112,25 @@ export async function GET(
         }))
       : legacyServices || []
 
+    // Priced options (migration 319) are the source of truth for the
+    // "Optional Extras" list; the legacy optional_extras names are kept only
+    // for anything not yet migrated into an option row. Read through the same
+    // client as the variation so visibility matches; an empty result simply
+    // falls back to the legacy list.
+    const { data: optionRows } = await optionsTable(supabase)
+      .select('name')
+      .eq('variation_id', variation.id)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+    const optionNames = (optionRows || []).map((o) => o.name)
+    const legacyNames = Array.isArray(variation.optional_extras)
+      ? (variation.optional_extras as unknown[]).filter((n): n is string => typeof n === 'string')
+      : []
+    const optionalExtraNames = [
+      ...optionNames,
+      ...legacyNames.filter((n) => !optionNames.includes(n)),
+    ]
+
     // Format response - INCLUDE variation_id for dynamic pricing
     const tourDetail = {
       variation_id: variation.id,  // <-- KEY ADDITION FOR DYNAMIC PRICING
@@ -133,7 +153,7 @@ export async function GET(
       max_pax: variation.max_pax,
       inclusions: variation.inclusions || [],
       exclusions: variation.exclusions || [],
-      optional_extras: variation.optional_extras || [],
+      optional_extras: optionalExtraNames,
       guide_type: variation.guide_type,
       guide_languages: variation.guide_languages || ['English', 'Arabic'],
       vehicle_type: variation.vehicle_type,

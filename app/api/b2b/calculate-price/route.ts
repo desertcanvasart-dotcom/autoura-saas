@@ -4,6 +4,11 @@ import { getEntranceFee as canonicalGetEntranceFee } from '@/lib/pricing/rate-re
 import { getCatalogScope } from '@/lib/catalog-scope'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getTieredActivityRate, applyActivityTiers } from '@/lib/rates/activity-tiers'
+import {
+  priceExtras, addExtrasToMoney, EXTRAS_SOURCE, OPTION_SOURCE,
+  type CatalogueExtra, type ExtraSelection, type LineSource, type MoneyBlock,
+} from '@/lib/pricing/extras-pricing'
+import { optionsTable } from '@/lib/tours/variation-options'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { getCurrencySymbol } from '@/lib/currency'
 
@@ -80,6 +85,92 @@ function getSeason(date: Date): 'low' | 'high' | 'peak' {
   if ([12, 1, 2, 3, 4].includes(month)) return 'high'
   if ([7, 8].includes(month)) return 'peak'
   return 'low'
+}
+
+// Catalogue extras chosen for this quote. Only ACTIVE rows of this tenant come
+// back; a withdrawn or foreign id is therefore a hole downstream, never a sale.
+async function loadExtras(tenantId: string, ids: string[]): Promise<CatalogueExtra[]> {
+  if (ids.length === 0) return []
+  const { data, error } = await getSupabaseAdmin()
+    .from('extras_catalogue')
+    .select('id, name, supplier_cost, selling_price, unit')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .in('id', ids)
+  if (error) {
+    console.error('Error loading extras_catalogue:', error)
+    return []
+  }
+  // The column is a CHECK-constrained text; narrow it to the two units.
+  return (data || []) as unknown as CatalogueExtra[]
+}
+
+// Priced options of THIS variation only (migration 319). Scoped by variation
+// as well as tenant, so an option from another programme can't be quoted here.
+async function loadVariationOptions(tenantId: string, variationId: string, ids: string[]): Promise<CatalogueExtra[]> {
+  if (ids.length === 0) return []
+  const { data, error } = await optionsTable(getSupabaseAdmin())
+    .select('id, name, supplier_cost, selling_price, unit')
+    .eq('tenant_id', tenantId)
+    .eq('variation_id', variationId)
+    .eq('is_active', true)
+    .in('id', ids)
+  if (error) {
+    console.error('Error loading tour_variation_options:', error)
+    return []
+  }
+  // The column is a CHECK-constrained text; narrow it to the two units.
+  return (data || []) as unknown as CatalogueExtra[]
+}
+
+// Fold priced extras into a finished result: lines join services (and so the
+// quote's services_snapshot), money is re-totalled at every pax count of the
+// rate sheet, and any hole makes the quote incomplete. Both engine branches
+// return through here so extras behave identically for auto-priced and
+// service-listed variations.
+function foldExtras(
+  result: PriceCalculationResult,
+  catalogue: CatalogueExtra[],
+  selections: ExtraSelection[],
+  source: LineSource = EXTRAS_SOURCE
+): PriceCalculationResult {
+  if (selections.length === 0) return result
+  const m = result.margin_percent
+  const r2 = (n: number) => Math.round(n * 100) / 100
+
+  const p = priceExtras(catalogue, selections, result.num_pax, source)
+  const money = addExtrasToMoney(
+    {
+      totalCost: result.total_cost,
+      marginAmount: result.margin_amount,
+      sellingPrice: result.selling_price,
+      pricePerPerson: result.price_per_person,
+    },
+    p, result.num_pax, m
+  )
+
+  // Per-person extras scale per row; per-booking ones are charged once per row.
+  // pax_pricing_table is typed any[] upstream; `row` is inferred, not declared.
+  type PaxBlock = (MoneyBlock & Record<string, unknown>) | undefined
+  const pax_pricing_table = result.pax_pricing_table?.map((row) => {
+    const rp = priceExtras(catalogue, selections, row.numPax, source)
+    const fold = (b: PaxBlock) => (b ? { ...b, ...addExtrasToMoney(b, rp, row.numPax, m) } : b)
+    return { ...row, withoutLeader: fold(row.withoutLeader), withLeader: fold(row.withLeader) }
+  })
+
+  const holes = [...result.holes, ...p.holes]
+  return {
+    ...result,
+    services: [...result.services, ...p.lines],
+    subtotal_cost: r2(result.subtotal_cost + p.cost_total),
+    total_cost: money.totalCost,
+    margin_amount: money.marginAmount,
+    selling_price: money.sellingPrice,
+    price_per_person: money.pricePerPerson,
+    pax_pricing_table,
+    holes,
+    complete: holes.length === 0,
+  }
 }
 
 // Get transport package for cruise sightseeing (kept for package deals)
@@ -278,7 +369,12 @@ export async function POST(request: NextRequest) {
       include_optionals = false,
       language = 'English',
       tier = 'standard',
-      tour_leader_included = false  // NEW: Added tour leader parameter
+      tour_leader_included = false,  // NEW: Added tour leader parameter
+      // Catalogue extras chosen for THIS quote (ids, or {id} objects). Priced
+      // through the engine like any other line — see lib/pricing/extras-pricing.
+      extras = [],
+      // Priced options of THIS variation (migration 319), same treatment.
+      options = []
     } = body
 
 
@@ -286,6 +382,21 @@ export async function POST(request: NextRequest) {
     if (!variation_id) {
       return NextResponse.json({ error: 'variation_id is required' }, { status: 400 })
     }
+
+    // Accept ids or {id} objects; anything else is ignored rather than trusted.
+    const isSelection = (e: unknown): e is ExtraSelection =>
+      typeof e === 'object' && e !== null &&
+      typeof (e as { id?: unknown }).id === 'string' && (e as { id: string }).id.length > 0
+    const toSelections = (raw: unknown): ExtraSelection[] =>
+      (Array.isArray(raw) ? raw : [])
+        .map((e: unknown) => (typeof e === 'string' ? { id: e } : e))
+        .filter(isSelection)
+    const extraSelections = toSelections(extras)
+    const optionSelections = toSelections(options)
+    const [extrasCatalogue, variationOptions] = await Promise.all([
+      loadExtras(tenantId, extraSelections.map((e) => e.id)),
+      loadVariationOptions(tenantId, variation_id, optionSelections.map((o) => o.id)),
+    ])
 
     // Fetch variation with template info
     const { data: variation, error: varError } = await (getSupabaseAdmin() as any)
@@ -426,9 +537,13 @@ export async function POST(request: NextRequest) {
         holes: (autoPriceResult.holes || []).map((h) => ({ kind: h.kind, message: h.message })),
       }
 
-
-
-      return NextResponse.json({ success: true, data: result })
+      return NextResponse.json({
+        success: true,
+        data: foldExtras(
+          foldExtras(result, extrasCatalogue, extraSelections),
+          variationOptions, optionSelections, OPTION_SOURCE
+        ),
+      })
     }
 
     // ============================================
@@ -767,9 +882,13 @@ export async function POST(request: NextRequest) {
       holes,
     }
 
-
-
-    return NextResponse.json({ success: true, data: result })
+    return NextResponse.json({
+      success: true,
+      data: foldExtras(
+        foldExtras(result, extrasCatalogue, extraSelections),
+        variationOptions, optionSelections, OPTION_SOURCE
+      ),
+    })
   } catch (error: any) {
     console.error('❌ Error calculating tour price:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
