@@ -446,9 +446,21 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                 className="w-full h-full object-contain"
               />
             </div>
-            {!isCollapsed && tenant && (
-              <span className="text-sm font-semibold text-gray-900 truncate">
-                {tenant.company_name}
+            {!isCollapsed && (
+              // The tenant's own brand stays prominent (white-label), with a
+              // small, muted "SaaS" tag so this getautoura.net app is never
+              // confused with the autoura.net "Autoura Ops" app — the two read
+              // identically in screenshots otherwise. The tag sits OUTSIDE the
+              // truncating name so it is always visible.
+              <span className="flex items-center gap-1.5 min-w-0">
+                {tenant && (
+                  <span className="text-sm font-semibold text-gray-900 truncate">
+                    {tenant.company_name}
+                  </span>
+                )}
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 flex-shrink-0">
+                  SaaS
+                </span>
               </span>
             )}
           </Link>
