@@ -164,7 +164,7 @@ export default function FlightsContent() {
   // City vocabulary from the destination catalog (Egypt fallback pre-migration).
   const { cities: cityOptions } = useDestinationCities()
   const dialog = useConfirmDialog()
-  const { symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { userCurrency, loading: currencyLoading } = useCurrency()
 
   const { fmtRate } = useRateRowFormat()
   const [rates, setRates] = useState<FlightRate[]>([])

@@ -604,7 +604,7 @@ function PPDSeasonalRateSection({
 
 export default function CruisesPage() {
   const dialog = useConfirmDialog()
-  const { symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { userCurrency, loading: currencyLoading } = useCurrency()
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [cruises, setCruises] = useState<Cruise[]>([])
