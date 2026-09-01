@@ -225,6 +225,20 @@ export async function middleware(request: NextRequest) {
       return response
     }
 
+    // Platform owners are verified by the SUPER_ADMIN_EMAILS allowlist, not by
+    // tenant membership, so the per-tenant is_active / role gate below does
+    // not apply to them — and MUST NOT. A super admin who owns a tenant can
+    // carry an ordinary user_profiles row (here: manager, and deactivated by
+    // accident today). That deactivated flag bounced them to /login, and the
+    // /login guard above bounces an authenticated super admin to /super-admin
+    // — so EVERY tenant page redirected to the super-admin dashboard. When a
+    // super admin is impersonating a tenant they already get an admin role
+    // server-side (lib/supabase-server.ts); this simply stops the tenant gate
+    // from overriding their platform access.
+    if (user.email && isSuperAdmin(user.email)) {
+      return response
+    }
+
     // Check if this route has permission restrictions
     const matchedRoute = Object.keys(ROUTE_PERMISSIONS).find(route => {
       return pathname === route || pathname.startsWith(route + '/')
@@ -240,8 +254,19 @@ export async function middleware(request: NextRequest) {
 
       // Check if user is active
       if (profile && !profile.is_active) {
-        // User is deactivated - sign them out and redirect
-        return NextResponse.redirect(new URL('/login?error=account_inactive', request.url))
+        // End the session BEFORE redirecting. The comment here used to claim
+        // "sign them out" but nothing did — so a still-authenticated
+        // deactivated user hit /login, the /login guard bounced them straight
+        // back into the app, the is_active check fired again… an infinite
+        // redirect loop for an ordinary account (and an inescapable bounce to
+        // /super-admin for a platform owner). Clearing the session locally
+        // makes /login terminal: it shows the notice instead of bouncing.
+        await supabase.auth.signOut({ scope: 'local' })
+        const redirect = NextResponse.redirect(new URL('/login?error=account_inactive', request.url))
+        // Carry the cleared auth cookies (set on `response` by signOut's cookie
+        // handler) onto the redirect, or the browser keeps the stale session.
+        response.cookies.getAll().forEach(c => redirect.cookies.set(c.name, c.value, c))
+        return redirect
       }
 
       const userRole = profile?.role || 'viewer'
