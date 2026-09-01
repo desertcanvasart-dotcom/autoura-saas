@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 139
+ * Tables: 138
  */
 
 export type Json =
@@ -892,113 +892,6 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "b2b_partners_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      b2b_pricing_rules: {
-        Row: {
-          id: string
-          rate_table: string | null
-          rate_id: string | null
-          service_name: string | null
-          service_category: string | null
-          pricing_model: string
-          unit_type: string | null
-          unit_capacity: number | null
-          tier1_min_pax: number | null
-          tier1_max_pax: number | null
-          tier1_rate_eur: number | null
-          tier1_label: string | null
-          tier2_min_pax: number | null
-          tier2_max_pax: number | null
-          tier2_rate_eur: number | null
-          tier2_label: string | null
-          tier3_min_pax: number | null
-          tier3_max_pax: number | null
-          tier3_rate_eur: number | null
-          tier3_label: string | null
-          tier4_min_pax: number | null
-          tier4_max_pax: number | null
-          tier4_rate_eur: number | null
-          tier4_label: string | null
-          notes: string | null
-          is_active: boolean | null
-          created_at: string | null
-          updated_at: string | null
-          applies_to: string | null
-          tenant_id: string | null
-        }
-        Insert: {
-          id?: string
-          rate_table?: string | null
-          rate_id?: string | null
-          service_name?: string | null
-          service_category?: string | null
-          pricing_model?: string
-          unit_type?: string | null
-          unit_capacity?: number | null
-          tier1_min_pax?: number | null
-          tier1_max_pax?: number | null
-          tier1_rate_eur?: number | null
-          tier1_label?: string | null
-          tier2_min_pax?: number | null
-          tier2_max_pax?: number | null
-          tier2_rate_eur?: number | null
-          tier2_label?: string | null
-          tier3_min_pax?: number | null
-          tier3_max_pax?: number | null
-          tier3_rate_eur?: number | null
-          tier3_label?: string | null
-          tier4_min_pax?: number | null
-          tier4_max_pax?: number | null
-          tier4_rate_eur?: number | null
-          tier4_label?: string | null
-          notes?: string | null
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-          applies_to?: string | null
-          tenant_id?: string | null
-        }
-        Update: {
-          id?: string
-          rate_table?: string | null
-          rate_id?: string | null
-          service_name?: string | null
-          service_category?: string | null
-          pricing_model?: string
-          unit_type?: string | null
-          unit_capacity?: number | null
-          tier1_min_pax?: number | null
-          tier1_max_pax?: number | null
-          tier1_rate_eur?: number | null
-          tier1_label?: string | null
-          tier2_min_pax?: number | null
-          tier2_max_pax?: number | null
-          tier2_rate_eur?: number | null
-          tier2_label?: string | null
-          tier3_min_pax?: number | null
-          tier3_max_pax?: number | null
-          tier3_rate_eur?: number | null
-          tier3_label?: string | null
-          tier4_min_pax?: number | null
-          tier4_max_pax?: number | null
-          tier4_rate_eur?: number | null
-          tier4_label?: string | null
-          notes?: string | null
-          is_active?: boolean | null
-          created_at?: string | null
-          updated_at?: string | null
-          applies_to?: string | null
-          tenant_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "b2b_pricing_rules_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
