@@ -189,6 +189,7 @@ const navigation: NavSection[] = [
       // (lib/pricing/season-uplift.ts) was already wired into auto-pricing,
       // but the editor was reachable only from the Settings page.
       { label: 'Seasonal Premiums', href: '/settings/seasons', icon: CalendarRange },
+      { label: 'Extras', href: '/rates/extras', icon: Sparkles },
     ]
   },
   {
