@@ -33,6 +33,7 @@ import {
 // Import DayBuilder component
 import DayBuilder from './DayBuilder'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 // ============================================
 // INTERFACES
@@ -776,6 +777,7 @@ function DayBuilderModal({ template, onClose, onSave }: DayBuilderModalProps) {
 
 export default function TourManagerContent() {
   const dialog = useConfirmDialog()
+  const { submitting, guard } = useSubmitGuard()
   const [templates, setTemplates] = useState<TourTemplate[]>([])
   const [themes, setThemes] = useState<TourTheme[]>([])  // Renamed from categories
   const [attractions, setAttractions] = useState<Attraction[]>([])  // NEW: Attractions from DB
@@ -1168,7 +1170,11 @@ export default function TourManagerContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+    // A tour template's code is generated per-submit and no unique constraint
+    // dedupes it, so a double-fired submit created TWO templates 1-2s apart
+    // (operator, 1 Sep — confirmed in the data). The guard drops the second
+    // call synchronously and disables the button while the first is in flight.
+    await guard(async () => {
     const dataToSubmit = {
       ...formData,
       template_code: formData.template_code || generateTemplateCode()
@@ -1221,7 +1227,13 @@ export default function TourManagerContent() {
             if (data.data) {
               const newTemplate = { ...data.data, duration_days: formData.duration_days }
               setTimeout(async () => {
-                if (await dialog.confirm({ message: 'Would you like to add activities to this tour now?' })) {
+                if (await dialog.confirm({
+                  title: 'Tour created',
+                  message: 'Would you like to add activities and set up day-by-day pricing now? You can also do this later from the tour list.',
+                  confirmText: 'Add activities',
+                  cancelText: 'Later',
+                  variant: 'info',
+                })) {
                   setDayBuilderTemplate(newTemplate)
                 }
               }, 500)
@@ -1243,6 +1255,7 @@ export default function TourManagerContent() {
     } catch (error) {
       showToast('error', 'Failed to save template')
     }
+    })
   }
 
   const handleDelete = async (id: string, name: string) => {
@@ -2285,10 +2298,13 @@ export default function TourManagerContent() {
                 ) : (
                   <button
                     type="submit"
-                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2"
+                    disabled={submitting}
+                    className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <Check className="w-4 h-4" />
-                    {editingTemplate ? 'Update Template' : 'Create Template & Variations'}
+                    {submitting
+                      ? (editingTemplate ? 'Updating…' : 'Creating…')
+                      : (editingTemplate ? 'Update Template' : 'Create Template & Variations')}
                   </button>
                 )}
               </div>
