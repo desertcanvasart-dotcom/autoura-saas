@@ -50,6 +50,8 @@ interface SleepingTrainRate {
   rate_valid_to?: string
   season?: string
   operator_name?: string
+  /** Resolved from property_id — the train this rate prices. */
+  property_name?: string | null
   supplier_id?: string
   description?: string
   notes?: string
@@ -801,6 +803,7 @@ export default function SleepingTrainRatesContent() {
                     />
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Route</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Operator</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Cabin</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Schedule</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">One-way ({userCurrency})</th>
@@ -832,6 +835,15 @@ export default function SleepingTrainRatesContent() {
                           <p className="text-xs text-gray-500">{rate.service_code}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {/* Operator, and WHICH of its trains this rate prices.
+                          This list showed neither — a sleeping-train rate could
+                          be fully linked and read as belonging to nobody. */}
+                      <span className="text-sm text-gray-600">{rate.operator_name || '—'}</span>
+                      {rate.property_name && (
+                        <span className="block text-xs text-gray-400">{rate.property_name}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">

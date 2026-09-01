@@ -830,11 +830,21 @@ export default function TrainRatesContent() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {rate.duration_hours ? (
-                        <span className="text-sm text-gray-600 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {rate.duration_hours}h
-                        </span>
+                      {/* Departure times were captured on the form and shown on
+                          no screen at all — the same "stored but invisible" gap
+                          the train link had. */}
+                      {rate.duration_hours || rate.departure_times ? (
+                        <div className="flex flex-col gap-0.5">
+                          {rate.duration_hours ? (
+                            <span className="text-sm text-gray-600 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {rate.duration_hours}h
+                            </span>
+                          ) : null}
+                          {rate.departure_times ? (
+                            <span className="text-xs text-gray-500">{rate.departure_times}</span>
+                          ) : null}
+                        </div>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
                       )}
