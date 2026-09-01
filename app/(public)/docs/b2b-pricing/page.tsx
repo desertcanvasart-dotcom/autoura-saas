@@ -123,7 +123,7 @@ export default function B2BPricingPage() {
           <li><strong>Transport Costs</strong> &mdash; Vehicle rates that step up by vehicle tier as the group grows (sedan &rarr; minivan &rarr; minibus &rarr; bus)</li>
         </ul>
         <p className="text-gray-600 mt-3">
-          Per-unit vs. tiered behavior and the transport vehicle-tier stepping are driven by the <strong>Pricing Rules</strong> page (B2B &rarr; Pricing Rules). See <Link href="/docs/b2b-pricing-rules" className="text-primary-600 hover:underline">B2B Pricing Rules</Link> for details.
+          Per-unit and tiered activity behavior is driven by <strong>Activities &amp; Add-ons</strong> (Rates &amp; Pricing &rarr; Activities); transport vehicle-tier stepping is driven by the <strong>Transport Packages</strong> page (Tours &rarr; Transport Packages). See <Link href="/docs/b2b-pricing-rules" className="text-primary-600 hover:underline">Transport Packages</Link> for details.
         </p>
         <p className="text-gray-600 mt-3">
           For the <strong>+1 Tour Leader</strong> scenario, the leader&apos;s costs (single room, entrances, meals) are distributed across the paying guests, increasing the per-person price slightly.

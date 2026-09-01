@@ -53,7 +53,7 @@ const NAV_ITEMS = [
   { href: '/docs/itineraries', label: 'Itineraries', icon: Map },
   { href: '/docs/b2c-pricing', label: 'B2C Pricing', icon: Calculator },
   { href: '/docs/b2b-pricing', label: 'B2B Pricing', icon: Briefcase },
-  { href: '/docs/b2b-pricing-rules', label: 'B2B Pricing Rules', icon: PackageSearch },
+  { href: '/docs/b2b-pricing-rules', label: 'Transport Packages', icon: PackageSearch },
   { href: '/docs/tour-programs', label: 'Tour Manager', icon: ClipboardList },
   { href: '/docs/b2b-quotes', label: 'B2B Quotes', icon: FileCheck },
   { href: '/docs/b2b-import', label: 'Converting to B2B', icon: FileInput },

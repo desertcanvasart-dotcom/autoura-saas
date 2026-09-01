@@ -15,7 +15,7 @@
   "app/api/whatsapp/send-invoice/route.ts": 2,
   "app/api/whatsapp/send-receipt/route.ts": 1,
   "app/b2b/calculator/[id]/page.tsx": 21,
-  "app/b2b/pricing-rules/page.tsx": 19,
+  "app/b2b/pricing-rules/page.tsx": 11,
   "app/calendar/page.tsx": 1,
   "app/clients/new/page.tsx": 1,
   "app/clients/page.tsx": 2,

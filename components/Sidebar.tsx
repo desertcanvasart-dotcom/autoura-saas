@@ -50,7 +50,7 @@ import {
   Route,
   Package,
   Briefcase,
-  Tags,
+  Car,
   Grid3x3,
   Sparkles,
   PenLine,
@@ -168,7 +168,7 @@ const navigation: NavSection[] = [
       // Single B2B quote store since migration 270 — calculator and
       // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.
       { label: 'Quotes', href: '/quotes/b2b', icon: FileText },
-      { label: 'Pricing Rules', href: '/b2b/pricing-rules', icon: Tags },
+      { label: 'Transport Packages', href: '/b2b/pricing-rules', icon: Car },
     ]
   },
   // There is deliberately no 'Quotes' group: New Quote and B2C Quotes live
