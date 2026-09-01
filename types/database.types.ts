@@ -9590,7 +9590,6 @@ export interface Database {
           long_description: string | null
           duration_days: number
           duration_nights: number
-          duration_hours: number | null
           category_id: string | null
           destination_id: string | null
           highlights: string[] | null
@@ -9622,6 +9621,7 @@ export interface Database {
           cached_starting_price: number | null
           cached_starting_tier: string | null
           cached_price_updated_at: string | null
+          duration_hours: number | null
         }
         Insert: {
           id?: string
@@ -9632,7 +9632,6 @@ export interface Database {
           long_description?: string | null
           duration_days?: number
           duration_nights?: number
-          duration_hours?: number | null
           category_id?: string | null
           destination_id?: string | null
           highlights?: string[] | null
@@ -9664,6 +9663,7 @@ export interface Database {
           cached_starting_price?: number | null
           cached_starting_tier?: string | null
           cached_price_updated_at?: string | null
+          duration_hours?: number | null
         }
         Update: {
           id?: string
@@ -9674,7 +9674,6 @@ export interface Database {
           long_description?: string | null
           duration_days?: number
           duration_nights?: number
-          duration_hours?: number | null
           category_id?: string | null
           destination_id?: string | null
           highlights?: string[] | null
@@ -9706,6 +9705,7 @@ export interface Database {
           cached_starting_price?: number | null
           cached_starting_tier?: string | null
           cached_price_updated_at?: string | null
+          duration_hours?: number | null
         }
         Relationships: [
           {
