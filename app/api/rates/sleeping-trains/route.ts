@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
+import { attachPropertyNames } from '@/lib/suppliers/attach-property-names'
+import { operatorNameForSupplier } from '@/lib/suppliers/operator-name'
 import { getCatalogScope, catalogOrExpr } from '@/lib/catalog-scope'
 
 export async function GET(request: NextRequest) {
@@ -42,7 +44,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data: data || [] })
+    // The rate names WHICH train it prices; the list could not show it.
+    return NextResponse.json({ success: true, data: await attachPropertyNames(createAdminClient(), data) })
   } catch (error: any) {
     console.error('GET sleeping_train_rates catch error:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
@@ -96,7 +99,12 @@ export async function POST(request: NextRequest) {
       rate_valid_from: body.rate_valid_from || null,
       rate_valid_to: body.rate_valid_to || null,
       season: body.season || null,
-      operator_name: body.operator_name || null,
+      // The supplier IS the operator (lib/suppliers/operator-name.ts).
+      operator_name: await operatorNameForSupplier(createAdminClient(), {
+        tenantId: authResult.tenant_id!,
+        supplierId: body.supplier_id,
+        fallback: body.operator_name,
+      }),
       supplier_id: body.supplier_id || null,
       ...(trainProp.property_id ? { property_id: trainProp.property_id } : {}),
       description: body.description || null,
