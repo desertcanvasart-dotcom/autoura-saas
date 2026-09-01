@@ -795,6 +795,7 @@ export default function TrainRatesContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Class</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Duration</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Operator</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Train</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Rate</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
@@ -850,10 +851,16 @@ export default function TrainRatesContent() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {/* Operator, and WHICH of its trains this rate prices. */}
                       <span className="text-sm text-gray-600">{rate.operator_name || '—'}</span>
-                      {rate.property_name && (
-                        <span className="block text-xs text-gray-400">{rate.property_name}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {/* WHICH of the operator's trains this rate prices, as its
+                          own labelled column — it was a subline under the
+                          operator and too easy to miss (operator, 1 Sep). */}
+                      {rate.property_name ? (
+                        <span className="text-sm text-gray-700">{rate.property_name}</span>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
