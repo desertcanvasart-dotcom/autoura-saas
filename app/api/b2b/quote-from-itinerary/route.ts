@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         const serviceType = svc.service_type || ''
         const serviceName = svc.service_name || ''
 
-        // Try B2B pricing rules
+        // Activities/entrances: group-size tiers first, then entrance fees
         if (serviceType === 'entrance' || serviceType === 'entrance_fee' || serviceType === 'activity') {
           // Bands on the activity itself (C3.3) first — same precedence as
           // the calculate-price engine, so the two cannot disagree about the
@@ -74,23 +74,6 @@ export async function POST(request: NextRequest) {
             lineTotal = priced.lineTotal
             quantityMode = priced.quantityMode
             rateSource = 'activity_tiers'
-          }
-          // NOTE: the lookup below matches on the FIRST WORD of the service
-          // name ('%Felucca%' for "Felucca Ride"), which can hit an unrelated
-          // service sharing that word. It is left as-is for anything already
-          // configured in b2b_pricing_rules; the tiered catalog above matches
-          // on the full name and takes precedence.
-          const { data: rules } = tiered
-            ? { data: null }
-            : await supabase.from('b2b_pricing_rules').select('*').or(`tenant_id.eq.${tenant_id},tenant_id.is.null`).eq('is_active', true).ilike('service_name', `%${serviceName.split(' ')[0]}%`).limit(1)
-          if (rules?.length) {
-            const rule = rules[0]
-            const rate = numPax <= (rule.tier1_max_pax || 999) ? rule.tier1_rate_eur : (rule.tier2_rate_eur || rule.tier1_rate_eur)
-            if (rate != null) {
-              if (rule.pricing_model === 'per_unit') { unitCost = rate; lineTotal = rate; quantityMode = 'fixed' }
-              else { unitCost = rate; lineTotal = rate * numPax; quantityMode = 'per_pax' }
-              rateSource = 'b2b_rule'
-            }
           } else {
             // Entrance fees — through the canonical lookup, not a local query.
             //

@@ -23,8 +23,9 @@ import { getCurrencySymbol } from '@/lib/currency'
 // SHARED B2C RATE TABLES:
 // - vehicles, guides, entrance_fees, hotel_contacts, meal_rates, nile_cruises
 // 
-// B2B-SPECIFIC TABLES (kept for tiered pricing):
-// - b2b_pricing_rules, b2b_transport_packages, b2b_partners, b2b_partner_pricing
+// B2B-SPECIFIC TABLES:
+// - b2b_transport_packages, b2b_partners, b2b_partner_pricing
+// (group-size activity tiers live on activity_rates.tiers — migration 306)
 // ============================================
 
 // Service-role client (auth is enforced per-handler via requireAuth)
@@ -81,20 +82,6 @@ function getSeason(date: Date): 'low' | 'high' | 'peak' {
   return 'low'
 }
 
-// Check for B2B pricing rules for an activity (kept for tiered pricing like felucca)
-async function getB2BPricingRule(serviceName: string, tenantId?: string): Promise<any | null> {
-  const { data, error } = await (getSupabaseAdmin() as any)
-    .from('b2b_pricing_rules')
-    .select('*')
-    .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
-    .eq('is_active', true)
-    .ilike('service_name', `%${serviceName.split(' ')[0]}%`)
-    .limit(1)
-
-  if (error || !data || data.length === 0) return null
-  return data[0]
-}
-
 // Get transport package for cruise sightseeing (kept for package deals)
 async function getTransportPackage(packageType: string, originCity: string, destCity: string, tenantId?: string): Promise<any | null> {
   const { data, error } = await (getSupabaseAdmin() as any)
@@ -109,82 +96,6 @@ async function getTransportPackage(packageType: string, originCity: string, dest
 
   if (error || !data || data.length === 0) return null
   return data[0]
-}
-
-// Calculate price using B2B pricing rule (tiered pricing)
-function applyB2BPricingRule(
-  rule: any, 
-  numPax: number
-): { unitCost: number; lineTotal: number; pricingNote: string; quantityMode: string } {
-  const model = rule.pricing_model
-
-  switch (model) {
-    case 'per_unit': {
-      let rate: number
-      let label: string
-
-      if (numPax <= (rule.tier1_max_pax || 999)) {
-        rate = rule.tier1_rate_eur
-        label = rule.tier1_label || 'Small'
-      } else if (rule.tier2_max_pax && numPax <= rule.tier2_max_pax) {
-        rate = rule.tier2_rate_eur
-        label = rule.tier2_label || 'Large'
-      } else {
-        const largeCapacity = rule.tier2_max_pax || rule.tier1_max_pax || 8
-        const largeRate = rule.tier2_rate_eur || rule.tier1_rate_eur
-        const unitsNeeded = Math.ceil(numPax / largeCapacity)
-        const totalCost = largeRate * unitsNeeded
-
-        return {
-          unitCost: totalCost,
-          lineTotal: totalCost,
-          pricingNote: `${unitsNeeded}x ${rule.tier2_label || rule.unit_type} @ €${largeRate} = €${totalCost}`,
-          quantityMode: 'fixed'
-        }
-      }
-
-      return {
-        unitCost: rate,
-        lineTotal: rate,
-        pricingNote: `${label}: €${rate} flat`,
-        quantityMode: 'fixed'
-      }
-    }
-
-    case 'tiered': {
-      let rate: number
-      let label: string
-
-      if (numPax <= (rule.tier1_max_pax || 2)) {
-        rate = rule.tier1_rate_eur
-        label = rule.tier1_label || `1-${rule.tier1_max_pax}`
-      } else if (numPax <= (rule.tier2_max_pax || 10)) {
-        rate = rule.tier2_rate_eur
-        label = rule.tier2_label || `${rule.tier1_max_pax + 1}-${rule.tier2_max_pax}`
-      } else if (numPax <= (rule.tier3_max_pax || 20)) {
-        rate = rule.tier3_rate_eur
-        label = rule.tier3_label || `${rule.tier2_max_pax + 1}-${rule.tier3_max_pax}`
-      } else {
-        rate = rule.tier4_rate_eur || rule.tier3_rate_eur
-        label = rule.tier4_label || `${rule.tier3_max_pax + 1}+`
-      }
-
-      return {
-        unitCost: rate,
-        lineTotal: rate * numPax,
-        pricingNote: `${label}: €${rate}/pax × ${numPax} = €${rate * numPax}`,
-        quantityMode: 'per_pax'
-      }
-    }
-
-    default:
-      return {
-        unitCost: rule.tier1_rate_eur || 0,
-        lineTotal: (rule.tier1_rate_eur || 0) * numPax,
-        pricingNote: 'Per person',
-        quantityMode: 'per_pax'
-      }
-  }
 }
 
 // Select vehicle from transport package based on group size
@@ -571,14 +482,12 @@ export async function POST(request: NextRequest) {
       let effectiveQuantityMode = service.quantity_mode || 'per_pax'
 
       // ============================================
-      // STEP 1: Check for B2B pricing rules (tiered pricing like felucca)
+      // STEP 1: Group-size tiers on the activity itself (felucca, camel ride…)
       // ============================================
       if (service.rate_type === 'activity' && service.service_name) {
-        // Bands on the activity itself (C3.3) come first: they live in the
-        // catalog the rest of the app prices from, carry as many bands as the
-        // contract has, and are matched on the FULL service name. The
-        // b2b_pricing_rules path below stays as the fallback for anything
-        // already configured there.
+        // Bands live on the activity in the catalog the rest of the app prices
+        // from (activity_rates.tiers, migration 306), carry as many bands as the
+        // contract has, and are matched on the FULL service name.
         const tiered = await getTieredActivityRate(
           getSupabaseAdmin() as never,
           service.service_name,
@@ -594,19 +503,6 @@ export async function POST(request: NextRequest) {
           pricingNote = priceResult.pricingNote
           effectiveQuantityMode = priceResult.quantityMode
           rateSource = 'activity_tiers'
-        }
-
-        const b2bRule = tiered ? null : await getB2BPricingRule(service.service_name, tenantId)
-
-        if (b2bRule) {
-          const priceResult = applyB2BPricingRule(b2bRule, num_pax)
-          unitCost = priceResult.unitCost
-          lineTotal = priceResult.lineTotal
-          pricingNote = priceResult.pricingNote
-          effectiveQuantityMode = priceResult.quantityMode
-          rateSource = 'b2b_rule'
-
-
         }
       }
 

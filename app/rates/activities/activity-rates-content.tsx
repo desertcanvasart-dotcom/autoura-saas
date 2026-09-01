@@ -7,7 +7,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Ticket, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, Users, AlertTriangle, CheckCircle, XCircle, Info, Ship, PersonStanding, Banknote } from 'lucide-react'
+import { Ticket, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, Users, AlertTriangle, CheckCircle, XCircle, Info, Ship, PersonStanding, Banknote, TrendingDown } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -63,7 +63,8 @@ const DURATIONS = [
 const PRICING_TYPES = [
   { value: 'per_person', label: 'Per Person', description: 'Rate multiplied by number of travelers', icon: PersonStanding },
   { value: 'per_unit', label: 'Per Unit', description: 'Flat rate per boat/vehicle/ride', icon: Ship },
-  { value: 'flat', label: 'Flat Rate', description: 'Single price regardless of group size', icon: Banknote }
+  { value: 'flat', label: 'Flat Rate', description: 'Single price regardless of group size', icon: Banknote },
+  { value: 'tiered', label: 'Tiered', description: 'Per-person rate drops as the group grows', icon: TrendingDown }
 ]
 
 // NEW: Common unit labels
@@ -99,7 +100,7 @@ interface ActivityRate {
   base_rate_eur: number
   base_rate_non_eur: number
   // NEW: Add-on pricing fields
-  pricing_type?: 'per_person' | 'per_unit' | 'flat'
+  pricing_type?: 'per_person' | 'per_unit' | 'flat' | 'tiered'
   unit_label?: string
   min_capacity?: number
   max_capacity?: number
@@ -198,7 +199,7 @@ export default function ActivityRatesContent() {
     base_rate_eur: 0,
     base_rate_non_eur: 0,
     // NEW: Add-on pricing fields
-    pricing_type: 'per_person' as 'per_person' | 'per_unit' | 'flat',
+    pricing_type: 'per_person' as 'per_person' | 'per_unit' | 'flat' | 'tiered',
     unit_label: '',
     min_capacity: 1,
     max_capacity: 99,
@@ -333,6 +334,12 @@ export default function ActivityRatesContent() {
   const { submitting, guard } = useSubmitGuard()
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // A tiered rate prices only from its bands — the engine never falls back to
+    // base_rate — so saving one with no bands would leave the activity unpriced.
+    if (formData.pricing_type === 'tiered' && tiers.length === 0) {
+      showNotification('error', 'Add a band', 'A tiered rate needs at least one group-size band. Add one, or switch to another pricing type.')
+      return
+    }
     guard(async () => {  try {
         const url = editingRate
           ? `/api/rates/activities/${editingRate.id}`
@@ -343,7 +350,17 @@ export default function ActivityRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency), ...(tiers.length > 0 || (editingRate as { tiers?: unknown } | null)?.tiers ? { tiers } : {}) })
+          // Bands belong to the tiered type only. A row that had bands under
+          // another type sends `tiers: []` (sanitized to NULL) so they are
+          // cleared rather than silently re-saved out of sight.
+          body: JSON.stringify({
+            ...formData,
+            base_rate_non_eur: formData.base_rate_eur,
+            ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency),
+            ...(formData.pricing_type === 'tiered'
+              ? { tiers }
+              : (editingRate as { tiers?: unknown } | null)?.tiers ? { tiers: [] } : {}),
+          })
         })
 
         const data = await response.json()
@@ -513,6 +530,7 @@ export default function ActivityRatesContent() {
   const perPersonRates = rates.filter(r => r.pricing_type === 'per_person' || !r.pricing_type).length
   const perUnitRates = rates.filter(r => r.pricing_type === 'per_unit').length
   const flatRates = rates.filter(r => r.pricing_type === 'flat').length
+  const tieredRates = rates.filter(r => r.pricing_type === 'tiered').length
   const uniqueCities = [...new Set(rates.map(r => r.city).filter(Boolean))].length
 
   // Get pricing type badge
@@ -522,9 +540,26 @@ export default function ActivityRatesContent() {
         return <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Per Unit</span>
       case 'flat':
         return <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">Flat</span>
+      case 'tiered':
+        return <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">Tiered</span>
       default:
         return <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">Per Person</span>
     }
+  }
+
+  // Headline rate for a row. A tiered row prices from its bands, never from
+  // base_rate, so showing base_rate (usually 0) would misstate its price —
+  // show the band range instead.
+  const renderRate = (rate: ActivityRate) => {
+    if (rate.pricing_type !== 'tiered') return fmtRate(Number(rate.base_rate_eur), rate, 2)
+    const bands = parseTiers((rate as { tiers?: unknown }).tiers) ?? []
+    if (bands.length === 0) return 'No bands'
+    const amounts = bands.map(b => b.rate_eur)
+    const lo = Math.min(...amounts)
+    const hi = Math.max(...amounts)
+    return lo === hi
+      ? `${fmtRate(lo, rate, 2)}/pax`
+      : `${fmtRate(lo, rate, 2)}–${fmtRate(hi, rate, 2)}/pax`
   }
 
   // Get notification icon
@@ -713,7 +748,7 @@ export default function ActivityRatesContent() {
       </div>
 
       {/* Stats - Updated with pricing type breakdown */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
             <Ticket className="w-4 h-4 text-gray-400" />
@@ -756,6 +791,14 @@ export default function ActivityRatesContent() {
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
+            <TrendingDown className="w-4 h-4 text-gray-400" />
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">{tieredRates}</p>
+          <p className="text-xs text-gray-600">Tiered</p>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+          <div className="flex items-center gap-2 mb-1">
             <MapPin className="w-4 h-4 text-gray-400" />
             <span className="w-1.5 h-1.5 rounded-full bg-orange-600"></span>
           </div>
@@ -791,6 +834,7 @@ export default function ActivityRatesContent() {
             <option value="per_person">Per Person</option>
             <option value="per_unit">Per Unit (Boat/Ride)</option>
             <option value="flat">Flat Rate</option>
+            <option value="tiered">Tiered (Volume Discount)</option>
           </select>
 
           {/* Category Filter */}
@@ -978,7 +1022,7 @@ export default function ActivityRatesContent() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</span>
+                      <span className="text-sm font-bold text-green-600">{renderRate(rate)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1066,7 +1110,7 @@ export default function ActivityRatesContent() {
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
                     <p className="text-xs text-gray-500">{userCurrency} Rate</p>
-                    <p className="text-lg font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</p>
+                    <p className="text-lg font-bold text-green-600">{renderRate(rate)}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
@@ -1119,7 +1163,7 @@ export default function ActivityRatesContent() {
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</span>
+                  <span className="text-sm font-bold text-green-600">{renderRate(rate)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}>
@@ -1320,7 +1364,7 @@ export default function ActivityRatesContent() {
                 </h3>
                 
                 {/* Pricing Type Selection */}
-                <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                   {PRICING_TYPES.map((type) => {
                     const Icon = type.icon
                     return (
@@ -1345,6 +1389,25 @@ export default function ActivityRatesContent() {
                     )
                   })}
                 </div>
+
+                {/* Bands saved under a non-tiered type (the editor used to be
+                    always visible) are never priced from. Surface them rather
+                    than hiding them, and say what saving will do. */}
+                {formData.pricing_type !== 'tiered' && tiers.length > 0 && (
+                  <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      This rate has {tiers.length} saved group-size band{tiers.length === 1 ? '' : 's'} that are only used by the Tiered pricing type. Saving as {PRICING_TYPES.find(t => t.value === formData.pricing_type)?.label ?? 'this type'} will remove them.
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, pricing_type: 'tiered' }))}
+                        className="ml-2 font-semibold underline hover:text-amber-900"
+                      >
+                        Switch to Tiered
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Per Unit Settings - Only show when per_unit is selected */}
                 {formData.pricing_type === 'per_unit' && (
@@ -1412,6 +1475,7 @@ export default function ActivityRatesContent() {
                         {formData.pricing_type === 'per_person' && '/ person'}
                         {formData.pricing_type === 'per_unit' && `/ ${formData.unit_label || 'unit'}`}
                         {formData.pricing_type === 'flat' && '/ total'}
+                        {formData.pricing_type === 'tiered' && '(not used for tiered — pricing comes from the bands below)'}
                       </span>
                     </label>
                     <div className="relative">
@@ -1429,13 +1493,22 @@ export default function ActivityRatesContent() {
                     </div>
                     <p className="text-xs text-gray-400 mt-1">Stored in EUR for consistency</p>
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
-                    <div className="mt-3">
-                      <ActivityTiersEditor
-                        tiers={tiers}
-                        onChange={setTiers}
-                        currencyLabel={rateCurrency || 'EUR'}
-                      />
-                    </div>
+                    {formData.pricing_type === 'tiered' && (
+                      <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3">
+                        <p className="text-xs font-medium text-purple-800 flex items-center gap-2 mb-2">
+                          <TrendingDown className="w-4 h-4" />
+                          Group-size bands — per-person rate by pax count
+                        </p>
+                        <ActivityTiersEditor
+                          tiers={tiers}
+                          onChange={setTiers}
+                          currencyLabel={rateCurrency || 'EUR'}
+                        />
+                        <p className="text-xs text-purple-600 mt-2">
+                          💡 Example: 1–4 pax at a higher per-person rate, 5–12 pax at a lower one. The matching band&apos;s rate is used at quote time.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
