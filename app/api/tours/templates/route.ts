@@ -135,6 +135,9 @@ export async function POST(request: NextRequest) {
       // template failed with a not-null violation (operator, 1 Sep). `??`
       // keeps 0; absent still defaults sensibly to days − 1.
       duration_nights: body.duration_nights ?? Math.max(0, (body.duration_days || 1) - 1),
+      // Day/stopover tours are measured in hours (nullable column); multi-day
+      // tours leave this null and use duration_days/nights instead.
+      duration_hours: body.duration_hours ?? null,
       primary_destination_id: body.primary_destination_id || null,
       destinations_covered: body.destinations_covered || [],
       cities_covered: body.cities_covered || [],

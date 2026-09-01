@@ -74,6 +74,7 @@ interface TourTemplate {
   tour_type: string
   duration_days: number
   duration_nights?: number
+  duration_hours?: number | null
   cities_covered?: string[]
   short_description?: string
   long_description?: string
@@ -135,6 +136,26 @@ const TOUR_TYPES = [
   { value: 'multi_day', label: 'Multi-Day Tour', minDays: 2, maxDays: 99 },
   { value: 'stopover', label: 'Stopover Tour', minDays: 1, maxDays: 1 }
 ]
+
+// Single-day tour types are measured in HOURS, not days/nights.
+const isSingleDayTourType = (tourType: string) =>
+  tourType === 'day_tour' || tourType === 'stopover'
+
+// Human-readable duration: hours for a single-day tour that has them, else the
+// classic "days/nights" shorthand.
+const formatTourDuration = (t: {
+  tour_type?: string | null
+  duration_days?: number | null
+  duration_nights?: number | null
+  duration_hours?: number | null
+}): string => {
+  if (t.duration_hours && isSingleDayTourType(t.tour_type || '')) {
+    return `${t.duration_hours}h`
+  }
+  const days = t.duration_days || 0
+  const nights = t.duration_nights || 0
+  return `${days}D${nights ? `/${nights}N` : ''}`
+}
 
 const PHYSICAL_LEVELS = [
   { value: 'easy', label: 'Easy - Suitable for all' },
@@ -267,6 +288,7 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
   const [searchTerm, setSearchTerm] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Filter attractions based on search term and exclude already selected
   const filteredAttractions = attractions.filter(a => 
@@ -295,8 +317,12 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
 
   const handleSelect = (attractionName: string) => {
     onSelect(attractionName)
+    // Keep the dropdown OPEN so the operator can add several attractions in a
+    // row without reopening after each pick. Clear the search so the full
+    // remaining list is scrollable, and keep focus on the input.
     setSearchTerm('')
-    setIsOpen(false)
+    setIsOpen(true)
+    inputRef.current?.focus()
   }
 
   return (
@@ -304,8 +330,9 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
       {/* Search Input with Dropdown */}
       <div className="relative" ref={dropdownRef}>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           <input
+            ref={inputRef}
             type="text"
             value={searchTerm}
             onChange={(e) => {
@@ -313,7 +340,7 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
               setIsOpen(true)
             }}
             onFocus={() => setIsOpen(true)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+            className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
             placeholder="Search attractions to add..."
           />
         </div>
@@ -751,7 +778,7 @@ function DayBuilderModal({ template, onClose, onSave }: DayBuilderModalProps) {
         <div className="px-4 py-3 border-b flex items-center justify-between bg-white">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Day Builder</h2>
-            <p className="text-xs text-gray-500 mt-0.5">{template.template_name} • {template.duration_days} days</p>
+            <p className="text-xs text-gray-500 mt-0.5">{template.template_name} • {formatTourDuration(template)}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
             <X className="w-5 h-5 text-gray-500" />
@@ -815,6 +842,7 @@ export default function TourManagerContent() {
     tour_type: 'day_tour',
     duration_days: 1,
     duration_nights: 0,
+    duration_hours: 8 as number | null,  // Day tours are measured in hours, not days
     cities_covered: [] as string[],
     short_description: '',
     long_description: '',
@@ -942,7 +970,20 @@ export default function TourManagerContent() {
           updated.tour_type = 'multi_day'
         }
       }
-      
+
+      // Keep duration coherent when the tour TYPE is switched. Single-day types
+      // are measured in hours (1 day / 0 nights); multi-day needs at least 2.
+      if (name === 'tour_type' && typeof parsedValue === 'string') {
+        if (isSingleDayTourType(parsedValue)) {
+          updated.duration_days = 1
+          updated.duration_nights = 0
+          if (!updated.duration_hours) updated.duration_hours = 8
+        } else if (prev.duration_days < 2) {
+          updated.duration_days = 2
+          updated.duration_nights = 1
+        }
+      }
+
       return updated
     })
   }
@@ -1074,6 +1115,7 @@ export default function TourManagerContent() {
       tour_type: 'day_tour',
       duration_days: 1,
       duration_nights: 0,
+      duration_hours: 8,
       cities_covered: [],
       short_description: '',
       long_description: '',
@@ -1115,6 +1157,7 @@ export default function TourManagerContent() {
       tour_type: template.tour_type,
       duration_days: template.duration_days,
       duration_nights: template.duration_nights || 0,
+      duration_hours: template.duration_hours ?? 8,
       cities_covered: template.cities_covered || [],
       short_description: template.short_description || '',
       long_description: template.long_description || '',
@@ -1175,9 +1218,16 @@ export default function TourManagerContent() {
     // (operator, 1 Sep — confirmed in the data). The guard drops the second
     // call synchronously and disables the button while the first is in flight.
     await guard(async () => {
+    const singleDay = isSingleDayTourType(formData.tour_type)
     const dataToSubmit = {
       ...formData,
-      template_code: formData.template_code || generateTemplateCode()
+      template_code: formData.template_code || generateTemplateCode(),
+      // Only one duration model applies at a time: a day tour carries hours
+      // (locked to 1 day / 0 nights); a multi-day tour carries days/nights and
+      // no hours. Null out the other side so stale values never persist.
+      duration_days: singleDay ? 1 : formData.duration_days,
+      duration_nights: singleDay ? 0 : formData.duration_nights,
+      duration_hours: singleDay ? (formData.duration_hours || null) : null,
     }
     
     try {
@@ -1402,13 +1452,13 @@ export default function TourManagerContent() {
         <div className="bg-white rounded-lg shadow-md border border-gray-200 p-3 mb-4">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search by name, code, or city..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
+                className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm"
               />
             </div>
             <div className="md:w-48 relative">
@@ -1524,7 +1574,7 @@ export default function TourManagerContent() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className="text-sm text-gray-900">
-                            {template.duration_days}D{template.duration_nights ? `/${template.duration_nights}N` : ''}
+                            {formatTourDuration(template)}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -1696,7 +1746,9 @@ export default function TourManagerContent() {
                   <div className="space-y-2 text-sm mb-4">
                     <div className="flex items-center gap-2 text-gray-600">
                       <Calendar className="w-4 h-4" />
-                      <span>{template.duration_days} day{template.duration_days > 1 ? 's' : ''}</span>
+                      <span>{isSingleDayTourType(template.tour_type) && template.duration_hours
+                        ? `${template.duration_hours} hours`
+                        : `${template.duration_days} day${template.duration_days > 1 ? 's' : ''}`}</span>
                       <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">
                         {TOUR_TYPES.find(t => t.value === template.tour_type)?.label}
                       </span>
@@ -1790,7 +1842,7 @@ export default function TourManagerContent() {
                     <span className="text-xs text-gray-500 font-mono">{template.template_code}</span>
                   </div>
                   <div className="hidden md:block">
-                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{template.duration_days}D</span>
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{formatTourDuration(template)}</span>
                   </div>
                   <div className="hidden md:flex items-center gap-1">
                     {(template.variations?.length || 0) > 0 ? (
@@ -1941,29 +1993,49 @@ export default function TourManagerContent() {
                         ))}
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Days) *</label>
-                      <input
-                        type="number"
-                        name="duration_days"
-                        value={formData.duration_days}
-                        onChange={handleChange}
-                        min="1"
-                        required
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Nights)</label>
-                      <input
-                        type="number"
-                        name="duration_nights"
-                        value={formData.duration_nights}
-                        onChange={handleChange}
-                        min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                      />
-                    </div>
+                    {isSingleDayTourType(formData.tour_type) ? (
+                      // A one-day tour is measured in HOURS, not days/nights.
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Hours) *</label>
+                        <input
+                          type="number"
+                          name="duration_hours"
+                          value={formData.duration_hours ?? ''}
+                          onChange={handleChange}
+                          min="1"
+                          max="24"
+                          required
+                          placeholder="e.g. 8"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Days) *</label>
+                          <input
+                            type="number"
+                            name="duration_days"
+                            value={formData.duration_days}
+                            onChange={handleChange}
+                            min="1"
+                            required
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Nights)</label>
+                          <input
+                            type="number"
+                            name="duration_nights"
+                            value={formData.duration_nights}
+                            onChange={handleChange}
+                            min="0"
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                          />
+                        </div>
+                      </>
+                    )}
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Physical Level</label>
                       <select

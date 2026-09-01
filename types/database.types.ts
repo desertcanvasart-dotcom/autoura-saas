@@ -9590,6 +9590,7 @@ export interface Database {
           long_description: string | null
           duration_days: number
           duration_nights: number
+          duration_hours: number | null
           category_id: string | null
           destination_id: string | null
           highlights: string[] | null
@@ -9631,6 +9632,7 @@ export interface Database {
           long_description?: string | null
           duration_days?: number
           duration_nights?: number
+          duration_hours?: number | null
           category_id?: string | null
           destination_id?: string | null
           highlights?: string[] | null
@@ -9672,6 +9674,7 @@ export interface Database {
           long_description?: string | null
           duration_days?: number
           duration_nights?: number
+          duration_hours?: number | null
           category_id?: string | null
           destination_id?: string | null
           highlights?: string[] | null
