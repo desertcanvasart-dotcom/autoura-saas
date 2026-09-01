@@ -1169,19 +1169,6 @@ export default function SleepingTrainRatesContent() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Operator</label>
-                    {/* The operator IS the supplier. A hardcoded list used to
-                        sit here, and it taught the wrong model: it offered
-                        "Spanish Trains (Talgo)" as an OPERATOR when Talgo is
-                        one of ENR's trains. */}
-                    <div className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
-                      {formData.operator_name || 'Set from the operator above'}
-                    </div>
-                    {formData.operator_name && !formData.supplier_id && (
-                      <p className="mt-1 text-xs text-amber-700">Not a recorded supplier &mdash; pick one above to link this rate to its fleet</p>
-                    )}
-                  </div>
-                  <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Origin City *</label>
                     <select
                       name="origin_city"

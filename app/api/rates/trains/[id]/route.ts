@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
+import { operatorNameForSupplier } from '@/lib/suppliers/operator-name'
 import { getCatalogScope, catalogOrExpr } from '@/lib/catalog-scope'
 
 export async function GET(
@@ -67,7 +68,17 @@ Object.assign(updateData, rateCurrencyWriteField(body))
     if (body.duration_hours !== undefined) updateData.duration_hours = body.duration_hours ? parseFloat(body.duration_hours) : null
     if (body.rate_valid_from !== undefined) updateData.rate_valid_from = body.rate_valid_from || null
     if (body.rate_valid_to !== undefined) updateData.rate_valid_to = body.rate_valid_to || null
-    if (body.operator_name !== undefined) updateData.operator_name = body.operator_name || null
+    // The supplier IS the operator: derive the denormalized name rather
+    // than trusting the client, so the two can never disagree. Clearing the
+    // supplier clears the name — a name with no supplier is the orphan state
+    // this replaced. A payload naming neither (e.g. CSV) is left alone.
+    if (body.supplier_id !== undefined || body.operator_name !== undefined) {
+      updateData.operator_name = await operatorNameForSupplier(createAdminClient(), {
+        tenantId: authResult.tenant_id!,
+        supplierId: body.supplier_id,
+        fallback: body.operator_name,
+      })
+    }
     if (body.supplier_id !== undefined) updateData.supplier_id = body.supplier_id || null
     if (body.property_id !== undefined) {
       const trainProp = await resolveRateProperty(createAdminClient(), {

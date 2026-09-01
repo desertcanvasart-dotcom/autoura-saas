@@ -89,4 +89,39 @@ describe('no hardcoded supplier vocabulary', () => {
       expect(src, `${rel} must submit the chosen train`).toContain('property_id')
     }
   })
+
+  it('a train form does not offer an operator field at all', () => {
+    // Deriving it in the form was still wrong: it filled only when the
+    // supplier SELECTION CHANGED, so opening a rate that already had a
+    // supplier showed a placeholder and saved null back over it. The supplier
+    // IS the operator, so the form names it once and the server stamps the
+    // denormalized column.
+    for (const rel of [
+      'app/rates/trains/train-rates-content.tsx',
+      'app/rates/sleeping-train/sleeping-train-rates-content.tsx',
+    ]) {
+      const src = readFileSync(join(ROOT, rel), 'utf8')
+      expect(
+        /name="operator_name"|Set from the operator above/.test(src),
+        `${rel} must not render an operator control — the supplier names it`
+      ).toBe(false)
+    }
+  })
+
+  it('every train rate write derives operator_name from the supplier', () => {
+    // A denormalized column the client can set is a column that drifts.
+    for (const rel of [
+      'app/api/rates/trains/route.ts',
+      'app/api/rates/trains/[id]/route.ts',
+      'app/api/rates/sleeping-trains/route.ts',
+      'app/api/rates/sleeping-trains/[id]/route.ts',
+    ]) {
+      const src = readFileSync(join(ROOT, rel), 'utf8')
+      expect(src, `${rel} must stamp operator_name from the supplier`).toContain('operatorNameForSupplier')
+      expect(
+        /operator_name\s*[:=]\s*body\.operator_name/.test(src),
+        `${rel} takes operator_name straight from the client — derive it instead`
+      ).toBe(false)
+    }
+  })
 })

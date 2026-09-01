@@ -42,6 +42,8 @@ interface TrainRate {
   rate_valid_from?: string
   rate_valid_to?: string
   operator_name?: string
+  /** Resolved from property_id — the train this rate prices. */
+  property_name?: string | null
   supplier_id?: string
   departure_times?: string
   description?: string
@@ -838,7 +840,11 @@ export default function TrainRatesContent() {
                       )}
                     </td>
                     <td className="px-4 py-3">
+                      {/* Operator, and WHICH of its trains this rate prices. */}
                       <span className="text-sm text-gray-600">{rate.operator_name || '—'}</span>
+                      {rate.property_name && (
+                        <span className="block text-xs text-gray-400">{rate.property_name}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.rate_eur), rate, 2)}</span>
@@ -1144,19 +1150,6 @@ export default function TrainRatesContent() {
                       onChange={handleChange}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Operator</label>
-                    {/* The operator IS the supplier. A hardcoded list used to
-                        sit here, and it taught the wrong model: it offered
-                        "Spanish Trains (Talgo)" as an OPERATOR when Talgo is
-                        one of ENR's trains. */}
-                    <div className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
-                      {formData.operator_name || 'Set from the operator above'}
-                    </div>
-                    {formData.operator_name && !formData.supplier_id && (
-                      <p className="mt-1 text-xs text-amber-700">Not a recorded supplier &mdash; pick one above to link this rate to its fleet</p>
-                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Origin City *</label>
