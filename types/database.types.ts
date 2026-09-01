@@ -9621,6 +9621,7 @@ export interface Database {
           cached_starting_price: number | null
           cached_starting_tier: string | null
           cached_price_updated_at: string | null
+          duration_hours: number | null
         }
         Insert: {
           id?: string
@@ -9662,6 +9663,7 @@ export interface Database {
           cached_starting_price?: number | null
           cached_starting_tier?: string | null
           cached_price_updated_at?: string | null
+          duration_hours?: number | null
         }
         Update: {
           id?: string
@@ -9703,6 +9705,7 @@ export interface Database {
           cached_starting_price?: number | null
           cached_starting_tier?: string | null
           cached_price_updated_at?: string | null
+          duration_hours?: number | null
         }
         Relationships: [
           {

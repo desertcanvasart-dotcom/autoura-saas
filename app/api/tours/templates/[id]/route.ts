@@ -148,6 +148,7 @@ export async function PUT(
     if (body.tour_type !== undefined) updateData.tour_type = body.tour_type
     if (body.duration_days !== undefined) updateData.duration_days = body.duration_days
     if (body.duration_nights !== undefined) updateData.duration_nights = body.duration_nights
+    if (body.duration_hours !== undefined) updateData.duration_hours = body.duration_hours
     if (body.primary_destination_id !== undefined) updateData.primary_destination_id = body.primary_destination_id
     if (body.destinations_covered !== undefined) updateData.destinations_covered = body.destinations_covered
     if (body.cities_covered !== undefined) updateData.cities_covered = body.cities_covered
