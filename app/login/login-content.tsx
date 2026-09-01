@@ -2,9 +2,9 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export default function LoginContent() {
@@ -14,6 +14,15 @@ export default function LoginContent() {
   const [loading, setLoading] = useState(false)
   const { signIn } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // The middleware sends a deactivated account here after ending its session.
+  // Without this the user landed on a blank login form with no reason given.
+  useEffect(() => {
+    if (searchParams.get('error') === 'account_inactive') {
+      setError('Your account has been deactivated. Contact your administrator.')
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
