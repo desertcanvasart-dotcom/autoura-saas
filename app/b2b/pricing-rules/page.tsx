@@ -553,9 +553,9 @@ export default function B2BPricingRulesPage() {
                 <p className="text-sm text-gray-500">Manage tiered pricing, boat sizes, and transport packages</p>
               </div>
             </div>
-            {/* /b2b has no page — Tour Builder is the B2B group's home surface */}
+            {/* /b2b has no page — Tour Manager is the Tours group's home surface */}
             <Link href="/tours/manage" className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">
-              ← Back to Tour Builder
+              ← Back to Tour Manager
             </Link>
           </div>
         </div>
