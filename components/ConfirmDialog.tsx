@@ -248,7 +248,14 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
     },
   }
 
-  const variant = state.variant || 'danger'
+  // A plain confirm() is a QUESTION, not a destruction. Defaulting to
+  // 'danger' painted every benign confirm — "add activities?", "archive
+  // completed tasks?", "create the final invoice?" — with a red trash
+  // icon and "Warning: this action cannot be undone", which reads as an
+  // irreversible delete (operator, 1 Sep). Every genuinely destructive
+  // caller passes variant: 'danger' explicitly (or uses confirmDelete),
+  // so nothing loses its warning.
+  const variant = state.variant || 'info'
   const styles = variantStyles[variant]
   const IconComponent = state.type === 'prompt' ? HelpCircle : styles.IconComponent
   const isAlert = state.type === 'alert'
