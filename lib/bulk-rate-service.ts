@@ -324,6 +324,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       id(), serviceCode(),
       col('role_type', 'Role Type', 'text', true),
       col('context', 'Context', 'text', false),
+      col('city', 'City', 'text', false),
       col('rate_unit', 'Rate Unit', 'text', true),
       col('rate_eur', 'Rate', 'number', true),
       col('description', 'Description', 'text', false),

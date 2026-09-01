@@ -1304,7 +1304,29 @@ export async function getHotelServiceRate(
 /**
  * Get tipping rate per day
  */
-export async function getTippingRate(scope: CatalogScope, tier: ServiceTier): Promise<number | null> {
+/** Resolves the daily tip total for one city. */
+export interface TippingRateResolver {
+  /** Total for a city; null when no rate applies (a hole, never a zero). */
+  forCity: (city?: string | null) => number | null
+}
+
+/**
+ * Get the daily tipping total, resolved PER CITY.
+ *
+ * Tips are place-specific: what a driver is tipped in Cairo is not what a
+ * driver is tipped in Aswan. A row with no city means "anywhere", which is
+ * what every row meant before the column existed.
+ *
+ * The subtlety is that this used to sum EVERY active per-day row. Add cities
+ * to that and a trip charges the Cairo driver tip AND the Aswan driver tip on
+ * every single day. So rows are grouped by role+context and exactly ONE is
+ * charged per group: the city's own rate if it has one, else the country-wide
+ * rate, else nothing for that group.
+ */
+export async function getTippingRates(
+  scope: CatalogScope,
+  tier: ServiceTier
+): Promise<TippingRateResolver | null> {
   try {
     const { data: rawTippingRates } = await getSupabaseAdmin()
       .from('tipping_rates')
@@ -1317,10 +1339,6 @@ export async function getTippingRate(scope: CatalogScope, tier: ServiceTier): Pr
       return null
     }
 
-    const dailyTotal = (rates as any[]).reduce((sum: number, r: any) =>
-      r.rate_unit === 'per_day' ? sum + (r.rate_eur || 0) : sum, 0
-    )
-
     const multipliers: Record<ServiceTier, number> = {
       budget: 0.8,
       standard: 1.0,
@@ -1328,11 +1346,46 @@ export async function getTippingRate(scope: CatalogScope, tier: ServiceTier): Pr
       luxury: 1.5
     }
 
-    // 0 means there were rows but no per_day tipping rate — treat as a hole.
-    return Math.round(dailyTotal * multipliers[tier]) || null
+    const perDay = (rates as any[]).filter(r => r.rate_unit === 'per_day')
+    const groups = new Map<string, any[]>()
+    for (const r of perDay) {
+      const key = `${r.role_type ?? ''}|${r.context ?? ''}`
+      groups.set(key, [...(groups.get(key) ?? []), r])
+    }
+
+    const norm = (c?: string | null) => (c || '').trim().toLowerCase()
+
+    return {
+      forCity: (city?: string | null) => {
+        const here = norm(city)
+        let dailyTotal = 0
+        for (const [, rows] of groups) {
+          const match =
+            (here !== '' ? rows.find(r => norm(r.city) === here) : undefined) ??
+            rows.find(r => !r.city)
+          if (match) dailyTotal += match.rate_eur || 0
+        }
+        // 0 means there were rows but none applied here — a hole, not free.
+        return Math.round(dailyTotal * multipliers[tier]) || null
+      },
+    }
   } catch (err) {
     return null
   }
+}
+
+/**
+ * Country-wide daily tip total. Kept as the canonical single-value lookup
+ * (lib/pricing/rate-resolution.ts re-exports it); pricing runs use
+ * getTippingRates() so each day resolves against its own city.
+ */
+export async function getTippingRate(
+  scope: CatalogScope,
+  tier: ServiceTier,
+  city?: string | null
+): Promise<number | null> {
+  const resolver = await getTippingRates(scope, tier)
+  return resolver ? resolver.forCity(city) : null
 }
 
 // ============================================
@@ -1665,10 +1718,10 @@ export async function calculateDayBasedPricing(
   // These four are independent — fetch concurrently. Water cost is
   // admin-configurable via Rates → Fixed Costs (fixed_daily_costs); falls back
   // to €2 (the previous hardcoded value) if the table is empty.
-  const [guideRate, mealRates, tippingRate, fixedDailyCosts] = await Promise.all([
+  const [guideRate, mealRates, tippingRates, fixedDailyCosts] = await Promise.all([
     getGuideRate(catalogScope, language, tier),
     getMealRates(catalogScope, tier),
-    getTippingRate(catalogScope, tier),
+    getTippingRates(catalogScope, tier),
     getFixedDailyCosts(),
   ])
   const waterCostPerPax = fixedDailyCosts.waterPerPersonPerDay
@@ -1739,6 +1792,9 @@ export async function calculateDayBasedPricing(
 
     // ----- TIPPING (fixed per day, when guide present) -----
     if (hasSightseeing) {
+      // Tips vary by place: this day's city picks the rate, falling back to
+      // the country-wide row when the city has none of its own.
+      const tippingRate = tippingRates?.forCity(day.city) ?? null
       if (tippingRate != null) {
         fixedCosts += tippingRate
         services.push({

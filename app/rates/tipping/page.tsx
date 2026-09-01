@@ -11,6 +11,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
 // ============================================
 // CONSTANTS
@@ -31,6 +32,8 @@ interface TippingRate {
   id: string
   service_code: string
   role_type: string
+  /** Where this tip applies; blank = anywhere. */
+  city?: string | null
   context: string | null
   rate_unit: string
   rate_eur: number
@@ -192,9 +195,11 @@ export default function TippingPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
 
+  const { cities: cityOptions } = useDestinationCities()
   const [formData, setFormData] = useState({
     service_code: '',
     role_type: 'guide',
+    city: '',
     context: 'day_tour',
     rate_unit: 'per_day',
     rate_eur: 0,
@@ -249,7 +254,8 @@ export default function TippingPage() {
     setEditingRate(null)
     setFormData({ 
       service_code: '', 
-      role_type: 'guide', 
+      role_type: 'guide',
+    city: '', 
       context: 'day_tour', 
       rate_unit: 'per_day', 
       rate_eur: 0, 
@@ -266,6 +272,7 @@ export default function TippingPage() {
     setFormData({
       service_code: rate.service_code,
       role_type: rate.role_type,
+      city: rate.city || '',
       context: rate.context || '',
       rate_unit: rate.rate_unit,
       rate_eur: rate.rate_eur,
@@ -334,6 +341,7 @@ export default function TippingPage() {
     setFormData({
       service_code: '',
       role_type: rate.role_type,
+      city: rate.city || '',
       context: rate.context || '',
       rate_unit: rate.rate_unit,
       rate_eur: rate.rate_eur,
@@ -575,6 +583,7 @@ export default function TippingPage() {
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-green-800">Role</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Context</th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">City</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Unit</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-green-800">{userCurrency} Rate</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-green-800">Description</th>
@@ -610,6 +619,9 @@ export default function TippingPage() {
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-gray-600">
                       {rate.context?.replace('_', ' ') || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs text-gray-600">
+                      {rate.city || <span className="text-gray-400">Any city</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs font-medium">
@@ -726,6 +738,24 @@ export default function TippingPage() {
                     ))}
                   </select>
                 </div>
+              </div>
+              <div>
+                {/* What a driver is tipped in Cairo is not what a driver is
+                    tipped in Aswan. Blank means the country-wide rate, which
+                    every row meant before this field existed — the engine
+                    prefers a city match and falls back to it. */}
+                <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                <select
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
+                >
+                  <option value="">Any city (country-wide)</option>
+                  {cityOptions.map(city => (
+                    <option key={city} value={city}>{city}</option>
+                  ))}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
