@@ -24,7 +24,7 @@ export default function B2BPricingPage() {
           The calculator has no sidebar entry of its own &mdash; you reach it from other pages:
         </p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>From the <strong>Tour Builder</strong> (B2B &rarr; Tour Builder): click the calculator icon on any variation</li>
+          <li>From the <strong>Tour Manager</strong> (Tours &rarr; Tour Manager): click the calculator icon on any variation</li>
           <li>Automatically, after saving a B2B quote in <strong>New Quote</strong> &mdash; the app redirects you straight to the calculator for the newly created variation</li>
         </ol>
         <p className="text-gray-600 mt-3">

@@ -14,20 +14,20 @@ export default function ToursRatesPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Tours &amp; Rates</h1>
 
-      {/* Ready Made Packages */}
+      {/* Tour Inventory */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Ready Made Packages</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Tour Inventory</h2>
         <p className="text-gray-600 mb-4">
           Pre-built tour packages you can browse and price instantly.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Browsing Tours</h3>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>B2B &rarr; Ready Made Packages</strong> in the sidebar</li>
+          <li>Go to <strong>Tours &rarr; Tour Inventory</strong> in the sidebar</li>
           <li>Filter by <strong>Tier</strong> or <strong>Category</strong>, or search &mdash; the search matches tour names, descriptions, and cities</li>
           <li>Click a tour to see the full details</li>
         </ol>
-        <DocScreenshot src="/docs/tours-rates/tours-list.jpg" alt="Ready Made Packages page with tier and category filters and tour cards" />
+        <DocScreenshot src="/docs/tours-rates/tours-list.jpg" alt="Tour Inventory page with tier and category filters and tour cards" />
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Tour Detail Page</h3>
         <p className="text-gray-600 mb-3">Each tour shows:</p>
@@ -50,7 +50,7 @@ export default function ToursRatesPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Managing Tour Templates</h3>
         <p className="text-gray-600">
-          Packages are created and edited in the <strong>Tour Builder</strong> (B2B &rarr; Tour Builder), where you manage templates, variations, and day-by-day itineraries. See <Link href="/docs/tour-programs" className="text-primary-600 hover:underline">Tour Builder</Link> for the full guide. To schedule dated departures on a template, use <strong>Operations &rarr; Tour Departures</strong>.
+          Packages are created and edited in the <strong>Tour Manager</strong> (Tours &rarr; Tour Manager), where you manage templates, variations, and day-by-day itineraries. See <Link href="/docs/tour-programs" className="text-primary-600 hover:underline">Tour Manager</Link> for the full guide. To schedule dated departures on a template, use <strong>Operations &rarr; Tour Departures</strong>.
         </p>
       </section>
 
