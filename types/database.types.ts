@@ -7347,7 +7347,6 @@ export interface Database {
       }
       sleeping_train_rates: {
         Row: {
-          property_id: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -7372,9 +7371,9 @@ export interface Database {
           created_at: string
           updated_at: string
           rate_currency: string | null
+          property_id: string | null
         }
         Insert: {
-          property_id?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -7399,9 +7398,9 @@ export interface Database {
           created_at?: string
           updated_at?: string
           rate_currency?: string | null
+          property_id?: string | null
         }
         Update: {
-          property_id?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -7426,6 +7425,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
           rate_currency?: string | null
+          property_id?: string | null
         }
         Relationships: [
           {
@@ -7440,6 +7440,13 @@ export interface Database {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sleeping_train_rates_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_properties"
             referencedColumns: ["id"]
           },
         ]
@@ -9899,7 +9906,6 @@ export interface Database {
       }
       train_rates: {
         Row: {
-          property_id: string | null
           id: string
           tenant_id: string | null
           service_code: string | null
@@ -9919,9 +9925,9 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           rate_currency: string | null
+          property_id: string | null
         }
         Insert: {
-          property_id?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -9941,9 +9947,9 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          property_id?: string | null
         }
         Update: {
-          property_id?: string | null
           id?: string
           tenant_id?: string | null
           service_code?: string | null
@@ -9963,6 +9969,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          property_id?: string | null
         }
         Relationships: [
           {
@@ -9977,6 +9984,13 @@ export interface Database {
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "train_rates_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_properties"
             referencedColumns: ["id"]
           },
         ]
