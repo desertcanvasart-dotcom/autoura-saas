@@ -12,6 +12,7 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
+import Link from 'next/link'
 
 // Egyptian cities with train stations
 const TRAIN_CITIES = [
@@ -26,12 +27,6 @@ const CLASS_TYPES = [
   'Second Class',
   'Third Class',
   'Business Class'
-]
-
-const OPERATORS = [
-  'Egyptian National Railways (ENR)',
-  'Spanish Trains (Talgo)',
-  'Private Operator'
 ]
 
 interface TrainRate {
@@ -132,6 +127,8 @@ export default function TrainRatesContent() {
     rate_valid_from: today,
     rate_valid_to: nextYear,
     operator_name: '',
+    supplier_id: '',
+    property_id: '',
     departure_times: '',
     description: '',
     notes: '',
@@ -188,11 +185,14 @@ export default function TrainRatesContent() {
       rate_valid_from: today,
       rate_valid_to: nextYear,
       operator_name: '',
+    supplier_id: '',
+    property_id: '',
       departure_times: '',
       description: '',
       notes: '',
       is_active: true
     })
+    setTrains([])
     setShowModal(true)
   }
 
@@ -209,12 +209,68 @@ export default function TrainRatesContent() {
       rate_valid_from: rate.rate_valid_from || today,
       rate_valid_to: rate.rate_valid_to || nextYear,
       operator_name: rate.operator_name || '',
+      supplier_id: rate.supplier_id || '',
+      property_id: (rate as { property_id?: string | null }).property_id || '',
       departure_times: rate.departure_times || '',
       description: rate.description || '',
       notes: rate.notes || '',
       is_active: rate.is_active
     })
+    void loadTrains(rate.supplier_id || '')
     setShowModal(true)
+  }
+
+
+  // Supplier-HAS-properties (Phase 3): a train rate is bought from a train
+  // OPERATOR, and prices one of that operator's TRAINS. Both existed in the
+  // database and the API already resolved them; this form simply had no way
+  // to say either, so the fleet was unreachable from the only screen that
+  // needed it.
+  const [trainSuppliers, setTrainSuppliers] = useState<{ id: string; name: string; type: string | null }[]>([])
+  const [trains, setTrains] = useState<{ id: string; name: string }[]>([])
+
+  // TRAIN OPERATORS FIRST, EVERYONE STILL SELECTABLE. Filtering strictly to
+  // type=train_operator would empty this control for a tenant whose railway
+  // has been filed as 'transport' for years — and a picker that hides the
+  // supplier you are looking for is a picker that looks broken.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/suppliers?status=active')
+        const data = await res.json().catch(() => ({}))
+        const rows = data.data || data.suppliers || []
+        if (!cancelled) {
+          setTrainSuppliers(
+            rows
+              .map((s: { id: string; name: string; type?: string | null }) => ({ id: s.id, name: s.name, type: s.type ?? null }))
+              .filter((s: { id: string; name: string }) => s.id && s.name)
+          )
+        }
+      } catch {
+        // An unreadable roster leaves the picker empty rather than blocking
+        // the rate: the rest of the form still saves.
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // The operator's trains, for the optional picker. Empty for "no supplier".
+  const loadTrains = async (supplierId: string) => {
+    if (!supplierId) { setTrains([]); return }
+    try {
+      const res = await fetch(`/api/suppliers/${supplierId}/properties?type=train&active_only=true`)
+      const data = await res.json().catch(() => ({}))
+      setTrains(res.ok && data.success ? data.data : [])
+    } catch { setTrains([]) }
+  }
+
+  const handleSupplierChange = (supplierId: string) => {
+    // The operator IS the supplier; keep the denormalized operator_name in
+    // step rather than letting a second control disagree with it.
+    const picked = trainSuppliers.find(s => s.id === supplierId)
+    setFormData(prev => ({ ...prev, supplier_id: supplierId, property_id: '', operator_name: picked?.name ?? '' }))
+    void loadTrains(supplierId)
   }
 
   const { submitting, guard } = useSubmitGuard()
@@ -300,11 +356,14 @@ export default function TrainRatesContent() {
       rate_valid_from: rate.rate_valid_from || today,
       rate_valid_to: rate.rate_valid_to || nextYear,
       operator_name: rate.operator_name || '',
+      supplier_id: rate.supplier_id || '',
+      property_id: (rate as { property_id?: string | null }).property_id || '',
       departure_times: rate.departure_times || '',
       description: rate.description || '',
       notes: rate.notes || '',
       is_active: rate.is_active
     })
+    void loadTrains(rate.supplier_id || '')
     setShowModal(true)
   }
 
@@ -1014,6 +1073,61 @@ export default function TrainRatesContent() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-4 overflow-y-auto max-h-[calc(90vh-140px)]">
+              {/* Who this rate is bought from, and which of their trains it
+                  prices. Rendered in three states so an operator who has just
+                  recorded a fleet is never left looking at an absent field. */}
+              <div className="mb-4 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Train Operator</label>
+                  <select
+                    value={formData.supplier_id}
+                    onChange={(e) => handleSupplierChange(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Not recorded yet</option>
+                    {trainSuppliers.some(s => s.type === 'train_operator') && (
+                      <optgroup label="Train Operators">
+                        {trainSuppliers.filter(s => s.type === 'train_operator').map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {trainSuppliers.some(s => s.type !== 'train_operator') && (
+                      <optgroup label="Other suppliers">
+                        {trainSuppliers.filter(s => s.type !== 'train_operator').map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    <Link href="/suppliers?type=train_operator" className="text-blue-600 hover:underline">Manage train operators &rarr;</Link>
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Train</label>
+                  {!formData.supplier_id ? (
+                    <p className="px-3 py-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+                      Pick an operator to choose one of its trains
+                    </p>
+                  ) : trains.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg">
+                      No trains recorded for this operator yet &mdash; add them on the supplier&apos;s Properties tab
+                    </p>
+                  ) : (
+                    <select
+                      value={formData.property_id}
+                      onChange={(e) => setFormData(prev => ({ ...prev, property_id: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    >
+                      <option value="">&mdash; Any / not specified &mdash;</option>
+                      {trains.map(tr => (
+                        <option key={tr.id} value={tr.id}>{tr.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </div>
               {/* Route Info */}
               <div className="mb-4">
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -1033,17 +1147,16 @@ export default function TrainRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Operator</label>
-                    <select
-                      name="operator_name"
-                      value={formData.operator_name}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Operator</option>
-                      {OPERATORS.map(op => (
-                        <option key={op} value={op}>{op}</option>
-                      ))}
-                    </select>
+                    {/* The operator IS the supplier. A hardcoded list used to
+                        sit here, and it taught the wrong model: it offered
+                        "Spanish Trains (Talgo)" as an OPERATOR when Talgo is
+                        one of ENR's trains. */}
+                    <div className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                      {formData.operator_name || 'Set from the operator above'}
+                    </div>
+                    {formData.operator_name && !formData.supplier_id && (
+                      <p className="mt-1 text-xs text-amber-700">Not a recorded supplier &mdash; pick one above to link this rate to its fleet</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Origin City *</label>
