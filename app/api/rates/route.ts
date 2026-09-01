@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { attachPropertyNames } from '@/lib/suppliers/attach-property-names'
 
 export async function GET(request: NextRequest) {
   try {
@@ -280,10 +281,19 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // A train rate names WHICH train it prices; the hub showed only the
+    // operator. Resolved with one extra query rather than a PostgREST embed —
+    // a missing FK fails the whole query, and "no train name" must not become
+    // "no rates". Cheap no-op for every other rate type.
+    const withNames =
+      type === 'trains' || type === 'sleeping_trains'
+        ? await attachPropertyNames(supabase, data as { property_id?: string | null }[])
+        : data
+
     return NextResponse.json({
       success: true,
-      data: data,
-      count: data.length
+      data: withNames,
+      count: withNames.length
     })
 
   } catch (error) {
