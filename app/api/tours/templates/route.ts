@@ -161,6 +161,44 @@ export async function POST(request: NextRequest) {
       exclusions: body.exclusions || []
     }
 
+    // Idempotency guard. The create form double-fires ~1.4s apart in the wild
+    // (confirmed in prod: two "Private Memphis, Saqqara, and Dahshur
+    // Excursion" templates at 17:26:30 and :32, 1.4s apart). The client-side
+    // submit guard did NOT stop it — the two calls are seconds apart, not the
+    // same tick — so the server must be the backstop. A template's code is
+    // generated per request with no unique constraint, so nothing downstream
+    // dedupes it either.
+    //
+    // Before inserting, look for a template this tenant just created with the
+    // same name and type. If found, return THAT one instead of a second row.
+    // The window is short so a genuine same-name template made minutes later
+    // still creates normally.
+    const dupWindowStart = new Date(Date.now() - 15_000).toISOString()
+    const { data: recent } = await supabase
+      .from('tour_templates')
+      // Empty select() returns all columns, like the insert below — and
+      // avoids the star form the select-star ratchet counts.
+      .select()
+      .eq('tenant_id', tenant_id)
+      .eq('template_name', body.template_name)
+      .eq('tour_type', body.tour_type)
+      .gte('created_at', dupWindowStart)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (recent) {
+      // The double-submit's second request: hand back the row the first one
+      // created rather than making a twin. The client then links its
+      // variations to this same id.
+      return NextResponse.json({
+        success: true,
+        data: recent,
+        message: 'Template already created',
+        deduplicated: true,
+      })
+    }
+
     const { data, error } = await supabase
       .from('tour_templates')
       .insert([templateData])

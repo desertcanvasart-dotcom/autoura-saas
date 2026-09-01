@@ -154,9 +154,40 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Idempotency: the tour create form double-fires, so this batch can arrive
+    // twice for the same template. A (template_id, tier) pair already present
+    // must NOT be inserted again, or one template ends up with two "standard"
+    // variations. Drop pairs that already exist, and if the whole batch is a
+    // repeat, return what is already there rather than erroring.
+    const templateIds = [...new Set(variationsToInsert.map(v => v.template_id))]
+    const { data: existingVars } = await supabase
+      .from('tour_variations')
+      .select('id, template_id, tier, variation_name')
+      .in('template_id', templateIds)
+    const existingKeys = new Set(
+      (existingVars ?? []).map((v: { template_id: string; tier: string }) => `${v.template_id}|${v.tier}`)
+    )
+    const toInsert = variationsToInsert.filter(
+      v => !existingKeys.has(`${v.template_id}|${v.tier}`)
+    )
+
+    if (toInsert.length === 0) {
+      // Entire batch already exists (the double-submit's second call). Return
+      // the existing rows so the client treats it as success.
+      const dupes = (existingVars ?? []).filter((v: { template_id: string }) =>
+        templateIds.includes(v.template_id)
+      )
+      return NextResponse.json({
+        success: true,
+        data: dupes,
+        deduplicated: true,
+        message: 'Variations already created',
+      })
+    }
+
     const { data, error } = await supabase
       .from('tour_variations')
-      .insert(variationsToInsert)
+      .insert(toInsert)
       .select()
 
     if (error) {
