@@ -330,7 +330,6 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
       {/* Search Input with Dropdown */}
       <div className="relative" ref={dropdownRef}>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           <input
             ref={inputRef}
             type="text"
@@ -340,7 +339,7 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
               setIsOpen(true)
             }}
             onFocus={() => setIsOpen(true)}
-            className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
             placeholder="Search attractions to add..."
           />
         </div>
