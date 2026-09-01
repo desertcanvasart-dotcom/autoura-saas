@@ -194,7 +194,7 @@ export default function RatesPage() {
   const [showSeasonalPricing, setShowSeasonalPricing] = useState(false)
 
   // Currency hook for user's preferred currency
-  const { display, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { display, userCurrency, loading: currencyLoading } = useCurrency()
 
   // Helper to get the correct rate based on user currency (EUR vs non-EUR)
   const getRate = (eurRate: number | undefined, nonEurRate: number | undefined): number => {

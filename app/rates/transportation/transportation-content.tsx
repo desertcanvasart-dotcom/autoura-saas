@@ -7,9 +7,11 @@ import { Search, Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronR
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 interface TransportationRate {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   route_name: string | null
   service_type: string
@@ -119,8 +121,9 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function TransportationContent() {
   const dialog = useConfirmDialog()
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { userCurrency, loading: currencyLoading } = useCurrency()
 
+  const { fmtRate } = useRateRowFormat()
   const [rates, setRates] = useState<TransportationRate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -741,7 +744,7 @@ export default function TransportationContent() {
                           return chips.length > 0 ? chips.map(chip => (
                             <span key={chip.label} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-700">
                               <span className="font-medium">{chip.label}</span>
-                              <span>{symbol}{convert(chip.eur).toFixed(0)}</span>
+                              <span>{fmtRate(chip.eur, rate, 0)}</span>
                             </span>
                           )) : <span className="text-sm text-gray-400">—</span>
                         })()}

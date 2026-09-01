@@ -53,6 +53,54 @@ export function sumByCurrency<T>(
   return totals
 }
 
+export type RateAverage = { amount: number; currency: string | null }
+
+/**
+ * Average a rate column in ONE currency, or refuse to average at all.
+ *
+ * The same rule as sumByCurrency, one level up. Money in different currencies
+ * does not add, and it does not average either: the rates pages summed every
+ * row's raw amount, divided by the row count and rendered the result with the
+ * viewer's symbol, so a list of EGP rows produced a euro figure nobody had
+ * entered (operator, 1 Sep).
+ *
+ * Average the rows in the tenant's own rates currency when there are any;
+ * otherwise, if every priced row shares one entry currency (an all-EGP list),
+ * average in THAT currency; mixed currencies return null, which the caller
+ * renders as a dash. Nothing is converted — this is a stat, not an exchange
+ * desk, and this codebase does not invent rates.
+ *
+ * Unpriced rows are excluded from the sum AND the count: a blank rate is a
+ * hole, not a 0, and averaging it in reports a rate nobody charges.
+ *
+ * Returns null rather than a '—' string so a caller cannot format a dash as a
+ * number.
+ */
+export function averageRateInOneCurrency<T>(
+  items: T[] | null | undefined,
+  getAmount: (item: T) => unknown,
+  getCurrency: (item: T) => unknown
+): RateAverage | null {
+  const code = (item: T): string | null => {
+    const c = getCurrency(item)
+    return typeof c === 'string' && c.trim() ? c.trim().toUpperCase() : null
+  }
+  const priced = (items ?? []).filter(i => num(getAmount(i)) > 0)
+  if (priced.length === 0) return null
+
+  const avg = (rows: T[]) => {
+    const mean = rows.reduce((sum, r) => sum + num(getAmount(r)), 0) / rows.length
+    return Math.round(mean * 100) / 100
+  }
+
+  const tenantRows = priced.filter(i => code(i) === null)
+  if (tenantRows.length) return { amount: avg(tenantRows), currency: null }
+
+  const currencies = new Set(priced.map(code))
+  if (currencies.size === 1) return { amount: avg(priced), currency: code(priced[0]) }
+  return null
+}
+
 /**
  * Render totals for a single tile: "€1,200.00 + $300.00".
  *

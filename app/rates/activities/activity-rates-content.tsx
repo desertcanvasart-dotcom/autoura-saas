@@ -13,7 +13,7 @@ import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import ActivityTiersEditor from '@/app/components/ActivityTiersEditor'
 import { parseTiers, type ActivityTier } from '@/lib/rates/activity-tiers'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 
 const ACTIVITY_CATEGORIES = [
@@ -87,6 +87,8 @@ interface Supplier {
 }
 
 interface ActivityRate {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   service_code: string
   activity_name: string
@@ -121,8 +123,10 @@ export default function ActivityRatesContent() {
   const searchParams = useSearchParams()
   const initialSupplierId = searchParams.get('supplier_id') || ''
 
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { userCurrency, loading: currencyLoading } = useCurrency()
 
+
+  const { fmtRate } = useRateRowFormat()
   const [rates, setRates] = useState<ActivityRate[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -974,7 +978,7 @@ export default function ActivityRatesContent() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
+                      <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -1062,7 +1066,7 @@ export default function ActivityRatesContent() {
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
                     <p className="text-xs text-gray-500">{userCurrency} Rate</p>
-                    <p className="text-lg font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
@@ -1115,7 +1119,7 @@ export default function ActivityRatesContent() {
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
+                  <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}>

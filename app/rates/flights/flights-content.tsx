@@ -9,9 +9,11 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 interface FlightRate {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   service_code: string
   route_from: string
@@ -162,8 +164,9 @@ export default function FlightsContent() {
   // City vocabulary from the destination catalog (Egypt fallback pre-migration).
   const { cities: cityOptions } = useDestinationCities()
   const dialog = useConfirmDialog()
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
+  const { fmtRate } = useRateRowFormat()
   const [rates, setRates] = useState<FlightRate[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -870,7 +873,7 @@ export default function FlightsContent() {
                     </div>
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <span className="text-sm font-medium text-gray-900">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
+                    <span className="text-sm font-medium text-gray-900">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</span>
                   </td>
                   <td className="px-4 py-2 text-center">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${

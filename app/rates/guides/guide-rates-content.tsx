@@ -11,7 +11,8 @@ import { Users, Plus, Search, Edit, Trash2, X, Check, Copy, Filter, Globe, MapPi
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 
 const LANGUAGES = [
@@ -48,6 +49,8 @@ interface Guide {
 }
 
 interface GuideRate {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   service_code: string
   guide_language: string
@@ -115,8 +118,9 @@ export default function GuideRatesContent() {
   } | null>(null)
 
   // Currency conversion
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { userCurrency, loading: currencyLoading } = useCurrency()
 
+  const { fmtRate, fmtAverage } = useRateRowFormat()
   const showNotification = (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string) => {
     setNotification({ type, title, message })
     setTimeout(() => setNotification(null), 5000)
@@ -432,9 +436,7 @@ export default function GuideRatesContent() {
   // Stats
   const activeRates = rates.filter(r => r.is_active).length
   const linkedRates = rates.filter(r => r.supplier_id).length
-  const avgRate = rates.length > 0
-    ? (rates.reduce((sum, r) => sum + (r.base_rate_eur || 0), 0) / rates.filter(r => (r.base_rate_eur || 0) > 0).length || 0).toFixed(0)
-    : '0'
+  const avgRate = averageRateInOneCurrency(rates, r => r.base_rate_eur, r => r.rate_currency)
   const uniqueCities = [...new Set(rates.map(r => r.city).filter(Boolean))].length
 
   // Get guide name by ID
@@ -660,7 +662,7 @@ export default function GuideRatesContent() {
             <span className="text-gray-400 font-bold">{rateSymbol}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{rateSymbol}{avgRate}</p>
+          <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate)}</p>
           <p className="text-xs text-gray-600">Avg. Daily Rate</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -900,7 +902,7 @@ export default function GuideRatesContent() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
+                      <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -979,7 +981,7 @@ export default function GuideRatesContent() {
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
                     <p className="text-xs text-gray-500">{userCurrency} Rate</p>
-                    <p className="text-lg font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
@@ -1029,7 +1031,7 @@ export default function GuideRatesContent() {
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
+                  <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}>
