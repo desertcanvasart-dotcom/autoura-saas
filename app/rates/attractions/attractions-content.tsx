@@ -930,7 +930,7 @@ export default function AttractionsContent() {
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
                           attraction.is_addon ? 'bg-orange-500' : 'bg-gray-200'
                         } ${togglingAddon === attraction.id ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
-                        title={attraction.is_addon ? 'Click to make standard' : 'Click to make add-on'}
+                        title={attraction.is_addon ? 'Currently excluded from the automatic price — click to include it' : 'Click to exclude from the automatic price (include only when the customer asks)'}
                       >
                         <span
                           className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${

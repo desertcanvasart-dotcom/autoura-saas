@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 138
+ * Tables: 139
  */
 
 export type Json =
@@ -4445,6 +4445,69 @@ export interface Database {
           },
           {
             foreignKeyName: "expenses_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extras_catalogue: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          description: string | null
+          category: string | null
+          supplier_cost: number | null
+          supplier_id: string | null
+          selling_price: number | null
+          unit: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          description?: string | null
+          category?: string | null
+          supplier_cost?: number | null
+          supplier_id?: string | null
+          selling_price?: number | null
+          unit?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          name?: string
+          description?: string | null
+          category?: string | null
+          supplier_cost?: number | null
+          supplier_id?: string | null
+          selling_price?: number | null
+          unit?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extras_catalogue_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extras_catalogue_supplier_id_fkey"
             columns: ["supplier_id"]
             isOneToOne: false
             referencedRelation: "suppliers"
