@@ -38,6 +38,9 @@ interface PricingResult {
     quantity: number
     unit_cost: number
     line_total: number
+    pricing_note?: string
+    // Present on catalogue-extra lines (rate_source 'extras_catalogue').
+    extra?: { unit: 'per_person' | 'per_booking'; pinned: boolean; sell_total: number | null; margin_total: number; cost_known: boolean }
   }>
   subtotal_cost: number
   total_cost: number
@@ -67,6 +70,18 @@ interface Partner {
   partner_code: string
 }
 
+// A sellable catalogue extra (Rates → Extras). Chosen per quote and priced
+// through the engine: cost + quote margin, or the operator's set price as-is.
+interface CatalogueExtraOption {
+  id: string
+  name: string
+  category: string | null
+  supplier_cost: number | null
+  selling_price: number | null
+  unit: 'per_person' | 'per_booking'
+  is_active: boolean
+}
+
 interface SavedQuote {
   id: string
   quote_number: string
@@ -92,6 +107,13 @@ export default function TourPriceCalculator() {
   const [marginPercent, setMarginPercent] = useState(25)
   const [includeOptionals, setIncludeOptionals] = useState(false)
   const [tourLeaderIncluded, setTourLeaderIncluded] = useState(false)
+  // Catalogue extras (Rates → Extras) offered on this quote.
+  const [availableExtras, setAvailableExtras] = useState<CatalogueExtraOption[]>([])
+  const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([])
+  const rateCurrency = (tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
+  // Priced options of THIS variation (Tour Manager → variation → Options).
+  const [availableOptions, setAvailableOptions] = useState<CatalogueExtraOption[]>([])
+  const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([])
 
   // Save Quote state
   const [showSaveModal, setShowSaveModal] = useState(false)
@@ -118,8 +140,10 @@ export default function TourPriceCalculator() {
   useEffect(() => {
     if (user && tenant) {
       fetchPartners()
+      fetchExtras()
+      fetchOptions(variationId)
     }
-  }, [user, tenant])
+  }, [user, tenant, variationId])
 
   const fetchPartners = async () => {
     try {
@@ -132,6 +156,74 @@ export default function TourPriceCalculator() {
       console.error('Failed to fetch partners:', err)
     }
   }
+
+  const fetchExtras = async () => {
+    try {
+      const res = await fetch('/api/extras-catalogue')
+      const data = await res.json()
+      if (data.success) {
+        setAvailableExtras((data.data || []).filter((x: CatalogueExtraOption) => x.is_active))
+      }
+    } catch (err) {
+      console.error('Failed to fetch extras:', err)
+    }
+  }
+
+  const toggleExtra = (id: string) =>
+    setSelectedExtraIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+
+  const fetchOptions = async (id: string) => {
+    if (!id) return
+    try {
+      const res = await fetch(`/api/tours/variations/${id}/options?active_only=true`)
+      const data = await res.json()
+      if (data.success) setAvailableOptions(data.data || [])
+    } catch (err) {
+      console.error('Failed to fetch variation options:', err)
+    }
+  }
+
+  const toggleOption = (id: string) =>
+    setSelectedOptionIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+
+  // One picker for both kinds — they carry the same fields and price the same
+  // way (cost + this quote's margin, or the operator's set price as-is).
+  const renderPicker = (
+    title: string,
+    items: CatalogueExtraOption[],
+    selected: string[],
+    toggle: (id: string) => void
+  ) => items.length > 0 && (
+    <div className="border border-gray-200 rounded-lg p-3">
+      <p className="text-sm font-medium text-gray-700 mb-2">{title}</p>
+      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+        {items.map(x => {
+          const unpriced = x.supplier_cost == null && x.selling_price == null
+          const label = x.selling_price != null
+            ? `${rateCurrency} ${x.selling_price} set`
+            : x.supplier_cost != null
+            ? `${rateCurrency} ${x.supplier_cost} cost + margin`
+            : 'not priced'
+          return (
+            <label key={x.id} className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.includes(x.id)}
+                onChange={() => toggle(x.id)}
+                className="w-4 h-4 mt-0.5 text-[#647C47] rounded"
+              />
+              <span className="text-sm leading-tight">
+                {x.name}
+                <span className={`block text-xs ${unpriced ? 'text-red-600' : 'text-gray-500'}`}>
+                  {label} · {x.unit === 'per_person' ? 'per person' : 'per booking'}
+                </span>
+              </span>
+            </label>
+          )
+        })}
+      </div>
+    </div>
+  )
 
   const calculatePrice = async () => {
     setLoading(true)
@@ -148,7 +240,9 @@ export default function TourPriceCalculator() {
           is_eur_passport: isEurPassport,
           margin_percent: marginPercent,
           include_optionals: includeOptionals,
-          tour_leader_included: tourLeaderIncluded
+          tour_leader_included: tourLeaderIncluded,
+          extras: selectedExtraIds,
+          options: selectedOptionIds
         })
       })
       const data = await res.json()
@@ -173,7 +267,9 @@ export default function TourPriceCalculator() {
           travel_date: travelDate,
           is_eur_passport: isEurPassport,
           margin_percent: marginPercent,
-          tour_leader_included: tourLeaderIncluded
+          tour_leader_included: tourLeaderIncluded,
+          extras: selectedExtraIds,
+          options: selectedOptionIds
         })
       })
       const data = await res.json()
@@ -477,7 +573,7 @@ export default function TourPriceCalculator() {
                 />
               </div>
 
-              {/* Include Optionals */}
+              {/* Include Optionals (the programme's own optional service lines) */}
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -485,8 +581,14 @@ export default function TourPriceCalculator() {
                   onChange={(e) => setIncludeOptionals(e.target.checked)}
                   className="w-4 h-4 text-[#647C47] rounded"
                 />
-                <span className="text-sm">Include optional extras</span>
+                <span className="text-sm">Include optional services</span>
               </label>
+
+              {/* Priced options of this variation, then catalogue extras. Both
+                  are priced through the engine like any line: cost + this
+                  quote's margin, or the operator's set price as-is. */}
+              {renderPicker('Options for this variation', availableOptions, selectedOptionIds, toggleOption)}
+              {renderPicker('Extras', availableExtras, selectedExtraIds, toggleExtra)}
 
               {/* Calculate Button */}
               <button
@@ -637,16 +739,27 @@ export default function TourPriceCalculator() {
                   <tbody className="divide-y">
                     {result.services.map((service, idx) => (
                       <tr key={idx} className="hover:bg-gray-50">
-                        <td className="px-4 py-2">{service.service_name}</td>
+                        <td className="px-4 py-2">
+                          {service.service_name}
+                          {service.extra && service.pricing_note && (
+                            <p className={`text-xs ${service.extra.cost_known === false ? 'text-red-600' : 'text-gray-500'}`}>
+                              {service.pricing_note}
+                            </p>
+                          )}
+                        </td>
                         <td className="px-4 py-2 text-center">
                           <span className={`px-2 py-0.5 rounded text-xs ${
-                            service.rate_source === 'stored'
+                            service.extra
+                              ? 'bg-purple-100 text-purple-700'
+                              : service.rate_source === 'stored'
                               ? 'bg-gray-100'
                               : service.rate_source === 'manual'
                               ? 'bg-yellow-100 text-yellow-700'
                               : 'bg-green-100 text-green-700'
                           }`}>
-                            {service.rate_type || service.rate_source}
+                            {service.extra
+                              ? `${service.rate_source === 'variation_option' ? 'Option' : 'Extra'}${service.extra.pinned ? ' · set price' : ''}`
+                              : (service.rate_type || service.rate_source)}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-center text-gray-500">{service.quantity_mode}</td>

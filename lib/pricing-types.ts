@@ -20,6 +20,10 @@ export type HoleKind =
   | 'tipping'
   | 'airport_service'
   | 'hotel_service'
+  // A catalogue extra (airport fast-track, late check-out…) chosen at quote
+  // time that cannot be priced: no supplier cost and no operator-set price,
+  // or a set price with the cost still unknown (margin can't be stated).
+  | 'extra'
   // Used by the AI build-quote route when no tour template matches strongly
   // enough to back a deliverable price. Different from the rate-level kinds
   // above — this is a hole at the template-match step, before any rate lookup

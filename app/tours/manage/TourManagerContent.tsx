@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
+import VariationOptionsModal from '@/components/VariationOptionsModal'
 import {
   Map,
   Plus,
@@ -824,6 +825,8 @@ export default function TourManagerContent() {
   
   // DAY BUILDER MODAL STATE
   const [dayBuilderTemplate, setDayBuilderTemplate] = useState<TourTemplate | null>(null)
+  // Which variation's priced options are being edited (migration 319).
+  const [optionsVariation, setOptionsVariation] = useState<TourVariation | null>(null)
   
   // NEW TEMPLATE VARIATIONS STATE (for creating with template)
   const [newTemplateVariations, setNewTemplateVariations] = useState<Set<string>>(new Set(['standard']))
@@ -1683,6 +1686,15 @@ export default function TourManagerContent() {
                                         >
                                           <Calculator className="w-4 h-4" />
                                         </Link>
+                                        {/* Priced upgrades that belong to this variation (migration 319). */}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => { e.stopPropagation(); setOptionsVariation(variation) }}
+                                          className="px-1.5 py-1 text-xs font-medium text-purple-700 hover:bg-purple-100 rounded transition-colors"
+                                          title="Priced options for this variation"
+                                        >
+                                          Options
+                                        </button>
                                       </div>
                                     </div>
                                   )
@@ -2395,6 +2407,14 @@ export default function TourManagerContent() {
       )}
 
       {/* DAY BUILDER MODAL */}
+      {optionsVariation && (
+        <VariationOptionsModal
+          variationId={optionsVariation.id}
+          variationName={optionsVariation.variation_name}
+          onClose={() => setOptionsVariation(null)}
+        />
+      )}
+
       {dayBuilderTemplate && (
         <DayBuilderModal
           template={dayBuilderTemplate}
