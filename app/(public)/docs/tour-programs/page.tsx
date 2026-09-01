@@ -9,12 +9,12 @@ export default function TourProgramsPage() {
       <nav className="flex items-center gap-2 text-sm text-gray-500 mb-6">
         <Link href="/docs" className="hover:text-primary-600 transition-colors">Docs</Link>
         <ChevronRight className="w-4 h-4" />
-        <span className="text-gray-900 font-medium">Tour Builder</span>
+        <span className="text-gray-900 font-medium">Tour Manager</span>
       </nav>
 
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">Tour Builder</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-4">Tour Manager</h1>
       <p className="text-gray-600 mb-8">
-        The Tour Builder (labeled <strong>Tour Programs Manager</strong> on the page itself) lets you create and manage reusable tour templates and their variations. Templates define the core itinerary, while variations represent specific versions (budget tier, group type, pax range) that feed into B2B pricing. Find it in the sidebar under <strong>B2B &rarr; Tour Builder</strong>.
+        The Tour Manager (labeled <strong>Tour Programs Manager</strong> on the page itself) lets you create and manage reusable tour templates and their variations. Templates define the core itinerary, while variations represent specific versions (budget tier, group type, pax range) that feed into B2B pricing. Find it in the sidebar under <strong>Tours &rarr; Tour Manager</strong>.
       </p>
 
       {/* Concepts */}
@@ -43,14 +43,14 @@ export default function TourProgramsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewing Templates</h2>
         <p className="text-gray-600 mb-3">
-          Navigate to <strong>B2B &rarr; Tour Builder</strong> in the sidebar. The page shows:
+          Navigate to <strong>Tours &rarr; Tour Manager</strong> in the sidebar. The page shows:
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
           <li><strong>Stats Cards</strong> &mdash; Totals for templates, variations, active, and featured</li>
           <li><strong>Search</strong> &mdash; Matches template name, code, or city</li>
           <li><strong>Filters</strong> &mdash; Separate <strong>Theme</strong> and <strong>Type</strong> dropdowns, plus an <strong>Active Only / Show All</strong> toggle</li>
           <li><strong>View Modes</strong> &mdash; Table, card grid, or compact list</li>
-          <li><strong>Browse Tours</strong> &mdash; A header link that jumps to the public-facing Ready Made Packages page</li>
+          <li><strong>Browse Tours</strong> &mdash; A header link that jumps to the public-facing Tour Inventory page</li>
         </ul>
         <p className="text-gray-600">
           The table view shows one row per template with columns: <strong>Template, Type, Duration, Cities, Variations, Status, Actions</strong>.

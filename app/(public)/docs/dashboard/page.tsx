@@ -51,7 +51,7 @@ export default function DashboardPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <p className="text-gray-600 mb-3">Shortcut buttons for the most common tasks:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
-          <li><strong>New Quote</strong> &mdash; Start a new itinerary/quote. On B2B-only workspaces this opens the Tour Builder instead.</li>
+          <li><strong>New Quote</strong> &mdash; Start a new itinerary/quote. On B2B-only workspaces this opens the Tour Manager instead.</li>
           <li><strong>Rates Hub</strong> &mdash; View and update your pricing</li>
           <li><strong>B2B Packages</strong> &mdash; Browse ready-made tour packages (hidden on B2C-only workspaces)</li>
           <li><strong>Clients</strong> &mdash; Jump to your client list</li>

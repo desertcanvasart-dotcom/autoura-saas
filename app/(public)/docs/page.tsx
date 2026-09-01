@@ -83,7 +83,7 @@ const CATEGORIES: DocCategory[] = [
     items: [
       { href: '/docs/b2b-pricing', icon: Briefcase, title: 'B2B Pricing', description: 'B2B price calculator with rate sheets, pax tables, and single supplement.' },
       { href: '/docs/b2b-pricing-rules', icon: PackageSearch, title: 'B2B Pricing Rules', description: 'Per-person, per-unit, and tiered pricing rules plus transport packages with vehicle tiers.' },
-      { href: '/docs/tour-programs', icon: ClipboardList, title: 'Tour Builder', description: 'Create and manage tour templates, variations, and the template-to-pricing flow.' },
+      { href: '/docs/tour-programs', icon: ClipboardList, title: 'Tour Manager', description: 'Create and manage tour templates, variations, and the template-to-pricing flow.' },
       { href: '/docs/b2b-quotes', icon: FileCheck, title: 'B2B Quotes', description: 'Save, manage, and export B2B quotes with PDF generation.' },
       { href: '/docs/b2b-import', icon: FileInput, title: 'Converting Itineraries to B2B', description: 'Turn standard itineraries into B2B quotes, templates, and partner rate sheets.' },
     ],
