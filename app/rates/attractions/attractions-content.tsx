@@ -12,7 +12,8 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 // ============================================
 // CONSTANTS
@@ -25,6 +26,8 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 // ============================================
 
 interface Attraction {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   service_code: string
   attraction_name: string
@@ -189,8 +192,9 @@ export default function AttractionsContent() {
   const { cities: cityOptions } = useDestinationCities()
   const searchParams = useSearchParams()
   const dialog = useConfirmDialog()
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { userCurrency, loading: currencyLoading } = useCurrency()
 
+  const { fmtRate, fmtAverage } = useRateRowFormat()
   const [attractions, setAttractions] = useState<Attraction[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -608,9 +612,7 @@ export default function AttractionsContent() {
   const activeAttractions = attractions.filter(a => a.is_active).length
   const addonAttractions = attractions.filter(a => a.is_addon).length  // NEW
   const standardAttractions = attractions.filter(a => !a.is_addon).length  // NEW
-  const avgRate = attractions.length > 0 
-  ? (attractions.reduce((sum, a) => sum + (a.eur_rate || 0), 0) / attractions.length).toFixed(2)
-  : '0.00'
+  const avgRate = averageRateInOneCurrency(attractions, a => a.eur_rate, a => a.rate_currency)
 
   if (loading) {
     return (
@@ -746,7 +748,7 @@ export default function AttractionsContent() {
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Avg. {userCurrency} Rate</p>
-            <p className="text-2xl font-bold text-gray-900">{symbol}{convert(parseFloat(avgRate)).toFixed(2)}</p>
+            <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate, 2)}</p>
           </div>
         </div>
 
@@ -919,7 +921,7 @@ export default function AttractionsContent() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm font-bold text-green-600">
-                      {attraction.fee_type === 'free' ? 'FREE' : `${symbol}${convert(attraction.eur_rate || 0).toFixed(2)}`}
+                      {attraction.fee_type === 'free' ? 'FREE' : `${fmtRate(attraction.eur_rate || 0, attraction, 2)}`}
                       </span>
                     </td>
                     {/* NEW: Add-on toggle column */}

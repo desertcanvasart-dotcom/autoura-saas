@@ -11,7 +11,8 @@ import { Utensils, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Users, Ch
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 
 const MEAL_TYPES = [
@@ -77,6 +78,8 @@ interface Supplier {
 }
 
 interface MealRate {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   service_code: string
   restaurant_name: string
@@ -115,8 +118,10 @@ export default function MealRatesContent() {
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
+
+  const { fmtRate, fmtAverage } = useRateRowFormat()
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
@@ -500,9 +505,7 @@ export default function MealRatesContent() {
   // Stats
   const activeRates = rates.filter(r => r.is_active).length
   const linkedRates = rates.filter(r => r.supplier_id).length
-  const avgRate = rates.length > 0
-    ? (rates.reduce((sum, r) => sum + (r.base_rate_eur || 0), 0) / rates.filter(r => (r.base_rate_eur || 0) > 0).length || 0).toFixed(0)
-    : '0'
+  const avgRate = averageRateInOneCurrency(rates, r => r.base_rate_eur, r => r.rate_currency)
   const uniqueCities = [...new Set(rates.map(r => r.city).filter(Boolean))].length
 
   // Get tier badge
@@ -731,7 +734,7 @@ export default function MealRatesContent() {
             <span className="text-gray-400 font-bold">{symbol}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{symbol}{convert(Number(avgRate)).toFixed(0)}</p>
+          <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate)}</p>
           <p className="text-xs text-gray-600">Avg. Rate</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -953,7 +956,7 @@ export default function MealRatesContent() {
                       {getTierBadge(rate.tier)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
+                      <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</span>
                       {rate.per_person_rate && <span className="text-xs text-gray-400">/pp</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -1034,7 +1037,7 @@ export default function MealRatesContent() {
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
                     <p className="text-xs text-gray-500">{userCurrency} Rate {rate.per_person_rate && '(per person)'}</p>
-                    <p className="text-lg font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
@@ -1087,7 +1090,7 @@ export default function MealRatesContent() {
                   {getTierBadge(rate.tier)}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.base_rate_eur)).toFixed(2)}</span>
+                  <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}>

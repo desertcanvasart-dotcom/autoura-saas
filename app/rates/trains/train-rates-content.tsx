@@ -10,7 +10,8 @@ import { Train, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Clock, Chevr
 import { useCurrency } from '@/hooks/useCurrency'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 // Egyptian cities with train stations
 const TRAIN_CITIES = [
@@ -34,6 +35,8 @@ const OPERATORS = [
 ]
 
 interface TrainRate {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   service_code: string
   origin_city: string
@@ -75,7 +78,7 @@ export default function TrainRatesContent() {
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
   // Labels must name the currency the amounts are actually in (C3.4b).
-  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
+  const { symbol: rateSymbol, code: rateCurrencyCode } = useRateCurrency(rateCurrency)
   const [viewMode, setViewMode] = useState<'table' | 'cards' | 'compact'>('table')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -92,6 +95,7 @@ export default function TrainRatesContent() {
   // Currency conversion
   const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
+  const { fmtRate, fmtAverage } = useRateRowFormat()
   // Toast/Notification
   const [notification, setNotification] = useState<{ 
     type: 'success' | 'error' | 'info' | 'warning'
@@ -390,9 +394,7 @@ export default function TrainRatesContent() {
 
   // Stats
   const activeRates = rates.filter(r => r.is_active).length
-  const avgRate = rates.length > 0
-    ? (rates.reduce((sum, r) => sum + (r.rate_eur || 0), 0) / rates.filter(r => (r.rate_eur || 0) > 0).length || 0).toFixed(0)
-    : '0'
+  const avgRate = averageRateInOneCurrency(rates, r => r.rate_eur, r => r.rate_currency)
   const uniqueRoutes = [...new Set(rates.map(r => `${r.origin_city}-${r.destination_city}`))].length
 
   // Get notification icon
@@ -553,7 +555,7 @@ export default function TrainRatesContent() {
             <span className="text-gray-400 font-bold">{symbol}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{symbol}{convert(Number(avgRate)).toFixed(0)}</p>
+          <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate)}</p>
           <p className="text-xs text-gray-600">Avg. Rate</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -780,7 +782,7 @@ export default function TrainRatesContent() {
                       <span className="text-sm text-gray-600">{rate.operator_name || '—'}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.rate_eur)).toFixed(2)}</span>
+                      <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.rate_eur), rate, 2)}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -852,7 +854,7 @@ export default function TrainRatesContent() {
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
                     <p className="text-xs text-gray-500">{userCurrency} Rate</p>
-                    <p className="text-lg font-bold text-green-600">{symbol}{convert(Number(rate.rate_eur)).toFixed(2)}</p>
+                    <p className="text-lg font-bold text-green-600">{fmtRate(Number(rate.rate_eur), rate, 2)}</p>
                   </div>
                   <div className="flex gap-1">
                     <button
@@ -898,7 +900,7 @@ export default function TrainRatesContent() {
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.rate_eur)).toFixed(2)}</span>
+                  <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.rate_eur), rate, 2)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}>
@@ -1141,9 +1143,13 @@ export default function TrainRatesContent() {
                       />
                     </div>
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
-                    {userCurrency !== 'EUR' && formData.rate_eur > 0 && (
+                    {/* The amount typed here is in the currency picked just
+                        above, which is not always EUR. Converting it as EUR
+                        showed the operator an approximation of a number they
+                        had not entered. */}
+                    {userCurrency !== rateCurrencyCode && formData.rate_eur > 0 && (
                       <p className="text-xs text-gray-500 mt-1">
-                        ≈ {symbol}{convert(Number(formData.rate_eur)).toFixed(2)} {userCurrency}
+                        ≈ {symbol}{convert(Number(formData.rate_eur), rateCurrencyCode).toFixed(2)} {userCurrency}
                       </p>
                     )}
                   </div>

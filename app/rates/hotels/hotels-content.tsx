@@ -17,7 +17,8 @@ import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
 import { parseSeasons, type RateSeason } from '@/lib/rates/rate-seasons'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 
 const TIER_OPTIONS = [
@@ -79,6 +80,8 @@ const SUPPLEMENT_OPTIONS: { type: SupplementType; name: string; category: string
 ]
 
 interface AccommodationRate {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   service_code: string
   property_name: string
@@ -343,8 +346,9 @@ export default function HotelsContent() {
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dialog = useConfirmDialog()
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { userCurrency, loading: currencyLoading } = useCurrency()
 
+  const { fmtRate, fmtAverage } = useRateRowFormat()
   const [rates, setRates] = useState<AccommodationRate[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -1043,9 +1047,7 @@ export default function HotelsContent() {
   // Stats
   const activeRates = rates.filter(r => r.is_active).length
   const linkedRates = rates.filter(r => r.supplier_id).length
-  const avgRate = rates.length > 0 
-    ? (rates.reduce((sum, r) => sum + (r.double_rate_eur || 0), 0) / rates.filter(r => (r.double_rate_eur || 0) > 0).length || 0).toFixed(0)
-    : '0'
+  const avgRate = averageRateInOneCurrency(rates, r => r.double_rate_eur, r => r.rate_currency)
 
   // Prevent hydration mismatch
   if (!mounted) {
@@ -1144,7 +1146,7 @@ export default function HotelsContent() {
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Avg. Double (Low)</p>
-            <p className="text-2xl font-bold text-gray-900">{symbol}{convert(parseFloat(avgRate) || 0).toFixed(0)}</p>
+            <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate)}</p>
           </div>
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
@@ -1359,12 +1361,12 @@ export default function HotelsContent() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm font-bold text-green-600">
-                          {symbol}{convert(rate.double_rate_eur || 0).toFixed(0)}
+                          {fmtRate(rate.double_rate_eur || 0, rate, 0)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm text-orange-600">
-                          {symbol}{convert(rate.high_season_double_eur || 0).toFixed(0)}
+                          {fmtRate(rate.high_season_double_eur || 0, rate, 0)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -1494,15 +1496,15 @@ export default function HotelsContent() {
                     <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
                       <div className="text-center">
                         <p className="text-xs text-blue-600 font-medium">Low</p>
-                        <p className="text-sm font-bold text-gray-700">{symbol}{convert(rate.double_rate_eur || 0).toFixed(0)}</p>
+                        <p className="text-sm font-bold text-gray-700">{fmtRate(rate.double_rate_eur || 0, rate, 0)}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-xs text-orange-600 font-medium">High</p>
-                        <p className="text-sm font-bold text-gray-700">{symbol}{convert(rate.high_season_double_eur || 0).toFixed(0)}</p>
+                        <p className="text-sm font-bold text-gray-700">{fmtRate(rate.high_season_double_eur || 0, rate, 0)}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-xs text-red-600 font-medium">Peak</p>
-                        <p className="text-sm font-bold text-gray-700">{symbol}{convert(rate.peak_season_double_eur || 0).toFixed(0)}</p>
+                        <p className="text-sm font-bold text-gray-700">{fmtRate(rate.peak_season_double_eur || 0, rate, 0)}</p>
                       </div>
                     </div>
                   </div>
@@ -1572,7 +1574,7 @@ export default function HotelsContent() {
                     )}
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-sm font-bold text-green-600">{symbol}{convert(rate.double_rate_eur || 0).toFixed(0)}</span>
+                    <span className="text-sm font-bold text-green-600">{fmtRate(rate.double_rate_eur || 0, rate, 0)}</span>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleEdit(rate)}

@@ -10,7 +10,8 @@ import { useCurrency } from '@/hooks/useCurrency'
 import { BedDouble, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, Moon, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 // Sleeping train routes (Cairo-Luxor-Aswan corridor)
 const SLEEPER_CITIES = [
@@ -38,6 +39,8 @@ const SEASONS = [
 ]
 
 interface SleepingTrainRate {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   service_code: string
   origin_city: string
@@ -63,8 +66,9 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function SleepingTrainRatesContent() {
   const searchParams = useSearchParams()
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { symbol, userCurrency, loading: currencyLoading } = useCurrency()
 
+  const { fmtRate, fmtAverage } = useRateRowFormat()
   const [rates, setRates] = useState<SleepingTrainRate[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -400,9 +404,7 @@ export default function SleepingTrainRatesContent() {
 
   // Stats
   const activeRates = rates.filter(r => r.is_active).length
-  const avgOneway = rates.length > 0
-    ? (rates.reduce((sum, r) => sum + (r.rate_oneway_eur || 0), 0) / rates.filter(r => (r.rate_oneway_eur || 0) > 0).length || 0).toFixed(0)
-    : '0'
+  const avgOneway = averageRateInOneCurrency(rates, r => r.rate_oneway_eur, r => r.rate_currency)
   const uniqueRoutes = [...new Set(rates.map(r => `${r.origin_city}-${r.destination_city}`))].length
 
   // Get notification icon
@@ -563,7 +565,7 @@ export default function SleepingTrainRatesContent() {
             <span className="text-gray-400 font-bold">{symbol}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{symbol}{convert(Number(avgOneway)).toFixed(0)}</p>
+          <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgOneway)}</p>
           <p className="text-xs text-gray-600">Avg. One-way ({userCurrency})</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
@@ -787,11 +789,11 @@ export default function SleepingTrainRatesContent() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.rate_oneway_eur)).toFixed(2)}</span>
+                      <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.rate_oneway_eur), rate, 2)}</span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       {rate.rate_roundtrip_eur ? (
-                        <span className="text-sm text-gray-600">{symbol}{convert(Number(rate.rate_roundtrip_eur)).toFixed(2)}</span>
+                        <span className="text-sm text-gray-600">{fmtRate(Number(rate.rate_roundtrip_eur), rate, 2)}</span>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
                       )}
@@ -873,9 +875,9 @@ export default function SleepingTrainRatesContent() {
                   <div>
                     <p className="text-xs text-gray-500">One-way / Roundtrip ({userCurrency})</p>
                     <p className="text-lg font-bold text-green-600">
-                      {symbol}{convert(Number(rate.rate_oneway_eur)).toFixed(2)}
+                      {fmtRate(Number(rate.rate_oneway_eur), rate, 2)}
                       {rate.rate_roundtrip_eur && (
-                        <span className="text-sm text-gray-500 font-normal"> / {symbol}{convert(Number(rate.rate_roundtrip_eur)).toFixed(2)}</span>
+                        <span className="text-sm text-gray-500 font-normal"> / {fmtRate(Number(rate.rate_roundtrip_eur), rate, 2)}</span>
                       )}
                     </p>
                   </div>
@@ -920,7 +922,7 @@ export default function SleepingTrainRatesContent() {
                   </span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-bold text-green-600">{symbol}{convert(Number(rate.rate_oneway_eur)).toFixed(2)}</span>
+                  <span className="text-sm font-bold text-green-600">{fmtRate(Number(rate.rate_oneway_eur), rate, 2)}</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                   }`}>

@@ -12,7 +12,8 @@ import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
 import { parseSeasons, type RateSeason } from '@/lib/rates/rate-seasons'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 // ============================================
 // CONSTANTS
@@ -43,6 +44,8 @@ interface Supplier {
 }
 
 interface Cruise {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   cruise_code: string
   ship_name: string
@@ -601,8 +604,9 @@ function PPDSeasonalRateSection({
 
 export default function CruisesPage() {
   const dialog = useConfirmDialog()
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { userCurrency, loading: currencyLoading } = useCurrency()
 
+  const { fmtRate, fmtAverage } = useRateRowFormat()
   const [cruises, setCruises] = useState<Cruise[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -1085,9 +1089,7 @@ export default function CruisesPage() {
     active: cruises.filter(c => c.is_active).length,
     preferred: cruises.filter(c => c.is_preferred).length,
     ships: new Set(cruises.map(c => c.ship_name)).size,
-    avgPPD: cruises.length > 0
-      ? Math.round(cruises.reduce((sum, c) => sum + (c.ppd_eur || c.rate_double_eur || 0), 0) / cruises.length)
-      : 0
+    avgPPD: averageRateInOneCurrency(cruises, c => c.ppd_eur || c.rate_double_eur, c => c.rate_currency)
   }
 
   if (loading) {
@@ -1168,7 +1170,7 @@ export default function CruisesPage() {
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
             <p className="text-xs text-gray-600">Avg. PPD Rate ({userCurrency})</p>
-            <p className="text-2xl font-bold text-purple-600">{symbol}{convert(stats.avgPPD).toFixed(0)}</p>
+            <p className="text-2xl font-bold text-purple-600">{fmtAverage(stats.avgPPD)}</p>
           </div>
         </div>
 
@@ -1337,13 +1339,13 @@ export default function CruisesPage() {
                       <TierBadge tier={cruise.tier} />
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-blue-600">
-                      {symbol}{convert(cruise.ppd_eur || cruise.rate_double_eur || 0).toFixed(2)}
+                      {fmtRate(cruise.ppd_eur || cruise.rate_double_eur || 0, cruise, 2)}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                      {cruise.single_supplement_eur ? `+${symbol}${convert(cruise.single_supplement_eur).toFixed(2)}` : '-'}
+                      {cruise.single_supplement_eur ? `+${fmtRate(cruise.single_supplement_eur, cruise, 2)}` : '-'}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-purple-600">
-                      {cruise.triple_reduction_eur ? `-${symbol}${convert(cruise.triple_reduction_eur).toFixed(2)}` : '-'}
+                      {cruise.triple_reduction_eur ? `-${fmtRate(cruise.triple_reduction_eur, cruise, 2)}` : '-'}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${

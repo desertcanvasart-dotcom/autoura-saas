@@ -9,7 +9,8 @@ import { DollarSign, Plus, Search, Edit, Trash2, X, Check, AlertCircle, CheckCir
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
-import { useRateCurrency } from '@/hooks/useRateCurrencySymbol'
+import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 // ============================================
 // CONSTANTS
@@ -25,6 +26,8 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 // ============================================
 
 interface TippingRate {
+  // The currency this row's amounts are in; blank means the tenant's.
+  rate_currency?: string | null
   id: string
   service_code: string
   role_type: string
@@ -165,8 +168,9 @@ function Pagination({
 
 export default function TippingPage() {
   const dialog = useConfirmDialog()
-  const { convert, symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { userCurrency, loading: currencyLoading } = useCurrency()
   
+  const { fmtRate, fmtAverage } = useRateRowFormat()
   const [rates, setRates] = useState<TippingRate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -419,9 +423,7 @@ export default function TippingPage() {
     active: rates.filter(r => r.is_active).length,
     guides: rates.filter(r => r.role_type === 'guide').length,
     drivers: rates.filter(r => r.role_type === 'driver').length,
-    avgTip: rates.length > 0 
-      ? Math.round(rates.reduce((sum, r) => sum + r.rate_eur, 0) / rates.length)
-      : 0
+    avgTip: averageRateInOneCurrency(rates, r => r.rate_eur, r => r.rate_currency)
   }
 
   if (loading) {
@@ -490,7 +492,7 @@ export default function TippingPage() {
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
             <p className="text-xs text-gray-600">Avg. Tip</p>
-            <p className="text-2xl font-bold text-green-600">{symbol}{convert(stats.avgTip).toFixed(0)}</p>
+            <p className="text-2xl font-bold text-green-600">{fmtAverage(stats.avgTip)}</p>
           </div>
         </div>
 
@@ -615,7 +617,7 @@ export default function TippingPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                      {symbol}{convert(Number(rate.rate_eur)).toFixed(2)}
+                      {fmtRate(Number(rate.rate_eur), rate, 2)}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 max-w-[200px] truncate">
                       {rate.description || '-'}
