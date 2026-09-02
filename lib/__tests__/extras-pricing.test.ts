@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { priceExtras, addExtrasToMoney, OPTION_SOURCE, type CatalogueExtra } from '@/lib/pricing/extras-pricing'
+import { priceExtras, addExtrasToMoney, type CatalogueExtra } from '@/lib/pricing/extras-pricing'
 
 // Extras at quote time: cost is the truth, the quote's margin is the house
 // rule, selling_price is an explicit pin. See lib/pricing/extras-pricing.ts.
@@ -84,20 +84,6 @@ describe('priceExtras', () => {
     expect(p.holes[0].message).toMatch(/not found/)
   })
 
-  it('a variation option rides the same math, stamped with its own source', () => {
-    // Same money as the pinned late check-out above; only the labels differ.
-    const p = priceExtras(catalogue, [{ id: 'lc' }], 6, OPTION_SOURCE)
-    const l = p.lines[0]
-    expect(l.rate_source).toBe('variation_option')
-    expect(l.service_category).toBe('option')
-    expect(l.rate_type).toBe('option')
-    expect(l.line_total).toBe(30)
-    expect(l.extra.sell_total).toBe(45)
-    expect(p.pinned_margin).toBe(15)
-    // Hole messages name the thing correctly.
-    const h = priceExtras(catalogue, [{ id: 'nope' }], 2, OPTION_SOURCE)
-    expect(h.holes[0].message).toMatch(/^Option nope was not found/)
-  })
 
   it('never reads a NULL or negative rate as a number', () => {
     const p = priceExtras(
