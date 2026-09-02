@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import VariationOptionsModal from '@/components/VariationOptionsModal'
 import {
   Map,
   Plus,
@@ -825,8 +824,6 @@ export default function TourManagerContent() {
   
   // DAY BUILDER MODAL STATE
   const [dayBuilderTemplate, setDayBuilderTemplate] = useState<TourTemplate | null>(null)
-  // Which variation's priced options are being edited (migration 319).
-  const [optionsVariation, setOptionsVariation] = useState<TourVariation | null>(null)
   
   // NEW TEMPLATE VARIATIONS STATE (for creating with template)
   const [newTemplateVariations, setNewTemplateVariations] = useState<Set<string>>(new Set(['standard']))
@@ -1686,15 +1683,19 @@ export default function TourManagerContent() {
                                         >
                                           <Calculator className="w-4 h-4" />
                                         </Link>
-                                        {/* Priced upgrades that belong to this variation (migration 319). */}
-                                        <button
-                                          type="button"
-                                          onClick={(e) => { e.stopPropagation(); setOptionsVariation(variation) }}
-                                          className="px-1.5 py-1 text-xs font-medium text-purple-700 hover:bg-purple-100 rounded transition-colors"
-                                          title="Priced options for this variation"
+                                        {/* The options this variation sells: optional
+                                            service lines with a cost and, when set, a
+                                            price (the sibling app's model, migration 320).
+                                            LABELLED, not a bare icon — the operator could
+                                            not find where options are authored otherwise. */}
+                                        <Link
+                                          href={`/tours/variations/${variation.id}/options`}
+                                          className="inline-flex items-center px-2 py-1 text-xs font-semibold text-[#647C47] border border-[#b8c9a8] hover:bg-[#e8ede3] rounded transition-colors whitespace-nowrap"
+                                          title="Options and upgrades this programme sells"
+                                          onClick={(e) => e.stopPropagation()}
                                         >
                                           Options
-                                        </button>
+                                        </Link>
                                       </div>
                                     </div>
                                   )
@@ -2407,14 +2408,6 @@ export default function TourManagerContent() {
       )}
 
       {/* DAY BUILDER MODAL */}
-      {optionsVariation && (
-        <VariationOptionsModal
-          variationId={optionsVariation.id}
-          variationName={optionsVariation.variation_name}
-          onClose={() => setOptionsVariation(null)}
-        />
-      )}
-
       {dayBuilderTemplate && (
         <DayBuilderModal
           template={dayBuilderTemplate}

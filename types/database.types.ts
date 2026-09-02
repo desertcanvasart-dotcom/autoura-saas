@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 139
+ * Tables: 138
  */
 
 export type Json =
@@ -9620,66 +9620,6 @@ export interface Database {
             columns: ["destination_id"]
             isOneToOne: false
             referencedRelation: "destinations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tour_variation_options: {
-        Row: {
-          id: string
-          tenant_id: string
-          variation_id: string
-          name: string
-          description: string | null
-          supplier_cost: number | null
-          selling_price: number | null
-          unit: string
-          is_active: boolean
-          sort_order: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          variation_id: string
-          name: string
-          description?: string | null
-          supplier_cost?: number | null
-          selling_price?: number | null
-          unit?: string
-          is_active?: boolean
-          sort_order?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          variation_id?: string
-          name?: string
-          description?: string | null
-          supplier_cost?: number | null
-          selling_price?: number | null
-          unit?: string
-          is_active?: boolean
-          sort_order?: number
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_variation_options_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tour_variation_options_variation_id_fkey"
-            columns: ["variation_id"]
-            isOneToOne: false
-            referencedRelation: "tour_variations"
             referencedColumns: ["id"]
           },
         ]

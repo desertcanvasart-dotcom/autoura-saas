@@ -5,10 +5,13 @@ import { getCatalogScope } from '@/lib/catalog-scope'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { getTieredActivityRate, applyActivityTiers } from '@/lib/rates/activity-tiers'
 import {
-  priceExtras, addExtrasToMoney, EXTRAS_SOURCE, OPTION_SOURCE,
-  type CatalogueExtra, type ExtraSelection, type LineSource, type MoneyBlock,
+  priceExtras, addExtrasToMoney,
+  type CatalogueExtra, type ExtraSelection, type MoneyBlock,
 } from '@/lib/pricing/extras-pricing'
-import { optionsTable } from '@/lib/tours/variation-options'
+// A priced OPTION is an optional service line of the variation, priced
+// off-margin when the operator set a price — the same modules as travel-ops-pro.
+import { parseOptionalSelection, isOptionalSelected } from '@/lib/b2b/optional-selection'
+import { composeQuoteTotals, optionalContribution, type OptionalContribution } from '@/lib/b2b/optional-pricing'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { getCurrencySymbol } from '@/lib/currency'
 
@@ -51,6 +54,10 @@ interface CalculatedService {
   is_optional: boolean
   day_number: number | null
   pricing_note?: string
+  // Optional services only: chosen for this quote, and what the customer pays.
+  is_selected?: boolean
+  selling_price?: number
+  price_basis?: 'operator_price' | 'cost_plus_margin'
 }
 
 interface PriceCalculationResult {
@@ -105,24 +112,6 @@ async function loadExtras(tenantId: string, ids: string[]): Promise<CatalogueExt
   return (data || []) as unknown as CatalogueExtra[]
 }
 
-// Priced options of THIS variation only (migration 319). Scoped by variation
-// as well as tenant, so an option from another programme can't be quoted here.
-async function loadVariationOptions(tenantId: string, variationId: string, ids: string[]): Promise<CatalogueExtra[]> {
-  if (ids.length === 0) return []
-  const { data, error } = await optionsTable(getSupabaseAdmin())
-    .select('id, name, supplier_cost, selling_price, unit')
-    .eq('tenant_id', tenantId)
-    .eq('variation_id', variationId)
-    .eq('is_active', true)
-    .in('id', ids)
-  if (error) {
-    console.error('Error loading tour_variation_options:', error)
-    return []
-  }
-  // The column is a CHECK-constrained text; narrow it to the two units.
-  return (data || []) as unknown as CatalogueExtra[]
-}
-
 // Fold priced extras into a finished result: lines join services (and so the
 // quote's services_snapshot), money is re-totalled at every pax count of the
 // rate sheet, and any hole makes the quote incomplete. Both engine branches
@@ -131,14 +120,13 @@ async function loadVariationOptions(tenantId: string, variationId: string, ids: 
 function foldExtras(
   result: PriceCalculationResult,
   catalogue: CatalogueExtra[],
-  selections: ExtraSelection[],
-  source: LineSource = EXTRAS_SOURCE
+  selections: ExtraSelection[]
 ): PriceCalculationResult {
   if (selections.length === 0) return result
   const m = result.margin_percent
   const r2 = (n: number) => Math.round(n * 100) / 100
 
-  const p = priceExtras(catalogue, selections, result.num_pax, source)
+  const p = priceExtras(catalogue, selections, result.num_pax)
   const money = addExtrasToMoney(
     {
       totalCost: result.total_cost,
@@ -153,7 +141,7 @@ function foldExtras(
   // pax_pricing_table is typed any[] upstream; `row` is inferred, not declared.
   type PaxBlock = (MoneyBlock & Record<string, unknown>) | undefined
   const pax_pricing_table = result.pax_pricing_table?.map((row) => {
-    const rp = priceExtras(catalogue, selections, row.numPax, source)
+    const rp = priceExtras(catalogue, selections, row.numPax)
     const fold = (b: PaxBlock) => (b ? { ...b, ...addExtrasToMoney(b, rp, row.numPax, m) } : b)
     return { ...row, withoutLeader: fold(row.withoutLeader), withLeader: fold(row.withLeader) }
   })
@@ -366,15 +354,14 @@ export async function POST(request: NextRequest) {
       is_eur_passport = true,
       margin_percent = 25,
       partner_id = null,
-      include_optionals = false,
       language = 'English',
       tier = 'standard',
       tour_leader_included = false,  // NEW: Added tour leader parameter
       // Catalogue extras chosen for THIS quote (ids, or {id} objects). Priced
       // through the engine like any other line — see lib/pricing/extras-pricing.
-      extras = [],
-      // Priced options of THIS variation (migration 319), same treatment.
-      options = []
+      extras = []
+      // include_optionals / selected_optional_ids are read off `body` by
+      // parseOptionalSelection below, not destructured here.
     } = body
 
 
@@ -387,16 +374,14 @@ export async function POST(request: NextRequest) {
     const isSelection = (e: unknown): e is ExtraSelection =>
       typeof e === 'object' && e !== null &&
       typeof (e as { id?: unknown }).id === 'string' && (e as { id: string }).id.length > 0
-    const toSelections = (raw: unknown): ExtraSelection[] =>
-      (Array.isArray(raw) ? raw : [])
-        .map((e: unknown) => (typeof e === 'string' ? { id: e } : e))
-        .filter(isSelection)
-    const extraSelections = toSelections(extras)
-    const optionSelections = toSelections(options)
-    const [extrasCatalogue, variationOptions] = await Promise.all([
-      loadExtras(tenantId, extraSelections.map((e) => e.id)),
-      loadVariationOptions(tenantId, variation_id, optionSelections.map((o) => o.id)),
-    ])
+    const extraSelections: ExtraSelection[] = (Array.isArray(extras) ? extras : [])
+      .map((e: unknown) => (typeof e === 'string' ? { id: e } : e))
+      .filter(isSelection)
+    const extrasCatalogue = await loadExtras(tenantId, extraSelections.map((e) => e.id))
+
+    // WHICH optional services the customer is buying, not merely whether. The
+    // old boolean priced every option or none — see lib/b2b/optional-selection.
+    const optionalSelection = parseOptionalSelection(body)
 
     // Fetch variation with template info
     const { data: variation, error: varError } = await (getSupabaseAdmin() as any)
@@ -539,10 +524,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: foldExtras(
-          foldExtras(result, extrasCatalogue, extraSelections),
-          variationOptions, optionSelections, OPTION_SOURCE
-        ),
+        data: foldExtras(result, extrasCatalogue, extraSelections),
       })
     }
 
@@ -585,7 +567,8 @@ export async function POST(request: NextRequest) {
     const optionalServices: CalculatedService[] = []
     const holes: { kind?: string; message: string }[] = []
     let subtotalCost = 0
-    let optionalTotal = 0
+    // One entry per CHOSEN optional service — see lib/b2b/optional-pricing.
+    const chosenOptionals: OptionalContribution[] = []
 
     // Process each service
     for (const svc of (services || [])) {
@@ -843,18 +826,51 @@ export async function POST(request: NextRequest) {
       }
 
       if (service.is_optional) {
-        optionalServices.push(calculatedService)
-        if (include_optionals) optionalTotal += lineTotal
+        // is_selected travels with the line so the caller can show what was
+        // chosen — and so the quote can snapshot the chosen ones as real
+        // services rather than losing them.
+        const selected = isOptionalSelected(service.id, optionalSelection)
+        const override = service.optional_price_override
+        const quantity = calculatedService.quantity
+        optionalServices.push({
+          ...calculatedService,
+          is_selected: selected,
+          // What the customer pays for it: the operator's own price when there
+          // is one, otherwise cost + margin like any other service.
+          selling_price: override
+            ? Math.round(Number(override) * quantity * 100) / 100
+            : Math.round(lineTotal * (1 + effectiveMargin / 100) * 100) / 100,
+          price_basis: override ? 'operator_price' : 'cost_plus_margin',
+        })
+        if (selected) {
+          chosenOptionals.push(optionalContribution({ lineTotal, override, quantity }))
+          // A chosen option with neither a cost nor a set price cannot be
+          // priced — flag it rather than sell it for nothing.
+          if (unitCost === 0 && !override) {
+            holes.push({
+              kind: 'option',
+              message: `Option "${service.service_name}" has no cost and no set price.`,
+            })
+          }
+        }
       } else {
         calculatedServices.push(calculatedService)
         subtotalCost += lineTotal
       }
     }
 
-    // Calculate totals
-    const totalCost = subtotalCost + (include_optionals ? optionalTotal : 0)
-    const marginAmount = totalCost * (effectiveMargin / 100)
-    const sellingPrice = totalCost + marginAmount
+    // Calculate totals. An option the operator has priced is added AFTER
+    // margin — that price is a decision, not a number to mark up — while its
+    // cost still counts as cost. See lib/b2b/optional-pricing.
+    const quoteTotals = composeQuoteTotals({
+      subtotalCost,
+      optionals: chosenOptionals,
+      marginPercent: effectiveMargin,
+    })
+    const totalCost = quoteTotals.costTotal
+    const marginAmount = quoteTotals.marginAmount
+    const sellingPrice = quoteTotals.baseSellingPrice
+    const optionalTotal = quoteTotals.optionalSellingTotal
     const pricePerPerson = sellingPrice / num_pax
 
     const result: PriceCalculationResult = {
@@ -884,10 +900,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: foldExtras(
-        foldExtras(result, extrasCatalogue, extraSelections),
-        variationOptions, optionSelections, OPTION_SOURCE
-      ),
+      data: foldExtras(result, extrasCatalogue, extraSelections),
     })
   } catch (error: any) {
     console.error('❌ Error calculating tour price:', error)

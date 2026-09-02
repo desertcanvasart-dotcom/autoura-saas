@@ -42,10 +42,11 @@ export interface ExtraSelection {
   id: string
 }
 
-/** Where a line comes from. Catalogue extras go with any quote; variation
- *  options belong to one programme. Same money model, different label. */
+/** Where a line comes from. Kept as a parameter so another catalogue can
+ *  ride the same math; a programme's own OPTIONS are optional service lines
+ *  priced by lib/b2b/optional-pricing instead. */
 export interface LineSource {
-  rate_source: 'extras_catalogue' | 'variation_option'
+  rate_source: 'extras_catalogue'
   service_category: string
   rate_type: string
   /** Noun used in hole messages: "Extra …" / "Option …". */
@@ -54,9 +55,6 @@ export interface LineSource {
 
 export const EXTRAS_SOURCE: LineSource = {
   rate_source: 'extras_catalogue', service_category: 'extra', rate_type: 'extra', label: 'Extra',
-}
-export const OPTION_SOURCE: LineSource = {
-  rate_source: 'variation_option', service_category: 'option', rate_type: 'option', label: 'Option',
 }
 
 /** Structurally matches the route's CalculatedService, so a line can be

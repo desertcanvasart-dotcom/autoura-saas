@@ -43,6 +43,18 @@ interface PricingResult {
     extra?: { unit: 'per_person' | 'per_booking'; pinned: boolean; sell_total: number | null; margin_total: number; cost_known: boolean }
   }>
   subtotal_cost: number
+  // The programme's optional services, each carrying whether it is chosen and
+  // what the CUSTOMER pays for it (operator price off-margin, or cost + margin).
+  optional_services?: Array<{
+    service_id: string
+    service_name: string
+    day_number?: number | null
+    line_total: number
+    is_selected?: boolean
+    selling_price?: number
+    price_basis?: 'operator_price' | 'cost_plus_margin'
+  }>
+  optional_total?: number
   total_cost: number
   margin_percent: number
   margin_amount: number
@@ -105,15 +117,14 @@ export default function TourPriceCalculator() {
   const [travelDate, setTravelDate] = useState(todayLocal())
   const [isEurPassport, setIsEurPassport] = useState(true)
   const [marginPercent, setMarginPercent] = useState(25)
-  const [includeOptionals, setIncludeOptionals] = useState(false)
+  // The programme's optional services the customer is buying, chosen one by
+  // one (lib/b2b/optional-selection). Ticking re-prices immediately.
+  const [selectedOptionals, setSelectedOptionals] = useState<string[]>([])
   const [tourLeaderIncluded, setTourLeaderIncluded] = useState(false)
   // Catalogue extras (Rates → Extras) offered on this quote.
   const [availableExtras, setAvailableExtras] = useState<CatalogueExtraOption[]>([])
   const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([])
   const rateCurrency = (tenant as { rates_currency?: string | null } | null)?.rates_currency || 'EUR'
-  // Priced options of THIS variation (Tour Manager → variation → Options).
-  const [availableOptions, setAvailableOptions] = useState<CatalogueExtraOption[]>([])
-  const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([])
 
   // Save Quote state
   const [showSaveModal, setShowSaveModal] = useState(false)
@@ -141,9 +152,8 @@ export default function TourPriceCalculator() {
     if (user && tenant) {
       fetchPartners()
       fetchExtras()
-      fetchOptions(variationId)
     }
-  }, [user, tenant, variationId])
+  }, [user, tenant])
 
   const fetchPartners = async () => {
     try {
@@ -171,20 +181,6 @@ export default function TourPriceCalculator() {
 
   const toggleExtra = (id: string) =>
     setSelectedExtraIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
-
-  const fetchOptions = async (id: string) => {
-    if (!id) return
-    try {
-      const res = await fetch(`/api/tours/variations/${id}/options?active_only=true`)
-      const data = await res.json()
-      if (data.success) setAvailableOptions(data.data || [])
-    } catch (err) {
-      console.error('Failed to fetch variation options:', err)
-    }
-  }
-
-  const toggleOption = (id: string) =>
-    setSelectedOptionIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
 
   // One picker for both kinds — they carry the same fields and price the same
   // way (cost + this quote's margin, or the operator's set price as-is).
@@ -225,7 +221,10 @@ export default function TourPriceCalculator() {
     </div>
   )
 
-  const calculatePrice = async () => {
+  const calculatePrice = async (optionalIdsOverride?: string[]) => {
+    // Priced from the argument when given — state has not updated yet when a
+    // checkbox handler calls this.
+    const optionalIds = optionalIdsOverride ?? selectedOptionals
     setLoading(true)
     setError(null)
     setSavedQuote(null)
@@ -239,10 +238,9 @@ export default function TourPriceCalculator() {
           travel_date: travelDate,
           is_eur_passport: isEurPassport,
           margin_percent: marginPercent,
-          include_optionals: includeOptionals,
           tour_leader_included: tourLeaderIncluded,
           extras: selectedExtraIds,
-          options: selectedOptionIds
+          selected_optional_ids: optionalIds
         })
       })
       const data = await res.json()
@@ -269,7 +267,7 @@ export default function TourPriceCalculator() {
           margin_percent: marginPercent,
           tour_leader_included: tourLeaderIncluded,
           extras: selectedExtraIds,
-          options: selectedOptionIds
+          selected_optional_ids: selectedOptionals
         })
       })
       const data = await res.json()
@@ -318,7 +316,12 @@ export default function TourPriceCalculator() {
           travel_date: travelDate,
           num_adults: numPax,
           num_children: 0,
-          services_snapshot: result.services,
+          // The CHOSEN optional services travel with the quote as real services,
+          // so their money and their lines stay together downstream.
+          services_snapshot: [
+            ...result.services,
+            ...(result.optional_services || []).filter(s => s.is_selected),
+          ],
           total_cost: result.total_cost,
           margin_percent: result.margin_percent,
           margin_amount: result.margin_amount,
@@ -573,26 +576,15 @@ export default function TourPriceCalculator() {
                 />
               </div>
 
-              {/* Include Optionals (the programme's own optional service lines) */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={includeOptionals}
-                  onChange={(e) => setIncludeOptionals(e.target.checked)}
-                  className="w-4 h-4 text-[#647C47] rounded"
-                />
-                <span className="text-sm">Include optional services</span>
-              </label>
-
-              {/* Priced options of this variation, then catalogue extras. Both
-                  are priced through the engine like any line: cost + this
-                  quote's margin, or the operator's set price as-is. */}
-              {renderPicker('Options for this variation', availableOptions, selectedOptionIds, toggleOption)}
+              {/* Catalogue extras — priced through the engine like any line:
+                  cost + this quote's margin, or the operator's set price as-is.
+                  The programme's own OPTIONS appear under the results, chosen
+                  one by one. */}
               {renderPicker('Extras', availableExtras, selectedExtraIds, toggleExtra)}
 
               {/* Calculate Button */}
               <button
-                onClick={calculatePrice}
+                onClick={() => calculatePrice()}
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#647C47] text-white rounded-lg hover:bg-[#4a5c35] font-medium disabled:opacity-50"
               >
@@ -792,6 +784,56 @@ export default function TourPriceCalculator() {
                 </table>
               </div>
             </>
+          )}
+
+          {/* ============================================
+              Optional services — chosen one by one
+              ============================================
+              The customer picks the ones they want. Ticking re-prices
+              immediately, and what is ticked here is what travels into the
+              quote as a real service. Mirrors travel-ops-pro. */}
+          {result?.optional_services && result.optional_services.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h3 className="text-base font-semibold mb-1">Options for this programme</h3>
+              <p className="text-xs text-gray-500 mb-3">Tick an option to add it to the quote. A price the operator set is charged as-is; otherwise cost plus this quote&apos;s margin.</p>
+              <div className="divide-y">
+                {result.optional_services.map(opt => (
+                  <label key={opt.service_id} className="flex items-center justify-between gap-3 py-2 cursor-pointer">
+                    <span className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={opt.is_selected ?? false}
+                        disabled={loading}
+                        onChange={e => {
+                          const next = e.target.checked
+                            ? [...selectedOptionals, opt.service_id]
+                            : selectedOptionals.filter(id => id !== opt.service_id)
+                          setSelectedOptionals(next)
+                          // Priced from `next`, not from state — state has
+                          // not updated by the time this runs.
+                          void calculatePrice(next)
+                        }}
+                        className="w-4 h-4 text-[#647C47] rounded flex-shrink-0"
+                      />
+                      <span className="text-sm truncate">
+                        {opt.service_name}
+                        {opt.day_number != null && (
+                          <span className="text-gray-400"> · Day {opt.day_number}</span>
+                        )}
+                      </span>
+                    </span>
+                    <span className="text-sm text-gray-700 flex-shrink-0 text-right">
+                      {/* What the CUSTOMER pays, not what the option costs us —
+                          and when the operator set that price, say so. */}
+                      +{rateCurrency} {(opt.selling_price ?? opt.line_total).toFixed(2)}
+                      {opt.price_basis === 'operator_price' && (
+                        <span className="block text-[11px] text-gray-400">operator price · no margin added</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Rate Sheet */}

@@ -14,9 +14,11 @@
 //
 // Deliberately NOT where programme upgrades live: an upgrade that belongs to
 // one package is authored on its variation (Tour Manager → variation →
-// Options, tour_variation_options / migration 319), because a Standard and a
-// Deluxe trip sell different upgrades at different prices. Same money model,
-// same pricing helper. These are the extras that go with any quote.
+// Options) as an optional SERVICE line with a cost and, when decided, a
+// price — tour_variation_services.optional_price_override, priced off-margin
+// by lib/b2b/optional-pricing (the sibling app's model, migration 320) —
+// because a Standard and a Deluxe trip sell different upgrades at different
+// prices. These are the extras that go with any quote.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Pencil, Plus, Trash2, X, Sparkles } from 'lucide-react'
@@ -214,8 +216,10 @@ export default function ExtrasPage() {
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-              <input value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+              <textarea value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })}
+                rows={3}
+                placeholder="What the customer gets — shown on the quote line"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-y" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
