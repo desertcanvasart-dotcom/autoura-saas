@@ -74,6 +74,9 @@ export async function POST(
     const oldPax = booking.num_travelers ?? 0
     const reprice = computeAddTravellerReprice({
       oldTotal: booking.total_amount,
+      // The agreed trip price WITHOUT extras (migration 321). Undefined on a
+      // booking that has never had one — the same arithmetic as before.
+      oldBaseTotal: (booking as Record<string, unknown>).base_total_cost as number | null | undefined,
       oldPax,
       addedPax: cr.requested_count,
       depositPercent: booking.deposit_percent,
@@ -98,6 +101,9 @@ export async function POST(
     if (reprice.method === 'per_person') {
       bookingPatch.total_amount = reprice.newTotal
       bookingPatch.deposit_amount = reprice.newDepositAmount
+      // Keep the base in step for the NEXT addition: without it, a later
+      // add-traveller would divide a total that already carries extras.
+      if (reprice.newBaseTotalCost !== undefined) bookingPatch.base_total_cost = reprice.newBaseTotalCost
       bookingPatch.balance_due = reprice.newBalanceDue
     }
     const { error: bookingError } = await admin.from('bookings').update(bookingPatch).eq('id', id)

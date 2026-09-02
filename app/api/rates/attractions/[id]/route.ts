@@ -68,6 +68,7 @@ export async function GET(
       notes: data.notes,
       is_active: data.is_active !== false,
       is_addon: data.is_addon || false,
+      is_sellable_extra: (data as Record<string, unknown>).is_sellable_extra === true,
       addon_note: data.addon_note,
       supplier_id: data.supplier_id,
       created_at: data.created_at,
@@ -150,6 +151,7 @@ export async function PUT(
     if (notes !== undefined) updateData.notes = notes
     if (is_active !== undefined) updateData.is_active = is_active
     if (is_addon !== undefined) updateData.is_addon = is_addon
+    if (body.is_sellable_extra !== undefined) updateData.is_sellable_extra = body.is_sellable_extra === true
     if (addon_note !== undefined) updateData.addon_note = addon_note
     if (supplier_id !== undefined) updateData.supplier_id = supplier_id || null
     

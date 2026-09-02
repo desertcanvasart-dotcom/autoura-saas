@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/supabase-server'
 import { loadFxContext, collectCurrencies, resolveReportingCurrency } from '@/lib/fx-report'
 import {
   computeTripPnL,
+  type PnlExtra,
   buildPnlSummary,
   type PnlCommission,
   type PnlExpense,
@@ -10,6 +11,7 @@ import {
   type PnlItinerary,
   type TripPnL,
 } from '@/lib/trip-pnl'
+import { extrasAdmin } from '@/lib/booking-extras-db'
 
 // ============================================
 // GET /api/profit-loss
@@ -159,6 +161,26 @@ export async function GET(request: NextRequest) {
     pushInto(expensesByTrip, expenses)
     pushInto(commissionsByTrip, commissions)
 
+    // ---------- Extras sold after the trips were priced (migration 321) ----------
+    // CONFIRMED booking_extras, joined to the trip through bookings.itinerary_id.
+    // A database without the table contributes nothing rather than 500ing.
+    const extrasByTrip = new Map<string, PnlExtra[]>()
+    if (itineraryIds.length) {
+      const { data: extraRows, error: extrasError } = await extrasAdmin()
+        .from('booking_extras')
+        .select('title, quantity, unit_price, currency, supplier_cost, supplier_currency, confirmed_at, bookings!inner(itinerary_id, tenant_id)')
+        .eq('status', 'confirmed')
+        .in('bookings.itinerary_id', itineraryIds.slice(0, MAX_IN_FILTER_IDS))
+      if (extrasError) console.error('profit-loss: could not read booking extras', extrasError)
+      for (const row of (extraRows ?? []) as Array<PnlExtra & { bookings: { itinerary_id?: string } | null }>) {
+        const itinId = row.bookings?.itinerary_id
+        if (!itinId) continue
+        const list = extrasByTrip.get(itinId) ?? []
+        list.push(row)
+        extrasByTrip.set(itinId, list)
+      }
+    }
+
     // ---------- Compute ----------
     const pnlData: TripPnL[] = (itineraries as PnlItinerary[]).map(itinerary =>
       computeTripPnL({
@@ -166,6 +188,7 @@ export async function GET(request: NextRequest) {
         invoices: invoicesByTrip.get(itinerary.id) || [],
         expenses: expensesByTrip.get(itinerary.id) || [],
         commissions: commissionsByTrip.get(itinerary.id) || [],
+        extras: extrasByTrip.get(itinerary.id) || [],
         fxIndex,
         liveRate,
       })

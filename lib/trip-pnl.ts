@@ -54,6 +54,23 @@ export interface PnlItinerary {
   total_cost?: number | string | null
 }
 
+/**
+ * A confirmed extra or upgrade (booking_extras, migration 321), sold after the
+ * trip was priced. It never reaches the itinerary, so without this the report
+ * would count what an extra earns (once invoiced) and nothing of what it
+ * cost, and every extra would read as pure profit. Ported from travel-ops-pro.
+ */
+export interface PnlExtra {
+  title?: string | null
+  quantity?: number | string | null
+  unit_price?: number | string | null
+  currency?: string | null
+  supplier_cost?: number | string | null
+  supplier_currency?: string | null
+  /** The date its money became real — what any conversion is done on. */
+  confirmed_at?: string | null
+}
+
 export interface PnlInvoice {
   itinerary_id: string | null
   invoice_number?: string | null
@@ -106,6 +123,10 @@ export interface TripPnL {
   currency: string
 
   quoted_amount: number
+  /** Of quoted_amount, what came from extras sold after the trip was priced. */
+  extras_revenue: number
+  /** What those extras cost us, in the trip currency. */
+  extras_supplier_cost: number
   total_revenue: number
   total_paid: number
 
@@ -215,12 +236,16 @@ export interface ComputeTripPnLInput {
   invoices: PnlInvoice[]
   expenses: PnlExpense[]
   commissions: PnlCommission[]
+  /** CONFIRMED extras and upgrades sold on this trip's booking. Optional:
+   *  absent before migration 321. */
+  extras?: PnlExtra[]
   fxIndex: FxIndex
   liveRate?: (from: string, to: string) => number | null
 }
 
 export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
   const { itinerary, invoices, expenses, commissions, fxIndex, liveRate } = input
+  const extras = input.extras ?? []
   const tripCurrency = currencyOf(itinerary.currency, 'EUR')
   const fx = emptyFxSummary()
   const holes: FxHole[] = []
@@ -358,14 +383,35 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
     }
   }
 
+  // ---------- Extras sold after the trip was priced ----------
+  // Revenue in the extra's own currency, cost in the supplier's — each
+  // converted on the day the sale became real. What cannot be converted is a
+  // hole, reported rather than silently dropped.
+  let extrasRevenue = 0
+  let extrasSupplierCost = 0
+  for (const extra of extras) {
+    const qty = Math.max(1, Math.floor(num(extra.quantity)) || 1)
+    const date = extra.confirmed_at ?? null
+    const priced = convertOnDate(fxIndex, num(extra.unit_price) * qty, currencyOf(extra.currency, tripCurrency), tripCurrency, date, liveRate)
+    tallyFx(fx, priced.basis)
+    if (priced.amount === null) {
+      holes.push({ kind: 'extra', reference: extra.title || 'extra', amount: num(extra.unit_price) * qty, fromCurrency: currencyOf(extra.currency, tripCurrency), toCurrency: tripCurrency, date, message: `Extra "${extra.title || ''}" is in ${currencyOf(extra.currency, tripCurrency)} and no rate to ${tripCurrency} is available — excluded.`.trim() })
+    } else extrasRevenue += priced.amount
+    if (num(extra.supplier_cost) > 0) {
+      const cost = convertOnDate(fxIndex, num(extra.supplier_cost) * qty, currencyOf(extra.supplier_currency, tripCurrency), tripCurrency, date, liveRate)
+      tallyFx(fx, cost.basis)
+      if (cost.amount !== null) extrasSupplierCost += cost.amount
+    }
+  }
+
   // ---------- Margin ----------
   // Revenue falls back to the quoted amount when nothing has been invoiced
   // yet, so a trip in progress still shows a margin. The quote is already in
   // the trip currency by construction.
-  const revenueForCalc = totalRevenue > 0 ? totalRevenue : num(itinerary.total_cost)
+  const revenueForCalc = totalRevenue > 0 ? totalRevenue : num(itinerary.total_cost) + extrasRevenue
 
   const grossProfit = roundMoney(
-    revenueForCalc - totalExpenses - commissionsPayable + commissionsReceivable
+    revenueForCalc - totalExpenses - extrasSupplierCost - commissionsPayable + commissionsReceivable
   )
   const profitMargin = revenueForCalc > 0 ? (grossProfit / revenueForCalc) * 100 : 0
 
@@ -379,7 +425,11 @@ export function computeTripPnL(input: ComputeTripPnLInput): TripPnL {
     status: itinerary.status || '',
     currency: tripCurrency,
 
-    quoted_amount: num(itinerary.total_cost),
+    // Quoted plus what was sold afterwards — otherwise quoted and invoiced
+    // diverge by the extras and the difference reads as an overcharge.
+    quoted_amount: roundMoney(num(itinerary.total_cost) + extrasRevenue),
+    extras_revenue: roundMoney(extrasRevenue),
+    extras_supplier_cost: roundMoney(extrasSupplierCost),
     total_revenue: roundMoney(totalRevenue),
     total_paid: roundMoney(totalPaid),
 

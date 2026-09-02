@@ -21,7 +21,7 @@ export const HORIZON_DAYS = 45
 export const BALANCE_SOON_DAYS = 14
 export const URGENT_DAYS = 7
 
-export type AttentionType = 'balance_due' | 'details_missing' | 'no_guide' | 'change_request'
+export type AttentionType = 'balance_due' | 'details_missing' | 'no_guide' | 'change_request' | 'extra_request'
 export type Severity = 'urgent' | 'soon'
 
 export interface AttentionItem {
@@ -61,6 +61,16 @@ export interface AttentionChangeRequest {
   created_at?: string | null
 }
 
+/** An option a traveller asked for or accepted from the portal (migration
+ *  321). Both wait on the office: 'requested' needs a price, 'accepted' needs
+ *  the thing secured before it can be confirmed and billed. */
+export interface AttentionExtraRequest {
+  booking_id: string
+  title?: string | null
+  status?: string | null
+  created_at?: string | null
+}
+
 export interface AttentionInput {
   /** Bookings inside the departure horizon. */
   departing: AttentionBooking[]
@@ -69,6 +79,8 @@ export interface AttentionInput {
   balanceDue: AttentionBooking[]
   passengers: AttentionPassenger[]
   changeRequests: AttentionChangeRequest[]
+  /** Portal extras waiting on the office. Optional: absent before migration 321. */
+  extraRequests?: AttentionExtraRequest[]
   /** itinerary id → assigned guide (null when unassigned). */
   guideByItinerary: Map<string, string | null>
   /** client id → display name. */
@@ -123,6 +135,13 @@ export function buildAttentionItems(input: AttentionInput): {
   }
 
   const items: AttentionItem[] = []
+  const extraByBooking = new Map<string, AttentionExtraRequest[]>()
+  for (const ex of input.extraRequests ?? []) {
+    const list = extraByBooking.get(ex.booking_id) ?? []
+    list.push(ex)
+    extraByBooking.set(ex.booking_id, list)
+  }
+
   for (const b of rows) {
     if (b.status === 'cancelled') continue
     const departsSoon = Boolean(b.start_date && b.start_date <= in7)
@@ -179,6 +198,18 @@ export function buildAttentionItems(input: AttentionInput): {
         severity: departsSoon ? 'urgent' : 'soon',
         detail: {},
         href: `/itineraries/${b.itinerary_id}/edit`,
+      })
+    }
+
+    // 3b. Portal extras waiting on the office — always urgent: a customer
+    //     has asked (or accepted) and is waiting.
+    for (const ex of extraByBooking.get(b.id) ?? []) {
+      items.push({
+        ...base,
+        type: 'extra_request',
+        severity: 'urgent',
+        detail: { title: ex.title ?? null, status: ex.status ?? null, requestedAt: ex.created_at ?? null },
+        href: `/bookings/${b.id}`,
       })
     }
 

@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 138
+ * Tables: 139
  */
 
 export type Json =
@@ -1447,6 +1447,132 @@ export interface Database {
           },
         ]
       }
+      booking_extras: {
+        Row: {
+          id: string
+          tenant_id: string
+          booking_id: string
+          passenger_id: string | null
+          kind: string
+          title: string
+          description: string | null
+          quantity: number
+          unit_price: number | null
+          currency: string | null
+          supplier_cost: number | null
+          supplier_currency: string | null
+          supplier_id: string | null
+          source_kind: string | null
+          source_id: string | null
+          replaces_service_id: string | null
+          status: string
+          requested_via: string
+          created_at: string
+          created_by: string | null
+          priced_at: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          resolved_at: string | null
+          invoiced_at: string | null
+          invoice_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          booking_id: string
+          passenger_id?: string | null
+          kind?: string
+          title: string
+          description?: string | null
+          quantity?: number
+          unit_price?: number | null
+          currency?: string | null
+          supplier_cost?: number | null
+          supplier_currency?: string | null
+          supplier_id?: string | null
+          source_kind?: string | null
+          source_id?: string | null
+          replaces_service_id?: string | null
+          status?: string
+          requested_via?: string
+          created_at?: string
+          created_by?: string | null
+          priced_at?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          resolved_at?: string | null
+          invoiced_at?: string | null
+          invoice_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          booking_id?: string
+          passenger_id?: string | null
+          kind?: string
+          title?: string
+          description?: string | null
+          quantity?: number
+          unit_price?: number | null
+          currency?: string | null
+          supplier_cost?: number | null
+          supplier_currency?: string | null
+          supplier_id?: string | null
+          source_kind?: string | null
+          source_id?: string | null
+          replaces_service_id?: string | null
+          status?: string
+          requested_via?: string
+          created_at?: string
+          created_by?: string | null
+          priced_at?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          resolved_at?: string | null
+          invoiced_at?: string | null
+          invoice_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_extras_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_extras_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_extras_passenger_id_fkey"
+            columns: ["passenger_id"]
+            isOneToOne: false
+            referencedRelation: "booking_passengers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_extras_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_extras_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_passenger_documents: {
         Row: {
           id: string
@@ -1910,6 +2036,8 @@ export interface Database {
           created_at: string
           updated_at: string
           assigned_to: string | null
+          base_total_cost: number | null
+          extras_total: number | null
         }
         Insert: {
           id?: string
@@ -1950,6 +2078,8 @@ export interface Database {
           created_at?: string
           updated_at?: string
           assigned_to?: string | null
+          base_total_cost?: number | null
+          extras_total?: number | null
         }
         Update: {
           id?: string
@@ -1990,6 +2120,8 @@ export interface Database {
           created_at?: string
           updated_at?: string
           assigned_to?: string | null
+          base_total_cost?: number | null
+          extras_total?: number | null
         }
         Relationships: [
           {
@@ -4103,6 +4235,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           rate_currency: string | null
+          is_sellable_extra: boolean
         }
         Insert: {
           id?: string
@@ -4128,6 +4261,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          is_sellable_extra?: boolean
         }
         Update: {
           id?: string
@@ -4153,6 +4287,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          is_sellable_extra?: boolean
         }
         Relationships: [
           {

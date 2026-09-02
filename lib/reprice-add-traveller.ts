@@ -28,6 +28,9 @@ export type AddTravellerReprice =
       delta: number
       newDepositAmount: number
       newBalanceDue: number
+      /** The agreed price WITHOUT extras, extended per person. Present only when
+       *  the booking carried a base (bookings.base_total_cost, migration 321). */
+      newBaseTotalCost?: number
     }
 
 function round2(n: number): number {
@@ -36,6 +39,11 @@ function round2(n: number): number {
 
 export function computeAddTravellerReprice(input: {
   oldTotal: number | null | undefined
+  /** bookings.base_total_cost. Absent (the usual case) means the booking has
+   *  no extras and its total IS the base. With extras, THIS is what gets
+   *  divided per person — one traveller's upgrade must not be charged again
+   *  to everyone added later. */
+  oldBaseTotal?: number | null | undefined
   oldPax: number
   addedPax: number
   depositPercent: number | null | undefined
@@ -51,12 +59,19 @@ export function computeAddTravellerReprice(input: {
   }
   if (addedPax <= 0) return { method: 'manual', reason: 'no travellers added' }
 
-  const perPerson = oldTotal / oldPax
+  // The extras-free price is what gets divided. Falling back to the total is
+  // not a guess: base_total_cost is NULL precisely when there are no extras.
+  const rawBase = Number(input.oldBaseTotal)
+  const hasBase = Number.isFinite(rawBase) && rawBase > 0
+  const base = hasBase ? rawBase : oldTotal
+  const perPerson = base / oldPax
   const newPax = oldPax + addedPax
-  const newTotal = round2(perPerson * newPax)
-  const delta = round2(newTotal - oldTotal)
+  const newBase = round2(perPerson * newPax)
+  const delta = round2(newBase - base)
+  // The extras ride along in the total untouched.
+  const newTotal = round2(oldTotal + delta)
   const depositPercent = Number(input.depositPercent) || 0
-  const newDepositAmount = round2(newTotal * (depositPercent / 100))
+  const newDepositAmount = round2(newBase * (depositPercent / 100))
   const oldBalance = Number(input.oldBalanceDue)
   // Preserve payments: the outstanding balance rises by exactly the delta.
   const newBalanceDue = round2((Number.isFinite(oldBalance) ? oldBalance : oldTotal) + delta)
@@ -68,6 +83,7 @@ export function computeAddTravellerReprice(input: {
     newTotal,
     delta,
     newDepositAmount,
+    ...(hasBase ? { newBaseTotalCost: newBase } : {}),
     newBalanceDue,
   }
 }
