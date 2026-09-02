@@ -35,11 +35,52 @@ function applyOr(rows: Row[], expr: string): Row[] {
   )
 }
 
-function makeQuery(rows: Row[]) {
+function makeQuery(rows: Row[], table?: string) {
   let filtered = [...rows]
+  // Writes are applied at the terminal (await / single / maybeSingle), after
+  // the filters that follow `.update(...)` / `.delete()` have run — the same
+  // order supabase-js applies them. Rows are mutated in place so a later
+  // read through the same mock sees the change (booking-extras recompute).
+  let pending: { type: 'update'; patch: Row } | { type: 'delete' } | null = null
+  const applyPending = () => {
+    if (!pending) return
+    if (pending.type === 'update') {
+      for (const r of filtered) Object.assign(r, pending.patch)
+    } else if (table) {
+      const gone = new Set(filtered)
+      currentTables[table] = (currentTables[table] ?? []).filter((r) => !gone.has(r))
+    }
+    pending = null
+  }
 
   const builder: any = {
     select() {
+      return builder
+    },
+    update(patch: Row) {
+      pending = { type: 'update', patch }
+      return builder
+    },
+    delete() {
+      pending = { type: 'delete' }
+      return builder
+    },
+    insert(rowOrRows: Row | Row[]) {
+      const inserted = Array.isArray(rowOrRows) ? rowOrRows : [rowOrRows]
+      if (table) currentTables[table] = [...(currentTables[table] ?? []), ...inserted]
+      filtered = inserted
+      return builder
+    },
+    in(col: string, vals: unknown[]) {
+      filtered = filtered.filter((r) => vals.includes(r[col]))
+      return builder
+    },
+    is(col: string, val: unknown) {
+      filtered = filtered.filter((r) => (val === null ? r[col] == null : r[col] === val))
+      return builder
+    },
+    not(col: string, op: string, val: unknown) {
+      if (op === 'is' && val === null) filtered = filtered.filter((r) => r[col] != null)
       return builder
     },
     eq(col: string, val: any) {
@@ -79,6 +120,7 @@ function makeQuery(rows: Row[]) {
       return builder
     },
     single() {
+      applyPending()
       return Promise.resolve(
         filtered.length
           ? { data: filtered[0], error: null }
@@ -86,10 +128,12 @@ function makeQuery(rows: Row[]) {
       )
     },
     maybeSingle() {
+      applyPending()
       return Promise.resolve({ data: filtered[0] ?? null, error: null })
     },
     // Make the builder awaitable: `await query` -> { data: rows[], error: null }
     then(onFulfilled: any, onRejected: any) {
+      applyPending()
       return Promise.resolve({ data: filtered, error: null }).then(
         onFulfilled,
         onRejected
@@ -103,6 +147,6 @@ function makeQuery(rows: Row[]) {
 /** Drop-in replacement for supabase-js `createClient`. */
 export function createMockClient() {
   return {
-    from: (table: string) => makeQuery(currentTables[table] ?? []),
+    from: (table: string) => makeQuery(currentTables[table] ?? [], table),
   }
 }

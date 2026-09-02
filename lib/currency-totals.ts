@@ -120,3 +120,25 @@ export function formatTotals(totals: CurrencyTotals, opts?: { defaultCurrency?: 
     .map(([code, v]) => `${currencySymbol(code)}${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
     .join(' + ')
 }
+
+// ---------------------------------------------------------------------------
+// Rounding to the smallest unit a currency actually has (ported from
+// travel-ops-pro). Any money DERIVED by arithmetic — a deposit taken as a
+// percentage, a balance taken as a difference — passes through here before it
+// is stored or billed: (1854367 * 20) / 100 is 370,873.4 yen, and a yen with a
+// decimal place is not a quantity of money that exists.
+// ---------------------------------------------------------------------------
+const ZERO_DECIMAL_CURRENCIES = new Set(['JPY', 'KRW', 'VND', 'CLP', 'ISK', 'HUF', 'TWD', 'UGX', 'PYG', 'RWF', 'XAF', 'XOF'])
+
+export function currencyDecimals(code: string): number {
+  return ZERO_DECIMAL_CURRENCIES.has(String(code || '').toUpperCase()) ? 0 : 2
+}
+
+export function roundToCurrency(amount: unknown, currency: unknown): number {
+  const s = typeof currency === 'string' ? currency.trim().toUpperCase() : ''
+  const code = /^[A-Z]{3}$/.test(s) ? s : 'EUR'
+  const n = typeof amount === 'number' ? amount : parseFloat(String(amount ?? ''))
+  const value = Number.isFinite(n) ? n : 0
+  const factor = currencyDecimals(code) === 0 ? 1 : 100
+  return Math.round(value * factor) / factor
+}

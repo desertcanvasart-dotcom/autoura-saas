@@ -7,6 +7,7 @@
 // answers nothing is worse than one that answers most of it.
 
 import { NextResponse } from 'next/server'
+import { extrasAdmin } from '@/lib/booking-extras-db'
 import { requireAuth } from '@/lib/supabase-server'
 import {
   buildAttentionItems,
@@ -15,6 +16,7 @@ import {
   type AttentionBooking,
   type AttentionPassenger,
   type AttentionChangeRequest,
+  AttentionExtraRequest,
 } from '@/lib/dashboard/attention'
 
 const BOOKING_COLS =
@@ -64,7 +66,17 @@ export async function GET() {
       return NextResponse.json({ success: true, data: { items: [], scannedBookings: 0 } })
     }
 
-    const [passengers, changeRequests, itineraries, clients] = await Promise.all([
+    // Portal extras waiting on the office (migration 321). The ids came from
+    // RLS-scoped bookings, so filtering on them is tenant-safe; a database
+    // without the table contributes nothing rather than sinking the list.
+    const extraRequestsPromise = extrasAdmin()
+      .from('booking_extras')
+      .select('booking_id, title, status, created_at')
+      .in('status', ['requested', 'accepted'])
+      .eq('requested_via', 'portal')
+      .in('booking_id', bookingIds)
+      .then((r: { data: unknown; error: unknown }) => (r.error ? { data: [] } : r))
+    const [passengers, changeRequests, itineraries, clients, extraRequests] = await Promise.all([
       supabase
         .from('booking_passengers')
         .select('booking_id, passport_number, date_of_birth')
@@ -80,6 +92,7 @@ export async function GET() {
       clientIds.length
         ? supabase.from('clients').select('id, full_name').in('id', clientIds)
         : Promise.resolve({ data: [], error: null }),
+      extraRequestsPromise,
     ])
 
     // A signal whose table is absent (migration pending) contributes nothing
@@ -98,6 +111,7 @@ export async function GET() {
       balanceDue: (balanceDue.data ?? []) as AttentionBooking[],
       passengers: (passengers.data ?? []) as AttentionPassenger[],
       changeRequests: (changeRequests.data ?? []) as AttentionChangeRequest[],
+      extraRequests: ((extraRequests as { data?: unknown }).data ?? []) as AttentionExtraRequest[],
       guideByItinerary,
       clientNames,
       today,

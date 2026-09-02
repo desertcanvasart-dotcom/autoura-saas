@@ -10,6 +10,7 @@ import {
   Download, AlertCircle, X as XIcon
 } from 'lucide-react'
 import AssigneeSelect from '@/components/AssigneeSelect'
+import BookingExtrasPanel from '@/components/BookingExtrasPanel'
 
 interface Booking {
   id: string
@@ -555,6 +556,13 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                   {paymentProgress.toFixed(0)}% paid
                 </p>
               </div>
+            </div>
+
+            {/* Extras and upgrades sold after the trip was sold (migration 321).
+                Confirming one raises Total Amount and Balance Due above; the
+                deposit is untouched. */}
+            <div className="lg:col-span-2">
+              <BookingExtrasPanel bookingId={resolvedParams.id} onTotalsChanged={() => fetchBooking()} />
             </div>
           </div>
         )}

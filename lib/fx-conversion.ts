@@ -78,7 +78,7 @@ export interface FxConversion {
  * this whole module exists to prevent).
  */
 export interface FxHole {
-  kind: 'expense' | 'commission' | 'trip' | 'invoice' | 'revenue'
+  kind: 'expense' | 'commission' | 'trip' | 'invoice' | 'revenue' | 'extra'
   /** Human reference for the row: expense number, commission description. */
   reference: string
   amount: number

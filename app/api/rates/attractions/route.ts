@@ -83,6 +83,8 @@ export async function GET(request: NextRequest) {
       notes: item.notes,
       is_active: item.is_active !== false, // Default to true if not set
       is_addon: item.is_addon || false,
+      // A site the customer can pay to ADD (migration 321) — separate from is_addon.
+      is_sellable_extra: (item as Record<string, unknown>).is_sellable_extra === true,
       addon_note: item.addon_note,
       supplier_id: item.supplier_id,
       created_at: item.created_at,

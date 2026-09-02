@@ -8,6 +8,8 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { includeAdditions, partitionAdditions, toLineItems, type Addition } from '@/lib/invoice-additions'
+import { extrasAdmin } from '@/lib/booking-extras-db'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { nextDocumentNumber, insertWithUniqueRetry } from '@/lib/document-numbering'
 
@@ -176,6 +178,40 @@ export async function POST(request: NextRequest) {
     let lineItems = body.line_items || []
     const depositPercent = body.deposit_percent || 10
     const fullTripCost = body.full_trip_cost || totalAmount // Store original trip cost
+    const currency = body.currency || 'EUR'
+
+    // Extras and upgrades sold after the trip was priced (migration 321) are
+    // added HERE rather than by each caller, so every invoice for a trip picks
+    // them up the same way — and only when CONFIRMED and not yet billed.
+    // Ported from travel-ops-pro (lib/invoice-additions).
+    const additions: Addition[] = []
+    let billedExtraIds: string[] = []
+    if (body.itinerary_id) {
+      const { data: extras, error: extrasError } = await extrasAdmin()
+        .from('booking_extras')
+        .select('id, title, kind, quantity, unit_price, currency, bookings!inner(itinerary_id, tenant_id)')
+        .eq('status', 'confirmed')
+        .is('invoiced_at', null)
+        .eq('tenant_id', tenant_id)
+        .eq('bookings.itinerary_id', body.itinerary_id)
+      // A database without migration 321 answers with an error. An invoice for
+      // the trip itself is still correct, so it is raised without them.
+      if (extrasError) console.error('invoices: could not read extras', extrasError)
+      for (const e of (extras ?? []) as Array<{ id: string; title: string; kind: string; quantity: number; unit_price: number; currency: string | null }>) {
+        additions.push({
+          id: String(e.id),
+          source: 'extra',
+          description: e.kind === 'upgrade' ? `${e.title} (upgrade)` : String(e.title),
+          quantity: Number(e.quantity) || 1,
+          unit_price: Number(e.unit_price),
+          currency: String(e.currency || currency),
+        })
+      }
+    }
+    const parts = partitionAdditions(additions, currency)
+    const additionsTotal = parts.total
+    const additionLines = toLineItems(parts.billable, currency)
+    billedExtraIds = parts.billable.filter(a => a.source === 'extra' && a.id).map(a => a.id as string)
 
     if (invoiceType === 'deposit') {
       // Deposit invoice: calculate deposit amount
@@ -208,6 +244,14 @@ export async function POST(request: NextRequest) {
         unit_price: totalAmount,
         amount: totalAmount
       }]
+    }
+
+    // Extras settle with the BALANCE, on exactly one document: not on a
+    // deposit (a percentage on account against the tour), and appended LAST
+    // because the type branches above rebuild lineItems from scratch.
+    if (additionsTotal && includeAdditions(invoiceType)) {
+      totalAmount = Math.round((totalAmount + additionsTotal) * 100) / 100
+      lineItems = [...lineItems, ...additionLines]
     }
 
     const baseInvoice = {
@@ -250,7 +294,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create invoice' }, { status: 500 })
     }
 
-    return NextResponse.json(data, { status: 201 })
+    // Stamp the extras this document bills, so the next invoice for the trip
+    // (which filters on invoiced_at IS NULL) cannot bill them again. Loud on
+    // failure, because the failure mode is silent double-billing later.
+    if (data?.id && billedExtraIds.length && includeAdditions(invoiceType)) {
+      const { error: stampError } = await extrasAdmin()
+        .from('booking_extras')
+        .update({ invoiced_at: new Date().toISOString(), invoice_id: data.id })
+        .in('id', billedExtraIds)
+        .eq('tenant_id', tenant_id)
+      if (stampError) console.error('invoices: could not stamp extras as invoiced', stampError)
+    }
+
+    return NextResponse.json(
+      parts.otherCurrency.length
+        ? { ...data, extras_in_other_currency: parts.otherCurrency.map(a => ({ id: a.id, description: a.description, currency: a.currency })) }
+        : data,
+      { status: 201 }
+    )
   } catch (error) {
     console.error('❌ Error in invoices POST:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

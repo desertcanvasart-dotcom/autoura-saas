@@ -45,6 +45,9 @@ interface Attraction {
   notes?: string
   is_active: boolean
   is_addon: boolean  // NEW: Add-on flag
+  // A site the customer can pay to ADD after the sale (booking extras). Separate
+  // from is_addon, which only keeps it out of the automatic price.
+  is_sellable_extra?: boolean
   addon_note?: string  // NEW: Optional note for add-ons
   supplier_id?: string
   supplier?: { id: string; name: string }
@@ -332,6 +335,25 @@ export default function AttractionsContent() {
   }
 
   // NEW: Toggle add-on status directly from table
+
+  // Sellable extra: can the customer pay to ADD this site after the sale? A
+  // different decision from is_addon (which only keeps it out of the automatic
+  // price), so it is its own toggle.
+  const toggleSellable = async (attraction: Attraction) => {
+    try {
+      const response = await fetch(`/api/rates/attractions/${attraction.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...attraction, is_sellable_extra: !attraction.is_sellable_extra })
+      })
+      const data = await response.json()
+      if (data.success) {
+        showToast('success', `${attraction.attraction_name} is ${!attraction.is_sellable_extra ? 'now a sellable extra' : 'no longer a sellable extra'}`)
+        fetchAttractions()
+      } else showToast('error', data.error || 'Could not update')
+    } catch { showToast('error', 'Could not update') }
+  }
+
   const toggleAddonStatus = async (attraction: Attraction) => {
     setTogglingAddon(attraction.id)
     try {
@@ -940,6 +962,14 @@ export default function AttractionsContent() {
                           }`}
                         />
                       </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleSellable(attraction)}
+                            title={attraction.is_sellable_extra ? 'Customers can add this after booking — click to stop offering it' : 'Let customers add this site after booking (a sellable extra)'}
+                            className={`px-2 py-1 text-xs rounded border ${attraction.is_sellable_extra ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'}`}
+                          >
+                            {attraction.is_sellable_extra ? 'Sellable' : 'Sell as extra'}
+                          </button>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
