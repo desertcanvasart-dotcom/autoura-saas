@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow } from '@/lib/bulk-rate-service'
+import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows } from '@/lib/bulk-rate-service'
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 
@@ -39,15 +39,27 @@ export async function POST(request: NextRequest) {
     if (preview.invalidRows > 0) return NextResponse.json({ success: false, error: `${preview.invalidRows} rows have errors`, ...preview })
 
     // The config's tableName is dynamic; the typed client cannot narrow it.
+    interface DynamicFilter extends PromiseLike<{ error: { message: string } | null }> {
+      eq(c: string, v: unknown): DynamicFilter
+    }
     interface DynamicTable {
-      select(columns: string): { in(column: string, values: unknown[]): PromiseLike<{ data: Record<string, unknown>[] | null }> }
+      select(columns: string): {
+        in(column: string, values: unknown[]): {
+          eq(c: string, v: unknown): PromiseLike<{ data: Record<string, unknown>[] | null }>
+        }
+      }
       insert(rows: Record<string, unknown>[]): PromiseLike<{ error: { message: string } | null }>
-      update(row: Record<string, unknown>): { eq(c: string, v: unknown): { eq(c: string, v: unknown): PromiseLike<{ error: { message: string } | null }> } }
+      update(row: Record<string, unknown>): DynamicFilter
     }
     const dynTable = () => supabase.from(config.tableName as 'accommodation_rates') as unknown as DynamicTable
 
     const importableColumns = config.columns.filter(c => !c.exportOnly)
-    const uniqueKeyColumn = config.uniqueKey[0]
+    // Matching uses the FULL natural key (config.uniqueKey), never just its
+    // first column — single-column matching is how a second, legitimately
+    // distinct rate silently replaced the first (A-item 5). The first key
+    // column still identifies the template's example row.
+    const uniqueKey = config.uniqueKey
+    const uniqueKeyColumn = uniqueKey[0]
 
     const rowsToUpsert: Record<string, any>[] = []
     let exampleRowsSkipped = 0
@@ -85,22 +97,42 @@ export async function POST(request: NextRequest) {
       rowsToUpsert.push(record)
     }
 
+    // Two rows in the same file sharing one natural key: the second would
+    // silently overwrite the first ("13 creates, 0 inserts"). Refuse them
+    // row-wise with the collision named, import the rest.
+    const partition = partitionImportRows(rowsToUpsert, uniqueKey)
+
     let inserted = 0, updated = 0
-    const importErrors: any[] = []
+    const importErrors: any[] = partition.duplicates.map(d => ({
+      row: uniqueKey.map(c => `${c}=${String(d.record[c])}`).join(', '),
+      operation: 'refused',
+      message: d.message,
+    }))
     const BATCH_SIZE = 50
 
-    for (let i = 0; i < rowsToUpsert.length; i += BATCH_SIZE) {
-      const batch = rowsToUpsert.slice(i, i + BATCH_SIZE)
+    for (let i = 0; i < partition.rows.length; i += BATCH_SIZE) {
+      const batch = partition.rows.slice(i, i + BATCH_SIZE)
       const keyValues = batch.map(r => r[uniqueKeyColumn]).filter(Boolean)
 
-      let existingKeys = new Set<string>()
+      // Existence is checked on the FULL key, scoped to THIS tenant — the
+      // old lookup matched one column with no tenant filter, so a
+      // global-catalog row visible to the tenant classified the row as
+      // "existing" and the tenant-scoped update then silently did nothing.
+      const existingKeys = new Set<string>()
       if (keyValues.length > 0) {
-        const { data: existing } = await dynTable().select(uniqueKeyColumn).in(uniqueKeyColumn, keyValues)
-        if (existing) existingKeys = new Set(existing.map((r: any) => r[uniqueKeyColumn]))
+        const { data: existing } = await dynTable()
+          .select(uniqueKey.join(', '))
+          .in(uniqueKeyColumn, keyValues)
+          .eq('tenant_id', tenant_id)
+        for (const row of existing ?? []) {
+          const key = importRowKey(row, uniqueKey)
+          if (key !== null) existingKeys.add(key)
+        }
       }
 
-      const toInsert = batch.filter(r => !r[uniqueKeyColumn] || !existingKeys.has(r[uniqueKeyColumn]))
-      const toUpdate = batch.filter(r => r[uniqueKeyColumn] && existingKeys.has(r[uniqueKeyColumn]))
+      const keyOf = (r: Record<string, unknown>) => importRowKey(r, uniqueKey)
+      const toInsert = batch.filter(r => { const k = keyOf(r); return k === null || !existingKeys.has(k) })
+      const toUpdate = batch.filter(r => { const k = keyOf(r); return k !== null && existingKeys.has(k) })
 
       if (toInsert.length > 0) {
         const { error } = await dynTable().insert(toInsert)
@@ -109,15 +141,18 @@ export async function POST(request: NextRequest) {
       }
 
       for (const record of toUpdate) {
-        const keyVal = record[uniqueKeyColumn]
-        const updateData = { ...record }; delete updateData[uniqueKeyColumn]; delete updateData.tenant_id
-        const { error } = await dynTable().update(updateData).eq(uniqueKeyColumn, keyVal).eq('tenant_id', tenant_id)
-        if (error) importErrors.push({ row: `${uniqueKeyColumn}=${keyVal}`, message: error.message })
+        const updateData = { ...record }
+        for (const col of uniqueKey) delete updateData[col]
+        delete updateData.tenant_id
+        let updateQuery = dynTable().update(updateData).eq('tenant_id', tenant_id)
+        for (const col of uniqueKey) updateQuery = updateQuery.eq(col, record[col])
+        const { error } = await updateQuery
+        if (error) importErrors.push({ row: uniqueKey.map(c => `${c}=${String(record[c])}`).join(', '), message: error.message })
         else updated++
       }
     }
 
-    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, exampleRowsSkipped, errors: importErrors })
+    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, errors: importErrors })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
