@@ -2000,7 +2000,7 @@ export interface Database {
         Row: {
           id: string
           tenant_id: string
-          itinerary_id: string
+          itinerary_id: string | null
           quote_id: string
           quote_type: string
           client_id: string | null
@@ -2042,7 +2042,7 @@ export interface Database {
         Insert: {
           id?: string
           tenant_id: string
-          itinerary_id: string
+          itinerary_id?: string | null
           quote_id: string
           quote_type: string
           client_id?: string | null
@@ -2084,7 +2084,7 @@ export interface Database {
         Update: {
           id?: string
           tenant_id?: string
-          itinerary_id?: string
+          itinerary_id?: string | null
           quote_id?: string
           quote_type?: string
           client_id?: string | null
@@ -9039,6 +9039,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           rate_currency: string | null
+          city: string | null
         }
         Insert: {
           id?: string
@@ -9054,6 +9055,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          city?: string | null
         }
         Update: {
           id?: string
@@ -9069,6 +9071,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          city?: string | null
         }
         Relationships: [
           {

@@ -1,6 +1,6 @@
 // Ported verbatim from travel-ops-pro (__tests__/lib/extras-catalog.test.ts).
 import { describe, it, expect } from 'vitest'
-import { priceCatalogItem, entranceFeeBasis, type Converter } from '@/lib/extras-catalog'
+import { priceCatalogItem, entranceFeeBasis, extraQuantityFor, type Converter } from '@/lib/extras-catalog'
 
 const usdToJpy: Converter = (amount, from, to) => (from === 'USD' && to === 'JPY' ? amount * 150 : null)
 const noRates: Converter = () => null
@@ -52,5 +52,25 @@ describe('entranceFeeBasis', () => {
   })
   it('reports no basis at all when neither rate is usable', () => {
     expect(entranceFeeBasis({ non_eur_rate: null, eur_rate: 0 })).toEqual({ cost: null, basis: null })
+  })
+})
+
+describe('extraQuantityFor', () => {
+  // The booking-time picker used to add everything at quantity 1, so a
+  // per-person extra on a 6-pax booking billed one person. Same rule as the
+  // quote-time path now: per-person rows cover the party.
+  it('a per-person row covers the whole party', () => {
+    expect(extraQuantityFor('per_person', 6)).toBe(6)
+  })
+  it('a per-booking row is one unit regardless of pax', () => {
+    expect(extraQuantityFor('per_booking', 6)).toBe(1)
+  })
+  it('floors at one when the pax count is unusable', () => {
+    expect(extraQuantityFor('per_person', 0)).toBe(1)
+    expect(extraQuantityFor('per_person', null)).toBe(1)
+    expect(extraQuantityFor('per_person', 'six')).toBe(1)
+  })
+  it('a fractional pax count floors to whole travellers', () => {
+    expect(extraQuantityFor('per_person', 2.9)).toBe(2)
   })
 })

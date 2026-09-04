@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2, Plus, Check, X, Sparkles, ArrowUpRight, Trash2, AlertTriangle, List, Pencil } from 'lucide-react'
 import { currencySymbol } from '@/lib/currency-totals'
+import { extraQuantityFor } from '@/lib/extras-catalog'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 type Extra = {
@@ -263,6 +264,7 @@ type CatalogItem = {
   unit_price: number | null
   currency: string
   price_note: string
+  unit: 'per_person' | 'per_booking'
 }
 type CatalogGroup = { source: string; label: string; items: CatalogItem[] }
 
@@ -285,6 +287,7 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
   bookingId: string; currency: string; onDone: () => void; onError: (msg: string | null) => void; onTypeInstead: () => void
 }) {
   const [groups, setGroups] = useState<CatalogGroup[] | null>(null)
+  const [numTravelers, setNumTravelers] = useState(1)
   const [busy, setBusy] = useState<string | null>(null)
   const [prices, setPrices] = useState<Record<string, string>>({})
 
@@ -292,7 +295,11 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
     let alive = true
     fetch(`/api/bookings/${bookingId}/extras/catalog`)
       .then(r => (r.ok ? r.json() : { groups: [] }))
-      .then(d => { if (alive) setGroups(d.groups || []) })
+      .then(d => {
+        if (!alive) return
+        setGroups(d.groups || [])
+        if (Number.isFinite(d.num_travelers) && d.num_travelers > 0) setNumTravelers(d.num_travelers)
+      })
       .catch(() => { if (alive) setGroups([]) })
     return () => { alive = false }
   }, [bookingId])
@@ -303,13 +310,18 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
     const typed = prices[item.source_id]
     const unitPrice = item.unit_price ?? (typed === '' || typed === undefined ? null : Number(typed))
     if (unitPrice == null) { onError('Set a price for this option first.'); return }
+    // A per-person row covers the whole party: quantity is the pax count.
+    // This used to be a hardcoded 1, so a per-person extra on a 6-pax
+    // booking billed one person's worth. The office can still edit the
+    // quantity afterwards.
+    const quantity = extraQuantityFor(item.unit, numTravelers)
     setBusy(item.source_id); onError(null)
     try {
       const res = await fetch(`/api/bookings/${bookingId}/extras`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          kind, title: item.title, description: item.subtitle, quantity: 1, unit_price: unitPrice, currency,
+          kind, title: item.title, description: item.subtitle, quantity, unit_price: unitPrice, currency,
           supplier_cost: item.supplier_cost, supplier_currency: item.supplier_currency, supplier_id: item.supplier_id,
           source_kind: item.source_kind, source_id: item.source_id,
         }),
@@ -341,6 +353,7 @@ function CatalogPicker({ bookingId, currency, onDone, onError, onTypeInstead }: 
                   {item.subtitle && <p className="text-xs text-gray-600">{item.subtitle}</p>}
                   <p className="text-[11px] text-gray-500">
                     {item.unit_price == null ? item.price_note : `${money(item.unit_price, currency)} · ${item.price_note}`}
+                    {item.unit === 'per_person' && numTravelers > 1 && ` · × ${numTravelers} travellers`}
                     {item.supplier_cost != null && ` · we pay ${money(item.supplier_cost, item.supplier_currency || currency)}`}
                   </p>
                 </div>
