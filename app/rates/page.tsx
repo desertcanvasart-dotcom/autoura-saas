@@ -14,10 +14,10 @@ interface BaseRate {
   id?: string
   service_code?: string
   city?: string
-  eur_rate?: number
-  non_eur_rate?: number
-  base_rate_eur?: number
-  base_rate_non_eur?: number
+  eur_rate?: number | null
+  non_eur_rate?: number | null
+  base_rate_eur?: number | null
+  base_rate_non_eur?: number | null
   supplier_name?: string
   notes?: string
   season?: string
@@ -53,13 +53,14 @@ interface AccommodationRate extends BaseRate {
   board_basis?: string
   tier?: string
   single_supplement_eur?: number
-  single_supplement_non_eur?: number  
+  single_supplement_non_eur?: number
   high_season_rate_eur?: number
   high_season_rate_non_eur?: number
   low_season_rate_eur?: number
   low_season_rate_non_eur?: number
-  base_rate_eur: number
-  base_rate_non_eur: number
+  // Per-person-in-double resolved from rate periods; null = unpriced (dash).
+  base_rate_eur: number | null
+  base_rate_non_eur: number | null
 }
 
 interface MealRate extends BaseRate {
@@ -207,8 +208,10 @@ export default function RatesPage() {
   }
 
   // Display rate in user's currency
-  const displayRate = (eurRate: number | undefined, nonEurRate?: number | undefined): string => {
-    const rate = getRate(eurRate, nonEurRate)
+  const displayRate = (eurRate: number | null | undefined, nonEurRate?: number | null | undefined): string => {
+    // An unpriced row is a dash, never a zero-looking price.
+    if (eurRate == null && nonEurRate == null) return '—'
+    const rate = getRate(eurRate ?? undefined, nonEurRate ?? undefined)
     return display(rate, 'EUR')
   }
 

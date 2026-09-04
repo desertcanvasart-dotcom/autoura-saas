@@ -280,11 +280,6 @@ export async function processRunForMemory(params: {
         num_children,
         notes,
         client_id,
-        clients (
-          full_name,
-          nationality,
-          preferred_language
-        ),
         itinerary_services (
           service_type,
           supplier_name,
@@ -304,6 +299,23 @@ export async function processRunForMemory(params: {
       .single()
 
     if (!itinerary) return { memories_written: 0 }
+
+    // itineraries has a client_id column but NO foreign key to clients, so
+    // the old `clients (…)` embed made PostgREST reject the whole query
+    // (PGRST200) — agent memory silently never wrote anything. The client is
+    // fetched separately and attached in the shape the embed produced.
+    let itineraryClient: { full_name: string | null; nationality: string | null; preferred_language: string | null } | null = null
+    const clientLookupId = client_id || itinerary.client_id
+    if (clientLookupId) {
+      const { data: clientRow } = await supabaseAdmin
+        .from('clients')
+        .select('full_name, nationality, preferred_language')
+        .eq('id', clientLookupId)
+        .eq('tenant_id', tenant_id)
+        .maybeSingle()
+      itineraryClient = clientRow ?? null
+    }
+    itinerary.clients = itineraryClient
 
     const writes: WriteMemoryInput[] = []
 

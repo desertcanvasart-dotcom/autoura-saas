@@ -39,9 +39,14 @@ export async function GET(request: NextRequest) {
 
     // Transportation rates
     if (!rate_type || rate_type === 'transportation') {
+      // transportation_rates has NO supplier_id column and no FK to
+      // suppliers. The old select embedded `suppliers (name)` anyway, so
+      // PostgREST rejected the WHOLE query (PGRST200), the error was
+      // discarded, and this endpoint silently returned zero transportation
+      // rates — always. A dead embed fails the query, not the column.
       const { data } = await (supabaseAdmin as any)
         .from('transportation_rates')
-        .select('id, service_type, vehicle_type, origin_city, destination_city, base_rate_eur, base_rate_non_eur, capacity, supplier_id, suppliers (name)')
+        .select('id, service_type, vehicle_type, origin_city, destination_city, base_rate_eur, base_rate_non_eur, capacity')
         .eq('tenant_id', authResult.tenant_id)
         .eq('is_active', true)
         .order('origin_city')
@@ -56,8 +61,9 @@ export async function GET(request: NextRequest) {
             rate_non_eur: r.base_rate_non_eur,
             city: r.origin_city,
             default_quantity_mode: 'per_group',
-            supplier_id: r.supplier_id,
-            supplier_name: (r.suppliers as any)?.name,
+            // transportation_rates carries no supplier link (see select above).
+            supplier_id: null,
+            supplier_name: undefined,
             details: `${r.vehicle_type} (${r.capacity} pax)`
           })
         }
