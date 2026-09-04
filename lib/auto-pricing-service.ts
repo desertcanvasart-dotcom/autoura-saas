@@ -32,6 +32,7 @@ import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/season-uplift'
 import { ratesForTravelDate } from '@/lib/rates/rate-seasons'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
+import { loadAttractionAliasIndex, resolveAttractionAlias } from '@/lib/pricing/attraction-aliases'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
@@ -98,6 +99,10 @@ export interface ItineraryDay {
     dinner: MealStatus
   }
   attractions: string[]
+  /** Explicit entrance_fees ids picked on the day editor (A-item 13). When
+   *  present they WIN and silence the free-text `attractions` wording —
+   *  an id is a decision, wording is a guess. */
+  attraction_ids?: string[]
   services: {
     airport_arrival: boolean
     airport_departure: boolean
@@ -539,6 +544,11 @@ export function parseItinerary(itineraryData: any, opts?: {
       attractions = extractAttractionsFromTitle(day.title)
     }
 
+    // Explicit entrance-fee ids from the day editor (A-item 13).
+    const attraction_ids: string[] = Array.isArray(day.attraction_ids)
+      ? day.attraction_ids.filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
+      : []
+
     return {
       day: day.day || index + 1,
       title: day.title || `Day ${index + 1}`,
@@ -547,6 +557,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       accommodation_type: day.accommodation_type || inferAccommodationType(day, itineraryData),
       meals,
       attractions,
+      attraction_ids,
       services,
       // Parse transport overrides if present
       transport: day.transport || undefined
@@ -986,6 +997,43 @@ export async function getHotelRates(
     return null
   } catch (err) {
     console.error('Error fetching hotel rates:', err)
+    return null
+  }
+}
+
+/**
+ * Get an entrance fee by its ID — the picker's path (A-item 13).
+ *
+ * An id is a decision: no ilike, no keyword fallback, no alias. A missing
+ * or deactivated id returns null so the caller records a hole telling the
+ * operator to re-pick — never a guess at what they might have meant.
+ * source is always 'db': the row was chosen by hand.
+ */
+export async function getEntranceFeeById(
+  scope: CatalogScope,
+  id: string,
+  isEurPassport: boolean
+): Promise<{ id: string; name: string; rate: number; source: RateSource } | null> {
+  try {
+    let { data: fees } = await getSupabaseAdmin()
+      .from('entrance_fees')
+      .select('id, attraction_name, eur_rate, non_eur_rate, egyptian_rate, rate_currency, is_active')
+      .or(catalogOrExpr(scope))
+      .eq('is_active', true)
+      .eq('id', id)
+      .limit(1)
+
+    if (!fees || fees.length === 0) return null
+
+    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const fee = fees[0] as { id: string; attraction_name: string; eur_rate: number | null; non_eur_rate: number | null }
+    // NULL = not priced yet (hole); 0 = genuinely free — see getEntranceFee.
+    const rate = resolveEntranceRate(fee, isEurPassport)
+    if (rate === null) return null
+
+    return { id: fee.id, name: fee.attraction_name, rate, source: 'db' }
+  } catch (err) {
+    console.error('Error fetching entrance fee by id:', err)
     return null
   }
 }
@@ -2005,23 +2053,46 @@ export async function calculateDayBasedPricing(
   // Collect unique attractions in first-seen order, fetch all concurrently
   // (was one serial round-trip per attraction — the main N+1), then apply in
   // order so the accumulated fee, service list, and holes are unchanged.
+  //
+  // Resolution order (A-item 13): a day carrying explicit attraction_ids is
+  // priced from THOSE rows and its free-text wording is silenced — an id is
+  // a decision, wording is a guess. Worded days resolve through the alias
+  // table (tenant rows + global catalogue, migration 323) before the
+  // catalogue lookup; a canonical joining several fees with ' + ' (a combo
+  // ticket) becomes several lines. The historical hardcoded map and ilike
+  // fallback still apply after an alias miss, so nothing regresses.
   let entranceFeesPerPax = 0
+  const aliasIndex = await loadAttractionAliasIndex(getSupabaseAdmin(), catalogScope.tenantId)
   const processedAttractions = new Set<string>()
-  const entranceLookups: { attraction: string; day: any }[] = []
+  const entranceLookups: { attraction?: string; feeId?: string; day: any }[] = []
   for (const day of itinerary) {
-    for (const attraction of day.attractions) {
-      const key = attraction.toLowerCase()
-      if (processedAttractions.has(key)) continue
-      processedAttractions.add(key)
-      entranceLookups.push({ attraction, day })
+    if (day.attraction_ids && day.attraction_ids.length > 0) {
+      for (const feeId of day.attraction_ids) {
+        if (processedAttractions.has(`id:${feeId}`)) continue
+        processedAttractions.add(`id:${feeId}`)
+        entranceLookups.push({ feeId, day })
+      }
+      continue
+    }
+    for (const worded of day.attractions) {
+      for (const attraction of resolveAttractionAlias(worded, aliasIndex)) {
+        const key = attraction.toLowerCase()
+        if (processedAttractions.has(key)) continue
+        processedAttractions.add(key)
+        entranceLookups.push({ attraction, day })
+      }
     }
   }
 
   const entranceFees = await Promise.all(
-    entranceLookups.map(l => getEntranceFee(catalogScope, l.attraction, isEurPassport))
+    entranceLookups.map(l =>
+      l.feeId
+        ? getEntranceFeeById(catalogScope, l.feeId, isEurPassport)
+        : getEntranceFee(catalogScope, l.attraction as string, isEurPassport)
+    )
   )
 
-  entranceLookups.forEach(({ attraction, day }, i) => {
+  entranceLookups.forEach(({ attraction, feeId, day }, i) => {
     const fee = entranceFees[i]
     // `>= 0`, not `> 0`: getEntranceFee now returns null for an unpriced
     // attraction, so anything arriving here has a real price — and 0 is a
@@ -2042,6 +2113,18 @@ export async function calculateDayBasedPricing(
         isPerPax: true,
         isOptional: false,
         notes: isEurPassport ? 'EUR rate' : 'non-EUR rate'
+      })
+    } else if (feeId) {
+      // A picked id that no longer resolves (deleted, deactivated, or its
+      // rate blanked) is its own hole: the operator RE-PICKS, the engine
+      // never guesses what they might have meant.
+      addHole({
+        kind: 'entrance',
+        reason: 'missing',
+        tier,
+        dayNumber: day.day,
+        lookupAttempted: `entrance fee id ${feeId}`,
+        message: `Day ${day.day}'s picked attraction is no longer in Rates → Attractions (or has no price). Re-pick it on the day editor.`,
       })
     } else {
       addHole({
