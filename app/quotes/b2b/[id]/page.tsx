@@ -159,7 +159,10 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
       const response = await fetch(`/api/quotes/b2b/${quote.id}/generate-pdf`)
 
       if (!response.ok) {
-        throw new Error('Failed to generate PDF')
+        // The route returns real reasons (e.g. 'Quote not found') — show
+        // them instead of a generic failure (A-item 18).
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to generate PDF')
       }
 
       const blob = await response.blob()
@@ -323,7 +326,7 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
                 ) : (
                   <>
                     <Download className="w-4 h-4" />
-                    Download PDF
+                    Quote PDF
                   </>
                 )}
               </button>
