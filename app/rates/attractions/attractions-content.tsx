@@ -195,7 +195,7 @@ export default function AttractionsContent() {
   const { cities: cityOptions } = useDestinationCities()
   const searchParams = useSearchParams()
   const dialog = useConfirmDialog()
-  const { userCurrency, loading: currencyLoading } = useCurrency()
+  const { loading: currencyLoading } = useCurrency()
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [attractions, setAttractions] = useState<Attraction[]>([])
@@ -769,7 +769,7 @@ export default function AttractionsContent() {
               <span className="text-gray-400 text-xl">💶</span>
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
-            <p className="text-xs text-gray-600">Avg. {userCurrency} Rate</p>
+            <p className="text-xs text-gray-600">Avg. Rate</p>
             <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate, 2)}</p>
           </div>
         </div>
@@ -1188,7 +1188,7 @@ export default function AttractionsContent() {
 
               {/* Pricing Information */}
               <div className="mb-4">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Pricing (stored in EUR)</h3>
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Pricing</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">

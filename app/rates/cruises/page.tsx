@@ -604,7 +604,7 @@ function PPDSeasonalRateSection({
 
 export default function CruisesPage() {
   const dialog = useConfirmDialog()
-  const { userCurrency, loading: currencyLoading } = useCurrency()
+  const { loading: currencyLoading } = useCurrency()
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [cruises, setCruises] = useState<Cruise[]>([])
@@ -1169,7 +1169,7 @@ export default function CruisesPage() {
             <p className="text-2xl font-bold text-blue-600">{stats.ships}</p>
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Avg. PPD Rate ({userCurrency})</p>
+            <p className="text-xs text-gray-600">Avg. PPD Rate</p>
             <p className="text-2xl font-bold text-purple-600">{fmtAverage(stats.avgPPD)}</p>
           </div>
         </div>
@@ -1276,9 +1276,9 @@ export default function CruisesPage() {
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Nights</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Cabin</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Tier</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">PPD ({userCurrency})</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">Single Supp ({userCurrency})</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">Triple Red ({userCurrency})</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">PPD</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">Single Supp</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">Triple Red</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Actions</th>
                 </tr>

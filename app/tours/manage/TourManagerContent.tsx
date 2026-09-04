@@ -1,5 +1,7 @@
 'use client'
 
+import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+
 export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useState, useRef } from 'react'
@@ -111,6 +113,7 @@ interface Toast {
 
 // NEW: Attraction interface from entrance_fees
 interface Attraction {
+  rate_currency?: string | null
   id: string
   attraction_name: string
   city: string
@@ -285,6 +288,7 @@ interface AttractionDropdownProps {
 }
 
 function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemove }: AttractionDropdownProps) {
+  const { fmtRate } = useRateRowFormat()
   const [searchTerm, setSearchTerm] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -367,7 +371,7 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
                       <div>
                         <p className="text-sm text-gray-900">{attr.attraction_name}</p>
                         <p className="text-xs text-gray-500">
-                          EUR: €{attr.eur_rate} / Non-EUR: €{attr.non_eur_rate}
+                          EUR passport: {fmtRate(attr.eur_rate, attr, 0)} / Non-EUR: {fmtRate(attr.non_eur_rate, attr, 0)}
                         </p>
                       </div>
                       <Plus className="w-4 h-4 text-gray-400 group-hover:text-green-600" />

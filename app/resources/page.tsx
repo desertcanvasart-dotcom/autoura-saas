@@ -1,5 +1,7 @@
 'use client'
 
+import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+
 import { useEffect, useState } from 'react'
 import { todayLocal } from '@/lib/today'
 import Link from 'next/link'
@@ -11,6 +13,7 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 // ============================================
 
 interface Guide {
+  rate_currency?: string | null
   id: string
   name: string
   email?: string
@@ -128,6 +131,7 @@ type TabType = 'guides' | 'vehicles' | 'hotels' | 'restaurants' | 'airportStaff'
 // ============================================
 
 export default function ResourcesPage() {
+  const { fmtRate } = useRateRowFormat()
   const [resources, setResources] = useState<ResourcesData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -725,7 +729,7 @@ export default function ResourcesPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm font-semibold text-gray-900">
-                          €{guide.daily_rate || 0}
+                          {fmtRate(guide.daily_rate || 0, guide, 0)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
