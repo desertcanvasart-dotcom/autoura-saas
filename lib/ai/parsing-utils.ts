@@ -6,7 +6,18 @@
 
 export type ServiceTier = 'budget' | 'standard' | 'deluxe' | 'luxury'
 export type InputMode = 'creative' | 'structured'
-export type PackageType = 'day-trips' | 'tours-only' | 'land-package' | 'cruise-package' | 'cruise-land'
+// The AI path's package vocabulary. 'full-package' and 'shore-excursions'
+// come from the grid vocabulary (lib/package-types.ts); 'cruise-package' is
+// this path's own. The DB CHECK (migration 322) accepts the union of both,
+// and lib/__tests__/package-type-check.test.ts pins all three to it.
+export type PackageType =
+  | 'day-trips'
+  | 'tours-only'
+  | 'land-package'
+  | 'full-package'
+  | 'cruise-package'
+  | 'cruise-land'
+  | 'shore-excursions'
 
 // Default margin percentage (used if no user preference)
 export const DEFAULT_MARGIN_PERCENT = 25

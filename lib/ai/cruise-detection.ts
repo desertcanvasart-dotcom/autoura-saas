@@ -192,11 +192,12 @@ export function determinePackageType(
     return 'cruise-land'
   }
 
-  // If not a cruise detected, use the requested package type (or land-package as default)
+  // If not a cruise detected, use the requested package type (or land-package
+  // as default). 'full-package' used to be downgraded to 'land-package' here
+  // because the DB CHECK didn't allow it — that silently stripped the
+  // "airport transfers included" semantics. Migration 322 widened the CHECK,
+  // so the requested type is honoured.
   if (!cruiseDetection.isCruise) {
-    if (requestedPackageType === 'full-package') {
-      return 'land-package'
-    }
     return (requestedPackageType as PackageType) || 'land-package'
   }
 
