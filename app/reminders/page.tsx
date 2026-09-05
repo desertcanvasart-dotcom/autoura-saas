@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface PendingReminder {
   invoice_id: string
@@ -290,7 +291,7 @@ export default function PaymentRemindersPage() {
   }
 
   const getCurrencySymbol = (currency: string) => {
-    return { EUR: '€', USD: '$', GBP: '£' }[currency] || currency
+    return getCurrencySymbol(currency)
   }
 
   const getReminderTypeConfig = (type: string) => {

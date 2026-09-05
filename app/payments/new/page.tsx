@@ -5,6 +5,7 @@ import { todayLocal } from '@/lib/today'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, FileText, MapPin, DollarSign } from 'lucide-react'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface Invoice {
   id: string
@@ -229,10 +230,6 @@ export default function RecordPaymentPage() {
     return 0
   }
 
-  const getCurrencySymbol = (currency: string) => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
-    return symbols[currency] || currency
-  }
 
   return (
     <div className="p-4 lg:p-6">

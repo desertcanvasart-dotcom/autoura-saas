@@ -30,6 +30,7 @@ import {
 import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface Expense {
   id: string
@@ -358,10 +359,6 @@ export default function ExpensesPage() {
     setEndDate('')
   }
 
-  const getCurrencySymbol = (currency: string) => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-    return symbols[currency] || currency
-  }
 
   const getCategoryIcon = (category: string) => {
     const cat = CATEGORIES.find(c => c.value === category)

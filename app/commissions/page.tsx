@@ -35,6 +35,7 @@ import {
 import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface Commission {
   id: string
@@ -320,8 +321,7 @@ export default function CommissionsPage() {
   })
 
   const formatCurrency = (amount: number, currency: string = 'EUR') => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
-    return `${symbols[currency] || currency}${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    return `${getCurrencySymbol(currency)}${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   if (loading) {

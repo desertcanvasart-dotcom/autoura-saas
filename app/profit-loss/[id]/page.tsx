@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { getCurrencySymbol } from '@/lib/currency'
 import { 
   ArrowLeft,
   TrendingUp,
@@ -157,10 +158,6 @@ export default function TripPnLDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  const getCurrencySymbol = (currency: string) => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-    return symbols[currency] || currency
-  }
 
   const getProfitColor = (profit: number) => {
     if (profit > 0) return 'text-green-600'

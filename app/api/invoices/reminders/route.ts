@@ -3,6 +3,7 @@ import { daysOverdueOrNull } from '@/lib/invoice-dates'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
+import { getCurrencySymbol } from '@/lib/currency'
 
 // Sends a reminder email directly via the shared mail helper.
 async function sendReminderEmail(params: {
@@ -25,7 +26,7 @@ async function sendReminderEmail(params: {
 }
 
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
-  const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
+  const currencySymbol = getCurrencySymbol(invoice.currency)
   const balanceDue = `${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`
   const totalAmount = `${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`
   // Callers skip invoices with no due date, but this renderer must not be the

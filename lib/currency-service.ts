@@ -12,16 +12,11 @@ export interface ExchangeRates {
 }
 
 // Supported currencies
-export const SUPPORTED_CURRENCIES = ['USD', 'EUR', 'GBP', 'EGP'] as const
-export type SupportedCurrency = typeof SUPPORTED_CURRENCIES[number]
-
-// Currency symbols
-export const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: '$',
-  EUR: '€',
-  GBP: '£',
-  EGP: 'E£'
-}
+// The vocabulary lives in lib/currency.ts (B-item 6: ONE vocabulary);
+// these re-exports keep this module's historical API surface.
+import { SUPPORTED_CURRENCIES, CURRENCY_SYMBOLS, getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
+export { SUPPORTED_CURRENCIES, CURRENCY_SYMBOLS }
+export type { CurrencyCode as SupportedCurrency } from '@/lib/currency'
 
 // Cache for exchange rates (in-memory, refreshes on server restart)
 let cachedRates: ExchangeRates | null = null
@@ -208,7 +203,7 @@ export function formatCurrency(
   })
 
   if (showSymbol) {
-    const symbol = CURRENCY_SYMBOLS[currency] || currency
+    const symbol = canonicalCurrencySymbol(currency)
     return `${symbol}${formatted}`
   }
 
@@ -219,7 +214,7 @@ export function formatCurrency(
  * Get currency symbol
  */
 export function getCurrencySymbol(currency: string): string {
-  return CURRENCY_SYMBOLS[currency] || currency
+  return canonicalCurrencySymbol(currency)
 }
 
 // ============================================

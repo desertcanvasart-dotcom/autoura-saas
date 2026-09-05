@@ -20,6 +20,7 @@ import {
   MapPin
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface UnifiedPayment {
   id: string
@@ -244,8 +245,7 @@ export default function ReceiptsPage() {
   }
 
   const formatCurrency = (amount: number, currency: string) => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-    return `${symbols[currency] || currency} ${amount.toFixed(2)}`
+    return `${getCurrencySymbol(currency)} ${amount.toFixed(2)}`
   }
 
   const getMethodLabel = (method: string) => {

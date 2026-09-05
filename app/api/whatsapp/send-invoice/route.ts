@@ -7,6 +7,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { brandColorRgb, fetchLogoBytes } from '@/lib/company-identity'
 import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
+import { getCurrencySymbol } from '@/lib/currency'
 
 // Generate Invoice PDF
 async function generateInvoicePDF(
@@ -29,7 +30,7 @@ async function generateInvoicePDF(
   const margin = 50
   let y = height - 50
 
-  const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
+  const currencySymbol = getCurrencySymbol(invoice.currency)
 
   // Brand accent: tenant color, falling back to the template's original olive.
   const [br, bg, bb] = brandColorRgb(
@@ -334,7 +335,7 @@ export async function POST(request: NextRequest) {
 
     const businessName = senderTenant?.company_name || ''
     const businessEmail = senderTenant?.contact_email || ''
-    const currencySymbol = ({ EUR: '€', USD: '$', GBP: '£' } as Record<string, string>)[invoice.currency] || invoice.currency
+    const currencySymbol = getCurrencySymbol(invoice.currency)
 
     const issueDate = new Date(invoice.issue_date).toLocaleDateString('en-GB', {
       day: 'numeric', month: 'long', year: 'numeric'

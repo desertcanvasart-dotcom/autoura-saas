@@ -1,6 +1,7 @@
 import { identityFooterLine, brandColorRgb, type CompanyIdentity } from './company-identity'
 import { jsPDF } from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface ReceiptData {
   receiptNumber: string
@@ -114,7 +115,7 @@ export function generateReceiptPDF(receipt: ReceiptData, invoice: Invoice, compa
   y += 25
 
   // Amount
-  const currencySymbol = { EUR: '€', USD: '$', GBP: '£' }[receipt.currency] || receipt.currency
+  const currencySymbol = getCurrencySymbol(receipt.currency)
   
   doc.setFillColor(100, 124, 71)
   doc.roundedRect(margin, y, pageWidth - 2 * margin, 25, 3, 3, 'F')

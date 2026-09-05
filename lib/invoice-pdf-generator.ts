@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import { brandColorRgb } from './company-identity'
 import { formatDateOnly } from '@/lib/date-utils'
+import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
 
 interface LineItem {
   description: string
@@ -59,10 +60,7 @@ export interface CompanyInfo {
 // identity (lib/company-identity.ts).
 const DEFAULT_COMPANY: CompanyInfo = { name: '' }
 
-const getCurrencySymbol = (currency: string): string => {
-  const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-  return symbols[currency] || currency
-}
+const getCurrencySymbol = (currency: string): string => canonicalCurrencySymbol(currency)
 
 const formatCurrency = (amount: number, currency: string): string => {
   return `${getCurrencySymbol(currency)}${Number(amount).toFixed(2)}`

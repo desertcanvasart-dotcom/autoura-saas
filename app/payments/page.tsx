@@ -15,6 +15,7 @@ import {
   MapPin
 } from 'lucide-react'
 import Link from 'next/link'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface UnifiedPayment {
   id: string
@@ -227,10 +228,6 @@ export default function PaymentsPage() {
     return labels[method] || method
   }
 
-  const getCurrencySymbol = (currency: string) => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
-    return symbols[currency] || currency
-  }
 
   const getSourceLink = (payment: UnifiedPayment) => {
     if (payment.source === 'invoice') {

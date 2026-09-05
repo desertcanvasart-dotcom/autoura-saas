@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { showToast } from '@/app/contexts/ToastContext'
+import { getCurrencySymbol } from '@/lib/currency'
 import { 
   Search,
   DollarSign,
@@ -169,10 +170,6 @@ export default function AccountsReceivablePage() {
     setSendingReminder(null)
   }
 
-  const getCurrencySymbol = (currency: string = 'EUR') => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-    return symbols[currency] || currency
-  }
 
   const getAgingColor = (bucket: string) => {
     switch (bucket) {

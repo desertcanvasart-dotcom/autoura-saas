@@ -32,6 +32,7 @@ import {
   ResponsiveContainer 
 } from 'recharts'
 import Link from 'next/link'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface AnalyticsData {
   revenue: {
@@ -100,12 +101,10 @@ const formatNumber = (num: number, decimals: number = 2): string => {
   return Number(num).toFixed(decimals)
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-
 // The symbol must follow the currency the API actually reported in. Printing
 // an EGP total behind a € sign is a wrong number that looks plausible.
 const formatMoney = (num: number, currency: string): string => {
-  const symbol = CURRENCY_SYMBOLS[currency] || `${currency} `
+  const symbol = getCurrencySymbol(currency)
   return `${symbol}${Number(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 

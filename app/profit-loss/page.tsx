@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { getCurrencySymbol } from '@/lib/currency'
 import { 
   Search,
   TrendingUp,
@@ -201,10 +202,6 @@ export default function ProfitLossPage() {
     currentPage * ITEMS_PER_PAGE
   )
 
-  const getCurrencySymbol = (currency: string) => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-    return symbols[currency] || currency
-  }
 
   const getProfitColor = (profit: number) => {
     if (profit > 0) return 'text-green-600'
