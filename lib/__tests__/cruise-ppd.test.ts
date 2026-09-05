@@ -14,15 +14,15 @@ describe('cruisePpdNightEur', () => {
     expect(cruisePpdNightEur({ ppd_eur: 95, rate_double_eur: 999 })).toBe(95)
   })
 
-  it('a legacy trip-cabin rate derives: cabin / 2 occupants / nights', () => {
-    // EUR 840 double cabin for the whole 3-night trip = 140/person/night.
-    expect(cruisePpdNightEur({ rate_double_eur: 840, duration_nights: 3 })).toBe(140)
-    // Same cabin money over 4 nights = 105/person/night.
-    expect(cruisePpdNightEur({ rate_double_eur: 840, duration_nights: 4 })).toBe(105)
+  it('a legacy trip rate is PER PERSON at double occupancy: trip / nights', () => {
+    // EUR 840 per person for the whole 3-night trip = 280/night.
+    expect(cruisePpdNightEur({ rate_double_eur: 840, duration_nights: 3 })).toBe(280)
+    // Same money over 4 nights = 210/night — nights drive the multiply.
+    expect(cruisePpdNightEur({ rate_double_eur: 840, duration_nights: 4 })).toBe(210)
   })
 
   it('rate_low_double_eur is the same legacy family', () => {
-    expect(cruisePpdNightEur({ rate_low_double_eur: 600, duration_nights: 3 })).toBe(100)
+    expect(cruisePpdNightEur({ rate_low_double_eur: 600, duration_nights: 3 })).toBe(200)
   })
 
   it('nothing priced = 0, never a guess', () => {
@@ -31,13 +31,13 @@ describe('cruisePpdNightEur', () => {
 
   it('missing duration uses the engine default of 4 nights', () => {
     expect(cruiseNightsOf({})).toBe(4)
-    expect(cruisePpdNightEur({ rate_double_eur: 800 })).toBe(100)
+    expect(cruisePpdNightEur({ rate_double_eur: 800 })).toBe(200)
   })
 })
 
 describe('cruisePpdNightNonEur', () => {
   it('derives from the non-EUR cabin rate when present', () => {
-    expect(cruisePpdNightNonEur({ rate_double_non_eur: 900, duration_nights: 3 })).toBe(150)
+    expect(cruisePpdNightNonEur({ rate_double_non_eur: 900, duration_nights: 3 })).toBe(300)
   })
 
   it('falls back to the EUR figure (the standard non-EU mirror)', () => {

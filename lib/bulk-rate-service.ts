@@ -1,5 +1,6 @@
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
-import { seasonsFromAccommodationColumns } from '@/lib/rates/rate-seasons'
+import { seasonsFromAccommodationColumns, seasonsFromCruiseColumns } from '@/lib/rates/rate-seasons'
+import { cruiseNightsOf } from '@/lib/rates/cruise-ppd'
 /**
  * Bulk Rate Import/Export Service
  * Provides CSV import/export for all rate tables with validation and upsert.
@@ -683,8 +684,70 @@ export const CANONICAL_COLUMN_ALIASES: Record<string, Record<string, string>> = 
   },
 }
 
+
+// ── nile_cruises: per-room-CSV ↔ per-person-per-night engine family ──────
+// The cruise CSV (both apps, headers identical) carries whole-trip
+// PER-PERSON rates by occupancy (Low/High/Peak x Single/Double/Triple),
+// while the engine, the form, and the periods model use per-person
+// PER-NIGHT figures (ppd / single_supplement / triple_reduction). The
+// bridge is arithmetic, locked 2026-09-05 (PR #331 + sibling semantics):
+//   ppd/night            = double_trip / nights
+//   single supp/night    = (single_trip - double_trip) / nights
+//   triple reduction/nt  = (double_trip - triple_trip) / nights
+// Suites have no engine equivalent and pass through untouched.
+
+const CRUISE_SEASON_PREFIX: Array<[string, string]> = [
+  ['low', ''],
+  ['high', 'high_season_'],
+  ['peak', 'peak_season_'],
+]
+
+function cruiseImportDerive(record: Record<string, unknown>): void {
+  const nights = cruiseNightsOf(record as { duration_nights?: number | string | null })
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+  const hole = (v: unknown) => !(typeof v === 'number' && Number.isFinite(v) && v !== 0)
+  for (const [csvSeason, enginePrefix] of CRUISE_SEASON_PREFIX) {
+    for (const p of ['eur', 'non_eur']) {
+      const double = num(record[`rate_${csvSeason}_double_${p}`])
+      if (double <= 0) continue
+      const ppdCol = `${enginePrefix}ppd_${p}`
+      const suppCol = `${enginePrefix}single_supplement_${p}`
+      const redCol = `${enginePrefix}triple_reduction_${p}`
+      if (hole(record[ppdCol])) record[ppdCol] = double / nights
+      const single = num(record[`rate_${csvSeason}_single_${p}`])
+      if (single > 0 && hole(record[suppCol])) {
+        record[suppCol] = Math.max(0, (single - double) / nights)
+      }
+      const triple = num(record[`rate_${csvSeason}_triple_${p}`])
+      if (triple > 0 && hole(record[redCol])) {
+        record[redCol] = Math.max(0, (double - triple) / nights)
+      }
+    }
+  }
+}
+
+/** Export-side reverse: a form-created cruise (engine family only) emits
+ *  real per-room-CSV numbers. Returns undefined when not derivable. */
+function cruiseExportDerive(row: Record<string, unknown>, column: string): unknown {
+  const m = column.match(/^rate_(low|high|peak)_(single|double|triple)_(eur|non_eur)$/)
+  if (!m) return undefined
+  const [, csvSeason, occupancy, p] = m
+  const enginePrefix = CRUISE_SEASON_PREFIX.find(([cs]) => cs === csvSeason)![1]
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+  const nights = cruiseNightsOf(row as { duration_nights?: number | string | null })
+  const ppd = num(row[`${enginePrefix}ppd_${p}`])
+  if (ppd <= 0) return undefined
+  if (occupancy === 'double') return ppd * nights
+  if (occupancy === 'single') return (ppd + num(row[`${enginePrefix}single_supplement_${p}`])) * nights
+  return (ppd - num(row[`${enginePrefix}triple_reduction_${p}`])) * nights
+}
+
 /** Fill each family from the other, never overwriting an explicit value. */
 export function applyCanonicalAliases(table: string, record: Record<string, unknown>): void {
+  if (table === 'nile_cruises') {
+    cruiseImportDerive(record)
+    return
+  }
   const aliases = CANONICAL_COLUMN_ALIASES[table]
   if (!aliases) return
   const usable = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v !== 0
@@ -698,6 +761,10 @@ export function applyCanonicalAliases(table: string, record: Record<string, unkn
 export function exportCellValue(table: string, row: Record<string, unknown>, column: string): unknown {
   const direct = row[column]
   if (direct !== null && direct !== undefined && direct !== 0) return direct
+  if (table === 'nile_cruises') {
+    const derived = cruiseExportDerive(row, column)
+    return derived === undefined ? direct : derived
+  }
   const aliases = CANONICAL_COLUMN_ALIASES[table]
   if (!aliases) return direct
   const partner =
@@ -712,9 +779,16 @@ export function exportCellValue(table: string, row: Record<string, unknown>, col
  *  period editor) rather than a legacy-columns row. Only when the file
  *  carries at least one dated window; existing seasons are never replaced. */
 export function deriveImportSeasons(table: string, record: Record<string, unknown>): void {
-  if (table !== 'accommodation_rates' || record.seasons != null) return
-  const seasons = seasonsFromAccommodationColumns(record)
-  if (seasons.length > 0) record.seasons = seasons
+  if (record.seasons != null) return
+  if (table === 'accommodation_rates') {
+    const seasons = seasonsFromAccommodationColumns(record)
+    if (seasons.length > 0) record.seasons = seasons
+  } else if (table === 'nile_cruises') {
+    // Runs AFTER cruiseImportDerive filled the engine family the derivation
+    // reads; the dated windows come from the CSV's own season date columns.
+    const seasons = seasonsFromCruiseColumns(record)
+    if (seasons.length > 0) record.seasons = seasons
+  }
 }
 
 export function getExportHeaders(config: RateTableConfig): string[] {

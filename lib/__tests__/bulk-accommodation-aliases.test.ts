@@ -38,10 +38,10 @@ describe('applyCanonicalAliases', () => {
     expect(r.pp_double_eur).toBe(150)
   })
 
-  it('other tables are untouched', () => {
-    const r: Record<string, unknown> = { rate_low_double_eur: 100 }
-    applyCanonicalAliases('nile_cruises', r)
-    expect(r).toEqual({ rate_low_double_eur: 100 })
+  it('tables with no aliases are untouched (cruises convert — see bulk-cruise-conversion.test)', () => {
+    const r: Record<string, unknown> = { daily_rate: 100 }
+    applyCanonicalAliases('guides', r)
+    expect(r).toEqual({ daily_rate: 100 })
   })
 
   it('every aliased column is a known monetary column (no typos either side)', () => {
