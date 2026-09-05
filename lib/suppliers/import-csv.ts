@@ -12,12 +12,23 @@
 //   - a supplier that already exists (same name, case-insensitive, in
 //     the tenant) is SKIPPED and reported — an import CREATES, it never
 //     silently updates.
+//
+// Type is NOT identity: a row without one imports as 'other' and is
+// REPORTED, not refused — a real list of 64 suppliers with no Type column
+// should land as unclassified rows to reclassify, not bounce 64 times
+// (which is exactly what happened on first use).
 
 import Papa from 'papaparse'
 
 const HEADER_MAP: Record<string, string> = {
   name: 'name',
+  company: 'name',
+  company_name: 'name',
+  supplier: 'name',
+  supplier_name: 'name',
   type: 'type',
+  supplier_type: 'type',
+  category: 'type',
   contact: 'contact_name',
   contact_name: 'contact_name',
   email: 'contact_email',
@@ -53,6 +64,8 @@ export interface SupplierImportParseResult {
   totalRows: number
   records: SupplierImportRecord[]
   refused: Array<{ row: number; reason: string }>
+  /** Names imported with type 'other' because the row named no type. */
+  typeDefaulted: string[]
   /** Fatal CSV syntax errors — nothing was parsed. */
   parseError?: string
 }
@@ -68,15 +81,17 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
       totalRows: 0,
       records: [],
       refused: [],
+      typeDefaulted: [],
       parseError: `CSV parsing failed: ${parsed.errors[0].message}`,
     }
   }
   if (parsed.data.length === 0) {
-    return { totalRows: 0, records: [], refused: [], parseError: 'No data rows' }
+    return { totalRows: 0, records: [], refused: [], typeDefaulted: [], parseError: 'No data rows' }
   }
 
   const refused: Array<{ row: number; reason: string }> = []
   const records: SupplierImportRecord[] = []
+  const typeDefaulted: string[] = []
   const seenNames = new Set<string>()
 
   parsed.data.forEach((raw, i) => {
@@ -95,8 +110,9 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
       return
     }
     if (!record.type) {
-      refused.push({ row: rowNum, reason: `"${name}" has no Type` })
-      return
+      // Type is not identity — import as 'other' and say so.
+      record.type = 'other'
+      typeDefaulted.push(name)
     }
     const key = name.toLowerCase()
     if (seenNames.has(key)) {
@@ -115,7 +131,7 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
     })
   })
 
-  return { totalRows: parsed.data.length, records, refused }
+  return { totalRows: parsed.data.length, records, refused, typeDefaulted }
 }
 
 /** Split parsed records against the tenant's existing supplier names

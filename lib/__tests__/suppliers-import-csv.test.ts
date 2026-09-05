@@ -42,13 +42,32 @@ describe('parseSuppliersCsv', () => {
     expect(r.records[0].type).toBe('transport_company')
   })
 
-  it('refuses rows missing the identity (Name / Type) with the reason named', () => {
-    const r = parseSuppliersCsv(['Name,Type', ',hotel', 'Ghost Lodge,'].join('\n'))
+  it('refuses a row missing its Name — the identity — with the reason named', () => {
+    const r = parseSuppliersCsv(['Name,Type', ',hotel'].join('\n'))
     expect(r.records).toEqual([])
-    expect(r.refused).toEqual([
-      { row: 2, reason: 'missing Name' },
-      { row: 3, reason: '"Ghost Lodge" has no Type' },
-    ])
+    expect(r.refused).toEqual([{ row: 2, reason: 'missing Name' }])
+  })
+
+  it("a missing Type is NOT a refusal: the row imports as 'other' and is reported", () => {
+    // First real use: a 64-supplier list with no Type column bounced 64
+    // times. Type is not identity — land the rows unclassified instead.
+    const r = parseSuppliersCsv(['Name,Type', 'Ghost Lodge,'].join('\n'))
+    expect(r.refused).toEqual([])
+    expect(r.records).toEqual([expect.objectContaining({ name: 'Ghost Lodge', type: 'other' })])
+    expect(r.typeDefaulted).toEqual(['Ghost Lodge'])
+  })
+
+  it('a file with no Type column at all imports every row as other', () => {
+    const r = parseSuppliersCsv(['Name,City', 'Abdul Rahman,Cairo', 'Accor,Giza'].join('\n'))
+    expect(r.records.map(x => x.type)).toEqual(['other', 'other'])
+    expect(r.typeDefaulted).toEqual(['Abdul Rahman', 'Accor'])
+  })
+
+  it('recognizes Supplier Type / Category / Company header spellings', () => {
+    const r = parseSuppliersCsv('Company Name,Supplier Type\nNile Star,Hotel')
+    expect(r.records[0]).toMatchObject({ name: 'Nile Star', type: 'hotel' })
+    expect(parseSuppliersCsv('Supplier,Category\nDesert Cars,Transport Company').records[0])
+      .toMatchObject({ name: 'Desert Cars', type: 'transport_company' })
   })
 
   it('refuses in-file duplicate names (case-insensitive) — never last-row-wins', () => {

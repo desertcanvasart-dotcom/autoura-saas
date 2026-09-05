@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
       inserted,
       skippedExisting,
       refused: parsed.refused,
+      typeDefaulted: parsed.typeDefaulted,
     })
   } catch (error) {
     console.error('suppliers import error:', error)
