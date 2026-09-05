@@ -42,3 +42,16 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   hotel: 'Hotel',
   train: 'Train',
 }
+
+/** The service tier a property sits in — the same four-tier vocabulary the
+ *  rates and quotes use, so a ship's or hotel's category flows straight into
+ *  the rate row that picks it. */
+export const PROPERTY_CATEGORIES = ['budget', 'standard', 'deluxe', 'luxury'] as const
+export type PropertyCategory = (typeof PROPERTY_CATEGORIES)[number]
+
+export const PROPERTY_CATEGORY_LABELS: Record<PropertyCategory, string> = {
+  budget: 'Budget',
+  standard: 'Standard',
+  deluxe: 'Deluxe',
+  luxury: 'Luxury',
+}

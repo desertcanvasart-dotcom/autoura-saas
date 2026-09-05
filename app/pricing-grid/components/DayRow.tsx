@@ -6,6 +6,7 @@ import type { GridDay, GridConfig, AllRates, SlotValue, DayCalc, SelectedItem, D
 import { GROUP_SLOTS, PP_SLOTS, DAY_TYPES, DAY_TYPE_LABELS, DEFAULT_DAY_TYPE, DAY_TYPE_DEFAULTS } from '../types'
 import { calculateDay, convertAmount } from '../lib/calculator'
 import SlotRow from './SlotRow'
+import CitySelect from '@/components/CitySelect'
 
 interface DayRowProps {
   day: GridDay
@@ -255,13 +256,13 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
             />
           </div>
           <div className="flex items-center gap-3 mt-0.5">
-            <input
-              type="text"
+            <CitySelect
               value={day.city}
-              onChange={(e) => onUpdateDay({ city: e.target.value })}
+              onChange={(city) => onUpdateDay({ city })}
               onClick={(e) => e.stopPropagation()}
-              className="text-xs text-gray-500 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 w-24"
               placeholder="City"
+              aria-label="City"
+              className="text-xs text-gray-500 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1 w-28"
             />
             {/* Collapsed mini summary: show key cost breakdown */}
             {!day.isExpanded && calc.dailyPerPerson > 0 && (

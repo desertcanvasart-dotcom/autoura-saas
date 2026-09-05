@@ -11,6 +11,7 @@ import {
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import CitySelect from '@/components/CitySelect'
 
 // ============================================
 // TRANSPORT PACKAGES MANAGEMENT
@@ -504,19 +505,18 @@ export default function TransportPackagesPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Origin City</label>
-                  <input
-                    type="text"
+                  <CitySelect
                     value={packageForm.origin_city}
-                    onChange={(e) => setPackageForm({ ...packageForm, origin_city: e.target.value })}
+                    onChange={(city) => setPackageForm({ ...packageForm, origin_city: city })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Destination City</label>
-                  <input
-                    type="text"
+                  <CitySelect
                     value={packageForm.destination_city}
-                    onChange={(e) => setPackageForm({ ...packageForm, destination_city: e.target.value })}
+                    onChange={(city) => setPackageForm({ ...packageForm, destination_city: city })}
+                    exclude={packageForm.origin_city}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
                 </div>

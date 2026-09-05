@@ -49,7 +49,7 @@ interface Cruise {
   id: string
   cruise_code: string
   ship_name: string
-  ship_category: 'standard' | 'deluxe' | 'luxury'
+  ship_category: 'budget' | 'standard' | 'deluxe' | 'luxury'
   route_name: string
   embark_city: string
   disembark_city: string
@@ -122,7 +122,7 @@ const NEW_SHIP = '__new__'
 interface CruiseFormData {
   cruise_code: string
   ship_name: string
-  ship_category: 'standard' | 'deluxe' | 'luxury'
+  ship_category: 'budget' | 'standard' | 'deluxe' | 'luxury'
   route_name: string
   embark_city: string
   disembark_city: string
@@ -778,7 +778,7 @@ export default function CruisesPage() {
       ...prev,
       property_id: value,
       ship_name: ship?.name || prev.ship_name,
-      ...(ship?.category && ['standard', 'deluxe', 'luxury'].includes(ship.category)
+      ...(ship?.category && (SHIP_CATEGORIES as readonly string[]).includes(ship.category)
         ? { ship_category: ship.category as CruiseFormData['ship_category'] }
         : {}),
     }))

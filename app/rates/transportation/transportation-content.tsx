@@ -5,6 +5,7 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
@@ -115,12 +116,12 @@ const VEHICLE_TYPES = [
   { value: '4x4', label: '4x4', minPax: 1, maxPax: 6 },
 ]
 
-const CITIES = ['Cairo', 'Giza', 'Luxor', 'Aswan', 'Alexandria', 'Hurghada', 'Sharm El Sheikh', 'Dahab', 'Siwa', 'Marsa Alam']
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function TransportationContent() {
   const dialog = useConfirmDialog()
+  const { cities: cityOptions } = useDestinationCities()
   const { loading: currencyLoading } = useCurrency()
 
   const { fmtRate } = useRateRowFormat()
@@ -607,7 +608,7 @@ export default function TransportationContent() {
             className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
           >
             <option value="">All Cities</option>
-            {CITIES.map(city => (
+            {cityOptions.map(city => (
               <option key={city} value={city}>{city}</option>
             ))}
           </select>
@@ -955,7 +956,7 @@ export default function TransportationContent() {
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                     >
                       <option value="">Select City</option>
-                      {CITIES.map(city => (
+                      {cityOptions.map(city => (
                         <option key={city} value={city}>{city}</option>
                       ))}
                     </select>
@@ -973,7 +974,7 @@ export default function TransportationContent() {
                         className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                       >
                         <option value="">Select Destination</option>
-                        {CITIES.filter(city => city !== formData.city).map(city => (
+                        {cityOptions.filter(city => city !== formData.city).map(city => (
                           <option key={city} value={city}>{city}</option>
                         ))}
                       </select>

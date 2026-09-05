@@ -27,6 +27,7 @@ import {
   Star
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
 // ============================================
 // CONSTANTS
@@ -42,33 +43,6 @@ const TIER_OPTIONS = [
 // ============================================
 // EGYPTIAN CITIES
 // ============================================
-const EGYPTIAN_CITIES = [
-  'Cairo',
-  'Giza',
-  'Alexandria',
-  'Luxor',
-  'Aswan',
-  'Hurghada',
-  'Sharm El Sheikh',
-  'Dahab',
-  'Marsa Alam',
-  'El Gouna',
-  'Siwa',
-  'Fayoum',
-  'Port Said',
-  'Suez',
-  'Ismailia',
-  'Taba',
-  'Nuweiba',
-  'Safaga',
-  'Ain Sokhna',
-  'Ras Sudr',
-  'Saint Catherine',
-  'Bahariya Oasis',
-  'Kharga Oasis',
-  'Dakhla Oasis'
-]
-
 // ============================================
 // INTERFACES
 // ============================================
@@ -168,6 +142,7 @@ function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => vo
 // ============================================
 
 export default function RestaurantsContent() {
+  const { cities: cityOptions } = useDestinationCities()
   const dialog = useConfirmDialog()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1116,7 +1091,7 @@ export default function RestaurantsContent() {
                     <select name="city" value={formData.city} onChange={handleChange} required
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm">
                       <option value="">Select City...</option>
-                      {EGYPTIAN_CITIES.map(city => (<option key={city} value={city}>{city}</option>))}
+                      {cityOptions.map(city => (<option key={city} value={city}>{city}</option>))}
                     </select>
                   </div>
                   <div className="md:col-span-2">
