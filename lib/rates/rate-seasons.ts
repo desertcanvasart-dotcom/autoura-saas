@@ -34,10 +34,18 @@ export const RATE_FIELDS = {
   accommodation: [
     'ppd_eur', 'single_supplement_eur', 'triple_reduction_eur',
     'ppd_non_eur', 'single_supplement_non_eur', 'triple_reduction_non_eur',
+    // The throughout guide's bed for a night in this period (B-item 1).
+    // Passport-less — a staff concession has one price. sanitizeSeasons
+    // stores a blank as 0, and 0 here means NO CONCESSION: the engine
+    // reads it as a pricing hole, never a free bed.
+    'guide_rate_eur',
   ],
   cruise: [
     'ppd_eur', 'single_supplement_eur', 'triple_reduction_eur',
     'ppd_non_eur', 'single_supplement_non_eur', 'triple_reduction_non_eur',
+    // The throughout guide's cabin for a night in this period — same
+    // semantics as the hotel guide bed above.
+    'guide_rate_eur',
   ],
 } as const
 

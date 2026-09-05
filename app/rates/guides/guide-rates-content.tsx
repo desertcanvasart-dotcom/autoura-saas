@@ -20,19 +20,30 @@ const LANGUAGES = [
   'Russian', 'Chinese', 'Japanese', 'Portuguese', 'Dutch', 'Polish'
 ]
 
+// The GRADE axis (B-item 1): the dropdown offers the two grades the engine
+// prices by — 'egyptologist' (the default ask) and 'senior'. Legacy values
+// stay displayable on existing rows via LEGACY_GUIDE_TYPE_LABELS, but new
+// rows pick a grade the engine can actually select on.
 const GUIDE_TYPES = [
-  { value: 'licensed', label: 'Licensed Guide' },
-  { value: 'egyptologist', label: 'Egyptologist' },
-  { value: 'local', label: 'Local Guide' },
-  { value: 'specialist', label: 'Specialist' },
-  { value: 'driver_guide', label: 'Driver Guide' },
-  { value: 'birdwatching', label: 'Birdwatching Guide' },
-  { value: 'bedouin', label: 'Bedouin Guide' }
+  { value: 'egyptologist', label: 'Egyptologist (default grade)' },
+  { value: 'senior', label: 'Senior guide' },
 ]
+
+const LEGACY_GUIDE_TYPE_LABELS: Record<string, string> = {
+  licensed: 'Licensed Guide',
+  local: 'Local Guide',
+  specialist: 'Specialist',
+  driver_guide: 'Driver Guide',
+  birdwatching: 'Birdwatching Guide',
+  bedouin: 'Bedouin Guide',
+}
 
 const TOUR_DURATIONS = [
   { value: 'half_day', label: 'Half Day (4h)' },
   { value: 'full_day', label: 'Full Day (8h)' },
+  // The throughout guide's cheaper fee for meet/goodbye/transit days —
+  // one row per grade (B-item 1).
+  { value: 'meet_greet', label: 'Meet & Assist day' },
   { value: 'extended', label: 'Extended (10h+)' },
   { value: 'hourly', label: 'Hourly' }
 ]
@@ -143,7 +154,7 @@ export default function GuideRatesContent() {
   const [formData, setFormData] = useState({
     service_code: '',
     guide_language: 'English',
-    guide_type: 'licensed',
+    guide_type: 'egyptologist',
     city: '',
     tour_duration: 'full_day',
     base_rate_eur: 0,
@@ -223,7 +234,7 @@ export default function GuideRatesContent() {
     setFormData({
       service_code: generateServiceCode(),
       guide_language: 'English',
-      guide_type: 'licensed',
+      guide_type: 'egyptologist',
       city: '',
       tour_duration: 'full_day',
       base_rate_eur: 0,
@@ -244,7 +255,7 @@ export default function GuideRatesContent() {
     setFormData({
       service_code: rate.service_code || '',
       guide_language: rate.guide_language || 'English',
-      guide_type: rate.guide_type || 'licensed',
+      guide_type: rate.guide_type || 'egyptologist',
       city: rate.city || '',
       tour_duration: rate.tour_duration || 'full_day',
       base_rate_eur: rate.base_rate_eur || 0,
@@ -266,7 +277,7 @@ export default function GuideRatesContent() {
     setFormData({
       service_code: generateServiceCode(), // Generate new code
       guide_language: rate.guide_language || 'English',
-      guide_type: rate.guide_type || 'licensed',
+      guide_type: rate.guide_type || 'egyptologist',
       city: rate.city || '',
       tour_duration: rate.tour_duration || 'full_day',
       base_rate_eur: rate.base_rate_eur || 0,
@@ -890,7 +901,7 @@ export default function GuideRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                        {GUIDE_TYPES.find(t => t.value === rate.guide_type)?.label || rate.guide_type}
+                        {GUIDE_TYPES.find(t => t.value === rate.guide_type)?.label || LEGACY_GUIDE_TYPE_LABELS[rate.guide_type] || rate.guide_type}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -973,7 +984,7 @@ export default function GuideRatesContent() {
                 )}
 
                 <div className="space-y-1 text-sm text-gray-600 mb-3">
-                  <p><span className="text-gray-400">Type:</span> {GUIDE_TYPES.find(t => t.value === rate.guide_type)?.label}</p>
+                  <p><span className="text-gray-400">Type:</span> {GUIDE_TYPES.find(t => t.value === rate.guide_type)?.label || LEGACY_GUIDE_TYPE_LABELS[rate.guide_type] || rate.guide_type}</p>
                   <p><span className="text-gray-400">City:</span> {rate.city || '—'}</p>
                   <p><span className="text-gray-400">Duration:</span> {TOUR_DURATIONS.find(d => d.value === rate.tour_duration)?.label}</p>
                 </div>

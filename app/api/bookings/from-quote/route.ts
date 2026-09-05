@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { b2bNumTravelers, b2bTotalAmount, calculatorTripFacts } from '@/lib/bookings/from-quote-facts'
+import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import type { Tables, TablesInsert } from '@/types/database.types'
 
 export async function POST(request: NextRequest) {
@@ -19,18 +20,29 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient()
     const body = await request.json()
-    const { quote_id, quote_type, deposit_percent = 30 } = body
+    const { quote_id, quote_type, deposit_percent: requestedDeposit } = body
 
     // Unvalidated, this reached `(total_amount * deposit_percent) / 100`
     // straight from the request body: -50 produces a negative deposit, 500
     // charges five times the trip.
-    if (typeof deposit_percent !== 'number' || !Number.isFinite(deposit_percent) ||
-        deposit_percent < 0 || deposit_percent > 100) {
+    if (requestedDeposit !== undefined &&
+        (typeof requestedDeposit !== 'number' || !Number.isFinite(requestedDeposit) ||
+         requestedDeposit < 0 || requestedDeposit > 100)) {
       return NextResponse.json(
         { success: false, error: 'deposit_percent must be a number between 0 and 100' },
         { status: 400 }
       )
     }
+
+    // The ORG's deposit rule, not a hardcoded 30 (mig 325): an explicit
+    // request value wins, else the tenant's setting, else the default.
+    const { data: depositTenant } = await createAdminClient()
+      .from('tenants')
+      .select('deposit_percent, deposit_due_days')
+      .eq('id', tenant_id)
+      .maybeSingle()
+    const depositRule = resolveDepositRule({ explicitPercent: requestedDeposit, tenant: depositTenant })
+    const deposit_percent = depositRule.depositPercent
 
     if (!quote_id || !quote_type) {
       return NextResponse.json(
@@ -268,7 +280,11 @@ export async function POST(request: NextRequest) {
       total_paid: 0,
       balance_due,
       status: 'pending_deposit',
-      payment_deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+      payment_deadline: (() => {
+        const d = new Date()
+        d.setDate(d.getDate() + depositRule.depositDueDays)
+        return d.toISOString().split('T')[0]
+      })(),
       created_by: user?.id
     }
 
