@@ -30,6 +30,7 @@ interface Department {
 
 interface TeamMember {
   id: string
+  name?: string | null
   department_id: string | null
 }
 
@@ -261,8 +262,22 @@ export default function DepartmentsSettingsPage() {
                     Inactive
                   </span>
                 )}
-                <span className="text-xs text-gray-500">
+                {/* A real popover, not a title tooltip: the load already
+                    fetched the members to count them — show the names too
+                    (A-item 21). */}
+                <span className="relative group text-xs text-gray-500 cursor-default">
                   {memberCount(dept.id)} member{memberCount(dept.id) === 1 ? '' : 's'}
+                  {memberCount(dept.id) > 0 && (
+                    <span className="absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 min-w-[10rem]">
+                      {members
+                        .filter(m => m.department_id === dept.id)
+                        .map(m => (
+                          <span key={m.id} className="block text-xs text-gray-700 whitespace-nowrap py-0.5">
+                            {m.name || 'Unnamed member'}
+                          </span>
+                        ))}
+                    </span>
+                  )}
                 </span>
               </div>
 

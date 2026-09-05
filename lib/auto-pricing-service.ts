@@ -1236,7 +1236,7 @@ export type AirportServiceType = 'meet_greet' | 'customs_assist' | 'full_service
  * the two) and `concierge` is a separate premium service — 7 priced rows that
  * nothing could request until day.services gained a level.
  */
-export type HotelServiceType = 'checkin_assist' | 'porter' | 'full_service' | 'concierge'
+export type HotelServiceType = 'checkin_assist' | 'checkout_assist' | 'porter' | 'full_service' | 'concierge'
 
 /** Human labels for the service levels, used on line items and holes. */
 const AIRPORT_LEVEL_LABEL: Record<AirportServiceType, string> = {
@@ -1247,9 +1247,19 @@ const AIRPORT_LEVEL_LABEL: Record<AirportServiceType, string> = {
 }
 const HOTEL_LEVEL_LABEL: Record<HotelServiceType, string> = {
   checkin_assist: 'Check-in Assistance',
-  porter: 'Check-out & Porter',
+  checkout_assist: 'Check-out Assistance',
+  porter: 'Porter',
   full_service: 'Full Service',
   concierge: 'Concierge',
+}
+
+// Check-out used to be conflated with the porter row (its label read
+// "Check-out & Porter" while the data said luggage-only). checkout_assist is
+// its own type now; a tenant whose table predates it still prices from the
+// legacy rows in this order — the engine asks for the real thing FIRST and
+// accepts the historical shapes (A-item 19).
+const HOTEL_LEVEL_FALLBACK: Partial<Record<HotelServiceType, HotelServiceType[]>> = {
+  checkout_assist: ['porter', 'full_service'],
 }
 
 
@@ -1313,26 +1323,34 @@ export async function getHotelServiceRate(
   try {
     const category = getTierCategory(tier)
 
-    const { data: rawHotelStaffRates } = await getSupabaseAdmin()
-      .from('hotel_staff_rates')
-      .select('*')
-      .or(catalogOrExpr(scope))
-      .eq('is_active', true)
-      .eq('service_type', serviceType)
-      .or(`hotel_category.eq.${category},hotel_category.eq.all`)
-      // Unambiguous on today's data (service_type + category resolves to one
-      // row), but ordered anyway so it cannot become arbitrary the day a
-      // second row is added.
-      .order('rate_eur', { ascending: true })
-      .limit(1)
-    const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
-
-    if (!rates || rates.length === 0) {
-      return null
+    const lookup = async (type: HotelServiceType): Promise<number | null> => {
+      const { data: rawHotelStaffRates } = await getSupabaseAdmin()
+        .from('hotel_staff_rates')
+        .select('*')
+        .or(catalogOrExpr(scope))
+        .eq('is_active', true)
+        .eq('service_type', type)
+        .or(`hotel_category.eq.${category},hotel_category.eq.all`)
+        // Unambiguous on today's data (service_type + category resolves to one
+        // row), but ordered anyway so it cannot become arbitrary the day a
+        // second row is added.
+        .order('rate_eur', { ascending: true })
+        .limit(1)
+      const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      if (!rates || rates.length === 0) return null
+      const rate = (rates[0] as any).rate_eur
+      return typeof rate === 'number' ? rate : null
     }
 
-    const rate = (rates[0] as any).rate_eur
-    return typeof rate === 'number' ? rate : null
+    const direct = await lookup(serviceType)
+    if (direct != null) return direct
+    // The asked type first, then the legacy rows it grew out of — a tenant
+    // holding only porter/full_service rows keeps pricing check-out days.
+    for (const legacy of HOTEL_LEVEL_FALLBACK[serviceType] ?? []) {
+      const rate = await lookup(legacy)
+      if (rate != null) return rate
+    }
+    return null
   } catch (err) {
     return null
   }
@@ -1887,7 +1905,7 @@ export async function calculateDayBasedPricing(
     // that does not specify one prices exactly as it did before.
     const airportLevel: AirportServiceType = day.services.airport_service_level ?? 'meet_greet'
     const checkinLevel: HotelServiceType = day.services.hotel_checkin_level ?? 'checkin_assist'
-    const checkoutLevel: HotelServiceType = day.services.hotel_checkout_level ?? 'porter'
+    const checkoutLevel: HotelServiceType = day.services.hotel_checkout_level ?? 'checkout_assist'
 
     // ----- AIRPORT SERVICES (fixed per service) -----
     if (day.services.airport_arrival) {

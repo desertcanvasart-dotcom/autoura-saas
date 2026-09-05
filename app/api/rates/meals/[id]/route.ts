@@ -83,7 +83,8 @@ Object.assign(updateData, rateCurrencyWriteField(body))
     if (body.rate_valid_to !== undefined) updateData.rate_valid_to = body.rate_valid_to || null
     if (body.supplier_id !== undefined) updateData.supplier_id = body.supplier_id || null
     if (body.supplier_name !== undefined) updateData.supplier_name = body.supplier_name || null
-    if (body.tier !== undefined) updateData.tier = body.tier || null
+    // 'standard', never NULL — see the POST route: a NULL tier is unpriceable.
+    if (body.tier !== undefined) updateData.tier = body.tier || 'standard'
     if (body.meal_category !== undefined) updateData.meal_category = body.meal_category || null
     if (body.dietary_options !== undefined) updateData.dietary_options = body.dietary_options || []
     if (body.per_person_rate !== undefined) updateData.per_person_rate = body.per_person_rate

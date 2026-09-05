@@ -16,7 +16,7 @@ import { averageRateInOneCurrency } from '@/lib/currency-totals'
 // CONSTANTS
 // ============================================
 
-const SERVICE_TYPES = ['porter', 'checkin_assist', 'full_service', 'concierge']
+const SERVICE_TYPES = ['porter', 'checkin_assist', 'checkout_assist', 'full_service', 'concierge']
 const HOTEL_CATEGORIES = ['budget', 'standard', 'luxury', 'all']
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 

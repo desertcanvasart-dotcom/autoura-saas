@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
-import { Plus, Edit, Save, X, Loader2, DollarSign, Trash2 } from 'lucide-react'
+import { Plus, Edit, Copy, Save, X, Loader2, DollarSign, Trash2 } from 'lucide-react'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -74,6 +74,15 @@ function FixedCostsContent() {
     setShowForm(true)
   }
 
+  // Prefill the create form from an existing row — saving creates a NEW cost,
+  // never overwrites the source (A-item 21).
+  const handleClone = (c: FixedCost) => {
+    setRateCurrency((c as { rate_currency?: string | null }).rate_currency || '')
+    setForm({ cost_type: `${c.cost_type} (copy)`, cost_per_person_per_day: String(c.cost_per_person_per_day), description: c.description || '', is_active: c.is_active })
+    setEditingId(null)
+    setShowForm(true)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4">
@@ -109,7 +118,8 @@ function FixedCostsContent() {
                   <span className={`text-xs px-2 py-0.5 rounded-full ${c.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                     {c.is_active ? 'Active' : 'Inactive'}
                   </span>
-                  <button onClick={() => handleEdit(c)} className="p-1.5 text-gray-400 hover:text-[#647C47]"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => handleEdit(c)} className="p-1.5 text-gray-400 hover:text-[#647C47]" title="Edit"><Edit className="w-4 h-4" /></button>
+                  <button onClick={() => handleClone(c)} className="p-1.5 text-gray-400 hover:text-[#647C47]" title="Duplicate"><Copy className="w-4 h-4" /></button>
                   <button onClick={() => handleDelete(c)} className="p-1.5 text-gray-400 hover:text-red-600" title="Delete"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
