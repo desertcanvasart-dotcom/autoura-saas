@@ -13,7 +13,7 @@ import {
   ShoppingBag, MapPin, Users, Briefcase, X, Edit, Trash2, Eye, Loader2, AlertCircle,
   Phone, Mail, MessageCircle, Percent, LayoutGrid, List, Table2, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, Download, Upload, Plane,
-  Star, Globe, DollarSign, FileText, Calendar, Check
+  Star, Globe, DollarSign, FileText, Calendar, Check, TrainFront
 } from 'lucide-react'
 import SupplierPropertiesPanel from '@/components/SupplierPropertiesPanel'
 import SupplierDocumentsPanel from '@/components/SupplierDocumentsPanel'
@@ -85,6 +85,7 @@ const CRUISE_ROUTES = ['Luxor to Aswan', 'Aswan to Luxor', 'Round Trip', 'Esna t
   hotel: { icon: Building2, label: 'Hotels', singular: 'Hotel', color: 'bg-blue-100 text-blue-700', borderColor: 'border-blue-200' },
   transport_company: { icon: Car, label: 'Transport', singular: 'Transport Company', color: 'bg-cyan-100 text-cyan-700', borderColor: 'border-cyan-200' },
   airline: { icon: Plane, label: 'Airlines', singular: 'Airline', color: 'bg-sky-100 text-sky-700', borderColor: 'border-sky-200' },
+  train_operator: { icon: TrainFront, label: 'Trains', singular: 'Train Operator', color: 'bg-violet-100 text-violet-700', borderColor: 'border-violet-200' },
   driver: { icon: Car, label: 'Drivers', singular: 'Driver', color: 'bg-teal-100 text-teal-700', borderColor: 'border-teal-200' },
   guide: { icon: Compass, label: 'Guides', singular: 'Guide', color: 'bg-green-100 text-green-700', borderColor: 'border-green-200' },
   cruise: { icon: Ship, label: 'Cruises', singular: 'Cruise', color: 'bg-indigo-100 text-indigo-700', borderColor: 'border-indigo-200' },
@@ -232,6 +233,22 @@ export default function SuppliersContent() {
     }
   }, [searchParams])
 
+  // Deep link (dashboard → a contract): /suppliers?supplier=<id>&tab=documents
+  // opens that supplier on that tab once the list has loaded. Once per id.
+  const [deepLinked, setDeepLinked] = useState<string | null>(null)
+  useEffect(() => {
+    const id = searchParams.get('supplier')
+    if (!id || id === deepLinked || suppliers.length === 0) return
+    const row = suppliers.find(s => s.id === id)
+    if (!row) return
+    const tab = searchParams.get('tab')
+    setDeepLinked(id)
+    setSelectedSupplier(row)
+    setViewTab(tab === 'documents' || tab === 'properties' ? tab : 'details')
+    setSupplierRates([])
+    setShowViewModal(true)
+  }, [searchParams, suppliers, deepLinked])
+
   const handleTypeChange = (type: string) => {
     setSelectedType(type)
     setCurrentPage(1)
@@ -348,7 +365,7 @@ export default function SuppliersContent() {
     setOpenMenuId(null)
   }
 
-  const handleView = (supplier: Supplier, tab: 'details' | 'properties' = 'details') => {
+  const handleView = (supplier: Supplier, tab: 'details' | 'properties' | 'documents' = 'details') => {
     setSelectedSupplier(supplier)
     setViewTab(tab)
     setSupplierRates([])

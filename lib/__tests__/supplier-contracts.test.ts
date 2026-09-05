@@ -81,3 +81,18 @@ describe('metadata helpers', () => {
     for (const t of CONTRACT_DOCUMENT_TYPES) expect(CONTRACT_DOCUMENT_TYPE_LABELS[t]).toBeTruthy()
   })
 })
+
+describe('the renewal window', () => {
+  const today = '2026-09-06'
+  it('spans recently expired through the warning horizon', async () => {
+    const { contractsExpiryWindow, daysUntil, describeExpiry } = await import('@/lib/supplier-contracts')
+    expect(contractsExpiryWindow(today)).toEqual({ from: '2026-08-07', to: '2026-11-05' })
+    expect(daysUntil(today, '2026-09-18')).toBe(12)
+    expect(daysUntil(today, '2026-09-03')).toBe(-3)
+    expect(describeExpiry(today, '2026-09-18')).toBe('Expires in 12 days')
+    expect(describeExpiry(today, '2026-09-06')).toBe('Expires today')
+    expect(describeExpiry(today, '2026-09-07')).toBe('Expires tomorrow')
+    expect(describeExpiry(today, '2026-09-05')).toBe('Expired yesterday')
+    expect(describeExpiry(today, '2026-09-03')).toBe('Expired 3 days ago')
+  })
+})

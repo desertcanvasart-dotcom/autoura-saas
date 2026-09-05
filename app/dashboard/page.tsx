@@ -10,6 +10,7 @@ import { createClient } from '@/app/supabase'
 import { useTenant } from '@/app/contexts/TenantContext'
 import TodayOnTheGround from '@/app/components/TodayOnTheGround'
 import NeedsAttention from './NeedsAttention'
+import ExpiringContracts from './ExpiringContracts'
 
 // ============================================
 // THE OPERATOR'S DAY
@@ -214,6 +215,10 @@ export default function DashboardPage() {
       {/* The page says "here's what needs you today" — this is the answer
           (C4). Loads independently so a slow scan never holds up the rest. */}
       <NeedsAttention />
+
+      {/* Supplier agreements running out — the renewal reminder for the
+          contracts kept under Suppliers → Documents. */}
+      <ExpiringContracts />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* The execution layer's cross-trip view: every trip running today
