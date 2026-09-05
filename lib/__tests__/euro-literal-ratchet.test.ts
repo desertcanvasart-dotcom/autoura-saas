@@ -58,8 +58,20 @@ function countEuroLiterals(): Record<string, number> {
         // The \u20AC escape spells the same symbol and was used to slip past
         // this very ratchet (fixed-costs, ServiceRatePicker — A-item 2).
         const src = fs.readFileSync(path.join(ROOT, r), 'utf8')
-        const n =
-          (src.match(/€/g) ?? []).length + (src.match(/\\u20AC/gi) ?? []).length
+        // Every spelling a ratchet-dodger could reach for: the raw symbol,
+        // both JS escapes, the three HTML entities, and building the
+        // character from its code at runtime.
+        const SPELLINGS = [
+          /€/g,
+          /\\u20AC/gi,
+          /\\u\{0*20AC\}/gi,
+          /&euro;/gi,
+          /&#0*8364;/g,
+          /&#x0*20AC;/gi,
+          /fromCharCode\(\s*8364\s*\)/g,
+          /fromCodePoint\(\s*(?:0x0*20AC|8364)\s*\)/gi,
+        ]
+        const n = SPELLINGS.reduce((sum, re) => sum + (src.match(re) ?? []).length, 0)
         if (n) out[r] = n
       }
     }
