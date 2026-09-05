@@ -35,7 +35,6 @@ interface Attraction {
   fee_type?: string
   eur_rate: number
   non_eur_rate: number
-  egyptian_rate?: number
   student_discount_percentage?: number
   child_discount_percent?: number
   season?: string
@@ -233,7 +232,6 @@ export default function AttractionsContent() {
     fee_type: 'standard',
     eur_rate: 0,
     non_eur_rate: 0,
-    egyptian_rate: 0,
     student_discount_percentage: 0,
     child_discount_percent: 0,
     season: 'all_year',
@@ -393,7 +391,6 @@ export default function AttractionsContent() {
       fee_type: 'standard',
       eur_rate: 0,
       non_eur_rate: 0,
-      egyptian_rate: 0,
       student_discount_percentage: 0,
       child_discount_percent: 0,
       season: 'all_year',
@@ -420,7 +417,6 @@ export default function AttractionsContent() {
       fee_type: attraction.fee_type || 'standard',
       eur_rate: attraction.eur_rate,
       non_eur_rate: attraction.eur_rate,
-      egyptian_rate: attraction.egyptian_rate || 0,
       student_discount_percentage: attraction.student_discount_percentage || 0,
       child_discount_percent: attraction.child_discount_percent || 0,
       season: attraction.season || 'all_year',
@@ -577,7 +573,6 @@ export default function AttractionsContent() {
       fee_type: rate.fee_type || 'standard',
       eur_rate: rate.eur_rate,
       non_eur_rate: rate.eur_rate,
-      egyptian_rate: rate.egyptian_rate || 0,
       student_discount_percentage: rate.student_discount_percentage || 0,
       child_discount_percent: rate.child_discount_percent || 0,
       season: rate.season || 'all_year',
@@ -1208,21 +1203,6 @@ export default function AttractionsContent() {
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Egyptian Rate ({rateSymbol})
-                    </label>
-                    <input
-                      type="number"
-                      name="egyptian_rate"
-                      value={formData.egyptian_rate}
-                      onChange={handleChange}
-                      step="0.01"
-                      min="0"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                      placeholder="0.00"
-                    />
-                  </div>
                 </div>
               </div>
 

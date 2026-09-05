@@ -103,7 +103,6 @@ export async function POST(request: NextRequest) {
       fee_type: body.fee_type || 'standard',
       eur_rate: parseFloat(body.eur_rate) || 0,
       non_eur_rate: parseFloat(body.non_eur_rate) || 0,
-      egyptian_rate: body.egyptian_rate ? parseFloat(body.egyptian_rate) : null,
       student_discount_percentage: body.student_discount_percentage || 50,
       child_discount_percent: body.child_discount_percent || 50,
       season: body.season || 'all_year',
