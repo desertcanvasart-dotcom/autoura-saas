@@ -457,7 +457,10 @@ export default function SuppliersContent() {
       if (data.typeDefaulted?.length) bits.push(`${data.typeDefaulted.length} had no Type — imported as "Other", reclassify when convenient`)
       if (data.skippedExisting?.length) bits.push(`${data.skippedExisting.length} already existed (skipped)`)
       if (data.refused?.length) bits.push(`${data.refused.length} refused (${data.refused.slice(0, 3).map((r: { reason: string }) => r.reason).join('; ')}${data.refused.length > 3 ? '…' : ''})`)
-      showToast(data.refused?.length ? 'warning' : 'success', `Suppliers import: ${bits.join(' · ')}`)
+      // A result that still needs the user's attention (refusals to fix,
+      // types to reclassify) is a WARNING — sticky until dismissed.
+      const needsAttention = Boolean(data.refused?.length || data.typeDefaulted?.length)
+      showToast(needsAttention ? 'warning' : 'success', `Suppliers import: ${bits.join(' · ')}`)
       fetchSuppliers()
     } catch (err) {
       showToast('error', `Suppliers import failed: ${err instanceof Error ? err.message : 'network error'}`)
