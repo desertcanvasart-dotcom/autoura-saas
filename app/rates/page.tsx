@@ -5,6 +5,7 @@ import { todayLocal } from '@/lib/today'
 import { RATES_TAB_ORDER, firstTabWithData, type RatesTab } from '@/lib/rates/first-tab-with-data'
 import Link from 'next/link'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 // ============================================
 // INTERFACES
@@ -12,6 +13,7 @@ import { useCurrency } from '@/hooks/useCurrency'
 
 interface BaseRate {
   id?: string
+  rate_currency?: string | null
   service_code?: string
   city?: string
   eur_rate?: number | null
@@ -76,6 +78,7 @@ interface MealRate extends BaseRate {
 }
 
 interface AirportStaffRate {
+  rate_currency?: string | null
   id: string
   service_code: string
   airport_code: string
@@ -90,6 +93,7 @@ interface AirportStaffRate {
 }
 
 interface HotelStaffRate {
+  rate_currency?: string | null
   id: string
   service_code: string
   service_type: string
@@ -102,6 +106,7 @@ interface HotelStaffRate {
 }
 
 interface CruiseRate {
+  rate_currency?: string | null
   id: string
   cruise_code: string
   ship_name: string
@@ -122,6 +127,7 @@ interface CruiseRate {
 }
 
 interface SleepingTrainRate {
+  rate_currency?: string | null
   id: string
   service_code: string
   operator_name: string
@@ -141,6 +147,7 @@ interface SleepingTrainRate {
 }
 
 interface TrainRate {
+  rate_currency?: string | null
   id: string
   service_code: string
   operator_name: string
@@ -158,6 +165,7 @@ interface TrainRate {
 }
 
 interface TippingRate {
+  rate_currency?: string | null
   id: string
   service_code: string
   role_type: string
@@ -199,20 +207,22 @@ export default function RatesPage() {
   const [showSeasonalPricing, setShowSeasonalPricing] = useState(false)
 
   // Currency hook for user's preferred currency
-  const { display, userCurrency, loading: currencyLoading } = useCurrency()
+  const { loading: currencyLoading } = useCurrency()
 
-  // Helper to get the correct rate based on user currency (EUR vs non-EUR)
-  const getRate = (eurRate: number | undefined, nonEurRate: number | undefined): number => {
-    const rate = userCurrency === 'EUR' ? (eurRate || 0) : (nonEurRate || eurRate || 0)
-    return rate
-  }
-
-  // Display rate in user's currency
-  const displayRate = (eurRate: number | null | undefined, nonEurRate?: number | null | undefined): string => {
+  // A rates table shows what the operator TYPED, in the currency it was
+  // typed in (the row's rate_currency, else the tenant's rates currency) —
+  // it never converts. This page used to push every raw number through the
+  // org-currency converter with a hardcoded 'EUR' source, so an EGP row was
+  // multiplied by an FX rate and displayed as no currency at all (A-item 2).
+  const { fmtRate } = useRateRowFormat()
+  const displayRate = (
+    row: { rate_currency?: string | null; base_rate_eur?: number | null; eur_rate?: number | null },
+    value?: number | null
+  ): string => {
+    const amount = value ?? row.base_rate_eur ?? row.eur_rate
     // An unpriced row is a dash, never a zero-looking price.
-    if (eurRate == null && nonEurRate == null) return '—'
-    const rate = getRate(eurRate ?? undefined, nonEurRate ?? undefined)
-    return display(rate, 'EUR')
+    if (amount == null) return '—'
+    return fmtRate(amount, row, 2)
   }
 
   // Pagination state
@@ -858,7 +868,7 @@ export default function RatesPage() {
           {/* Currency indicator */}
           <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
             <span className="text-xs text-gray-500">
-              Showing rates in <span className="font-semibold text-gray-700">{userCurrency}</span>
+              Rates are shown in the currency each rate was entered in
             </span>
             {currencyLoading && (
               <span className="text-xs text-gray-400">Loading currency...</span>
@@ -898,7 +908,7 @@ export default function RatesPage() {
                         }
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {displayRate(rate.base_rate_eur || rate.eur_rate, rate.base_rate_non_eur || rate.non_eur_rate)}
+                        {displayRate(rate)}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">{rate.supplier_name || '-'}</td>
                     </tr>
@@ -945,7 +955,7 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {displayRate(rate.base_rate_eur || rate.eur_rate, rate.base_rate_non_eur || rate.non_eur_rate)}
+                        {displayRate(rate)}
                       </td>
                     </tr>
                   ))}
@@ -991,7 +1001,7 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {displayRate(rate.base_rate_eur || rate.eur_rate, rate.base_rate_non_eur || rate.non_eur_rate)}
+                        {displayRate(rate)}
                       </td>
                     </tr>
                   ))}
@@ -1041,7 +1051,7 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {displayRate(rate.base_rate_eur, rate.base_rate_non_eur)}
+                        {displayRate(rate)}
                       </td>
                     </tr>
                   ))}
@@ -1081,7 +1091,7 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {displayRate(rate.base_rate_eur || rate.eur_rate, rate.base_rate_non_eur || rate.non_eur_rate)}
+                        {displayRate(rate)}
                       </td>
                     </tr>
                   ))}
@@ -1152,13 +1162,13 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {display(rate.rate_single_eur, 'EUR')}
+                        {displayRate(rate, rate.rate_single_eur)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-blue-600">
-                        {display(rate.rate_double_eur, 'EUR')}
+                        {displayRate(rate, rate.rate_double_eur)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-purple-600">
-                        {rate.rate_triple_eur ? display(rate.rate_triple_eur, 'EUR') : '-'}
+                        {rate.rate_triple_eur ? displayRate(rate, rate.rate_triple_eur) : '-'}
                       </td>
                     </tr>
                   ))}
@@ -1216,10 +1226,10 @@ export default function RatesPage() {
                         {rate.arrival_time || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {display(rate.rate_oneway_eur, 'EUR')}
+                        {displayRate(rate, rate.rate_oneway_eur)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-purple-600">
-                        {rate.rate_roundtrip_eur ? display(rate.rate_roundtrip_eur, 'EUR') : '-'}
+                        {rate.rate_roundtrip_eur ? displayRate(rate, rate.rate_roundtrip_eur) : '-'}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">
                         {rate.meals_included || 'Dinner & Breakfast'}
@@ -1278,7 +1288,7 @@ export default function RatesPage() {
                         {rate.departure_times || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {display(rate.rate_eur, 'EUR')}
+                        {displayRate(rate, rate.rate_eur)}
                       </td>
                     </tr>
                   ))}
@@ -1337,7 +1347,7 @@ export default function RatesPage() {
                         {rate.description || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {displayRate(rate.rate_eur, rate.rate_non_eur)}
+                        {displayRate(rate, rate.rate_eur)}
                       </td>
                     </tr>
                   ))}
@@ -1394,7 +1404,7 @@ export default function RatesPage() {
                         {rate.description || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {displayRate(rate.rate_eur, rate.rate_non_eur)}
+                        {displayRate(rate, rate.rate_eur)}
                       </td>
                     </tr>
                   ))}
@@ -1452,7 +1462,7 @@ export default function RatesPage() {
                         {rate.description || '-'}
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                        {display(rate.rate_eur, 'EUR')}
+                        {displayRate(rate, rate.rate_eur)}
                       </td>
                     </tr>
                   ))}

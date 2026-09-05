@@ -1904,7 +1904,7 @@ export default function HotelsContent() {
                   Low Season Rates
                   <span className="text-xs font-normal text-gray-500 ml-2">(PPD Model - Set your own dates)</span>
                 </h3>
-                <p className="text-xs text-gray-500 mb-2 italic">Enter rates in EUR (base currency)</p>
+                <p className="text-xs text-gray-500 mb-2 italic">Enter rates in the rate&rsquo;s currency ({rateSymbol})</p>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   {/* Date Range */}
                   <div className="grid grid-cols-2 gap-3 mb-4 pb-3 border-b border-blue-200">
@@ -2003,7 +2003,7 @@ export default function HotelsContent() {
                   High Season Rates
                   <span className="text-xs font-normal text-gray-500 ml-2">(PPD Model - Set your own dates)</span>
                 </h3>
-                <p className="text-xs text-gray-500 mb-2 italic">Enter rates in EUR (base currency)</p>
+                <p className="text-xs text-gray-500 mb-2 italic">Enter rates in the rate&rsquo;s currency ({rateSymbol})</p>
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                   {/* Date Range */}
                   <div className="grid grid-cols-2 gap-3 mb-4 pb-3 border-b border-orange-200">
@@ -2104,7 +2104,7 @@ export default function HotelsContent() {
                   Peak Season Rates
                   <span className="text-xs font-normal text-gray-500 ml-2">(PPD Model - Holidays, special events)</span>
                 </h3>
-                <p className="text-xs text-gray-500 mb-2 italic">Enter rates in EUR (base currency)</p>
+                <p className="text-xs text-gray-500 mb-2 italic">Enter rates in the rate&rsquo;s currency ({rateSymbol})</p>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   {/* Date Ranges - Primary and Secondary */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 pb-3 border-b border-red-200">
