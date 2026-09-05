@@ -265,8 +265,9 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update airline_code if airline changed
-    if (updates.airline) {
+    // The explicit IATA code on the rate wins (B-item 7); recompute from
+    // the airline name only when no code was sent.
+    if (updates.airline && !updates.airline_code) {
       updates.airline_code = getAirlineCode(updates.airline)
     }
 

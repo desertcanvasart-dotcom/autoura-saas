@@ -65,6 +65,9 @@ interface FormData {
   tax_eur: number
   /** Throughout guide's negotiated fare — blank = guide pays customer fare. */
   guide_rate?: string | number
+  /** IATA carrier code ON THE RATE (B-item 7) — auto-filled from the known
+   *  airlines or the picked supplier, editable. */
+  airline_code?: string
   baggage_kg: number
   departure_time: string
   arrival_time: string
@@ -91,6 +94,7 @@ const initialFormData: FormData = {
   base_rate_non_eur: 0,
   tax_eur: 0,
   guide_rate: '' as string | number,
+  airline_code: 'MS',
   baggage_kg: 23,
   departure_time: '',
   arrival_time: '',
@@ -281,9 +285,12 @@ export default function FlightsContent() {
   }
 
   const handleAirlineChange = (airline: string) => {
+    const known = AIRLINES.find(a => a.name === airline)
     setFormData(prev => ({
       ...prev,
       airline,
+      // IATA auto-fills from the known-carrier list; stays editable.
+      airline_code: known && known.code !== 'Other' ? known.code : prev.airline_code,
       service_code: generateServiceCode(prev.route_from, prev.route_to, airline, prev.cabin_class)
     }))
   }
@@ -298,10 +305,19 @@ export default function FlightsContent() {
 
   const handleSupplierChange = (supplierId: string) => {
     const supplier = suppliers.find(s => s.id === supplierId)
+    // The airline on a flight rate IS a supplier (B-item 7): picking an
+    // air-carrier supplier names the airline too, and fills the IATA code
+    // when the carrier is a known one.
+    const known = supplier && AIRLINES.find(a => a.name.toLowerCase() === supplier.name.toLowerCase())
     setFormData(prev => ({
       ...prev,
       supplier_id: supplierId,
-      supplier_name: supplier?.name || ''
+      supplier_name: supplier?.name || '',
+      ...(supplier ? { airline: supplier.name } : {}),
+      ...(known && known.code !== 'Other' ? { airline_code: known.code } : {}),
+      ...(supplier
+        ? { service_code: generateServiceCode(prev.route_from, prev.route_to, supplier.name, prev.cabin_class) }
+        : {}),
     }))
   }
 
@@ -339,6 +355,7 @@ export default function FlightsContent() {
       base_rate_non_eur: rate.base_rate_non_eur || 0,
       tax_eur: rate.tax_eur || 0,
       guide_rate: (rate as { guide_rate?: number | null }).guide_rate ?? '',
+      airline_code: (rate as { airline_code?: string | null }).airline_code || '',
       baggage_kg: rate.baggage_kg || 23,
       departure_time: rate.departure_time || '',
       arrival_time: rate.arrival_time || '',
@@ -402,6 +419,7 @@ export default function FlightsContent() {
         tax_non_eur: formData.tax_eur,
         ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency),
         supplier_id: formData.supplier_id || null,
+        airline_code: (formData.airline_code || '').trim().toUpperCase() || null,
         flight_number: formData.flight_number || null,
         departure_time: formData.departure_time || null,
         arrival_time: formData.arrival_time || null,
@@ -537,6 +555,7 @@ export default function FlightsContent() {
       base_rate_non_eur: rate.base_rate_non_eur || 0,
       tax_eur: rate.tax_eur || 0,
       guide_rate: (rate as { guide_rate?: number | null }).guide_rate ?? '',
+      airline_code: (rate as { airline_code?: string | null }).airline_code || '',
       baggage_kg: rate.baggage_kg || 23,
       departure_time: rate.departure_time || '',
       arrival_time: rate.arrival_time || '',
@@ -846,6 +865,11 @@ export default function FlightsContent() {
                   </td>
                   <td className="px-4 py-2">
                     <span className="text-sm text-gray-700">{rate.airline}</span>
+                    {(rate as { airline_code?: string | null }).airline_code && (
+                      <span className="ml-1.5 text-[10px] font-mono font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded px-1 py-0.5">
+                        {(rate as { airline_code?: string | null }).airline_code}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     {rate.flight_number ? (
@@ -1084,10 +1108,26 @@ export default function FlightsContent() {
                       required
                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                     >
+                      {/* An airline picked via the supplier dropdown may not
+                          be in the fixed list — keep it selectable. */}
+                      {formData.airline && !AIRLINES.some(a => a.name === formData.airline) && (
+                        <option value={formData.airline}>{formData.airline} (supplier)</option>
+                      )}
                       {AIRLINES.map(airline => (
                         <option key={airline.code} value={airline.name}>{airline.name}</option>
                       ))}
                     </select>
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">IATA code</label>
+                      <input
+                        type="text"
+                        value={formData.airline_code || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, airline_code: e.target.value.toUpperCase().slice(0, 3) }))}
+                        maxLength={3}
+                        placeholder="MS"
+                        className="w-24 px-3 py-1.5 text-sm border border-gray-200 rounded-md font-mono uppercase"
+                      />
+                    </div>
                   </div>
 
                   <div>

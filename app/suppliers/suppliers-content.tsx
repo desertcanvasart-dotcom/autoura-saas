@@ -3,6 +3,7 @@
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 import { useState, useEffect, useRef } from 'react'
+import { showToast } from '@/app/contexts/ToastContext'
 import { todayLocal } from '@/lib/today'
 import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -10,7 +11,7 @@ import {
   Search, Plus, MoreHorizontal, Building2, Car, Compass, Ship, Ticket, Utensils, 
   ShoppingBag, MapPin, Users, Briefcase, X, Edit, Trash2, Eye, Loader2, AlertCircle,
   Phone, Mail, MessageCircle, Percent, LayoutGrid, List, Table2, ChevronUp, ChevronDown,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, Download,
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, Download, Upload, Plane,
   Star, Globe, DollarSign, FileText, Calendar, Check
 } from 'lucide-react'
 import SupplierPropertiesPanel from '@/components/SupplierPropertiesPanel'
@@ -90,6 +91,7 @@ const CRUISE_ROUTES = ['Luxor to Aswan', 'Aswan to Luxor', 'Round Trip', 'Esna t
   const TYPE_CONFIG: Record<string, { icon: any; label: string; singular: string; color: string; borderColor: string }> = {
   hotel: { icon: Building2, label: 'Hotels', singular: 'Hotel', color: 'bg-blue-100 text-blue-700', borderColor: 'border-blue-200' },
   transport_company: { icon: Car, label: 'Transport', singular: 'Transport Company', color: 'bg-cyan-100 text-cyan-700', borderColor: 'border-cyan-200' },
+  airline: { icon: Plane, label: 'Airlines', singular: 'Airline', color: 'bg-sky-100 text-sky-700', borderColor: 'border-sky-200' },
   driver: { icon: Car, label: 'Drivers', singular: 'Driver', color: 'bg-teal-100 text-teal-700', borderColor: 'border-teal-200' },
   guide: { icon: Compass, label: 'Guides', singular: 'Guide', color: 'bg-green-100 text-green-700', borderColor: 'border-green-200' },
   cruise: { icon: Ship, label: 'Cruises', singular: 'Cruise', color: 'bg-indigo-100 text-indigo-700', borderColor: 'border-indigo-200' },
@@ -430,6 +432,35 @@ export default function SuppliersContent() {
     }
   }
 
+  // CSV import (B-item 7): the export's own format round-trips. The server
+  // refuses in-file duplicate names and SKIPS names that already exist —
+  // an import creates, it never silently updates.
+  const importInputRef = useRef<HTMLInputElement | null>(null)
+  const handleImportFile = async (file: File) => {
+    try {
+      const csvData = await file.text()
+      const res = await fetch('/api/suppliers/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvData }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setError(data.error || 'Import failed')
+        return
+      }
+      const bits = [`${data.inserted} imported`]
+      if (data.skippedExisting?.length) bits.push(`${data.skippedExisting.length} already existed (skipped)`)
+      if (data.refused?.length) bits.push(`${data.refused.length} refused (${data.refused.slice(0, 3).map((r: { reason: string }) => r.reason).join('; ')}${data.refused.length > 3 ? '…' : ''})`)
+      showToast(data.refused?.length ? 'warning' : 'success', `Suppliers import: ${bits.join(' · ')}`)
+      fetchSuppliers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   const handleExport = () => {
     const csv = [
       ['Name', 'Type', 'Contact', 'Email', 'Phone', 'City', 'Commission', 'Status'].join(','),
@@ -582,6 +613,20 @@ export default function SuppliersContent() {
                 ))}
               </div>
               <div className="w-px h-6 bg-gray-200" />
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportFile(f) }}
+              />
+              <button
+                onClick={() => importInputRef.current?.click()}
+                title="Import suppliers from a CSV (the Export format round-trips)"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <Upload className="w-4 h-4" /> Import
+              </button>
               <button onClick={handleExport} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
                 <Download className="w-4 h-4" /> Export
               </button>

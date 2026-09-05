@@ -81,6 +81,10 @@ export async function PUT(
     if (updates.guide_rate !== undefined) {
       updates.guide_rate = updates.guide_rate === '' || updates.guide_rate === null ? null : Number(updates.guide_rate)
     }
+    // IATA code (B-item 7): normalize; a cleared code stores as null, never ''.
+    if (updates.airline_code !== undefined) {
+      updates.airline_code = String(updates.airline_code ?? '').trim().toUpperCase() || null
+    }
 
     // Regenerate route_name if route fields changed
     if (updates.route_from || updates.route_to) {
