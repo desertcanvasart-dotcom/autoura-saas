@@ -35,19 +35,24 @@ function walk(dir: string, out: string[] = []): string[] {
 const rel = (f: string) => f.replace(ROOT + '/', '')
 const lineOf = (src: string, i: number) => src.slice(0, i).split('\n').length
 
-/** True when the call starting at `open` ('(') has a top-level comma. */
-function hasSecondArgument(src: string, open: number): boolean {
+/** The text of the call's second argument (call starts at `open`, a '('),
+ *  or null when there is no top-level comma. */
+function secondArgument(src: string, open: number): string | null {
   let depth = 0
+  let commaAt = -1
   for (let i = open; i < src.length; i++) {
     const ch = src[i]
     if (ch === '(' || ch === '[' || ch === '{') depth++
     else if (ch === ')' || ch === ']' || ch === '}') {
       depth--
-      if (depth === 0) return false
-    } else if (ch === ',' && depth === 1) return true
+      if (depth === 0) return commaAt === -1 ? null : src.slice(commaAt + 1, i).trim()
+    } else if (ch === ',' && depth === 1 && commaAt === -1) commaAt = i
   }
-  return false
+  return null
 }
+
+const hasSecondArgument = (src: string, open: number): boolean =>
+  secondArgument(src, open) !== null
 
 describe('row-currency display', () => {
   it('every convert() on a rates page names the currency it is converting FROM', () => {
@@ -69,6 +74,31 @@ describe('row-currency display', () => {
       'Pass the source currency: convert(amount, row.rate_currency || tenantCurrency). ' +
         'To display a rate as entered — which is what a rates table should do — ' +
         'use fmtRate(amount, row) from useRateRowFormat() and do not convert at all.'
+    ).toEqual([])
+  })
+
+  it("the named source currency is the ROW's, never a quoted literal", () => {
+    // convert(amount, 'EUR') passes the first rule while making the same
+    // assumption it exists to forbid: since migration 298 a *_eur column
+    // holds the tenant's rates currency, so the source must be read off the
+    // row (row.rate_currency || tenantCurrency), not asserted in quotes. If
+    // a value truly is a fixed currency by definition, put it in a named
+    // constant whose comment says why — the literal-in-the-call is what
+    // this forbids.
+    const violations: string[] = []
+    for (const file of walk(RATES)) {
+      const src = readFileSync(file, 'utf8')
+      for (const m of src.matchAll(/(?<![A-Za-z_$.])convert\(/g)) {
+        const open = m.index! + m[0].length - 1
+        const arg = secondArgument(src, open)
+        if (arg && /^['"`][A-Za-z]{3}['"`]$/.test(arg)) {
+          violations.push(`${rel(file)}:${lineOf(src, m.index!)} — convert(amount, ${arg}) hardcodes the source currency`)
+        }
+      }
+    }
+    expect(
+      violations,
+      "Read the source currency off the record: convert(amount, row.rate_currency || tenantCurrency)."
     ).toEqual([])
   })
 
