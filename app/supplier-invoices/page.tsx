@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Receipt, Plus, Search, Upload, Loader2, X, Sparkles } from 'lucide-react'
+import { Receipt, Plus, Upload, Loader2, X, Sparkles } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 
@@ -118,9 +118,8 @@ export default function SupplierInvoicesPage() {
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search supplier..."
-            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]" />
+            className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]" />
         </div>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
           <option value="">All statuses</option>{['received', 'matched', 'approved', 'paid', 'disputed', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}

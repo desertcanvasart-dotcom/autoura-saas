@@ -6,7 +6,6 @@ import {
   User,
   Link as LinkIcon,
   Unlink,
-  Search,
   Loader2,
   Check,
   X,
@@ -226,13 +225,12 @@ export default function ClientLinkButton({
           <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
             <div className="p-3 border-b border-gray-100">
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search clients..."
-                  className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  className="w-full pl-3 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500"
                   autoFocus
                 />
               </div>

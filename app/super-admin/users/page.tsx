@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Search, User, Ban, CheckCircle2, Trash2 } from 'lucide-react'
+import { User, Ban, CheckCircle2, Trash2 } from 'lucide-react'
 
 export default function UsersListPage() {
   const [users, setUsers] = useState<any[]>([])
@@ -67,13 +67,12 @@ export default function UsersListPage() {
       </div>
 
       <div className="relative max-w-md mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
         <input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search by name or email..."
-          className="w-full pl-9 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-blue-500 outline-none"
+          className="w-full pl-3 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-blue-500 outline-none"
         />
       </div>
 

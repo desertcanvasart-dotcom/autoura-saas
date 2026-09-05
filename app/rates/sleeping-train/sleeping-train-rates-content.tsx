@@ -7,7 +7,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useCurrency } from '@/hooks/useCurrency'
-import { BedDouble, Plus, Search, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, Moon, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
+import { BedDouble, Plus, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, Moon, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
@@ -650,13 +650,12 @@ export default function SleepingTrainRatesContent() {
           {/* Search */}
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search rates..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
+                className="w-full pl-3 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
               />
             </div>
           </div>

@@ -8,7 +8,6 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Search,
   FileText,
   ExternalLink,
   Plus,
@@ -327,13 +326,12 @@ export default function PaymentsPage() {
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 flex flex-wrap gap-3">
         <div className="flex-1 min-w-[200px] relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search by client, reference, or transaction..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="w-full pl-3 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
         <select

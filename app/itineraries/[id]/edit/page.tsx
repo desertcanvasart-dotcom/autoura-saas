@@ -28,7 +28,6 @@ import {
   User,
   Ticket,
   Car,
-  Search,
   Trash2,
   Edit3,
   DollarSign,
@@ -1619,13 +1618,12 @@ export default function ItineraryEditorPage() {
             </div>
             <div className="p-4">
               <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
                   type="text"
                   placeholder="Search attractions..."
                   value={attractionSearch}
                   onChange={(e) => setAttractionSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#647C47]"
+                  className="w-full pl-4 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:border-[#647C47]"
                 />
               </div>
 

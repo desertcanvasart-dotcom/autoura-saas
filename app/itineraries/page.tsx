@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Plus, FileText, Eye, Edit2, Trash2, CheckCircle2, AlertCircle, X } from 'lucide-react'
+import { Plus, FileText, Eye, Edit2, Trash2, CheckCircle2, AlertCircle, X } from 'lucide-react'
 
 interface Itinerary {
   id: string
@@ -294,13 +294,12 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
 
       {/* ⭐ SLIM SEARCH BAR */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
           type="text"
           placeholder="Search by client name, trip name, or code..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+          className="w-full pl-4 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
         />
       </div>
 

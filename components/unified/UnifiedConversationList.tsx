@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, RefreshCw, Loader2, Mail, Archive, User } from 'lucide-react'
+import { RefreshCw, Loader2, Mail, Archive, User } from 'lucide-react'
 import ChannelBadge from './ChannelBadge'
 
 interface Conversation {
@@ -80,8 +80,7 @@ export default function UnifiedConversationList({ onSelectConversation, selected
           </button>
         </div>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-8 pr-3 py-1.5 text-sm bg-gray-100 border-none rounded-lg focus:bg-white focus:ring-1 focus:ring-[#647C47] outline-none" />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="w-full pl-3 pr-3 py-1.5 text-sm bg-gray-100 border-none rounded-lg focus:bg-white focus:ring-1 focus:ring-[#647C47] outline-none" />
         </div>
         <div className="flex gap-1 mt-2">
           <button onClick={() => setFilter('active')} className={`px-2.5 py-1 text-xs rounded-full ${filter === 'active' ? 'bg-[#647C47] text-white' : 'text-gray-500 hover:bg-gray-100'}`}>Active</button>
