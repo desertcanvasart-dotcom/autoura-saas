@@ -16,7 +16,7 @@ import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
 import { displayPpd } from '@/lib/rates/rate-seasons'
-import { parseSeasons, type RateSeason } from '@/lib/rates/rate-seasons'
+import { seasonsForRow, type RateSeason } from '@/lib/rates/rate-seasons'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
@@ -718,7 +718,9 @@ export default function HotelsContent() {
     const deriveTripleRed = (tripleRate: number, ppd: number) => Math.max(0, ppd - (tripleRate / 3))
 
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
-    setPeriods(parseSeasons((rate as { seasons?: unknown }).seasons, 'accommodation') ?? [])
+    // Legacy rows: fixed Low/High/Peak columns surface as editable named
+    // periods (seasonsForRow derives them); saving writes them as periods.
+    setPeriods(seasonsForRow(rate, 'accommodation'))
     setFormData({
       service_code: rate.service_code || '',
       property_name: rate.property_name || '',
@@ -900,7 +902,9 @@ export default function HotelsContent() {
   const handleClone = (rate: AccommodationRate) => {
     setEditingRate(null) // This is a new record
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
-    setPeriods(parseSeasons((rate as { seasons?: unknown }).seasons, 'accommodation') ?? [])
+    // Legacy rows: fixed Low/High/Peak columns surface as editable named
+    // periods (seasonsForRow derives them); saving writes them as periods.
+    setPeriods(seasonsForRow(rate, 'accommodation'))
     setFormData({
       service_code: '', // Will be auto-generated
       property_name: rate.property_name,
@@ -1901,45 +1905,32 @@ export default function HotelsContent() {
 
                 <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">4</span>
-                  Low Season Rates
-                  <span className="text-xs font-normal text-gray-500 ml-2">(PPD Model - Set your own dates)</span>
+                  Base Rate
+                  <span className="text-xs font-normal text-gray-500 ml-2">(PPD Model — used when no contract period covers the travel date)</span>
                 </h3>
-                <p className="text-xs text-gray-500 mb-2 italic">Enter rates in the rate&rsquo;s currency ({rateSymbol})</p>
+                <p className="text-xs text-gray-500 mb-2 italic">Enter amounts in the rate&rsquo;s own currency — the Currency field above names it.</p>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  {/* Date Range */}
-                  <div className="grid grid-cols-2 gap-3 mb-4 pb-3 border-b border-blue-200">
-                    <div>
-                      <label className="block text-xs font-medium text-blue-700 mb-1">From <span className="text-gray-400">(optional)</span></label>
-                      <input type="date" name="low_season_from" value={formData.low_season_from} onChange={handleChange}
-                        className="w-full px-3 py-2 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-blue-700 mb-1">To <span className="text-gray-400">(optional)</span></label>
-                      <input type="date" name="low_season_to" value={formData.low_season_to} onChange={handleChange}
-                        className="w-full px-3 py-2 text-sm border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white" />
-                    </div>
-                  </div>
 
                   {/* EU Passport Holders - PPD Model */}
                   <p className="text-xs font-medium text-gray-600 mb-2">EU Passport Holders</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol}) *</label>
+                      <label className="block text-xs text-gray-500 mb-1">PPD *</label>
                       <input type="number" name="ppd_eur" value={formData.ppd_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-blue-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent bg-white font-medium" placeholder="Per Person Double" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
+                      <label className="block text-xs text-gray-500 mb-1">Single Supp</label>
                       <input type="number" name="single_supplement_eur" value={formData.single_supplement_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
+                      <label className="block text-xs text-gray-500 mb-1">Triple Red</label>
                       <input type="number" name="triple_reduction_eur" value={formData.triple_reduction_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
+                      <label className="block text-xs text-gray-500 mb-1">Suite</label>
                       <input type="number" name="suite_rate_eur" value={formData.suite_rate_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
@@ -1961,22 +1952,22 @@ export default function HotelsContent() {
                   <p className="text-xs font-medium text-gray-600 mb-2">Non-EU Passport Holders</p>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol})</label>
+                      <label className="block text-xs text-gray-500 mb-1">PPD</label>
                       <input type="number" name="ppd_non_eur" value={formData.ppd_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
+                      <label className="block text-xs text-gray-500 mb-1">Single Supp</label>
                       <input type="number" name="single_supplement_non_eur" value={formData.single_supplement_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
+                      <label className="block text-xs text-gray-500 mb-1">Triple Red</label>
                       <input type="number" name="triple_reduction_non_eur" value={formData.triple_reduction_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
+                      <label className="block text-xs text-gray-500 mb-1">Suite</label>
                       <input type="number" name="suite_rate_non_eur" value={formData.suite_rate_non_eur} onChange={handleChange} step="0.01" min="0"
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
                     </div>
@@ -1990,218 +1981,6 @@ export default function HotelsContent() {
                         <span>Single: <strong>{rateSymbol}{(formData.ppd_non_eur + formData.single_supplement_non_eur).toFixed(2)}</strong></span>
                         <span>Double: <strong>{rateSymbol}{(formData.ppd_non_eur * 2).toFixed(2)}</strong></span>
                         <span>Triple: <strong>{rateSymbol}{((formData.ppd_non_eur - formData.triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* SECTION 5: High Season Rates - PPD Model */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">5</span>
-                  High Season Rates
-                  <span className="text-xs font-normal text-gray-500 ml-2">(PPD Model - Set your own dates)</span>
-                </h3>
-                <p className="text-xs text-gray-500 mb-2 italic">Enter rates in the rate&rsquo;s currency ({rateSymbol})</p>
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  {/* Date Range */}
-                  <div className="grid grid-cols-2 gap-3 mb-4 pb-3 border-b border-orange-200">
-                    <div>
-                      <label className="block text-xs font-medium text-orange-700 mb-1">From <span className="text-gray-400">(optional)</span></label>
-                      <input type="date" name="high_season_from" value={formData.high_season_from} onChange={handleChange}
-                        title="High season start date"
-                        className="w-full px-3 py-2 text-sm border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-orange-700 mb-1">To <span className="text-gray-400">(optional)</span></label>
-                      <input type="date" name="high_season_to" value={formData.high_season_to} onChange={handleChange}
-                        title="High season end date"
-                        className="w-full px-3 py-2 text-sm border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white" />
-                    </div>
-                  </div>
-
-                  {/* EU Passport Holders - PPD Model */}
-                  <p className="text-xs font-medium text-gray-600 mb-2">EU Passport Holders</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol})</label>
-                      <input type="number" name="high_season_ppd_eur" value={formData.high_season_ppd_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-orange-400 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent bg-white font-medium" placeholder="Per Person Double" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
-                      <input type="number" name="high_season_single_supplement_eur" value={formData.high_season_single_supplement_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
-                      <input type="number" name="high_season_triple_reduction_eur" value={formData.high_season_triple_reduction_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
-                      <input type="number" name="high_season_suite_eur" value={formData.high_season_suite_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                  </div>
-
-                  {/* Calculated Room Rates - EU */}
-                  {formData.high_season_ppd_eur > 0 && (
-                    <div className="mb-4 p-2 bg-orange-100 rounded-lg">
-                      <p className="text-xs text-orange-700 font-medium mb-1">Calculated Room Rates (EU Passport):</p>
-                      <div className="flex gap-4 text-xs text-orange-800">
-                        <span>Single: <strong>{rateSymbol}{(formData.high_season_ppd_eur + formData.high_season_single_supplement_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>{rateSymbol}{(formData.high_season_ppd_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>{rateSymbol}{((formData.high_season_ppd_eur - formData.high_season_triple_reduction_eur) * 3).toFixed(2)}</strong></span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Non-EU Passport Holders - PPD Model */}
-                  <p className="text-xs font-medium text-gray-600 mb-2">Non-EU Passport Holders</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol})</label>
-                      <input type="number" name="high_season_ppd_non_eur" value={formData.high_season_ppd_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
-                      <input type="number" name="high_season_single_supplement_non_eur" value={formData.high_season_single_supplement_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
-                      <input type="number" name="high_season_triple_reduction_non_eur" value={formData.high_season_triple_reduction_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
-                      <input type="number" name="high_season_suite_non_eur" value={formData.high_season_suite_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                  </div>
-
-                  {/* Calculated Room Rates - Non-EU */}
-                  {formData.high_season_ppd_non_eur > 0 && (
-                    <div className="mt-3 p-2 bg-orange-100 rounded-lg">
-                      <p className="text-xs text-orange-700 font-medium mb-1">Calculated Room Rates (Non-EU Passport):</p>
-                      <div className="flex gap-4 text-xs text-orange-800">
-                        <span>Single: <strong>{rateSymbol}{(formData.high_season_ppd_non_eur + formData.high_season_single_supplement_non_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>{rateSymbol}{(formData.high_season_ppd_non_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>{rateSymbol}{((formData.high_season_ppd_non_eur - formData.high_season_triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* SECTION 6: Peak Season Rates - PPD Model */}
-              <div className="mb-6">
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xs font-bold">6</span>
-                  Peak Season Rates
-                  <span className="text-xs font-normal text-gray-500 ml-2">(PPD Model - Holidays, special events)</span>
-                </h3>
-                <p className="text-xs text-gray-500 mb-2 italic">Enter rates in the rate&rsquo;s currency ({rateSymbol})</p>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  {/* Date Ranges - Primary and Secondary */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 pb-3 border-b border-red-200">
-                    <div>
-                      <label className="block text-xs font-medium text-red-700 mb-1">Period 1 From <span className="text-gray-400">(optional)</span></label>
-                      <input type="date" name="peak_season_from" value={formData.peak_season_from} onChange={handleChange}
-                        className="w-full px-3 py-2 text-sm border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-red-700 mb-1">Period 1 To <span className="text-gray-400">(optional)</span></label>
-                      <input type="date" name="peak_season_to" value={formData.peak_season_to} onChange={handleChange}
-                        className="w-full px-3 py-2 text-sm border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-red-700 mb-1">Period 2 From <span className="text-gray-400">(optional)</span></label>
-                      <input type="date" name="peak_season_2_from" value={formData.peak_season_2_from} onChange={handleChange}
-                        title="Peak season period 2 start date"
-                        className="w-full px-3 py-2 text-sm border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-red-700 mb-1">Period 2 To <span className="text-gray-400">(optional)</span></label>
-                      <input type="date" name="peak_season_2_to" value={formData.peak_season_2_to} onChange={handleChange}
-                        title="Peak season period 2 end date"
-                        className="w-full px-3 py-2 text-sm border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white" />
-                    </div>
-                  </div>
-
-                  {/* EU Passport Holders - PPD Model */}
-                  <p className="text-xs font-medium text-gray-600 mb-2">EU Passport Holders</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol}) *</label>
-                      <input type="number" name="peak_season_ppd_eur" value={formData.peak_season_ppd_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-red-400 rounded-lg focus:ring-2 focus:ring-red-600 focus:border-transparent bg-white font-medium" placeholder="Per Person Double" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
-                      <input type="number" name="peak_season_single_supplement_eur" value={formData.peak_season_single_supplement_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
-                      <input type="number" name="peak_season_triple_reduction_eur" value={formData.peak_season_triple_reduction_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
-                      <input type="number" name="peak_season_suite_eur" value={formData.peak_season_suite_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                  </div>
-
-                  {/* Calculated Room Rates - EU */}
-                  {formData.peak_season_ppd_eur > 0 && (
-                    <div className="mb-4 p-2 bg-red-100 rounded-lg">
-                      <p className="text-xs text-red-700 font-medium mb-1">Calculated Room Rates (EU Passport):</p>
-                      <div className="flex gap-4 text-xs text-red-800">
-                        <span>Single: <strong>{rateSymbol}{(formData.peak_season_ppd_eur + formData.peak_season_single_supplement_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>{rateSymbol}{(formData.peak_season_ppd_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>{rateSymbol}{((formData.peak_season_ppd_eur - formData.peak_season_triple_reduction_eur) * 3).toFixed(2)}</strong></span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Non-EU Passport Holders - PPD Model */}
-                  <p className="text-xs font-medium text-gray-600 mb-2">Non-EU Passport Holders</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD ({rateSymbol})</label>
-                      <input type="number" name="peak_season_ppd_non_eur" value={formData.peak_season_ppd_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp ({rateSymbol})</label>
-                      <input type="number" name="peak_season_single_supplement_non_eur" value={formData.peak_season_single_supplement_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red ({rateSymbol})</label>
-                      <input type="number" name="peak_season_triple_reduction_non_eur" value={formData.peak_season_triple_reduction_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite ({rateSymbol})</label>
-                      <input type="number" name="peak_season_suite_non_eur" value={formData.peak_season_suite_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                  </div>
-
-                  {/* Calculated Room Rates - Non-EU */}
-                  {formData.peak_season_ppd_non_eur > 0 && (
-                    <div className="mt-3 p-2 bg-red-100 rounded-lg">
-                      <p className="text-xs text-red-700 font-medium mb-1">Calculated Room Rates (Non-EU Passport):</p>
-                      <div className="flex gap-4 text-xs text-red-800">
-                        <span>Single: <strong>{rateSymbol}{(formData.peak_season_ppd_non_eur + formData.peak_season_single_supplement_non_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>{rateSymbol}{(formData.peak_season_ppd_non_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>{rateSymbol}{((formData.peak_season_ppd_non_eur - formData.peak_season_triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
                       </div>
                     </div>
                   )}

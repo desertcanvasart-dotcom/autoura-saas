@@ -4,8 +4,9 @@
 // Dated rate periods editor (C3.2b)
 // ============================================
 // The entry surface for the `seasons` model (migration 305). A contract
-// carries as many dated windows as it carries — six is ordinary — so this is
-// an add-as-many-as-you-need list rather than three fixed slots.
+// carries as many dated windows as it carries — so this is a free-text-named
+// list of up to SIX periods rather than three fixed Low/High/Peak slots
+// (every agency cuts its seasons differently).
 //
 // It warns about overlaps and gaps instead of forbidding them: overlap is
 // legal and normal (a Christmas window inside a broad winter one, where the
@@ -39,6 +40,8 @@ function emptyPeriod(entity: RateSeasonEntity): RateSeason {
   return { name: '', from: '', to: '', rates }
 }
 
+export const MAX_RATE_PERIODS = 6
+
 export default function RatePeriodsEditor({
   entity,
   periods,
@@ -71,16 +74,18 @@ export default function RatePeriodsEditor({
           <h4 className="text-sm font-semibold text-gray-900">Contract periods</h4>
           <p className="text-xs text-gray-500 mt-0.5">
             One row per dated window in the contract, with real dates including the year.
-            Add as many as the contract has. When a departure falls in two overlapping
-            windows the <strong>shorter</strong> one is used, so a Christmas window inside a
-            winter one works the way a contract reads.
-            {periods.length > 0 && ' While any period exists here, the fixed seasons below are not used for pricing.'}
+            Name each one whatever your contract calls it — up to {MAX_RATE_PERIODS} periods. When a
+            departure falls in two overlapping windows the <strong>shorter</strong> one is used, so a
+            Christmas window inside a winter one works the way a contract reads.
+            {periods.length > 0 && ' The base rate below is used only for dates no period covers.'}
           </p>
         </div>
         <button
           type="button"
           onClick={() => onChange([...periods, emptyPeriod(entity)])}
-          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-md hover:bg-[#4f6238]"
+          disabled={periods.length >= MAX_RATE_PERIODS}
+          title={periods.length >= MAX_RATE_PERIODS ? `Up to ${MAX_RATE_PERIODS} periods per rate` : undefined}
+          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-[#647C47] rounded-md hover:bg-[#4f6238] disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Plus className="w-3.5 h-3.5" /> Add period
         </button>
@@ -88,7 +93,7 @@ export default function RatePeriodsEditor({
 
       {periods.length === 0 ? (
         <p className="text-xs text-gray-400">
-          No periods yet — this rate prices from the fixed seasons below.
+          No periods yet — this rate prices from the base rate below for every date.
         </p>
       ) : (
         <div className="space-y-3">
