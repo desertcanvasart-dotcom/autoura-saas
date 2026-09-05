@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import {
-  Search, Filter, X, Star, TrendingUp, Calendar,
+  Filter, X, Star, TrendingUp, Calendar,
   User, Building, Users, ChevronDown, SlidersHorizontal
 } from 'lucide-react'
 
@@ -57,13 +57,12 @@ export function ClientFilters({ onFilterChange }: { onFilterChange: (filters: an
       <div className="p-4">
         <div className="flex items-center gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Search by name, email, or phone..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <button

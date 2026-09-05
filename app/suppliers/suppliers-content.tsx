@@ -8,7 +8,7 @@ import { todayLocal } from '@/lib/today'
 import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { 
-  Search, Plus, MoreHorizontal, Building2, Car, Compass, Ship, Ticket, Utensils, 
+  Plus, MoreHorizontal, Building2, Car, Compass, Ship, Ticket, Utensils, 
   ShoppingBag, MapPin, Users, Briefcase, X, Edit, Trash2, Eye, Loader2, AlertCircle,
   Phone, Mail, MessageCircle, Percent, LayoutGrid, List, Table2, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUpDown, Download, Upload, Plane,
@@ -217,6 +217,11 @@ export default function SuppliersContent() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  // Bulk selection — ids live across pages of the current filter; any
+  // filter change clears them so an action never hits invisible rows.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const rowMenuRef = useRef<HTMLDivElement>(null)
   // Same swallowed-click backdrop, one level up (AUT-W02).
   useDismissOnOutside(openMenuId !== null, rowMenuRef, () => setOpenMenuId(null))
@@ -307,7 +312,9 @@ export default function SuppliersContent() {
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedSuppliers = filteredSuppliers.slice(startIndex, startIndex + itemsPerPage)
 
-  useEffect(() => { setCurrentPage(1) }, [searchQuery, selectedType, selectedStatus, itemsPerPage])
+  useEffect(() => { setCurrentPage(1); setSelectedIds(new Set()) }, [searchQuery, selectedType, selectedStatus, itemsPerPage])
+
+  const allFilteredSelected = filteredSuppliers.length > 0 && filteredSuppliers.every(s => selectedIds.has(s.id))
 
   const stats = suppliers.reduce((acc, s) => {
     acc[s.type] = (acc[s.type] || 0) + 1
@@ -429,6 +436,48 @@ export default function SuppliersContent() {
       setError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    setSelectedIds(allFilteredSelected ? new Set() : new Set(filteredSuppliers.map(s => s.id)))
+  }
+
+  // Fans out to the per-id route so its auth + RLS guards apply to every
+  // row; a partial failure reports the count rather than lying "deleted".
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    setBulkDeleting(true)
+    try {
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/suppliers/${id}`, { method: 'DELETE' }))
+      )
+      const deleted = ids.filter((_, i) => {
+        const r = results[i]
+        return r.status === 'fulfilled' && r.value.ok
+      })
+      setSelectedIds(new Set(ids.filter(id => !deleted.includes(id))))
+      setShowBulkDeleteModal(false)
+      if (deleted.length === ids.length) {
+        showToast('success', `${deleted.length} supplier${deleted.length === 1 ? '' : 's'} deleted`)
+      } else {
+        showToast('error', `Deleted ${deleted.length} of ${ids.length} — ${ids.length - deleted.length} failed`)
+      }
+      fetchSuppliers()
+    } catch (err) {
+      console.error('Error bulk deleting suppliers:', err)
+      showToast('error', 'Failed to delete suppliers')
+    } finally {
+      setBulkDeleting(false)
     }
   }
 
@@ -700,13 +749,12 @@ export default function SuppliersContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
         <div className="flex gap-3 flex-wrap">
           <div className="flex-1 min-w-[200px] relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search by name, email, city..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+              className="w-full h-10 pl-4 pr-4 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white"
             />
           </div>
           <select
@@ -739,6 +787,30 @@ export default function SuppliersContent() {
           </div>
         ) : (
           <>
+            {/* Bulk action bar */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-3 px-4 py-2 mb-4 bg-red-50 border border-red-200 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">{selectedIds.size} selected</span>
+                {!allFilteredSelected && (
+                  <button type="button" onClick={handleSelectAll} className="text-sm text-gray-500 hover:text-gray-700 underline">
+                    Select all {filteredSuppliers.length}
+                  </button>
+                )}
+                <button type="button" onClick={() => setSelectedIds(new Set())} className="text-sm text-gray-500 hover:text-gray-700 underline">
+                  Clear selection
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkDeleteModal(true)}
+                  disabled={bulkDeleting}
+                  className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Selected
+                </button>
+              </div>
+            )}
+
             {/* GRID VIEW */}
             {viewMode === 'grid' && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -749,6 +821,14 @@ export default function SuppliersContent() {
                     <div key={supplier.id} className={`bg-white rounded-lg border ${config.borderColor} p-4 hover:shadow-md transition-all cursor-pointer group`} onClick={() => handleView(supplier)}>
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(supplier.id)}
+                            onChange={() => toggleSelected(supplier.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                            aria-label={`Select ${supplier.name}`}
+                          />
                           <div className={`w-10 h-10 rounded-lg ${config.color} flex items-center justify-center`}>
                             <Icon className="w-5 h-5" />
                           </div>
@@ -830,6 +910,15 @@ export default function SuppliersContent() {
                 <table className="w-full">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="w-10 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={allFilteredSelected}
+                          onChange={handleSelectAll}
+                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                          aria-label="Select all suppliers"
+                        />
+                      </th>
                       <th className="text-left px-4 py-3"><button onClick={() => handleSort('name')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">Name <SortIcon field="name" /></button></th>
                       <th className="text-left px-4 py-3"><button onClick={() => handleSort('type')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">Type <SortIcon field="type" /></button></th>
                       <th className="text-left px-4 py-3"><button onClick={() => handleSort('city')} className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">City <SortIcon field="city" /></button></th>
@@ -844,6 +933,16 @@ export default function SuppliersContent() {
                       const Icon = config.icon
                       return (
                         <tr key={supplier.id} className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" onClick={() => handleView(supplier)}>
+                          <td className="w-10 px-4 py-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(supplier.id)}
+                              onChange={() => toggleSelected(supplier.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                              aria-label={`Select ${supplier.name}`}
+                            />
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className={`w-8 h-8 rounded-lg ${config.color} flex items-center justify-center`}><Icon className="w-4 h-4" /></div>
@@ -880,6 +979,14 @@ export default function SuppliersContent() {
                   const Icon = config.icon
                   return (
                     <div key={supplier.id} className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50 cursor-pointer group" onClick={() => handleView(supplier)}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(supplier.id)}
+                        onChange={() => toggleSelected(supplier.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 flex-shrink-0"
+                        aria-label={`Select ${supplier.name}`}
+                      />
                       <div className={`w-10 h-10 rounded-lg ${config.color} flex items-center justify-center flex-shrink-0`}><Icon className="w-5 h-5" /></div>
                       <div className="flex-1 min-w-0 grid grid-cols-5 gap-4">
                         <div>
@@ -1097,6 +1204,26 @@ export default function SuppliersContent() {
                   <p>Document management coming soon</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Modal */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center"><Trash2 className="w-5 h-5 text-red-600" /></div>
+              <div><h3 className="text-lg font-semibold text-gray-900">Delete {selectedIds.size} Supplier{selectedIds.size === 1 ? '' : 's'}</h3><p className="text-sm text-gray-500">This action cannot be undone</p></div>
+            </div>
+            <p className="text-sm text-gray-600 mb-6">Are you sure you want to delete the <strong>{selectedIds.size}</strong> selected supplier{selectedIds.size === 1 ? '' : 's'}? Rates linked to them keep their data but lose the supplier link.</p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowBulkDeleteModal(false)} disabled={bulkDeleting} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50">Cancel</button>
+              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+                {bulkDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {bulkDeleting ? 'Deleting...' : 'Delete Selected'}
+              </button>
             </div>
           </div>
         </div>

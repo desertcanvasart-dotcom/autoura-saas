@@ -6,7 +6,7 @@ import { createClient } from '@/app/supabase'
 import Link from 'next/link'
 import {
   FileText, Building2, Calendar, Users, ChevronRight, AlertCircle,
-  Loader2, Filter, Search, Clock, CheckCircle, XCircle, Eye,
+  Loader2, Filter, Clock, CheckCircle, XCircle, Eye,
   Trash2, Download, Check, X, SlidersHorizontal, ChevronLeft
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
@@ -465,13 +465,12 @@ export default function B2BQuotesPage() {
 
             {/* Search */}
             <div className="flex-1 relative">
-              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search by quote #, partner, or trip..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
 

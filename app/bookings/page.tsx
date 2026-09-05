@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-  BookOpen, User, Calendar, Eye, DollarSign, Filter, Search,
-  ChevronRight, AlertCircle, Loader2, Clock, CheckCircle2,
+  BookOpen, User, Calendar, Eye, DollarSign, Filter, ChevronRight, AlertCircle, Loader2, Clock, CheckCircle2,
   Plane, PartyPopper, XCircle, Users, Building2
 } from 'lucide-react'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -226,13 +225,12 @@ export default function BookingsPage() {
           <div className="flex items-center gap-4">
             {/* Search */}
             <div className="flex-1 relative">
-              <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 placeholder="Search by booking #, client name, or trip..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
 

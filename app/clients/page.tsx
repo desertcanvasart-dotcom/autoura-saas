@@ -3,7 +3,7 @@
 import { todayLocal } from '@/lib/today'
 
 import {
-  Users, UserPlus, Search, Star, TrendingUp,
+  Users, UserPlus, Star, TrendingUp,
   AlertCircle, CheckCircle, Trash2, SlidersHorizontal, X
 } from 'lucide-react'
 
@@ -467,13 +467,12 @@ export default function ClientsPage() {
           <div className="p-4">
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Search by name, email, phone, or client code..."
                   value={filters.search}
                   onChange={(e) => handleFilterChange('search', e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
+                  className="w-full pl-4 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent shadow-sm"
                 />
               </div>
               <button

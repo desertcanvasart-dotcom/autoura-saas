@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { todayLocal } from '@/lib/today'
 import { sumByCurrency, formatTotals, currencySymbol } from '@/lib/currency-totals'
 import { 
-  Search, 
   Plus, 
   Eye,
   Trash2, 
@@ -608,13 +607,12 @@ export default function InvoicesContent() {
       {/* Search and Filters */}
       <div className="flex items-center gap-4 bg-white rounded-lg border border-gray-200 shadow-sm p-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search invoices..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
+            className="w-full pl-4 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] shadow-sm"
           />
         </div>
 
