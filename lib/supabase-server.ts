@@ -151,7 +151,12 @@ export async function getUserTenantId(): Promise<TenantIdResult> {
     status: 200,
     user,
     tenant_id: membership.tenant_id,
-    role: membership.role,
+    // A platform owner is 'admin' in their own tenant too, whatever their
+    // membership row says — same rule as impersonation above and the
+    // middleware's super-admin exemption. Without this, a super admin whose
+    // membership happened to say 'manager' passed the client (sidebar) but
+    // was refused by admin-gated APIs.
+    role: user.email && isSuperAdmin(user.email) ? 'admin' : membership.role,
   };
 }
 

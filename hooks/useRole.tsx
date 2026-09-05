@@ -27,10 +27,16 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
 }
 
 export function useRole(): UseRoleReturn {
-  const { profile } = useAuth()
-  
-  const role = (profile?.role as UserRole) || 'viewer'
-  
+  const { profile, isSuperAdmin } = useAuth()
+
+  // A platform owner is 'admin' everywhere they browse, whatever their
+  // ordinary user_profiles row says. The server already agrees (requireAuth
+  // grants role 'admin' when impersonating; middleware exempts super admins
+  // from the per-tenant gate) — the client was the one layer still reading
+  // the profile row alone, which hid the whole Settings section from a super
+  // admin whose own row happened to say 'manager'.
+  const role = isSuperAdmin ? 'admin' : (profile?.role as UserRole) || 'viewer'
+
   return useMemo(() => {
     const roleLevel = ROLE_HIERARCHY[role] || 0
     
