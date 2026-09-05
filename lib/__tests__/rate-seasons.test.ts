@@ -9,6 +9,7 @@ import {
   seasonsFromCruiseColumns,
   seasonsForRow,
   ratesForTravelDate,
+  resolveTravelDateRates,
   legacyColumnMirror,
   type RateSeason,
 } from '../rates/rate-seasons'
@@ -147,8 +148,24 @@ describe('legacy bridge — rows with no periods still price', () => {
     const withSeasons = { ...hotelRow, seasons: [{ name: 'Contract', from: '2026-06-01', to: '2026-06-30', rates: { ppd_eur: 999 } }] }
     expect(seasonsForRow(withSeasons, 'accommodation')[0].name).toBe('Contract')
     expect(ratesForTravelDate(withSeasons, 'accommodation', '2026-06-15')!.rates.ppd_eur).toBe(999)
-    // A date outside every period returns null so the caller uses base columns.
+    // A date outside every period returns null. The engine no longer treats
+    // that as a base-column fallback for STORED periods — see
+    // resolveTravelDateRates below — but null stays the simple form's answer.
     expect(ratesForTravelDate(withSeasons, 'accommodation', '2026-08-01')).toBeNull()
+  })
+
+  it('resolveTravelDateRates tells a stored-period GAP apart from a period-less row', () => {
+    const withSeasons = { ...hotelRow, seasons: [{ name: 'Contract', from: '2026-06-01', to: '2026-06-30', rates: { ppd_eur: 999 } }] }
+    // Covered date → the period.
+    expect(resolveTravelDateRates(withSeasons, 'accommodation', '2026-06-15')).toMatchObject({ kind: 'period' })
+    // Uncovered date on a STORED contract → gap (a pricing hole upstream).
+    expect(resolveTravelDateRates(withSeasons, 'accommodation', '2026-08-01')).toEqual({ kind: 'gap', travelDate: '2026-08-01' })
+    // No travel date → not a gap: date-less readers price from the mirror.
+    expect(resolveTravelDateRates(withSeasons, 'accommodation', null)).toEqual({ kind: 'no_periods' })
+    // Legacy row (no stored seasons): a derived miss keeps the historical
+    // fall-through, never a gap.
+    expect(resolveTravelDateRates(hotelRow, 'accommodation', '2026-11-15')).toMatchObject({ kind: 'period' })
+    expect(resolveTravelDateRates({ ppd_eur: 55 }, 'accommodation', '2026-08-01')).toEqual({ kind: 'no_periods' })
   })
 
   it('a legacy row still resolves by date through the same lookup', () => {
