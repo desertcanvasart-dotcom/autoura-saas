@@ -101,6 +101,7 @@ interface MealRate {
   minimum_pax?: number
   notes?: string
   is_active: boolean
+  is_preferred?: boolean | null
   created_at?: string
   updated_at?: string
 }
@@ -197,7 +198,8 @@ export default function MealRatesContent() {
     per_person_rate: true,
     minimum_pax: 1,
     notes: '',
-    is_active: true
+    is_active: true,
+    is_preferred: false
   })
 
   // Fetch rates
@@ -294,7 +296,8 @@ export default function MealRatesContent() {
       per_person_rate: true,
       minimum_pax: 1,
       notes: '',
-      is_active: true
+      is_active: true,
+      is_preferred: false
     })
     setShowModal(true)
   }
@@ -322,7 +325,8 @@ export default function MealRatesContent() {
       per_person_rate: rate.per_person_rate !== false,
       minimum_pax: rate.minimum_pax || 1,
       notes: rate.notes || '',
-      is_active: rate.is_active
+      is_active: rate.is_active,
+      is_preferred: rate.is_preferred === true
     })
     setShowModal(true)
   }
@@ -350,7 +354,8 @@ export default function MealRatesContent() {
       per_person_rate: rate.per_person_rate !== false,
       minimum_pax: rate.minimum_pax || 1,
       notes: rate.notes || '',
-      is_active: rate.is_active
+      is_active: rate.is_active,
+      is_preferred: rate.is_preferred === true
     })
     setShowModal(true)
   }
@@ -1439,7 +1444,7 @@ export default function MealRatesContent() {
                 />
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1448,6 +1453,15 @@ export default function MealRatesContent() {
                     className="w-4 h-4 text-primary-600 border-gray-300 rounded"
                   />
                   <span className="text-sm font-medium text-gray-900">Active (available for bookings)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_preferred === true}
+                    onChange={(e) => setFormData({ ...formData, is_preferred: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded"
+                  />
+                  <span className="text-sm font-medium text-gray-900">Preferred restaurant</span>
                 </label>
               </div>
             </form>

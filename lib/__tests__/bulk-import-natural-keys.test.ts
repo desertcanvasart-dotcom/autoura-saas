@@ -37,6 +37,9 @@ describe('uniqueKey per table is a pinned decision', () => {
       nile_cruises: ['cruise_code'],
       train_rates: ['service_code'],
       sleeping_train_rates: ['service_code'],
+      // An extra's identity is its name (per tenant) — same key the extras
+      // page itself de-duplicates on (2026-09-05 sweep: CSV added).
+      extras_catalogue: ['name'],
       fixed_costs: ['cost_type'],
     })
   })

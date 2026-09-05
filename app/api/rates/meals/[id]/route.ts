@@ -90,6 +90,7 @@ Object.assign(updateData, rateCurrencyWriteField(body))
     if (body.per_person_rate !== undefined) updateData.per_person_rate = body.per_person_rate
     if (body.minimum_pax !== undefined) updateData.minimum_pax = body.minimum_pax ? parseInt(body.minimum_pax) : null
     if (body.notes !== undefined) updateData.notes = body.notes || null
+    if (body.is_preferred !== undefined) updateData.is_preferred = body.is_preferred === true
     if (body.is_active !== undefined) updateData.is_active = body.is_active
 
     const { data, error } = await supabase
