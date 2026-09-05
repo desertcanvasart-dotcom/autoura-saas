@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Auth failed' }, { status: 401 })
 
     const body = await request.json()
-    const { itinerary_id, partner_id = null, margin_percent = 25, tour_leader_included = false, is_eur_passport = true, language = 'English' } = body
+    const { itinerary_id, partner_id = null, margin_percent = 25, tour_leader_included = false, is_eur_passport = true, language = 'English', guide_mode = null, guide_grade = null } = body
     if (!itinerary_id) return NextResponse.json({ success: false, error: 'itinerary_id is required' }, { status: 400 })
 
     // 1. Fetch itinerary
@@ -196,6 +196,9 @@ export async function POST(request: NextRequest) {
         selling_price: sellingPrice,
         price_per_person: pricePerPerson,
         season,
+        // Guide ask (B-items 1/3): NULL = the defaults, only non-default stored.
+        guide_mode: guide_mode === 'throughout' ? 'throughout' : null,
+        guide_grade: guide_grade === 'senior' ? 'senior' : null,
         source: 'from_itinerary',
         tour_leader_included,
         tour_leader_cost: tourLeaderCost,

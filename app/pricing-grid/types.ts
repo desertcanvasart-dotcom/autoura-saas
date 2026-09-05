@@ -24,6 +24,14 @@ export interface GridConfig {
    *  is the behaviour the gate always had. */
   packageType?: PackageType
   withGuide: boolean
+  /** Spot (default): the per-day guide slots as picked. Throughout (B-item
+   *  3): ONE guide travels the whole trip — his bed from each night's
+   *  chosen property's guide rate, meals when pax ≤ 3, a seat on every
+   *  flight pick, and the rate sheet sizes vehicles at pax+1. Pure grid
+   *  math from what the slots already hold; nothing is fetched. Grade
+   *  needs no control — the guide slot's dropdown lists every guide-rate
+   *  row (senior and Meet & Assist included). */
+  guideMode?: 'spot' | 'throughout'
   currency: string
   marginPercent: number
   exchangeRate: number | null  // EUR → target currency
@@ -207,6 +215,11 @@ export interface RateOption {
   // vehicle as group size grows — the one cost that is non-linear in pax.
   capacity_min?: number
   capacity_max?: number
+  /** The throughout guide's rate on this option (B-item 3): a hotel/cruise
+   *  option's FIRST-period guide bed (null = no concession — an amber
+   *  unpriced night, never a silent zero), or a flight's negotiated guide
+   *  fare (null = customer fare, 0 = rides free). */
+  guide_rate_eur?: number | null
 }
 
 export interface AllRates {

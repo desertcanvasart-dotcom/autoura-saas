@@ -55,6 +55,10 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { config, days, totals } = body
+    // Throughout-guide synthetic rows (B-item 3): computed by the grid's own
+    // pure math client-side; written verbatim, tagged for the reload parser.
+    const throughoutExtras: Array<{ dayNumber: number; kind: string; label: string; amountEur: number }> =
+      Array.isArray(body.throughout_extras) ? body.throughout_extras : []
 
     if (!config || !days || !totals) {
       return NextResponse.json({ success: false, error: 'Missing config, days, or totals' }, { status: 400 })
@@ -253,6 +257,26 @@ export async function POST(request: NextRequest) {
             is_included: true,
           })
         }
+      }
+
+      // Throughout guide (B-item 3): synthetic GROUP rows carrying his
+      // bed/meals/flight seats onto the saved itinerary — so any quote
+      // built from it carries the money. Tagged so the reload parser skips
+      // them (they are DERIVED from the slots; reloading must never double
+      // them back in).
+      for (const extra of throughoutExtras.filter((e: { dayNumber: number }) => e.dayNumber === day.dayNumber)) {
+        const kind = String(extra.kind)
+        services.push({
+          itinerary_id: itineraryId,
+          day_id: dayRecord.id,
+          service_type: kind === 'bed' ? 'accommodation' : kind === 'meal' ? 'meal' : 'flight',
+          service_name: String(extra.label || 'Throughout Guide'),
+          description: `[pricing-grid:throughout_guide] ${kind}`,
+          quantity: 1,
+          unit_cost: Number(extra.amountEur) || 0,
+          total_cost: Number(extra.amountEur) || 0,
+          is_included: true,
+        })
       }
 
       if (services.length > 0) {

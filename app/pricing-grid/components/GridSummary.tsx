@@ -9,6 +9,9 @@ interface GridSummaryProps {
   totals: GridTotals
   config: GridConfig
   dayCount: number
+  /** Throughout mode: nights whose chosen property has NO guide rate —
+   *  shown amber above the summary, never a silent zero bed (B-item 3). */
+  unpricedGuideBedDays?: number[]
   onSave?: () => void
   isSaving?: boolean
   savedItineraryId?: string | null
@@ -18,7 +21,7 @@ interface GridSummaryProps {
   saveMessage?: string | null
 }
 
-export default function GridSummary({ totals, config, dayCount, onSave, isSaving, savedItineraryId, savedItineraryCode, savedQuoteId, savedQuoteNumber, saveMessage }: GridSummaryProps) {
+export default function GridSummary({ totals, config, dayCount, unpricedGuideBedDays = [], onSave, isSaving, savedItineraryId, savedItineraryCode, savedQuoteId, savedQuoteNumber, saveMessage }: GridSummaryProps) {
   const { pax, marginPercent, currency } = config
   const sym = getCurrencySymbol(currency)
   const fmt = (n: number) => n.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -39,6 +42,15 @@ export default function GridSummary({ totals, config, dayCount, onSave, isSaving
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mt-4">
+      {/* Throughout guide: unpriced bed nights — amber, never a silent zero
+          bed (B-item 3). */}
+      {unpricedGuideBedDays.length > 0 && (
+        <div className="px-5 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-800">
+          ⚠ {unpricedGuideBedDays.length} night{unpricedGuideBedDays.length === 1 ? '' : 's'} without a guide bed rate
+          (day{unpricedGuideBedDays.length === 1 ? '' : 's'} {unpricedGuideBedDays.join(', ')}) — the throughout
+          guide&rsquo;s bed is NOT in this total. Add &ldquo;Guide Bed / Night&rdquo; to those properties&rsquo; rate periods.
+        </div>
+      )}
       {/* Header */}
       <div className="px-5 py-3 bg-gray-800 text-white flex items-center justify-between">
         <div>

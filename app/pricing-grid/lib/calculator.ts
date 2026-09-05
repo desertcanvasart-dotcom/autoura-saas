@@ -86,13 +86,25 @@ export function calculateDay(day: GridDay, config: GridConfig): DayCalc {
 
 // --- Grand Totals ---
 
-export function calculateGrandTotals(days: GridDay[], config: GridConfig): GridTotals {
+export function calculateGrandTotals(
+  days: GridDay[],
+  config: GridConfig,
+  opts?: {
+    /** The throughout guide's extras (bed/meals/flight seats) as ONE group
+     *  cost, from computeThroughoutGuideExtras (B-item 3). */
+    throughoutGroupExtraEur?: number
+  }
+): GridTotals {
   const { pax, marginPercent } = config
 
   let costPerPerson = 0
   for (const day of days) {
     const calc = calculateDay(day, config)
     costPerPerson += calc.dailyPerPerson
+  }
+  // Throughout guide (B3): a group cost, divided across the paying guests.
+  if (opts?.throughoutGroupExtraEur && pax > 0) {
+    costPerPerson += opts.throughoutGroupExtraEur / pax
   }
 
   const totalCost = costPerPerson * pax
@@ -269,19 +281,29 @@ export function calculatePaxRange(
   days: GridDay[],
   config: GridConfig,
   tierIndex: TransportTierIndex,
-  opts?: { paxFrom?: number; paxTo?: number },
+  opts?: {
+    paxFrom?: number
+    paxTo?: number
+    /** Throughout guide (B-item 3): his extras join the group-fixed costs
+     *  (the sheet keeps the meal lines at every count — the documented
+     *  approximation), and every vehicle sizes at pax+1 — stacking with
+     *  the tour leader row's own +1. */
+    throughoutGroupExtraEur?: number
+    throughoutExtraSeats?: number
+  },
 ): PaxRangeResult {
   const safeMargin = Math.max(0, Math.min(isNaN(config.marginPercent) ? 0 : config.marginPercent, MARGIN_CAP))
   const { groupFixed, perPerson, singleSupplement } = aggregateNonTransport(days, config)
+  const extraSeats = opts?.throughoutExtraSeats ?? 0
 
   // The per-pax math is the shared core primitive — the grid only supplies the
   // shape-specific bits: aggregates, a tier-index transport resolver, and the
   // leader-cost policy (leader takes a single room + their own per-person costs).
   const paxPricing = priceAcrossPax({
-    groupFixed,
+    groupFixed: groupFixed + (opts?.throughoutGroupExtraEur ?? 0),
     perPerson,
     marginPercent: safeMargin,
-    transportAt: (pax) => transportForPax(days, config, pax, tierIndex),
+    transportAt: (pax) => transportForPax(days, config, pax + extraSeats, tierIndex),
     tourLeaderCost: perPerson + singleSupplement,
     paxFrom: opts?.paxFrom,
     paxTo: opts?.paxTo,

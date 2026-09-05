@@ -193,6 +193,23 @@ export default function GridHeader({ config, onChange, totals }: GridHeaderProps
             {config.withGuide ? 'Guide' : 'No Guide'}
           </button>
 
+          {/* Spot / Throughout (B-item 3): one guide travels the whole trip
+              — bed from each night's property guide rate, meals when the
+              party is small, a seat on every flight pick, vehicles at pax+1
+              on the sheet. Pure grid math; nothing fetched. */}
+          <button
+            type="button"
+            onClick={() => update({ guideMode: config.guideMode === 'throughout' ? 'spot' : 'throughout' })}
+            title="Throughout: one guide travels day 1 to the end — bed, meals (small parties), flight seats, +1 vehicle seat"
+            className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all whitespace-nowrap ${
+              config.guideMode === 'throughout'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                : 'bg-gray-100 border-gray-200 text-gray-400 hover:bg-gray-150'
+            }`}
+          >
+            {config.guideMode === 'throughout' ? 'Throughout +1' : 'Spot'}
+          </button>
+
           <div className="w-px h-5 bg-gray-200" />
 
           {/* Currency */}

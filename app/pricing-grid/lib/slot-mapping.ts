@@ -139,6 +139,11 @@ export function mapServicesToSlots(
   }
 
   for (const svc of services) {
+    // Throughout-guide synthetic rows are DERIVED from the slots (B-item
+    // 3) — the grid recomputes them live, so reloading them into slots
+    // would double the money.
+    if ((svc.description || svc.notes || '').includes('throughout_guide')) continue
+
     // Try to extract original slotId from grid metadata
     // Check description first (new format: __grid:slot:xxx|rate_id:yyy)
     // Then notes (legacy format: slot:xxx|rate_id:yyy)

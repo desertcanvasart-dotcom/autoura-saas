@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import type { GridConfig, GridDay, AllRates, SlotValue, GridTotals } from './types'
 import { SLOT_DEFINITIONS } from './types'
 import { calculateGrandTotals, calculateDay } from './lib/calculator'
+import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/throughout-guide'
 import { mapServicesToSlots } from './lib/slot-mapping'
 import GridHeader from './components/GridHeader'
 import ClientInfoBar from './components/ClientInfoBar'
@@ -51,6 +52,7 @@ const DEFAULT_CONFIG: GridConfig = {
   clientType: 'b2c',
   packageType: 'full-package',
   withGuide: true,
+  guideMode: 'spot',
   currency: 'EUR',
   marginPercent: 25,
   exchangeRate: null,
@@ -598,7 +600,14 @@ function PricingGridContent() {
       const res = await fetch('/api/pricing-grid/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ config, days, totals })
+        body: JSON.stringify({
+          config,
+          days,
+          totals,
+          // Synthetic group rows carrying the throughout guide's money onto
+          // the saved itinerary (B-item 3); the reload parser skips them.
+          throughout_extras: config.guideMode === 'throughout' ? throughoutGuide.extras : [],
+        })
       })
 
       const data = await res.json()
@@ -623,6 +632,8 @@ function PricingGridContent() {
                 margin_percent: config.marginPercent,
                 is_eur_passport: config.passport === 'eu',
                 language: 'English',
+                // Stored via B1's columns, non-default only.
+                guide_mode: config.guideMode === 'throughout' ? 'throughout' : undefined,
               })
             })
             const quoteData = await quoteRes.json()
@@ -674,8 +685,15 @@ function PricingGridContent() {
   }
 
   // --- Calculate Totals ---
+  // Throughout guide (B-item 3): pure grid math from what the slots hold —
+  // the option payloads carry the guide rates, nothing is fetched here.
+  const throughoutGuide = computeThroughoutGuideExtras(
+    days,
+    config,
+    buildGuideRateIndex(rates ?? {})
+  )
   const totals: GridTotals = days.length > 0
-    ? calculateGrandTotals(days, config)
+    ? calculateGrandTotals(days, config, { throughoutGroupExtraEur: throughoutGuide.totalEur })
     : { costPerPerson: 0, totalCost: 0, marginAmount: 0, sellingPricePerPerson: 0, sellingPriceTotal: 0 }
 
   // --- Render ---
@@ -784,6 +802,7 @@ function PricingGridContent() {
             totals={totals}
             config={config}
             dayCount={days.length}
+            unpricedGuideBedDays={config.guideMode === 'throughout' ? throughoutGuide.unpricedBedDays : []}
             onSave={handleSave}
             isSaving={isSaving}
             savedItineraryId={config.itineraryId}
