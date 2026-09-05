@@ -335,3 +335,50 @@ export function legacyColumnMirror(
     ? { low_season_from: first.from, low_season_to: first.to, ...shared }
     : { low_season_start: first.from, low_season_end: first.to, ...shared }
 }
+
+// ── Display price for overview lists (A-item 16) ─────────────────────────
+// The hotel overview rendered `double_rate_eur` — the one column family
+// legacyColumnMirror never writes — so a hotel saved through the periods
+// editor displayed a zero. What a LIST should show is the row's
+// per-person-in-double, resolved from its periods: today's period when one
+// covers today, else the first period, else the legacy base columns.
+
+export interface DisplayPpd {
+  /** PP-in-double to show now, or null when the row is genuinely unpriced. */
+  current: number | null
+  /** The highest period PPD (peak) — null when there is only a base rate. */
+  top: number | null
+  /** Name of the period `current` came from, when it came from one. */
+  periodName: string | null
+  periodCount: number
+}
+
+export function displayPpd(
+  row: object,
+  entity: RateSeasonEntity,
+  todayIso?: string
+): DisplayPpd {
+  // 0 in a period means "unpriced hole" (sanitizeSeasons stores blanks as
+  // 0); 0 in a base column is the same bad data. Both display as unpriced.
+  const usable = (v: unknown): number | null => {
+    const n = Number(v)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+
+  const list = seasonsForRow(row, entity)
+  if (list.length > 0) {
+    const today = todayIso ?? new Date().toISOString().slice(0, 10)
+    const chosen = seasonForTravelDate(list, today) ?? list[0]
+    const tops = list.map(s => usable(s.rates.ppd_eur)).filter((n): n is number => n !== null)
+    return {
+      current: usable(chosen.rates.ppd_eur),
+      top: tops.length ? Math.max(...tops) : null,
+      periodName: chosen.name,
+      periodCount: list.length,
+    }
+  }
+
+  const r = asRow(row)
+  const base = usable(r.ppd_eur) ?? (usable(r.double_rate_eur) ? (usable(r.double_rate_eur) as number) / 2 : null)
+  return { current: base, top: null, periodName: null, periodCount: 0 }
+}

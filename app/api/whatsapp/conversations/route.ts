@@ -169,30 +169,56 @@ export async function POST(request: NextRequest) {
     // Create new conversation
     let assignedTeamMemberId = null
 
-    // Auto-assign if requested
+    // Auto-assign if requested. This used to order by last_assigned_at — a
+    // column migration 309 deliberately never added ("selected but never
+    // read by any UI") — so PostgREST rejected the query, the error was
+    // discarded, and auto-assign silently never assigned anyone. The pick is
+    // now the LEAST-LOADED available agent, counted from open conversations
+    // at read time — the same recompute-from-source rule the agents route
+    // follows (a stored counter/timestamp drifts).
     if (auto_assign !== false) {
-      const { data: nextAgent } = await supabase
+      const { data: candidates } = await supabase
         .from('team_members')
-        .select('id')
+        .select('id, created_at')
         .eq('is_active', true)
         .eq('is_available', true)
-        .order('last_assigned_at', { ascending: true, nullsFirst: true })
         .order('created_at', { ascending: true })
-        .limit(1)
-        .single()
 
-      if (nextAgent) {
-        assignedTeamMemberId = nextAgent.id
+      if (candidates && candidates.length > 0) {
+        const { data: open } = await supabase
+          .from('whatsapp_conversations')
+          .select('assigned_team_member_id')
+          .eq('status', 'active')
+          .not('assigned_team_member_id', 'is', null)
+        const counts = new Map<string, number>()
+        for (const row of (open ?? []) as Array<{ assigned_team_member_id: string }>) {
+          counts.set(row.assigned_team_member_id, (counts.get(row.assigned_team_member_id) ?? 0) + 1)
+        }
+        // Fewest open conversations wins; ties go to the longest-serving
+        // agent (the list is already ordered by created_at).
+        let best = candidates[0]
+        let bestCount = counts.get(best.id) ?? 0
+        for (const c of candidates.slice(1)) {
+          const n = counts.get(c.id) ?? 0
+          if (n < bestCount) { best = c; bestCount = n }
+        }
+        assignedTeamMemberId = best.id
       }
     }
 
+    // The assignment must land ON the conversation (mig 309 columns) — the
+    // old code only wrote the activity log, so even a successful auto-assign
+    // left the conversation unassigned.
     const { data: newConversation, error } = await supabase
       .from('whatsapp_conversations')
       .insert({
         tenant_id,
         phone_number: cleanPhone,
         client_name: client_name || null,
-        client_id: client_id || null
+        client_id: client_id || null,
+        ...(assignedTeamMemberId
+          ? { assigned_team_member_id: assignedTeamMemberId, assigned_at: new Date().toISOString() }
+          : {})
       })
       .select('*')
       .single()

@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { attachPropertyNames } from '@/lib/suppliers/attach-property-names'
+import { displayPpd } from '@/lib/rates/rate-seasons'
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,65 +36,79 @@ export async function GET(request: NextRequest) {
     let error = null
 
     switch (type) {
-      case 'accommodation':
-        // ✅ Pull from hotel_contacts table
+      case 'accommodation': {
+        // The RATE table, not hotel_contacts. This tab used to read the
+        // contacts view and hardcode base_rate_eur: 0, so the overview showed
+        // every hotel at zero while accommodation_rates held the real data —
+        // the third instance of the wrong-table class (see A-item 15).
         const accommodationQuery = supabase
-          .from('hotel_contacts')
+          .from('accommodation_rates')
           .select('*')
           .eq('is_active', true)
-        
+
         if (city) {
           accommodationQuery.ilike('city', city)
         }
-        
+
         const accommodationResult = await accommodationQuery
-        
-        // Transform hotel data to match rates format
-        data = (accommodationResult.data || []).map((hotel: any) => ({
-          service_code: hotel.id,
-          property_name: hotel.name,
-          property_type: hotel.property_type,
-          star_rating: hotel.star_rating,
-          city: hotel.city,
-          address: hotel.address,
-          supplier_name: hotel.contact_person,
-          notes: hotel.notes,
-          base_rate_eur: 0,
-          base_rate_non_eur: 0
-        }))
+
+        // Price: per-person-in-double resolved from the row's rate periods
+        // (today's, else the first), never the dead double_rate columns —
+        // rows saved through the periods editor leave those NULL (A-item 16).
+        data = (accommodationResult.data || []).map((hotel: any) => {
+          const ppd = displayPpd(hotel, 'accommodation')
+          return {
+            id: hotel.id,
+            service_code: hotel.service_code || hotel.id,
+            property_name: hotel.property_name || hotel.hotel_name,
+            star_rating: hotel.star_rating,
+            tier: hotel.tier,
+            city: hotel.city,
+            supplier_name: hotel.supplier_name,
+            notes: hotel.notes,
+            rate_currency: hotel.rate_currency,
+            base_rate_eur: ppd.current,
+            base_rate_non_eur: ppd.current,
+          }
+        })
         error = accommodationResult.error
         break
+      }
 
-      case 'meal':
-        // ✅ Pull from restaurant_contacts table
+      case 'meal': {
+        // The RATE table, not restaurant_contacts (whose price columns were
+        // hardcoded to 0 here) — same wrong-table class as accommodation.
         const mealQuery = supabase
-          .from('restaurant_contacts')
+          .from('meal_rates')
           .select('*')
           .eq('is_active', true)
-        
+
         if (city) {
           mealQuery.ilike('city', city)
         }
-        
+
         const mealResult = await mealQuery
-        
-        // Transform restaurant data to match rates format
-        data = (mealResult.data || []).map((restaurant: any) => ({
-          service_code: restaurant.id,
-          restaurant_name: restaurant.name,
-          meal_type: restaurant.meal_types?.[0] || 'lunch',
-          cuisine_type: restaurant.cuisine_type,
-          restaurant_type: restaurant.restaurant_type,
-          city: restaurant.city,
-          supplier_name: restaurant.contact_person,
-          notes: restaurant.notes,
-          base_rate_eur: 0,
-          base_rate_non_eur: 0,
-          eur_rate: 0,
-          non_eur_rate: 0
+
+        data = (mealResult.data || []).map((meal: any) => ({
+          id: meal.id,
+          service_code: meal.service_code || meal.id,
+          restaurant_name: meal.restaurant_name,
+          meal_type: meal.meal_type,
+          cuisine_type: meal.cuisine_type,
+          restaurant_type: meal.restaurant_type,
+          tier: meal.tier,
+          city: meal.city,
+          supplier_name: meal.supplier_name,
+          notes: meal.notes,
+          rate_currency: meal.rate_currency,
+          base_rate_eur: meal.base_rate_eur,
+          base_rate_non_eur: meal.base_rate_non_eur,
+          eur_rate: meal.base_rate_eur,
+          non_eur_rate: meal.base_rate_non_eur
         }))
         error = mealResult.error
         break
+      }
 
       case 'entrance':
         // ✅ Keep entrance_fees table (already correct)
@@ -142,30 +157,39 @@ export async function GET(request: NextRequest) {
         error = transportResult.error
         break
 
-      case 'guide':
-        // ✅ Pull from guides table
+      case 'guide': {
+        // The RATE table, not the guides roster. This tab used to read
+        // `guides.daily_rate_eur` — a column that does not exist — so every
+        // guide showed the fallback while guide_rates (the table the engine
+        // prices from) was never consulted (A-item 15).
         const guideQuery = supabase
-          .from('guides')
+          .from('guide_rates')
           .select('*')
           .eq('is_active', true)
-        
+
+        if (city) {
+          guideQuery.ilike('city', city)
+        }
+
         const guideResult = await guideQuery
-        
-        // Transform guide data to match rates format
-        data = (guideResult.data || []).map((guide: any) => ({
-          service_code: guide.id,
-          guide_language: guide.languages?.[0] || 'English',
-          guide_type: guide.specialties?.[0] || 'General',
-          city: 'Cairo',
-          tour_duration: 'full_day',
-          notes: `${guide.name} - ${guide.certification_number || ''}`,
-          base_rate_eur: guide.daily_rate_eur || guide.daily_rate || 0,
-          base_rate_non_eur: guide.daily_rate_eur || guide.daily_rate || 0,
-          eur_rate: guide.daily_rate_eur || guide.daily_rate || 0,
-          non_eur_rate: guide.daily_rate_eur || guide.daily_rate || 0
+
+        data = (guideResult.data || []).map((rate: any) => ({
+          id: rate.id,
+          service_code: rate.service_code || rate.id,
+          guide_language: rate.guide_language,
+          guide_type: rate.guide_type,
+          city: rate.city,
+          tour_duration: rate.tour_duration,
+          notes: rate.notes,
+          rate_currency: rate.rate_currency,
+          base_rate_eur: rate.full_day_rate ?? rate.base_rate_eur,
+          base_rate_non_eur: rate.full_day_rate ?? rate.base_rate_non_eur,
+          eur_rate: rate.full_day_rate ?? rate.base_rate_eur,
+          non_eur_rate: rate.full_day_rate ?? rate.base_rate_non_eur
         }))
         error = guideResult.error
         break
+      }
 
       case 'service':
       case 'service_fee':

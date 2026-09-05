@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/supabase-server';
+import { attachChangerEmails } from '@/lib/quotes/attach-changer-emails';
 
 /**
  * GET /api/quotes/[type]/[id]/versions/[versionNumber]
@@ -44,8 +45,7 @@ export async function GET(
         changed_at,
         change_reason,
         change_summary,
-        changes_diff,
-        users:changed_by (email)
+        changes_diff
       `)
       .eq('quote_type', type)
       .eq('quote_id', id)
@@ -66,9 +66,13 @@ export async function GET(
       );
     }
 
+    // changed_by references auth.users, which PostgREST cannot embed — the
+    // email is joined app-side (see lib/quotes/attach-changer-emails).
+    const [versionWithUser] = await attachChangerEmails(supabase, [version]);
+
     return NextResponse.json({
       success: true,
-      version
+      version: versionWithUser
     });
 
   } catch (error: any) {

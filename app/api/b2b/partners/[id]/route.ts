@@ -25,14 +25,15 @@ export async function GET(
       }, { status: 401 })
     }
 
+    // b2b_partner_pricing has NO foreign key to b2b_partners (or to
+    // tour_variations) — only tenant_id. Embedding it made PostgREST reject
+    // the WHOLE query with PGRST200, so the partner page 500'd. The pricing
+    // rows and their variations are joined app-side instead. (The b2b_quotes
+    // embed rides a real FK and stays.)
     const { data, error } = await supabase
       .from('b2b_partners')
       .select(`
         *,
-        b2b_partner_pricing (
-          id, variation_id, margin_percent_override, fixed_price_per_pax, is_active,
-          tour_variations (variation_name, variation_code, tier, tour_templates (template_name))
-        ),
         b2b_quotes (id, quote_number, status, selling_price, created_at)
       `)
       .eq('id', id)
@@ -46,7 +47,30 @@ export async function GET(
       return NextResponse.json({ error: 'Partner not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true, data })
+    const { data: pricingRows } = await supabase
+      .from('b2b_partner_pricing')
+      .select('id, variation_id, margin_percent_override, fixed_price_per_pax, is_active')
+      .eq('partner_id', id)
+
+    const variationIds = [...new Set((pricingRows ?? []).map(p => p.variation_id).filter(Boolean))] as string[]
+    const { data: variations } = variationIds.length
+      ? await supabase
+          .from('tour_variations')
+          .select('id, variation_name, variation_code, tier, tour_templates (template_name)')
+          .in('id', variationIds)
+      : { data: [] }
+    const variationById = new Map((variations ?? []).map(v => [v.id, v]))
+
+    const withPricing = {
+      ...data,
+      b2b_partner_pricing: (pricingRows ?? []).map(p => ({
+        ...p,
+        // The shape the embed was supposed to produce.
+        tour_variations: (p.variation_id && variationById.get(p.variation_id)) || null,
+      })),
+    }
+
+    return NextResponse.json({ success: true, data: withPricing })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

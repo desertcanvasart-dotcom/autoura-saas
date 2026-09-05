@@ -12,10 +12,10 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Building2, Plus, Search, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
+import { displayPpd } from '@/lib/rates/rate-seasons'
 import { parseSeasons, type RateSeason } from '@/lib/rates/rate-seasons'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
@@ -346,9 +346,21 @@ export default function HotelsContent() {
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dialog = useConfirmDialog()
-  const { userCurrency, loading: currencyLoading } = useCurrency()
+  // (the org display currency is no longer named in this page's headers —
+  // every price renders in its ROW's currency via fmtRate)
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
+
+  // The list price is the row's per-person-in-double resolved from its rate
+  // periods (today's, else the first), never the dead double_rate columns —
+  // rows saved through the periods editor leave those NULL, which used to
+  // render every such hotel at 0 (A-item 16). Unpriced shows a dash.
+  const ppdCell = (rate: AccommodationRate, which: 'current' | 'top') => {
+    const ppd = displayPpd(rate, 'accommodation')
+    const value = which === 'current' ? ppd.current : ppd.top
+    return value == null ? '—' : fmtRate(value, rate, 0)
+  }
+
   const [rates, setRates] = useState<AccommodationRate[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -1306,8 +1318,8 @@ export default function HotelsContent() {
                     <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Tier</th>
                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
                     <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Board</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Low Dbl ({userCurrency})</th>
-                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">High Dbl ({userCurrency})</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">PP Dbl</th>
+                    <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Peak PP Dbl</th>
                     <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                     <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
                   </tr>
@@ -1361,12 +1373,12 @@ export default function HotelsContent() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm font-bold text-green-600">
-                          {fmtRate(rate.double_rate_eur || 0, rate, 0)}
+                          {ppdCell(rate, 'current')}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm text-orange-600">
-                          {fmtRate(rate.high_season_double_eur || 0, rate, 0)}
+                          {ppdCell(rate, 'top')}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -1495,16 +1507,16 @@ export default function HotelsContent() {
 
                     <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
                       <div className="text-center">
-                        <p className="text-xs text-blue-600 font-medium">Low</p>
-                        <p className="text-sm font-bold text-gray-700">{fmtRate(rate.double_rate_eur || 0, rate, 0)}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-orange-600 font-medium">High</p>
-                        <p className="text-sm font-bold text-gray-700">{fmtRate(rate.high_season_double_eur || 0, rate, 0)}</p>
+                        <p className="text-xs text-blue-600 font-medium">PP Dbl</p>
+                        <p className="text-sm font-bold text-gray-700">{ppdCell(rate, 'current')}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-xs text-red-600 font-medium">Peak</p>
-                        <p className="text-sm font-bold text-gray-700">{fmtRate(rate.peak_season_double_eur || 0, rate, 0)}</p>
+                        <p className="text-sm font-bold text-gray-700">{ppdCell(rate, 'top')}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 font-medium">Periods</p>
+                        <p className="text-sm font-bold text-gray-700">{displayPpd(rate, 'accommodation').periodCount || '—'}</p>
                       </div>
                     </div>
                   </div>
@@ -1574,7 +1586,7 @@ export default function HotelsContent() {
                     )}
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-sm font-bold text-green-600">{fmtRate(rate.double_rate_eur || 0, rate, 0)}</span>
+                    <span className="text-sm font-bold text-green-600">{ppdCell(rate, 'current')}</span>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleEdit(rate)}

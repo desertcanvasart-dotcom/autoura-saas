@@ -44,21 +44,59 @@ export async function GET(
       .eq('template_id', id)
       .order('tier', { ascending: true })
 
-    // Get days with activities (RLS filters automatically)
+    // Get days with activities (RLS filters automatically).
+    //
+    // Only the tour_day_activities embed rides a real foreign key. The four
+    // embeds this replaces were ALL dead: there is no `attractions` table at
+    // all (entrance_id points at entrance_fees), and tour_days has no FK to
+    // hotel_contacts, guides, or transportation_rates — so PostgREST
+    // rejected the whole query (PGRST200) and, unchecked, this route
+    // returned a tour with NO DAYS. Same class as the restaurant embed
+    // documented below; everything joins app-side now.
     const { data: days } = await supabase
       .from('tour_days')
       .select(`
         *,
-        activities:tour_day_activities(
-          *,
-          entrance:attractions(id, name, city),
-          transportation:transportation_rates(id, vehicle_type, city)
-        ),
-        accommodation:hotel_contacts(id, name, city),
-        guide:guides(id, name, languages)
+        activities:tour_day_activities(*)
       `)
       .eq('template_id', id)
       .order('day_number', { ascending: true })
+
+    type Row = Record<string, unknown>
+    const activityRows = (days ?? []).flatMap((d: Row) => (d.activities as Row[]) ?? [])
+    const idsOf = (rows: Row[], key: string) =>
+      [...new Set(rows.map(r => r[key]).filter((v): v is string => typeof v === 'string'))]
+    const byId = async (
+      table: 'entrance_fees' | 'transportation_rates' | 'hotel_contacts' | 'guides',
+      cols: string,
+      ids: string[]
+    ): Promise<Map<string, Row>> => {
+      if (ids.length === 0) return new Map()
+      const { data: rows } = await supabase.from(table).select(cols).in('id', ids)
+      return new Map(((rows ?? []) as unknown as Row[]).map(r => [r.id as string, r]))
+    }
+
+    const [entranceById, transportById, hotelById, guideById] = await Promise.all([
+      byId('entrance_fees', 'id, attraction_name, city', idsOf(activityRows, 'entrance_id')),
+      byId('transportation_rates', 'id, vehicle_type, city', idsOf(activityRows, 'transportation_id')),
+      byId('hotel_contacts', 'id, name, city', idsOf(days ?? [], 'accommodation_id')),
+      byId('guides', 'id, name, languages', idsOf(days ?? [], 'guide_id')),
+    ])
+
+    const daysJoined = (days ?? []).map((d: Row) => ({
+      ...d,
+      accommodation: d.accommodation_id ? hotelById.get(d.accommodation_id as string) ?? null : null,
+      guide: d.guide_id ? guideById.get(d.guide_id as string) ?? null : null,
+      activities: ((d.activities as Row[]) ?? []).map(a => {
+        const fee = a.entrance_id ? entranceById.get(a.entrance_id as string) : null
+        return {
+          ...a,
+          // The shapes the embeds were supposed to produce.
+          entrance: fee ? { id: fee.id, name: fee.attraction_name, city: fee.city } : null,
+          transportation: a.transportation_id ? transportById.get(a.transportation_id as string) ?? null : null,
+        }
+      }),
+    }))
 
     // Meals are resolved with a second read rather than a PostgREST embed.
     // `lunch_meal:restaurant_contacts!lunch_meal_id` is a COLUMN-name hint,
@@ -68,7 +106,7 @@ export async function GET(
     // result was never error-checked, so it degraded silently.
     const mealIds = [
       ...new Set(
-        (days ?? [])
+        daysJoined
           .flatMap((d: Record<string, unknown>) => [d.lunch_meal_id, d.dinner_meal_id])
           .filter((v): v is string => typeof v === 'string')
       ),
@@ -81,7 +119,7 @@ export async function GET(
         .in('id', mealIds)
       restaurants = Object.fromEntries(((rows ?? []) as Array<{ id: string }>).map((r) => [r.id, r]))
     }
-    const daysWithMeals = (days ?? []).map((d: Record<string, unknown>) => ({
+    const daysWithMeals = daysJoined.map((d: Record<string, unknown>) => ({
       ...d,
       lunch_meal: d.lunch_meal_id ? restaurants[d.lunch_meal_id as string] ?? null : null,
       dinner_meal: d.dinner_meal_id ? restaurants[d.dinner_meal_id as string] ?? null : null,

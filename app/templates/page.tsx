@@ -200,7 +200,7 @@ export default function TemplatesPage() {
     overview: { totalTemplates: number; totalSentLast30Days: number; successRate: number; pendingScheduled: number }
     topTemplates: { id: string; name: string; channel: string; usage_count: number }[]
     channelDistribution: { email: number; whatsapp: number; sms: number; both: number }
-    recentSends: { id: string; channel: string; status: string; created_at: string; template: { name: string } | null }[]
+    recentSends: { id: string; channel: string; status: string; sent_at: string | null; template: { name: string } | null }[]
   } | null>(null)
 
   // ============================================
