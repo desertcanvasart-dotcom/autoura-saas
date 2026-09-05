@@ -8681,7 +8681,6 @@ export interface Database {
           whatsapp_ai_enabled: boolean | null
           concierge_enabled: boolean
           copilot_pregenerate_enabled: boolean
-          use_global_catalog: boolean
           activity_summary_enabled: boolean
         }
         Insert: {
@@ -8704,7 +8703,6 @@ export interface Database {
           whatsapp_ai_enabled?: boolean | null
           concierge_enabled?: boolean
           copilot_pregenerate_enabled?: boolean
-          use_global_catalog?: boolean
           activity_summary_enabled?: boolean
         }
         Update: {
@@ -8727,7 +8725,6 @@ export interface Database {
           whatsapp_ai_enabled?: boolean | null
           concierge_enabled?: boolean
           copilot_pregenerate_enabled?: boolean
-          use_global_catalog?: boolean
           activity_summary_enabled?: boolean
         }
         Relationships: [
@@ -11352,11 +11349,6 @@ export interface Database {
         Args: {
           p_tenant_id?: string
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Returns: any
-      }
-      get_use_global_catalog: {
-        Args: Record<PropertyKey, never>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
       }

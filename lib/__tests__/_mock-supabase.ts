@@ -150,3 +150,15 @@ export function createMockClient() {
     from: (table: string) => makeQuery(currentTables[table] ?? [], table),
   }
 }
+
+/** setMockTables + stamp every row with the test tenant. The global rate
+ *  catalog is retired: engine queries filter to the tenant's own rows, so a
+ *  tenant-less fixture row silently vanishes from every lookup. Rows that
+ *  already carry a tenant_id (cross-tenant isolation tests) keep it. */
+export function setMockTablesStamped(tables: MockTables): void {
+  const stamped: MockTables = {}
+  for (const [name, rows] of Object.entries(tables)) {
+    stamped[name] = (rows as Array<Record<string, unknown>>).map(r => ({ tenant_id: 'test-tenant', ...r }))
+  }
+  setMockTables(stamped)
+}

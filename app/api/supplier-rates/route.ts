@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
           query = query.eq('tenant_id', authResult.tenant_id)
         } else if (SHARED_CATALOG_TABLES.has(table)) {
           // Tenant rows + shared/global catalog rows (tenant_id IS NULL)
-          query = query.or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
+          query = query.eq('tenant_id', authResult.tenant_id)
         }
 
         const { data, error } = await query

@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeAll } from 'vitest'
-import { setMockTables } from './_mock-supabase'
+import { setMockTablesStamped as setMockTables } from './_mock-supabase'
 import { TEMPLATE_ID, multiTierRateTables } from './fixtures/sample-templates'
 
 // Phase 5 drift guard: lock the engine's computed per-person prices across a
@@ -30,6 +30,9 @@ describe('golden basket — cross-tier price drift guard', () => {
         setMockTables(multiTierRateTables())
         const r = await calculateDayBasedPricing({
           templateId: TEMPLATE_ID,
+      tenantId: 'test-tenant',
+        tenantId: 'test-tenant',
+          tenantId: 'test-tenant',
           tier,
           isEurPassport,
           language: 'English',

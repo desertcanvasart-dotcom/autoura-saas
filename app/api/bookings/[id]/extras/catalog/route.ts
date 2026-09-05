@@ -133,7 +133,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .eq('is_sellable_extra', true)
     // The rate catalogue is tenant rows plus the shared global rows (tenant_id
     // NULL), exactly as the engine reads it.
-    .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+    .eq('tenant_id', tenantId)
   if (addonError) console.error('extras catalog: sellable attraction extras', addonError)
 
   for (const a of addons ?? []) {

@@ -171,7 +171,7 @@ async function getTransportPackage(packageType: string, originCity: string, dest
   const { data, error } = await (admin as any)
     .from('b2b_transport_packages')
     .select('*')
-    .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+    .eq('tenant_id', tenantId)
     .eq('package_type', packageType)
     .eq('origin_city', originCity)
     .eq('destination_city', destCity)

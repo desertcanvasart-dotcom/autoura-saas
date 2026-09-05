@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { setMockTables } from './_mock-supabase'
+import { setMockTablesStamped as setMockTables } from './_mock-supabase'
 
 // Mock supabase-js before importing the engine (vitest hoists vi.mock).
 vi.mock('@supabase/supabase-js', async () => {
@@ -9,7 +9,7 @@ vi.mock('@supabase/supabase-js', async () => {
 
 import { getHotelRates } from '@/lib/auto-pricing-service'
 
-const TEST_SCOPE = { tenantId: 'test-tenant', useGlobalCatalog: true }
+const TEST_SCOPE = { tenantId: 'test-tenant' }
 
 beforeAll(() => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://localhost')

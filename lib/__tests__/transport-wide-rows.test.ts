@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeAll, beforeEach } from 'vitest'
-import { setMockTables } from './_mock-supabase'
+import { setMockTablesStamped as setMockTables } from './_mock-supabase'
 
 vi.mock('@supabase/supabase-js', async () => {
   const mock = await import('./_mock-supabase')
@@ -8,7 +8,7 @@ vi.mock('@supabase/supabase-js', async () => {
 
 import { buildTransportCache, findTransportRate } from '@/lib/auto-pricing-service'
 
-const TEST_SCOPE = { tenantId: 'test-tenant', useGlobalCatalog: true }
+const TEST_SCOPE = { tenantId: 'test-tenant' }
 
 beforeAll(() => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://localhost')

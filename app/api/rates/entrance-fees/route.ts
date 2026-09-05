@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       .from('entrance_fees')
       .select('*')
       // Tenant rows + shared/global catalog rows (tenant_id IS NULL)
-      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
+      .eq('tenant_id', authResult.tenant_id)
       .order('city', { ascending: true })
       .order('attraction_name', { ascending: true })
 

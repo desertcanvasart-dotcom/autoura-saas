@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeAll } from 'vitest'
 import { computeCoverage, type CoverageCalc } from '@/lib/pricing-coverage'
-import { setMockTables } from './_mock-supabase'
+import { setMockTablesStamped as setMockTables } from './_mock-supabase'
 import {
   fullRateTables,
   missingHotelTables,
@@ -92,7 +92,7 @@ describe('computeCoverage — integration with the real engine', () => {
       templates: [{ id: TEMPLATE_ID, name: 'Cairo' }],
       tiers: ['standard'],
       isEurPassport: true,
-      calc: (a) => calculateDayBasedPricing(a),
+      calc: (a) => calculateDayBasedPricing({ ...a, tenantId: 'test-tenant' }),
     })
     expect(report.summary.incomplete).toBe(0)
     expect(report.summary.totalHoles).toBe(0)
@@ -104,7 +104,7 @@ describe('computeCoverage — integration with the real engine', () => {
       templates: [{ id: TEMPLATE_ID, name: 'Cairo' }],
       tiers: ['standard'],
       isEurPassport: true,
-      calc: (a) => calculateDayBasedPricing(a),
+      calc: (a) => calculateDayBasedPricing({ ...a, tenantId: 'test-tenant' }),
     })
     expect(report.summary.incomplete).toBe(1)
     expect(report.summary.holesByKind.hotel).toBeGreaterThanOrEqual(1)

@@ -19,7 +19,7 @@ export async function GET() {
     const { data, error } = await (createAdminClient() as any)
       .from('b2b_transport_packages')
       .select('*')
-      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
+      .eq('tenant_id', authResult.tenant_id)
       .order('package_name')
 
     if (error) {
