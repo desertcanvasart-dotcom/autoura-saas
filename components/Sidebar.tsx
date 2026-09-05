@@ -56,6 +56,7 @@ import {
   PenLine,
   CalendarRange,
   Globe,
+  BookA,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -253,6 +254,7 @@ const navigation: NavSection[] = [
       { label: 'Organization', href: '/settings/tenant', icon: Building },
       // 'Team Management' (/settings/team) consolidated into User Management
       // (/users) below; the old route redirects there.
+      { label: 'Your Vocabulary', href: '/settings/vocabulary', icon: BookA },
       { label: 'Destinations', href: '/settings/destinations', icon: Globe },
       { label: 'Departments', href: '/settings/departments', icon: Building },
       { label: 'WhatsApp', href: '/settings/whatsapp', icon: MessageSquare },

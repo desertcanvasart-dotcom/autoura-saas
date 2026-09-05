@@ -812,6 +812,22 @@ function SettingsContent() {
         <p className="text-sm text-gray-500 mt-1">Configure default settings for itineraries and pricing.</p>
       </div>
 
+      {/* The agency's own words — tiers, supplier types, vehicles… (migration 334). */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-900">Your vocabulary</p>
+          <p className="text-xs text-gray-500">
+            Rename tiers, supplier types, vehicles and cabins in your own words; hide what you never use.
+          </p>
+        </div>
+        <Link
+          href="/settings/vocabulary"
+          className="px-3 py-1.5 text-sm font-medium text-[#647C47] border border-[#647C47]/40 rounded-lg hover:bg-[#647C47]/5 transition-colors"
+        >
+          Manage vocabulary
+        </Link>
+      </div>
+
       {/* Destinations live in their own manager (P1: countries/cities as data). */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between">
         <div>

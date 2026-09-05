@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 141
+ * Tables: 142
  */
 
 export type Json =
@@ -9057,6 +9057,59 @@ export interface Database {
           },
         ]
       }
+      tenant_vocabularies: {
+        Row: {
+          id: string
+          tenant_id: string
+          kind: string
+          key: string
+          label: string
+          description: string | null
+          behavior: string | null
+          rank: number
+          meta: Json
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          kind: string
+          key: string
+          label: string
+          description?: string | null
+          behavior?: string | null
+          rank?: number
+          meta: Json
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          kind?: string
+          key?: string
+          label?: string
+          description?: string | null
+          behavior?: string | null
+          rank?: number
+          meta?: Json
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_vocabularies_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           id: string
@@ -11519,6 +11572,13 @@ export interface Database {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
       }
+      reset_tenant_vocabulary: {
+        Args: {
+          p_kind?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
       revert_b2b_quote_to_version: {
         Args: {
           p_quote_id?: string
@@ -11535,6 +11595,14 @@ export interface Database {
           p_revert_reason?: string
           p_reverted_by?: string
           p_version_number?: number
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      seed_tenant_vocabulary: {
+        Args: {
+          p_kind?: string
+          p_tenant?: string
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
