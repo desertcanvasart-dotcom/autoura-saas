@@ -192,7 +192,7 @@ export default function ToursBrowsePage() {
         {tours.some(t => t.starting_from) && (
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">💶</span>
+              <span className="text-lg">💰</span>
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             </div>
             <p className="text-xs text-gray-500 mb-1">Starting From</p>

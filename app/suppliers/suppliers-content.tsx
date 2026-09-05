@@ -469,6 +469,28 @@ export default function SuppliersContent() {
     }
   }
 
+  // The Sample CSV is the CONTRACT: fill it with your own data and it
+  // imports. Carries every understood header and one example row, with the
+  // valid Type vocabulary spelled out — rows without a Type import as
+  // "Other" (reported), so classification comes from THIS file, not from
+  // whatever another system exported.
+  const handleSampleCsv = () => {
+    const validTypes = Object.keys(TYPE_CONFIG).join(' | ')
+    const csv = [
+      'Name,Type,Contact,Email,Phone,City,Country,Commission,Status,Notes,Website',
+      `Nile Star Hotel,hotel,Ahmed Hassan,reservations@nilestar.example,+20 100 000 0000,Cairo,Egypt,10,active,Valid types: ${validTypes},https://nilestar.example`,
+    ].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'suppliers_sample.csv'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const handleExport = () => {
     const csv = [
       ['Name', 'Type', 'Contact', 'Email', 'Phone', 'City', 'Commission', 'Status'].join(','),
@@ -628,6 +650,13 @@ export default function SuppliersContent() {
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportFile(f) }}
               />
+              <button
+                onClick={handleSampleCsv}
+                title="Download the import format with one example row — fill it with your data and import"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <FileText className="w-4 h-4" /> Sample CSV
+              </button>
               <button
                 onClick={() => importInputRef.current?.click()}
                 title="Import suppliers from a CSV (the Export format round-trips)"
