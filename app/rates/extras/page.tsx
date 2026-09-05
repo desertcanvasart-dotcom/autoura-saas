@@ -21,6 +21,7 @@
 // prices. These are the extras that go with any quote.
 
 import { useCallback, useEffect, useState } from 'react'
+import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { Copy, Loader2, Pencil, Plus, Trash2, X, Sparkles } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useTenant } from '@/app/contexts/TenantContext'
@@ -115,15 +116,18 @@ export default function ExtrasPage() {
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Sparkles className="w-6 h-6 text-primary-600" /> Extras
         </h1>
-        {!draft && (
-          <button
-            type="button"
-            onClick={() => setDraft(EMPTY)}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
-          >
-            <Plus className="w-4 h-4" /> Add extra
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <BulkRateImportExport tableName="extras_catalogue" onImportComplete={load} />
+          {!draft && (
+            <button
+              type="button"
+              onClick={() => setDraft(EMPTY)}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700"
+            >
+              <Plus className="w-4 h-4" /> Add extra
+            </button>
+          )}
+        </div>
       </div>
       <p className="text-sm text-gray-500 mb-6">Paid extras you can add to any quote — airport fast-track, extra luggage, a late check-out. Pick them in the B2B calculator: each is priced from its cost plus the quote&apos;s margin, or at the price you set here. Upgrades that belong to one programme are set on its variation, under Tour Manager → Options.</p>
 

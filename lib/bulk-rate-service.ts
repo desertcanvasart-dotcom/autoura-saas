@@ -104,6 +104,10 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('property_type', 'Property Type', 'text', false),
       col('city', 'City', 'text', false),
       col('board_basis', 'Board Basis', 'text', false),
+      // The engine matches hotels BY TIER — a file without it lands rows in
+      // the default bucket (2026-09-05 sweep).
+      col('tier', 'Tier', 'text', false),
+      col('supplier_name', 'Supplier Name', 'text', false),
       // Low season EUR
       col('pp_double_eur', 'Low PP Double EUR', 'number', false),
       col('single_supp_eur', 'Low Single Supp EUR', 'number', false),
@@ -112,6 +116,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('pp_double_non_eur', 'Low PP Double Non-EUR', 'number', false),
       col('single_supp_non_eur', 'Low Single Supp Non-EUR', 'number', false),
       col('triple_red_non_eur', 'Low Triple Red Non-EUR', 'number', false),
+      col('suite_rate_eur', 'Low Suite EUR', 'number', false),
+      legacyRate('suite_rate_non_eur', 'Low Suite Non-EUR (legacy)', 'suite_rate_eur'),
       // Low season dates
       col('low_season_from', 'Low Season From', 'date', false),
       col('low_season_to', 'Low Season To', 'date', false),
@@ -123,6 +129,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('high_pp_double_non_eur', 'High PP Double Non-EUR', 'number', false),
       col('high_single_supp_non_eur', 'High Single Supp Non-EUR', 'number', false),
       col('high_triple_red_non_eur', 'High Triple Red Non-EUR', 'number', false),
+      col('high_season_suite_eur', 'High Suite EUR', 'number', false),
+      legacyRate('high_season_suite_non_eur', 'High Suite Non-EUR (legacy)', 'high_season_suite_eur'),
       // High season dates
       col('high_season_from', 'High Season From', 'date', false),
       col('high_season_to', 'High Season To', 'date', false),
@@ -134,13 +142,15 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('peak_pp_double_non_eur', 'Peak PP Double Non-EUR', 'number', false),
       col('peak_single_supp_non_eur', 'Peak Single Supp Non-EUR', 'number', false),
       col('peak_triple_red_non_eur', 'Peak Triple Red Non-EUR', 'number', false),
+      col('peak_season_suite_eur', 'Peak Suite EUR', 'number', false),
+      legacyRate('peak_season_suite_non_eur', 'Peak Suite Non-EUR (legacy)', 'peak_season_suite_eur'),
       // Peak season dates
       col('peak_season_from', 'Peak Season From', 'date', false),
       col('peak_season_to', 'Peak Season To', 'date', false),
       col('peak_season_2_from', 'Peak Season 2 From', 'date', false),
       col('peak_season_2_to', 'Peak Season 2 To', 'date', false),
       // Validity
-      rateValidFrom(), rateValidTo(),
+      rateValidFrom(), rateValidTo(), notes(),
       // Contact
       col('contact_name', 'Contact Name', 'text', false),
       col('contact_email', 'Contact Email', 'text', false),
@@ -279,6 +289,14 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('flight_type', 'Flight Type', 'text', false),
       col('cabin_class', 'Cabin Class', 'text', false),
       col('base_rate_eur', 'Rate', 'number', true),
+      // Tax is priced with the fare (engine: fare + tax per pax) — a file
+      // without it lands silently underpriced flights (2026-09-05 sweep).
+      col('tax_eur', 'Tax EUR', 'number', false),
+      legacyRate('tax_non_eur', 'Tax Non-EUR (legacy)', 'tax_eur'),
+      // Throughout guide's negotiated fare (B-item 2): blank = customer
+      // fare, 0 = rides free.
+      col('guide_rate', 'Guide Fare', 'number', false),
+      col('airline_code', 'Airline IATA Code', 'text', false),
       legacyRate('base_rate_non_eur', 'Rate Non-EUR (legacy)', 'base_rate_eur'),
       col('baggage_kg', 'Baggage (kg)', 'number', false),
       col('departure_time', 'Departure Time', 'text', false),
@@ -441,6 +459,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('duration_hours', 'Duration (hours)', 'number', false),
       col('operator_name', 'Operator', 'text', false),
       col('departure_times', 'Departure Times', 'text', false),
+      col('guide_rate', 'Guide Fare', 'number', false),
       rateValidFrom(), rateValidTo(),
       supplierId(),
       col('description', 'Description', 'text', false),
@@ -462,7 +481,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('rate_roundtrip_eur', 'Roundtrip EUR', 'number', false),
       col('departure_time', 'Departure Time', 'text', false),
       col('arrival_time', 'Arrival Time', 'text', false),
-      season(), rateValidFrom(), rateValidTo(),
+      season(), col('guide_rate', 'Guide Fare', 'number', false),
+      rateValidFrom(), rateValidTo(),
       col('operator_name', 'Operator', 'text', false),
       supplierId(),
       col('description', 'Description', 'text', false),
@@ -471,6 +491,23 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     ],
   },
 
+  extras_catalogue: {
+    tableName: 'extras_catalogue',
+    displayName: 'Extras Catalogue',
+    uniqueKey: ['name'],
+    columns: [
+      id(),
+      col('name', 'Name', 'text', true),
+      col('category', 'Category', 'text', false),
+      col('description', 'Description', 'text', false),
+      // Cost is what the supplier charges; selling_price is an optional PIN —
+      // blank means the engine prices cost + quote margin (the extras model).
+      col('supplier_cost', 'Supplier Cost', 'number', false),
+      col('selling_price', 'Selling Price (pin, optional)', 'number', false),
+      col('unit', 'Unit', 'text', false),
+      isActive(),
+    ],
+  },
   fixed_costs: {
     tableName: 'fixed_daily_costs',
     displayName: 'Fixed Costs',

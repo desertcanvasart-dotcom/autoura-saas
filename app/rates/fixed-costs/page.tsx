@@ -5,6 +5,7 @@ import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { Plus, Edit, Copy, Save, X, Loader2, DollarSign, Trash2 } from 'lucide-react'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface FixedCost {
@@ -97,10 +98,13 @@ function FixedCostsContent() {
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">Per-person daily costs (water, tips, service fees)</p>
           </div>
-          <button onClick={() => { setForm({ cost_type: '', cost_per_person_per_day: '', description: '', is_active: true }); setEditingId(null); setShowForm(true) }}
-            className="btn-primary text-sm px-4 py-2 rounded-lg flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Add Cost
-          </button>
+          <div className="flex items-center gap-2">
+            <BulkRateImportExport tableName="fixed_costs" onImportComplete={fetchCosts} />
+            <button onClick={() => { setForm({ cost_type: '', cost_per_person_per_day: '', description: '', is_active: true }); setEditingId(null); setShowForm(true) }}
+              className="btn-primary text-sm px-4 py-2 rounded-lg flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Add Cost
+            </button>
+          </div>
         </div>
       </header>
 
