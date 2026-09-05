@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 140
+ * Tables: 141
  */
 
 export type Json =
@@ -7721,6 +7721,85 @@ export interface Database {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      supplier_contracts: {
+        Row: {
+          id: string
+          tenant_id: string
+          supplier_id: string
+          property_id: string | null
+          document_type: string
+          title: string
+          valid_from: string | null
+          valid_to: string | null
+          notes: string | null
+          storage_path: string
+          mime_type: string
+          size_bytes: number
+          original_filename: string | null
+          uploaded_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          supplier_id: string
+          property_id?: string | null
+          document_type?: string
+          title: string
+          valid_from?: string | null
+          valid_to?: string | null
+          notes?: string | null
+          storage_path: string
+          mime_type: string
+          size_bytes: number
+          original_filename?: string | null
+          uploaded_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          supplier_id?: string
+          property_id?: string | null
+          document_type?: string
+          title?: string
+          valid_from?: string | null
+          valid_to?: string | null
+          notes?: string | null
+          storage_path?: string
+          mime_type?: string
+          size_bytes?: number
+          original_filename?: string | null
+          uploaded_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_contracts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_contracts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_contracts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_properties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       supplier_documents: {
         Row: {

@@ -84,7 +84,7 @@ export default function SuppliersPage() {
           <li><strong>Details</strong> &mdash; Contact information, type, status, and commission</li>
           <li><strong>Rates</strong> &mdash; Rates associated with this supplier</li>
           <li><strong>Properties</strong> &mdash; Child properties, for parent companies</li>
-          <li><strong>Documents</strong> &mdash; Files attached to the supplier</li>
+          <li><strong>Documents</strong> &mdash; The contracts, rate sheets, allotment agreements, licences and insurance you hold with the supplier. Upload a PDF, image, Word or Excel file, set its validity dates, and optionally tie it to one of the supplier&rsquo;s properties (a specific ship or hotel). Documents ending within 60 days are flagged <em>Expiring soon</em>; files open through a short-lived private link, never a permanent URL.</li>
         </ul>
         <ScreenshotPlaceholder caption="Supplier view modal on /suppliers showing the Details, Rates, Properties, and Documents tabs" />
         <Tip>
