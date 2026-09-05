@@ -10,10 +10,13 @@
 // Two storage generations:
 //   - PPD model (ppd_eur family / seasons periods): already per person
 //     per night — used as-is.
-//   - Legacy trip-cabin model (rate_double_eur family): a whole-trip
-//     DOUBLE CABIN price. Per person per night = cabin / 2 occupants
-//     / nights — the exact derivation the engine's legacy fallback uses
-//     (lib/auto-pricing-service.ts), duplicated nowhere else.
+//   - Legacy trip model (rate_double_eur family): a whole-trip
+//     PER-PERSON price at double occupancy — the sibling app's engine
+//     states it outright ("rate_double_eur is already per-person"), and
+//     it matches this repo's own hotel convention (pp_double_eur is
+//     per-person). Per person per night = trip / nights. (This repo's
+//     legacy fallback divided by 2 as if it were a cabin rate — that
+//     HALVED legacy cruise prices and is fixed alongside this helper.)
 
 const num = (v: unknown): number => {
   const n = typeof v === 'string' ? Number(v) : v
@@ -39,8 +42,8 @@ export function cruiseNightsOf(row: CruisePpdRow): number {
 export function cruisePpdNightEur(row: CruisePpdRow): number {
   const ppd = num(row.ppd_eur)
   if (ppd > 0) return ppd
-  const tripCabin = num(row.rate_double_eur) || num(row.rate_low_double_eur)
-  return tripCabin > 0 ? tripCabin / 2 / cruiseNightsOf(row) : 0
+  const trip = num(row.rate_double_eur) || num(row.rate_low_double_eur)
+  return trip > 0 ? trip / cruiseNightsOf(row) : 0
 }
 
 /** Non-EUR variant; falls back to the EUR figure when unset (the tables'
@@ -48,7 +51,7 @@ export function cruisePpdNightEur(row: CruisePpdRow): number {
 export function cruisePpdNightNonEur(row: CruisePpdRow): number {
   const ppd = num(row.ppd_non_eur)
   if (ppd > 0) return ppd
-  const tripCabin = num(row.rate_double_non_eur) || num(row.rate_low_double_non_eur)
-  if (tripCabin > 0) return tripCabin / 2 / cruiseNightsOf(row)
+  const trip = num(row.rate_double_non_eur) || num(row.rate_low_double_non_eur)
+  if (trip > 0) return trip / cruiseNightsOf(row)
   return cruisePpdNightEur(row)
 }

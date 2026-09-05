@@ -915,8 +915,11 @@ export async function getCruiseRates(
         tripleRedNight = cruise.triple_reduction_eur ?? 0
       }
     } else {
-      // Legacy model - derive from trip rates
-      const ppdTrip = cruise.rate_double_eur / 2
+      // Legacy model — whole-trip PER-PERSON rates (double occupancy), the
+      // sibling's stated semantics and this repo's hotel convention. The
+      // old code divided rate_double_eur by 2 as if it were a cabin rate,
+      // which HALVED every legacy cruise price.
+      const ppdTrip = cruise.rate_double_eur
       ppdNight = ppdTrip / durationNights
       const singleSuppTrip = (cruise.rate_single_eur || cruise.rate_double_eur) - ppdTrip
       singleSuppNight = Math.max(0, singleSuppTrip / durationNights)
