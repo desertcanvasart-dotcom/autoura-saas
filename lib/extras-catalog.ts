@@ -45,6 +45,21 @@ export interface CatalogItem {
   unit_price: number | null
   currency: string
   price_note: string
+  /**
+   * What one unit covers. The quote-time path always multiplied per-person
+   * rows by pax (lib/pricing/extras-pricing.ts); the booking-time picker
+   * used to add everything at quantity 1, so a 30/person fast-track on a
+   * 6-pax booking billed one person's worth. The catalogue now says the unit and the
+   * picker multiplies — same rule on both sides of the booking line.
+   */
+  unit: 'per_person' | 'per_booking'
+}
+
+/** How many units the picker adds: the party for per-person rows, one otherwise. */
+export function extraQuantityFor(unit: 'per_person' | 'per_booking', numTravelers: unknown): number {
+  if (unit !== 'per_person') return 1
+  const pax = Math.floor(Number(numTravelers))
+  return Number.isFinite(pax) && pax > 0 ? pax : 1
 }
 
 /** Convert between currencies, or null when there is no rate to do it with. */

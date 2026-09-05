@@ -1,6 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 
+// Agents are team_members (there is no sales_agents table — embedding it
+// killed every activity query with PGRST200). Attach the agent app-side in
+// the shape the embed was supposed to produce; photo_url is aliased to
+// avatar_url, the same mapping the agents route uses (mig 309 note).
+async function attachAgents(
+  supabase: NonNullable<Awaited<ReturnType<typeof requireAuth>>['supabase']>,
+  rows: Array<Record<string, unknown>>
+): Promise<Array<Record<string, unknown>>> {
+  const ids = [
+    ...new Set(
+      rows
+        .map(r => (r.team_member_id as string | null) ?? (r.agent_id as string | null))
+        .filter((v): v is string => Boolean(v))
+    ),
+  ]
+  const { data: members } = ids.length
+    ? await supabase.from('team_members').select('id, name, email, photo_url').in('id', ids)
+    : { data: [] }
+  const byId = new Map(
+    (members ?? []).map((m: { id: string; name: string | null; email: string | null; photo_url: string | null }) => [
+      m.id,
+      { id: m.id, name: m.name, email: m.email, avatar_url: m.photo_url },
+    ])
+  )
+  return rows.map(r => ({
+    ...r,
+    agent: byId.get(((r.team_member_id as string | null) ?? (r.agent_id as string | null)) || '') ?? null,
+  }))
+}
+
 // Verify a conversation belongs to the caller's tenant (RLS-scoped lookup).
 async function assertConversationInTenant(
   supabase: NonNullable<Awaited<ReturnType<typeof requireAuth>>['supabase']>,
@@ -37,12 +67,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
+    // There is no sales_agents table — the old embed made PostgREST reject
+    // the whole query (PGRST200), so the activity feed was always empty.
+    // Agents are team_members; they are joined app-side below.
     let query = supabase
       .from('conversation_activity')
-      .select(`
-        *,
-        agent:sales_agents(id, name, email, avatar_url)
-      `)
+      .select('id, conversation_id, agent_id, team_member_id, action_type, action_details, created_at')
       .order('created_at', { ascending: false })
       .limit(limit)
 
@@ -62,10 +92,12 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ 
-      success: true, 
-      activities: data || [],
-      count: data?.length || 0
+    const activities = await attachAgents(supabase, data || [])
+
+    return NextResponse.json({
+      success: true,
+      activities,
+      count: activities.length
     })
   } catch (error: any) {
     console.error('Error fetching activity:', error)
@@ -114,10 +146,7 @@ export async function POST(request: NextRequest) {
         action_type,
         action_details: action_details || {}
       })
-      .select(`
-        *,
-        agent:sales_agents(id, name, avatar_url)
-      `)
+      .select('id, conversation_id, agent_id, team_member_id, action_type, action_details, created_at')
       .single()
 
     if (error) throw error
@@ -125,9 +154,11 @@ export async function POST(request: NextRequest) {
     // Agent replies are tracked via conversation_activity above;
     // whatsapp_conversations has no last_agent_id / last_agent_reply_at columns.
 
+    const [activity] = await attachAgents(supabase, [data])
+
     return NextResponse.json({
-      success: true, 
-      activity: data,
+      success: true,
+      activity,
       message: 'Activity logged successfully'
     })
   } catch (error: any) {

@@ -64,7 +64,7 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 export default function SleepingTrainRatesContent() {
   const searchParams = useSearchParams()
-  const { symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { symbol, loading: currencyLoading } = useCurrency()
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [rates, setRates] = useState<SleepingTrainRate[]>([])
@@ -628,7 +628,7 @@ export default function SleepingTrainRatesContent() {
             <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
           </div>
           <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgOneway)}</p>
-          <p className="text-xs text-gray-600">Avg. One-way ({userCurrency})</p>
+          <p className="text-xs text-gray-600">Avg. One-way</p>
         </div>
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
           <div className="flex items-center gap-2 mb-1">
@@ -807,8 +807,8 @@ export default function SleepingTrainRatesContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Train</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Cabin</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Schedule</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">One-way ({userCurrency})</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Roundtrip ({userCurrency})</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">One-way</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Roundtrip</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
                 </tr>
@@ -948,7 +948,7 @@ export default function SleepingTrainRatesContent() {
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
-                    <p className="text-xs text-gray-500">One-way / Roundtrip ({userCurrency})</p>
+                    <p className="text-xs text-gray-500">One-way / Roundtrip</p>
                     <p className="text-lg font-bold text-green-600">
                       {fmtRate(Number(rate.rate_oneway_eur), rate, 2)}
                       {rate.rate_roundtrip_eur && (

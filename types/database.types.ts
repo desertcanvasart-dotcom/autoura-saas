@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 139
+ * Tables: 140
  */
 
 export type Json =
@@ -729,6 +729,44 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: "airport_staff_rates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attraction_aliases: {
+        Row: {
+          id: string
+          tenant_id: string | null
+          alias: string
+          canonical: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id?: string | null
+          alias: string
+          canonical: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string | null
+          alias?: string
+          canonical?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attraction_aliases_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2000,7 +2038,7 @@ export interface Database {
         Row: {
           id: string
           tenant_id: string
-          itinerary_id: string
+          itinerary_id: string | null
           quote_id: string
           quote_type: string
           client_id: string | null
@@ -2042,7 +2080,7 @@ export interface Database {
         Insert: {
           id?: string
           tenant_id: string
-          itinerary_id: string
+          itinerary_id?: string | null
           quote_id: string
           quote_type: string
           client_id?: string | null
@@ -2084,7 +2122,7 @@ export interface Database {
         Update: {
           id?: string
           tenant_id?: string
-          itinerary_id?: string
+          itinerary_id?: string | null
           quote_id?: string
           quote_type?: string
           client_id?: string | null
@@ -9039,6 +9077,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           rate_currency: string | null
+          city: string | null
         }
         Insert: {
           id?: string
@@ -9054,6 +9093,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          city?: string | null
         }
         Update: {
           id?: string
@@ -9069,6 +9109,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          city?: string | null
         }
         Relationships: [
           {

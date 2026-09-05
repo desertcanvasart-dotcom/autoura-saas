@@ -8,9 +8,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const admin = auth.adminClient!
     const { id } = await params
 
+    // tenant_members.user_id references auth.users, and no FK to
+    // user_profiles exists — the old `user:user_profiles(...)` embed made
+    // PostgREST reject the whole query (PGRST200, the exact incident
+    // postgrest-embed-hints.test.ts was written about), its error was
+    // swallowed, and the member list rendered empty. Profiles are joined in
+    // a second query instead (user_profiles.id mirrors auth.users.id).
     const [tenantRes, membersRes, featuresRes, subRes, activityRes, usageRes] = await Promise.all([
       admin.from('tenants').select('*').eq('id', id).single(),
-      admin.from('tenant_members').select('*, user:user_profiles(email, full_name, role, is_active)').eq('tenant_id', id).order('joined_at', { ascending: false }),
+      admin.from('tenant_members').select('id, tenant_id, user_id, role, status, invited_by, invited_at, joined_at, created_at, updated_at').eq('tenant_id', id).order('joined_at', { ascending: false }),
       admin.from('tenant_features').select('*').eq('tenant_id', id).maybeSingle(),
       admin.from('tenant_subscriptions').select('*, plan:subscription_plans(name, slug, price_monthly, price_yearly)').eq('tenant_id', id).maybeSingle(),
       admin.from('tenant_activity_logs').select('*').eq('tenant_id', id).order('created_at', { ascending: false }).limit(20),
@@ -19,11 +25,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (tenantRes.error) throw tenantRes.error
 
+    const memberRows = membersRes.data ?? []
+    const memberUserIds = [...new Set(memberRows.map(m => m.user_id).filter(Boolean))] as string[]
+    const { data: profiles } = memberUserIds.length
+      ? await admin.from('user_profiles').select('id, email, full_name, role, is_active').in('id', memberUserIds)
+      : { data: [] }
+    const profileById = new Map((profiles ?? []).map(p => [p.id, p]))
+    const members = memberRows.map(m => ({
+      ...m,
+      // The shape the embed was supposed to produce.
+      user: (m.user_id && profileById.get(m.user_id)) || null,
+    }))
+
     return NextResponse.json({
       success: true,
       data: {
         tenant: tenantRes.data,
-        members: membersRes.data || [],
+        members,
         features: featuresRes.data || null,
         subscription: subRes.data || null,
         recentActivity: activityRes.data || [],

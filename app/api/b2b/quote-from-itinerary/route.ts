@@ -181,6 +181,22 @@ export async function POST(request: NextRequest) {
         currency: itinerary.currency || 'EUR',
         status: 'draft',
         pricing_table: [{ pax: numPax, cost_per_person: Math.round((totalCost / numPax) * 100) / 100, selling_per_person: pricePerPerson, total: sellingPrice }],
+        // Summary pricing + trip facts (migration 270 columns). These used to
+        // be computed above and then dropped from the insert, so converting
+        // the quote to a booking found selling_price NULL and froze a zero.
+        trip_name: itinerary.trip_name,
+        travel_date: itinerary.start_date,
+        num_adults: itinerary.num_adults,
+        num_children: itinerary.num_children,
+        is_eur_passport,
+        services_snapshot: servicesSnapshot,
+        total_cost: totalCost,
+        margin_percent: effectiveMargin,
+        margin_amount: marginAmount,
+        selling_price: sellingPrice,
+        price_per_person: pricePerPerson,
+        season,
+        source: 'from_itinerary',
         tour_leader_included,
         tour_leader_cost: tourLeaderCost,
         single_supplement: singleSupplement,

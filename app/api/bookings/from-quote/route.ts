@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { b2bNumTravelers, b2bTotalAmount, calculatorTripFacts } from '@/lib/bookings/from-quote-facts'
 import type { Tables, TablesInsert } from '@/types/database.types'
 
 export async function POST(request: NextRequest) {
@@ -120,28 +121,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Fetch the itinerary
+    // Fetch the itinerary. B2C quotes always have one; B2B quotes saved from
+    // the CALCULATOR deliberately do not (migration 270: "calculator quotes
+    // have no itinerary_id") — those book from the quote's own facts below.
     const itinerary_id = quote.itinerary_id
-    if (!itinerary_id) {
+    if (!itinerary_id && quote_type === 'b2c') {
       return NextResponse.json(
         { success: false, error: 'Quote has no linked itinerary' },
         { status: 404 }
       )
     }
 
-    const { data: itinerary, error: itineraryError } = await adminClient
-      .from('itineraries')
-      .select('*')
-      .eq('id', itinerary_id)
-      .eq('tenant_id', tenant_id)
-      .single()
+    let itinerary: Tables<'itineraries'> | null = null
+    if (itinerary_id) {
+      const { data, error: itineraryError } = await adminClient
+        .from('itineraries')
+        .select('*')
+        .eq('id', itinerary_id)
+        .eq('tenant_id', tenant_id)
+        .single()
 
-    if (itineraryError || !itinerary) {
-      console.error('Error fetching itinerary:', itineraryError)
-      return NextResponse.json(
-        { success: false, error: 'Itinerary not found' },
-        { status: 404 }
-      )
+      if (itineraryError || !data) {
+        console.error('Error fetching itinerary:', itineraryError)
+        return NextResponse.json(
+          { success: false, error: 'Itinerary not found' },
+          { status: 404 }
+        )
+      }
+      itinerary = data
     }
 
     // Generate booking number
@@ -158,34 +165,99 @@ export async function POST(request: NextRequest) {
 
     const booking_number = bookingNumberData
 
-    // Calculate deposit and payment details
-    const total_amount = b2cQuote ? b2cQuote.selling_price : 0 // B2B pricing is in pricing_table
+    // The frozen money and pax, from what the quote actually holds. This used
+    // to write B2B bookings with total_amount = 0 ("pricing is in
+    // pricing_table") and num_travelers = 2 — stale since migration 270 gave
+    // b2b_quotes real selling_price/num_adults/num_children. A quote that
+    // holds no usable figure is refused, never frozen as zero.
+    let total_amount: number
+    let num_travelers: number
+    if (b2cQuote) {
+      total_amount = b2cQuote.selling_price
+      num_travelers = b2cQuote.num_travelers
+    } else {
+      const pax = b2bNumTravelers(b2bQuote!)
+      if (!pax.ok) {
+        return NextResponse.json({ success: false, error: pax.error }, { status: 400 })
+      }
+      const total = b2bTotalAmount(b2bQuote!, pax.value)
+      if (!total.ok) {
+        return NextResponse.json({ success: false, error: total.error }, { status: 400 })
+      }
+      num_travelers = pax.value
+      total_amount = total.value
+    }
+
     const deposit_amount = (total_amount * deposit_percent) / 100
     const balance_due = total_amount
 
-    // Bookings require concrete dates; an itinerary without them cannot be booked.
-    if (!itinerary.start_date || !itinerary.end_date) {
-      return NextResponse.json(
-        { success: false, error: 'Itinerary is missing start or end date' },
-        { status: 400 }
-      )
+    // Trip facts: from the itinerary when there is one, else (calculator
+    // quote) from the quote's travel date plus its programme's duration.
+    let tripFacts: { trip_name: string; start_date: string; end_date: string; total_days: number }
+    if (itinerary) {
+      // Bookings require concrete dates; an itinerary without them cannot be booked.
+      if (!itinerary.start_date || !itinerary.end_date) {
+        return NextResponse.json(
+          { success: false, error: 'Itinerary is missing start or end date' },
+          { status: 400 }
+        )
+      }
+      tripFacts = {
+        trip_name: itinerary.trip_name || `Trip to ${itinerary.client_name}`,
+        start_date: itinerary.start_date,
+        end_date: itinerary.end_date,
+        total_days: itinerary.total_days || 0,
+      }
+    } else {
+      const variationId = b2bQuote!.variation_id
+      if (!variationId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'This quote has neither an itinerary nor a tour variation — it cannot be converted to a booking.',
+          },
+          { status: 400 }
+        )
+      }
+      const { data: variationRow } = await adminClient
+        .from('tour_variations')
+        .select('variation_name, tour_templates (template_name, duration_days)')
+        .eq('id', variationId)
+        .eq('tenant_id', tenant_id)
+        .maybeSingle()
+
+      const facts = calculatorTripFacts({
+        trip_name: b2bQuote!.trip_name,
+        travel_date: b2bQuote!.travel_date,
+        variation: variationRow
+          ? {
+              variation_name: variationRow.variation_name,
+              template_name: variationRow.tour_templates?.template_name ?? null,
+              duration_days: variationRow.tour_templates?.duration_days ?? null,
+            }
+          : null,
+      })
+      if (!facts.ok) {
+        return NextResponse.json({ success: false, error: facts.error }, { status: 400 })
+      }
+      tripFacts = facts.value
     }
 
     // Create booking
     const bookingData: TablesInsert<'bookings'> = {
       tenant_id,
-      itinerary_id,
+      itinerary_id: itinerary_id ?? null,
       quote_id,
       quote_type,
       client_id: b2cQuote?.client_id ?? null,
       partner_id: b2bQuote?.partner_id ?? null,
       booking_number,
       booking_date: new Date().toISOString().split('T')[0],
-      trip_name: itinerary.trip_name || `Trip to ${itinerary.client_name}`,
-      start_date: itinerary.start_date,
-      end_date: itinerary.end_date,
-      total_days: itinerary.total_days || 0,
-      num_travelers: b2cQuote ? b2cQuote.num_travelers : 2,
+      trip_name: tripFacts.trip_name,
+      start_date: tripFacts.start_date,
+      end_date: tripFacts.end_date,
+      total_days: tripFacts.total_days,
+      num_travelers,
       total_amount,
       currency: quote.currency || 'EUR',
       payment_terms: quote_type === 'b2c'
@@ -247,11 +319,13 @@ export async function POST(request: NextRequest) {
         .eq('id', quote_id)
     }
 
-    // Update itinerary status to 'confirmed'
-    await adminClient
-      .from('itineraries')
-      .update({ status: 'confirmed' })
-      .eq('id', itinerary_id)
+    // Update itinerary status to 'confirmed' (calculator quotes have none)
+    if (itinerary_id) {
+      await adminClient
+        .from('itineraries')
+        .update({ status: 'confirmed' })
+        .eq('id', itinerary_id)
+    }
 
 
 

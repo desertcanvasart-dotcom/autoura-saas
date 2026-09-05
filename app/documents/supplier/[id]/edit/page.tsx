@@ -1,5 +1,7 @@
 'use client'
 
+import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -11,6 +13,7 @@ interface EntranceFee {
   city: string
   eur_rate: number
   non_eur_rate: number
+  rate_currency?: string | null
   is_addon: boolean
   addon_note?: string
 }
@@ -21,10 +24,12 @@ interface SelectedAttraction {
   city: string
   eur_rate: number
   non_eur_rate: number
+  rate_currency?: string | null
   quantity: number
 }
 
 export default function EditSupplierDocumentPage() {
+  const { fmtRate } = useRateRowFormat()
   const params = useParams()
   const router = useRouter()
   const [document, setDocument] = useState<any>(null)
@@ -128,6 +133,7 @@ export default function EditSupplierDocumentPage() {
       city: fee.city,
       eur_rate: fee.eur_rate,
       non_eur_rate: fee.non_eur_rate,
+      rate_currency: fee.rate_currency,
       quantity: document?.num_adults + (document?.num_children || 0) || 1
     }
     
@@ -537,7 +543,7 @@ export default function EditSupplierDocumentPage() {
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <span className="text-sm text-gray-700">€{attraction.eur_rate.toFixed(2)}</span>
+                            <span className="text-sm text-gray-700">{fmtRate(attraction.eur_rate, attraction, 2)}</span>
                           </td>
                           <td className="px-4 py-3 text-center">
                             <input
@@ -550,7 +556,7 @@ export default function EditSupplierDocumentPage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <span className="text-sm font-semibold text-primary-600">
-                              €{(attraction.eur_rate * attraction.quantity).toFixed(2)}
+                              {fmtRate(attraction.eur_rate * attraction.quantity, attraction, 2)}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -574,7 +580,15 @@ export default function EditSupplierDocumentPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className="text-lg font-bold text-primary-600">
-                            €{calculateAttractionsTotal().toFixed(2)}
+                            {(() => {
+                              // A total is only honest when every row shares one
+                              // currency — raw numbers in different currencies
+                              // must never be summed under one symbol (A-item 3).
+                              const currencies = new Set(selectedAttractions.map(a => a.rate_currency || ''))
+                              return currencies.size > 1
+                                ? '\u2014 (mixed currencies)'
+                                : fmtRate(calculateAttractionsTotal(), selectedAttractions[0], 2)
+                            })()}
                           </span>
                         </td>
                         <td></td>
@@ -661,9 +675,9 @@ export default function EditSupplierDocumentPage() {
                                 </p>
                               </div>
                               <div className="text-right">
-                                <p className="text-sm font-semibold text-primary-600">€{fee.eur_rate.toFixed(2)}</p>
+                                <p className="text-sm font-semibold text-primary-600">{fmtRate(fee.eur_rate, fee, 2)}</p>
                                 {fee.non_eur_rate > 0 && fee.non_eur_rate !== fee.eur_rate && (
-                                  <p className="text-xs text-gray-400">Non-EU: €{fee.non_eur_rate.toFixed(2)}</p>
+                                  <p className="text-xs text-gray-400">Non-EU: {fmtRate(fee.non_eur_rate, fee, 2)}</p>
                                 )}
                               </div>
                             </button>

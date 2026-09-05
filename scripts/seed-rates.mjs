@@ -50,6 +50,10 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!url || !key) die('NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY required')
 
+// Say WHERE the write is going before it goes — .env.local on this project
+// points at the live database (A-item 23).
+console.log(`target: ${new URL(url).host} — ${APPLY ? 'APPLYING' : 'dry run (pass --apply to write)'}`)
+
 const supabase = createClient(url, key, { auth: { persistSession: false } })
 const input = JSON.parse(fs.readFileSync(file, 'utf8'))
 

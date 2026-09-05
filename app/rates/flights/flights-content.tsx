@@ -164,7 +164,7 @@ export default function FlightsContent() {
   // City vocabulary from the destination catalog (Egypt fallback pre-migration).
   const { cities: cityOptions } = useDestinationCities()
   const dialog = useConfirmDialog()
-  const { userCurrency, loading: currencyLoading } = useCurrency()
+  const { loading: currencyLoading } = useCurrency()
 
   const { fmtRate } = useRateRowFormat()
   const [rates, setRates] = useState<FlightRate[]>([])
@@ -805,7 +805,7 @@ export default function FlightsContent() {
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Flight</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Class</th>
               <th className="text-left text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Schedule</th>
-              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">{userCurrency} Rate</th>
+              <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Rate</th>
               <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Type</th>
               <th className="text-center text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Status</th>
               <th className="text-right text-xs font-medium text-gray-500 uppercase tracking-wider px-4 py-2">Actions</th>

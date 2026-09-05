@@ -16,6 +16,7 @@ import {
   Filter,
   MoreVertical,
   Edit,
+  Copy,
   Trash2,
   Eye,
   Clock,
@@ -101,6 +102,23 @@ export default function DeparturesPage() {
     price_per_person: '',
     status: 'open'
   })
+
+  // "Same tour, new date": open the create modal prefilled from an existing
+  // departure with the DATE blank — recurring departures repeat everything
+  // but the date, and retyping them is how typos land (A-item 22).
+  const handleClone = (d: TourDeparture) => {
+    setNewDeparture({
+      template_id: d.template_id || '',
+      tour_name: d.tour_name,
+      start_date: '',
+      duration_days: d.duration_days,
+      max_pax: d.max_pax,
+      min_pax: d.min_pax,
+      price_per_person: d.price_per_person != null ? String(d.price_per_person) : '',
+      status: 'open'
+    })
+    setShowCreateModal(true)
+  }
 
   // Edit/Delete
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -481,6 +499,14 @@ export default function DeparturesPage() {
                           <option value="cancelled">Cancelled</option>
                         </select>
                       )}
+
+                      <button
+                        onClick={() => handleClone(departure)}
+                        className="p-1.5 text-gray-400 hover:text-[#647C47] hover:bg-gray-50 rounded transition-colors"
+                        title="Clone — same tour, new date"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
 
                       <button
                         onClick={() => handleDelete(departure.id)}

@@ -30,8 +30,9 @@ import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/season-uplift'
-import { ratesForTravelDate } from '@/lib/rates/rate-seasons'
+import { resolveTravelDateRates } from '@/lib/rates/rate-seasons'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
+import { loadAttractionAliasIndex, resolveAttractionAlias } from '@/lib/pricing/attraction-aliases'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
@@ -98,6 +99,10 @@ export interface ItineraryDay {
     dinner: MealStatus
   }
   attractions: string[]
+  /** Explicit entrance_fees ids picked on the day editor (A-item 13). When
+   *  present they WIN and silence the free-text `attractions` wording —
+   *  an id is a decision, wording is a guess. */
+  attraction_ids?: string[]
   services: {
     airport_arrival: boolean
     airport_departure: boolean
@@ -539,6 +544,11 @@ export function parseItinerary(itineraryData: any, opts?: {
       attractions = extractAttractionsFromTitle(day.title)
     }
 
+    // Explicit entrance-fee ids from the day editor (A-item 13).
+    const attraction_ids: string[] = Array.isArray(day.attraction_ids)
+      ? day.attraction_ids.filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
+      : []
+
     return {
       day: day.day || index + 1,
       title: day.title || `Day ${index + 1}`,
@@ -547,6 +557,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       accommodation_type: day.accommodation_type || inferAccommodationType(day, itineraryData),
       meals,
       attractions,
+      attraction_ids,
       services,
       // Parse transport overrides if present
       transport: day.transport || undefined
@@ -767,6 +778,10 @@ export async function getCruiseRates(
   durationNights: number
   season: 'low' | 'high' | 'peak'
   source: RateSource
+  /** Set when the row HAS stored contract periods and none covers the travel
+   *  date — a pricing hole naming the uncovered night, never a base-column
+   *  fallback (the base columns mirror the FIRST period's rate). */
+  periodGap?: { propertyName: string; date: string }
 } | null> {
   try {
     let query = getSupabaseAdmin()
@@ -800,11 +815,25 @@ export async function getCruiseRates(
     // C3.2: dated rate periods first. `seasons` (migration 305) is the
     // operator's real contract windows, WITH years — the low/high/peak
     // detection below compares month-day only, so a window entered for one
-    // contract year silently applied to every year after it. When no period
-    // covers the date (or none are entered), fall through to the legacy
-    // columns exactly as before.
-    const cruisePeriod = ratesForTravelDate(cruise, 'cruise', travelDate)
-    if (cruisePeriod) {
+    // contract year silently applied to every year after it. Only a row with
+    // NO stored periods falls through to the legacy columns: a stored
+    // contract whose windows don't cover the night is a GAP — the base
+    // columns mirror the FIRST period's rate, so falling through would price
+    // an uncovered October night at the summer rate and call it complete.
+    const cruisePeriod = resolveTravelDateRates(cruise, 'cruise', travelDate)
+    if (cruisePeriod.kind === 'gap') {
+      return {
+        shipName: cruise.ship_name,
+        ppdNight: 0,
+        singleSuppNight: 0,
+        tripleRedNight: 0,
+        durationNights,
+        season: 'low',
+        source: 'missing',
+        periodGap: { propertyName: cruise.ship_name || 'this cruise', date: cruisePeriod.travelDate },
+      }
+    }
+    if (cruisePeriod.kind === 'period') {
       ppdNight = cruisePeriod.rates.ppd_eur
       singleSuppNight = cruisePeriod.rates.single_supplement_eur
       tripleRedNight = cruisePeriod.rates.triple_reduction_eur
@@ -900,15 +929,34 @@ export async function getHotelRates(
   tripleRedNight: number
   season: 'low' | 'high' | 'peak'
   source: RateSource
+  /** Set when the row HAS stored contract periods and none covers the travel
+   *  date — a pricing hole naming the uncovered night, never a base-column
+   *  fallback (the base columns mirror the FIRST period's rate). */
+  periodGap?: { propertyName: string; date: string }
 } | null> {
   const cityNorm = city.trim().toLowerCase()
 
   const mapRow = (hotel: any, source: RateSource) => {
     // C3.2: dated rate periods first — real contract windows with years.
     // detectHotelSeason below compares month-day only, so a window entered
-    // for one contract year silently applied to every year after it.
-    const period = ratesForTravelDate(hotel, 'accommodation', travelDate)
-    if (period) {
+    // for one contract year silently applied to every year after it. A row
+    // with stored periods that don't cover the night is a GAP, not a
+    // fall-through: the base columns mirror the FIRST period's rate, so the
+    // old fallback priced an uncovered October night at the summer rate.
+    const period = resolveTravelDateRates(hotel, 'accommodation', travelDate)
+    if (period.kind === 'gap') {
+      const name = hotel.property_name || hotel.name
+      return {
+        hotelName: name,
+        ppdNight: 0,
+        singleSuppNight: 0,
+        tripleRedNight: 0,
+        season: 'low' as const,
+        source: 'missing' as RateSource,
+        periodGap: { propertyName: name || 'this hotel', date: period.travelDate },
+      }
+    }
+    if (period.kind === 'period') {
       return {
         hotelName: hotel.property_name || hotel.name,
         ppdNight: period.rates.ppd_eur,
@@ -986,6 +1034,43 @@ export async function getHotelRates(
     return null
   } catch (err) {
     console.error('Error fetching hotel rates:', err)
+    return null
+  }
+}
+
+/**
+ * Get an entrance fee by its ID — the picker's path (A-item 13).
+ *
+ * An id is a decision: no ilike, no keyword fallback, no alias. A missing
+ * or deactivated id returns null so the caller records a hole telling the
+ * operator to re-pick — never a guess at what they might have meant.
+ * source is always 'db': the row was chosen by hand.
+ */
+export async function getEntranceFeeById(
+  scope: CatalogScope,
+  id: string,
+  isEurPassport: boolean
+): Promise<{ id: string; name: string; rate: number; source: RateSource } | null> {
+  try {
+    let { data: fees } = await getSupabaseAdmin()
+      .from('entrance_fees')
+      .select('id, attraction_name, eur_rate, non_eur_rate, egyptian_rate, rate_currency, is_active')
+      .or(catalogOrExpr(scope))
+      .eq('is_active', true)
+      .eq('id', id)
+      .limit(1)
+
+    if (!fees || fees.length === 0) return null
+
+    fees = await normalizeRateRows(getSupabaseAdmin(), 'entrance_fees', fees, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    const fee = fees[0] as { id: string; attraction_name: string; eur_rate: number | null; non_eur_rate: number | null }
+    // NULL = not priced yet (hole); 0 = genuinely free — see getEntranceFee.
+    const rate = resolveEntranceRate(fee, isEurPassport)
+    if (rate === null) return null
+
+    return { id: fee.id, name: fee.attraction_name, rate, source: 'db' }
+  } catch (err) {
+    console.error('Error fetching entrance fee by id:', err)
     return null
   }
 }
@@ -1199,7 +1284,7 @@ export type AirportServiceType = 'meet_greet' | 'customs_assist' | 'full_service
  * the two) and `concierge` is a separate premium service — 7 priced rows that
  * nothing could request until day.services gained a level.
  */
-export type HotelServiceType = 'checkin_assist' | 'porter' | 'full_service' | 'concierge'
+export type HotelServiceType = 'checkin_assist' | 'checkout_assist' | 'porter' | 'full_service' | 'concierge'
 
 /** Human labels for the service levels, used on line items and holes. */
 const AIRPORT_LEVEL_LABEL: Record<AirportServiceType, string> = {
@@ -1210,9 +1295,19 @@ const AIRPORT_LEVEL_LABEL: Record<AirportServiceType, string> = {
 }
 const HOTEL_LEVEL_LABEL: Record<HotelServiceType, string> = {
   checkin_assist: 'Check-in Assistance',
-  porter: 'Check-out & Porter',
+  checkout_assist: 'Check-out Assistance',
+  porter: 'Porter',
   full_service: 'Full Service',
   concierge: 'Concierge',
+}
+
+// Check-out used to be conflated with the porter row (its label read
+// "Check-out & Porter" while the data said luggage-only). checkout_assist is
+// its own type now; a tenant whose table predates it still prices from the
+// legacy rows in this order — the engine asks for the real thing FIRST and
+// accepts the historical shapes (A-item 19).
+const HOTEL_LEVEL_FALLBACK: Partial<Record<HotelServiceType, HotelServiceType[]>> = {
+  checkout_assist: ['porter', 'full_service'],
 }
 
 
@@ -1276,26 +1371,34 @@ export async function getHotelServiceRate(
   try {
     const category = getTierCategory(tier)
 
-    const { data: rawHotelStaffRates } = await getSupabaseAdmin()
-      .from('hotel_staff_rates')
-      .select('*')
-      .or(catalogOrExpr(scope))
-      .eq('is_active', true)
-      .eq('service_type', serviceType)
-      .or(`hotel_category.eq.${category},hotel_category.eq.all`)
-      // Unambiguous on today's data (service_type + category resolves to one
-      // row), but ordered anyway so it cannot become arbitrary the day a
-      // second row is added.
-      .order('rate_eur', { ascending: true })
-      .limit(1)
-    const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
-
-    if (!rates || rates.length === 0) {
-      return null
+    const lookup = async (type: HotelServiceType): Promise<number | null> => {
+      const { data: rawHotelStaffRates } = await getSupabaseAdmin()
+        .from('hotel_staff_rates')
+        .select('*')
+        .or(catalogOrExpr(scope))
+        .eq('is_active', true)
+        .eq('service_type', type)
+        .or(`hotel_category.eq.${category},hotel_category.eq.all`)
+        // Unambiguous on today's data (service_type + category resolves to one
+        // row), but ordered anyway so it cannot become arbitrary the day a
+        // second row is added.
+        .order('rate_eur', { ascending: true })
+        .limit(1)
+      const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      if (!rates || rates.length === 0) return null
+      const rate = (rates[0] as any).rate_eur
+      return typeof rate === 'number' ? rate : null
     }
 
-    const rate = (rates[0] as any).rate_eur
-    return typeof rate === 'number' ? rate : null
+    const direct = await lookup(serviceType)
+    if (direct != null) return direct
+    // The asked type first, then the legacy rows it grew out of — a tenant
+    // holding only porter/full_service rows keeps pricing check-out days.
+    for (const legacy of HOTEL_LEVEL_FALLBACK[serviceType] ?? []) {
+      const rate = await lookup(legacy)
+      if (rate != null) return rate
+    }
+    return null
   } catch (err) {
     return null
   }
@@ -1680,6 +1783,18 @@ export async function calculateDayBasedPricing(
     const cr = await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate)
     if (cr && cr.source === 'db') {
       cruiseRates = cr
+    } else if (cr?.periodGap) {
+      // The cruise EXISTS and has contract periods — the travel date falls in
+      // a gap between them. One hole naming the uncovered date; never the
+      // base columns, which hold the first period's rate.
+      addHole({
+        kind: 'cruise',
+        reason: 'missing',
+        tier,
+        city: firstCruiseDay?.city,
+        lookupAttempted: `cruise rate period covering ${cr.periodGap.date} (${tier})`,
+        message: `${cr.periodGap.propertyName} has rate periods, but none covers ${cr.periodGap.date}. Add a period for that date in Rates → Cruises.`,
+      })
     } else {
       addHole({
         kind: 'cruise',
@@ -1703,6 +1818,18 @@ export async function calculateDayBasedPricing(
     const rates = hotelResults[i]
     if (rates && rates.source === 'db') {
       hotelRatesMap.set(city, rates)
+    } else if (rates?.periodGap) {
+      // The hotel EXISTS and has contract periods — the travel date falls in
+      // a gap between them. One hole per property naming the uncovered date;
+      // never the base columns, which hold the first period's rate.
+      addHole({
+        kind: 'hotel',
+        reason: 'missing',
+        tier,
+        city,
+        lookupAttempted: `hotel rate period covering ${rates.periodGap.date} (${city}, ${tier})`,
+        message: `${rates.periodGap.propertyName} has rate periods, but none covers ${rates.periodGap.date}. Add a period for that date in Rates → Hotels.`,
+      })
     } else {
       addHole({
         kind: 'hotel',
@@ -1826,7 +1953,7 @@ export async function calculateDayBasedPricing(
     // that does not specify one prices exactly as it did before.
     const airportLevel: AirportServiceType = day.services.airport_service_level ?? 'meet_greet'
     const checkinLevel: HotelServiceType = day.services.hotel_checkin_level ?? 'checkin_assist'
-    const checkoutLevel: HotelServiceType = day.services.hotel_checkout_level ?? 'porter'
+    const checkoutLevel: HotelServiceType = day.services.hotel_checkout_level ?? 'checkout_assist'
 
     // ----- AIRPORT SERVICES (fixed per service) -----
     if (day.services.airport_arrival) {
@@ -2005,23 +2132,46 @@ export async function calculateDayBasedPricing(
   // Collect unique attractions in first-seen order, fetch all concurrently
   // (was one serial round-trip per attraction — the main N+1), then apply in
   // order so the accumulated fee, service list, and holes are unchanged.
+  //
+  // Resolution order (A-item 13): a day carrying explicit attraction_ids is
+  // priced from THOSE rows and its free-text wording is silenced — an id is
+  // a decision, wording is a guess. Worded days resolve through the alias
+  // table (tenant rows + global catalogue, migration 323) before the
+  // catalogue lookup; a canonical joining several fees with ' + ' (a combo
+  // ticket) becomes several lines. The historical hardcoded map and ilike
+  // fallback still apply after an alias miss, so nothing regresses.
   let entranceFeesPerPax = 0
+  const aliasIndex = await loadAttractionAliasIndex(getSupabaseAdmin(), catalogScope.tenantId)
   const processedAttractions = new Set<string>()
-  const entranceLookups: { attraction: string; day: any }[] = []
+  const entranceLookups: { attraction?: string; feeId?: string; day: any }[] = []
   for (const day of itinerary) {
-    for (const attraction of day.attractions) {
-      const key = attraction.toLowerCase()
-      if (processedAttractions.has(key)) continue
-      processedAttractions.add(key)
-      entranceLookups.push({ attraction, day })
+    if (day.attraction_ids && day.attraction_ids.length > 0) {
+      for (const feeId of day.attraction_ids) {
+        if (processedAttractions.has(`id:${feeId}`)) continue
+        processedAttractions.add(`id:${feeId}`)
+        entranceLookups.push({ feeId, day })
+      }
+      continue
+    }
+    for (const worded of day.attractions) {
+      for (const attraction of resolveAttractionAlias(worded, aliasIndex)) {
+        const key = attraction.toLowerCase()
+        if (processedAttractions.has(key)) continue
+        processedAttractions.add(key)
+        entranceLookups.push({ attraction, day })
+      }
     }
   }
 
   const entranceFees = await Promise.all(
-    entranceLookups.map(l => getEntranceFee(catalogScope, l.attraction, isEurPassport))
+    entranceLookups.map(l =>
+      l.feeId
+        ? getEntranceFeeById(catalogScope, l.feeId, isEurPassport)
+        : getEntranceFee(catalogScope, l.attraction as string, isEurPassport)
+    )
   )
 
-  entranceLookups.forEach(({ attraction, day }, i) => {
+  entranceLookups.forEach(({ attraction, feeId, day }, i) => {
     const fee = entranceFees[i]
     // `>= 0`, not `> 0`: getEntranceFee now returns null for an unpriced
     // attraction, so anything arriving here has a real price — and 0 is a
@@ -2042,6 +2192,18 @@ export async function calculateDayBasedPricing(
         isPerPax: true,
         isOptional: false,
         notes: isEurPassport ? 'EUR rate' : 'non-EUR rate'
+      })
+    } else if (feeId) {
+      // A picked id that no longer resolves (deleted, deactivated, or its
+      // rate blanked) is its own hole: the operator RE-PICKS, the engine
+      // never guesses what they might have meant.
+      addHole({
+        kind: 'entrance',
+        reason: 'missing',
+        tier,
+        dayNumber: day.day,
+        lookupAttempted: `entrance fee id ${feeId}`,
+        message: `Day ${day.day}'s picked attraction is no longer in Rates → Attractions (or has no price). Re-pick it on the day editor.`,
       })
     } else {
       addHole({
@@ -2450,6 +2612,14 @@ export function formatPricingTable(result: DayPricingResult): string[][] {
 // BACKWARD COMPATIBILITY LAYER
 // ============================================
 
+// NOTE: this interface once declared numAdults/numChildren/mealPlan/
+// includeAccommodation — accepted, forwarded nowhere, read by nothing. A
+// parameter that looks like it selects a price and does not is worse than
+// its absence (see getAirportServiceRate's tier note): the B2B route passed
+// mealPlan/includeAccommodation for months believing they did something.
+// The day-based engine decides meals and accommodation from the itinerary
+// itself; do not re-add knobs here without wiring them into
+// DayPricingParams and the core.
 export interface PricingParams {
   templateId: string
   /** What the customer is buying (lib/package-types.ts). Templates carry no
@@ -2460,14 +2630,10 @@ export interface PricingParams {
   tenantId: string
   tier: ServiceTier
   numPax: number
-  numAdults?: number
-  numChildren?: number
   isEurPassport: boolean
   language?: string
   travelDate?: string
   marginPercent?: number
-  mealPlan?: 'none' | 'breakfast_only' | 'lunch_only' | 'dinner_only' | 'half_board' | 'full_board'
-  includeAccommodation?: boolean
   tourLeaderIncluded?: boolean
 }
 
@@ -2533,8 +2699,14 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
 
 
 
+  // Forward EVERY core option explicitly — a wrapper that forwards only some
+  // params is silent pricing corruption: packageType used to be dropped
+  // right here, so no caller could ever override the tour_type inference.
+  // (travelDate was dropped by the B2B route one layer up — same trap.)
+  // If DayPricingParams gains an option, it must be forwarded here.
   const dayResult = await calculateDayBasedPricing({
     templateId,
+    packageType: params.packageType,
     tenantId: params.tenantId,
     tier,
     isEurPassport,

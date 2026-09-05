@@ -73,7 +73,6 @@ export async function GET(request: NextRequest) {
       fee_type: item.fee_type || 'standard',
       eur_rate: item.eur_rate,
       non_eur_rate: item.non_eur_rate,
-      egyptian_rate: item.egyptian_rate,
       student_discount_percentage: item.student_discount_percentage,
       child_discount_percent: item.child_discount_percent,
       season: item.season,
@@ -139,7 +138,6 @@ export async function POST(request: NextRequest) {
       fee_type,
       eur_rate,
       non_eur_rate,
-      egyptian_rate,
       student_discount_percentage,
       child_discount_percent,
       season,
@@ -178,7 +176,6 @@ export async function POST(request: NextRequest) {
         // falls through on null/undefined.
         eur_rate: eur_rate ?? null,
         non_eur_rate: non_eur_rate ?? null,
-        egyptian_rate: egyptian_rate || null,
         student_discount_percentage: student_discount_percentage || null,
         child_discount_percent: child_discount_percent || null,
         season: season || 'all_year',

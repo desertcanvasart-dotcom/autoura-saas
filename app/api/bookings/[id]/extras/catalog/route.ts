@@ -44,7 +44,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   const { data: booking } = await admin
     .from('bookings')
-    .select('id, currency, quote_id, quote_type')
+    .select('id, currency, quote_id, quote_type, num_travelers')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .maybeSingle()
@@ -92,7 +92,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     if (variationIds.length) {
       const { data: services, error } = await admin
         .from('tour_variation_services')
-        .select('id, variation_id, service_name, service_category, cost_per_unit, optional_price_override, notes')
+        .select('id, variation_id, service_name, service_category, cost_per_unit, optional_price_override, quantity_mode, notes')
         .in('variation_id', variationIds)
         .eq('is_optional', true)
       if (error) console.error('extras catalog: variation services', error)
@@ -116,6 +116,10 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
           supplier_id: null,
           ...priced,
           currency: bookingCurrency,
+          // Migration 320 mapped the options' unit onto quantity_mode:
+          // per_person → 'per_pax', per_booking → 'fixed'. Anything else
+          // (per_day, per_night…) is not multiplied by pax.
+          unit: s.quantity_mode === 'per_pax' ? 'per_person' : 'per_booking',
         })
       }
     }
@@ -147,6 +151,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       // rate this price came from.
       price_note: basis ? `${basis}, ${priced.price_note}` : priced.price_note,
       currency: bookingCurrency,
+      // An entrance ticket is inherently per person.
+      unit: 'per_person',
     })
   }
 
@@ -171,6 +177,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       supplier_id: c.supplier_id ?? null,
       ...priced,
       currency: bookingCurrency,
+      unit: c.unit === 'per_booking' ? 'per_booking' : 'per_person',
     })
   }
 
@@ -178,6 +185,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     currency: bookingCurrency,
     rate_currency: rateCurrency,
     margin_percent: marginPercent,
+    // The party size, so the picker can add per-person rows × pax.
+    num_travelers: booking.num_travelers ?? 1,
     groups: [
       { source: 'package', label: 'Options in this programme', items: packageItems },
       { source: 'addon', label: 'Attraction extras', items: addonItems },

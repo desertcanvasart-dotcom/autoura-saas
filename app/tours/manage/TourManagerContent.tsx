@@ -1,5 +1,7 @@
 'use client'
 
+import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+
 export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useState, useRef } from 'react'
@@ -101,6 +103,11 @@ interface ItineraryDay {
   title: string
   description: string
   meals: string[]
+  /** Names, for display and for the engine's text fallback. */
+  attractions?: string[]
+  /** Explicit entrance_fees ids — the engine prices THESE and ignores
+   *  wording when present (A-item 13). */
+  attraction_ids?: string[]
 }
 
 interface Toast {
@@ -111,6 +118,7 @@ interface Toast {
 
 // NEW: Attraction interface from entrance_fees
 interface Attraction {
+  rate_currency?: string | null
   id: string
   attraction_name: string
   city: string
@@ -285,6 +293,7 @@ interface AttractionDropdownProps {
 }
 
 function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemove }: AttractionDropdownProps) {
+  const { fmtRate } = useRateRowFormat()
   const [searchTerm, setSearchTerm] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -367,7 +376,7 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
                       <div>
                         <p className="text-sm text-gray-900">{attr.attraction_name}</p>
                         <p className="text-xs text-gray-500">
-                          EUR: €{attr.eur_rate} / Non-EUR: €{attr.non_eur_rate}
+                          EUR passport: {fmtRate(attr.eur_rate, attr, 0)} / Non-EUR: {fmtRate(attr.non_eur_rate, attr, 0)}
                         </p>
                       </div>
                       <Plus className="w-4 h-4 text-gray-400 group-hover:text-green-600" />
@@ -411,12 +420,17 @@ function AttractionDropdown({ attractions, selectedAttractions, onSelect, onRemo
 interface ItineraryEditorProps {
   itinerary: ItineraryDay[]
   onChange: (itinerary: ItineraryDay[]) => void
+  /** The entrance-fee catalogue, for picking attractions BY ID. */
+  attractionOptions: Attraction[]
 }
 
-function ItineraryEditor({ itinerary, onChange }: ItineraryEditorProps) {
+function ItineraryEditor({ itinerary, onChange, attractionOptions }: ItineraryEditorProps) {
   const [dayTitle, setDayTitle] = useState('')
   const [dayDescription, setDayDescription] = useState('')
   const [dayMeals, setDayMeals] = useState<string[]>([])
+  // Picked BY ID from the entrance-fee catalogue: the engine prices these
+  // rows exactly and ignores the title's wording (A-item 13).
+  const [dayAttractions, setDayAttractions] = useState<Array<{ id: string; name: string }>>([])
 
   const toggleMeal = (meal: string) => {
     setDayMeals(prev => 
@@ -426,6 +440,13 @@ function ItineraryEditor({ itinerary, onChange }: ItineraryEditorProps) {
     )
   }
 
+  const addDayAttraction = (id: string) => {
+    if (!id) return
+    const attr = attractionOptions.find(a => a.id === id)
+    if (!attr || dayAttractions.some(a => a.id === id)) return
+    setDayAttractions(prev => [...prev, { id: attr.id, name: attr.attraction_name }])
+  }
+
   const addDay = () => {
     if (!dayTitle.trim()) return
     
@@ -433,7 +454,13 @@ function ItineraryEditor({ itinerary, onChange }: ItineraryEditorProps) {
       day: itinerary.length + 1,
       title: dayTitle.trim(),
       description: dayDescription.trim(),
-      meals: dayMeals
+      meals: dayMeals,
+      ...(dayAttractions.length > 0
+        ? {
+            attractions: dayAttractions.map(a => a.name),
+            attraction_ids: dayAttractions.map(a => a.id),
+          }
+        : {})
     }
     
     onChange([...itinerary, newDay])
@@ -442,6 +469,7 @@ function ItineraryEditor({ itinerary, onChange }: ItineraryEditorProps) {
     setDayTitle('')
     setDayDescription('')
     setDayMeals([])
+    setDayAttractions([])
   }
 
   const removeDay = (index: number) => {
@@ -513,6 +541,43 @@ function ItineraryEditor({ itinerary, onChange }: ItineraryEditorProps) {
           ))}
         </div>
 
+        {/* Attractions — picked BY ID so the engine prices the exact fee
+            rows and ignores the title's wording (A-item 13). */}
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Attractions:</span>
+            <select
+              value=""
+              onChange={(e) => addDayAttraction(e.target.value)}
+              className="px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
+            >
+              <option value="">Pick from entrance fees…</option>
+              {attractionOptions
+                .filter(a => !dayAttractions.some(d => d.id === a.id))
+                .map(a => (
+                  <option key={a.id} value={a.id}>{a.attraction_name}{a.city ? ` — ${a.city}` : ''}</option>
+                ))}
+            </select>
+          </div>
+          {dayAttractions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {dayAttractions.map(a => (
+                <span key={a.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">
+                  {a.name}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${a.name}`}
+                    onClick={() => setDayAttractions(prev => prev.filter(x => x.id !== a.id))}
+                    className="text-green-700 hover:text-green-900"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Add Button */}
         <button
           type="button"
@@ -539,6 +604,11 @@ function ItineraryEditor({ itinerary, onChange }: ItineraryEditorProps) {
                 <p className="text-sm font-medium text-gray-900">{day.title}</p>
                 {day.description && (
                   <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{day.description}</p>
+                )}
+                {day.attraction_ids && day.attraction_ids.length > 0 && (
+                  <p className="text-xs text-green-700 mt-0.5">
+                    Attractions (priced by pick): {(day.attractions || []).join(', ')}
+                  </p>
                 )}
                 {day.meals && day.meals.length > 0 && (
                   <p className="text-xs text-blue-600 mt-1">
@@ -2180,6 +2250,7 @@ export default function TourManagerContent() {
                     <ItineraryEditor
                       itinerary={formData.itinerary}
                       onChange={handleItineraryChange}
+                      attractionOptions={attractions}
                     />
                   </div>
 

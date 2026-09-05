@@ -55,7 +55,11 @@ function countEuroLiterals(): Record<string, number> {
         !r.endsWith('euro-literal-ratchet.test.ts') &&
         !r.endsWith('currency-vocabulary.test.ts')
       ) {
-        const n = (fs.readFileSync(path.join(ROOT, r), 'utf8').match(/€/g) ?? []).length
+        // The \u20AC escape spells the same symbol and was used to slip past
+        // this very ratchet (fixed-costs, ServiceRatePicker — A-item 2).
+        const src = fs.readFileSync(path.join(ROOT, r), 'utf8')
+        const n =
+          (src.match(/€/g) ?? []).length + (src.match(/\\u20AC/gi) ?? []).length
         if (n) out[r] = n
       }
     }

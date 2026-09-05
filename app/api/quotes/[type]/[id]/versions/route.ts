@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/supabase-server';
+import { attachChangerEmails } from '@/lib/quotes/attach-changer-emails';
 
 /**
  * GET /api/quotes/[type]/[id]/versions
@@ -23,8 +24,10 @@ export async function GET(
     // Use authenticated client - RLS will filter by tenant
     const supabase = await createAuthenticatedClient();
 
-    // Fetch all versions for this quote
-    const { data: versions, error } = await supabase
+    // Fetch all versions for this quote. changed_by references auth.users,
+    // which PostgREST cannot embed — the old `users:changed_by (email)`
+    // embed failed the whole query (see lib/quotes/attach-changer-emails).
+    const { data: rawVersions, error } = await supabase
       .from('quote_versions')
       .select(`
         id,
@@ -34,8 +37,7 @@ export async function GET(
         changed_at,
         change_reason,
         change_summary,
-        changes_diff,
-        users:changed_by (email)
+        changes_diff
       `)
       .eq('quote_type', type)
       .eq('quote_id', id)
@@ -49,10 +51,12 @@ export async function GET(
       );
     }
 
+    const versions = await attachChangerEmails(supabase, rawVersions ?? []);
+
     return NextResponse.json({
       success: true,
-      versions: versions || [],
-      total_versions: versions?.length || 0
+      versions,
+      total_versions: versions.length
     });
 
   } catch (error: any) {

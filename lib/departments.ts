@@ -7,7 +7,7 @@
  * service_type, a name longer than the column).
  */
 
-import { isValidServiceType } from '@/lib/service-types'
+import { isValidServiceType, normalizeServiceType } from '@/lib/service-types'
 
 /** departments.name is VARCHAR(100). */
 export const DEPARTMENT_NAME_MAX = 100
@@ -75,10 +75,17 @@ export function validateDepartmentInput(
     }
     const seen = new Set<string>()
     for (const entry of raw) {
-      if (typeof entry !== 'string' || !isValidServiceType(entry)) {
+      if (typeof entry !== 'string') {
         return { ok: false, error: `Unknown service type: ${String(entry)}` }
       }
-      seen.add(entry)
+      // Custom types are welcome (B-item 5) — normalized to the snake_case
+      // key routing matches on. Only garbage that normalizes to nothing is
+      // refused.
+      const cleaned = normalizeServiceType(entry)
+      if (!cleaned || !isValidServiceType(cleaned)) {
+        return { ok: false, error: `Invalid service type: ${String(entry)}` }
+      }
+      seen.add(cleaned)
     }
     value.service_types = [...seen]
   }

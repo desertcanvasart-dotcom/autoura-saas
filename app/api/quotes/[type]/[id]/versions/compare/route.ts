@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAuthenticatedClient } from '@/lib/supabase-server';
+import { attachChangerEmails } from '@/lib/quotes/attach-changer-emails';
 
 /**
  * GET /api/quotes/[type]/[id]/versions/compare?from=1&to=2
@@ -34,10 +35,14 @@ export async function GET(
     // Use authenticated client - RLS will filter by tenant
     const supabase = await createAuthenticatedClient();
 
-    // Fetch both versions
-    const { data: versions, error } = await supabase
+    // Fetch both versions. quote_versions has NO foreign key on changed_by
+    // (and there is no `users` relation in the public schema), so the old
+    // embed `users:changed_by (email)` made PostgREST reject the WHOLE query
+    // with PGRST200 — version comparison 500'd for every quote. The email is
+    // looked up separately from user_profiles instead.
+    const { data: rawVersions, error } = await supabase
       .from('quote_versions')
-      .select('version_number, quote_data, changed_at, changed_by, users:changed_by (email)')
+      .select('version_number, quote_data, changed_at, changed_by')
       .eq('quote_type', type)
       .eq('quote_id', id)
       .in('version_number', [fromVersion, toVersion])
@@ -51,12 +56,14 @@ export async function GET(
       );
     }
 
-    if (!versions || versions.length !== 2) {
+    if (!rawVersions || rawVersions.length !== 2) {
       return NextResponse.json(
         { success: false, error: 'One or both versions not found' },
         { status: 404 }
       );
     }
+
+    const versions = await attachChangerEmails(supabase, rawVersions);
 
     const [oldVersion, newVersion] = versions;
 
