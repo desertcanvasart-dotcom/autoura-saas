@@ -11,7 +11,7 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
-import { parseSeasons, type RateSeason } from '@/lib/rates/rate-seasons'
+import { seasonsForRow, type RateSeason } from '@/lib/rates/rate-seasons'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
@@ -402,6 +402,8 @@ function PPDSeasonalRateSection({
   rates,
   onRateChange,
   showSecondPeriod = false,
+  subtitle,
+  hideDates = false,
   borderColor = 'border-gray-200',
   bgColor = 'bg-white',
   // The symbol the amounts are actually in — the cruise's own currency, or
@@ -429,6 +431,8 @@ function PPDSeasonalRateSection({
   }
   onRateChange: (field: string, value: number) => void
   showSecondPeriod?: boolean
+  subtitle?: string
+  hideDates?: boolean
   borderColor?: string
   bgColor?: string
   rateSymbol?: string
@@ -441,8 +445,10 @@ function PPDSeasonalRateSection({
         </span>
         {title}
       </h4>
+      {subtitle && <p className="text-xs text-gray-500 -mt-2 mb-3 italic">{subtitle}</p>}
 
       {/* Date Range */}
+      {!hideDates && (
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
           <label className="block text-xs font-medium text-red-600 mb-1">From</label>
@@ -463,6 +469,8 @@ function PPDSeasonalRateSection({
           />
         </div>
       </div>
+
+      )}
 
       {/* Second Period for Peak Season */}
       {showSecondPeriod && (
@@ -501,7 +509,7 @@ function PPDSeasonalRateSection({
         <label className="block text-xs font-medium text-gray-500 mb-2">EUR Passport Holders</label>
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-blue-600 font-medium mb-1">PPD ({rateSymbol}) *</label>
+            <label className="block text-xs text-blue-600 font-medium mb-1">PPD *</label>
             <input
               type="number"
               value={rates.ppd_eur}
@@ -513,7 +521,7 @@ function PPDSeasonalRateSection({
             />
           </div>
           <div>
-            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp ({rateSymbol})</label>
+            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp</label>
             <input
               type="number"
               value={rates.single_supplement_eur}
@@ -525,7 +533,7 @@ function PPDSeasonalRateSection({
             />
           </div>
           <div>
-            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red ({rateSymbol})</label>
+            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red</label>
             <input
               type="number"
               value={rates.triple_reduction_eur}
@@ -552,7 +560,7 @@ function PPDSeasonalRateSection({
         <label className="block text-xs font-medium text-gray-500 mb-2">Non-EUR Passport Holders</label>
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs text-blue-600 font-medium mb-1">PPD ({rateSymbol}) *</label>
+            <label className="block text-xs text-blue-600 font-medium mb-1">PPD *</label>
             <input
               type="number"
               value={rates.ppd_non_eur}
@@ -563,7 +571,7 @@ function PPDSeasonalRateSection({
             />
           </div>
           <div>
-            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp ({rateSymbol})</label>
+            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp</label>
             <input
               type="number"
               value={rates.single_supplement_non_eur}
@@ -574,7 +582,7 @@ function PPDSeasonalRateSection({
             />
           </div>
           <div>
-            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red ({rateSymbol})</label>
+            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red</label>
             <input
               type="number"
               value={rates.triple_reduction_non_eur}
@@ -793,7 +801,9 @@ export default function CruisesPage() {
 
   const handleEdit = (cruise: Cruise) => {
     setRateCurrency((cruise as { rate_currency?: string | null }).rate_currency || '')
-    setPeriods(parseSeasons((cruise as { seasons?: unknown }).seasons, 'cruise') ?? [])
+    // Legacy rows: fixed Low/High/Peak columns surface as editable named
+    // periods (seasonsForRow derives them); saving writes them as periods.
+    setPeriods(seasonsForRow(cruise, 'cruise'))
     setEditingCruise(cruise)
     setFormData({
       cruise_code: cruise.cruise_code,
@@ -854,7 +864,9 @@ export default function CruisesPage() {
   // Clone/Duplicate a cruise
   const handleClone = (cruise: Cruise) => {
     setRateCurrency((cruise as { rate_currency?: string | null }).rate_currency || '')
-    setPeriods(parseSeasons((cruise as { seasons?: unknown }).seasons, 'cruise') ?? [])
+    // Legacy rows: fixed Low/High/Peak columns surface as editable named
+    // periods (seasonsForRow derives them); saving writes them as periods.
+    setPeriods(seasonsForRow(cruise, 'cruise'))
     setEditingCruise(null) // This is a new record
     setFormData({
       cruise_code: '', // Will be auto-generated
@@ -1602,10 +1614,12 @@ export default function CruisesPage() {
                 currencyLabel={rateCurrency || 'EUR'}
               />
 
-              {/* Section 6: Low Season Rates (PPD Model) */}
+              {/* Section 6: Base Rate — used when no contract period covers the date */}
               <PPDSeasonalRateSection
                 rateSymbol={rateSymbol}
-                title="Low Season Rates"
+                title="Base Rate"
+                subtitle="Used when no contract period covers the travel date. Amounts are in the rate's own currency."
+                hideDates
                 seasonNumber={3}
                 startDate={formData.low_season_start}
                 endDate={formData.low_season_end}
@@ -1622,55 +1636,6 @@ export default function CruisesPage() {
                 onRateChange={(field, value) => setFormData({ ...formData, [field]: value })}
                 borderColor="border-green-200"
                 bgColor="bg-green-50/30"
-              />
-
-              {/* Section 7: High Season Rates (PPD Model) */}
-              <PPDSeasonalRateSection
-                rateSymbol={rateSymbol}
-                title="High Season Rates"
-                seasonNumber={4}
-                startDate={formData.high_season_start}
-                endDate={formData.high_season_end}
-                onStartDateChange={(value) => setFormData({ ...formData, high_season_start: value })}
-                onEndDateChange={(value) => setFormData({ ...formData, high_season_end: value })}
-                rates={{
-                  ppd_eur: formData.high_season_ppd_eur,
-                  ppd_non_eur: formData.high_season_ppd_non_eur,
-                  single_supplement_eur: formData.high_season_single_supplement_eur,
-                  single_supplement_non_eur: formData.high_season_single_supplement_non_eur,
-                  triple_reduction_eur: formData.high_season_triple_reduction_eur,
-                  triple_reduction_non_eur: formData.high_season_triple_reduction_non_eur
-                }}
-                onRateChange={(field, value) => setFormData({ ...formData, [`high_season_${field}`]: value })}
-                borderColor="border-blue-200"
-                bgColor="bg-blue-50/30"
-              />
-
-              {/* Section 8: Peak Season Rates (PPD Model) */}
-              <PPDSeasonalRateSection
-                rateSymbol={rateSymbol}
-                title="Peak Season Rates"
-                seasonNumber={5}
-                startDate={formData.peak_season_1_start}
-                endDate={formData.peak_season_1_end}
-                startDate2={formData.peak_season_2_start}
-                endDate2={formData.peak_season_2_end}
-                onStartDateChange={(value) => setFormData({ ...formData, peak_season_1_start: value })}
-                onEndDateChange={(value) => setFormData({ ...formData, peak_season_1_end: value })}
-                onStartDate2Change={(value) => setFormData({ ...formData, peak_season_2_start: value })}
-                onEndDate2Change={(value) => setFormData({ ...formData, peak_season_2_end: value })}
-                rates={{
-                  ppd_eur: formData.peak_season_ppd_eur,
-                  ppd_non_eur: formData.peak_season_ppd_non_eur,
-                  single_supplement_eur: formData.peak_season_single_supplement_eur,
-                  single_supplement_non_eur: formData.peak_season_single_supplement_non_eur,
-                  triple_reduction_eur: formData.peak_season_triple_reduction_eur,
-                  triple_reduction_non_eur: formData.peak_season_triple_reduction_non_eur
-                }}
-                onRateChange={(field, value) => setFormData({ ...formData, [`peak_season_${field}`]: value })}
-                showSecondPeriod={true}
-                borderColor="border-orange-200"
-                bgColor="bg-orange-50/30"
               />
 
               {/* Section 9: Rate Card Validity */}
