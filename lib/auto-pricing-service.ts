@@ -30,7 +30,7 @@ import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/season-uplift'
-import { ratesForTravelDate } from '@/lib/rates/rate-seasons'
+import { resolveTravelDateRates } from '@/lib/rates/rate-seasons'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
@@ -767,6 +767,10 @@ export async function getCruiseRates(
   durationNights: number
   season: 'low' | 'high' | 'peak'
   source: RateSource
+  /** Set when the row HAS stored contract periods and none covers the travel
+   *  date — a pricing hole naming the uncovered night, never a base-column
+   *  fallback (the base columns mirror the FIRST period's rate). */
+  periodGap?: { propertyName: string; date: string }
 } | null> {
   try {
     let query = getSupabaseAdmin()
@@ -800,11 +804,25 @@ export async function getCruiseRates(
     // C3.2: dated rate periods first. `seasons` (migration 305) is the
     // operator's real contract windows, WITH years — the low/high/peak
     // detection below compares month-day only, so a window entered for one
-    // contract year silently applied to every year after it. When no period
-    // covers the date (or none are entered), fall through to the legacy
-    // columns exactly as before.
-    const cruisePeriod = ratesForTravelDate(cruise, 'cruise', travelDate)
-    if (cruisePeriod) {
+    // contract year silently applied to every year after it. Only a row with
+    // NO stored periods falls through to the legacy columns: a stored
+    // contract whose windows don't cover the night is a GAP — the base
+    // columns mirror the FIRST period's rate, so falling through would price
+    // an uncovered October night at the summer rate and call it complete.
+    const cruisePeriod = resolveTravelDateRates(cruise, 'cruise', travelDate)
+    if (cruisePeriod.kind === 'gap') {
+      return {
+        shipName: cruise.ship_name,
+        ppdNight: 0,
+        singleSuppNight: 0,
+        tripleRedNight: 0,
+        durationNights,
+        season: 'low',
+        source: 'missing',
+        periodGap: { propertyName: cruise.ship_name || 'this cruise', date: cruisePeriod.travelDate },
+      }
+    }
+    if (cruisePeriod.kind === 'period') {
       ppdNight = cruisePeriod.rates.ppd_eur
       singleSuppNight = cruisePeriod.rates.single_supplement_eur
       tripleRedNight = cruisePeriod.rates.triple_reduction_eur
@@ -900,15 +918,34 @@ export async function getHotelRates(
   tripleRedNight: number
   season: 'low' | 'high' | 'peak'
   source: RateSource
+  /** Set when the row HAS stored contract periods and none covers the travel
+   *  date — a pricing hole naming the uncovered night, never a base-column
+   *  fallback (the base columns mirror the FIRST period's rate). */
+  periodGap?: { propertyName: string; date: string }
 } | null> {
   const cityNorm = city.trim().toLowerCase()
 
   const mapRow = (hotel: any, source: RateSource) => {
     // C3.2: dated rate periods first — real contract windows with years.
     // detectHotelSeason below compares month-day only, so a window entered
-    // for one contract year silently applied to every year after it.
-    const period = ratesForTravelDate(hotel, 'accommodation', travelDate)
-    if (period) {
+    // for one contract year silently applied to every year after it. A row
+    // with stored periods that don't cover the night is a GAP, not a
+    // fall-through: the base columns mirror the FIRST period's rate, so the
+    // old fallback priced an uncovered October night at the summer rate.
+    const period = resolveTravelDateRates(hotel, 'accommodation', travelDate)
+    if (period.kind === 'gap') {
+      const name = hotel.property_name || hotel.name
+      return {
+        hotelName: name,
+        ppdNight: 0,
+        singleSuppNight: 0,
+        tripleRedNight: 0,
+        season: 'low' as const,
+        source: 'missing' as RateSource,
+        periodGap: { propertyName: name || 'this hotel', date: period.travelDate },
+      }
+    }
+    if (period.kind === 'period') {
       return {
         hotelName: hotel.property_name || hotel.name,
         ppdNight: period.rates.ppd_eur,
@@ -1680,6 +1717,18 @@ export async function calculateDayBasedPricing(
     const cr = await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate)
     if (cr && cr.source === 'db') {
       cruiseRates = cr
+    } else if (cr?.periodGap) {
+      // The cruise EXISTS and has contract periods — the travel date falls in
+      // a gap between them. One hole naming the uncovered date; never the
+      // base columns, which hold the first period's rate.
+      addHole({
+        kind: 'cruise',
+        reason: 'missing',
+        tier,
+        city: firstCruiseDay?.city,
+        lookupAttempted: `cruise rate period covering ${cr.periodGap.date} (${tier})`,
+        message: `${cr.periodGap.propertyName} has rate periods, but none covers ${cr.periodGap.date}. Add a period for that date in Rates → Cruises.`,
+      })
     } else {
       addHole({
         kind: 'cruise',
@@ -1703,6 +1752,18 @@ export async function calculateDayBasedPricing(
     const rates = hotelResults[i]
     if (rates && rates.source === 'db') {
       hotelRatesMap.set(city, rates)
+    } else if (rates?.periodGap) {
+      // The hotel EXISTS and has contract periods — the travel date falls in
+      // a gap between them. One hole per property naming the uncovered date;
+      // never the base columns, which hold the first period's rate.
+      addHole({
+        kind: 'hotel',
+        reason: 'missing',
+        tier,
+        city,
+        lookupAttempted: `hotel rate period covering ${rates.periodGap.date} (${city}, ${tier})`,
+        message: `${rates.periodGap.propertyName} has rate periods, but none covers ${rates.periodGap.date}. Add a period for that date in Rates → Hotels.`,
+      })
     } else {
       addHole({
         kind: 'hotel',
@@ -2450,6 +2511,14 @@ export function formatPricingTable(result: DayPricingResult): string[][] {
 // BACKWARD COMPATIBILITY LAYER
 // ============================================
 
+// NOTE: this interface once declared numAdults/numChildren/mealPlan/
+// includeAccommodation — accepted, forwarded nowhere, read by nothing. A
+// parameter that looks like it selects a price and does not is worse than
+// its absence (see getAirportServiceRate's tier note): the B2B route passed
+// mealPlan/includeAccommodation for months believing they did something.
+// The day-based engine decides meals and accommodation from the itinerary
+// itself; do not re-add knobs here without wiring them into
+// DayPricingParams and the core.
 export interface PricingParams {
   templateId: string
   /** What the customer is buying (lib/package-types.ts). Templates carry no
@@ -2460,14 +2529,10 @@ export interface PricingParams {
   tenantId: string
   tier: ServiceTier
   numPax: number
-  numAdults?: number
-  numChildren?: number
   isEurPassport: boolean
   language?: string
   travelDate?: string
   marginPercent?: number
-  mealPlan?: 'none' | 'breakfast_only' | 'lunch_only' | 'dinner_only' | 'half_board' | 'full_board'
-  includeAccommodation?: boolean
   tourLeaderIncluded?: boolean
 }
 
@@ -2533,8 +2598,14 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
 
 
 
+  // Forward EVERY core option explicitly — a wrapper that forwards only some
+  // params is silent pricing corruption: packageType used to be dropped
+  // right here, so no caller could ever override the tour_type inference.
+  // (travelDate was dropped by the B2B route one layer up — same trap.)
+  // If DayPricingParams gains an option, it must be forwarded here.
   const dayResult = await calculateDayBasedPricing({
     templateId,
+    packageType: params.packageType,
     tenantId: params.tenantId,
     tier,
     isEurPassport,
