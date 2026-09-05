@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
+import { parseSeasons } from '@/lib/rates/rate-seasons'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
@@ -76,6 +77,14 @@ export async function GET(request: NextRequest) {
       normalizeRateRows(supabase, 'b2b_transport_packages', rawCruiseTransportPkgs as Record<string, unknown>[], runCurrency),
       normalizeRateRows(supabase, 'flight_rates', rawFlightRates as Record<string, unknown>[], runCurrency),
     ])
+
+    // First stored period's guide bed rate (B-item 3); 0 in a period means
+    // "no concession entered" (the sanitizer stores blanks as 0) → null.
+    const firstPeriodGuideRate = (seasons: unknown, entity: 'accommodation' | 'cruise'): number | null => {
+      const first = parseSeasons(seasons, entity)?.[0]
+      const rate = first?.rates.guide_rate_eur
+      return typeof rate === 'number' && rate > 0 ? rate : null
+    }
 
     // Map to RateOption format per slot. Transport tiering is built by
     // groupVehicleRowsToTiers() at module scope (see below).
@@ -168,6 +177,10 @@ export async function GET(request: NextRequest) {
         board_basis: r.board_basis || 'BB',
         single_supp_eur: toNum(r.single_supp_eur),
         single_supp_non_eur: toNum(r.single_supp_non_eur),
+        // The throughout guide's bed: the FIRST period's guide rate — the
+        // same period the headline PP-Double mirrors (B-item 3). Null = no
+        // concession on file; the grid shows an amber unpriced night.
+        guide_rate_eur: firstPeriodGuideRate(r.seasons, 'accommodation'),
       })),
 
       entrance_fees: (entranceFees || []).map((r: any) => ({
@@ -188,6 +201,9 @@ export async function GET(request: NextRequest) {
         details: `${r.airline} | ${r.flight_number || ''} | ${r.cabin_class}`,
         route_from: r.route_from,
         route_to: r.route_to,
+        // Guide fare on the ticket: null = he pays the customer fare,
+        // 0 = rides free (B-items 1/3).
+        guide_rate_eur: typeof r.guide_rate === 'number' ? r.guide_rate : null,
       })),
 
       experiences: (activityRates || [])
@@ -225,6 +241,8 @@ export async function GET(request: NextRequest) {
         single_rate_non_eur: toNum(r.rate_single_non_eur || r.rate_low_single_non_eur),
         duration_nights: r.duration_nights,
         ship_category: r.ship_category,
+        // The throughout guide's cabin per night, first-period rate (B3).
+        guide_rate_eur: firstPeriodGuideRate(r.seasons, 'cruise'),
       })),
     }
 
