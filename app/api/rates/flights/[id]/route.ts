@@ -78,6 +78,9 @@ export async function PUT(
 
     // Remove id from body to avoid conflicts
     const { id: _, ...updates } = body
+    if (updates.guide_rate !== undefined) {
+      updates.guide_rate = updates.guide_rate === '' || updates.guide_rate === null ? null : Number(updates.guide_rate)
+    }
 
     // Regenerate route_name if route fields changed
     if (updates.route_from || updates.route_to) {

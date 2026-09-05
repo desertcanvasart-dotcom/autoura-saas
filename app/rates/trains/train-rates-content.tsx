@@ -125,6 +125,7 @@ export default function TrainRatesContent() {
     destination_city: '',
     class_type: '',
     rate_eur: 0,
+    guide_rate: '' as string | number,
     duration_hours: '',
     rate_valid_from: today,
     rate_valid_to: nextYear,
@@ -183,6 +184,7 @@ export default function TrainRatesContent() {
       destination_city: '',
       class_type: '',
       rate_eur: 0,
+      guide_rate: '',
       duration_hours: '',
       rate_valid_from: today,
       rate_valid_to: nextYear,
@@ -207,6 +209,7 @@ export default function TrainRatesContent() {
       destination_city: rate.destination_city || '',
       class_type: rate.class_type || '',
       rate_eur: rate.rate_eur || 0,
+      guide_rate: (rate as { guide_rate?: number | null }).guide_rate ?? '',
       duration_hours: rate.duration_hours?.toString() || '',
       rate_valid_from: rate.rate_valid_from || today,
       rate_valid_to: rate.rate_valid_to || nextYear,
@@ -354,6 +357,7 @@ export default function TrainRatesContent() {
       destination_city: rate.destination_city || '',
       class_type: rate.class_type || '',
       rate_eur: rate.rate_eur || 0,
+      guide_rate: (rate as { guide_rate?: number | null }).guide_rate ?? '',
       duration_hours: rate.duration_hours?.toString() || '',
       rate_valid_from: rate.rate_valid_from || today,
       rate_valid_to: rate.rate_valid_to || nextYear,
@@ -1275,6 +1279,21 @@ export default function TrainRatesContent() {
                         ≈ {symbol}{convert(Number(formData.rate_eur), rateCurrencyCode).toFixed(2)} {userCurrency}
                       </p>
                     )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Guide fare ({rateSymbol})</label>
+                    <input
+                      type="number"
+                      value={formData.guide_rate ?? ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, guide_rate: e.target.value }))}
+                      min="0"
+                      step="0.01"
+                      placeholder="Blank = customer fare"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      The throughout guide&rsquo;s seat. Blank = he pays the customer fare; 0 = rides free.
+                    </p>
                   </div>
                 </div>
               </div>

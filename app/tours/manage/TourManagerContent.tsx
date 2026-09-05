@@ -108,6 +108,19 @@ interface ItineraryDay {
   /** Explicit entrance_fees ids — the engine prices THESE and ignores
    *  wording when present (A-item 13). */
   attraction_ids?: string[]
+  /** How this day travels (B-item 2). Absent = road. flight/train = the
+   *  previous day's city → this day's; sleeping train = this day's city →
+   *  the next day's (board tonight, wake there — no hotel that night). */
+  transport_type?: 'flight' | 'train' | 'sleeping_train'
+  /** The EXACT ticket row when several serve the route ("Auto" = resolve
+   *  by route at pricing time; ambiguity becomes a named hole). */
+  transport_rate_id?: string
+}
+
+/** A ticket row the Travel picker can name (B-item 2). */
+interface TicketOption {
+  id: string
+  label: string
 }
 
 interface Toast {
@@ -422,15 +435,20 @@ interface ItineraryEditorProps {
   onChange: (itinerary: ItineraryDay[]) => void
   /** The entrance-fee catalogue, for picking attractions BY ID. */
   attractionOptions: Attraction[]
+  /** Ticket catalogues for the Travel picker (B-item 2). */
+  ticketOptions: Record<'flight' | 'train' | 'sleeping_train', TicketOption[]>
 }
 
-function ItineraryEditor({ itinerary, onChange, attractionOptions }: ItineraryEditorProps) {
+function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions }: ItineraryEditorProps) {
   const [dayTitle, setDayTitle] = useState('')
   const [dayDescription, setDayDescription] = useState('')
   const [dayMeals, setDayMeals] = useState<string[]>([])
   // Picked BY ID from the entrance-fee catalogue: the engine prices these
   // rows exactly and ignores the title's wording (A-item 13).
   const [dayAttractions, setDayAttractions] = useState<Array<{ id: string; name: string }>>([])
+  // Travel mode + optional exact row (B-item 2). '' = road, as before.
+  const [dayTransportType, setDayTransportType] = useState<'' | 'flight' | 'train' | 'sleeping_train'>('')
+  const [dayTransportRateId, setDayTransportRateId] = useState('')
 
   const toggleMeal = (meal: string) => {
     setDayMeals(prev => 
@@ -460,6 +478,12 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions }: ItineraryEd
             attractions: dayAttractions.map(a => a.name),
             attraction_ids: dayAttractions.map(a => a.id),
           }
+        : {}),
+      ...(dayTransportType
+        ? {
+            transport_type: dayTransportType,
+            ...(dayTransportRateId ? { transport_rate_id: dayTransportRateId } : {}),
+          }
         : {})
     }
     
@@ -470,6 +494,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions }: ItineraryEd
     setDayDescription('')
     setDayMeals([])
     setDayAttractions([])
+    setDayTransportType('')
+    setDayTransportRateId('')
   }
 
   const removeDay = (index: number) => {
@@ -578,6 +604,54 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions }: ItineraryEd
           )}
         </div>
 
+        {/* Travel picker (B-item 2): how this day travels. Road is the
+            default; flights/day trains run previous-day city → this day's,
+            a sleeper runs this day's city → the next day's (no hotel that
+            night — the ticket IS the bed). Naming the exact row beats
+            "Auto" when several serve the route. */}
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500">Travel:</span>
+            {([['', 'Road'], ['flight', 'Flight'], ['train', 'Day train'], ['sleeping_train', 'Sleeping train']] as const).map(([value, label]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => { setDayTransportType(value as typeof dayTransportType); setDayTransportRateId('') }}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                  dayTransportType === value
+                    ? 'bg-green-600 text-white border-green-600'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {dayTransportType && (
+            <div className="mt-2">
+              <select
+                value={dayTransportRateId}
+                onChange={(e) => setDayTransportRateId(e.target.value)}
+                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">
+                  {ticketOptions[dayTransportType].length === 0
+                    ? 'No rates in the catalogue yet — pricing will show a hole for this route'
+                    : 'Auto — resolve by route at pricing time'}
+                </option>
+                {ticketOptions[dayTransportType].map(o => (
+                  <option key={o.id} value={o.id}>{o.label}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-gray-500 mt-1">
+                {dayTransportType === 'sleeping_train'
+                  ? 'Board tonight, wake in the next day\u2019s city \u2014 no hotel bed this night.'
+                  : 'The leg runs from the previous day\u2019s city to this one; several matching rates become a pick-the-exact-one hole unless named here.'}
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Add Button */}
         <button
           type="button"
@@ -608,6 +682,12 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions }: ItineraryEd
                 {day.attraction_ids && day.attraction_ids.length > 0 && (
                   <p className="text-xs text-green-700 mt-0.5">
                     Attractions (priced by pick): {(day.attractions || []).join(', ')}
+                  </p>
+                )}
+                {day.transport_type && (
+                  <p className="text-xs text-sky-700 mt-0.5">
+                    Travel: {day.transport_type === 'sleeping_train' ? 'Sleeping train' : day.transport_type === 'train' ? 'Day train' : 'Flight'}
+                    {day.transport_rate_id ? ' (named rate)' : ' (auto by route)'}
                   </p>
                 )}
                 {day.meals && day.meals.length > 0 && (
@@ -877,6 +957,11 @@ export default function TourManagerContent() {
   const [templates, setTemplates] = useState<TourTemplate[]>([])
   const [themes, setThemes] = useState<TourTheme[]>([])  // Renamed from categories
   const [attractions, setAttractions] = useState<Attraction[]>([])  // NEW: Attractions from DB
+  // Ticket catalogues for the Travel picker (B-item 2), labelled
+  // operator/class/route so the operator can name THE train or flight.
+  const [ticketOptions, setTicketOptions] = useState<Record<'flight' | 'train' | 'sleeping_train', TicketOption[]>>({
+    flight: [], train: [], sleeping_train: [],
+  })
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTheme, setSelectedTheme] = useState('all')  // Renamed from selectedCategory
@@ -999,6 +1084,28 @@ export default function TourManagerContent() {
     }
   }
 
+  const fetchTicketOptions = async () => {
+    type TicketRow = Record<string, unknown>
+    const load = async (url: string, label: (r: TicketRow) => string): Promise<TicketOption[]> => {
+      try {
+        const res = await fetch(url)
+        if (!res.ok) return []
+        const body = await res.json()
+        return ((body.data || []) as TicketRow[])
+          .filter(r => r.is_active !== false)
+          .map(r => ({ id: String(r.id), label: label(r) }))
+      } catch {
+        return []
+      }
+    }
+    const [flight, train, sleeping_train] = await Promise.all([
+      load('/api/rates/flights', r => `${r.airline}${r.flight_number ? ` ${r.flight_number}` : ''} ${r.route_from} → ${r.route_to}${r.cabin_class ? ` (${r.cabin_class})` : ''}`),
+      load('/api/rates/trains', r => `${r.operator_name || 'Train'}${r.class_type ? ` ${r.class_type}` : ''} ${r.origin_city} → ${r.destination_city}`),
+      load('/api/rates/sleeping-trains', r => `${r.operator_name || 'Sleeper'} ${r.cabin_type} ${r.origin_city} → ${r.destination_city}`),
+    ])
+    setTicketOptions({ flight, train, sleeping_train })
+  }
+
   useEffect(() => {
     // Set a timeout to prevent infinite loading
     const loadingTimeout = setTimeout(() => {
@@ -1009,7 +1116,8 @@ export default function TourManagerContent() {
     Promise.all([
       fetchTemplates(),
       fetchThemes(),  // Renamed from fetchCategories
-      fetchAttractions()  // NEW: Fetch attractions on load
+      fetchAttractions(),  // NEW: Fetch attractions on load
+      fetchTicketOptions()  // Ticket catalogues for the Travel picker (B2)
     ]).finally(() => {
       clearTimeout(loadingTimeout)
       setLoading(false)
@@ -2251,6 +2359,7 @@ export default function TourManagerContent() {
                       itinerary={formData.itinerary}
                       onChange={handleItineraryChange}
                       attractionOptions={attractions}
+                      ticketOptions={ticketOptions}
                     />
                   </div>
 

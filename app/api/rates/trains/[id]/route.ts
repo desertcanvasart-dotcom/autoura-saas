@@ -61,6 +61,7 @@ export async function PUT(
 Object.assign(updateData, rateCurrencyWriteField(body))
 
     if (body.service_code !== undefined) updateData.service_code = body.service_code
+    if (body.guide_rate !== undefined) updateData.guide_rate = body.guide_rate === '' || body.guide_rate === null ? null : Number(body.guide_rate)
     if (body.origin_city !== undefined) updateData.origin_city = body.origin_city || null
     if (body.destination_city !== undefined) updateData.destination_city = body.destination_city || null
     if (body.class_type !== undefined) updateData.class_type = body.class_type || null

@@ -86,6 +86,11 @@ export async function POST(request: NextRequest) {
 
 
     const newRate = {
+      // Throughout guide's negotiated fare (B1/B2): sent only when the form
+      // filled it. NULL = guide pays the customer fare; 0 = rides free.
+      ...(body.guide_rate !== undefined
+        ? { guide_rate: body.guide_rate === '' || body.guide_rate === null ? null : Number(body.guide_rate) }
+        : {}),
       ...rateCurrencyWriteField(body),
       tenant_id: authResult.tenant_id,
       service_code: body.service_code || `TRN-${Date.now().toString(36).toUpperCase()}`,

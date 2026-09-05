@@ -33,6 +33,10 @@ import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/s
 import { resolveTravelDateRates } from '@/lib/rates/rate-seasons'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import { loadAttractionAliasIndex, resolveAttractionAlias } from '@/lib/pricing/attraction-aliases'
+import {
+  collectTicketLegs, rowServesRoute, selectTicketRow,
+  groupSleeperTrains, trainForNamedRow,
+} from '@/lib/pricing/ticket-legs'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
@@ -103,6 +107,14 @@ export interface ItineraryDay {
    *  present they WIN and silence the free-text `attractions` wording —
    *  an id is a decision, wording is a guess. */
   attraction_ids?: string[]
+  /** How this day travels (B-item 2). Absent = road, exactly as before.
+   *  flight/train legs run PREVIOUS day's city → this day's city; a
+   *  sleeping train runs THIS day's city → the NEXT day's (board tonight,
+   *  wake there) and forces no hotel bed that night — the ticket IS the
+   *  bed. */
+  transport_type?: 'flight' | 'train' | 'sleeping_train'
+  /** The EXACT ticket row when several serve the route; named rows win. */
+  transport_rate_id?: string
   services: {
     airport_arrival: boolean
     airport_departure: boolean
@@ -570,15 +582,31 @@ export function parseItinerary(itineraryData: any, opts?: {
       ? day.attraction_ids.filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
       : []
 
+    // Travel mode (B-item 2). Unknown values read as road — never a guess.
+    const transport_type =
+      day.transport_type === 'flight' || day.transport_type === 'train' || day.transport_type === 'sleeping_train'
+        ? day.transport_type
+        : undefined
+    const transport_rate_id =
+      typeof day.transport_rate_id === 'string' && day.transport_rate_id.length > 0
+        ? day.transport_rate_id
+        : undefined
+
     return {
       day: day.day || index + 1,
       title: day.title || `Day ${index + 1}`,
       description: day.description || '',
       city: day.city || inferCityFromTitle(day.title || ''),
-      accommodation_type: day.accommodation_type || inferAccommodationType(day, itineraryData),
+      // A sleeping-train night has no hotel bed — the ticket IS the bed
+      // (B-item 2); the sleeper night joins the rooming list instead.
+      accommodation_type: transport_type === 'sleeping_train'
+        ? 'none'
+        : (day.accommodation_type || inferAccommodationType(day, itineraryData)),
       meals,
       attractions,
       attraction_ids,
+      transport_type,
+      transport_rate_id,
       services,
       // Parse transport overrides if present
       transport: day.transport || undefined
@@ -2038,15 +2066,282 @@ export async function calculateDayBasedPricing(
 
 
 
+
+  // ============================================
+  // TICKET LEGS (B-item 2): flights, day trains, sleeping trains
+  // ============================================
+  // Legs collected from the parsed days; only the needed catalogues are
+  // fetched, currency-normalized. Selection never guesses: named row →
+  // exactly one active match → a hole listing the candidates by name.
+  // Fares are per-person and sit in per-pax tour cost — so age-based child
+  // discounts apply to them (the sibling's documented simplification).
+  const ticketLegs = collectTicketLegs(itinerary)
+  let ticketFaresPerPax = 0
+  let ticketGuideSeatCost = 0
+  const ticketGuideLines: PricedService[] = []
+  if (ticketLegs.length > 0) {
+    const runCurrencyForTickets = await getTenantRunCurrency(getSupabaseAdmin(), catalogScope.tenantId)
+    const passengerFare = (eur: unknown, nonEur: unknown): number | null => {
+      const v = isEurPassport ? eur : (nonEur ?? eur)
+      return typeof v === 'number' && v >= 0 ? v : null
+    }
+    const validFor = (row: { rate_valid_from?: string | null; rate_valid_to?: string | null }): boolean =>
+      !travelDate ||
+      ((!row.rate_valid_from || row.rate_valid_from <= travelDate) &&
+        (!row.rate_valid_to || row.rate_valid_to >= travelDate))
+
+    const TICKET_COLUMNS = {
+      flight_rates:
+        'id, airline, flight_number, cabin_class, route_from, route_to, base_rate_eur, tax_eur, base_rate_non_eur, tax_non_eur, guide_rate, rate_valid_from, rate_valid_to, rate_currency, is_active',
+      train_rates:
+        'id, origin_city, destination_city, operator_name, class_type, rate_eur, guide_rate, rate_valid_from, rate_valid_to, rate_currency, is_active',
+      sleeping_train_rates:
+        'id, origin_city, destination_city, operator_name, supplier_id, cabin_type, rate_oneway_eur, rate_oneway_non_eur, guide_rate, rate_valid_from, rate_valid_to, rate_currency, is_active',
+    } as const
+    const fetchMode = async (table: keyof typeof TICKET_COLUMNS) => {
+      const { data } = await getSupabaseAdmin()
+        .from(table)
+        .select(TICKET_COLUMNS[table])
+        .or(catalogOrExpr(catalogScope))
+        .eq('is_active', true)
+      return normalizeRateRows(getSupabaseAdmin(), table, (data ?? []) as unknown as Record<string, unknown>[], runCurrencyForTickets)
+    }
+    const [flightRows, trainRows, sleeperRows] = await Promise.all([
+      ticketLegs.some(l => l.mode === 'flight') ? fetchMode('flight_rates') : Promise.resolve([]),
+      ticketLegs.some(l => l.mode === 'train') ? fetchMode('train_rates') : Promise.resolve([]),
+      ticketLegs.some(l => l.mode === 'sleeping_train') ? fetchMode('sleeping_train_rates') : Promise.resolve([]),
+    ])
+
+    const MODE_RATES_PAGE = { flight: 'Rates → Flights', train: 'Rates → Trains', sleeping_train: 'Rates → Sleeping Trains' } as const
+
+    interface FlightTicketRow {
+      id: string; airline: string; flight_number?: string | null; cabin_class?: string | null
+      route_from: string; route_to: string
+      base_rate_eur: number | null; tax_eur: number | null
+      base_rate_non_eur: number | null; tax_non_eur: number | null
+      guide_rate?: number | null; rate_valid_from?: string | null; rate_valid_to?: string | null
+    }
+    interface TrainTicketRow {
+      id: string; origin_city: string; destination_city: string
+      operator_name?: string | null; class_type?: string | null
+      rate_eur: number | null; guide_rate?: number | null
+      rate_valid_from?: string | null; rate_valid_to?: string | null
+    }
+
+    for (const leg of ticketLegs) {
+      const route = `${leg.from} → ${leg.to}`
+      const addLegHole = (message: string, lookup: string) =>
+        addHole({
+          kind: 'transport',
+          reason: 'missing',
+          tier,
+          dayNumber: leg.dayNumber,
+          lookupAttempted: lookup,
+          message,
+        })
+
+      if (leg.mode === 'flight') {
+        // Always the ECONOMY cabin; legacy rows with no cabin_class count
+        // as economy — a premium row never auto-resolves.
+        const candidates = (flightRows as unknown as FlightTicketRow[]).filter(
+          r => rowServesRoute(r, leg) && validFor(r) && (!r.cabin_class || /econom/i.test(r.cabin_class))
+        )
+        const sel = selectTicketRow(candidates, leg.namedRateId, r => `${r.airline}${r.flight_number ? ` ${r.flight_number}` : ''}${r.cabin_class ? ` (${r.cabin_class})` : ''}`)
+        if (sel.kind === 'named_missing') {
+          addLegHole(`Day ${leg.dayNumber}'s picked flight is no longer in ${MODE_RATES_PAGE.flight} — re-pick it on the day editor.`, `flight id ${sel.namedId}`)
+          continue
+        }
+        if (sel.kind === 'no_rate') {
+          addLegHole(`No economy flight rate for ${route}. Add it in ${MODE_RATES_PAGE.flight}.`, `flight ${route}`)
+          continue
+        }
+        if (sel.kind === 'ambiguous') {
+          addLegHole(`Several flights serve ${route}: ${sel.candidates.join(', ')}. Pick the exact flight on day ${leg.dayNumber}.`, `flight ${route}`)
+          continue
+        }
+        const r = sel.row
+        const base = passengerFare(r.base_rate_eur, r.base_rate_non_eur)
+        if (base === null) {
+          addLegHole(`The ${r.airline} flight for ${route} has no fare yet. Price it in ${MODE_RATES_PAGE.flight}.`, `flight ${route}`)
+          continue
+        }
+        const tax = passengerFare(r.tax_eur, r.tax_non_eur) ?? 0
+        const farePerPax = base + tax
+        ticketFaresPerPax += farePerPax
+        services.push({
+          id: `day${leg.dayNumber}-flight-${r.id}`,
+          dayNumber: leg.dayNumber,
+          serviceType: 'flight',
+          serviceName: `Flight ${r.airline}${r.flight_number ? ` ${r.flight_number}` : ''} ${route} (economy)`,
+          quantity: 1,
+          quantityMode: 'per_pax',
+          unitCost: farePerPax,
+          lineTotal: farePerPax,
+          rateSource: 'flight_rates',
+          isPerPax: true,
+          isOptional: false,
+        })
+        if (throughoutGuide) {
+          const seat = typeof r.guide_rate === 'number' ? r.guide_rate : farePerPax
+          ticketGuideSeatCost += seat
+          ticketGuideLines.push({
+            id: `day${leg.dayNumber}-guide-flight-${r.id}`,
+            dayNumber: leg.dayNumber,
+            serviceType: 'flight',
+            serviceName: `Throughout Guide — flight seat (${route})`,
+            quantity: 1,
+            quantityMode: 'fixed',
+            unitCost: seat,
+            lineTotal: seat,
+            rateSource: 'flight_rates',
+            isPerPax: false,
+            isOptional: false,
+          })
+        }
+      } else if (leg.mode === 'train') {
+        const candidates = (trainRows as unknown as TrainTicketRow[]).filter(r => rowServesRoute(r, leg) && validFor(r))
+        const sel = selectTicketRow(candidates, leg.namedRateId, r => `${r.operator_name || 'Train'}${r.class_type ? ` ${r.class_type}` : ''}`)
+        if (sel.kind === 'named_missing') {
+          addLegHole(`Day ${leg.dayNumber}'s picked train is no longer in ${MODE_RATES_PAGE.train} — re-pick it on the day editor.`, `train id ${sel.namedId}`)
+          continue
+        }
+        if (sel.kind === 'no_rate') {
+          addLegHole(`No train rate for ${route}. Add it in ${MODE_RATES_PAGE.train}.`, `train ${route}`)
+          continue
+        }
+        if (sel.kind === 'ambiguous') {
+          addLegHole(`Several trains serve ${route}: ${sel.candidates.join(', ')}. Pick the exact train on day ${leg.dayNumber}.`, `train ${route}`)
+          continue
+        }
+        const r = sel.row
+        const farePerPax = typeof r.rate_eur === 'number' && r.rate_eur >= 0 ? r.rate_eur : null
+        if (farePerPax === null) {
+          addLegHole(`The ${r.operator_name || 'train'} for ${route} has no fare yet. Price it in ${MODE_RATES_PAGE.train}.`, `train ${route}`)
+          continue
+        }
+        ticketFaresPerPax += farePerPax
+        services.push({
+          id: `day${leg.dayNumber}-train-${r.id}`,
+          dayNumber: leg.dayNumber,
+          serviceType: 'transportation',
+          serviceName: `Train ${r.operator_name || ''} ${route}${r.class_type ? ` (${r.class_type})` : ''}`.replace(/\s+/g, ' ').trim(),
+          quantity: 1,
+          quantityMode: 'per_pax',
+          unitCost: farePerPax,
+          lineTotal: farePerPax,
+          rateSource: 'train_rates',
+          isPerPax: true,
+          isOptional: false,
+        })
+        if (throughoutGuide) {
+          const seat = typeof r.guide_rate === 'number' ? r.guide_rate : farePerPax
+          ticketGuideSeatCost += seat
+          ticketGuideLines.push({
+            id: `day${leg.dayNumber}-guide-train-${r.id}`,
+            dayNumber: leg.dayNumber,
+            serviceType: 'transportation',
+            serviceName: `Throughout Guide — train seat (${route})`,
+            quantity: 1,
+            quantityMode: 'fixed',
+            unitCost: seat,
+            lineTotal: seat,
+            rateSource: 'train_rates',
+            isPerPax: false,
+            isOptional: false,
+          })
+        }
+      } else {
+        // ----- SLEEPING TRAIN: the ticket IS the bed -----
+        const routeRows = (sleeperRows as unknown as import('@/lib/pricing/ticket-legs').SleeperCabinRow[]).filter(r => rowServesRoute(r, leg) && validFor(r as { rate_valid_from?: string | null; rate_valid_to?: string | null }))
+        const trains = groupSleeperTrains(routeRows)
+        let train = null
+        if (leg.namedRateId) {
+          train = trainForNamedRow(trains, leg.namedRateId)
+          if (!train) {
+            addLegHole(`Day ${leg.dayNumber}'s picked sleeping train is no longer in ${MODE_RATES_PAGE.sleeping_train} — re-pick it on the day editor.`, `sleeping train id ${leg.namedRateId}`)
+            continue
+          }
+        } else if (trains.length === 0) {
+          addLegHole(`No sleeping-train rate for ${route}. Add it in ${MODE_RATES_PAGE.sleeping_train}.`, `sleeping train ${route}`)
+          continue
+        } else if (trains.length > 1) {
+          addLegHole(`Several sleeping trains serve ${route}: ${trains.map(t => t.label).join(', ')}. Pick the exact train on day ${leg.dayNumber}.`, `sleeping train ${route}`)
+          continue
+        } else {
+          train = trains[0]
+        }
+
+        const halfTwinFare = train.halfTwin
+          ? passengerFare(train.halfTwin.rate_oneway_eur, (train.halfTwin as { rate_oneway_non_eur?: number | null }).rate_oneway_non_eur)
+          : null
+        if (halfTwinFare === null) {
+          addLegHole(`${train.label} (${route}) has no shared/half-twin cabin rate. Add it in ${MODE_RATES_PAGE.sleeping_train}.`, `sleeping train ${route}`)
+          continue
+        }
+        // Everyone prices at half-twin per person; the night joins the
+        // rooming list so a solo traveller pays the single-cabin gap.
+        ticketFaresPerPax += halfTwinFare
+        services.push({
+          id: `day${leg.dayNumber}-sleeper-${train.halfTwin!.id}`,
+          dayNumber: leg.dayNumber,
+          serviceType: 'transportation',
+          serviceName: `Sleeping train ${train.label} ${route} (half twin, per person)`,
+          quantity: 1,
+          quantityMode: 'per_pax',
+          unitCost: halfTwinFare,
+          lineTotal: halfTwinFare,
+          rateSource: 'sleeping_train_rates',
+          isPerPax: true,
+          isOptional: false,
+        })
+        const singleFare = train.single
+          ? passengerFare(train.single.rate_oneway_eur, (train.single as { rate_oneway_non_eur?: number | null }).rate_oneway_non_eur)
+          : null
+        if (singleFare !== null) {
+          singleSupplement += Math.max(0, singleFare - halfTwinFare)
+        } else {
+          warnings.push(`${train.label} (${route}) has no single-cabin row — a solo traveller's sleeper supplement is not included.`)
+        }
+        if (throughoutGuide) {
+          // The guide takes a SINGLE cabin: the single row's guide_rate,
+          // else the single fare; with no single row on file, his berth
+          // falls back to the half-twin fare — flagged, not silent.
+          let seat: number
+          if (train.single) {
+            seat = typeof train.single.guide_rate === 'number' ? train.single.guide_rate : (singleFare ?? halfTwinFare)
+          } else {
+            seat = halfTwinFare
+            warnings.push(`${train.label} (${route}): no single-cabin row — the throughout guide's berth is priced at the half-twin fare.`)
+          }
+          ticketGuideSeatCost += seat
+          ticketGuideLines.push({
+            id: `day${leg.dayNumber}-guide-sleeper-${train.rows[0].id}`,
+            dayNumber: leg.dayNumber,
+            serviceType: 'transportation',
+            serviceName: `Throughout Guide — sleeper single cabin (${route})`,
+            quantity: 1,
+            quantityMode: 'fixed',
+            unitCost: seat,
+            lineTotal: seat,
+            rateSource: 'sleeping_train_rates',
+            isPerPax: false,
+            isOptional: false,
+          })
+        }
+      }
+    }
+  }
+
   // ============================================
   // STEP 6: Calculate FIXED costs (don't scale with pax)
   // ============================================
 
   let fixedCosts = 0
 
-  // The throughout guide's beds computed in STEP 5 are fixed costs too.
-  fixedCosts += guideBedCosts
-  services.push(...guideBedLines)
+  // The throughout guide's beds (STEP 5) and ticket seats (B-item 2) are
+  // fixed costs too.
+  fixedCosts += guideBedCosts + ticketGuideSeatCost
+  services.push(...guideBedLines, ...ticketGuideLines)
 
   for (let i = 0; i < itinerary.length; i++) {
     const day = itinerary[i]
@@ -2534,7 +2829,7 @@ export async function calculateDayBasedPricing(
     })
   }
 
-  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax
+  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax
 
 
 
@@ -2558,8 +2853,16 @@ export async function calculateDayBasedPricing(
 
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0
     const hasAirportService = day.services.airport_arrival || day.services.airport_departure
+    // A day travelling by ticket (B-item 2) is NOT an intercity ROAD day —
+    // the ticket is the day's transport (and no station transfers are
+    // emitted: the operator's decision). A flight day's airport transfers
+    // ride on the airport_arrival/departure services, unaffected here.
+    // A sleeper's city change lands on the MORNING AFTER: the previous
+    // day's overnight ticket covers this day's arrival too.
     const isIntercityDay = previousDay && 
                            previousDay.city.toLowerCase() !== day.city.toLowerCase() &&
+                           !day.transport_type &&
+                           previousDay.transport_type !== 'sleeping_train' &&
                            day.accommodation_type !== 'cruise' &&
                            previousDay.accommodation_type !== 'cruise'
 
@@ -2713,7 +3016,8 @@ export async function calculateDayBasedPricing(
     // the two roles stack, as the operator's model says they can.
     transportAt: throughoutGuide ? (pax: number) => transportAtPax(pax + 1) : transportAtPax,
     // Tour leader: single room (PPD + single supplement) + their own per-pax costs
-    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax,
+    // The tour leader pays CUSTOMER fare on tickets (B-item 2).
+    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax,
     paxFrom: PAX_COUNTS[0],
     paxTo: PAX_COUNTS[PAX_COUNTS.length - 1],
   })

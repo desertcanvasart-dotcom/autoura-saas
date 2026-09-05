@@ -130,6 +130,7 @@ export default function SleepingTrainRatesContent() {
     destination_city: '',
     cabin_type: '',
     rate_oneway_eur: 0,
+    guide_rate: '' as string | number,
     rate_roundtrip_eur: 0,
     departure_time: '',
     arrival_time: '',
@@ -190,6 +191,7 @@ export default function SleepingTrainRatesContent() {
       destination_city: '',
       cabin_type: '',
       rate_oneway_eur: 0,
+      guide_rate: '',
       rate_roundtrip_eur: 0,
       departure_time: '',
       arrival_time: '',
@@ -216,6 +218,7 @@ export default function SleepingTrainRatesContent() {
       destination_city: rate.destination_city || '',
       cabin_type: rate.cabin_type || '',
       rate_oneway_eur: rate.rate_oneway_eur || 0,
+      guide_rate: (rate as { guide_rate?: number | null }).guide_rate ?? '',
       rate_roundtrip_eur: rate.rate_roundtrip_eur || 0,
       departure_time: rate.departure_time || '',
       arrival_time: rate.arrival_time || '',
@@ -329,6 +332,7 @@ export default function SleepingTrainRatesContent() {
       destination_city: rate.destination_city || '',
       cabin_type: rate.cabin_type || '',
       rate_oneway_eur: rate.rate_oneway_eur || 0,
+      guide_rate: (rate as { guide_rate?: number | null }).guide_rate ?? '',
       rate_roundtrip_eur: rate.rate_roundtrip_eur || 0,
       departure_time: rate.departure_time || '',
       arrival_time: rate.arrival_time || '',
@@ -1285,7 +1289,7 @@ export default function SleepingTrainRatesContent() {
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="rate_oneway_eur" className="block text-xs font-medium text-gray-600 mb-1">One-way Rate (EUR - base currency) *</label>
+                    <label htmlFor="rate_oneway_eur" className="block text-xs font-medium text-gray-600 mb-1">One-way Rate ({rateSymbol}) *</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{rateSymbol}</span>
                       <input
@@ -1304,7 +1308,7 @@ export default function SleepingTrainRatesContent() {
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
                   <div>
-                    <label htmlFor="rate_roundtrip_eur" className="block text-xs font-medium text-gray-600 mb-1">Roundtrip Rate (EUR - base currency)</label>
+                    <label htmlFor="rate_roundtrip_eur" className="block text-xs font-medium text-gray-600 mb-1">Roundtrip Rate ({rateSymbol})</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{rateSymbol}</span>
                       <input
@@ -1319,6 +1323,21 @@ export default function SleepingTrainRatesContent() {
                         className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Guide fare ({rateSymbol})</label>
+                    <input
+                      type="number"
+                      value={formData.guide_rate ?? ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, guide_rate: e.target.value }))}
+                      min="0"
+                      step="0.01"
+                      placeholder="Blank = customer fare"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      The throughout guide&rsquo;s berth (single cabin rows). Blank = he pays the customer fare; 0 = rides free.
+                    </p>
                   </div>
                 </div>
               </div>
