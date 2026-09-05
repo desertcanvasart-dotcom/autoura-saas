@@ -49,7 +49,9 @@ describe('runPending against real Postgres', () => {
   let db: PGlite
   beforeEach(() => { db = new PGlite() })
 
-  it('applies in order, records each, and a rerun is a no-op', async () => {
+  // 30s: PGlite start-up competes with the (real, growing) migration replay
+  // in the same suite run — under full-suite load this crossed the 5s default.
+  it('applies in order, records each, and a rerun is a no-op', { timeout: 30_000 }, async () => {
     const client = pgliteClient(db)
     const first = await runPending(client, FILES)
     expect(first.failed).toBeUndefined()
