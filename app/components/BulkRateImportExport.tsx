@@ -165,6 +165,9 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
       const data = await res.json()
 
       if (data.success || (data.inserted > 0 || data.updated > 0)) {
+        if (data.supplierLinksCleared > 0) {
+          showToast('warning', `${data.supplierLinksCleared} rows named a supplier this workspace doesn't have — imported without the supplier link; set suppliers on them when convenient.`)
+        }
         setImportState(prev => ({
           ...prev,
           step: 'done',
@@ -176,10 +179,18 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
         }))
         onImportComplete?.()
       } else {
+        // A failed import must SAY WHY — the response carries per-batch/row
+        // messages even when there is no top-level error (the FK-failure
+        // case showed a bare "Import failed" and nothing else).
+        const detail = (data.errors || [])
+          .slice(0, 3)
+          .map((e: { message?: string }) => e.message)
+          .filter(Boolean)
+          .join(' | ')
         setImportState(prev => ({
           ...prev,
           step: 'error',
-          error: data.error || 'Import failed',
+          error: data.error || (detail ? `Import failed: ${detail}` : 'Import failed'),
         }))
       }
     } catch (err: any) {

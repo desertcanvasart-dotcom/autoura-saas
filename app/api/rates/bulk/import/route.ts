@@ -171,6 +171,32 @@ export async function POST(request: NextRequest) {
       rowsToUpsert.push(record)
     }
 
+    // supplier_id is a LINK, not a rate: a file exported from another system
+    // (the sibling app's template carries its own supplier UUIDs) names
+    // suppliers this database has never seen, and the FK then fails EVERY
+    // batch — 119 good rates bounced for a link. Unknown ids are cleared and
+    // reported; the rates land, the supplier link is a named gap to fix.
+    let supplierLinksCleared = 0
+    {
+      const ids = [...new Set(rowsToUpsert.map(r => r.supplier_id).filter(Boolean))] as string[]
+      if (ids.length > 0) {
+        const { data: known } = await (supabase
+          .from('suppliers') as unknown as {
+            select(c: string): { in(c: string, v: string[]): { eq(c: string, v: string): PromiseLike<{ data: Array<{ id: string }> | null }> } }
+          })
+          .select('id')
+          .in('id', ids)
+          .eq('tenant_id', tenant_id)
+        const knownIds = new Set((known ?? []).map(r => r.id))
+        for (const r of rowsToUpsert) {
+          if (r.supplier_id && !knownIds.has(r.supplier_id)) {
+            delete r.supplier_id
+            supplierLinksCleared++
+          }
+        }
+      }
+    }
+
     // Two rows in the same file sharing one natural key: the second would
     // silently overwrite the first ("13 creates, 0 inserts"). Refuse them
     // row-wise with the collision named, import the rest.
@@ -226,7 +252,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, errors: importErrors })
+    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, errors: importErrors })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }

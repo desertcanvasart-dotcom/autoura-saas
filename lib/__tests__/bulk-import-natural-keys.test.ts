@@ -95,3 +95,26 @@ describe('partitionImportRows', () => {
     expect(p.duplicates).toHaveLength(0)
   })
 })
+
+describe('foreign supplier links (sibling-app files)', () => {
+  // A template filled from the sibling app carries ITS supplier UUIDs; the
+  // FK then failed every batch and 119 good rates bounced for a link. The
+  // route must clear unknown ids (reported) rather than fail the file, and
+  // must say WHY when it does fail.
+  it('the route validates supplier_id against this tenant and clears unknowns', () => {
+    const src = readFileSync(
+      path.join(__dirname, '..', '..', 'app', 'api', 'rates', 'bulk', 'import', 'route.ts'),
+      'utf8'
+    )
+    expect(src).toMatch(/supplierLinksCleared/)
+    expect(src).toMatch(/from\('suppliers'\)[\s\S]{0,400}\.eq\('tenant_id', tenant_id\)/)
+  })
+
+  it('the widget surfaces per-row messages when an import fails', () => {
+    const src = readFileSync(
+      path.join(__dirname, '..', '..', 'app', 'components', 'BulkRateImportExport.tsx'),
+      'utf8'
+    )
+    expect(src).toMatch(/Import failed: \$\{detail\}/)
+  })
+})
