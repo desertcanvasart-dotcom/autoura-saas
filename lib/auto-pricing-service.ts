@@ -2450,6 +2450,14 @@ export function formatPricingTable(result: DayPricingResult): string[][] {
 // BACKWARD COMPATIBILITY LAYER
 // ============================================
 
+// NOTE: this interface once declared numAdults/numChildren/mealPlan/
+// includeAccommodation — accepted, forwarded nowhere, read by nothing. A
+// parameter that looks like it selects a price and does not is worse than
+// its absence (see getAirportServiceRate's tier note): the B2B route passed
+// mealPlan/includeAccommodation for months believing they did something.
+// The day-based engine decides meals and accommodation from the itinerary
+// itself; do not re-add knobs here without wiring them into
+// DayPricingParams and the core.
 export interface PricingParams {
   templateId: string
   /** What the customer is buying (lib/package-types.ts). Templates carry no
@@ -2460,14 +2468,10 @@ export interface PricingParams {
   tenantId: string
   tier: ServiceTier
   numPax: number
-  numAdults?: number
-  numChildren?: number
   isEurPassport: boolean
   language?: string
   travelDate?: string
   marginPercent?: number
-  mealPlan?: 'none' | 'breakfast_only' | 'lunch_only' | 'dinner_only' | 'half_board' | 'full_board'
-  includeAccommodation?: boolean
   tourLeaderIncluded?: boolean
 }
 
@@ -2533,8 +2537,14 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
 
 
 
+  // Forward EVERY core option explicitly — a wrapper that forwards only some
+  // params is silent pricing corruption: packageType used to be dropped
+  // right here, so no caller could ever override the tour_type inference.
+  // (travelDate was dropped by the B2B route one layer up — same trap.)
+  // If DayPricingParams gains an option, it must be forwarded here.
   const dayResult = await calculateDayBasedPricing({
     templateId,
+    packageType: params.packageType,
     tenantId: params.tenantId,
     tier,
     isEurPassport,

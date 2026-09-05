@@ -13,6 +13,7 @@ import {
 import { parseOptionalSelection, isOptionalSelected } from '@/lib/b2b/optional-selection'
 import { composeQuoteTotals, optionalContribution, type OptionalContribution } from '@/lib/b2b/optional-pricing'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
+import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getCurrencySymbol } from '@/lib/currency'
 
 // ============================================
@@ -163,7 +164,8 @@ function foldExtras(
 
 // Get transport package for cruise sightseeing (kept for package deals)
 async function getTransportPackage(packageType: string, originCity: string, destCity: string, tenantId?: string): Promise<any | null> {
-  const { data, error } = await (getSupabaseAdmin() as any)
+  const admin = getSupabaseAdmin()
+  const { data, error } = await (admin as any)
     .from('b2b_transport_packages')
     .select('*')
     .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
@@ -174,7 +176,11 @@ async function getTransportPackage(packageType: string, originCity: string, dest
     .limit(1)
 
   if (error || !data || data.length === 0) return null
-  return data[0]
+  // A rates table never converts — but a rates CONSUMER must: the row may be
+  // priced in any currency (rate_currency, mig 295), and this total is summed
+  // with every other line. Convert once, here, at the fetch boundary.
+  const [normalized] = await normalizeRateRows(admin, 'b2b_transport_packages', data)
+  return normalized ?? null
 }
 
 // Select vehicle from transport package based on group size
@@ -233,23 +239,29 @@ async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standar
 
 // Select guide from guides table based on language and tier
 async function selectGuideFromB2CTable(language: string = 'English', tier: string = 'standard', tenantId?: string): Promise<{ rate: number; name: string; id: string } | null> {
-  const { data: guides, error } = await (getSupabaseAdmin() as any)
+  const admin = getSupabaseAdmin()
+  const { data: rawGuides, error } = await (admin as any)
     .from('guides')
-    .select('id, name, daily_rate, languages, tier, is_preferred')
+    .select('id, name, daily_rate, rate_currency, languages, tier, is_preferred')
     .eq('is_active', true)
     .eq('tenant_id', tenantId)
     .contains('languages', [language])
     .order('is_preferred', { ascending: false })
 
+  // Per-row currency (mig 295): convert into the run currency at the fetch
+  // boundary, before this rate joins a total with every other line.
+  const guides = await normalizeRateRows(admin, 'guides', rawGuides)
+
   if (error || !guides || guides.length === 0) {
     // Fallback: any guide
-    const { data: anyGuide } = await (getSupabaseAdmin() as any)
+    const { data: anyGuideRaw } = await (admin as any)
       .from('guides')
-      .select('id, name, daily_rate, tier')
+      .select('id, name, daily_rate, rate_currency, tier')
       .eq('is_active', true)
       .eq('tenant_id', tenantId)
       .order('is_preferred', { ascending: false })
       .limit(1)
+    const anyGuide = await normalizeRateRows(admin, 'guides', anyGuideRaw)
 
     if (!anyGuide || anyGuide.length === 0) return null
 
@@ -440,7 +452,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Call auto-pricing service with tour leader parameter
+      // Call auto-pricing service. travelDate MUST be forwarded: it was
+      // dropped here for months, so every dated hotel/cruise period and the
+      // operator's seasonal uplift were silently ignored — a Christmas and an
+      // August departure priced identically while the response stamped
+      // `season` beside the number. (mealPlan/includeAccommodation were
+      // removed from PricingParams: the engine never read them.)
       const autoPriceResult = await calculateAutoPricing({
         templateId,
         tenantId,
@@ -448,10 +465,9 @@ export async function POST(request: NextRequest) {
         numPax: num_pax,
         isEurPassport: is_eur_passport,
         language,
+        travelDate: travel_date,
         marginPercent: effectiveMargin,
-        mealPlan: 'lunch_only',
-        includeAccommodation: (template?.duration_days || 1) > 1,
-        tourLeaderIncluded: tour_leader_included  // NEW: Pass tour leader flag
+        tourLeaderIncluded: tour_leader_included
       })
 
       if (!autoPriceResult.success) {
@@ -535,6 +551,12 @@ export async function POST(request: NextRequest) {
     const travelDate = new Date(travel_date)
     const season = getSeason(travelDate)
 
+    // The tenant's run currency: every normalized rate below is in it, every
+    // human-readable note carries its symbol, and the result declares it —
+    // this branch used to hardcode EUR for all three (C3.4).
+    const runCurrency = await getTenantRunCurrency(getSupabaseAdmin(), tenantId ?? '')
+    const symbol = getCurrencySymbol(runCurrency)
+
     // Determine effective margin (partner override)
     let effectiveMargin = margin_percent
     if (partner_id) {
@@ -594,7 +616,6 @@ export async function POST(request: NextRequest) {
         if (tiered) {
           // The note is shown to a human, so it carries the tenant's own
           // currency symbol rather than a hardcoded one (C3.4).
-          const symbol = getCurrencySymbol(await getTenantRunCurrency(getSupabaseAdmin(), tenantId ?? ''))
           const priceResult = applyActivityTiers(tiered.tiers, num_pax, is_eur_passport ?? true, symbol)
           unitCost = priceResult.unitCost
           lineTotal = priceResult.lineTotal
@@ -615,7 +636,7 @@ export async function POST(request: NextRequest) {
             unitCost = vehicle.rate
             lineTotal = vehicle.rate
             effectiveQuantityMode = 'fixed'
-            pricingNote = `${vehicle.vehicle}: €${vehicle.rate} (${num_pax} pax)`
+            pricingNote = `${vehicle.vehicle}: ${symbol}${vehicle.rate} (${num_pax} pax)`
             rateSource = 'b2b_package'
 
           }
@@ -628,7 +649,7 @@ export async function POST(request: NextRequest) {
             unitCost = vehicle.rate
             lineTotal = vehicle.rate
             effectiveQuantityMode = 'fixed'
-            pricingNote = `${vehicle.vehicle}: €${vehicle.rate} (${num_pax} pax)`
+            pricingNote = `${vehicle.vehicle}: ${symbol}${vehicle.rate} (${num_pax} pax)`
             rateSource = 'b2b_package'
           }
         }
@@ -647,7 +668,7 @@ export async function POST(request: NextRequest) {
               unitCost = vehicle.rate
               lineTotal = vehicle.rate
               effectiveQuantityMode = 'fixed'
-              pricingNote = `${vehicle.vehicle}: €${vehicle.rate}/day`
+              pricingNote = `${vehicle.vehicle}: ${symbol}${vehicle.rate}/day`
               rateSource = 'vehicles'
 
             }
@@ -660,7 +681,7 @@ export async function POST(request: NextRequest) {
               unitCost = guide.rate
               lineTotal = guide.rate
               effectiveQuantityMode = 'fixed'
-              pricingNote = `${guide.name}: €${guide.rate}/day`
+              pricingNote = `${guide.name}: ${symbol}${guide.rate}/day`
               rateSource = 'guides'
 
             }
@@ -675,7 +696,7 @@ export async function POST(request: NextRequest) {
                 unitCost = fee.rate
                 lineTotal = fee.rate * num_pax
                 effectiveQuantityMode = 'per_pax'
-                pricingNote = `${fee.name}: €${fee.rate}/pax (${is_eur_passport ? 'EUR' : 'non-EUR'})`
+                pricingNote = `${fee.name}: ${symbol}${fee.rate}/pax (${is_eur_passport ? 'EUR' : 'non-EUR'} passport)`
                 rateSource = 'entrance_fees'
 
               }
@@ -690,7 +711,7 @@ export async function POST(request: NextRequest) {
               unitCost = hotel.rate
               lineTotal = hotel.rate * roomsNeeded
               effectiveQuantityMode = 'per_room'
-              pricingNote = `${hotel.name}: €${hotel.rate}/room × ${roomsNeeded}`
+              pricingNote = `${hotel.name}: ${symbol}${hotel.rate}/room × ${roomsNeeded}`
               rateSource = 'hotel_contacts'
 
             }
@@ -700,12 +721,17 @@ export async function POST(request: NextRequest) {
           case 'cruise': {
             // Cruise rates from nile_cruises table
             if (service.rate_id) {
-              const { data: cruise } = await (getSupabaseAdmin() as any)
+              const { data: cruiseRaw } = await (getSupabaseAdmin() as any)
                 .from('nile_cruises')
                 .select('*')
                 .eq('id', service.rate_id)
                 .eq('tenant_id', tenantId)
                 .single()
+              // Per-row currency (mig 295): an EGP-priced cabin must not join
+              // the total as if its number were in the run currency.
+              const [cruise] = await normalizeRateRows(
+                getSupabaseAdmin(), 'nile_cruises', cruiseRaw ? [cruiseRaw] : []
+              )
 
               if (cruise) {
                 const c = cruise as any
@@ -738,12 +764,14 @@ export async function POST(request: NextRequest) {
               ? 'dinner'
               : 'lunch'
 
-            const { data: mealRows } = await (getSupabaseAdmin() as any)
+            const { data: mealRowsRaw } = await (getSupabaseAdmin() as any)
               .from('meal_rates')
-              .select('meal_type, base_rate_eur')
+              .select('meal_type, base_rate_eur, rate_currency')
               .eq('is_active', true)
               .eq('tenant_id', tenantId)
               .eq('tier', tier)
+            // Per-row currency (mig 295), converted at the fetch boundary.
+            const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', mealRowsRaw)
 
             const match = (mealRows ?? []).find(
               (r: any) => String(r.meal_type ?? '').toLowerCase().includes(mealType)
@@ -757,7 +785,7 @@ export async function POST(request: NextRequest) {
               unitCost = mealRate
               lineTotal = unitCost * num_pax
               effectiveQuantityMode = 'per_pax'
-              pricingNote = `€${unitCost}/pax`
+              pricingNote = `${symbol}${unitCost}/pax`
               rateSource = 'meal_rates'
             }
             break
@@ -893,7 +921,9 @@ export async function POST(request: NextRequest) {
       selling_price: Math.round(sellingPrice * 100) / 100,
       price_per_person: Math.round(pricePerPerson * 100) / 100,
       single_supplement: 0,  // Not calculated in legacy mode
-      currency: 'EUR',
+      // Every rate above was normalized into the tenant's run currency at its
+      // fetch; declare that currency instead of the historical 'EUR'.
+      currency: runCurrency,
       complete: holes.length === 0,
       holes,
     }
