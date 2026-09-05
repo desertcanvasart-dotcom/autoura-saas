@@ -146,18 +146,26 @@ if (unverified.length) {
 }
 
 console.log('\n── 2. anonymous writes must be rejected ──')
+// The write probe runs inside try/finally: this script's one dangerous
+// failure mode is landing the sentinel in a LIVE tenants table (which is
+// exactly what happens when the RLS it probes is broken) and then dying
+// before the cleanup line — a crash, Ctrl-C, or a network blip would have
+// stranded a fake tenant in production (A-item 23).
 const SENTINEL = 'zz-rls-verify-delete-me'
-const { data: ins, error: iErr } = await anon
-  .from('tenants').insert({ company_name: SENTINEL }).select().single()
-if (iErr) {
-  console.log(`   ✅ blocked  anonymous INSERT into tenants (${iErr.code})`)
-} else {
-  failures++
-  console.log('   ❌ ALLOWED  anonymous INSERT into tenants — cleaning up')
-  if (ins?.id) await svc.from('tenants').delete().eq('id', ins.id)
+try {
+  const { data: ins, error: iErr } = await anon
+    .from('tenants').insert({ company_name: SENTINEL }).select().single()
+  if (iErr) {
+    console.log(`   ✅ blocked  anonymous INSERT into tenants (${iErr.code})`)
+  } else {
+    failures++
+    console.log('   ❌ ALLOWED  anonymous INSERT into tenants — cleaning up')
+    if (ins?.id) await svc.from('tenants').delete().eq('id', ins.id)
+  }
+} finally {
+  // Belt and braces: never leave a sentinel behind, whatever happened above.
+  await svc.from('tenants').delete().like('company_name', 'zz-rls-verify%')
 }
-// Belt and braces: never leave a sentinel behind, whatever happened above.
-await svc.from('tenants').delete().like('company_name', 'zz-rls-verify%')
 
 console.log('\n── 3. the app must still be able to read (RLS without policies denies all) ──')
 for (const t of GUARDED) {

@@ -41,6 +41,17 @@ function giveUp(reason) {
   process.exit(CHECK_ONLY ? 1 : 0)
 }
 
+// Only a deploy environment (Railway sets RAILWAY_*) may sync the catalogue
+// implicitly — `npm start` on a laptop whose shell exports the production
+// keys must not silently rewrite subscription_plans (A-item 23). A human can
+// still force it with --live. --check stays read-only and unaffected.
+const onRailway = Boolean(
+  process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_SERVICE_ID
+)
+if (!CHECK_ONLY && !onRailway && !process.argv.includes('--live')) {
+  giveUp('not a deploy environment — pass --live to sync plans from this machine')
+}
+
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!url || !serviceKey) {
