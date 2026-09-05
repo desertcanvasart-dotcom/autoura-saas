@@ -761,7 +761,7 @@ export default function AttractionsContent() {
 
           <div className="bg-white p-3 rounded-lg shadow-md border border-gray-200">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-gray-400 text-xl">💶</span>
+              <span className="text-gray-400 text-xl">💰</span>
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
             <p className="text-xs text-gray-600">Avg. Rate</p>

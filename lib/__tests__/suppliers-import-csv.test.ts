@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { parseSuppliersCsv, splitAgainstExisting } from '@/lib/suppliers/import-csv'
 
 // ============================================
@@ -97,5 +99,32 @@ describe('splitAgainstExisting', () => {
     const { toInsert, skippedExisting } = splitAgainstExisting(records, ['  NILE STAR '])
     expect(skippedExisting).toEqual(['Nile Star'])
     expect(toInsert.map(r => r.name)).toEqual(['New Kid'])
+  })
+})
+
+describe('the suppliers Sample CSV is the contract', () => {
+  it("the sample's own example row imports with a real type and zero refusals", () => {
+    // Mirrors handleSampleCsv in app/suppliers/suppliers-content.tsx.
+    const sample = [
+      'Name,Type,Contact,Email,Phone,City,Country,Commission,Status,Notes,Website',
+      'Nile Star Hotel,hotel,Ahmed Hassan,reservations@nilestar.example,+20 100 000 0000,Cairo,Egypt,10,active,Valid types: hotel | airline,https://nilestar.example',
+    ].join('\n')
+    const r = parseSuppliersCsv(sample)
+    expect(r.refused).toEqual([])
+    expect(r.typeDefaulted).toEqual([])
+    expect(r.records[0]).toMatchObject({
+      name: 'Nile Star Hotel',
+      type: 'hotel',
+      contact_name: 'Ahmed Hassan',
+      city: 'Cairo',
+      default_commission_rate: 10,
+      status: 'active',
+    })
+  })
+
+  it('the sample page markup actually offers the sample download', () => {
+    const src = readFileSync(join(__dirname, '..', '..', 'app', 'suppliers', 'suppliers-content.tsx'), 'utf8')
+    expect(src).toContain('suppliers_sample.csv')
+    expect(src).toContain('Sample CSV')
   })
 })
