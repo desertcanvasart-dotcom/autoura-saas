@@ -127,7 +127,7 @@ export async function getTieredActivityRate(
       .eq('is_active', true)
       .eq('pricing_type', 'tiered')
       .not('tiers', 'is', null)
-    if (tenantId) q = q.or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+    if (tenantId) q = q.eq('tenant_id', tenantId)
     return q
   }
 

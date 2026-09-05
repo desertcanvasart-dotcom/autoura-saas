@@ -56,8 +56,22 @@ export const cairoTemplateRow = {
 }
 
 /** A fully-populated rate dataset — every lookup resolves to a real row. */
+
+/** The retired global catalog is gone: rate queries filter to the tenant's
+ *  own rows, so every fixture row must belong to the test tenant. Stamped
+ *  centrally at each builder's return, never per row. */
+export const TEST_TENANT_ID = 'test-tenant'
+type Row = Record<string, unknown>
+function stampTenant(tables: MockTables): MockTables {
+  const out: MockTables = {}
+  for (const [name, rows] of Object.entries(tables)) {
+    out[name] = (rows as Row[]).map(r => ({ tenant_id: TEST_TENANT_ID, ...r }))
+  }
+  return out
+}
+
 export function fullRateTables(): MockTables {
-  return {
+  return stampTenant({
     tour_templates: [cairoTemplateRow],
     accommodation_rates: [
       {
@@ -137,7 +151,7 @@ export function fullRateTables(): MockTables {
     ),
     airport_staff_rates: [],
     hotel_staff_rates: [],
-  }
+  })
 }
 
 /**
@@ -147,7 +161,7 @@ export function fullRateTables(): MockTables {
 export function missingHotelTables(): MockTables {
   const tables = fullRateTables()
   tables.accommodation_rates = []
-  return tables
+  return stampTenant(tables)
 }
 
 /**
@@ -181,7 +195,7 @@ export function multiTierRateTables(): MockTables {
     is_preferred: true,
     is_active: true,
   }))
-  return tables
+  return stampTenant(tables)
 }
 
 /**
@@ -202,5 +216,5 @@ export function fuzzyHotelTables(): MockTables {
       is_active: true,
     },
   ]
-  return tables
+  return stampTenant(tables)
 }

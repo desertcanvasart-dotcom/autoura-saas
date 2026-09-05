@@ -8,19 +8,19 @@ import { Check } from 'lucide-react'
 import WelcomeStep from './steps/WelcomeStep'
 import BusinessStep from './steps/BusinessStep'
 import BrandingStep from './steps/BrandingStep'
-import CatalogStep from './steps/CatalogStep'
 import TeamSetupStep from './steps/TeamSetupStep'
 import QuickTourStep from './steps/QuickTourStep'
 import CompleteStep from './steps/CompleteStep'
 
+// The Catalog step died with the global catalog (migration 331): every
+// company enters or CSV-imports its own rates.
 const STEPS = [
   { id: 0, name: 'Welcome', component: WelcomeStep },
   { id: 1, name: 'Business', component: BusinessStep },
   { id: 2, name: 'Branding', component: BrandingStep },
-  { id: 3, name: 'Catalog', component: CatalogStep },
-  { id: 4, name: 'Team', component: TeamSetupStep },
-  { id: 5, name: 'Tour', component: QuickTourStep },
-  { id: 6, name: 'Complete', component: CompleteStep },
+  { id: 3, name: 'Team', component: TeamSetupStep },
+  { id: 4, name: 'Tour', component: QuickTourStep },
+  { id: 5, name: 'Complete', component: CompleteStep },
 ]
 
 export default function OnboardingContent() {
@@ -47,7 +47,9 @@ export default function OnboardingContent() {
           }
           // Resume from last step if incomplete
           if (result.data.onboarding_step > 0) {
-            setCurrentStep(result.data.onboarding_step)
+            // Clamp: tenants saved a step index under the 7-step flow (with
+            // the retired Catalog step); the flow is 6 steps now.
+            setCurrentStep(Math.min(result.data.onboarding_step, STEPS.length - 1))
           }
         }
       } catch (error) {

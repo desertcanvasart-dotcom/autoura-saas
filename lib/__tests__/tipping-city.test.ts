@@ -25,7 +25,7 @@ type Row = {
   rate_eur: number
 }
 
-const scope = { tenantId: 'test-tenant', useGlobalCatalog: false } as never
+const scope = { tenantId: 'test-tenant' } as never
 
 async function resolver(rows: Row[]) {
   setMockTables({

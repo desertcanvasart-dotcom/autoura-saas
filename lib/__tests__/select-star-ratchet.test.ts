@@ -19,7 +19,7 @@ const STAR = /\.select\(\s*['"`]\*['"`]/g
 // The count on 2026-08-31, after narrowing the head:true count queries (where
 // the star was inert). Lower this — never raise it — as star-selects are
 // replaced with explicit column lists.
-const BASELINE = 278
+const BASELINE = 277
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

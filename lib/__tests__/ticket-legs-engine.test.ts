@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeAll } from 'vitest'
-import { setMockTables } from './_mock-supabase'
+import { setMockTablesStamped as setMockTables } from './_mock-supabase'
 import { fullRateTables } from './fixtures/sample-templates'
 
 // ============================================

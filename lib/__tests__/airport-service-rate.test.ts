@@ -48,7 +48,7 @@ vi.mock('@/lib/supabase-server', () => ({
 }))
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: () => chain() }) }))
 
-const SCOPE = { tenantId: 't1', useGlobalCatalog: false } as unknown as CatalogScope
+const SCOPE = { tenantId: 't1' } as unknown as CatalogScope
 
 beforeEach(() => {
   for (const k of Object.keys(calls)) delete calls[k]

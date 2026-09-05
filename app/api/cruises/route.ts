@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       .from('nile_cruises')
       .select('*')
       // Tenant rows plus legacy/global rows created before tenant scoping
-      .or(`tenant_id.eq.${authResult.tenant_id},tenant_id.is.null`)
+      .eq('tenant_id', authResult.tenant_id)
       .order('ship_name', { ascending: true })
 
     if (isActive === 'true') {

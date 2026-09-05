@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeAll } from 'vitest'
-import { setMockTables } from './_mock-supabase'
+import { setMockTablesStamped as setMockTables } from './_mock-supabase'
 import { TEMPLATE_ID, fullRateTables } from './fixtures/sample-templates'
 
 // ============================================
@@ -28,7 +28,7 @@ const BASE_PARAMS = {
   marginPercent: 25,
 }
 
-const SCOPE = { tenantId: 'test-tenant', useGlobalCatalog: true } as unknown as CatalogScope
+const SCOPE = { tenantId: 'test-tenant' } as unknown as CatalogScope
 
 const GUIDE_RATE_ROWS = [
   { id: 'gr-full', guide_language: 'English', guide_type: 'egyptologist', tour_duration: 'full_day', full_day_rate: 70, is_active: true },
