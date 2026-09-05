@@ -1,6 +1,7 @@
 'use client'
 
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { useDestinationCities } from '@/hooks/useDestinationCities'
 
 import { useState, useEffect, useRef } from 'react'
 import { showToast } from '@/app/contexts/ToastContext'
@@ -68,15 +69,6 @@ type ViewMode = 'grid' | 'table' | 'list'
 type SortField = 'name' | 'type' | 'city' | 'status' | 'commission'
 type SortDirection = 'asc' | 'desc'
 
-// Constants - FULL EGYPTIAN CITIES LIST (36 cities)
-const EGYPTIAN_CITIES = [
-  'Alamein', 'Alexandria', 'Aswan', 'Asyut', 'Bahariya', 'Beni Suef', 'Cairo',
-  'Dahab', 'Dakhla', 'Edfu', 'El Arish', 'El Balyana', 'El Gouna', 'El Quseir',
-  'El Tor', 'Esna', 'Farafra', 'Fayoum', 'Giza', 'Hurghada', 'Ismailia', 'Kharga', 
-  'Kom Ombo', 'Luxor', 'Marsa Alam', 'Minya', 'Nuweiba', 'Port Said', 'Qena', 
-  'Rafah', 'Rosetta (Rashid)', 'Safaga', 'Saint Catherine', 'Sharm El Sheikh', 
-  'Sheikh Zuweid', 'Siwa', 'Sohag', 'Suez', 'Taba'
-]
 
 const VEHICLE_TYPES = ['Sedan', 'Minivan', 'Van', 'Bus', 'SUV', '4x4']
 
@@ -191,6 +183,7 @@ function MultiSelect({ options, value, onChange, placeholder }: {
 }
 
 export default function SuppliersContent() {
+  const { cities: cityOptions } = useDestinationCities()
   const { fmtRate } = useRateRowFormat()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -583,7 +576,7 @@ export default function SuppliersContent() {
       { name: 'WhatsApp', key: 'whatsapp', type: 'tel' },
       { name: 'Website', key: 'website', type: 'url' },
       // Location
-      { name: 'City', key: 'city', type: 'select', options: EGYPTIAN_CITIES },
+      { name: 'City', key: 'city', type: 'select', options: cityOptions },
       { name: 'Address', key: 'address', type: 'textarea' },
       // Commissions (C2): the direction decides the engine's base —
       // receivable = % of THEIR price, payable = % of OUR profit.

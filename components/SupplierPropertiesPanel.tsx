@@ -11,7 +11,10 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { Loader2, Pencil, Plus, Ship, Building2, TrainFront, Trash2, X } from 'lucide-react'
+import CitySelect from '@/components/CitySelect'
 import {
+  PROPERTY_CATEGORIES,
+  PROPERTY_CATEGORY_LABELS,
   PROPERTY_TYPE_LABELS,
   propertyTypesForRoles,
   type PropertyType,
@@ -193,11 +196,24 @@ export default function SupplierPropertiesPanel({ supplierId, supplierRoles }: P
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
-              <input value={draft.city} onChange={e => setDraft({ ...draft, city: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+              <CitySelect value={draft.city} onChange={city => setDraft({ ...draft, city })} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
-              <input value={draft.category} onChange={e => setDraft({ ...draft, category: e.target.value })} placeholder="5★ deluxe" className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+              <select
+                value={draft.category}
+                onChange={e => setDraft({ ...draft, category: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+              >
+                <option value="">Select Category...</option>
+                {/* A legacy free-text category stays selectable until it is re-filed. */}
+                {draft.category && !(PROPERTY_CATEGORIES as readonly string[]).includes(draft.category) && (
+                  <option value={draft.category}>{draft.category}</option>
+                )}
+                {PROPERTY_CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{PROPERTY_CATEGORY_LABELS[cat]}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Contact name</label>

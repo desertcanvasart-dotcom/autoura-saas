@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Plus, X, MapPin, Ticket, Calculator } from 'lucide-react'
+import CitySelect from '@/components/CitySelect'
 
 interface EntranceFee {
   id: string
@@ -349,10 +350,9 @@ export default function EditSupplierDocumentPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-                <input
-                  type="text"
+                <CitySelect
                   value={document.city || ''}
-                  onChange={(e) => setDocument({ ...document, city: e.target.value })}
+                  onChange={(city) => setDocument({ ...document, city })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>

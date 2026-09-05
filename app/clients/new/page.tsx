@@ -9,6 +9,7 @@ import {
   Star, Bell, Heart, ArrowLeft, Save, X, ChevronRight
 } from 'lucide-react'
 import RequireFeature from '@/components/RequireFeature'
+import { CityDatalist } from '@/components/CitySelect'
 import { useTenant } from '@/app/contexts/TenantContext'
 
 const LEAD_SOURCES = [
@@ -395,10 +396,12 @@ export default function NewClientPage() {
                     <label className={labelClass}>City</label>
                     <input
                       type="text"
+                      list="client-city-options"
                       value={formData.city}
                       onChange={(e) => handleInputChange('city', e.target.value)}
                       className={inputClass}
                     />
+                    <CityDatalist id="client-city-options" />
                   </div>
 
                   <div className="col-span-2">
