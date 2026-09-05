@@ -45,6 +45,7 @@ interface ReportInvoice {
   total_amount?: number | string | null
   amount_paid?: number | string | null
   balance_due?: number | string | null
+  tax_amount?: number | string | null
   currency?: string | null
   status?: string | null
 }
@@ -146,7 +147,7 @@ export async function GET(request: NextRequest) {
       // Current year invoices - only needed columns
       supabase
         .from('invoices')
-        .select('id, invoice_number, issue_date, paid_at, total_amount, amount_paid, balance_due, currency, status')
+        .select('id, invoice_number, issue_date, paid_at, total_amount, amount_paid, balance_due, tax_amount, currency, status')
         .gte('issue_date', yearStart)
         .lte('issue_date', yearEnd)
         .order('issue_date', { ascending: true }),
@@ -218,6 +219,7 @@ export async function GET(request: NextRequest) {
       date: (row: ReportInvoice) => row.paid_at || row.issue_date,
       fields: [
         { name: 'total_amount', date: (row: ReportInvoice) => row.issue_date },
+        { name: 'tax_amount', date: (row: ReportInvoice) => row.issue_date },
         'amount_paid',
         'balance_due',
       ],
@@ -380,16 +382,21 @@ export async function GET(request: NextRequest) {
     const totalRevenue = yearInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0)
     const totalExpensesAmount = yearExpenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
 
+    // VAT is what the invoices SAY, never a flat percentage of revenue.
+    // The old lines multiplied gross figures by a hardcoded 14% while every
+    // invoice in the same query carried its real tax_amount — an estimate
+    // wearing a report. vat_paid is NULL because expenses carry no tax
+    // field at all: input VAT is genuinely untracked, and an honest hole
+    // beats a fabricated 14%-of-expenses.
     const taxSummary = {
       gross_revenue: totalRevenue,
       total_expenses: totalExpensesAmount,
       deductible_expenses: deductibleTotal,
       taxable_income: totalRevenue - deductibleTotal,
       expense_breakdown: categoryBreakdown,
-      // Estimated tax (simplified - would need actual tax rates)
-      estimated_vat_collected: totalRevenue * 0.14, // 14% Egypt VAT example
-      estimated_vat_paid: totalExpensesAmount * 0.14,
-      net_vat: (totalRevenue - totalExpensesAmount) * 0.14
+      vat_collected: yearInvoices.reduce((sum, inv) => sum + Number(inv.tax_amount || 0), 0),
+      vat_paid: null as number | null,
+      net_vat: null as number | null,
     }
 
     // Commission reports (for guides, drivers, etc.)

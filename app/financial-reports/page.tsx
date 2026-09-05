@@ -67,9 +67,9 @@ interface TaxSummary {
   deductible_expenses: number
   taxable_income: number
   expense_breakdown: CategoryExpense[]
-  estimated_vat_collected: number
-  estimated_vat_paid: number
-  net_vat: number
+  vat_collected: number
+  vat_paid: number | null
+  net_vat: number | null
 }
 
 interface CommissionRecipient {
@@ -647,25 +647,34 @@ export default function FinancialReportsPage() {
             </div>
           </div>
 
-          {/* VAT Summary */}
+          {/* VAT Summary — what the invoices actually charged, never a flat
+              percentage of revenue. Input VAT shows as untracked because
+              expenses carry no tax field: an honest hole, not an estimate. */}
           <div className="bg-white border border-gray-200 rounded-lg p-5">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">VAT Summary (Estimated 14%)</h3>
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">VAT Summary</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Collected = the tax lines on this year&rsquo;s invoices, restated into the reporting currency.
+            </p>
             <div className="grid grid-cols-3 gap-4">
               <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-600 mb-1">VAT Collected</p>
-                <p className="text-lg font-semibold text-blue-700">{formatAmount(taxSummary.estimated_vat_collected)}</p>
+                <p className="text-xs text-blue-600 mb-1">VAT Collected (from invoices)</p>
+                <p className="text-lg font-semibold text-blue-700">{formatAmount(taxSummary.vat_collected)}</p>
               </div>
-              <div className="p-4 bg-red-50 rounded-lg">
-                <p className="text-xs text-red-600 mb-1">VAT Paid</p>
-                <p className="text-lg font-semibold text-red-700">{formatAmount(taxSummary.estimated_vat_paid)}</p>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">VAT Paid (input VAT)</p>
+                {taxSummary.vat_paid === null ? (
+                  <p className="text-sm text-gray-500">Not tracked — expenses carry no tax field</p>
+                ) : (
+                  <p className="text-lg font-semibold text-red-700">{formatAmount(taxSummary.vat_paid)}</p>
+                )}
               </div>
-              <div className={`p-4 rounded-lg ${taxSummary.net_vat >= 0 ? 'bg-green-50' : 'bg-orange-50'}`}>
-                <p className={`text-xs mb-1 ${taxSummary.net_vat >= 0 ? 'text-green-600' : 'text-orange-600'}`}>
-                  Net VAT {taxSummary.net_vat >= 0 ? 'Payable' : 'Receivable'}
-                </p>
-                <p className={`text-lg font-semibold ${taxSummary.net_vat >= 0 ? 'text-green-700' : 'text-orange-700'}`}>
-                  {formatAmount(Math.abs(taxSummary.net_vat))}
-                </p>
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <p className="text-xs text-gray-500 mb-1">Net VAT</p>
+                {taxSummary.net_vat === null ? (
+                  <p className="text-sm text-gray-500">&mdash; needs input VAT</p>
+                ) : (
+                  <p className="text-lg font-semibold text-gray-900">{formatAmount(Math.abs(taxSummary.net_vat))}</p>
+                )}
               </div>
             </div>
           </div>
