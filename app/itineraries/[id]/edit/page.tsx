@@ -472,6 +472,13 @@ export default function ItineraryEditorPage() {
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error || 'Update failed')
       setItinerary({ ...itinerary, status: newStatus })
+      // Confirming creates the booking (B-item 7) — tell the operator what
+      // happened either way; a silent side effect is how money gets lost.
+      if (data.booking?.booking_number) {
+        showToast('success', `Booking ${data.booking.booking_number} created — deposit ${data.booking.deposit_percent}% due ${data.booking.payment_deadline}`)
+      } else if (data.booking_note) {
+        showToast('info', data.booking_note)
+      }
     } catch (error) {
       console.error('Error updating status:', error)
       showToast('error', 'Failed to update status')

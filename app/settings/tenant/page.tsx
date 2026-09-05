@@ -63,6 +63,9 @@ export default function TenantSettingsPage() {
   // "fall through to the platform constant". A number state would force 0 —
   // and 0 is a real house rate (an at-cost agency), not an absence.
   const [defaultMargin, setDefaultMargin] = useState('')
+  // The org's deposit rule (mig 325): blank = the defaults (30% / 7 days).
+  const [depositPercent, setDepositPercent] = useState('')
+  const [depositDueDays, setDepositDueDays] = useState('')
   // Run currency (C3.4): '' = EUR default. Reinterprets stored rate amounts;
   // the field warns about that.
   const [ratesCurrency, setRatesCurrency] = useState('')
@@ -84,6 +87,9 @@ export default function TenantSettingsPage() {
           ? ''
           : String(tenant.default_margin_percent)
       )
+      const t = tenant as { deposit_percent?: number | null; deposit_due_days?: number | null }
+      setDepositPercent(t.deposit_percent === null || t.deposit_percent === undefined ? '' : String(t.deposit_percent))
+      setDepositDueDays(t.deposit_due_days === null || t.deposit_due_days === undefined ? '' : String(t.deposit_due_days))
       // Workspace visibility is a tenant preference, free on every tier —
       // no longer derived from feature flags, which read like entitlements.
       setWorkspaceMode(tenant.workspace_mode ?? 'both')
@@ -242,6 +248,9 @@ export default function TenantSettingsPage() {
           // Empty field -> NULL -> the resolver falls through to the platform
           // constant. Storing 0 here would silently make every quote at-cost.
           default_margin_percent: defaultMargin.trim() === '' ? null : Number(defaultMargin),
+          // Blank -> NULL -> resolveDepositRule falls back to the defaults.
+          deposit_percent: depositPercent.trim() === '' ? null : Number(depositPercent),
+          deposit_due_days: depositDueDays.trim() === '' ? null : Number(depositDueDays),
           ...(ratesCurrency || (tenant as { rates_currency?: string | null }).rates_currency
             ? { rates_currency: ratesCurrency || null }
             : {}),
@@ -427,6 +436,45 @@ export default function TenantSettingsPage() {
               <p className="mt-1 text-[10px] text-gray-400">
                 Leave blank to use the platform default. A colleague who clears their own
                 margin falls back to this.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Deposit %
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(New bookings)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={depositPercent}
+                onChange={(e) => setDepositPercent(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                placeholder="Not set — uses 30%"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                Applied when a confirmed itinerary creates its booking.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Deposit due within (days)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="365"
+                step="1"
+                value={depositDueDays}
+                onChange={(e) => setDepositDueDays(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                placeholder="Not set — uses 7"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                Days from booking creation until the deposit deadline.
               </p>
             </div>
           </div>

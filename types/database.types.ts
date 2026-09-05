@@ -2039,8 +2039,8 @@ export interface Database {
           id: string
           tenant_id: string
           itinerary_id: string | null
-          quote_id: string
-          quote_type: string
+          quote_id: string | null
+          quote_type: string | null
           client_id: string | null
           partner_id: string | null
           booking_number: string
@@ -2081,8 +2081,8 @@ export interface Database {
           id?: string
           tenant_id: string
           itinerary_id?: string | null
-          quote_id: string
-          quote_type: string
+          quote_id?: string | null
+          quote_type?: string | null
           client_id?: string | null
           partner_id?: string | null
           booking_number: string
@@ -2123,8 +2123,8 @@ export interface Database {
           id?: string
           tenant_id?: string
           itinerary_id?: string | null
-          quote_id?: string
-          quote_type?: string
+          quote_id?: string | null
+          quote_type?: string | null
           client_id?: string | null
           partner_id?: string | null
           booking_number?: string
@@ -8999,6 +8999,8 @@ export interface Database {
           email_domain_verified_at: string | null
           default_margin_percent: number | null
           rates_currency: string | null
+          deposit_percent: number | null
+          deposit_due_days: number | null
         }
         Insert: {
           id?: string
@@ -9029,6 +9031,8 @@ export interface Database {
           email_domain_verified_at?: string | null
           default_margin_percent?: number | null
           rates_currency?: string | null
+          deposit_percent?: number | null
+          deposit_due_days?: number | null
         }
         Update: {
           id?: string
@@ -9059,6 +9063,8 @@ export interface Database {
           email_domain_verified_at?: string | null
           default_margin_percent?: number | null
           rates_currency?: string | null
+          deposit_percent?: number | null
+          deposit_due_days?: number | null
         }
         Relationships: []
       }
