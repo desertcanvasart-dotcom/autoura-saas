@@ -58,7 +58,6 @@ export async function GET(
       fee_type: data.fee_type,
       eur_rate: data.eur_rate,
       non_eur_rate: data.non_eur_rate,
-      egyptian_rate: data.egyptian_rate,
       student_discount_percentage: data.student_discount_percentage,
       child_discount_percent: data.child_discount_percent,
       season: data.season,
@@ -115,7 +114,6 @@ export async function PUT(
       fee_type,
       eur_rate,
       non_eur_rate,
-      egyptian_rate,
       student_discount_percentage,
       child_discount_percent,
       season,
@@ -141,7 +139,6 @@ export async function PUT(
     if (fee_type !== undefined) updateData.fee_type = fee_type
     if (eur_rate !== undefined) updateData.eur_rate = eur_rate
     if (non_eur_rate !== undefined) updateData.non_eur_rate = non_eur_rate
-    if (egyptian_rate !== undefined) updateData.egyptian_rate = egyptian_rate
     if (student_discount_percentage !== undefined) updateData.student_discount_percentage = student_discount_percentage
     if (child_discount_percent !== undefined) updateData.child_discount_percent = child_discount_percent
     if (season !== undefined) updateData.season = season

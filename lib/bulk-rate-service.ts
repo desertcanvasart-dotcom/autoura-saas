@@ -252,7 +252,6 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('fee_type', 'Fee Type', 'text', false),
       col('eur_rate', 'Rate', 'number', true),
       legacyRate('non_eur_rate', 'Non-EUR Rate (legacy)', 'eur_rate'),
-      col('egyptian_rate', 'Egyptian Rate', 'number', false),
       col('student_discount_percentage', 'Student Discount %', 'number', false),
       col('child_discount_percent', 'Child Discount %', 'number', false),
       col('category', 'Category', 'text', false),
