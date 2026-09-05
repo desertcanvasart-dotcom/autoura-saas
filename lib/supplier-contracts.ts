@@ -180,3 +180,38 @@ export interface SupplierContract {
   updated_at: string
   property?: { id: string; name: string } | null
 }
+
+// ------------------------------------------------------------------
+// The renewal view — what the dashboard shows
+// ------------------------------------------------------------------
+
+/** A contract that lapsed this recently is still news: the rates it carried
+ *  may be in live quotes. Older lapses are history, not a reminder. */
+export const CONTRACT_EXPIRED_LOOKBACK_DAYS = 30
+
+export function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+/** Whole days from `today` to `date` (negative when `date` has passed). */
+export function daysUntil(today: string, date: string): number {
+  return daysBetween(today.slice(0, 10), date.slice(0, 10))
+}
+
+/** The valid_to range the dashboard reminder covers: recently expired
+ *  through expiring within the warning horizon. */
+export function contractsExpiryWindow(today: string): { from: string; to: string } {
+  return { from: addDaysIso(today, -CONTRACT_EXPIRED_LOOKBACK_DAYS), to: addDaysIso(today, CONTRACT_EXPIRING_DAYS) }
+}
+
+/** "Expires in 12 days", "Expires today", "Expired 3 days ago". */
+export function describeExpiry(today: string, validTo: string): string {
+  const n = daysUntil(today, validTo)
+  if (n === 0) return 'Expires today'
+  if (n === 1) return 'Expires tomorrow'
+  if (n > 1) return `Expires in ${n} days`
+  if (n === -1) return 'Expired yesterday'
+  return `Expired ${-n} days ago`
+}

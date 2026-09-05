@@ -24,7 +24,7 @@ export default function SuppliersPage() {
           Every supplier belongs to one of 12 types:
         </p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
-          {['Hotel', 'Transport Company', 'Driver', 'Guide', 'Cruise', 'Activity Provider', 'Attraction', 'Tour Operator', 'Ground Handler', 'Restaurant', 'Shop', 'Other'].map((type) => (
+          {['Hotel', 'Transport Company', 'Driver', 'Guide', 'Cruise', 'Train Operator', 'Activity Provider', 'Attraction', 'Tour Operator', 'Ground Handler', 'Restaurant', 'Shop', 'Other'].map((type) => (
             <div key={type} className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 text-center">{type}</div>
           ))}
         </div>
