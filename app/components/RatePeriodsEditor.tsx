@@ -17,6 +17,7 @@
 import { useMemo } from 'react'
 import { Plus, Trash2, AlertTriangle } from 'lucide-react'
 import {
+  MAX_RATE_PERIODS,
   RATE_FIELDS,
   overlappingSeasons,
   seasonGaps,
@@ -40,7 +41,7 @@ function emptyPeriod(entity: RateSeasonEntity): RateSeason {
   return { name: '', from: '', to: '', rates }
 }
 
-export const MAX_RATE_PERIODS = 6
+export { MAX_RATE_PERIODS } // re-export for existing importers
 
 export default function RatePeriodsEditor({
   entity,

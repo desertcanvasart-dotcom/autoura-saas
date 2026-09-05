@@ -3,6 +3,8 @@ import { requireAuth } from '@/lib/supabase-server'
 import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows, applyCanonicalAliases, deriveImportSeasons } from '@/lib/bulk-rate-service'
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
+import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES } from '@/lib/rates/periods-csv'
+import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,6 +35,73 @@ export async function POST(request: NextRequest) {
 
     const rows = parsed.data
     if (rows.length === 0) return NextResponse.json({ success: false, error: 'No data rows' }, { status: 400 })
+
+    // ---- Periods-format rate sheet (one row per contract period) ----
+    // Detected by its headers; the flat format cannot trip this. Periods
+    // UPDATE an existing property's rate windows — a rate sheet never
+    // creates a property (it has no city or tier to create one with).
+    const periodsTarget = PERIODS_CSV_TABLES[table]
+    if (periodsTarget && detectPeriodsCsv(parsed.meta.fields ?? [])) {
+      const sheet = parsePeriodsCsv(rows)
+      const validRows = sheet.totalRows - sheet.errors.length
+      if (dryRun) {
+        return NextResponse.json({
+          success: true, dryRun: true,
+          totalRows: sheet.totalRows, validRows, invalidRows: sheet.errors.length,
+          errors: sheet.errors, sampleData: [],
+        })
+      }
+      if (sheet.errors.length > 0) {
+        return NextResponse.json({
+          success: false, error: `${sheet.errors.length} rows have errors`,
+          totalRows: sheet.totalRows, validRows, invalidRows: sheet.errors.length, errors: sheet.errors,
+        })
+      }
+
+      let updated = 0
+      const periodErrors: Array<{ row: string; message: string }> = []
+      for (const group of sheet.groups) {
+        interface PropRow { id: string }
+        let query = supabase
+          .from(periodsTarget.entity === 'accommodation' ? 'accommodation_rates' : 'nile_cruises')
+          .select('id')
+          .eq('tenant_id', tenant_id)
+        query = group.service_code
+          ? query.eq(periodsTarget.codeColumn, group.service_code)
+          : query.ilike(periodsTarget.nameColumn, group.property_name ?? '')
+        const { data: matches } = await (query as unknown as PromiseLike<{ data: PropRow[] | null }>)
+
+        const label = group.property_name || group.service_code || group.key
+        if (!matches || matches.length === 0) {
+          periodErrors.push({ row: label, message: `No existing ${periodsTarget.entity === 'accommodation' ? 'hotel' : 'cruise'} matches "${label}" — ${periodsTarget.createHint}.` })
+          continue
+        }
+        if (matches.length > 1) {
+          periodErrors.push({ row: label, message: `"${label}" matches ${matches.length} rows — give each row its Service Code so the periods land on the right one.` })
+          continue
+        }
+
+        const seasons = sanitizeSeasons(group.periods, periodsTarget.entity) ?? []
+        const { error } = await supabase
+          .from(periodsTarget.entity === 'accommodation' ? 'accommodation_rates' : 'nile_cruises')
+          .update({
+            seasons,
+            ...legacyColumnMirror(seasons, periodsTarget.entity),
+            updated_at: new Date().toISOString(),
+          } as never)
+          .eq('id', matches[0].id)
+          .eq('tenant_id', tenant_id)
+        if (error) periodErrors.push({ row: label, message: error.message })
+        else updated++
+      }
+
+      return NextResponse.json({
+        success: periodErrors.length === 0,
+        totalRows: sheet.totalRows, validRows, invalidRows: 0,
+        inserted: 0, updated, refusedDuplicates: 0, exampleRowsSkipped: 0,
+        errors: periodErrors,
+      })
+    }
 
     const preview = validateImportData(rows, config)
     if (dryRun) return NextResponse.json({ success: true, dryRun: true, ...preview })

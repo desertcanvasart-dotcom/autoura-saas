@@ -30,6 +30,10 @@ export interface RateSeason {
 /** The rate fields each catalog's periods carry, in display order.
  *  These are THIS app's per-person-per-day model — the columns
  *  getHotelRates/getCruiseRates actually read. */
+/** Up to six free-text-named periods per rate (every agency cuts its
+ *  seasons differently — locked with the flexible-periods model). */
+export const MAX_RATE_PERIODS = 6
+
 export const RATE_FIELDS = {
   accommodation: [
     'ppd_eur', 'single_supplement_eur', 'triple_reduction_eur',
