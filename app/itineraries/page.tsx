@@ -126,6 +126,11 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
       const data = await response.json()
 
       if (data.success) {
+        if (data.booking?.booking_number) {
+          showToast('success', `Booking ${data.booking.booking_number} created`)
+        } else if (data.booking_note) {
+          showToast('info', data.booking_note)
+        }
         setItineraries(itineraries.map(it => 
           it.id === id ? { ...it, status: newStatus } : it
         ))
