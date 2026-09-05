@@ -13,6 +13,7 @@ import {
 } from '@/lib/itinerary-share'
 import ReportProblem from './ReportProblem'
 import TripChat from './TripChat'
+import { getCurrencySymbol } from '@/lib/currency'
 
 // ============================================
 // THE SHAREABLE ITINERARY PAGE — public, token-gated
@@ -168,7 +169,6 @@ function fmtDate(d: string | null): string {
   }
 }
 
-const CURRENCY: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
 
 export default async function SharedItineraryPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params
@@ -204,7 +204,7 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
     restaurant: { emoji: '🍽', label: 'Restaurant' },
     cruise: { emoji: '🚢', label: 'Nile cruise' },
   }
-  const sym = (it.currency && CURRENCY[it.currency]) || it.currency || ''
+  const sym = it.currency ? getCurrencySymbol(it.currency) : ''
   const travellers = it.numAdults + it.numChildren
 
   return (

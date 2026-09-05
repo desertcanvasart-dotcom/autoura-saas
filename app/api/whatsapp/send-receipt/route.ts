@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
+import { getCurrencySymbol } from '@/lib/currency'
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,8 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const receiptNumber = payment.transaction_reference || `RCP-${payment.id.slice(0, 8).toUpperCase()}`
-    const currencySymbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-    const currencySymbol = currencySymbols[payment.currency] || payment.currency
+    const currencySymbol = getCurrencySymbol(payment.currency)
     const amount = `${currencySymbol}${Number(payment.amount).toFixed(2)}`
     const paymentDate = new Date(payment.payment_date).toLocaleDateString('en-GB', {
       day: 'numeric',

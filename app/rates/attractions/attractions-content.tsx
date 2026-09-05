@@ -35,7 +35,6 @@ interface Attraction {
   fee_type?: string
   eur_rate: number
   non_eur_rate: number
-  egyptian_rate?: number
   student_discount_percentage?: number
   child_discount_percent?: number
   season?: string
@@ -195,7 +194,7 @@ export default function AttractionsContent() {
   const { cities: cityOptions } = useDestinationCities()
   const searchParams = useSearchParams()
   const dialog = useConfirmDialog()
-  const { userCurrency, loading: currencyLoading } = useCurrency()
+  const { loading: currencyLoading } = useCurrency()
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [attractions, setAttractions] = useState<Attraction[]>([])
@@ -233,7 +232,6 @@ export default function AttractionsContent() {
     fee_type: 'standard',
     eur_rate: 0,
     non_eur_rate: 0,
-    egyptian_rate: 0,
     student_discount_percentage: 0,
     child_discount_percent: 0,
     season: 'all_year',
@@ -393,7 +391,6 @@ export default function AttractionsContent() {
       fee_type: 'standard',
       eur_rate: 0,
       non_eur_rate: 0,
-      egyptian_rate: 0,
       student_discount_percentage: 0,
       child_discount_percent: 0,
       season: 'all_year',
@@ -420,7 +417,6 @@ export default function AttractionsContent() {
       fee_type: attraction.fee_type || 'standard',
       eur_rate: attraction.eur_rate,
       non_eur_rate: attraction.eur_rate,
-      egyptian_rate: attraction.egyptian_rate || 0,
       student_discount_percentage: attraction.student_discount_percentage || 0,
       child_discount_percent: attraction.child_discount_percent || 0,
       season: attraction.season || 'all_year',
@@ -577,7 +573,6 @@ export default function AttractionsContent() {
       fee_type: rate.fee_type || 'standard',
       eur_rate: rate.eur_rate,
       non_eur_rate: rate.eur_rate,
-      egyptian_rate: rate.egyptian_rate || 0,
       student_discount_percentage: rate.student_discount_percentage || 0,
       child_discount_percent: rate.child_discount_percent || 0,
       season: rate.season || 'all_year',
@@ -769,7 +764,7 @@ export default function AttractionsContent() {
               <span className="text-gray-400 text-xl">💶</span>
               <div className="w-1.5 h-1.5 rounded-full bg-primary-600" />
             </div>
-            <p className="text-xs text-gray-600">Avg. {userCurrency} Rate</p>
+            <p className="text-xs text-gray-600">Avg. Rate</p>
             <p className="text-2xl font-bold text-gray-900">{fmtAverage(avgRate, 2)}</p>
           </div>
         </div>
@@ -1188,7 +1183,7 @@ export default function AttractionsContent() {
 
               {/* Pricing Information */}
               <div className="mb-4">
-                <h3 className="text-base font-semibold text-gray-900 mb-3">Pricing (stored in EUR)</h3>
+                <h3 className="text-base font-semibold text-gray-900 mb-3">Pricing</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1208,21 +1203,6 @@ export default function AttractionsContent() {
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Egyptian Rate ({rateSymbol})
-                    </label>
-                    <input
-                      type="number"
-                      name="egyptian_rate"
-                      value={formData.egyptian_rate}
-                      onChange={handleChange}
-                      step="0.01"
-                      min="0"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                      placeholder="0.00"
-                    />
-                  </div>
                 </div>
               </div>
 

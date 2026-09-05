@@ -118,7 +118,7 @@ export default function GuideRatesContent() {
   } | null>(null)
 
   // Currency conversion
-  const { userCurrency, loading: currencyLoading } = useCurrency()
+  const { loading: currencyLoading } = useCurrency()
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const showNotification = (type: 'success' | 'error' | 'info' | 'warning', title: string, message: string) => {
@@ -854,7 +854,7 @@ export default function GuideRatesContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Type</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Duration</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Rate</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
                 </tr>
@@ -980,7 +980,7 @@ export default function GuideRatesContent() {
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
-                    <p className="text-xs text-gray-500">{userCurrency} Rate</p>
+                    <p className="text-xs text-gray-500">Rate</p>
                     <p className="text-lg font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</p>
                   </div>
                   <div className="flex gap-1">
@@ -1249,7 +1249,7 @@ export default function GuideRatesContent() {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="base_rate_eur" className="block text-xs font-medium text-gray-600 mb-1">Rate (EUR) *</label>
+                    <label htmlFor="base_rate_eur" className="block text-xs font-medium text-gray-600 mb-1">Rate ({rateSymbol}) *</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{rateSymbol}</span>
                       <input

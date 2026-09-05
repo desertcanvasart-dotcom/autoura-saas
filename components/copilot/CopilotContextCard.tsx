@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, User, Route, Receipt, Wallet, Star } from 'lucide-react'
 import type { CopilotContext } from '@/app/types/copilot'
+import { getCurrencySymbol } from '@/lib/currency'
 
-const SYM: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
 const money = (n: number | null, c: string | null) =>
-  n == null ? '—' : `${SYM[c || ''] || (c ? c + ' ' : '')}${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+  n == null ? '—' : `${c ? getCurrencySymbol(c) : ''}${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
 
 export default function CopilotContextCard({ context }: { context: CopilotContext }) {
   const [open, setOpen] = useState(true)

@@ -48,8 +48,18 @@ function countEuroLiterals(): Record<string, number> {
       // This file itself is excluded: it has to print the symbol to explain
       // the rule, and counting its own examples would make the ratchet fail
       // every time someone improved the message.
-      else if (/\.tsx?$/.test(e.name) && !r.endsWith('euro-literal-ratchet.test.ts')) {
-        const n = (fs.readFileSync(path.join(ROOT, r), 'utf8').match(/€/g) ?? []).length
+      // currency-vocabulary.test.ts is excluded for the same reason as this
+      // file: it must spell the symbol to police it.
+      else if (
+        /\.tsx?$/.test(e.name) &&
+        !r.endsWith('euro-literal-ratchet.test.ts') &&
+        !r.endsWith('currency-vocabulary.test.ts')
+      ) {
+        // The \u20AC escape spells the same symbol and was used to slip past
+        // this very ratchet (fixed-costs, ServiceRatePicker — A-item 2).
+        const src = fs.readFileSync(path.join(ROOT, r), 'utf8')
+        const n =
+          (src.match(/€/g) ?? []).length + (src.match(/\\u20AC/gi) ?? []).length
         if (n) out[r] = n
       }
     }

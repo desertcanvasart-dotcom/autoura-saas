@@ -1,5 +1,7 @@
 'use client'
 
+import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+
 import { useState, useEffect, useCallback } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useRouter, useParams } from 'next/navigation'
@@ -46,6 +48,7 @@ import { useRole } from '@/hooks/useRole'
 // ============================================
 
 interface Attraction {
+  rate_currency?: string | null
   id: string
   activity_name: string
   city: string | null
@@ -192,6 +195,7 @@ const getServiceIcon = (type: string | null) => {
 // ============================================
 
 export default function ItineraryEditorPage() {
+  const { fmtRate } = useRateRowFormat()
   const router = useRouter()
   const params = useParams()
   const itineraryId = params?.id as string
@@ -1672,7 +1676,7 @@ export default function ItineraryEditorPage() {
                         <div className="text-xs text-gray-500 mt-0.5">📍 {attr.city}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-semibold text-[#647C47]">€{attr.base_rate_eur} / €{attr.base_rate_non_eur}</div>
+                        <div className="text-sm font-semibold text-[#647C47]">{fmtRate(attr.base_rate_eur, attr, 0)} / {fmtRate(attr.base_rate_non_eur, attr, 0)}</div>
                         <div className="text-[11px] text-gray-500">EUR / non-EUR</div>
                       </div>
                     </div>

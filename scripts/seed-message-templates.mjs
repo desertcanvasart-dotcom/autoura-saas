@@ -46,6 +46,10 @@ if (!url || !serviceKey) {
   console.error('NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY required')
   process.exit(1)
 }
+// Say WHERE the write is going before it goes — .env.local on this project
+// points at the live database (A-item 23).
+console.log(`target: ${new URL(url).host} — ${APPLY ? 'APPLYING' : 'dry run (pass --apply to write)'}`)
+
 const admin = createClient(url, serviceKey, { auth: { persistSession: false } })
 
 const extractPlaceholders = (text) =>

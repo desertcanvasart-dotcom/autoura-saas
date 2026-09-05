@@ -25,6 +25,18 @@ const COOKIE = process.env.GRID_COOKIE || ''
 const TIER = process.env.TIER || 'standard'
 const DO_WRITE = process.env.SMOKE_WRITE === '1'
 
+// Writing through a real logged-in session against a non-local host creates a
+// draft itinerary in a LIVE tenant. That must be a decision, not a default —
+// same fence as setup-stripe-plans --live (A-item 23).
+const isLocalTarget = /^https?:\/\/(localhost|127\.0\.0\.1)([:/]|$)/.test(BASE_URL)
+if (DO_WRITE && !isLocalTarget && !process.argv.includes('--live')) {
+  console.error(
+    `Refusing SMOKE_WRITE=1 against ${BASE_URL}: that creates a draft itinerary in a live tenant.\n` +
+      'Run against localhost, or pass --live if you really mean the deployed app.'
+  )
+  process.exit(1)
+}
+
 let passed = 0
 let failed = 0
 const ok = (m) => { passed++; console.log(`  \x1b[32m✓\x1b[0m ${m}`) }

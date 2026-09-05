@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { getCurrencySymbol } from '@/lib/currency'
 import { 
   TrendingUp, 
   DollarSign, 
@@ -127,9 +128,6 @@ export default function ItineraryPL({
     })
   }
 
-  const getCurrencySymbol = (curr: string) => {
-    return { EUR: '€', USD: '$', GBP: '£' }[curr] || curr
-  }
 
   const formatCurrency = (amount: number) => {
     return `${getCurrencySymbol(currency)}${amount.toFixed(2)}`

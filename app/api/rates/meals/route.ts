@@ -99,7 +99,10 @@ export async function POST(request: NextRequest) {
       rate_valid_to: body.rate_valid_to || null,
       supplier_id: body.supplier_id || null,
       supplier_name: body.supplier_name || null,
-      tier: body.tier || null,
+      // 'standard', never NULL: the engine matches meals with a strict
+      // .eq('tier', …), so a NULL-tier row is permanently unpriceable — a
+      // silent hole no other rates API can produce (A-item 20).
+      tier: body.tier || 'standard',
       meal_category: body.meal_category || null,
       dietary_options: body.dietary_options || [],
       per_person_rate: body.per_person_rate !== false,

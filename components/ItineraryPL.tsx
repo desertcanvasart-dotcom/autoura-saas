@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -134,7 +135,7 @@ export default function ItineraryPL({
   }
 
   const getCurrencySymbol = (curr: string) => {
-    return { EUR: '€', USD: '$', GBP: '£' }[curr] || curr
+    return canonicalCurrencySymbol(curr)
   }
 
   const formatCurrency = (amount: number) => {

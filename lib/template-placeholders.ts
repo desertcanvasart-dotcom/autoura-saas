@@ -1,4 +1,5 @@
 // lib/template-placeholders.ts
+import { getCurrencySymbol } from '@/lib/currency'
 // Utility functions for template placeholder replacement
 
 /**
@@ -38,15 +39,7 @@ function formatCurrency(amount: number | string | undefined, currency: string = 
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
   if (isNaN(num)) return ''
   
-  const symbols: Record<string, string> = {
-    EUR: '€',
-    USD: '$',
-    GBP: '£',
-    EGP: 'EGP ',
-  }
-  
-  const symbol = symbols[currency] || `${currency} `
-  return `${symbol}${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  return `${getCurrencySymbol(currency)}${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
 /**

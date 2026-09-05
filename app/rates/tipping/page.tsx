@@ -171,7 +171,7 @@ function Pagination({
 
 export default function TippingPage() {
   const dialog = useConfirmDialog()
-  const { userCurrency, loading: currencyLoading } = useCurrency()
+  const { loading: currencyLoading } = useCurrency()
   
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [rates, setRates] = useState<TippingRate[]>([])
@@ -585,7 +585,7 @@ export default function TippingPage() {
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Context</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">City</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Unit</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-green-800">{userCurrency} Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-green-800">Rate</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-green-800">Description</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-green-800">Actions</th>
@@ -772,7 +772,7 @@ export default function TippingPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Amount in EUR ({rateSymbol}) *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Amount ({rateSymbol}) *</label>
                   <input 
                     type="number" 
                     name="rate_eur" 

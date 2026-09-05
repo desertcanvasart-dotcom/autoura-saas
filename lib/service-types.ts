@@ -52,8 +52,38 @@ export const ALL_SERVICE_TYPES: ServiceTypeOption[] = [
 
 const ALLOWED = new Set(ALL_SERVICE_TYPES.map(t => t.value))
 
+/** service_types entries are snake_case keys at most this long. */
+export const SERVICE_TYPE_MAX = 40
+
+/**
+ * Normalize a typed service type the way the sanitizer stores it:
+ * lowercase, spaces/dashes to underscores, everything else dropped.
+ * The CLIENT must use this too (B-item 5) — what the operator sees added
+ * to the card must be byte-identical to what the server will keep, or the
+ * picker shows a type that routing will never match.
+ */
+export function normalizeServiceType(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .replace(/[^a-z0-9_]/g, '')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, SERVICE_TYPE_MAX)
+}
+
+/**
+ * A valid type is a curated one OR any well-formed snake_case key (B-item
+ * 5: custom service types). Routing needs no whitelist —
+ * findDepartmentForServiceType matches whatever the department rows own,
+ * so a tenant can route their own service vocabulary (a custom
+ * service_category on itinerary services) to a department. The curated
+ * lists remain what the picker OFFERS; they no longer bound what it may
+ * hold.
+ */
 export function isValidServiceType(value: string): boolean {
-  return ALLOWED.has(value)
+  return ALLOWED.has(value) || /^[a-z][a-z0-9_]*$/.test(value) && value.length <= SERVICE_TYPE_MAX
 }
 
 export function serviceTypeLabel(value: string): string {

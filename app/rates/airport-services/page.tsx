@@ -190,7 +190,7 @@ function Pagination({
 
 export default function AirportServicesPage() {
   const dialog = useConfirmDialog()
-  const { userCurrency, loading: currencyLoading } = useCurrency()
+  const { loading: currencyLoading } = useCurrency()
   
   const { fmtRate, fmtAverage } = useRateRowFormat()
   const [rates, setRates] = useState<AirportStaffRate[]>([])
@@ -518,7 +518,7 @@ export default function AirportServicesPage() {
             <p className="text-2xl font-bold text-amber-600">{stats.vipServices}</p>
           </div>
           <div className="bg-white p-3 rounded-lg shadow-md border">
-            <p className="text-xs text-gray-600">Avg. Rate ({userCurrency})</p>
+            <p className="text-xs text-gray-600">Avg. Rate</p>
             <p className="text-2xl font-bold text-green-600">{fmtAverage(stats.avgRate)}</p>
           </div>
         </div>
@@ -613,7 +613,7 @@ export default function AirportServicesPage() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-sky-800">Airport</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-sky-800">Service</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-sky-800">Direction</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-sky-800">{userCurrency} Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-sky-800">Rate</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-sky-800">Description</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-sky-800">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-sky-800">Actions</th>
@@ -780,7 +780,7 @@ export default function AirportServicesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Rate in EUR ({rateSymbol}) *</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Rate ({rateSymbol}) *</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{rateSymbol}</span>
                     <input
@@ -792,12 +792,12 @@ export default function AirportServicesPage() {
                       step="0.01"
                       required
                       placeholder="0.00"
-                      title="Rate in EUR"
+                      title="Rate"
                       className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600"
                     />
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">Stored in EUR, displayed in {userCurrency}</p>
+                  <p className="text-xs text-gray-400 mt-1">Entered and shown in the rate&rsquo;s own currency</p>
                 </div>
               </div>
               <div>

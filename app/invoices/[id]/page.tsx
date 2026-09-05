@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface Invoice {
   id: string
@@ -412,10 +413,6 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  const getCurrencySymbol = (currency: string) => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£' }
-    return symbols[currency] || currency
-  }
 
   const formatReminderDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {

@@ -60,17 +60,21 @@ export async function GET() {
     })
 
     // Get recent send logs
+    // template_send_log's timestamp column is sent_at — there is no
+    // created_at. Selecting/ordering by the phantom column made PostgREST
+    // reject the whole query, so "recent sends" was always empty and the
+    // 30-day stats below counted nothing.
     const { data: recentSends } = await supabase
       .from('template_send_log')
       .select(`
         id,
         channel,
         status,
-        created_at,
+        sent_at,
         template:message_templates(name)
       `)
       .eq('tenant_id', tenant_id)
-      .order('created_at', { ascending: false })
+      .order('sent_at', { ascending: false })
       .limit(10)
 
     // Get send statistics for the last 30 days
@@ -81,7 +85,7 @@ export async function GET() {
       .from('template_send_log')
       .select('status, channel')
       .eq('tenant_id', tenant_id)
-      .gte('created_at', thirtyDaysAgo.toISOString())
+      .gte('sent_at', thirtyDaysAgo.toISOString())
 
     const stats = {
       totalSent: 0,

@@ -3,6 +3,7 @@
 import { Save, ExternalLink, Loader2 } from 'lucide-react'
 import type { GridTotals, GridConfig } from '../types'
 import { convertAmount } from '../lib/calculator'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface GridSummaryProps {
   totals: GridTotals
@@ -19,7 +20,7 @@ interface GridSummaryProps {
 
 export default function GridSummary({ totals, config, dayCount, onSave, isSaving, savedItineraryId, savedItineraryCode, savedQuoteId, savedQuoteNumber, saveMessage }: GridSummaryProps) {
   const { pax, marginPercent, currency } = config
-  const sym = currency === 'EUR' ? '\u20AC' : currency === 'USD' ? '$' : currency === 'GBP' ? '\u00A3' : currency === 'EGP' ? 'E\u00A3' : currency
+  const sym = getCurrencySymbol(currency)
   const fmt = (n: number) => n.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const cv = (n: number) => convertAmount(n, config.exchangeRate)
 

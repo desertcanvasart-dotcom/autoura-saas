@@ -154,12 +154,14 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
   transportation_rates: {
     tableName: 'transportation_rates',
     displayName: 'Transportation',
-    // route_name is the identity column — transportation_rates has NO
-    // service_code (matching on it made the existence check error out
-    // silently, so every import row went down the raw-insert path and
-    // 400'd on the phantom columns; this table also has no season,
-    // validity dates, supplier_id or notes).
-    uniqueKey: ['route_name'],
+    // transportation_rates has NO service_code; its identity is the FULL
+    // natural key. route_name alone was the match key once, and a route
+    // name is a human label two legitimately distinct rows share (the same
+    // route as an airport transfer and as a day tour, or in two cities) —
+    // matching on it alone silently overwrote one with the other, the
+    // "a create never updates" incident class (A-item 5). This table also
+    // has no season, validity dates, supplier_id or notes.
+    uniqueKey: ['route_name', 'service_type', 'city'],
     columns: [
       id(),
       col('route_name', 'Route Name', 'text', true),
@@ -252,7 +254,6 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('fee_type', 'Fee Type', 'text', false),
       col('eur_rate', 'Rate', 'number', true),
       legacyRate('non_eur_rate', 'Non-EUR Rate (legacy)', 'eur_rate'),
-      col('egyptian_rate', 'Egyptian Rate', 'number', false),
       col('student_discount_percentage', 'Student Discount %', 'number', false),
       col('child_discount_percent', 'Child Discount %', 'number', false),
       col('category', 'Category', 'text', false),
@@ -752,4 +753,62 @@ export function getTableDisplayName(tableName: string): string {
  */
 export function getSupportedTables(): string[] {
   return Object.keys(RATE_TABLE_CONFIGS)
+}
+
+// ============================================
+// Natural-key matching for imports (A-item 5)
+// ============================================
+// The import used to split rows into insert/update on ONE column
+// (uniqueKey[0]) — the exact shape that cost the sibling live data: a
+// second rate sharing that single column silently replaced the first
+// ("13 creates, 0 inserts"). Matching now uses the FULL uniqueKey, and a
+// file whose rows collide with EACH OTHER on that key is refused row-wise
+// with a message naming the collision, never last-row-wins.
+
+/** The row's natural key as a comparable string, or null when any part is
+ *  missing (such rows always insert — same behaviour as before). */
+export function importRowKey(
+  record: Record<string, unknown>,
+  uniqueKey: string[]
+): string | null {
+  const parts: string[] = []
+  for (const col of uniqueKey) {
+    const v = record[col]
+    if (v === null || v === undefined || v === '') return null
+    parts.push(String(v).trim().toLowerCase())
+  }
+  // NUL separator: a space would let ('a b','c') collide with ('a','b c').
+  return parts.join('\u0000')
+}
+
+export interface ImportRowPartition<T> {
+  /** Rows safe to import — at most one per natural key. */
+  rows: T[]
+  /** Rows refused because an earlier row in the SAME file has their key. */
+  duplicates: Array<{ record: T; message: string }>
+}
+
+export function partitionImportRows<T extends Record<string, unknown>>(
+  records: T[],
+  uniqueKey: string[]
+): ImportRowPartition<T> {
+  const seen = new Set<string>()
+  const rows: T[] = []
+  const duplicates: Array<{ record: T; message: string }> = []
+  for (const record of records) {
+    const key = importRowKey(record, uniqueKey)
+    if (key !== null && seen.has(key)) {
+      const label = uniqueKey.map(c => `${c}=${String(record[c])}`).join(', ')
+      duplicates.push({
+        record,
+        message:
+          `Two rows in this file share the same ${uniqueKey.join(' + ')} (${label}). ` +
+          `The second would silently overwrite the first — give each row its own identity, or merge them.`,
+      })
+      continue
+    }
+    if (key !== null) seen.add(key)
+    rows.push(record)
+  }
+  return { rows, duplicates }
 }

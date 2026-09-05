@@ -477,7 +477,13 @@ export default function ViewItineraryPage() {
   }
 
   const handleDownloadPDF = async () => {
-    if (!itinerary || days.length === 0) return
+    if (!itinerary) return
+    if (days.length === 0) {
+      // This used to silently return while the button looked enabled — a
+      // dead click that read as "the app is broken" (A-item 18).
+      showToast('error', 'This itinerary has no days yet — add days before generating the PDF.')
+      return
+    }
 
     setGeneratingPDF(true)
     try {
@@ -822,9 +828,10 @@ export default function ViewItineraryPage() {
               )}
               <button
                 onClick={handleDownloadPDF}
-                disabled={generatingPDF}
+                disabled={generatingPDF || days.length === 0}
+                title={days.length === 0 ? 'Add days to the itinerary first — an empty itinerary has nothing to print' : 'Preview and download the client itinerary PDF'}
                 className={`px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-1.5 ${
-                  generatingPDF ? 'opacity-50 cursor-not-allowed' : ''
+                  generatingPDF || days.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
                 {generatingPDF ? (
@@ -835,7 +842,7 @@ export default function ViewItineraryPage() {
                 ) : (
                   <>
                     <Download className="w-4 h-4" />
-                    PDF
+                    Itinerary PDF
                   </>
                 )}
               </button>

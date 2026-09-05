@@ -118,7 +118,7 @@ export default function MealRatesContent() {
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
-  const { symbol, userCurrency, loading: currencyLoading } = useCurrency()
+  const { symbol, loading: currencyLoading } = useCurrency()
 
 
   const { fmtRate, fmtAverage } = useRateRowFormat()
@@ -913,7 +913,7 @@ export default function MealRatesContent() {
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Meal Type</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">City</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600">Tier</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">{userCurrency} Rate</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold text-gray-600">Rate</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Status</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-gray-600">Actions</th>
                 </tr>
@@ -1036,7 +1036,7 @@ export default function MealRatesContent() {
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                   <div>
-                    <p className="text-xs text-gray-500">{userCurrency} Rate {rate.per_person_rate && '(per person)'}</p>
+                    <p className="text-xs text-gray-500">Rate {rate.per_person_rate && '(per person)'}</p>
                     <p className="text-lg font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</p>
                   </div>
                   <div className="flex gap-1">
@@ -1366,10 +1366,10 @@ export default function MealRatesContent() {
                       required
                       min="0"
                       step="0.01"
-                      placeholder="Enter rate in EUR"
+                      placeholder="Enter rate"
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Stored in EUR, displayed in your preferred currency</p>
+                    <p className="text-xs text-gray-500 mt-1">Entered and shown in the rate&rsquo;s own currency</p>
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                   </div>
                   <div>

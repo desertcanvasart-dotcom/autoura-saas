@@ -260,8 +260,48 @@ export function ratesForTravelDate(
   entity: RateSeasonEntity,
   travelDate: string | null | undefined
 ): { season: RateSeason; rates: Record<string, number> } | null {
-  const season = seasonForTravelDate(seasonsForRow(row, entity), travelDate)
-  return season ? { season, rates: season.rates } : null
+  const r = resolveTravelDateRates(row, entity, travelDate)
+  return r.kind === 'period' ? { season: r.season, rates: r.rates } : null
+}
+
+/** What a travel-date lookup found — three DIFFERENT answers that used to be
+ *  two. `null` from ratesForTravelDate conflated "this row has no dated
+ *  periods" (base columns are the truth) with "this row HAS the operator's
+ *  contract windows and none covers the night" — and the second silently
+ *  priced from the base columns, which legacyColumnMirror fills with the
+ *  FIRST period's rate. An October night wore the summer price, marked
+ *  complete. A gap in a stored contract is a pricing HOLE, never a fallback. */
+export type TravelDateRates =
+  | { kind: 'period'; season: RateSeason; rates: Record<string, number> }
+  /** Stored periods exist and none covers the (present) travel date. */
+  | { kind: 'gap'; travelDate: string }
+  /** No stored periods (legacy row, or a date-less read): the caller's
+   *  base-column path is the honest answer. */
+  | { kind: 'no_periods' }
+
+export function resolveTravelDateRates(
+  row: object,
+  entity: RateSeasonEntity,
+  travelDate: string | null | undefined
+): TravelDateRates {
+  const stored = parseSeasons(asRow(row).seasons, entity)
+  if (stored?.length) {
+    const season = seasonForTravelDate(stored, travelDate)
+    if (season) return { kind: 'period', season, rates: season.rates }
+    // A date-less read of a period row is legitimate (the grid, the CSV
+    // export) — the mirrored base columns ARE the first period. Only a real
+    // travel date that falls between the operator's windows is a gap.
+    const day = typeof travelDate === 'string' ? travelDate.slice(0, 10) : ''
+    if (ISO_DATE.test(day)) return { kind: 'gap', travelDate: day }
+    return { kind: 'no_periods' }
+  }
+  // Legacy rows (no `seasons`): derive periods from the fixed columns and
+  // keep the historical behaviour — a derived miss falls through to the
+  // caller's month-day season detection, exactly as before.
+  const derived = seasonForTravelDate(seasonsForRow(row, entity), travelDate)
+  return derived
+    ? { kind: 'period', season: derived, rates: derived.rates }
+    : { kind: 'no_periods' }
 }
 
 // ── Base-column mirror ───────────────────────────────────────────────────
@@ -294,4 +334,51 @@ export function legacyColumnMirror(
   return entity === 'accommodation'
     ? { low_season_from: first.from, low_season_to: first.to, ...shared }
     : { low_season_start: first.from, low_season_end: first.to, ...shared }
+}
+
+// ── Display price for overview lists (A-item 16) ─────────────────────────
+// The hotel overview rendered `double_rate_eur` — the one column family
+// legacyColumnMirror never writes — so a hotel saved through the periods
+// editor displayed a zero. What a LIST should show is the row's
+// per-person-in-double, resolved from its periods: today's period when one
+// covers today, else the first period, else the legacy base columns.
+
+export interface DisplayPpd {
+  /** PP-in-double to show now, or null when the row is genuinely unpriced. */
+  current: number | null
+  /** The highest period PPD (peak) — null when there is only a base rate. */
+  top: number | null
+  /** Name of the period `current` came from, when it came from one. */
+  periodName: string | null
+  periodCount: number
+}
+
+export function displayPpd(
+  row: object,
+  entity: RateSeasonEntity,
+  todayIso?: string
+): DisplayPpd {
+  // 0 in a period means "unpriced hole" (sanitizeSeasons stores blanks as
+  // 0); 0 in a base column is the same bad data. Both display as unpriced.
+  const usable = (v: unknown): number | null => {
+    const n = Number(v)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+
+  const list = seasonsForRow(row, entity)
+  if (list.length > 0) {
+    const today = todayIso ?? new Date().toISOString().slice(0, 10)
+    const chosen = seasonForTravelDate(list, today) ?? list[0]
+    const tops = list.map(s => usable(s.rates.ppd_eur)).filter((n): n is number => n !== null)
+    return {
+      current: usable(chosen.rates.ppd_eur),
+      top: tops.length ? Math.max(...tops) : null,
+      periodName: chosen.name,
+      periodCount: list.length,
+    }
+  }
+
+  const r = asRow(row)
+  const base = usable(r.ppd_eur) ?? (usable(r.double_rate_eur) ? (usable(r.double_rate_eur) as number) / 2 : null)
+  return { current: base, top: null, periodName: null, periodCount: 0 }
 }

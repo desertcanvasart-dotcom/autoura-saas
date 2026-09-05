@@ -5,7 +5,7 @@ import { DEFAULT_MARGIN_PERCENT } from '@/lib/ai/parsing-utils'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/app/supabase'
-import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 import {
   User,
   Mail,
@@ -999,7 +999,6 @@ function SettingsContent() {
         <div className="flex gap-2">
           {SUPPORTED_CURRENCIES.map((currency) => {
             const isSelected = userPreferences.default_currency === currency
-            const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
 
             return (
               <button
@@ -1011,7 +1010,7 @@ function SettingsContent() {
                     : 'border-gray-200 hover:border-gray-300 text-gray-700'
                 }`}
               >
-                {symbols[currency]} {currency}
+                {getCurrencySymbol(currency)} {currency}
               </button>
             )
           })}
@@ -1050,7 +1049,6 @@ function SettingsContent() {
 
         <div className="space-y-3">
           {exchangeRates.map((rate) => {
-            const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
             const names: Record<string, string> = {
               EUR: 'Euro',
               USD: 'US Dollar',
@@ -1063,7 +1061,7 @@ function SettingsContent() {
               <div key={rate.target_currency} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-gray-100">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg font-medium">{symbols[rate.target_currency]}</span>
+                    <span className="text-lg font-medium">{getCurrencySymbol(rate.target_currency)}</span>
                     <span className="text-sm font-medium text-gray-900">{rate.target_currency}</span>
                     <span className="text-xs text-gray-400">({names[rate.target_currency]})</span>
                     {isApiRate ? (

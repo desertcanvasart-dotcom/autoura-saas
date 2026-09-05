@@ -21,7 +21,7 @@
 // prices. These are the extras that go with any quote.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Loader2, Pencil, Plus, Trash2, X, Sparkles } from 'lucide-react'
+import { Copy, Loader2, Pencil, Plus, Trash2, X, Sparkles } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useTenant } from '@/app/contexts/TenantContext'
 
@@ -180,6 +180,23 @@ export default function ExtrasPage() {
                           className="p-1.5 text-gray-400 hover:text-primary-600"
                         >
                           <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Duplicate ${x.name}`}
+                          title="Duplicate"
+                          onClick={() => setDraft({
+                            // No id: saving creates a NEW extra prefilled from
+                            // this one — the safe direction (A-item 21).
+                            name: `${x.name} (copy)`, description: x.description || '',
+                            category: x.category || '',
+                            supplier_cost: x.supplier_cost?.toString() ?? '',
+                            selling_price: x.selling_price?.toString() ?? '',
+                            unit: x.unit, is_active: x.is_active,
+                          })}
+                          className="p-1.5 text-gray-400 hover:text-primary-600"
+                        >
+                          <Copy className="w-4 h-4" />
                         </button>
                         <button
                           type="button"
