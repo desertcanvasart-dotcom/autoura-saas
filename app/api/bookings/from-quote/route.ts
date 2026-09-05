@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
-import { b2bNumTravelers, b2bTotalAmount, calculatorTripFacts } from '@/lib/bookings/from-quote-facts'
+import { b2bNumTravelers, b2bTotalAmount, b2cNumTravelers, b2cTotalAmount, calculatorTripFacts } from '@/lib/bookings/from-quote-facts'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import type { Tables, TablesInsert } from '@/types/database.types'
 
@@ -185,8 +185,19 @@ export async function POST(request: NextRequest) {
     let total_amount: number
     let num_travelers: number
     if (b2cQuote) {
-      total_amount = b2cQuote.selling_price
-      num_travelers = b2cQuote.num_travelers
+      // Same rule as B2B below: the columns are NOT NULL but an unpriced
+      // quote carries a 0, and a booking must never freeze a zero the quote
+      // never priced.
+      const pax = b2cNumTravelers(b2cQuote)
+      if (!pax.ok) {
+        return NextResponse.json({ success: false, error: pax.error }, { status: 400 })
+      }
+      const total = b2cTotalAmount(b2cQuote)
+      if (!total.ok) {
+        return NextResponse.json({ success: false, error: total.error }, { status: 400 })
+      }
+      num_travelers = pax.value
+      total_amount = total.value
     } else {
       const pax = b2bNumTravelers(b2bQuote!)
       if (!pax.ok) {

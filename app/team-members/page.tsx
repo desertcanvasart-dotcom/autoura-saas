@@ -440,7 +440,7 @@ export default function TeamMembersPage() {
       </div>
 
       {/* Team Members Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {filteredMembers.length === 0 ? (
           <div className="col-span-full bg-white border border-gray-200 rounded-lg p-8 text-center">
             <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
@@ -458,11 +458,11 @@ export default function TeamMembersPage() {
             return (
               <div 
                 key={member.id} 
-                className={`bg-white border rounded-lg p-4 ${member.is_active ? 'border-gray-200' : 'border-gray-200 opacity-60'}`}
+                className={`bg-white border rounded-lg p-3 ${member.is_active ? 'border-gray-200' : 'border-gray-200 opacity-60'}`}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-lg">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 shrink-0 bg-gray-100 rounded-full flex items-center justify-center text-base">
                       {roleConfig.icon}
                     </div>
                     <div>
@@ -495,30 +495,30 @@ export default function TeamMembersPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 mb-4">
+                <div className="space-y-1 mb-2">
                   {member.email && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Mail className="h-3.5 w-3.5 text-gray-400" />
+                    <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                      <Mail className="h-3 w-3 shrink-0 text-gray-400" />
                       <span className="truncate">{member.email}</span>
                     </div>
                   )}
                   {member.phone && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Phone className="h-3.5 w-3.5 text-gray-400" />
+                    <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                      <Phone className="h-3 w-3 shrink-0 text-gray-400" />
                       <span>{member.phone}</span>
                     </div>
                   )}
                 </div>
 
                 {member.notes && (
-                  <p className="text-xs text-gray-500 mb-3 line-clamp-2">{member.notes}</p>
+                  <p className="text-xs text-gray-500 mb-2 line-clamp-1">{member.notes}</p>
                 )}
 
-                <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-1 pt-2 border-t border-gray-100">
                   {activitySummaryEnabled && member.user_id && (
                     <button
                       onClick={() => openActivityModal(member)}
-                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition-colors"
                     >
                       <Activity className="h-3 w-3" />
                       Activity
@@ -526,7 +526,7 @@ export default function TeamMembersPage() {
                   )}
                   <button
                     onClick={() => handleEdit(member)}
-                    className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition-colors"
                   >
                     <Edit2 className="h-3 w-3" />
                     Edit
@@ -534,7 +534,7 @@ export default function TeamMembersPage() {
                   {member.is_active ? (
                     <button
                       onClick={() => handleDelete(member)}
-                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
                     >
                       <Trash2 className="h-3 w-3" />
                       Deactivate
@@ -542,7 +542,7 @@ export default function TeamMembersPage() {
                   ) : (
                     <button
                       onClick={() => handleReactivate(member)}
-                      className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50 rounded transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-50 rounded transition-colors"
                     >
                       <CheckCircle className="h-3 w-3" />
                       Reactivate

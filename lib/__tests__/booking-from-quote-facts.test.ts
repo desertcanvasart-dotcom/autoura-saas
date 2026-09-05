@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   b2bNumTravelers,
   b2bTotalAmount,
+  b2cNumTravelers,
+  b2cTotalAmount,
   calculatorTripFacts,
   type B2bQuoteForBooking,
 } from '@/lib/bookings/from-quote-facts'
@@ -126,5 +128,39 @@ describe('calculatorTripFacts', () => {
     })
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toMatch(/no duration/)
+  })
+})
+
+// The B2C convert path froze b2cQuote.selling_price verbatim — the columns
+// are NOT NULL, so the hole shows up as a 0, and a 0-total booking is a hole
+// wearing a booking number. Same rule the B2B path already enforces.
+describe('b2cTotalAmount', () => {
+  it('a priced quote freezes its selling price', () => {
+    const res = b2cTotalAmount({ selling_price: 1240.5, num_travelers: 2 })
+    expect(res).toEqual({ ok: true, value: 1240.5 })
+  })
+
+  it('a zero selling price is a refusal, never a frozen zero', () => {
+    const res = b2cTotalAmount({ selling_price: 0, num_travelers: 2 })
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.error).toMatch(/no priced total/)
+  })
+
+  it('total_cost is NOT a fallback — cost is not a selling price', () => {
+    // The helper is not even given total_cost; this pins the signature.
+    const res = b2cTotalAmount({ selling_price: null, num_travelers: 2 })
+    expect(res.ok).toBe(false)
+  })
+})
+
+describe('b2cNumTravelers', () => {
+  it('a real pax count passes through, floored', () => {
+    expect(b2cNumTravelers({ selling_price: 100, num_travelers: 3 })).toEqual({ ok: true, value: 3 })
+  })
+
+  it('zero travellers is a refusal, never a default', () => {
+    const res = b2cNumTravelers({ selling_price: 100, num_travelers: 0 })
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.error).toMatch(/how many travellers/)
   })
 })

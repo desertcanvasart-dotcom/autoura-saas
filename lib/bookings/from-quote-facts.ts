@@ -89,6 +89,41 @@ export function b2bTotalAmount(quote: B2bQuoteForBooking, numTravelers: number):
   }
 }
 
+export interface B2cQuoteForBooking {
+  selling_price: number | null
+  num_travelers: number | null
+}
+
+/**
+ * How many travellers a B2C quote is for. The column is NOT NULL, but a 0
+ * slips the type check while meaning "nobody" — a refusal, never a default.
+ */
+export function b2cNumTravelers(quote: B2cQuoteForBooking): Facts<number> {
+  const pax = usableNumber(quote.num_travelers)
+  if (pax != null) return { ok: true, value: Math.floor(pax) }
+  return {
+    ok: false,
+    error:
+      'This quote does not say how many travellers it is for — set the number of travellers on the quote before converting it.',
+  }
+}
+
+/**
+ * The frozen total for a B2C booking. selling_price is NOT NULL, so the
+ * hole shows up as a 0 — and a booking must never freeze a zero the quote
+ * never priced (the same rule the B2B path already enforces). total_cost is
+ * deliberately NOT a fallback: cost is not a selling price.
+ */
+export function b2cTotalAmount(quote: B2cQuoteForBooking): Facts<number> {
+  const selling = usableNumber(quote.selling_price)
+  if (selling != null) return { ok: true, value: selling }
+  return {
+    ok: false,
+    error:
+      'This quote has no priced total — its selling price is empty or zero. Reprice the itinerary before converting it to a booking.',
+  }
+}
+
 export interface CalculatorTripInput {
   trip_name: string | null
   travel_date: string | null
