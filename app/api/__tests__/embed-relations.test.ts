@@ -86,23 +86,44 @@ function* sourceFiles(dir: string): Generator<string> {
   }
 }
 
-/** Top-level embed tokens of a select string: `alias:name!hint (…)`. */
-function topLevelEmbeds(select: string): Array<{ name: string; hint: string | null }> {
-  const out: Array<{ name: string; hint: string | null }> = []
-  let depth = 0
-  const re = /(?:([a-zA-Z_][a-zA-Z0-9_]*):)?([a-zA-Z_][a-zA-Z0-9_]*)(?:!([a-zA-Z0-9_]+))?\s*\(/g
+// PostgREST aggregates open parens without being embeds.
+const AGGREGATES = new Set(['count', 'sum', 'avg', 'max', 'min'])
+
+interface EmbedNode { name: string; hint: string | null; children: EmbedNode[] }
+
+/** The FULL embed tree of a select string: `alias:name!hint(…)` at every
+ *  depth. A dead embed three levels down kills the whole query exactly as a
+ *  top-level one does — the guard originally stopped at depth 0 and the
+ *  versions routes' nested `changed_by` embeds slid under it. */
+function parseEmbeds(select: string): EmbedNode[] {
+  const roots: EmbedNode[] = []
+  const stack: EmbedNode[] = []
+  const re = /(?:([a-zA-Z_][a-zA-Z0-9_]*):)?([a-zA-Z_][a-zA-Z0-9_]*)(?:!([a-zA-Z0-9_]+))?\s*\(|\)/g
   let m: RegExpExecArray | null
-  let last = 0
   while ((m = re.exec(select))) {
-    // Track depth up to this match.
-    for (let i = last; i < m.index; i++) {
-      if (select[i] === '(') depth++
-      if (select[i] === ')') depth--
+    if (m[0] === ')') {
+      stack.pop()
+      continue
     }
-    last = m.index
-    if (depth === 0 && m[2] !== 'count') out.push({ name: m[2], hint: m[3] ?? null })
+    const node: EmbedNode = { name: m[2], hint: m[3] ?? null, children: [] }
+    ;(stack.length ? stack[stack.length - 1].children : roots).push(node)
+    stack.push(node)
   }
-  return out
+  return roots
+}
+
+/** The table an embed resolves to, so its OWN children can be validated
+ *  against that table's relationships. Null = cannot resolve. */
+function resolveEmbedTable(parent: string, name: string, hint: string | null): string | null {
+  if (RELS.has(name)) return name
+  const own = RELS.get(parent)
+  const byColumn = own?.find(r => r.columns.includes(name))
+  if (byColumn) return byColumn.referencedRelation
+  if (hint && hint !== 'inner') {
+    const byHint = own?.find(r => r.fkeyName === hint || r.columns.includes(hint))
+    if (byHint) return byHint.referencedRelation
+  }
+  return null
 }
 
 describe('PostgREST embeds ride real foreign keys', () => {
@@ -123,13 +144,25 @@ describe('PostgREST embeds ride real foreign keys', () => {
 
           const sel = window.match(/\.select\(\s*(['"`])([\s\S]*?)\1/)
           if (!sel) return
-          for (const e of topLevelEmbeds(sel[2])) {
-            if (embedIsValid(table, e.name, e.hint)) continue
-            if (ALLOW.some(a => a.from === table && a.embed === e.name)) continue
-            violations.push(
-              `${rel}: .from('${table}') embeds '${e.name}${e.hint ? `!${e.hint}` : ''}' — no foreign key links them (PGRST200 kills the whole query)`
-            )
+          const check = (parent: string, nodes: EmbedNode[], trail: string) => {
+            for (const e of nodes) {
+              if (AGGREGATES.has(e.name)) continue
+              const label = trail ? `${trail}.${e.name}` : e.name
+              if (!embedIsValid(parent, e.name, e.hint) && !ALLOW.some(a => a.from === parent && a.embed === e.name)) {
+                violations.push(
+                  `${rel}: .from('${table}') embeds '${label}${e.hint ? `!${e.hint}` : ''}' — no foreign key links '${parent}' to it (PGRST200 kills the whole query)`
+                )
+                continue // children of a dead embed are noise
+              }
+              if (e.children.length) {
+                const childTable = resolveEmbedTable(parent, e.name, e.hint)
+                // Unresolvable but valid (allowlisted, or out-of-schema view):
+                // nothing to check the children against.
+                if (childTable) check(childTable, e.children, label)
+              }
+            }
           }
+          check(table, parseEmbeds(sel[2]), '')
         })
       }
     }
