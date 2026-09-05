@@ -1,4 +1,5 @@
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { seasonsFromAccommodationColumns } from '@/lib/rates/rate-seasons'
 /**
  * Bulk Rate Import/Export Service
  * Provides CSV import/export for all rate tables with validation and upsert.
@@ -601,6 +602,84 @@ export function validateImportData(
 /**
  * Generate CSV headers for a table config.
  */
+
+// ============================================
+// Canonical column aliases — healing the accommodation split-brain
+// ============================================
+// accommodation_rates grew two same-unit column families: the ENGINE family
+// (ppd_eur / high_season_ppd_eur / …) that pricing, the rate form, and the
+// period editor read, and the IMPORTER family (pp_double_eur /
+// high_pp_double_eur / …) that this CSV surface and the pricing grid read.
+// Migration 220 mirrored importer→engine ONCE; every hotel imported after it
+// priced at 0 and opened blank, and every form-created hotel exported blank
+// cells and was invisible to the grid. Both units are per-person-in-double —
+// the alias is definitional, not a guess.
+//
+// The permanent rule: every WRITE through the bulk surface fills BOTH
+// families (applyCanonicalAliases), the EXPORT reads either
+// (exportCellValue), and imported season columns become real dated periods
+// (deriveImportSeasons) so imports are native to the periods model.
+// Migration 329 backfills existing rows in both directions.
+// (nile_cruises is NOT aliased here: its importer family is per-ROOM rates,
+// and room→per-person is a conversion, not an alias — tracked separately.)
+
+export const CANONICAL_COLUMN_ALIASES: Record<string, Record<string, string>> = {
+  accommodation_rates: {
+    pp_double_eur: 'ppd_eur',
+    single_supp_eur: 'single_supplement_eur',
+    triple_red_eur: 'triple_reduction_eur',
+    pp_double_non_eur: 'ppd_non_eur',
+    single_supp_non_eur: 'single_supplement_non_eur',
+    triple_red_non_eur: 'triple_reduction_non_eur',
+    high_pp_double_eur: 'high_season_ppd_eur',
+    high_single_supp_eur: 'high_season_single_supplement_eur',
+    high_triple_red_eur: 'high_season_triple_reduction_eur',
+    high_pp_double_non_eur: 'high_season_ppd_non_eur',
+    high_single_supp_non_eur: 'high_season_single_supplement_non_eur',
+    high_triple_red_non_eur: 'high_season_triple_reduction_non_eur',
+    peak_pp_double_eur: 'peak_season_ppd_eur',
+    peak_single_supp_eur: 'peak_season_single_supplement_eur',
+    peak_triple_red_eur: 'peak_season_triple_reduction_eur',
+    peak_pp_double_non_eur: 'peak_season_ppd_non_eur',
+    peak_single_supp_non_eur: 'peak_season_single_supplement_non_eur',
+    peak_triple_red_non_eur: 'peak_season_triple_reduction_non_eur',
+  },
+}
+
+/** Fill each family from the other, never overwriting an explicit value. */
+export function applyCanonicalAliases(table: string, record: Record<string, unknown>): void {
+  const aliases = CANONICAL_COLUMN_ALIASES[table]
+  if (!aliases) return
+  const usable = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v !== 0
+  for (const [importer, canonical] of Object.entries(aliases)) {
+    if (!usable(record[canonical]) && usable(record[importer])) record[canonical] = record[importer]
+    else if (!usable(record[importer]) && usable(record[canonical])) record[importer] = record[canonical]
+  }
+}
+
+/** Export cell: the named column, else its alias partner. */
+export function exportCellValue(table: string, row: Record<string, unknown>, column: string): unknown {
+  const direct = row[column]
+  if (direct !== null && direct !== undefined && direct !== 0) return direct
+  const aliases = CANONICAL_COLUMN_ALIASES[table]
+  if (!aliases) return direct
+  const partner =
+    aliases[column] ?? Object.entries(aliases).find(([, canon]) => canon === column)?.[0]
+  if (!partner) return direct
+  const v = row[partner]
+  return v === null || v === undefined ? direct : v
+}
+
+/** Imported season columns become REAL dated periods, so a bulk-imported
+ *  hotel is native to the periods model (free-text names, editable in the
+ *  period editor) rather than a legacy-columns row. Only when the file
+ *  carries at least one dated window; existing seasons are never replaced. */
+export function deriveImportSeasons(table: string, record: Record<string, unknown>): void {
+  if (table !== 'accommodation_rates' || record.seasons != null) return
+  const seasons = seasonsFromAccommodationColumns(record)
+  if (seasons.length > 0) record.seasons = seasons
+}
+
 export function getExportHeaders(config: RateTableConfig): string[] {
   return config.columns.map(c => c.name)
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { RATE_TABLE_CONFIGS, getExportHeaders, getTemplateHeaders, buildTemplateRow } from '@/lib/bulk-rate-service'
+import { RATE_TABLE_CONFIGS, getExportHeaders, getTemplateHeaders, buildTemplateRow, exportCellValue } from '@/lib/bulk-rate-service'
 import type { Database } from '@/types/database.types'
 import Papa from 'papaparse'
 
@@ -64,8 +64,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
+    // exportCellValue reads a cell's column OR its alias partner, so a hotel
+    // saved through the form (engine family only) exports real numbers.
     const rows = (data || []).map(row =>
-      Object.fromEntries(headers.map(h => [h, row[h] ?? '']))
+      Object.fromEntries(headers.map(h => [h, exportCellValue(table, row, h) ?? '']))
     )
     const csv = Papa.unparse(rows, { columns: headers })
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows } from '@/lib/bulk-rate-service'
+import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows, applyCanonicalAliases, deriveImportSeasons } from '@/lib/bulk-rate-service'
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 
@@ -93,6 +93,11 @@ export async function POST(request: NextRequest) {
           record[colDef.name] = record[colDef.mirrorFrom]
         }
       }
+
+      // Heal the accommodation split-brain at the write boundary: fill both
+      // column families and turn dated season columns into real periods.
+      applyCanonicalAliases(table, record)
+      deriveImportSeasons(table, record)
 
       rowsToUpsert.push(record)
     }
