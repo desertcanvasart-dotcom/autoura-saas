@@ -16,6 +16,7 @@ import {
   Star, Globe, DollarSign, FileText, Calendar, Check
 } from 'lucide-react'
 import SupplierPropertiesPanel from '@/components/SupplierPropertiesPanel'
+import SupplierDocumentsPanel from '@/components/SupplierDocumentsPanel'
 import { propertyTypesForRoles } from '@/lib/supplier-properties'
 
 // Types
@@ -1192,10 +1193,7 @@ export default function SuppliersContent() {
               )}
 
               {viewTab === 'documents' && (
-                <div className="text-center py-8 text-gray-500">
-                  <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                  <p>Document management coming soon</p>
-                </div>
+                <SupplierDocumentsPanel supplierId={selectedSupplier.id} />
               )}
             </div>
           </div>
