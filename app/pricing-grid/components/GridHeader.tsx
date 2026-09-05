@@ -24,7 +24,7 @@ const TIERS: { value: Tier; label: string }[] = [
   { value: 'luxury', label: 'Luxury' },
 ]
 
-import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 
 const CURRENCIES = SUPPORTED_CURRENCIES
 
@@ -36,7 +36,7 @@ const DEFAULT_MARGINS: Record<ClientType, number> = {
 export default function GridHeader({ config, onChange, totals }: GridHeaderProps) {
   const [partners, setPartners] = useState<B2BPartner[]>([])
   const update = (partial: Partial<GridConfig>) => onChange({ ...config, ...partial })
-  const sym = config.currency === 'EUR' ? '\u20AC' : config.currency === 'USD' ? '$' : config.currency === 'GBP' ? '\u00A3' : config.currency === 'EGP' ? 'E\u00A3' : config.currency
+  const sym = getCurrencySymbol(config.currency)
   const fmt = (n: number) => n.toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const cv = (n: number) => convertAmount(n, config.exchangeRate)
 

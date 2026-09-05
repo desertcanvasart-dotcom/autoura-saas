@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface Expense {
   id: string
@@ -198,10 +199,6 @@ export default function ExpenseDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
-  const getCurrencySymbol = (currency: string) => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-    return symbols[currency] || currency
-  }
 
   if (loading) {
     return (

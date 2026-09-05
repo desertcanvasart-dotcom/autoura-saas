@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { todayLocal } from '@/lib/today'
-import { CurrencyTotals, formatTotals, currencySymbol as ctSymbol } from '@/lib/currency-totals'
+import { CurrencyTotals, formatTotals } from '@/lib/currency-totals'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { showToast } from '@/app/contexts/ToastContext'
+import { getCurrencySymbol } from '@/lib/currency'
 import { 
   Search,
   DollarSign,
@@ -211,10 +212,6 @@ export default function AccountsPayablePage() {
     }
   }
 
-  const getCurrencySymbol = (currency: string = 'EUR') => {
-    const symbols: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-    return symbols[currency] || currency
-  }
 
   const getAgingColor = (bucket: string) => {
     switch (bucket) {

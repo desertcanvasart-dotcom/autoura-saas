@@ -6,6 +6,7 @@
 import { jsPDF } from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
 import { identityFooterLine, brandColorRgb, tint, type CompanyIdentity } from './company-identity'
+import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
 
 // ============================================
 // TYPES
@@ -130,13 +131,7 @@ function formatShortDate(dateStr: string): string {
  * Get currency symbol
  */
 function getCurrencySymbol(currency: string): string {
-  const symbols: Record<string, string> = {
-    EUR: '€',
-    USD: '$',
-    GBP: '£',
-    EGP: 'E£'
-  }
-  return symbols[currency] || currency
+  return canonicalCurrencySymbol(currency)
 }
 
 /**

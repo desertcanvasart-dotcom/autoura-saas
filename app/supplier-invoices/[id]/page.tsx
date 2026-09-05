@@ -6,9 +6,9 @@ import Link from 'next/link'
 import { ArrowLeft, Loader2, FileText, Check, DollarSign, AlertTriangle, Upload, Link2, X, Trash2 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { getCurrencySymbol } from '@/lib/currency'
 
-const SYM: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-const money = (n: number, c = 'EUR') => `${SYM[c] || c + ' '}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const money = (n: number, c = 'EUR') => `${getCurrencySymbol(c)}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const STATUS_BADGE: Record<string, string> = { received: 'bg-gray-100 text-gray-600', matched: 'bg-blue-100 text-blue-700', approved: 'bg-indigo-100 text-indigo-700', paid: 'bg-green-100 text-green-700', disputed: 'bg-red-100 text-red-700', cancelled: 'bg-gray-100 text-gray-400' }
 const MATCH_BADGE: Record<string, string> = { unmatched: 'bg-amber-100 text-amber-700', partial: 'bg-orange-100 text-orange-700', matched: 'bg-green-100 text-green-700', discrepancy: 'bg-red-100 text-red-700' }
 

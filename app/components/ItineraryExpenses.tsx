@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import Link from 'next/link'
+import { getCurrencySymbol } from '@/lib/currency'
 
 interface Expense {
   id: string
@@ -67,13 +68,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   rejected: { label: 'Rejected', color: 'text-red-700', bg: 'bg-red-100' }
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  EUR: '€',
-  USD: '$',
-  GBP: '£',
-  EGP: 'E£'
-}
-
 export default function ItineraryExpenses({
   itineraryId,
   currency,
@@ -121,7 +115,6 @@ export default function ItineraryExpenses({
     }
   }
 
-  const getCurrencySymbol = (curr: string) => CURRENCY_SYMBOLS[curr] || curr
 
   const totalAmount = expenses.reduce((sum, exp) => {
     // Sum in original currencies — display purposes

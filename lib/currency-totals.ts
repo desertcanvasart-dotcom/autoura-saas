@@ -1,4 +1,5 @@
 // ============================================
+import { getCurrencySymbol } from '@/lib/currency'
 // PER-CURRENCY TOTALS
 // ============================================
 // The payments dashboard summed amounts across currencies into one number and
@@ -13,10 +14,8 @@
 
 export type CurrencyTotals = Record<string, number>
 
-const CURRENCY_SYMBOLS: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-
 export function currencySymbol(code: string): string {
-  return CURRENCY_SYMBOLS[code] || code
+  return getCurrencySymbol(code)
 }
 
 /** Normalise to a 3-letter upper code; blank/garbage falls back to EUR. */

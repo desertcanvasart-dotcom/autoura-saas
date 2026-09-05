@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { requireAuth } from '@/lib/supabase-server'
+import { getCurrencySymbol } from '@/lib/currency'
 
 // GET /api/itineraries/[id]/template-data
 // Returns itinerary data formatted for template placeholder replacement
@@ -137,8 +138,7 @@ function buildPlaceholderData(itinerary: any, days: any[], companyName: string =
 function fmtCurrency(amount: number | string, currency: string): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
   if (isNaN(num)) return ''
-  const symbols: Record<string, string> = { EUR: '\u20AC', USD: '$', GBP: '\u00A3', EGP: 'EGP ' }
-  return `${symbols[currency] || currency + ' '}${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  return `${getCurrencySymbol(currency)}${num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
 }
 
 function fmtDate(date: string | Date): string {

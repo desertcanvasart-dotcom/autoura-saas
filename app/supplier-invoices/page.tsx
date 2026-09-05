@@ -4,10 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Receipt, Plus, Search, Upload, Loader2, X, Sparkles } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
-import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 
-const SYM: Record<string, string> = { EUR: '€', USD: '$', GBP: '£', EGP: 'E£' }
-const money = (n: number, c = 'EUR') => `${SYM[c] || c + ' '}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const money = (n: number, c = 'EUR') => `${getCurrencySymbol(c)}${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const STATUS_BADGE: Record<string, string> = {
   received: 'bg-gray-100 text-gray-600', matched: 'bg-blue-100 text-blue-700',
