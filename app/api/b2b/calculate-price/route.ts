@@ -70,6 +70,9 @@ interface PriceCalculationResult {
   season: string
   is_eur_passport: boolean
   tour_leader_included: boolean  // NEW
+  /** Guide grade/mode the price was asked for (B-item 1); auto branch only. */
+  guide_grade?: string
+  guide_mode?: string
   services: CalculatedService[]
   optional_services: CalculatedService[]
   subtotal_cost: number
@@ -369,6 +372,9 @@ export async function POST(request: NextRequest) {
       language = 'English',
       tier = 'standard',
       tour_leader_included = false,  // NEW: Added tour leader parameter
+      // Guide grade + mode (B-item 1). Defaults = the historical behaviour.
+      guide_grade = 'egyptologist',
+      guide_mode = 'spot',
       // Catalogue extras chosen for THIS quote (ids, or {id} objects). Priced
       // through the engine like any other line — see lib/pricing/extras-pricing.
       extras = []
@@ -467,7 +473,9 @@ export async function POST(request: NextRequest) {
         language,
         travelDate: travel_date,
         marginPercent: effectiveMargin,
-        tourLeaderIncluded: tour_leader_included
+        tourLeaderIncluded: tour_leader_included,
+        guideGrade: guide_grade,
+        guideMode: guide_mode
       })
 
       if (!autoPriceResult.success) {
@@ -520,6 +528,8 @@ export async function POST(request: NextRequest) {
         season,
         is_eur_passport,
         tour_leader_included,  // NEW
+        guide_grade,
+        guide_mode,
         services: convertedServices,
         optional_services: convertedOptional,
         subtotal_cost: autoPriceResult.subtotalCost,

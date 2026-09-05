@@ -20,6 +20,8 @@ interface B2BQuote {
   status: string
   tier: string
   tour_leader_included: boolean
+  guide_grade?: string | null
+  guide_mode?: string | null
   currency: string
   ppd_accommodation: number
   ppd_cruise: number
@@ -409,6 +411,11 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
                 {quote.tour_leader_included && (
                   <span className="px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-700">
                     Tour Leader +1
+                  </span>
+                )}
+                {quote.guide_mode === 'throughout' && (
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-[#e8ede3] text-[#4a5c35]">
+                    +1 Guide{quote.guide_grade === 'senior' ? ' \u00b7 Senior' : ''}
                   </span>
                 )}
               </div>

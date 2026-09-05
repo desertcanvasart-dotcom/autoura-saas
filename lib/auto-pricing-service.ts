@@ -150,7 +150,28 @@ export interface DayPricingParams {
   language?: string
   travelDate?: string
   marginPercent?: number
+  // ---- Guide grades + the throughout guide (B-item 1) ----
+  /** 'egyptologist' (default) or 'senior'. The default ask keeps the
+   *  historical roster fallback; a non-default ask must match a real
+   *  guide_rates row — hole, never a guess. */
+  guideGrade?: GuideGrade
+  /** 'spot' (default, historical: per-city guide on sightseeing days) or
+   *  'throughout' (+1: one guide travels day 1 → end — a fee every day, a
+   *  bed each night at the property's period guide rate, meals at group
+   *  rates for small parties, one extra vehicle seat). */
+  guideMode?: GuideMode
+  /** The pax count the quote is FOR. Used only by the throughout guide's
+   *  meal rule (guide eats at group rates when the party is ≤ 3); the
+   *  multi-pax sheet keeps the line at all counts — a documented
+   *  approximation, exactly as in the sibling. */
+  requestedPax?: number
 }
+
+export type GuideGrade = 'egyptologist' | 'senior'
+export type GuideMode = 'spot' | 'throughout'
+export const DEFAULT_GUIDE_GRADE: GuideGrade = 'egyptologist'
+/** The party size at and below which the throughout guide eats at group rates. */
+export const GUIDE_MEALS_MAX_PAX = 3
 
 // Single pax calculation result
 export interface PaxPricingResult {
@@ -778,6 +799,10 @@ export async function getCruiseRates(
   durationNights: number
   season: 'low' | 'high' | 'peak'
   source: RateSource
+  /** The throughout guide's cabin for one night, from the resolved period's
+   *  guide_rate_eur (B-item 1). Null = no concession on file — a pricing
+   *  hole in throughout mode, never a free bed. */
+  guideBedNight?: number | null
   /** Set when the row HAS stored contract periods and none covers the travel
    *  date — a pricing hole naming the uncovered night, never a base-column
    *  fallback (the base columns mirror the FIRST period's rate). */
@@ -810,6 +835,7 @@ export async function getCruiseRates(
     let ppdNight: number
     let singleSuppNight: number
     let tripleRedNight: number
+    let guideBedNight: number | null = null
     let season: 'low' | 'high' | 'peak' = 'low'
 
     // C3.2: dated rate periods first. `seasons` (migration 305) is the
@@ -837,6 +863,9 @@ export async function getCruiseRates(
       ppdNight = cruisePeriod.rates.ppd_eur
       singleSuppNight = cruisePeriod.rates.single_supplement_eur
       tripleRedNight = cruisePeriod.rates.triple_reduction_eur
+      // Guide cabin: 0 in a period means "no concession entered" (the
+      // sanitizer stores blanks as 0) — null here, a hole upstream.
+      guideBedNight = cruisePeriod.rates.guide_rate_eur > 0 ? cruisePeriod.rates.guide_rate_eur : null
       // The old three-level label is kept for the result shape; a named
       // period is reported as its own name by the caller.
       season = 'low'
@@ -873,6 +902,7 @@ export async function getCruiseRates(
       ppdNight,
       singleSuppNight,
       tripleRedNight: Math.max(0, tripleRedNight),
+      guideBedNight,
       durationNights,
       season,
       source: 'db'
@@ -929,6 +959,10 @@ export async function getHotelRates(
   tripleRedNight: number
   season: 'low' | 'high' | 'peak'
   source: RateSource
+  /** The throughout guide's bed for one night, from the resolved period's
+   *  guide_rate_eur (B-item 1). Null = no concession on file — a pricing
+   *  hole in throughout mode, never a free bed. */
+  guideBedNight?: number | null
   /** Set when the row HAS stored contract periods and none covers the travel
    *  date — a pricing hole naming the uncovered night, never a base-column
    *  fallback (the base columns mirror the FIRST period's rate). */
@@ -962,6 +996,9 @@ export async function getHotelRates(
         ppdNight: period.rates.ppd_eur,
         singleSuppNight: Math.max(0, period.rates.single_supplement_eur),
         tripleRedNight: Math.max(0, period.rates.triple_reduction_eur),
+        // 0 = blank in the editor (the sanitizer's convention) = no
+        // concession — null here, a hole upstream in throughout mode.
+        guideBedNight: period.rates.guide_rate_eur > 0 ? period.rates.guide_rate_eur : null,
         season: 'low' as const,
         source,
       }
@@ -990,6 +1027,8 @@ export async function getHotelRates(
       ppdNight: ppd,
       singleSuppNight: Math.max(0, singleSupp),
       tripleRedNight: Math.max(0, tripleRed),
+      // Legacy rows carry no guide-bed concession at all.
+      guideBedNight: null,
       season,
       source,
     }
@@ -1156,12 +1195,58 @@ export async function getEntranceFee(
 /**
  * Get guide rate
  */
+/**
+ * Get the guide rate for a language, grade and duration (B-item 1).
+ *
+ * The RATE table (guide_rates: guide_language + guide_type as the grade
+ * axis + tour_duration as the fee kind) is asked FIRST. The critical
+ * semantics, ported from the sibling:
+ *
+ *   - the DEFAULT ask (egyptologist / full_day) keeps the historical
+ *     roster fallback below, so ungraded installs price exactly as before;
+ *   - a NON-DEFAULT ask (senior, meet_greet) must match a real row —
+ *     null (a hole), never a guess from the roster or another grade.
+ */
 export async function getGuideRate(
   scope: CatalogScope,
   language: string,
-  tier: ServiceTier
+  tier: ServiceTier,
+  opts?: { grade?: GuideGrade; duration?: 'full_day' | 'half_day' | 'meet_greet' }
 ): Promise<{ id: string; name: string; dailyRate: number; source: RateSource } | null> {
+  const grade = opts?.grade ?? DEFAULT_GUIDE_GRADE
+  const duration = opts?.duration ?? 'full_day'
+  const isDefaultAsk = grade === DEFAULT_GUIDE_GRADE && duration === 'full_day'
   try {
+    // ---- guide_rates: the rate table, matched exactly ----
+    const { data: rawRateRows } = await getSupabaseAdmin()
+      .from('guide_rates')
+      .select('id, guide_language, guide_type, tour_duration, full_day_rate, half_day_rate, base_rate_eur, base_rate_non_eur, rate_currency, is_active')
+      .or(catalogOrExpr(scope))
+      .eq('is_active', true)
+      .ilike('guide_language', language)
+      .eq('guide_type', grade)
+      .eq('tour_duration', duration)
+      .order('full_day_rate', { ascending: true })
+      .limit(1)
+    const rateRows = await normalizeRateRows(getSupabaseAdmin(), 'guide_rates', rawRateRows, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    if (rateRows && rateRows.length > 0) {
+      const r = rateRows[0] as any
+      const rate = r.full_day_rate ?? r.base_rate_eur
+      if (typeof rate === 'number' && rate > 0) {
+        return {
+          id: r.id,
+          name: `${language} ${grade === 'senior' ? 'Senior ' : ''}Guide`,
+          dailyRate: rate,
+          source: 'db',
+        }
+      }
+    }
+
+    // A non-default ask stops here: senior or Meet & Assist without a row
+    // is a HOLE naming what to add — pricing an egyptologist as a senior
+    // (or a full day as a meet & greet) would be a silent wrong number.
+    if (!isDefaultAsk) return null
+
     const { data: rawGuides, error } = await getSupabaseAdmin()
       .from('guides')
       .select('*')
@@ -1671,8 +1756,12 @@ export async function calculateDayBasedPricing(
     isEurPassport,
     language = 'English',
     travelDate,
-    marginPercent = 25
+    marginPercent = 25,
+    guideGrade = DEFAULT_GUIDE_GRADE,
+    guideMode = 'spot',
+    requestedPax
   } = params
+  const throughoutGuide = guideMode === 'throughout'
 
   // Resolved once per calculation; every rate lookup below is scoped by it.
   const catalogScope = await getCatalogScope(getSupabaseAdmin(), tenantId)
@@ -1845,8 +1934,14 @@ export async function calculateDayBasedPricing(
   // These four are independent — fetch concurrently. Water cost is
   // admin-configurable via Rates → Fixed Costs (fixed_daily_costs); falls back
   // to €2 (the previous hardcoded value) if the table is empty.
-  const [guideRate, mealRates, tippingRates, fixedDailyCosts] = await Promise.all([
-    getGuideRate(catalogScope, language, tier),
+  const [guideRate, guideMeetRate, mealRates, tippingRates, fixedDailyCosts] = await Promise.all([
+    getGuideRate(catalogScope, language, tier, { grade: guideGrade }),
+    // The throughout guide's cheaper fee for meet/goodbye/transit days.
+    // Only fetched when asked for — and it must be a REAL row: pricing a
+    // meet & assist day at the full-day rate would be a silent guess.
+    throughoutGuide
+      ? getGuideRate(catalogScope, language, tier, { grade: guideGrade, duration: 'meet_greet' })
+      : Promise.resolve(null),
     getMealRates(catalogScope, tier),
     getTippingRates(catalogScope, tier),
     getFixedDailyCosts(),
@@ -1874,6 +1969,72 @@ export async function calculateDayBasedPricing(
     tripleReduction += (cruiseRates.tripleRedNight || 0) * cruiseNights
   }
 
+  // ----- THROUGHOUT GUIDE: bed each night (fixed) — B-item 1 -----
+  // From that night's period guide_rate ("Guide Bed / Night" on the rate
+  // periods). One hole per property when the concession is blank — a
+  // missing guide bed is a gap in the contract data, never a free bed.
+  let guideBedCosts = 0
+  const guideBedLines: PricedService[] = []
+  if (throughoutGuide) {
+    const holedBedCities = new Set<string>()
+    for (const day of hotelDays) {
+      const hotelRate = hotelRatesMap.get(day.city)
+      if (!hotelRate) continue // the hotel itself is already a hole (STEP 4)
+      if (hotelRate.guideBedNight != null) {
+        guideBedCosts += hotelRate.guideBedNight
+        guideBedLines.push({
+          id: `day${day.day}-guide-bed`,
+          dayNumber: day.day,
+          serviceType: 'accommodation',
+          serviceName: `Throughout Guide — bed (${hotelRate.hotelName})`,
+          quantity: 1,
+          quantityMode: 'fixed',
+          unitCost: hotelRate.guideBedNight,
+          lineTotal: hotelRate.guideBedNight,
+          rateSource: 'accommodation_rates',
+          isPerPax: false,
+          isOptional: false,
+        })
+      } else if (!holedBedCities.has(day.city)) {
+        holedBedCities.add(day.city)
+        addHole({
+          kind: 'hotel',
+          reason: 'missing',
+          tier,
+          city: day.city,
+          lookupAttempted: `guide bed rate (${hotelRate.hotelName})`,
+          message: `${hotelRate.hotelName} has no "Guide Bed / Night" on its rate periods — the throughout guide's bed cannot be priced. Add it in Rates → Hotels.`,
+        })
+      }
+    }
+    if (cruiseRates && cruiseNights > 0) {
+      if (cruiseRates.guideBedNight != null) {
+        guideBedCosts += cruiseRates.guideBedNight * cruiseNights
+        guideBedLines.push({
+          id: `cruise-guide-bed`,
+          dayNumber: cruiseDays[0]?.day ?? 1,
+          serviceType: 'cruise',
+          serviceName: `Throughout Guide — cabin (${cruiseRates.shipName})`,
+          quantity: cruiseNights,
+          quantityMode: 'fixed',
+          unitCost: cruiseRates.guideBedNight,
+          lineTotal: cruiseRates.guideBedNight * cruiseNights,
+          rateSource: 'nile_cruises',
+          isPerPax: false,
+          isOptional: false,
+        })
+      } else {
+        addHole({
+          kind: 'cruise',
+          reason: 'missing',
+          tier,
+          lookupAttempted: `guide cabin rate (${cruiseRates.shipName})`,
+          message: `${cruiseRates.shipName} has no "Guide Bed / Night" on its rate periods — the throughout guide's cabin cannot be priced. Add it in Rates → Cruises.`,
+        })
+      }
+    }
+  }
+
 
 
 
@@ -1883,6 +2044,10 @@ export async function calculateDayBasedPricing(
 
   let fixedCosts = 0
 
+  // The throughout guide's beds computed in STEP 5 are fixed costs too.
+  fixedCosts += guideBedCosts
+  services.push(...guideBedLines)
+
   for (let i = 0; i < itinerary.length; i++) {
     const day = itinerary[i]
     const previousDay = i > 0 ? itinerary[i - 1] : null
@@ -1890,14 +2055,54 @@ export async function calculateDayBasedPricing(
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0
 
     // ----- GUIDE (fixed per day) -----
-    if (hasSightseeing) {
+    // Spot (historical): a fee on sightseeing days only. Throughout
+    // (B-item 1): ONE guide travels day 1 → end — the full-day fee on
+    // sightseeing days and the cheaper Meet & Assist fee on every other
+    // day. A missing meet/assist rate is a hole NAMING the duration to
+    // add, never the full-day rate worn as a guess.
+    const gradeLabel = guideGrade === 'senior' ? 'Senior ' : ''
+    if (throughoutGuide) {
+      const dayRate = hasSightseeing ? guideRate : guideMeetRate
+      const feeLabel = hasSightseeing
+        ? `Throughout Guide (${language}${guideGrade === 'senior' ? ', Senior' : ''})`
+        : 'Throughout Guide — Meet & Assist'
+      if (dayRate && dayRate.source === 'db') {
+        fixedCosts += dayRate.dailyRate
+        services.push({
+          id: `day${day.day}-guide`,
+          dayNumber: day.day,
+          serviceType: 'guide',
+          serviceName: feeLabel,
+          quantity: 1,
+          quantityMode: 'fixed',
+          unitCost: dayRate.dailyRate,
+          lineTotal: dayRate.dailyRate,
+          rateSource: 'guide_rates',
+          isPerPax: false,
+          isOptional: false
+        })
+      } else {
+        addHole({
+          kind: 'guide',
+          reason: dayRate ? 'fuzzy' : 'missing',
+          tier,
+          dayNumber: day.day,
+          lookupAttempted: hasSightseeing
+            ? `${language} ${gradeLabel}guide full_day (${tier})`
+            : `${language} ${gradeLabel}guide meet_greet (${tier})`,
+          message: hasSightseeing
+            ? `No ${language} ${gradeLabel.toLowerCase()}guide full-day rate. Add it in Rates → Guides.`
+            : `No ${language} ${gradeLabel.toLowerCase()}guide "Meet & Assist" rate for the throughout guide's non-sightseeing days. Add a meet_greet duration row in Rates → Guides.`,
+        })
+      }
+    } else if (hasSightseeing) {
       if (guideRate && guideRate.source === 'db') {
         fixedCosts += guideRate.dailyRate
         services.push({
           id: `day${day.day}-guide`,
           dayNumber: day.day,
           serviceType: 'guide',
-          serviceName: `${language} Speaking Guide`,
+          serviceName: `${language} ${gradeLabel}Speaking Guide`,
           quantity: 1,
           quantityMode: 'fixed',
           unitCost: guideRate.dailyRate,
@@ -1911,8 +2116,8 @@ export async function calculateDayBasedPricing(
           kind: 'guide',
           reason: guideRate ? 'fuzzy' : 'missing',
           tier,
-          lookupAttempted: `${language} guide (${tier})`,
-          message: `No exact ${tier} ${language}-speaking guide rate. Add it in Rates → Guides.`,
+          lookupAttempted: `${language} ${gradeLabel}guide (${tier})`,
+          message: `No exact ${tier} ${language}-speaking ${gradeLabel.toLowerCase()}guide rate. Add it in Rates → Guides.`,
         })
       }
     }
@@ -2277,6 +2482,36 @@ export async function calculateDayBasedPricing(
     }
   }
 
+  // ----- THROUGHOUT GUIDE: meals at group rates when the party is small -----
+  // Operator's rule (B-item 1): with 4+ guests the restaurants feed the
+  // guide free; at ≤ GUIDE_MEALS_MAX_PAX guests his portion is bought at
+  // the group rate — one FIXED line per external meal. Priced at the
+  // REQUESTED pax; the multi-pax sheet keeps the line at every count — a
+  // documented approximation, exactly as in the sibling. (Missing meal
+  // rates are already holes above; no second hole for the guide's plate.)
+  if (throughoutGuide && requestedPax != null && requestedPax <= GUIDE_MEALS_MAX_PAX && mealRates) {
+    for (const day of itinerary) {
+      for (const meal of ['lunch', 'dinner'] as const) {
+        if (day.meals[meal] !== 'external') continue
+        const rate = mealRates[meal]
+        fixedCosts += rate
+        services.push({
+          id: `day${day.day}-guide-${meal}`,
+          dayNumber: day.day,
+          serviceType: 'meal',
+          serviceName: `Throughout Guide — ${meal} (group rate)`,
+          quantity: 1,
+          quantityMode: 'fixed',
+          unitCost: rate,
+          lineTotal: rate,
+          rateSource: 'meal_rates',
+          isPerPax: false,
+          isOptional: false,
+        })
+      }
+    }
+  }
+
   // ----- Water (per pax per sightseeing day) -----
   const sightseeingDaysList = itinerary.filter(d => d.services.guide_required || d.attractions.length > 0)
   const sightseeingDays = sightseeingDaysList.length
@@ -2473,7 +2708,10 @@ export async function calculateDayBasedPricing(
     groupFixed: fixedCosts,
     perPerson: perPaxCosts,
     marginPercent,
-    transportAt: transportAtPax,
+    // Throughout guide (B-item 1): one extra seat in EVERY vehicle sizing.
+    // Combined with the tour leader, the sheet's +1 rows become pax+2 —
+    // the two roles stack, as the operator's model says they can.
+    transportAt: throughoutGuide ? (pax: number) => transportAtPax(pax + 1) : transportAtPax,
     // Tour leader: single room (PPD + single supplement) + their own per-pax costs
     tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax,
     paxFrom: PAX_COUNTS[0],
@@ -2635,6 +2873,9 @@ export interface PricingParams {
   travelDate?: string
   marginPercent?: number
   tourLeaderIncluded?: boolean
+  /** Guide grade/mode (B-item 1) — see DayPricingParams. */
+  guideGrade?: GuideGrade
+  guideMode?: GuideMode
 }
 
 export interface PricingResult {
@@ -2712,7 +2953,11 @@ export async function calculateAutoPricing(params: PricingParams): Promise<Prici
     isEurPassport,
     language,
     travelDate: params.travelDate,
-    marginPercent
+    marginPercent,
+    guideGrade: params.guideGrade,
+    guideMode: params.guideMode,
+    // The throughout guide's meal rule prices at the requested party size.
+    requestedPax: numPax
   })
 
   if (!dayResult.success) {

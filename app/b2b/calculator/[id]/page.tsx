@@ -121,6 +121,9 @@ export default function TourPriceCalculator() {
   // one (lib/b2b/optional-selection). Ticking re-prices immediately.
   const [selectedOptionals, setSelectedOptionals] = useState<string[]>([])
   const [tourLeaderIncluded, setTourLeaderIncluded] = useState(false)
+  // Guide grade + mode (B-item 1). Defaults = the historical behaviour.
+  const [guideGrade, setGuideGrade] = useState<'egyptologist' | 'senior'>('egyptologist')
+  const [guideMode, setGuideMode] = useState<'spot' | 'throughout'>('spot')
   // Catalogue extras (Rates → Extras) offered on this quote.
   const [availableExtras, setAvailableExtras] = useState<CatalogueExtraOption[]>([])
   const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([])
@@ -239,6 +242,8 @@ export default function TourPriceCalculator() {
           is_eur_passport: isEurPassport,
           margin_percent: marginPercent,
           tour_leader_included: tourLeaderIncluded,
+          guide_grade: guideGrade,
+          guide_mode: guideMode,
           extras: selectedExtraIds,
           selected_optional_ids: optionalIds
         })
@@ -266,6 +271,8 @@ export default function TourPriceCalculator() {
           is_eur_passport: isEurPassport,
           margin_percent: marginPercent,
           tour_leader_included: tourLeaderIncluded,
+          guide_grade: guideGrade,
+          guide_mode: guideMode,
           extras: selectedExtraIds,
           selected_optional_ids: selectedOptionals
         })
@@ -329,6 +336,9 @@ export default function TourPriceCalculator() {
           price_per_person: result.price_per_person,
           tour_leader_included: tourLeaderIncluded,
           tour_leader_cost: result.tour_leader_cost || null,
+          // Store only non-default values — NULL means the defaults (mig 326).
+          guide_grade: guideGrade === 'egyptologist' ? null : guideGrade,
+          guide_mode: guideMode === 'spot' ? null : guideMode,
           single_supplement: result.single_supplement || null,
           is_eur_passport: isEurPassport,
           season: result.season,
@@ -365,7 +375,8 @@ export default function TourPriceCalculator() {
 
   const exportToCSV = () => {
     if (rateSheet.length === 0) return
-    const tourLeaderSuffix = tourLeaderIncluded ? ' (+1 TL)' : ' (+0)'
+    const guideSuffix = guideMode === 'throughout' ? ` (+1 Guide${guideGrade === 'senior' ? ' Senior' : ''})` : ''
+    const tourLeaderSuffix = (tourLeaderIncluded ? ' (+1 TL)' : ' (+0)') + guideSuffix
     const headers = ['Passengers', 'Total Cost (€)', 'Margin (€)', 'Selling Price (€)', 'Per Person (€)']
     const rows = rateSheet.map(row => [
       row.pax,
@@ -530,6 +541,50 @@ export default function TourPriceCalculator() {
                   {tourLeaderIncluded 
                     ? 'Tour leader costs (meals, entrance, single room) distributed across paying guests'
                     : 'Standard calculation without tour leader'}
+                </p>
+              </div>
+
+              {/* Throughout Guide (+1) — B-item 1 */}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <UserPlus className="w-4 h-4 inline mr-1" />Guide
+                </label>
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setGuideMode('spot')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      guideMode === 'spot'
+                        ? 'bg-[#647C47] text-white'
+                        : 'bg-white border text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Spot
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGuideMode('throughout')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      guideMode === 'throughout'
+                        ? 'bg-[#647C47] text-white'
+                        : 'bg-white border text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Throughout (+1)
+                  </button>
+                </div>
+                <select
+                  value={guideGrade}
+                  onChange={(e) => setGuideGrade(e.target.value as 'egyptologist' | 'senior')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
+                >
+                  <option value="egyptologist">Egyptologist (default)</option>
+                  <option value="senior">Senior guide</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-2">
+                  {guideMode === 'throughout'
+                    ? 'One guide travels the whole trip: fee every day, bed each night at the property\u2019s guide rate, meals at group rates for small parties, one extra vehicle seat.'
+                    : 'Per-city guide on sightseeing days only (the historical model).'}
                 </p>
               </div>
 

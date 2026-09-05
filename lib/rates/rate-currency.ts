@@ -34,9 +34,9 @@ export const RATE_MONETARY_COLUMNS: Record<string, string[]> = {
   airport_staff_rates: ['rate_eur'],
   meal_rates: ['base_rate_eur', 'base_rate_non_eur'],
   activity_rates: ['base_rate_eur', 'base_rate_non_eur'],
-  train_rates: ['rate_eur'],
-  sleeping_train_rates: ['rate_oneway_eur', 'rate_roundtrip_eur', 'rate_oneway_non_eur', 'rate_roundtrip_non_eur'],
-  flight_rates: ['base_rate_eur', 'tax_eur', 'base_rate_non_eur', 'tax_non_eur'],
+  train_rates: ['rate_eur', 'guide_rate'],
+  sleeping_train_rates: ['rate_oneway_eur', 'rate_roundtrip_eur', 'rate_oneway_non_eur', 'rate_roundtrip_non_eur', 'guide_rate'],
+  flight_rates: ['base_rate_eur', 'tax_eur', 'base_rate_non_eur', 'tax_non_eur', 'guide_rate'],
   fixed_daily_costs: ['cost_per_person_per_day'],
   b2b_transport_packages: ['sedan_rate', 'minivan_rate', 'van_rate', 'minibus_rate', 'bus_rate'],
   transportation_rates: [

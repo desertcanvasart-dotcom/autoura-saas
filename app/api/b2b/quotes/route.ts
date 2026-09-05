@@ -104,6 +104,9 @@ export async function POST(request: NextRequest) {
       single_supplement,
       is_eur_passport = true,
       season,
+      // Guide grade/mode (B-item 1) — nullable, NULL = the defaults.
+      guide_grade = null,
+      guide_mode = null,
       // Other
       currency = 'EUR',
       valid_days = 30,
@@ -149,6 +152,9 @@ export async function POST(request: NextRequest) {
         tour_leader_included,
         tour_leader_cost,
         single_supplement,
+        // Store only non-default values (mig 326): NULL = egyptologist/spot.
+        guide_grade: guide_grade === 'egyptologist' ? null : guide_grade,
+        guide_mode: guide_mode === 'spot' ? null : guide_mode,
         is_eur_passport,
         season,
         status: 'draft',

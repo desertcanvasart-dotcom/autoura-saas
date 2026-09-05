@@ -24,6 +24,7 @@ import {
 } from '@/lib/rates/rate-seasons'
 
 const FIELD_LABELS: Record<string, string> = {
+  guide_rate_eur: 'Guide Bed / Night',
   ppd_eur: 'PPD',
   single_supplement_eur: 'Single supp',
   triple_reduction_eur: 'Triple red',

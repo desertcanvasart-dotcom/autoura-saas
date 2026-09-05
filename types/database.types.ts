@@ -993,6 +993,8 @@ export interface Database {
           converted_to_itinerary_id: string | null
           converted_at: string | null
           created_by: string | null
+          guide_grade: string | null
+          guide_mode: string | null
         }
         Insert: {
           id?: string
@@ -1049,6 +1051,8 @@ export interface Database {
           converted_to_itinerary_id?: string | null
           converted_at?: string | null
           created_by?: string | null
+          guide_grade?: string | null
+          guide_mode?: string | null
         }
         Update: {
           id?: string
@@ -1105,6 +1109,8 @@ export interface Database {
           converted_to_itinerary_id?: string | null
           converted_at?: string | null
           created_by?: string | null
+          guide_grade?: string | null
+          guide_mode?: string | null
         }
         Relationships: [
           {
@@ -4693,6 +4699,7 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           rate_currency: string | null
+          guide_rate: number | null
         }
         Insert: {
           id?: string
@@ -4726,6 +4733,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          guide_rate?: number | null
         }
         Update: {
           id?: string
@@ -4759,6 +4767,7 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           rate_currency?: string | null
+          guide_rate?: number | null
         }
         Relationships: [
           {
@@ -7501,6 +7510,7 @@ export interface Database {
           updated_at: string
           rate_currency: string | null
           property_id: string | null
+          guide_rate: number | null
         }
         Insert: {
           id?: string
@@ -7528,6 +7538,7 @@ export interface Database {
           updated_at?: string
           rate_currency?: string | null
           property_id?: string | null
+          guide_rate?: number | null
         }
         Update: {
           id?: string
@@ -7555,6 +7566,7 @@ export interface Database {
           updated_at?: string
           rate_currency?: string | null
           property_id?: string | null
+          guide_rate?: number | null
         }
         Relationships: [
           {
@@ -10067,6 +10079,7 @@ export interface Database {
           updated_at: string | null
           rate_currency: string | null
           property_id: string | null
+          guide_rate: number | null
         }
         Insert: {
           id?: string
@@ -10089,6 +10102,7 @@ export interface Database {
           updated_at?: string | null
           rate_currency?: string | null
           property_id?: string | null
+          guide_rate?: number | null
         }
         Update: {
           id?: string
@@ -10111,6 +10125,7 @@ export interface Database {
           updated_at?: string | null
           rate_currency?: string | null
           property_id?: string | null
+          guide_rate?: number | null
         }
         Relationships: [
           {
