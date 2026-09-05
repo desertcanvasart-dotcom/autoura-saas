@@ -97,5 +97,22 @@ describe('migration replay from scratch', () => {
       'Execution',
       'Reservation',
     ])
+
+    // Core-table WRITE probes. Replaying DDL proves the schema builds; it
+    // does not prove rows can be written — migration 311 dropped
+    // parent_supplier_id but left 009's validation trigger reading
+    // NEW.parent_supplier_id, and every suppliers INSERT after it failed
+    // with 'record "new" has no field' (found by the first real CSV
+    // import, not by any test). This probe fails on exactly that class:
+    // an orphaned trigger, policy, or constraint on a core table.
+    await db.exec(`
+      INSERT INTO suppliers (tenant_id, name, company_name, type, status)
+      SELECT t.id, 'Replay Probe Supplier', 'Replay Probe Supplier', 'hotel', 'active'
+      FROM tenants t WHERE t.company_name = 'Replay Probe Co'
+    `)
+    const probe = await db.query(
+      "SELECT count(*)::int AS n FROM suppliers WHERE name = 'Replay Probe Supplier'"
+    )
+    expect((probe.rows[0] as { n: number }).n).toBe(1)
   }, 120_000)
 })
