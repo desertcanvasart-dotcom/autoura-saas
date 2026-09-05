@@ -7,6 +7,7 @@
 // authenticated user's tenant.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { cruisePpdNightEur, cruisePpdNightNonEur } from '@/lib/rates/cruise-ppd'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { parseSeasons } from '@/lib/rates/rate-seasons'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
@@ -234,11 +235,15 @@ export async function GET(request: NextRequest) {
       cruise: (cruiseRates || []).map((r: any) => ({
         id: r.id,
         name: `${r.ship_name} (${r.duration_nights}N, ${r.cabin_type})`,
-        rateEur: toNum(r.rate_double_eur || r.rate_low_double_eur),
-        rateNonEur: toNum(r.rate_double_non_eur || r.rate_low_double_non_eur || r.rate_double_eur || r.rate_low_double_eur),
-        details: `${r.route_name || ''} | ${r.tier || ''} | ${r.cabin_type || 'Standard'}`,
-        single_rate_eur: toNum(r.rate_single_eur || r.rate_low_single_eur),
-        single_rate_non_eur: toNum(r.rate_single_non_eur || r.rate_low_single_non_eur),
+        // PER PERSON PER NIGHT — the one cruise basis. The slot is picked on
+        // each cruise night, so a 3-night cruise multiplies by 3 naturally.
+        // This used to expose the legacy whole-trip DOUBLE-CABIN rate, so a
+        // cruise picked across its nights charged nights x trip x cabin.
+        rateEur: cruisePpdNightEur(r),
+        rateNonEur: cruisePpdNightNonEur(r),
+        details: `${r.route_name || ''} | ${r.tier || ''} | ${r.cabin_type || 'Standard'} | per person/night`,
+        single_rate_eur: toNum(r.single_supplement_eur),
+        single_rate_non_eur: toNum(r.single_supplement_non_eur),
         duration_nights: r.duration_nights,
         ship_category: r.ship_category,
         // The throughout guide's cabin per night, first-period rate (B3).

@@ -18,6 +18,8 @@ import { fileURLToPath } from 'node:url'
 // Exiting 0 on any 200 makes those nights indistinguishable from healthy ones,
 // which is the quiet-degradation failure mode this whole area keeps hitting.
 // These tests spawn the real scripts against a stub server and assert the code.
+// 30s describes: spawning node competes with the suite's PGlite migration
+// replay — under full-suite load the 5s default flakes (2026-09-05).
 // ============================================================================
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -79,7 +81,7 @@ afterEach(async () => {
   }
 })
 
-describe('cron-agent-memory', () => {
+describe('cron-agent-memory', { timeout: 30_000 }, () => {
   it('exits 0 and reports the counts on a clean run', async () => {
     const { url, received } = await stub({
       body: JSON.stringify({
@@ -164,7 +166,7 @@ describe('cron-agent-memory', () => {
   })
 })
 
-describe('cron-exchange-rates', () => {
+describe('cron-exchange-rates', { timeout: 30_000 }, () => {
   it('exits 0 and reports snapshots written', async () => {
     const { url, received } = await stub({
       body: JSON.stringify({
@@ -254,7 +256,7 @@ async function stubByPath(
 const OK_INVOICES = JSON.stringify({ success: true, message: 'Processed 3 reminders', sent: 3, failed: 0, skipped: 0 })
 const OK_TASKS = JSON.stringify({ success: true, message: 'Task reminders sent: 2 due soon, 1 overdue', results: { dueSoon: 2, overdue: 1, errors: [] } })
 
-describe('cron-reminders', () => {
+describe('cron-reminders', { timeout: 30_000 }, () => {
   it('exits 0 on a clean run and calls BOTH endpoints with a Bearer secret', async () => {
     const { url, hits, auth } = await stubByPath({
       '/api/cron/purge-traveller-documents': { body: JSON.stringify({ success: true, purged: 0, failures: [] }) },

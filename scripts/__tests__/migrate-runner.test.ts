@@ -45,13 +45,14 @@ describe('normalizeName / computePending', () => {
   })
 })
 
-describe('runPending against real Postgres', () => {
+// Every test here boots a fresh PGlite, which competes with the (real,
+// growing) full-migration replay in the same suite run — under load any of
+// them can cross the 5s default. One describe-level allowance.
+describe('runPending against real Postgres', { timeout: 30_000 }, () => {
   let db: PGlite
   beforeEach(() => { db = new PGlite() })
 
-  // 30s: PGlite start-up competes with the (real, growing) migration replay
-  // in the same suite run — under full-suite load this crossed the 5s default.
-  it('applies in order, records each, and a rerun is a no-op', { timeout: 30_000 }, async () => {
+  it('applies in order, records each, and a rerun is a no-op', async () => {
     const client = pgliteClient(db)
     const first = await runPending(client, FILES)
     expect(first.failed).toBeUndefined()
