@@ -12,6 +12,7 @@ import {
   AlertCircle,
   X,
   Info,
+  Users,
 } from 'lucide-react'
 import {
   ROUTABLE_SERVICE_TYPES,
@@ -294,11 +295,17 @@ export default function DepartmentsSettingsPage() {
                 )}
                 {/* A real popover, not a title tooltip: the load already
                     fetched the members to count them — show the names too
-                    (A-item 21). */}
-                <span className="relative group text-xs text-gray-500 cursor-default">
+                    (A-item 21). The count LOOKS interactive (icon + dotted
+                    underline) so the hover is discoverable, and clicking
+                    jumps to the team list pre-filtered to this department. */}
+                <Link
+                  href={`/team-members?department=${dept.id}`}
+                  className="relative group inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 underline decoration-dotted underline-offset-2"
+                >
+                  <Users className="w-3 h-3" />
                   {memberCount(dept.id)} member{memberCount(dept.id) === 1 ? '' : 's'}
                   {memberCount(dept.id) > 0 && (
-                    <span className="absolute left-0 top-full mt-1 z-10 hidden group-hover:block bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 min-w-[10rem]">
+                    <span className="absolute left-0 top-full mt-1 z-10 hidden group-hover:block group-focus-visible:block bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 min-w-[10rem]">
                       {members
                         .filter(m => m.department_id === dept.id)
                         .map(m => (
@@ -308,7 +315,7 @@ export default function DepartmentsSettingsPage() {
                         ))}
                     </span>
                   )}
-                </span>
+                </Link>
               </div>
 
               {dept.description && (

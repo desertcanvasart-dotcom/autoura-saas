@@ -141,6 +141,14 @@ export default function TeamMembersPage() {
     fetchMembers()
   }, [showInactive])
 
+  // The departments page links here as /team-members?department=<id> —
+  // arrive pre-filtered. Read off window instead of useSearchParams() so
+  // the page needs no Suspense boundary.
+  useEffect(() => {
+    const dept = new URLSearchParams(window.location.search).get('department')
+    if (dept) setDepartmentFilter(dept)
+  }, [])
+
   useEffect(() => {
     if (!activityMember) return
     let cancelled = false
