@@ -77,14 +77,37 @@ describe('validateDepartmentInput', () => {
     })
   })
 
-  it('rejects an unknown service type', () => {
+  it('accepts a CUSTOM snake_case service type, normalized like the server stores it', () => {
+    // B-item 5: routing matches whatever the department owns, so the
+    // vocabulary is no longer bounded by the curated list. 'teleportation'
+    // is a perfectly good custom type now.
     const result = validateDepartmentInput({
       name: 'Ticketing',
-      service_types: ['entrance', 'teleportation'],
+      service_types: ['entrance', 'teleportation', ' Balloon Rides ', 'shore-excursion'],
     })
 
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.service_types).toEqual(['entrance', 'teleportation', 'balloon_rides', 'shore_excursion'])
+    }
+  })
+
+  it('still rejects garbage that normalizes to nothing', () => {
+    const result = validateDepartmentInput({
+      name: 'Ticketing',
+      service_types: ['entrance', '!!!'],
+    })
     expect(result.ok).toBe(false)
-    expect(result).toMatchObject({ error: expect.stringContaining('teleportation') })
+    expect(result).toMatchObject({ error: expect.stringContaining('!!!') })
+  })
+
+  it('a normalized custom type collides with its differently-spelled twin', () => {
+    const result = validateDepartmentInput({
+      name: 'Ticketing',
+      service_types: ['Balloon Rides', 'balloon_rides'],
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.service_types).toEqual(['balloon_rides'])
   })
 
   it('rejects a name longer than the column', () => {
@@ -135,7 +158,9 @@ describe('validateDepartmentInput', () => {
     })
 
     it('still rejects a bad value when the key IS supplied', () => {
-      const result = validateDepartmentInput({ service_types: ['nope'] }, { partial: true })
+      // 'nope' is a valid CUSTOM type since B-item 5 — garbage now means
+      // something that normalizes to nothing.
+      const result = validateDepartmentInput({ service_types: ['???'] }, { partial: true })
       expect(result.ok).toBe(false)
     })
 

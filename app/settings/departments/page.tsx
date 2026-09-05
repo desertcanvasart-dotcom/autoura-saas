@@ -16,8 +16,12 @@ import {
 import {
   ROUTABLE_SERVICE_TYPES,
   BACK_OFFICE_SERVICE_TYPES,
+  ALL_SERVICE_TYPES,
   serviceTypeLabel,
+  normalizeServiceType,
 } from '@/lib/service-types'
+
+const CURATED_TYPE_VALUES = new Set(ALL_SERVICE_TYPES.map(t => t.value))
 
 interface Department {
   id: string
@@ -116,6 +120,32 @@ export default function DepartmentsSettingsPage() {
         ? prev.service_types.filter(t => t !== value)
         : [...prev.service_types, value],
     }))
+  }
+
+  // Custom service types (B-item 5): normalized EXACTLY like the server
+  // sanitizer so what appears on the card is what routing will match, and
+  // subject to the same one-active-owner exclusivity as the curated types.
+  const [customTypeInput, setCustomTypeInput] = useState('')
+  const [customTypeNotice, setCustomTypeNotice] = useState<string | null>(null)
+
+  const addCustomServiceType = () => {
+    const cleaned = normalizeServiceType(customTypeInput)
+    if (!cleaned) {
+      setCustomTypeNotice('Type a name — letters, numbers, spaces or dashes.')
+      return
+    }
+    if (form.service_types.includes(cleaned)) {
+      setCustomTypeNotice(`Already on this department: ${cleaned}`)
+      return
+    }
+    const owner = claimedBy(cleaned)
+    if (owner) {
+      setCustomTypeNotice(`"${cleaned}" is already handled by ${owner} — tasks route to one department per service type.`)
+      return
+    }
+    setCustomTypeNotice(null)
+    setCustomTypeInput('')
+    setForm(prev => ({ ...prev, service_types: [...prev.service_types, cleaned] }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -390,6 +420,55 @@ export default function DepartmentsSettingsPage() {
                     )
                   })}
                 </div>
+
+                {/* Custom types (B-item 5): the tenant's own vocabulary —
+                    routing matches whatever the department owns. */}
+                <p className="text-xs text-gray-500 mt-3 mb-2">
+                  Custom service types. Tasks whose service type matches route here too —
+                  useful when your services carry your own categories.
+                </p>
+                {form.service_types.filter(t => !CURATED_TYPE_VALUES.has(t)).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {form.service_types.filter(t => !CURATED_TYPE_VALUES.has(t)).map(t => (
+                      <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#e8ede3] text-[#4a5c35] rounded text-xs font-mono">
+                        {t}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${t}`}
+                          onClick={() => toggleServiceType(t)}
+                          className="hover:text-red-700"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={customTypeInput}
+                    onChange={e => { setCustomTypeInput(e.target.value); setCustomTypeNotice(null) }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomServiceType() } }}
+                    placeholder="Add custom service type"
+                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
+                  />
+                  <button
+                    type="button"
+                    onClick={addCustomServiceType}
+                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Add
+                  </button>
+                </div>
+                {customTypeInput && normalizeServiceType(customTypeInput) !== customTypeInput.trim() && (
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Will be saved as: <span className="font-mono">{normalizeServiceType(customTypeInput) || '—'}</span>
+                  </p>
+                )}
+                {customTypeNotice && (
+                  <p className="text-xs text-amber-700 mt-1">{customTypeNotice}</p>
+                )}
 
                 <p className="text-xs text-gray-500 mt-3 mb-2">
                   Back-office work. No itinerary service produces these, so they never generate tasks —
