@@ -75,5 +75,27 @@ describe('migration replay from scratch', () => {
     // The exemption list must not go stale: every entry still actually fails
     // under the stub (a fixed one should be REMOVED from the list).
     expect(exemptSeen.sort()).toEqual(Object.keys(EXEMPT).sort())
+
+    // Post-replay invariants for migration 327 (localized departments):
+    // no shared NULL-tenant departments survive the build, and creating a
+    // tenant seeds its own 4 starter departments via trigger — the rows the
+    // tenant can actually edit.
+    const nullDepts = await db.query(
+      'SELECT count(*)::int AS n FROM departments WHERE tenant_id IS NULL'
+    )
+    expect((nullDepts.rows[0] as { n: number }).n).toBe(0)
+
+    await db.exec(
+      "INSERT INTO tenants (company_name, contact_email) VALUES ('Replay Probe Co', 'probe@example.com')"
+    )
+    const seeded = await db.query(
+      "SELECT d.name FROM departments d JOIN tenants t ON t.id = d.tenant_id WHERE t.company_name = 'Replay Probe Co' ORDER BY d.name"
+    )
+    expect((seeded.rows as Array<{ name: string }>).map(r => r.name)).toEqual([
+      'Accounting',
+      'Aviation',
+      'Execution',
+      'Reservation',
+    ])
   }, 120_000)
 })

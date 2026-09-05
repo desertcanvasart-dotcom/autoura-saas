@@ -338,6 +338,10 @@ export default function DepartmentsSettingsPage() {
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
+              {/* Migration 327 localized the built-ins — every department the
+                  tenant sees is now their own row, so every one is editable.
+                  isBuiltIn survives only as a guard for a stray NULL-tenant
+                  row, which the API would refuse to write anyway. */}
               {isBuiltIn(dept) ? (
                 <span className="text-xs text-gray-400 px-2">Shared platform-wide</span>
               ) : (
