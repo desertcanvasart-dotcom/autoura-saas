@@ -444,9 +444,13 @@ export default function SuppliersContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csvData }),
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        setError(data.error || 'Import failed')
+      // Failures must TOAST: the page's `error` state renders only inside
+      // the add/edit modals, so setError here is a message into the void —
+      // which is exactly how the first failed import looked ("nothing
+      // happened at all").
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data || !data.success) {
+        showToast('error', `Suppliers import failed: ${data?.error || `server returned ${res.status}`}`)
         return
       }
       const bits = [`${data.inserted} imported`]
@@ -456,7 +460,7 @@ export default function SuppliersContent() {
       showToast(data.refused?.length ? 'warning' : 'success', `Suppliers import: ${bits.join(' · ')}`)
       fetchSuppliers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Import failed')
+      showToast('error', `Suppliers import failed: ${err instanceof Error ? err.message : 'network error'}`)
     } finally {
       if (importInputRef.current) importInputRef.current.value = ''
     }
