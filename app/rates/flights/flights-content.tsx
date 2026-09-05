@@ -24,7 +24,8 @@ interface FlightRate {
   cabin_class: 'economy' | 'business' | 'first'
   base_rate_eur: number
   base_rate_non_eur: number
-  tax_eur: number | null
+  tax_eur: number
+  guide_rate?: string | number | null
   tax_non_eur: number | null
   baggage_kg: number | null
   departure_time: string | null
@@ -62,6 +63,8 @@ interface FormData {
   base_rate_eur: number
   base_rate_non_eur: number
   tax_eur: number
+  /** Throughout guide's negotiated fare — blank = guide pays customer fare. */
+  guide_rate?: string | number
   baggage_kg: number
   departure_time: string
   arrival_time: string
@@ -87,6 +90,7 @@ const initialFormData: FormData = {
   base_rate_eur: 0,
   base_rate_non_eur: 0,
   tax_eur: 0,
+  guide_rate: '' as string | number,
   baggage_kg: 23,
   departure_time: '',
   arrival_time: '',
@@ -334,6 +338,7 @@ export default function FlightsContent() {
       base_rate_eur: rate.base_rate_eur,
       base_rate_non_eur: rate.base_rate_non_eur || 0,
       tax_eur: rate.tax_eur || 0,
+      guide_rate: (rate as { guide_rate?: number | null }).guide_rate ?? '',
       baggage_kg: rate.baggage_kg || 23,
       departure_time: rate.departure_time || '',
       arrival_time: rate.arrival_time || '',
@@ -531,6 +536,7 @@ export default function FlightsContent() {
       base_rate_eur: rate.base_rate_eur,
       base_rate_non_eur: rate.base_rate_non_eur || 0,
       tax_eur: rate.tax_eur || 0,
+      guide_rate: (rate as { guide_rate?: number | null }).guide_rate ?? '',
       baggage_kg: rate.baggage_kg || 23,
       departure_time: rate.departure_time || '',
       arrival_time: rate.arrival_time || '',
@@ -1311,6 +1317,21 @@ export default function FlightsContent() {
                         className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-600 mb-1.5">Guide fare ({rateSymbol})</label>
+                    <input
+                      type="number"
+                      value={formData.guide_rate ?? ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, guide_rate: e.target.value }))}
+                      min="0"
+                      step="0.01"
+                      placeholder="Blank = customer fare"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      The throughout guide&rsquo;s seat. Blank = he pays the customer fare; 0 = rides free.
+                    </p>
                   </div>
 
                   <div>
