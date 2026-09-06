@@ -22,7 +22,7 @@ export default function B2BImportPage() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Conversion Flow</h2>
         <ol className="list-decimal list-inside space-y-3 text-gray-700 mb-4">
           <li>
-            <strong>Open New Quote</strong> (<code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/pricing-grid</code>) &mdash; the same grid documented in <Link href="/docs/itinerary-creation" className="text-primary-600 hover:underline">Itinerary Creation</Link>.
+            <strong>Open the Pricing Grid</strong> (<code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/pricing-grid</code>) &mdash; the same grid documented in <Link href="/docs/itinerary-creation" className="text-primary-600 hover:underline">Itinerary Creation</Link>.
           </li>
           <li>
             <strong>Set Client Type to B2B.</strong> Optionally pick a partner &mdash; the partner&rsquo;s default margin percentage is applied to the quote.

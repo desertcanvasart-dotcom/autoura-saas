@@ -140,6 +140,11 @@ const navigation: NavSection[] = [
       // (the inbox's "generate itinerary" action deep-links into it) but it
       // is not a destination users should browse to directly.
       { label: 'Message Templates', href: '/templates', icon: FileText },
+      // The library feeds the words the Copilot and the itinerary writer use,
+      // so it lives with the channels. Admin/manager as it was under Content.
+      { label: 'Content Library', href: '/content-library', icon: Library, roles: ['admin', 'manager'] },
+      { label: 'AI Prompts', href: '/content-library/prompts', icon: Library, roles: ['admin', 'manager'] },
+      { label: 'Writing Rules', href: '/content-library/rules', icon: BookOpen, roles: ['admin', 'manager'] },
     ]
   },
   {
@@ -149,7 +154,11 @@ const navigation: NavSection[] = [
     // Quotes group; the original items keep admin/manager via item roles.
     roles: ['admin', 'manager', 'member'],
     items: [
-      { label: 'New Quote', href: '/pricing-grid', icon: Grid3x3 },
+      // A sale starts in an email or a WhatsApp and lands in an itinerary, so
+      // New Quote opens the new-itinerary form — the same place the dashboard's
+      // quick action goes. The spreadsheet-style calculator keeps its own entry.
+      { label: 'New Quote', href: '/itineraries/new', icon: Sparkles },
+      { label: 'Pricing Grid', href: '/pricing-grid', icon: Grid3x3 },
       { label: 'B2C Quotes', href: '/quotes/b2c', icon: User },
       { label: 'Suppliers', href: '/suppliers', icon: Building, roles: ['admin', 'manager'] },
       { label: 'Itineraries', href: '/itineraries', icon: Route, roles: ['admin', 'manager'] },
@@ -161,6 +170,9 @@ const navigation: NavSection[] = [
       { label: 'Capacity Calendar', href: '/settings/capacity', icon: CalendarRange, roles: ['admin'] },
       // 'Team Members' moved to CRM (a directory of people).
       { label: 'Tasks', href: '/tasks', icon: CheckSquare, roles: ['admin', 'manager'] },
+      // Contracts and vouchers generated from itineraries — operational
+      // paperwork, not content. Moved here when the Content section dissolved.
+      { label: 'Documents', href: '/documents', icon: FileText, roles: ['admin', 'manager'] },
     ]
   },
   // 'Tours' sits directly under Operations (renamed from 'B2B' and moved up
@@ -198,25 +210,49 @@ const navigation: NavSection[] = [
     roles: ['admin', 'manager'],
     items: [
       { label: 'Rates Hub', href: '/rates', icon: Coins },
-      { label: 'Hotels', href: '/rates/hotels', icon: Hotel },
-      { label: 'Nile Cruises', href: '/rates/cruises', icon: Ship },
-      { label: 'Sleeping Trains', href: '/rates/sleeping-train', icon: BedDouble },
-      { label: 'Flights', href: '/rates/flights', icon: Plane },
-      { label: 'Trains', href: '/rates/trains', icon: Train },
-      { label: 'Meals', href: '/rates/meals', icon: UtensilsCrossed },
-      { label: 'Attractions', href: '/rates/attractions', icon: Building },
-      { label: 'Tour Guides', href: '/rates/guides', icon: Users },   
-      { label: 'Activities', href: '/rates/activities', icon: Ticket },    
-      { label: 'Transportation', href: '/rates/transportation', icon: Truck },
-      { label: 'Airport Services', href: '/rates/airport-services', icon: Plane },
-      { label: 'Hotel Services', href: '/rates/hotel-services', icon: ConciergeBell },
-      { label: 'Tipping', href: '/rates/tipping', icon: DollarSign },
-      { label: 'Fixed Costs', href: '/rates/fixed-costs', icon: DollarSign },
+      // Fifteen rate pages in four subgroups, collapsed until needed; the
+      // subgroup holding the open page expands on its own. Parent hrefs are
+      // anchors on the hub: they only render as a link when the sidebar is
+      // collapsed to icons.
+      {
+        label: 'Accommodation', href: '/rates#accommodation', icon: Hotel,
+        children: [
+          { label: 'Hotels', href: '/rates/hotels', icon: Hotel },
+          { label: 'Nile Cruises', href: '/rates/cruises', icon: Ship },
+          { label: 'Sleeping Trains', href: '/rates/sleeping-train', icon: BedDouble },
+          { label: 'Hotel Services', href: '/rates/hotel-services', icon: ConciergeBell },
+        ],
+      },
+      {
+        label: 'Transport & Tickets', href: '/rates#transport', icon: Truck,
+        children: [
+          { label: 'Transportation', href: '/rates/transportation', icon: Truck },
+          { label: 'Flights', href: '/rates/flights', icon: Plane },
+          { label: 'Trains', href: '/rates/trains', icon: Train },
+          { label: 'Airport Services', href: '/rates/airport-services', icon: Plane },
+        ],
+      },
+      {
+        label: 'Guides & Services', href: '/rates#services', icon: Users,
+        children: [
+          { label: 'Tour Guides', href: '/rates/guides', icon: Users },
+          { label: 'Meals', href: '/rates/meals', icon: UtensilsCrossed },
+          { label: 'Attractions', href: '/rates/attractions', icon: Building },
+          { label: 'Activities', href: '/rates/activities', icon: Ticket },
+          { label: 'Extras', href: '/rates/extras', icon: Sparkles },
+        ],
+      },
+      {
+        label: 'Costs', href: '/rates#costs', icon: DollarSign,
+        children: [
+          { label: 'Tipping', href: '/rates/tipping', icon: DollarSign },
+          { label: 'Fixed Costs', href: '/rates/fixed-costs', icon: DollarSign },
+        ],
+      },
       // Built long before it was linked: the season-uplift engine
       // (lib/pricing/season-uplift.ts) was already wired into auto-pricing,
       // but the editor was reachable only from the Settings page.
       { label: 'Seasonal Premiums', href: '/settings/seasons', icon: CalendarRange },
-      { label: 'Extras', href: '/rates/extras', icon: Sparkles },
     ]
   },
   {
@@ -233,17 +269,6 @@ const navigation: NavSection[] = [
       { label: 'Expenses', href: '/expenses', icon: Receipt },
       { label: 'Commissions', href: '/commissions', icon: Handshake },
       { label: 'Profit & Loss', href: '/profit-loss', icon: TrendingUp },
-    ]
-  },
-  {
-    title: 'Content',
-    key: 'content',
-    roles: ['admin', 'manager'],
-    items: [
-      { label: 'Content Library', href: '/content-library', icon: Library },
-      { label: 'AI Prompts', href: '/content-library/prompts', icon: Library },
-      { label: 'Writing Rules', href: '/content-library/rules', icon: BookOpen },
-      { label: 'Documents', href: '/documents', icon: FileText },
     ]
   },
   {
@@ -350,6 +375,12 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
       if (hasActiveItem && !expandedSections.includes(section.key)) {
         setExpandedSections(prev => [...prev, section.key])
       }
+      // …and the submenu (a Rates subgroup) holding the open page.
+      section.items.forEach(item => {
+        if (item.children?.some(child => isChildActive(child.href)) && !expandedMenus.includes(item.label)) {
+          setExpandedMenus(prev => [...prev, item.label])
+        }
+      })
     })
   }, [pathname, currentUrl, filteredNavigation])
 
@@ -371,14 +402,12 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
 
   // Check if a child link is active (works with query params on client)
   const isChildActive = (childHref: string): boolean => {
-    if (!currentUrl) return false
-
     const typeMatch = childHref.match(/type=(\w+)/)
     if (typeMatch) {
-      return currentUrl.includes(`type=${typeMatch[1]}`)
+      return !!currentUrl && currentUrl.includes(`type=${typeMatch[1]}`)
     }
-    
-    return false
+    // A plain path child (the Rates subgroups) is active on its own page.
+    return pathname === childHref || pathname.startsWith(childHref + '/')
   }
 
   const handleSignOut = async () => {

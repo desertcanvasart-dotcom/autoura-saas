@@ -77,7 +77,7 @@ export default function TourProgramsPage() {
           When you build a quote in <strong>New Quote</strong> with the client type set to <strong>B2B</strong>, saving it automatically creates a tour template and its first variation, then redirects you to the B2B Price Calculator for that variation.
         </p>
         <Tip>
-          <strong>Note:</strong> The WhatsApp Parser&apos;s B2B mode creates a B2B quote record only &mdash; it does not create a template. Templates are auto-created via the New Quote flow described above.
+          <strong>Note:</strong> The WhatsApp Parser&apos;s B2B mode creates a B2B quote record only &mdash; it does not create a template. Templates are auto-created via the Pricing Grid flow described above.
         </Tip>
         <ScreenshotPlaceholder caption="Template creation form with name, type, duration fields and the Edit Days day builder" />
       </section>

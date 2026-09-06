@@ -105,7 +105,7 @@ export default function ToursRatesPage() {
           <li>Fill in the details and save</li>
         </ol>
         <Tip>
-          Rates power pricing across the app: itineraries in <strong>Auto</strong> cost mode, and &mdash; most importantly &mdash; the <strong>New Quote</strong> pricing grid and the <strong>B2B Price Calculator</strong>. Keep them up to date; the pricing engine flags any service it cannot find a rate for instead of inventing a price.
+          Rates power pricing across the app: itineraries in <strong>Auto</strong> cost mode, and &mdash; most importantly &mdash; the <strong>Pricing Grid</strong> and the <strong>B2B Price Calculator</strong>. Keep them up to date; the pricing engine flags any service it cannot find a rate for instead of inventing a price.
         </Tip>
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">EU vs Non-EU Pricing</h3>
