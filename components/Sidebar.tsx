@@ -101,8 +101,18 @@ const navigation: NavSection[] = [
     title: 'CRM',
     key: 'crm',
     roles: ['admin', 'manager', 'member'],
+    // The people and organisations the agency deals with come first
+    // (clients, partner agencies, its own staff), then the work around them.
     items: [
       { label: 'Clients', href: '/clients', icon: Users, businessTypes: ['b2c_only', 'b2c_and_b2b'] },
+      // Partners (partner agencies who buy from this tenant) moved here from
+      // the Tours section: they are a relationship, not a tour. Still only
+      // for B2B-workspace tenants and admin/manager, exactly as before.
+      { label: 'Partners', href: '/b2b/partners', icon: Handshake, roles: ['admin', 'manager'], businessTypes: ['b2b_only', 'b2c_and_b2b'] },
+      // Team Members (the staff directory tasks are assigned to — NOT logins,
+      // those are User Management) moved here from Operations: a directory
+      // of people belongs with the other directories of people.
+      { label: 'Team Members', href: '/team-members', icon: Users, roles: ['admin', 'manager'] },
       { label: 'Concierge Leads', href: '/concierge-briefs', icon: ConciergeBell },
       // 'Staff' (/contacts?type=staff) removed: the Contacts page duplicated
       // Clients and showed airport staff under a misleading label — airport
@@ -151,7 +161,12 @@ const navigation: NavSection[] = [
       { label: 'Suppliers', href: '/suppliers', icon: Building, roles: ['admin', 'manager'] },
       { label: 'Itineraries', href: '/itineraries', icon: Route, roles: ['admin', 'manager'] },
       { label: 'Tour Departures', href: '/departures', icon: Calendar, roles: ['admin', 'manager'] },
-      { label: 'Team Members', href: '/team-members', icon: Users, roles: ['admin', 'manager'] },
+      // The capacity calendar (how much the operation takes on per date, and
+      // which tours run when) moved here from Settings: it is planned
+      // alongside departures, not configured once. Route unchanged; still
+      // admin-only, as it was under Settings.
+      { label: 'Capacity Calendar', href: '/settings/capacity', icon: CalendarRange, roles: ['admin'] },
+      // 'Team Members' moved to CRM (a directory of people).
       { label: 'Tasks', href: '/tasks', icon: CheckSquare, roles: ['admin', 'manager'] },
     ]
   },
@@ -165,7 +180,7 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Tour Manager', href: '/tours/manage', icon: LayoutTemplate },
       { label: 'Tour Inventory', href: '/tours', icon: Package },
-      { label: 'Partners', href: '/b2b/partners', icon: Handshake },
+      // 'Partners' moved to CRM (a relationship, not a tour).
       // Single B2B quote store since migration 270 — calculator and
       // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.
       { label: 'Quotes', href: '/quotes/b2b', icon: FileText },
@@ -258,7 +273,7 @@ const navigation: NavSection[] = [
       { label: 'Destinations', href: '/settings/destinations', icon: Globe },
       { label: 'Departments', href: '/settings/departments', icon: Building },
       { label: 'WhatsApp', href: '/settings/whatsapp', icon: MessageSquare },
-      { label: 'Capacity', href: '/settings/capacity', icon: Calendar },
+      // 'Capacity' moved to Operations as 'Capacity Calendar' (same route).
       { label: 'Billing and Subscriptions', href: '/settings/billing', icon: CreditCard },
       { label: 'User Management', href: '/users', icon: Shield },
     ]
