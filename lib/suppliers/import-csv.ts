@@ -19,6 +19,13 @@
 // (which is exactly what happened on first use).
 
 import Papa from 'papaparse'
+import { resolveVocabularyKey } from '@/lib/vocabulary'
+
+// A supplier can fill SEVERAL roles (migration 340): the Type cell may list
+// them separated by | ; or / — "hotel | transport company" — in the agency's
+// keys or labels. resolveImportTypes() turns the words into vocabulary keys
+// and REFUSES a row naming a role the agency does not have, so a typo never
+// lands as a bogus type (the database would refuse it anyway, as a 500).
 
 const HEADER_MAP: Record<string, string> = {
   name: 'name',
@@ -48,7 +55,10 @@ export interface SupplierImportRecord {
   /** 1-based CSV line (header is line 1). */
   row: number
   name: string
+  /** The PRIMARY role (types[0]). */
   type: string
+  /** Every role the Type cell named, as slugs (or vocabulary keys after resolveImportTypes). */
+  types: string[]
   contact_name?: string
   contact_email?: string
   contact_phone?: string
@@ -123,15 +133,56 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
       return
     }
     seenNames.add(key)
+    const types = splitTypes(String(record.type))
     records.push({
-      ...(record as Omit<SupplierImportRecord, 'row' | 'name' | 'type'>),
+      ...(record as Omit<SupplierImportRecord, 'row' | 'name' | 'type' | 'types'>),
       row: rowNum,
       name,
-      type: String(record.type).trim().toLowerCase().replace(/[\s-]+/g, '_'),
+      type: types[0],
+      types,
     })
   })
 
   return { totalRows: parsed.data.length, records, refused, typeDefaulted }
+}
+
+/** "Hotel | Transport company; ground_handler" → ['hotel', 'transport_company', 'ground_handler']. */
+export function splitTypes(cell: string): string[] {
+  const out: string[] = []
+  for (const part of String(cell ?? '').split(/[|;/]/)) {
+    const slug = part.trim().toLowerCase().replace(/[\s-]+/g, '_')
+    if (slug && !out.includes(slug)) out.push(slug)
+  }
+  return out.length ? out : ['other']
+}
+
+/**
+ * Turn each record's role words into the agency's vocabulary keys. A word
+ * that matches nothing (key, label, or slug) REFUSES the row, naming it.
+ * With an empty vocabulary (migration 334 not applied) records pass as-is.
+ */
+export function resolveImportTypes(
+  records: SupplierImportRecord[],
+  vocab: readonly { key: string; label: string }[]
+): { records: SupplierImportRecord[]; refused: Array<{ row: number; reason: string }> } {
+  if (vocab.length === 0) return { records, refused: [] }
+  const ok: SupplierImportRecord[] = []
+  const refused: Array<{ row: number; reason: string }> = []
+  for (const r of records) {
+    const keys: string[] = []
+    let bad: string | null = null
+    for (const t of r.types) {
+      const key = resolveVocabularyKey(vocab, t)
+      if (!key) { bad = t; break }
+      if (!keys.includes(key)) keys.push(key)
+    }
+    if (bad) {
+      refused.push({ row: r.row, reason: `"${r.name}": type "${bad}" is not in your supplier types (Settings → Your vocabulary)` })
+      continue
+    }
+    ok.push({ ...r, types: keys, type: keys[0] })
+  }
+  return { records: ok, refused }
 }
 
 /** Split parsed records against the tenant's existing supplier names
