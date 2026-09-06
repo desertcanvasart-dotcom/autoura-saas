@@ -1269,7 +1269,7 @@ export default function RatesPage() {
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                           rate.class_type === 'first_class' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-700'
                         }`}>
-                          {rate.class_type.replace('_', ' ')}
+                          <VocabLabel kind="train_class" value={rate.class_type} fallback="—" />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center text-sm text-gray-700">

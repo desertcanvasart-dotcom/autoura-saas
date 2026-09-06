@@ -26,13 +26,29 @@ describe('the kinds', () => {
     for (const k of VOCABULARY_KINDS) expect(VOCABULARY_KIND_INFO[k].title).toBeTruthy()
   })
 
-  it('the SQL preset (migration 334) seeds exactly these kinds and behaviours', () => {
-    const sql = fs.readFileSync(path.join(__dirname, '../../supabase/migrations/334_tenant_vocabularies.sql'), 'utf8')
+  // The preset and the kind CHECK live in SQL. Each is read from the LAST
+  // migration that defines it, so adding a kind (341 added train_class)
+  // means a new migration, never an edit to an applied one.
+  const migrationsDir = path.join(__dirname, '../../supabase/migrations')
+  const lastMigrationContaining = (needle: RegExp): string => {
+    const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort()
+    for (let i = files.length - 1; i >= 0; i--) {
+      const sql = fs.readFileSync(path.join(migrationsDir, files[i]), 'utf8')
+      if (needle.test(sql)) return sql
+    }
+    throw new Error(`no migration matches ${needle}`)
+  }
+
+  it('the SQL preset seeds exactly these kinds and behaviours', () => {
+    const sql = lastMigrationContaining(/CREATE OR REPLACE FUNCTION seed_tenant_vocabulary\(/)
     for (const k of VOCABULARY_KINDS) expect(sql).toContain(`p_kind = '${k}'`)
-    // The CHECK list in SQL and the TS list must agree.
+    for (const b of SUPPLIER_BEHAVIORS) expect(sql).toContain(`'supplier_type', '${b.key}'`)
+  })
+
+  it('the kind CHECK constraint in SQL and the TS list agree', () => {
+    const sql = lastMigrationContaining(/tenant_vocabularies_kind_check|kind TEXT NOT NULL CHECK \(kind IN/)
     const check = sql.match(/kind IN \(([\s\S]*?)\)\)/)![1].match(/'([a-z_]+)'/g)!.map(s => s.replace(/'/g, ''))
     expect(check.sort()).toEqual([...VOCABULARY_KINDS].sort())
-    for (const b of SUPPLIER_BEHAVIORS) expect(sql).toContain(`'supplier_type', '${b.key}'`)
   })
 })
 
@@ -160,5 +176,10 @@ describe('the agency ladder vs the preset', () => {
     expect(bad.errors[0]).toMatch(/tier: "Platinum" is not in your tier list/)
     // A kind with no vocabulary is left as typed (migration not applied, or the kind is unmanaged)
     expect(resolveRecordKeys({ meal_type: 'Lunch' }, vocab).errors).toEqual([])
+    // A train-rate CSV says "Second Class AC" (or the old stored label); the row gets the key.
+    const trains = { train_class: [{ key: 'first_class', label: 'First Class' }, { key: 'second_class_ac', label: 'Second Class AC' }] }
+    expect(resolveRecordKeys({ class_type: 'Second Class AC' }, trains).record.class_type).toBe('second_class_ac')
+    expect(resolveRecordKeys({ class_type: 'first_class' }, trains).record.class_type).toBe('first_class')
+    expect(resolveRecordKeys({ class_type: 'Platinum' }, trains).errors).toHaveLength(1)
   })
 })

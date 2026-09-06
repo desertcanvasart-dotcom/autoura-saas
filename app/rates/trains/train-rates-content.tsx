@@ -13,20 +13,13 @@ import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurre
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 import Link from 'next/link'
+import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 
 // Egyptian cities with train stations
 const TRAIN_CITIES = [
   'Alexandria', 'Aswan', 'Asyut', 'Beni Suef', 'Cairo', 'Damanhur',
   'Edfu', 'El Minya', 'Esna', 'Giza', 'Kom Ombo', 'Luxor',
   'Mansoura', 'Port Said', 'Qena', 'Sohag', 'Suez', 'Tanta', 'Zagazig'
-]
-
-const CLASS_TYPES = [
-  'First Class',
-  'Second Class AC',
-  'Second Class',
-  'Third Class',
-  'Business Class'
 ]
 
 interface TrainRate {
@@ -673,17 +666,9 @@ export default function TrainRatesContent() {
             ))}
           </select>
 
-          {/* Class Filter */}
-          <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
-          >
-            <option value="">All Classes</option>
-            {CLASS_TYPES.map(cls => (
-              <option key={cls} value={cls}>{cls}</option>
-            ))}
-          </select>
+          {/* Class Filter — the agency's classes (Settings → Your vocabulary) */}
+          <VocabSelect kind="train_class" value={selectedClass} onChange={setSelectedClass} placeholder="All Classes"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
 
           {/* Active Only Toggle */}
           <button
@@ -830,7 +815,7 @@ export default function TrainRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">
-                        {rate.class_type || '—'}
+                        <VocabLabel kind="train_class" value={rate.class_type} fallback="—" />
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -926,7 +911,7 @@ export default function TrainRatesContent() {
 
                 <div className="flex items-center gap-2 mb-2">
                   <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs">
-                    {rate.class_type}
+                    <VocabLabel kind="train_class" value={rate.class_type} />
                   </span>
                   {rate.duration_hours && (
                     <span className="text-xs text-gray-500 flex items-center gap-1">
@@ -978,7 +963,7 @@ export default function TrainRatesContent() {
                     {rate.origin_city} → {rate.destination_city}
                   </span>
                   <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs">
-                    {rate.class_type}
+                    <VocabLabel kind="train_class" value={rate.class_type} />
                   </span>
                   {rate.duration_hours && (
                     <span className="text-sm text-gray-500">{rate.duration_hours}h</span>
@@ -1203,18 +1188,11 @@ export default function TrainRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Class Type *</label>
-                    <select
-                      name="class_type"
-                      value={formData.class_type}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Class</option>
-                      {CLASS_TYPES.map(cls => (
-                        <option key={cls} value={cls}>{cls}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="train_class" name="class_type" value={formData.class_type}
+                      onChange={v => setFormData(prev => ({ ...prev, class_type: v }))} required placeholder="Select Class" />
+                    <Link href="/settings/vocabulary" className="text-xs text-primary-600 hover:underline mt-1 inline-block">
+                      Edit the class list →
+                    </Link>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Duration (hours)</label>
