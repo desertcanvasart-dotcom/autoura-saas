@@ -4,7 +4,7 @@ import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 export const dynamic = 'force-dynamic'
 
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
 import {
   Map,
@@ -34,7 +34,7 @@ import {
 // Import DayBuilder component
 import DayBuilder from './DayBuilder'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { useTierConfigs } from '@/components/vocabulary'
+import { useTierConfigs, useVocabulary } from '@/components/vocabulary'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 // ============================================
@@ -122,6 +122,8 @@ interface TicketOption {
   id: string
   label: string
 }
+/** A ticket rate row as the rates APIs return it. */
+type TicketRow = Record<string, unknown>
 
 interface Toast {
   id: string
@@ -890,9 +892,20 @@ export default function TourManagerContent() {
   const [attractions, setAttractions] = useState<Attraction[]>([])  // NEW: Attractions from DB
   // Ticket catalogues for the Travel picker (B-item 2), labelled
   // operator/class/route so the operator can name THE train or flight.
-  const [ticketOptions, setTicketOptions] = useState<Record<'flight' | 'train' | 'sleeping_train', TicketOption[]>>({
+  const [ticketRows, setTicketRows] = useState<Record<'flight' | 'train' | 'sleeping_train', TicketRow[]>>({
     flight: [], train: [], sleeping_train: [],
   })
+  const { labelFor: trainClassLabel } = useVocabulary('train_class')
+  const { labelFor: sleeperCabinLabel } = useVocabulary('sleeper_cabin')
+  const ticketOptions = useMemo<Record<'flight' | 'train' | 'sleeping_train', TicketOption[]>>(() => {
+    const opt = (rows: TicketRow[], label: (r: TicketRow) => string) => rows.map(r => ({ id: String(r.id), label: label(r) }))
+    const str = (v: unknown) => (v == null ? '' : String(v))
+    return {
+      flight: opt(ticketRows.flight, r => `${str(r.airline)}${r.flight_number ? ` ${str(r.flight_number)}` : ''} ${str(r.route_from)} → ${str(r.route_to)}${r.cabin_class ? ` (${str(r.cabin_class)})` : ''}`),
+      train: opt(ticketRows.train, r => `${str(r.operator_name) || 'Train'}${r.class_type ? ` ${trainClassLabel(str(r.class_type))}` : ''} ${str(r.origin_city)} → ${str(r.destination_city)}`),
+      sleeping_train: opt(ticketRows.sleeping_train, r => `${str(r.operator_name) || 'Sleeper'} ${sleeperCabinLabel(str(r.cabin_type))} ${str(r.origin_city)} → ${str(r.destination_city)}`),
+    }
+  }, [ticketRows, trainClassLabel, sleeperCabinLabel])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTheme, setSelectedTheme] = useState('all')  // Renamed from selectedCategory
@@ -1010,26 +1023,26 @@ export default function TourManagerContent() {
     }
   }
 
+  // Rows are kept raw and labelled at render, so the train class and sleeper
+  // cabin read in the agency's words (Settings → Your vocabulary) even when
+  // the vocabulary finishes loading after the rates do.
   const fetchTicketOptions = async () => {
-    type TicketRow = Record<string, unknown>
-    const load = async (url: string, label: (r: TicketRow) => string): Promise<TicketOption[]> => {
+    const load = async (url: string): Promise<TicketRow[]> => {
       try {
         const res = await fetch(url)
         if (!res.ok) return []
         const body = await res.json()
-        return ((body.data || []) as TicketRow[])
-          .filter(r => r.is_active !== false)
-          .map(r => ({ id: String(r.id), label: label(r) }))
+        return ((body.data || []) as TicketRow[]).filter(r => r.is_active !== false)
       } catch {
         return []
       }
     }
     const [flight, train, sleeping_train] = await Promise.all([
-      load('/api/rates/flights', r => `${r.airline}${r.flight_number ? ` ${r.flight_number}` : ''} ${r.route_from} → ${r.route_to}${r.cabin_class ? ` (${r.cabin_class})` : ''}`),
-      load('/api/rates/trains', r => `${r.operator_name || 'Train'}${r.class_type ? ` ${r.class_type}` : ''} ${r.origin_city} → ${r.destination_city}`),
-      load('/api/rates/sleeping-trains', r => `${r.operator_name || 'Sleeper'} ${r.cabin_type} ${r.origin_city} → ${r.destination_city}`),
+      load('/api/rates/flights'),
+      load('/api/rates/trains'),
+      load('/api/rates/sleeping-trains'),
     ])
-    setTicketOptions({ flight, train, sleeping_train })
+    setTicketRows({ flight, train, sleeping_train })
   }
 
   useEffect(() => {
