@@ -6,7 +6,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { getAnthropicClient } from '@/lib/ai/anthropic-client'
 import { egyptPromptContext, type DestinationPromptContext } from './destination-context'
 import type { ServiceTier, ExtractedDay, PackageType } from './parsing-utils'
-import { TIER_DESCRIPTIONS, calculateExpectedDays, preParseRawItinerary } from './parsing-utils'
+import { tierDescription, calculateExpectedDays, preParseRawItinerary } from './parsing-utils'
 import type { WritingRule } from './content-library'
 import { buildWritingRulesContext } from './content-library'
 
@@ -360,7 +360,7 @@ CLIENT: ${clientName}
 TOUR: ${tourName}
 DATE: ${startDate}
 TRAVELERS: ${numAdults} adults${numChildren > 0 ? `, ${numChildren} children` : ''}
-TIER: ${tier.toUpperCase()} (${TIER_DESCRIPTIONS[tier]})
+TIER: ${tier.toUpperCase()} (${tierDescription(tier)})
 CITIES: ${cities.length > 0 ? cities.join(', ') : effectiveCity}
 ${interests.length > 0 ? `INTERESTS: ${interests.join(', ')}` : ''}
 ${specialRequests.length > 0 ? `SPECIAL REQUESTS: ${specialRequests.join(', ')}` : ''}
@@ -384,7 +384,7 @@ PLANNING GUIDELINES:
 3. Last day typically departure transfer
 4. Group nearby attractions on the same day
 5. Include realistic driving times
-6. For ${tier} tier: ${TIER_DESCRIPTIONS[tier]}
+6. For ${tier} tier: ${tierDescription(tier)}
 
 Return ONLY valid JSON:
 {

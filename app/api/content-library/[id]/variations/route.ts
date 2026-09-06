@@ -8,7 +8,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-const VALID_TIERS = ['budget', 'standard', 'deluxe', 'luxury']
+import { loadVocabulary } from '@/lib/vocabulary-server'
+import { PRESET_TIERS } from '@/lib/vocabulary'
+
+/** The tenant's tier keys (hidden ones included — a stored key must still
+ *  read), the preset when the vocabulary is empty. */
+async function validTiers(supabase: Parameters<typeof loadVocabulary>[0]): Promise<string[]> {
+  const keys = (await loadVocabulary(supabase, 'tier')).map(i => i.key)
+  return keys.length ? keys : [...PRESET_TIERS]
+}
 
 // Helper to create Supabase client
 async function createClient() {
@@ -48,6 +56,7 @@ export async function GET(
       .eq('content_id', id)
       .order('tier', { ascending: true })
 
+    const VALID_TIERS = await validTiers(supabase as Parameters<typeof loadVocabulary>[0])
     if (tier && VALID_TIERS.includes(tier)) {
       query = query.eq('tier', tier)
     }
@@ -95,6 +104,7 @@ export async function POST(
     const { tier, title, description, highlights, inclusions, internal_notes } = body
 
     // Validation
+    const VALID_TIERS = await validTiers(supabase as Parameters<typeof loadVocabulary>[0])
     if (!tier || !VALID_TIERS.includes(tier)) {
       return NextResponse.json(
         { error: `Invalid tier. Must be one of: ${VALID_TIERS.join(', ')}` },
@@ -187,6 +197,7 @@ export async function PUT(
     }
 
     // Validate all variations
+    const VALID_TIERS = await validTiers(supabase as Parameters<typeof loadVocabulary>[0])
     for (const v of variations) {
       if (!v.tier || !VALID_TIERS.includes(v.tier)) {
         return NextResponse.json(

@@ -224,3 +224,135 @@ export function groupByKind(items: VocabularyItem[]): Record<VocabularyKind, Voc
   for (const k of VOCABULARY_KINDS) out[k].sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label))
   return out
 }
+
+// ------------------------------------------------------------------
+// Translating between the agency's ladder and the platform's preset
+// ------------------------------------------------------------------
+// The pricing engine and the AI parsers were written against four words.
+// Where they still need a NOTION of "low / mid / high" (a tipping
+// multiplier, a staff-rate category, a prompt hint), they ask for the
+// preset word at the same POSITION on the agency's ladder — never the
+// agency's word itself.
+
+export const PRESET_TIERS = ['budget', 'standard', 'deluxe', 'luxury'] as const
+export type PresetTier = (typeof PRESET_TIERS)[number]
+
+/** Words people use for a tier, mapped onto the preset. */
+export const TIER_SYNONYMS: Record<string, PresetTier> = {
+  budget: 'budget', economy: 'budget', cheap: 'budget', basic: 'budget', '3 star': 'budget', '3-star': 'budget', '3*': 'budget',
+  standard: 'standard', 'mid-range': 'standard', midrange: 'standard', moderate: 'standard', '4 star': 'standard', '4-star': 'standard', '4*': 'standard',
+  deluxe: 'deluxe', superior: 'deluxe', 'first class': 'deluxe', 'first-class': 'deluxe', '5 star': 'deluxe', '5-star': 'deluxe', '5*': 'deluxe',
+  luxury: 'luxury', premium: 'luxury', vip: 'luxury', 'high-end': 'luxury', ultra: 'luxury',
+}
+
+/** Position 0..total-1 → step 0..steps-1 on the preset ladder. */
+export function ladderStep(position: number, total: number, steps: number = PRESET_TIERS.length): number {
+  if (total <= 1 || position < 0) return steps - 1
+  const p = Math.min(position, total - 1)
+  // Round half DOWN: the middle of a three-tier ladder is "standard", not "deluxe".
+  return Math.ceil((p * (steps - 1)) / (total - 1) - 0.5)
+}
+
+/** The preset word at this tier's position on the agency's ladder. An
+ *  unknown tier reads as 'standard'. */
+export function presetTierFor(ladder: readonly string[], tier: string | null | undefined): PresetTier {
+  if (!tier) return 'standard'
+  const pos = ladder.indexOf(tier)
+  if (pos < 0) return (PRESET_TIERS as readonly string[]).includes(tier) ? (tier as PresetTier) : 'standard'
+  return PRESET_TIERS[ladderStep(pos, ladder.length)]
+}
+
+/** The agency's tier at the preset word's position: budget → lowest,
+ *  luxury → highest, standard / deluxe → a third and two thirds up. */
+export function tierFromPreset(ladder: readonly string[], preset: PresetTier): string {
+  if (ladder.length === 0) return preset
+  const step = PRESET_TIERS.indexOf(preset)
+  const pos = Math.round((step * (ladder.length - 1)) / (PRESET_TIERS.length - 1))
+  return ladder[pos]
+}
+
+/** What "standard" means on this ladder — the default tier for anything
+ *  that arrives without one. */
+export function defaultTierKey(ladder: readonly string[]): string {
+  return tierFromPreset(ladder, 'standard')
+}
+
+/** A stored key from whatever a person typed: the key itself, the label
+ *  (case-insensitive), or anything that slugifies to the key. */
+export function resolveVocabularyKey(items: readonly Pick<VocabularyItem, 'key' | 'label'>[], value: string | null | undefined): string | null {
+  if (value == null) return null
+  const raw = String(value).trim()
+  if (!raw) return null
+  const lower = raw.toLowerCase()
+  const slug = slugifyKey(raw)
+  const hit = items.find(i => i.key === raw)
+    ?? items.find(i => i.label.toLowerCase() === lower)
+    ?? items.find(i => i.key === slug)
+    ?? items.find(i => slugifyKey(i.label) === slug)
+  return hit?.key ?? null
+}
+
+/** A tier key for a free-text tier: the agency's own word if it matches,
+ *  else a synonym mapped by position, else the ladder's default. */
+export function normalizeTierKey(value: string | null | undefined, items: readonly Pick<VocabularyItem, 'key' | 'label'>[]): string {
+  const ladder = items.map(i => i.key)
+  const direct = resolveVocabularyKey(items, value)
+  if (direct) return direct
+  const lower = String(value ?? '').trim().toLowerCase()
+  const preset = lower ? TIER_SYNONYMS[lower] : undefined
+  if (preset) return tierFromPreset(ladder, preset)
+  return defaultTierKey(ladder)
+}
+
+/** Tipping and similar per-tier multipliers, by ladder position. */
+export function tierMultiplier(ladder: readonly string[], tier: string, table: readonly number[] = [0.8, 1.0, 1.2, 1.5]): number {
+  const pos = ladder.indexOf(tier)
+  if (pos < 0) return table[1]
+  return table[ladderStep(pos, ladder.length, table.length)]
+}
+
+export interface VehicleBand { key: string; min_pax: number; max_pax: number }
+
+/** The smallest vehicle that seats the group; failing that, the smallest
+ *  whose maximum covers it; failing that, the largest there is. */
+export function vehicleForPax(vehicles: readonly VehicleBand[], pax: number): string | null {
+  if (vehicles.length === 0) return null
+  const sized = [...vehicles].sort((a, b) => a.max_pax - b.max_pax || a.min_pax - b.min_pax)
+  const exact = sized.find(v => pax >= v.min_pax && pax <= v.max_pax)
+  if (exact) return exact.key
+  const covers = sized.find(v => v.max_pax >= pax)
+  if (covers) return covers.key
+  return sized[sized.length - 1].key
+}
+
+/** Which import/CSV columns are vocabulary keys, and of which kind. */
+export const VOCABULARY_COLUMNS: Record<string, VocabularyKind> = {
+  tier: 'tier',
+  board_basis: 'board_basis',
+  meal_type: 'meal_type',
+  vehicle_type: 'vehicle_type',
+  property_type: 'hotel_property_type',
+  cabin_type: 'sleeper_cabin',
+  ship_category: 'tier',
+}
+
+/** Re-file a record's vocabulary columns as stored keys. Values that match
+ *  nothing are reported, never guessed. */
+export function resolveRecordKeys(
+  record: Record<string, unknown>,
+  vocab: Partial<Record<VocabularyKind, readonly Pick<VocabularyItem, 'key' | 'label'>[]>>,
+  columnKinds: Record<string, VocabularyKind> = VOCABULARY_COLUMNS
+): { record: Record<string, unknown>; errors: string[] } {
+  const out = { ...record }
+  const errors: string[] = []
+  for (const [column, kind] of Object.entries(columnKinds)) {
+    const value = out[column]
+    if (value == null || String(value).trim() === '') continue
+    const items = vocab[kind]
+    if (!items || items.length === 0) continue // no vocabulary for this kind: leave as typed
+    const key = resolveVocabularyKey(items, String(value))
+    if (key) out[column] = key
+    else errors.push(`${column}: "${String(value)}" is not in your ${kind.replace(/_/g, ' ')} list (Settings → Your vocabulary)`)
+  }
+  return { record: out, errors }
+}

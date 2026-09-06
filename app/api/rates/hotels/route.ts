@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       ...(hotelProp.property_id ? { property_id: hotelProp.property_id } : {}),
       property_type: body.property_type || 'hotel',
       city: body.city || null,
-      board_basis: body.board_basis || 'BB',
+      board_basis: body.board_basis || 'bb',
       tier: body.tier || 'standard',
       supplier_id: body.supplier_id || null,
       supplier_name: body.supplier_name || null,

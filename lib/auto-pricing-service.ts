@@ -39,6 +39,8 @@ import {
 } from '@/lib/pricing/ticket-legs'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
+import { presetTierFor, tierMultiplier, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
+import { tierLadderForTenant, vehicleBandsForTenant } from '@/lib/vocabulary-server'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
@@ -65,7 +67,11 @@ function getSupabaseAdmin() {
 // TYPES
 // ============================================
 
-export type ServiceTier = 'budget' | 'standard' | 'deluxe' | 'luxury'
+/** A key from the tenant's tier vocabulary (Settings → Your vocabulary); the
+ *  four preset words are the Egypt default. Where the engine needs a notion of
+ *  low / mid / high it maps the tenant's ladder onto the preset by POSITION
+ *  (lib/vocabulary: presetTierFor). */
+export type ServiceTier = string
 export type AccommodationType = 'hotel' | 'cruise' | 'none'
 export type MealStatus = 'included' | 'external' | 'none'
 
@@ -283,16 +289,19 @@ interface TransportRate {
 export const PAX_COUNTS = Array.from({ length: 40 }, (_, i) => i + 1)
 
 // Vehicle capacity tiers
-export const VEHICLE_CAPACITY = {
+export const VEHICLE_CAPACITY: Record<string, { min: number; max: number }> = {
   'Sedan': { min: 1, max: 2 },
   'Minivan': { min: 3, max: 7 },
   'Van': { min: 8, max: 14 },
   'Minibus': { min: 15, max: 20 },
   'Bus': { min: 21, max: 45 },
   'Horse Carriage': { min: 1, max: 4 }  // Special for Edfu
-} as const
+}
 
-export type VehicleType = keyof typeof VEHICLE_CAPACITY
+/** A vehicle key from the tenant's vocabulary ('sedan'); the built-in names
+ *  above are the Egypt default. Matching is by slug, so 'Sedan' and 'sedan'
+ *  are one vehicle. */
+export type VehicleType = string
 
 // Area to attractions mapping (for auto-detection)
 const AREA_ATTRACTIONS: Record<string, string[]> = {
@@ -330,6 +339,36 @@ const SPECIAL_VEHICLE_CITIES: Record<string, VehicleType> = {
   'edfu': 'Horse Carriage'
 }
 
+/** Vehicle types compare as slugs: a row saying 'Sedan' and a vocabulary key
+ *  'sedan' are the same vehicle. */
+const vehicleKey = (v: unknown) => slugifyKey(String(v ?? ''))
+
+// The tenant's tier ladder and vehicle bands (Settings → Your vocabulary),
+// memoised for a minute — a pricing run asks for them several times.
+const VOCAB_TTL_MS = 60_000
+const ladderMemo = new Map<string, { at: number; value: string[] }>()
+const vehicleMemo = new Map<string, { at: number; value: VehicleBand[] }>()
+type VocabClient = Parameters<typeof tierLadderForTenant>[0]
+
+async function tenantTierLadder(tenantId: string): Promise<string[]> {
+  const hit = ladderMemo.get(tenantId)
+  if (hit && Date.now() - hit.at < VOCAB_TTL_MS) return hit.value
+  const value = await tierLadderForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId)
+  ladderMemo.set(tenantId, { at: Date.now(), value })
+  return value
+}
+
+async function tenantVehicleBands(tenantId: string): Promise<VehicleBand[]> {
+  const hit = vehicleMemo.get(tenantId)
+  if (hit && Date.now() - hit.at < VOCAB_TTL_MS) return hit.value
+  const value = await vehicleBandsForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId)
+  vehicleMemo.set(tenantId, { at: Date.now(), value })
+  return value
+}
+
+/** Test seam: forget memoised vocabularies. */
+export function clearVocabularyMemo() { ladderMemo.clear(); vehicleMemo.clear() }
+
 // NOTE: DEFAULT_RATES (hardcoded per-tier fallback prices) was REMOVED in the
 // pricing harness (Layer 1). Per policy — "never fabricate or invent rates" —
 // a missing or fuzzy-matched rate now produces a PricingHole and marks the
@@ -343,10 +382,15 @@ const SPECIAL_VEHICLE_CITIES: Record<string, VehicleType> = {
 /**
  * Get vehicle type based on pax count (including tour leader if applicable)
  */
-export function getVehicleTypeByPax(totalPax: number, city?: string): VehicleType {
+export function getVehicleTypeByPax(totalPax: number, city?: string, bands?: VehicleBand[]): VehicleType {
   // Check for special vehicle cities first
   if (city && SPECIAL_VEHICLE_CITIES[city.toLowerCase()]) {
     return SPECIAL_VEHICLE_CITIES[city.toLowerCase()]
+  }
+  // The tenant's own vehicles, when it has defined their passenger bands.
+  if (bands && bands.length > 0) {
+    const key = vehicleForPax(bands, totalPax)
+    if (key) return key
   }
 
   if (totalPax <= 2) return 'Sedan'
@@ -376,9 +420,10 @@ export function getAirportCode(city: string): string {
 /**
  * Map tier to hotel category for hotel_staff_rates
  */
-export function getTierCategory(tier: ServiceTier): string {
-  if (tier === 'budget') return 'budget'
-  if (tier === 'luxury') return 'luxury'
+export function getTierCategory(tier: ServiceTier, ladder?: readonly string[]): string {
+  const preset = ladder ? presetTierFor(ladder, tier) : tier
+  if (preset === 'budget') return 'budget'
+  if (preset === 'luxury') return 'luxury'
   return 'standard'  // standard and deluxe both map to standard
 }
 
@@ -1485,7 +1530,7 @@ export async function getHotelServiceRate(
   tier: ServiceTier
 ): Promise<number | null> {
   try {
-    const category = getTierCategory(tier)
+    const category = getTierCategory(tier, await tenantTierLadder(scope.tenantId))
 
     const lookup = async (type: HotelServiceType): Promise<number | null> => {
       const { data: rawHotelStaffRates } = await getSupabaseAdmin()
@@ -1558,12 +1603,8 @@ export async function getTippingRates(
       return null
     }
 
-    const multipliers: Record<ServiceTier, number> = {
-      budget: 0.8,
-      standard: 1.0,
-      deluxe: 1.2,
-      luxury: 1.5
-    }
+    // By position on the tenant's ladder: lowest tier 0.8 … highest 1.5.
+    const multiplier = tierMultiplier(await tenantTierLadder(scope.tenantId), tier)
 
     const perDay = (rates as any[]).filter(r => r.rate_unit === 'per_day')
     const groups = new Map<string, any[]>()
@@ -1585,7 +1626,7 @@ export async function getTippingRates(
           if (match) dailyTotal += match.rate_eur || 0
         }
         // 0 means there were rows but none applied here — a hole, not free.
-        return Math.round(dailyTotal * multipliers[tier]) || null
+        return Math.round(dailyTotal * multiplier) || null
       },
     }
   } catch (err) {
@@ -1676,7 +1717,7 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
       (rate.city || '').toLowerCase(),
       rate.duration || '',
       rate.area || '',
-      rate.vehicle_type || ''
+      vehicleKey(rate.vehicle_type)
     ].join('|')
 
     cache.set(baseKey, rate)
@@ -1687,7 +1728,7 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
       (rate.city || '').toLowerCase(),
       rate.duration || '',
       '',
-      rate.vehicle_type || ''
+      vehicleKey(rate.vehicle_type)
     ].join('|')
 
     if (!cache.has(keyNoArea)) {
@@ -1700,7 +1741,7 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
         'intercity_transfer',
         (rate.origin_city || '').toLowerCase(),
         (rate.destination_city || '').toLowerCase(),
-        rate.vehicle_type || ''
+        vehicleKey(rate.vehicle_type)
       ].join('|')
       cache.set(intercityKey, rate)
     }
@@ -1730,27 +1771,27 @@ export function findTransportRate(
   const cityLower = city.toLowerCase()
 
   // Priority 1: Exact match (service_type + city + duration + area + vehicle) — definite.
-  const exactKey = [serviceType, cityLower, duration, area || '', vehicleType].join('|')
+  const exactKey = [serviceType, cityLower, duration, area || '', vehicleKey(vehicleType)].join('|')
   if (cache.has(exactKey)) {
     return { rate: cache.get(exactKey)!, source: 'db' }
   }
 
   // Priority 2: Match without area — still definite (area is optional metadata).
-  const noAreaKey = [serviceType, cityLower, duration, '', vehicleType].join('|')
+  const noAreaKey = [serviceType, cityLower, duration, '', vehicleKey(vehicleType)].join('|')
   if (cache.has(noAreaKey)) {
     return { rate: cache.get(noAreaKey)!, source: 'db' }
   }
 
   // Priority 4: Intercity route match (origin→destination) — definite for transfers.
   if (serviceType === 'intercity_transfer' && originCity && destinationCity) {
-    const intercityKey = ['intercity_transfer', originCity.toLowerCase(), destinationCity.toLowerCase(), vehicleType].join('|')
+    const intercityKey = ['intercity_transfer', originCity.toLowerCase(), destinationCity.toLowerCase(), vehicleKey(vehicleType)].join('|')
     if (cache.has(intercityKey)) {
       return { rate: cache.get(intercityKey)!, source: 'db' }
     }
   }
 
   // Priority 3: Match without duration — APPROXIMATE (different trip length).
-  const noDurationKey = [serviceType, cityLower, '', '', vehicleType].join('|')
+  const noDurationKey = [serviceType, cityLower, '', '', vehicleKey(vehicleType)].join('|')
   if (cache.has(noDurationKey)) {
     return { rate: cache.get(noDurationKey)!, source: 'fuzzy' }
   }
@@ -1760,7 +1801,7 @@ export function findTransportRate(
   for (const fallbackCity of fallbackCities) {
     if (fallbackCity === cityLower) continue
 
-    const fallbackKey = [serviceType, fallbackCity, duration, '', vehicleType].join('|')
+    const fallbackKey = [serviceType, fallbackCity, duration, '', vehicleKey(vehicleType)].join('|')
     if (cache.has(fallbackKey)) {
       return { rate: cache.get(fallbackKey)!, source: 'fuzzy' }
     }
@@ -1892,6 +1933,7 @@ export async function calculateDayBasedPricing(
   // ============================================
 
   const transportCache = await buildTransportCache(catalogScope)
+  const vehicleBands = await tenantVehicleBands(tenantId)
 
   // ============================================
   // STEP 4: Fetch all required rates
@@ -2896,7 +2938,7 @@ export async function calculateDayBasedPricing(
   // STEP 9: Add transport services (for 2 pax baseline)
   // ============================================
 
-  const baseVehicleType = getVehicleTypeByPax(2)
+  const baseVehicleType = getVehicleTypeByPax(2, undefined, vehicleBands)
   let baseTransportCost = 0
 
   for (const info of transportInfoByDay) {
@@ -2978,7 +3020,7 @@ export async function calculateDayBasedPricing(
       if (needs.useSpecialVehicle && needs.specialVehicleType) {
         vehicleType = needs.specialVehicleType
       } else {
-        vehicleType = getVehicleTypeByPax(pax, info.city)
+        vehicleType = getVehicleTypeByPax(pax, info.city, vehicleBands)
       }
 
       const match = findTransportRate(transportCache, {
@@ -3442,7 +3484,7 @@ export async function getTemplatePriceRange(
   tenantId: string,
   isEurPassport: boolean = true
 ): Promise<{ minPrice: number; maxPrice: number; tier: ServiceTier } | null> {
-  const tiers: ServiceTier[] = ['budget', 'standard', 'deluxe', 'luxury']
+  const tiers: ServiceTier[] = await tenantTierLadder(tenantId)
 
   const results = await calculateMultiTierPricing(
     templateId,
@@ -3453,7 +3495,7 @@ export async function getTemplatePriceRange(
   )
 
   let minPrice = Infinity
-  let minTier: ServiceTier = 'standard'
+  let minTier: ServiceTier = defaultTierKey(tiers)
   let maxPrice = 0
 
   for (const [tier, result] of results) {

@@ -103,3 +103,62 @@ describe('validation', () => {
     expect(wouldBreakMinimum('meal_type', [item({ id: 'a' })], 'a')).toBe(true)
   })
 })
+
+describe('the agency ladder vs the preset', () => {
+  const four = ['budget', 'standard', 'deluxe', 'luxury']
+  const stars = ['3_star', '4_star', '5_star']
+  const one = ['only']
+  it('maps positions both ways', async () => {
+    const { presetTierFor, tierFromPreset, defaultTierKey } = await import('@/lib/vocabulary')
+    expect(presetTierFor(four, 'deluxe')).toBe('deluxe')
+    expect(presetTierFor(stars, '3_star')).toBe('budget')
+    expect(presetTierFor(stars, '4_star')).toBe('standard')
+    expect(presetTierFor(stars, '5_star')).toBe('luxury')
+    expect(presetTierFor(stars, 'gone')).toBe('standard')
+    expect(presetTierFor(one, 'only')).toBe('luxury')
+    expect(tierFromPreset(stars, 'budget')).toBe('3_star')
+    expect(tierFromPreset(stars, 'luxury')).toBe('5_star')
+    expect(tierFromPreset(four, 'standard')).toBe('standard')
+    expect(defaultTierKey(stars)).toBe('4_star')
+    expect(defaultTierKey([])).toBe('standard')
+  })
+  it('normalises free text onto the agency ladder', async () => {
+    const { normalizeTierKey, resolveVocabularyKey } = await import('@/lib/vocabulary')
+    const items = [{ key: '3_star', label: '3★' }, { key: '4_star', label: '4 Star' }, { key: '5_star', label: '5 Star Deluxe' }]
+    expect(resolveVocabularyKey(items, '4 star')).toBe('4_star')
+    expect(resolveVocabularyKey(items, '5-Star-Deluxe')).toBe('5_star')
+    expect(resolveVocabularyKey(items, '3★')).toBe('3_star')
+    expect(resolveVocabularyKey(items, 'platinum')).toBeNull()
+    expect(normalizeTierKey('luxury', items)).toBe('5_star')   // synonym → top of ladder
+    expect(normalizeTierKey('economy', items)).toBe('3_star')
+    expect(normalizeTierKey('vip', items)).toBe('5_star')
+    expect(normalizeTierKey('', items)).toBe('4_star')          // default = "standard" position
+    expect(normalizeTierKey('deluxe', four.map(k => ({ key: k, label: k })))).toBe('deluxe')
+  })
+  it('multipliers and vehicles follow position and pax', async () => {
+    const { tierMultiplier, vehicleForPax } = await import('@/lib/vocabulary')
+    expect(tierMultiplier(four, 'luxury')).toBe(1.5)
+    expect(tierMultiplier(stars, '4_star')).toBe(1.0)
+    expect(tierMultiplier(stars, 'gone')).toBe(1.0)
+    const v = [{ key: 'coach', min_pax: 25, max_pax: 50 }, { key: 'car', min_pax: 1, max_pax: 3 }, { key: 'van', min_pax: 4, max_pax: 12 }]
+    expect(vehicleForPax(v, 2)).toBe('car')
+    expect(vehicleForPax(v, 15)).toBe('coach')  // nothing seats 15 exactly → smallest that covers
+    expect(vehicleForPax(v, 80)).toBe('coach')  // too big for anything → the largest
+    expect(vehicleForPax([], 2)).toBeNull()
+  })
+  it('re-files CSV values as keys and names the ones it cannot', async () => {
+    const { resolveRecordKeys } = await import('@/lib/vocabulary')
+    const vocab = {
+      tier: [{ key: '4_star', label: '4 Star' }],
+      board_basis: [{ key: 'bb', label: 'Bed & Breakfast' }],
+    }
+    const r = resolveRecordKeys({ tier: '4 star', board_basis: 'BB', city: 'Luxor' }, vocab)
+    expect(r.record).toEqual({ tier: '4_star', board_basis: 'bb', city: 'Luxor' })
+    expect(r.errors).toEqual([])
+    const bad = resolveRecordKeys({ tier: 'Platinum' }, vocab)
+    expect(bad.record.tier).toBe('Platinum')
+    expect(bad.errors[0]).toMatch(/tier: "Platinum" is not in your tier list/)
+    // A kind with no vocabulary is left as typed (migration not applied, or the kind is unmanaged)
+    expect(resolveRecordKeys({ meal_type: 'Lunch' }, vocab).errors).toEqual([])
+  })
+})

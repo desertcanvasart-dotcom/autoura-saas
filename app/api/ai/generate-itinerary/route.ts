@@ -28,6 +28,8 @@ import {
   buildContentContext, buildWritingRulesContext, fetchAttractionsList,
 } from '@/lib/ai/content-library'
 import { getUserPreferences } from '@/lib/ai/user-preferences'
+import { loadVocabulary } from '@/lib/vocabulary-server'
+import { presetTierFor, tierMultiplier } from '@/lib/vocabulary'
 import { generateFromStructuredInput, generateCreativeItinerary } from '@/lib/ai/prompt-builder'
 import { loadDestinationPromptContext } from '@/lib/ai/destination-context'
 import { getTenantRunCurrency, DEFAULT_RUN_CURRENCY } from '@/lib/rates/run-currency'
@@ -488,7 +490,13 @@ export async function POST(request: NextRequest) {
     const city = requested_city || destinationContext.defaultCity
     const finalTourName = tour_requested || tour_name || `${destinationContext.name} Tour`
     let finalLanguage = language !== 'English' ? language : (conversation_language || 'English')
-    const tier: ServiceTier = raw_tier ? normalizeTier(raw_tier) : budget_level !== 'standard' ? normalizeTier(budget_level) : userPrefs.default_tier
+    // The agency's tiers (Settings → Your vocabulary): a typed word resolves
+    // to the agency's own key, a synonym maps by ladder position.
+    const tierItems = await loadVocabulary(supabase, 'tier')
+    const tierLadder = tierItems.map(i => i.key)
+    const tier: ServiceTier = raw_tier
+      ? normalizeTier(raw_tier, tierItems)
+      : budget_level !== 'standard' ? normalizeTier(budget_level, tierItems) : normalizeTier(userPrefs.default_tier, tierItems)
 
     if (!isValidDate(start_date)) {
       return NextResponse.json(
@@ -969,11 +977,11 @@ export async function POST(request: NextRequest) {
 
     let airportServiceRates = { arrival: 0, departure: 0 }
     if (haveAirportRows) {
-      const resolved = resolveAirportRates(airportStaffRates, { tier, city: effectiveCity })
+      const resolved = resolveAirportRates(airportStaffRates, { tier, city: effectiveCity, ladder: tierLadder })
       if (resolved.ok) {
         airportServiceRates = { arrival: resolved.rates.arrival, departure: resolved.rates.departure }
       } else {
-        const wanted = AIRPORT_SERVICE_BY_TIER[tier]
+        const wanted = AIRPORT_SERVICE_BY_TIER[presetTierFor(tierLadder, tier)]
         addHole({
           kind: 'airport_service', tier, reason: 'missing',
           lookupAttempted: `airport_staff_rates for '${effectiveCity}' service_type '${wanted}'`,
@@ -1039,8 +1047,8 @@ export async function POST(request: NextRequest) {
       message: 'No active tipping rates are set up. Add them in Rates → Tipping.',
     })
     let dailyTips = tippingRates?.reduce((sum: number, t: any) => t.rate_unit === 'per_day' ? sum + toNumber(t.rate_eur, 0) : sum, 0) || 0
-    const tierTipsMultiplier: Record<ServiceTier, number> = { 'budget': 0.8, 'standard': 1.0, 'deluxe': 1.2, 'luxury': 1.5 }
-    dailyTips = Math.round(dailyTips * tierTipsMultiplier[tier])
+    // By position on the agency's ladder: lowest tier 0.8 … highest 1.5.
+    dailyTips = Math.round(dailyTips * tierMultiplier(tierLadder, tier))
 
     // `daily_rate`, not `daily_rate_eur` — the latter does not exist on either
     // table, so both of these were silently 0 and every quote said transport

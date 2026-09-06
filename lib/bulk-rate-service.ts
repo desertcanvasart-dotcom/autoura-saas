@@ -891,7 +891,7 @@ function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
   if (/(^|_)city$/.test(name) || name === 'embark_city' || name === 'disembark_city') return 'Cairo'
   if (/country/.test(name)) return 'Egypt'
   if (name === 'property_type') return 'hotel'
-  if (name === 'board_basis') return 'BB'
+  if (name === 'board_basis') return 'bb'
   if (name === 'tier') return 'standard'
   if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
     return 'Example Name'
