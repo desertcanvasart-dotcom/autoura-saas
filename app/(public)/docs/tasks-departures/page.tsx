@@ -14,7 +14,7 @@ export default function TasksDeparturesPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Tasks, Departures &amp; Capacity</h1>
       <p className="text-gray-600 mb-8">
-        Three tools keep day-to-day operations on track: <strong>Tasks</strong> for team to-dos, <strong>Tour Departures</strong> for scheduled group departures, and the <strong>Capacity</strong> calendar for controlling how much your operation takes on per date. Tasks and Departures live in the sidebar under <strong>Operations</strong> (admin and manager roles); Capacity lives under <strong>Settings</strong> and is admin-only.
+        Three tools keep day-to-day operations on track: <strong>Tasks</strong> for team to-dos, <strong>Tour Departures</strong> for scheduled group departures, and the <strong>Capacity</strong> calendar for controlling how much your operation takes on per date. All three live in the sidebar under <strong>Operations</strong> &mdash; Tasks and Departures for admin and manager roles, the <strong>Capacity Calendar</strong> (right under Tour Departures) admin-only.
       </p>
 
       {/* Tasks */}
