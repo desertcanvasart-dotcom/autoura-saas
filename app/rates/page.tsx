@@ -895,7 +895,7 @@ export default function RatesPage() {
                   {paginatedRates.transportation.map((rate, index) => (
                     <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
                       <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.service_type}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900"><VocabLabel kind="transport_service_type" value={rate.service_type} /></td>
                       <td className="px-4 py-3 text-sm text-gray-700"><VocabLabel kind="vehicle_type" value={rate.vehicle_type} /></td>
                       <td className="px-4 py-3">
                         <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
@@ -944,7 +944,7 @@ export default function RatesPage() {
                     <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
                       <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.guide_language}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{rate.guide_type}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700"><VocabLabel kind="guide_grade" value={rate.guide_type} /></td>
                       <td className="px-4 py-3">
                         <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                           {rate.city}
@@ -952,7 +952,7 @@ export default function RatesPage() {
                       </td>
                       <td className="px-4 py-3 text-xs">
                         <span className="px-2 py-0.5 bg-gray-100 rounded text-gray-700">
-                          {rate.tour_duration?.replace('_', ' ')}
+                          <VocabLabel kind="guide_duration" value={rate.tour_duration} />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
@@ -1322,7 +1322,7 @@ export default function RatesPage() {
                           rate.service_type === 'customs_assist' ? 'bg-blue-100 text-blue-800' :
                           'bg-gray-100 text-gray-700'
                         }`}>
-                          {rate.service_type.replace('_', ' ')}
+                          <VocabLabel kind="airport_service_type" value={rate.service_type} />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -1378,7 +1378,7 @@ export default function RatesPage() {
                           rate.service_type === 'porter' ? 'bg-blue-100 text-blue-800' :
                           'bg-gray-100 text-gray-700'
                         }`}>
-                          {rate.service_type.replace('_', ' ')}
+                          <VocabLabel kind="hotel_service_type" value={rate.service_type} />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -1434,19 +1434,19 @@ export default function RatesPage() {
                           rate.role_type === 'porter' ? 'bg-purple-100 text-purple-800' :
                           'bg-gray-100 text-gray-700'
                         }`}>
-                          {rate.role_type.replace('_', ' ')}
+                          <VocabLabel kind="tipping_role" value={rate.role_type} />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         {rate.context ? (
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">
-                            {rate.context.replace('_', ' ')}
+                            <VocabLabel kind="tipping_context" value={rate.context} />
                           </span>
                         ) : '-'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs font-medium">
-                          {rate.rate_unit.replace('_', ' ')}
+                          <VocabLabel kind="tipping_unit" value={rate.rate_unit} />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">

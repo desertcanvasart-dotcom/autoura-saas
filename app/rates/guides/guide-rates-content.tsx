@@ -13,6 +13,7 @@ import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
+import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 
 
 const LANGUAGES = [
@@ -20,33 +21,11 @@ const LANGUAGES = [
   'Russian', 'Chinese', 'Japanese', 'Portuguese', 'Dutch', 'Polish'
 ]
 
-// The GRADE axis (B-item 1): the dropdown offers the two grades the engine
-// prices by — 'egyptologist' (the default ask) and 'senior'. Legacy values
-// stay displayable on existing rows via LEGACY_GUIDE_TYPE_LABELS, but new
-// rows pick a grade the engine can actually select on.
-const GUIDE_TYPES = [
-  { value: 'egyptologist', label: 'Egyptologist (default grade)' },
-  { value: 'senior', label: 'Senior guide' },
-]
-
-const LEGACY_GUIDE_TYPE_LABELS: Record<string, string> = {
-  licensed: 'Licensed Guide',
-  local: 'Local Guide',
-  specialist: 'Specialist',
-  driver_guide: 'Driver Guide',
-  birdwatching: 'Birdwatching Guide',
-  bedouin: 'Bedouin Guide',
-}
-
-const TOUR_DURATIONS = [
-  { value: 'half_day', label: 'Half Day (4h)' },
-  { value: 'full_day', label: 'Full Day (8h)' },
-  // The throughout guide's cheaper fee for meet/goodbye/transit days —
-  // one row per grade (B-item 1).
-  { value: 'meet_greet', label: 'Meet & Assist day' },
-  { value: 'extended', label: 'Extended (10h+)' },
-  { value: 'hourly', label: 'Hourly' }
-]
+// The GRADE axis (B-item 1) and the day type both come from the agency's
+// vocabulary (Settings → Your vocabulary: Guide grades, Guide day types).
+// The engine prices by KEY — 'egyptologist' / 'senior', 'full_day' /
+// 'half_day' / 'meet_greet' — so labels are the agency's to change; the six
+// legacy grades are seeded hidden so old rows still read as words.
 
 interface Guide {
   id: string
@@ -739,16 +718,8 @@ export default function GuideRatesContent() {
           </select>
 
           {/* Guide Type Filter */}
-          <select
-            value={selectedGuideType}
-            onChange={(e) => setSelectedGuideType(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
-          >
-            <option value="">All Types</option>
-            {GUIDE_TYPES.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
+          <VocabSelect kind="guide_grade" value={selectedGuideType} onChange={setSelectedGuideType} placeholder={"All Types"}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
 
           {/* Active Only Toggle */}
           <button
@@ -900,7 +871,7 @@ export default function GuideRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                        {GUIDE_TYPES.find(t => t.value === rate.guide_type)?.label || LEGACY_GUIDE_TYPE_LABELS[rate.guide_type] || rate.guide_type}
+                        <VocabLabel kind="guide_grade" value={rate.guide_type} />
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -908,7 +879,7 @@ export default function GuideRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="text-sm text-gray-600">
-                        {TOUR_DURATIONS.find(d => d.value === rate.tour_duration)?.label || rate.tour_duration}
+                        <VocabLabel kind="guide_duration" value={rate.tour_duration} />
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -983,9 +954,9 @@ export default function GuideRatesContent() {
                 )}
 
                 <div className="space-y-1 text-sm text-gray-600 mb-3">
-                  <p><span className="text-gray-400">Type:</span> {GUIDE_TYPES.find(t => t.value === rate.guide_type)?.label || LEGACY_GUIDE_TYPE_LABELS[rate.guide_type] || rate.guide_type}</p>
+                  <p><span className="text-gray-400">Type:</span> <VocabLabel kind="guide_grade" value={rate.guide_type} /></p>
                   <p><span className="text-gray-400">City:</span> {rate.city || '—'}</p>
-                  <p><span className="text-gray-400">Duration:</span> {TOUR_DURATIONS.find(d => d.value === rate.tour_duration)?.label}</p>
+                  <p><span className="text-gray-400">Duration:</span> <VocabLabel kind="guide_duration" value={rate.tour_duration} /></p>
                 </div>
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
@@ -1188,17 +1159,8 @@ export default function GuideRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Guide Type *</label>
-                    <select
-                      name="guide_type"
-                      value={formData.guide_type}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      {GUIDE_TYPES.map(type => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="guide_grade" value={formData.guide_type} onChange={v => setFormData(prev => ({ ...prev, guide_type: v }))} placeholder={null} name="guide_type" required
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
@@ -1247,16 +1209,8 @@ export default function GuideRatesContent() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Tour Duration</label>
-                    <select
-                      name="tour_duration"
-                      value={formData.tour_duration}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      {TOUR_DURATIONS.map(dur => (
-                        <option key={dur.value} value={dur.value}>{dur.label}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="guide_duration" value={formData.tour_duration} onChange={v => setFormData(prev => ({ ...prev, tour_duration: v }))} placeholder={null} name="tour_duration"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>
                     <label htmlFor="base_rate_eur" className="block text-xs font-medium text-gray-600 mb-1">Rate ({rateSymbol}) *</label>

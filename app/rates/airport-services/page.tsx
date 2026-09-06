@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Plane, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VocabSelect, useVocabulary } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
@@ -23,7 +24,6 @@ const AIRPORTS = [
   { code: 'HRG', name: 'Hurghada International' },
   { code: 'SSH', name: 'Sharm El-Sheikh' }
 ]
-const SERVICE_TYPES = ['meet_greet', 'customs_assist', 'full_service', 'vip_service']
 const DIRECTIONS = ['arrival', 'departure', 'both']
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
@@ -60,10 +60,6 @@ interface Toast {
 
 function getAirportName(code: string): string {
   return AIRPORTS.find(a => a.code === code)?.name || code
-}
-
-function formatServiceType(type: string): string {
-  return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 function formatDirection(direction: string): string {
@@ -201,6 +197,8 @@ export default function AirportServicesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedAirport, setSelectedAirport] = useState('all')
   const [selectedService, setSelectedService] = useState('all')
+  // The agency's words for the service levels (Settings → Your vocabulary).
+  const { labelFor: formatServiceType } = useVocabulary('airport_service_type')
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<AirportStaffRate | null>(null)
@@ -571,16 +569,8 @@ export default function AirportServicesPage() {
                 <option key={a.code} value={a.code}>{a.code} - {a.name}</option>
               ))}
             </select>
-            <select 
-              value={selectedService} 
-              onChange={(e) => setSelectedService(e.target.value)} 
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600"
-            >
-              <option value="all">All Services</option>
-              {SERVICE_TYPES.map(s => (
-                <option key={s} value={s}>{formatServiceType(s)}</option>
-              ))}
-            </select>
+            <VocabSelect kind="airport_service_type" value={selectedService} onChange={setSelectedService} placeholder={"All Services"} emptyValue="all"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600" />
             <button 
               onClick={() => setShowInactive(!showInactive)} 
               className={`px-3 py-2 text-sm rounded-lg font-medium ${
@@ -779,16 +769,8 @@ export default function AirportServicesPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Service Type *</label>
-                  <select 
-                    name="service_type" 
-                    value={formData.service_type} 
-                    onChange={handleChange} 
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600"
-                  >
-                    {SERVICE_TYPES.map(s => (
-                      <option key={s} value={s}>{formatServiceType(s)}</option>
-                    ))}
-                  </select>
+                  <VocabSelect kind="airport_service_type" value={formData.service_type} onChange={v => setFormData(prev => ({ ...prev, service_type: v }))} placeholder={null} name="service_type"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

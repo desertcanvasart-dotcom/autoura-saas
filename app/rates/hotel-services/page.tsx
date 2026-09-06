@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ConciergeBell, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VocabSelect, useVocabulary } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
@@ -16,8 +17,6 @@ import { averageRateInOneCurrency } from '@/lib/currency-totals'
 // CONSTANTS
 // ============================================
 
-const SERVICE_TYPES = ['porter', 'checkin_assist', 'checkout_assist', 'full_service', 'concierge']
-const HOTEL_CATEGORIES = ['budget', 'standard', 'luxury', 'all']
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 // ============================================
@@ -30,7 +29,8 @@ interface HotelStaffRate {
   id: string
   service_code: string
   service_type: string
-  hotel_category: 'budget' | 'standard' | 'luxury' | 'all'
+  /** A tier key from the agency's vocabulary, or 'all' for every hotel. */
+  hotel_category: string
   rate_eur: number
   description: string | null
   notes: string | null
@@ -49,14 +49,6 @@ interface Toast {
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
-
-function formatServiceType(type: string): string {
-  return type.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-}
-
-function formatCategory(category: string): string {
-  return category.charAt(0).toUpperCase() + category.slice(1)
-}
 
 // ============================================
 // PAGINATION COMPONENT
@@ -188,6 +180,11 @@ export default function HotelServicesPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedService, setSelectedService] = useState('all')
+  // The agency's words (Settings → Your vocabulary): service levels, and the
+  // tiers a hotel category is one of ('all' means every hotel).
+  const { labelFor: formatServiceType } = useVocabulary('hotel_service_type')
+  const { items: tierItems, labelFor: tierLabel } = useVocabulary('tier')
+  const categoryLabel = (c: string) => (c === 'all' ? 'All hotels' : tierLabel(c))
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -209,7 +206,7 @@ export default function HotelServicesPage() {
   const [formData, setFormData] = useState({
     service_code: '',
     service_type: 'porter',
-    hotel_category: 'all' as 'budget' | 'standard' | 'luxury' | 'all',
+    hotel_category: 'all',
     rate_eur: 0,
     description: '',
     notes: '',
@@ -357,7 +354,7 @@ export default function HotelServicesPage() {
 
   const handleDelete = async (rate: HotelStaffRate) => {
     const serviceName = formatServiceType(rate.service_type)
-    const categoryName = formatCategory(rate.hotel_category)
+    const categoryName = categoryLabel(rate.hotel_category)
     
     const confirmed = await dialog.confirmDelete('Hotel Service Rate',
       `Are you sure you want to delete the "${serviceName}" service for ${categoryName} hotels? This action cannot be undone.`
@@ -544,24 +541,16 @@ export default function HotelServicesPage() {
                 className="w-full pl-3 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600 focus:border-transparent" 
               />
             </div>
-            <select 
-              value={selectedService} 
-              onChange={(e) => setSelectedService(e.target.value)} 
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
-            >
-              <option value="all">All Services</option>
-              {SERVICE_TYPES.map(s => (
-                <option key={s} value={s}>{formatServiceType(s)}</option>
-              ))}
-            </select>
-            <select 
-              value={selectedCategory} 
-              onChange={(e) => setSelectedCategory(e.target.value)} 
+            <VocabSelect kind="hotel_service_type" value={selectedService} onChange={setSelectedService} placeholder={"All Services"} emptyValue="all"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600" />
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
               className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
             >
               <option value="all">All Categories</option>
-              {HOTEL_CATEGORIES.map(c => (
-                <option key={c} value={c}>{formatCategory(c)}</option>
+              {tierItems.map(t => (
+                <option key={t.key} value={t.key}>{t.label}</option>
               ))}
             </select>
             <button 
@@ -656,7 +645,7 @@ export default function HotelServicesPage() {
                         rate.hotel_category === 'budget' ? 'bg-gray-100 text-gray-700' :
                         'bg-green-100 text-green-800'
                       }`}>
-                        {formatCategory(rate.hotel_category)}
+                        {categoryLabel(rate.hotel_category)}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
@@ -745,27 +734,21 @@ export default function HotelServicesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Service Type *</label>
-                  <select 
-                    name="service_type" 
-                    value={formData.service_type} 
-                    onChange={handleChange} 
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
-                  >
-                    {SERVICE_TYPES.map(s => (
-                      <option key={s} value={s}>{formatServiceType(s)}</option>
-                    ))}
-                  </select>
+                  <VocabSelect kind="hotel_service_type" value={formData.service_type} onChange={v => setFormData(prev => ({ ...prev, service_type: v }))} placeholder={null} name="service_type"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Hotel Category *</label>
-                  <select 
-                    name="hotel_category" 
-                    value={formData.hotel_category} 
-                    onChange={handleChange} 
+                  <select
+                    name="hotel_category"
+                    value={formData.hotel_category}
+                    onChange={handleChange}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
                   >
-                    {HOTEL_CATEGORIES.map(c => (
-                      <option key={c} value={c}>{formatCategory(c)}</option>
+                    {/* The agency's tiers (Settings → Your vocabulary); 'all' = every hotel. */}
+                    <option value="all">All hotels</option>
+                    {tierItems.map(t => (
+                      <option key={t.key} value={t.key}>{t.label}</option>
                     ))}
                   </select>
                 </div>

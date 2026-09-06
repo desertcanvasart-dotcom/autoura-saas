@@ -12,7 +12,12 @@
 export const VOCABULARY_KINDS = [
   'tier', 'supplier_type', 'board_basis', 'vehicle_type',
   'cruise_cabin', 'sleeper_cabin', 'meal_type', 'hotel_property_type',
-  'train_class',
+  'train_class', 'attraction_category', 'attraction_fee_type', 'tipping_role',
+  'tipping_context', 'tipping_unit', 'transport_service_type', 'flight_type',
+  'flight_cabin', 'flight_frequency', 'airport_service_type', 'hotel_service_type',
+  'cuisine_type', 'restaurant_type', 'dietary_option', 'activity_category',
+  'activity_type', 'activity_duration', 'activity_unit', 'guide_grade',
+  'guide_duration',
 ] as const
 export type VocabularyKind = (typeof VOCABULARY_KINDS)[number]
 
@@ -20,8 +25,15 @@ export function isVocabularyKind(v: unknown): v is VocabularyKind {
   return (VOCABULARY_KINDS as readonly string[]).includes(String(v))
 }
 
+/** How the settings screen groups the kinds — a flat list of 29 is a wall. */
+export const VOCABULARY_GROUPS = [
+  'General', 'Hotels & cruises', 'Transport & tickets', 'Guides & tipping', 'Meals', 'Attractions & activities',
+] as const
+export type VocabularyGroup = (typeof VOCABULARY_GROUPS)[number]
+
 export interface VocabularyKindInfo {
   kind: VocabularyKind
+  group: VocabularyGroup
   title: string
   /** One line for the settings screen: what this list is. */
   description: string
@@ -36,6 +48,7 @@ export interface VocabularyKindInfo {
 export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = {
   tier: {
     kind: 'tier',
+    group: 'General',
     title: 'Service tiers',
     description: 'The quality levels you sell, from lowest to highest. Every rate, quote and tour variation is filed under one of these.',
     usedIn: 'Quotes, tour variations, hotel and cruise rates, content library',
@@ -44,6 +57,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
   },
   supplier_type: {
     kind: 'supplier_type',
+    group: 'General',
     title: 'Supplier types',
     description: 'The kinds of companies you buy from. Each one behaves like a built-in kind (a hotel gets a Properties tab, a transport company gets rate linkage) — rename them, hide the ones you never use, or add your own.',
     usedIn: 'Suppliers section, rate forms, expenses',
@@ -52,6 +66,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
   },
   board_basis: {
     kind: 'board_basis',
+    group: 'Hotels & cruises',
     title: 'Board basis',
     description: 'Meal plans a hotel rate can carry.',
     usedIn: 'Hotel rates, quotes',
@@ -60,6 +75,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
   },
   vehicle_type: {
     kind: 'vehicle_type',
+    group: 'Transport & tickets',
     title: 'Vehicle types',
     description: 'The vehicles you price transport with, and how many passengers each carries — the pricing engine picks the smallest vehicle that fits the group.',
     usedIn: 'Transport rates, pricing engine, supplier fleets',
@@ -68,6 +84,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
   },
   cruise_cabin: {
     kind: 'cruise_cabin',
+    group: 'Hotels & cruises',
     title: 'Cruise cabin types',
     description: 'Cabin categories on a Nile or lake cruise.',
     usedIn: 'Cruise rates',
@@ -76,6 +93,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
   },
   sleeper_cabin: {
     kind: 'sleeper_cabin',
+    group: 'Transport & tickets',
     title: 'Sleeping-train cabins',
     description: 'Cabin types on overnight trains.',
     usedIn: 'Sleeping-train rates',
@@ -84,6 +102,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
   },
   train_class: {
     kind: 'train_class',
+    group: 'Transport & tickets',
     title: 'Train classes',
     description: 'Seat classes on day trains.',
     usedIn: 'Train rates, quotes',
@@ -92,6 +111,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
   },
   meal_type: {
     kind: 'meal_type',
+    group: 'Meals',
     title: 'Meal types',
     description: 'The meals a restaurant rate can be for.',
     usedIn: 'Restaurant and meal rates, itinerary days',
@@ -100,11 +120,192 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
   },
   hotel_property_type: {
     kind: 'hotel_property_type',
+    group: 'Hotels & cruises',
     title: 'Accommodation types',
     description: 'What kind of place a hotel rate is for.',
     usedIn: 'Hotel rates',
     minItems: 1,
     example: 'Hotel / Resort / Camp / Dahabiya',
+  },
+  attraction_category: {
+    kind: 'attraction_category',
+    group: 'Attractions & activities',
+    title: 'Attraction categories',
+    description: 'What kind of site an entrance fee is for.',
+    usedIn: 'Attractions & entrance fees',
+    minItems: 1,
+    example: 'Temple / Museum / Tomb',
+  },
+  attraction_fee_type: {
+    kind: 'attraction_fee_type',
+    group: 'Attractions & activities',
+    title: 'Entrance fee types',
+    description: 'How an attraction charges.',
+    usedIn: 'Attractions & entrance fees',
+    minItems: 1,
+    example: 'Standard / Free Entry / Donation Based',
+  },
+  tipping_role: {
+    kind: 'tipping_role',
+    group: 'Guides & tipping',
+    title: 'Tipping roles',
+    description: 'Who gets tipped.',
+    usedIn: 'Tipping rates, pricing engine',
+    minItems: 1,
+    example: 'Guide / Driver / Boat Crew',
+  },
+  tipping_context: {
+    kind: 'tipping_context',
+    group: 'Guides & tipping',
+    title: 'Tipping contexts',
+    description: 'The occasion a tip is for.',
+    usedIn: 'Tipping rates',
+    minItems: 1,
+    example: 'Day Tour / Cruise / Airport',
+  },
+  tipping_unit: {
+    kind: 'tipping_unit',
+    group: 'Guides & tipping',
+    title: 'Tipping units',
+    description: 'How a tip is counted. The engine sums the per-day ones.',
+    usedIn: 'Tipping rates, pricing engine',
+    minItems: 1,
+    example: 'Per Day / Per Service / Per Person',
+  },
+  transport_service_type: {
+    kind: 'transport_service_type',
+    group: 'Transport & tickets',
+    title: 'Transport service types',
+    description: 'The kinds of journey you price. Ticking "needs a destination" makes the form ask for one; the engine selects by key (airport transfer, day tour, half day).',
+    usedIn: 'Transportation rates, pricing engine',
+    minItems: 1,
+    example: 'Airport Transfer / Day Tour / Intercity Drop-off',
+  },
+  flight_type: {
+    kind: 'flight_type',
+    group: 'Transport & tickets',
+    title: 'Flight types',
+    description: 'Domestic or international.',
+    usedIn: 'Flight rates',
+    minItems: 1,
+    example: 'Domestic / International',
+  },
+  flight_cabin: {
+    kind: 'flight_cabin',
+    group: 'Transport & tickets',
+    title: 'Flight cabins',
+    description: 'Cabin classes on a flight. The engine prices economy.',
+    usedIn: 'Flight rates, pricing engine',
+    minItems: 1,
+    example: 'Economy / Business / First Class',
+  },
+  flight_frequency: {
+    kind: 'flight_frequency',
+    group: 'Transport & tickets',
+    title: 'Flight frequencies',
+    description: 'How often a flight runs.',
+    usedIn: 'Flight rates',
+    minItems: 1,
+    example: 'Daily / Weekdays Only / Charter',
+  },
+  airport_service_type: {
+    kind: 'airport_service_type',
+    group: 'Transport & tickets',
+    title: 'Airport service levels',
+    description: 'The levels of airport assistance you sell. The engine defaults to meet & greet.',
+    usedIn: 'Airport service rates, pricing engine',
+    minItems: 1,
+    example: 'Meet & Greet / VIP Service',
+  },
+  hotel_service_type: {
+    kind: 'hotel_service_type',
+    group: 'Hotels & cruises',
+    title: 'Hotel service levels',
+    description: 'The kinds of hotel assistance you sell. The engine asks for check-in assist and porter.',
+    usedIn: 'Hotel service rates, pricing engine',
+    minItems: 1,
+    example: 'Porter / Check-in Assist / Concierge',
+  },
+  cuisine_type: {
+    kind: 'cuisine_type',
+    group: 'Meals',
+    title: 'Cuisines',
+    description: 'What a restaurant cooks.',
+    usedIn: 'Meal rates',
+    minItems: 1,
+    example: 'Egyptian / Mediterranean / Seafood',
+  },
+  restaurant_type: {
+    kind: 'restaurant_type',
+    group: 'Meals',
+    title: 'Restaurant types',
+    description: 'What kind of place a meal is at.',
+    usedIn: 'Meal rates',
+    minItems: 1,
+    example: 'Fine Dining / Buffet / Street Food',
+  },
+  dietary_option: {
+    kind: 'dietary_option',
+    group: 'Meals',
+    title: 'Dietary options',
+    description: 'What a restaurant can cater for.',
+    usedIn: 'Meal rates',
+    minItems: 1,
+    example: 'Vegetarian / Halal / Gluten-Free',
+  },
+  activity_category: {
+    kind: 'activity_category',
+    group: 'Attractions & activities',
+    title: 'Activity categories',
+    description: 'What kind of activity it is.',
+    usedIn: 'Activities & add-ons',
+    minItems: 1,
+    example: 'Desert Safari / Nile Experience',
+  },
+  activity_type: {
+    kind: 'activity_type',
+    group: 'Attractions & activities',
+    title: 'Activity types',
+    description: 'The format of an activity.',
+    usedIn: 'Activities & add-ons',
+    minItems: 1,
+    example: 'Guided Tour / Workshop / Show',
+  },
+  activity_duration: {
+    kind: 'activity_duration',
+    group: 'Attractions & activities',
+    title: 'Activity durations',
+    description: 'How long an activity takes.',
+    usedIn: 'Activities & add-ons',
+    minItems: 1,
+    example: '1 hour / Half Day (4-5h)',
+  },
+  activity_unit: {
+    kind: 'activity_unit',
+    group: 'Attractions & activities',
+    title: 'Activity units',
+    description: 'What a per-unit activity is priced per.',
+    usedIn: 'Activities & add-ons',
+    minItems: 1,
+    example: 'boat / felucca / ride',
+  },
+  guide_grade: {
+    kind: 'guide_grade',
+    group: 'Guides & tipping',
+    title: 'Guide grades',
+    description: 'The grades of guide you price. The engine asks for these by key (egyptologist by default, senior on request); older grades are kept hidden so old rates still read.',
+    usedIn: 'Guide rates, quotes, pricing engine',
+    minItems: 1,
+    example: 'Egyptologist / Senior guide',
+  },
+  guide_duration: {
+    kind: 'guide_duration',
+    group: 'Guides & tipping',
+    title: 'Guide day types',
+    description: 'The kinds of guiding day you price. The engine asks for full day, half day and meet & assist by key.',
+    usedIn: 'Guide rates, pricing engine',
+    minItems: 1,
+    example: 'Full Day (8h) / Half Day (4h) / Meet & Assist day',
   },
 }
 
@@ -335,7 +536,8 @@ export function vehicleForPax(vehicles: readonly VehicleBand[], pax: number): st
   return sized[sized.length - 1].key
 }
 
-/** Which import/CSV columns are vocabulary keys, and of which kind. */
+/** Which import/CSV columns are vocabulary keys, and of which kind —
+ *  the columns whose name means one thing in every table. */
 export const VOCABULARY_COLUMNS: Record<string, VocabularyKind> = {
   tier: 'tier',
   board_basis: 'board_basis',
@@ -345,6 +547,44 @@ export const VOCABULARY_COLUMNS: Record<string, VocabularyKind> = {
   cabin_type: 'sleeper_cabin',
   class_type: 'train_class',
   ship_category: 'tier',
+  fee_type: 'attraction_fee_type',
+  role_type: 'tipping_role',
+  context: 'tipping_context',
+  rate_unit: 'tipping_unit',
+  flight_type: 'flight_type',
+  cabin_class: 'flight_cabin',
+  frequency: 'flight_frequency',
+  cuisine_type: 'cuisine_type',
+  restaurant_type: 'restaurant_type',
+  activity_category: 'activity_category',
+  activity_type: 'activity_type',
+  unit_label: 'activity_unit',
+  guide_type: 'guide_grade',
+  tour_duration: 'guide_duration',
+}
+
+/** Columns whose name means something DIFFERENT per table: `service_type`
+ *  is a journey on transportation rates and an assistance level on airport
+ *  or hotel service rates; `category` is an attraction category only on
+ *  entrance fees; `duration` is a vocabulary word on activities but free
+ *  text on transport. Looked up by the importer's table name. */
+export const TABLE_VOCABULARY_COLUMNS: Record<string, Record<string, VocabularyKind>> = {
+  transportation_rates: { service_type: 'transport_service_type' },
+  airport_staff_rates: { service_type: 'airport_service_type' },
+  hotel_staff_rates: { service_type: 'hotel_service_type' },
+  entrance_fees: { category: 'attraction_category' },
+  activity_rates: { duration: 'activity_duration' },
+}
+
+/** The vocabulary columns of one import table. */
+export function vocabularyColumnsFor(table: string): Record<string, VocabularyKind> {
+  return { ...VOCABULARY_COLUMNS, ...(TABLE_VOCABULARY_COLUMNS[table] ?? {}) }
+}
+
+/** transport_service_type meta: does this journey need a destination city? */
+export function needsDestination(items: readonly Pick<VocabularyItem, 'key' | 'meta'>[], key: string | null | undefined): boolean {
+  if (!key) return false
+  return Boolean(items.find(i => i.key === key)?.meta?.needs_destination)
 }
 
 /** Re-file a record's vocabulary columns as stored keys. Values that match
