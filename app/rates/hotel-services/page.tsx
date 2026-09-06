@@ -35,6 +35,9 @@ interface HotelStaffRate {
   description: string | null
   notes: string | null
   is_active: boolean
+  /** The outside company this service is bought from (migration 339); null = in-house. */
+  supplier_id?: string | null
+  supplier_name?: string | null
 }
 
 interface Toast { 
@@ -210,13 +213,30 @@ export default function HotelServicesPage() {
     rate_eur: 0,
     description: '',
     notes: '',
-    is_active: true
+    is_active: true,
+    supplier_id: '',
+    supplier_name: ''
   })
 
   const showToast = (type: 'success' | 'error', message: string) => {
     const id = Date.now().toString()
     setToasts(prev => [...prev, { id, type, message }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
+  }
+
+  // The outside companies this service can be bought from: every supplier whose
+  // type behaves as ground handler (an agency's own "Airport assistant" or
+  // "Hotel assistant" type, Settings → Your vocabulary).
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; city?: string | null }[]>([])
+  useEffect(() => {
+    fetch('/api/suppliers?type=ground_handler&status=active')
+      .then(r => r.json())
+      .then(j => setSuppliers(Array.isArray(j?.data) ? j.data : []))
+      .catch(() => setSuppliers([]))
+  }, [])
+  const handleSupplierChange = (supplierId: string) => {
+    const s = suppliers.find(x => x.id === supplierId)
+    setFormData(prev => ({ ...prev, supplier_id: supplierId, supplier_name: s?.name || '' }))
   }
 
   const fetchRates = async () => {
@@ -266,7 +286,9 @@ export default function HotelServicesPage() {
       rate_eur: 0,
       description: '',
       notes: '',
-      is_active: true
+      is_active: true,
+      supplier_id: '',
+      supplier_name: ''
     })
     setShowModal(true)
   }
@@ -281,7 +303,9 @@ export default function HotelServicesPage() {
       rate_eur: rate.rate_eur,
       description: rate.description || '',
       notes: rate.notes || '',
-      is_active: rate.is_active
+      is_active: rate.is_active,
+      supplier_id: rate.supplier_id || '',
+      supplier_name: rate.supplier_name || ''
     })
     setShowModal(true)
   }
@@ -323,7 +347,9 @@ export default function HotelServicesPage() {
       rate_eur: rate.rate_eur,
       description: rate.description || '',
       notes: rate.notes || '',
-      is_active: rate.is_active
+      is_active: rate.is_active,
+      supplier_id: rate.supplier_id || '',
+      supplier_name: rate.supplier_name || ''
     })
     setShowModal(true)
     showToast('success', 'Rate cloned - modify and save as new')
@@ -638,6 +664,7 @@ export default function HotelServicesPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 max-w-[250px] truncate">
                       {rate.description || '-'}
+                      {rate.supplier_name && <span className="block text-[11px] text-gray-400 truncate">via {rate.supplier_name}</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -741,6 +768,23 @@ export default function HotelServicesPage() {
                       <option key={c} value={c}>{formatCategory(c)}</option>
                     ))}
                   </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Supplier</label>
+                  <select
+                    value={formData.supplier_id}
+                    onChange={e => handleSupplierChange(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
+                  >
+                    <option value="">In-house / no supplier</option>
+                    {suppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}{s.city ? ` (${s.city})` : ''}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    The company you buy this hotel assistance from — any supplier whose type behaves as ground handler.{' '}
+                    <Link href="/suppliers?type=ground_handler" className="text-rose-600 hover:underline">Manage suppliers &rarr;</Link>
+                  </p>
                 </div>
               </div>
               <div>
