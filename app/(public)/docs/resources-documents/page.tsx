@@ -31,7 +31,7 @@ export default function ResourcesDocumentsPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Resources Page</h3>
         <p className="text-gray-600">
-          There is also a <strong>Resources</strong> overview page (not in the sidebar) with tabs for Guides, Vehicles, Hotels, Restaurants, Airport Staff, and Hotel Staff. Use it to browse; for adding and editing resources, use the <strong>Suppliers</strong> page above, and for pricing use the <strong>Rates &amp; Pricing</strong> category pages.
+          There is also a <strong>Resources</strong> overview page (not in the sidebar) with tabs for Guides, Vehicles, Hotels, Restaurants, Airport Staff, and Hotel Staff. Use it to browse; for adding and editing resources, use the <strong>Suppliers</strong> page above, and for pricing use the <strong>Rates</strong> category pages.
         </p>
       </section>
 

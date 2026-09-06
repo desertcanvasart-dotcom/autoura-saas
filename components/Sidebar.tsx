@@ -193,7 +193,7 @@ const navigation: NavSection[] = [
     ]
   },
   {
-    title: 'Rates & Pricing',
+    title: 'Rates',
     key: 'rates',
     roles: ['admin', 'manager'],
     items: [

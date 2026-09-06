@@ -37,7 +37,7 @@ export default function B2CPricingPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Rate Sources</h2>
         <p className="text-gray-600 mb-3">
-          Pricing pulls from the rate tables managed under <strong>Rates &amp; Pricing</strong> in the sidebar (start at the <strong>Rates Hub</strong>). The 14 categories are:
+          Pricing pulls from the rate tables managed under <strong>Rates</strong> in the sidebar (start at the <strong>Rates Hub</strong>). The 14 categories are:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Hotels</strong> &mdash; Per-person per night by city, tier (budget/standard/deluxe/luxury), and season</li>

@@ -83,11 +83,11 @@ export default function GettingStartedPage() {
               </tr>
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <td className="px-4 py-3 font-medium text-gray-900">Manager</td>
-                <td className="px-4 py-3 text-gray-600">All day-to-day operations plus Rates &amp; Pricing, Finance, Suppliers, Itineraries, Tour Departures, Team Members, and Tasks</td>
+                <td className="px-4 py-3 text-gray-600">All day-to-day operations plus Rates, Finance, Suppliers, Itineraries, Tour Departures, Team Members, and Tasks</td>
               </tr>
               <tr className="border-b border-gray-100">
                 <td className="px-4 py-3 font-medium text-gray-900">Member</td>
-                <td className="px-4 py-3 text-gray-600">Works on the clients and tasks assigned to them &mdash; communication, quotes, and bookings. Does not see Rates &amp; Pricing, Finance, or the operations management pages</td>
+                <td className="px-4 py-3 text-gray-600">Works on the clients and tasks assigned to them &mdash; communication, quotes, and bookings. Does not see Rates, Finance, or the operations management pages</td>
               </tr>
               <tr>
                 <td className="px-4 py-3 font-medium text-gray-900">Viewer</td>

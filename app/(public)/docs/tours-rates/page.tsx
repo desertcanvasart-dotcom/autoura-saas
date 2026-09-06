@@ -56,9 +56,9 @@ export default function ToursRatesPage() {
 
       {/* Rates Management */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Rates &amp; Pricing</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Rates</h2>
         <p className="text-gray-600 mb-4">
-          All your buying rates live under the <strong>Rates &amp; Pricing</strong> sidebar group. The <strong>Rates Hub</strong> entry opens the Rate Management overview, and each of the 14 rate categories has its own page beneath it.
+          All your buying rates live under the <strong>Rates</strong> sidebar group. The <strong>Rates Hub</strong> entry opens the Rate Management overview, and each of the 14 rate categories has its own page beneath it.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Rate Categories</h3>
@@ -100,7 +100,7 @@ export default function ToursRatesPage() {
           Adding and editing happens on the individual category pages, not the overview:
         </p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Open the relevant category from the sidebar (e.g., Rates &amp; Pricing &rarr; Hotels)</li>
+          <li>Open the relevant category from the sidebar (e.g., Rates &rarr; Hotels)</li>
           <li>Add a new rate or click an existing rate to edit</li>
           <li>Fill in the details and save</li>
         </ol>
