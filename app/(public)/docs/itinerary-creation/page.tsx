@@ -14,7 +14,7 @@ export default function ItineraryCreationPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Itinerary Creation</h1>
       <p className="text-gray-600 mb-8">
-        Autoura offers two connected paths for creating itineraries. The <strong>WhatsApp Parser</strong> extracts client details from a conversation, and the <strong>New Quote</strong> grid (the pricing grid) is where you build the full day-by-day itinerary with services, rates, and live pricing.
+        Autoura offers two connected paths for creating itineraries. The <strong>WhatsApp Parser</strong> extracts client details from a conversation, and the <strong>Pricing Grid</strong> is where you build the full day-by-day itinerary with services, rates, and live pricing.
       </p>
 
       {/* Two Paths */}
@@ -27,16 +27,16 @@ export default function ItineraryCreationPage() {
             <p className="text-xs text-gray-400">Access: WhatsApp inbox conversation &rarr; Parse, or B2C Quotes &rarr; New Quote</p>
           </div>
           <div className="border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">New Quote (Pricing Grid)</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">Pricing Grid</h3>
             <p className="text-sm text-gray-600 mb-2">The full itinerary builder. Accepts text, file uploads, or existing itineraries. AI parses input into a day-by-day grid with 15 service slots, each linked to your rate tables.</p>
-            <p className="text-xs text-gray-400">Sidebar: Operations &rarr; New Quote</p>
+            <p className="text-xs text-gray-400">Sidebar: Operations &rarr; Pricing Grid</p>
           </div>
         </div>
         <p className="text-gray-600 mb-3">
           From the parser you can generate in two modes &mdash; <strong>Quick Generate</strong> or <strong>Generate &amp; Edit</strong> &mdash; both landing on the itinerary detail and edit pages. A separate button sends the parsed conversation to the pricing grid instead, when you want to price the trip straight away.
         </p>
         <Tip>
-          <strong>Quick start:</strong> You can go directly to <strong>New Quote</strong> without the WhatsApp Parser. Paste text, upload a file, or load an existing itinerary &mdash; the grid handles all three.
+          <strong>Quick start:</strong> You can go directly to the <strong>Pricing Grid</strong> without the WhatsApp Parser. Paste text, upload a file, or load an existing itinerary &mdash; the grid handles all three.
         </Tip>
       </section>
 
@@ -132,7 +132,7 @@ export default function ItineraryCreationPage() {
           <strong>Load by link:</strong> The grid also opens with an itinerary pre-loaded via <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">/pricing-grid?itinerary=&lt;id&gt;</code> &mdash; this is exactly what the <strong>Price in Grid</strong> button on the itinerary editor does.
         </Tip>
 
-        <DocScreenshot src="/docs/itinerary-creation/parser-review.jpg" alt="New Quote pricing grid showing trip settings bar, live quote strip, and the three input methods" />
+        <DocScreenshot src="/docs/itinerary-creation/parser-review.jpg" alt="Pricing Grid showing trip settings bar, live quote strip, and the three input methods" />
       </section>
 
       {/* Service Slots */}

@@ -92,7 +92,7 @@ export default function WorkflowsPage() {
           <li>Click <strong>Download PDF</strong> and send it to the client</li>
         </ol>
         <Tip>
-          Two different &ldquo;New Quote&rdquo; buttons: the <strong>Dashboard</strong> quick action opens the plain new-itinerary form, while <strong>New Quote in the sidebar</strong> (Operations group) opens the <strong>Pricing Grid</strong> &mdash; the spreadsheet-style quoting surface. Use whichever fits the job.
+          <strong>New Quote</strong> &mdash; on the Dashboard and in the sidebar (Operations group) &mdash; always opens the new-itinerary form: most sales start in an email or a WhatsApp and land in an itinerary. The spreadsheet-style quoting surface is its own entry, <strong>Pricing Grid</strong>, right below it.
         </Tip>
       </section>
 
