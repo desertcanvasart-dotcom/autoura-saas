@@ -26,7 +26,9 @@ import { VocabLabel } from '@/components/vocabulary'
 interface Supplier {
   id: string
   name: string
+  /** The PRIMARY role; `types` is the full list (migration 340). */
   type: string
+  types?: string[] | null
   contact_name?: string
   contact_email?: string
   contact_phone?: string
@@ -111,8 +113,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 
 // Multi-select component
-function MultiSelect({ options, value, onChange, placeholder }: { 
-  options: string[]; value: string[]; onChange: (v: string[]) => void; placeholder: string 
+function MultiSelect({ options, value, onChange, placeholder, labels }: { 
+  options: string[]; value: string[]; onChange: (v: string[]) => void; placeholder: string; labels?: Record<string, string>
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const dismissRootRef = useRef<HTMLDivElement>(null)
@@ -136,7 +138,7 @@ function MultiSelect({ options, value, onChange, placeholder }: {
           ) : (
             value.map(v => (
               <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-100 text-primary-700 rounded text-xs font-medium">
-                {v}
+                {labels?.[v] ?? v}
                 <span 
                   role="button"
                   tabIndex={0}
@@ -178,7 +180,7 @@ function MultiSelect({ options, value, onChange, placeholder }: {
                 }}
                 className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50 flex items-center justify-between cursor-pointer"
               >
-                <span>{option}</span>
+                <span>{labels?.[option] ?? option}</span>
                 {value.includes(option) && <Check className="w-4 h-4 text-primary-600" />}
               </div>
             ))}
@@ -200,6 +202,9 @@ export default function SuppliersContent() {
   // called, and which built-in kind it behaves as.
   const { items: typeItems, all: allTypes } = useVocabulary('supplier_type')
   const behaviorOf = (type: string) => allTypes.find(t => t.key === type)?.behavior ?? type
+  /** Every role a supplier fills (340); rows written before carry one. */
+  const typesOf = (s: { type: string; types?: string[] | null }) => (s.types && s.types.length ? s.types : [s.type]).filter(Boolean)
+  const typeLabels = (s: { type: string; types?: string[] | null }) => typesOf(s).map(t => getTypeConfig(t).singular).join(' · ')
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -304,7 +309,7 @@ export default function SuppliersContent() {
   // Filter and sort
   const filteredSuppliers = suppliers
     .filter(supplier => {
-      const matchesType = selectedType === 'all' || supplier.type === selectedType
+      const matchesType = selectedType === 'all' || typesOf(supplier).includes(selectedType)
       const matchesStatus = selectedStatus === 'all' || supplier.status === selectedStatus
       const matchesSearch = !searchQuery || 
         supplier.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -337,7 +342,7 @@ export default function SuppliersContent() {
   const allFilteredSelected = filteredSuppliers.length > 0 && filteredSuppliers.every(s => selectedIds.has(s.id))
 
   const stats = suppliers.reduce((acc, s) => {
-    acc[s.type] = (acc[s.type] || 0) + 1
+    for (const t of typesOf(s)) acc[t] = (acc[t] || 0) + 1
     acc.all = (acc.all || 0) + 1
     return acc
   }, { all: 0 } as Record<string, number>)
@@ -371,14 +376,14 @@ export default function SuppliersContent() {
 
   const handleAdd = () => {
     const defaultType = selectedType !== 'all' ? selectedType : 'hotel'
-    setFormData({ status: 'active', type: defaultType })
+    setFormData({ status: 'active', type: defaultType, types: [defaultType] })
     setError(null)
     setShowAddModal(true)
   }
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier)
-    setFormData({ ...supplier })
+    setFormData({ ...supplier, types: typesOf(supplier) })
     setError(null)
     setShowEditModal(true)
     setOpenMenuId(null)
@@ -392,7 +397,7 @@ export default function SuppliersContent() {
     setOpenMenuId(null)
 
     // Fetch rates for transport companies
-    if (['transport_company', 'transport', 'driver'].includes(behaviorOf(supplier.type))) {
+    if (typesOf(supplier).map(behaviorOf).some(b => ['transport_company', 'transport', 'driver'].includes(b))) {
       fetchSupplierRates(supplier.id)
     }
   }
@@ -420,7 +425,7 @@ export default function SuppliersContent() {
       // A cruise line or hotel was just created — open it on its Properties
       // tab so the fleet can be added right away.
       const row: Supplier | undefined = created.data
-      if (row?.id && propertyTypesForRoles([row.type]).length > 0) {
+      if (row?.id && propertyTypesForRoles(typesOf(row).map(behaviorOf)).length > 0) {
         handleView(row, 'properties')
       }
     } catch (err: any) {
@@ -575,7 +580,7 @@ export default function SuppliersContent() {
       ['Name', 'Type', 'Contact', 'Email', 'Phone', 'City', 'Commission', 'Status'].join(','),
       ...filteredSuppliers.map(s => [
         s.name, 
-        s.type, 
+        typesOf(s).join('|'), 
         s.contact_name, 
         s.contact_email, 
         s.contact_phone, 
@@ -604,7 +609,8 @@ export default function SuppliersContent() {
   }> => {
     return [
       { name: 'Supplier Name', key: 'name', type: 'text', required: true },
-      { name: 'Type', key: 'type', type: 'select', required: true, options: typeItems.map(t => t.key), optionLabels: Object.fromEntries(typeItems.map(t => [t.key, t.label])) },
+      // One or more roles: the first chosen is the primary (its icon and tab). 
+      { name: 'Types', key: 'types', type: 'multiselect', required: true, options: typeItems.map(t => t.key), optionLabels: Object.fromEntries(typeItems.map(t => [t.key, t.label])), description: 'A company can fill several roles — a ground handler that does airport and hotel assistance, a hotel with its own transfer fleet.' },
       // Contact
       { name: 'Contact Person', key: 'contact_name', type: 'text' },
       { name: 'Email', key: 'contact_email', type: 'email' },
@@ -635,6 +641,7 @@ export default function SuppliersContent() {
       return (
         <MultiSelect
           options={field.options}
+          labels={field.optionLabels}
           value={Array.isArray(value) ? value : []}
           onChange={(v) => setFormData(prev => ({ ...prev, [field.key]: v }))}
           placeholder={`Select ${field.name.toLowerCase()}...`}
@@ -867,7 +874,7 @@ export default function SuppliersContent() {
                               {supplier.name}
                             </h3>
                             <p className="text-xs text-gray-500">
-                              {config.singular}{supplier.city && ` • ${supplier.city}`}
+                              {typeLabels(supplier)}{supplier.city && ` • ${supplier.city}`}
                             </p>
                           </div>
                         </div>
@@ -878,7 +885,7 @@ export default function SuppliersContent() {
                           {openMenuId === supplier.id && (
                             <div className="absolute right-0 top-8 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
                               <button onClick={(e) => { e.stopPropagation(); handleView(supplier) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"><Eye className="w-3.5 h-3.5" /> View</button>
-                              {propertyTypesForRoles([supplier.type]).length > 0 && (
+                              {propertyTypesForRoles(typesOf(supplier).map(behaviorOf)).length > 0 && (
                                 <button onClick={(e) => { e.stopPropagation(); handleView(supplier, 'properties') }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"><Ship className="w-3.5 h-3.5" /> Properties</button>
                               )}
                               <button onClick={(e) => { e.stopPropagation(); handleEdit(supplier) }} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"><Edit className="w-3.5 h-3.5" /> Edit</button>
@@ -983,7 +990,7 @@ export default function SuppliersContent() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3"><span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${config.color}`}>{config.label}</span></td>
+                          <td className="px-4 py-3"><span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${config.color}`}>{typeLabels(supplier)}</span></td>
                           <td className="px-4 py-3"><span className="text-sm text-gray-600">{supplier.city || '—'}</span></td>
                           <td className="px-4 py-3">{supplier.contact_email ? <a href={`mailto:${supplier.contact_email}`} onClick={(e) => e.stopPropagation()} className="text-sm text-primary-600 hover:underline">{supplier.contact_email}</a> : <span className="text-sm text-gray-400">—</span>}</td>
                           <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLORS[supplier.status]}`}>{supplier.status}</span></td>
@@ -1023,7 +1030,7 @@ export default function SuppliersContent() {
                           <p className="text-sm font-medium text-gray-900 truncate flex items-center gap-1.5">
                             {supplier.name}
                           </p>
-                          <p className="text-xs text-gray-500">{config.label}</p>
+                          <p className="text-xs text-gray-500">{typeLabels(supplier)}</p>
                         </div>
                         <div className="flex items-center gap-1.5 text-sm text-gray-600">{supplier.city && <><MapPin className="w-3.5 h-3.5 text-gray-400" />{supplier.city}</>}</div>
                         <div>{supplier.contact_email && <a href={`mailto:${supplier.contact_email}`} onClick={(e) => e.stopPropagation()} className="text-sm text-gray-600 hover:text-primary-600 flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-gray-400" /><span className="truncate">{supplier.contact_email}</span></a>}</div>
@@ -1075,8 +1082,8 @@ export default function SuppliersContent() {
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                {formData.type && (() => {
-                  const config = getTypeConfig(formData.type)
+                {(formData.types?.[0] || formData.type) && (() => {
+                  const config = getTypeConfig(formData.types?.[0] || formData.type)
                   const Icon = config.icon
                   return <div className={`w-10 h-10 rounded-lg ${config.color} flex items-center justify-center`}><Icon className="w-5 h-5" /></div>
                 })()}
@@ -1115,7 +1122,7 @@ export default function SuppliersContent() {
               <button onClick={() => { setShowAddModal(false); setShowEditModal(false); setError(null) }} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">
                 Cancel
               </button>
-              <button onClick={showAddModal ? handleSaveNew : handleSaveEdit} disabled={saving || !formData.name} className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2">
+              <button onClick={showAddModal ? handleSaveNew : handleSaveEdit} disabled={saving || !formData.name || !(Array.isArray(formData.types) && formData.types.length > 0)} className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
@@ -1139,7 +1146,7 @@ export default function SuppliersContent() {
                   <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                     {selectedSupplier.name}
                   </h2>
-                  <p className="text-sm text-gray-500">{getTypeConfig(selectedSupplier.type).singular}</p>
+                  <p className="text-sm text-gray-500">{typeLabels(selectedSupplier)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -1152,7 +1159,7 @@ export default function SuppliersContent() {
             <div className="px-6 border-b border-gray-200">
               <div className="flex gap-6">
                 <button onClick={() => setViewTab('details')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${viewTab === 'details' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Details</button>
-                {['transport_company', 'transport', 'driver'].includes(selectedSupplier.type) && (
+                {typesOf(selectedSupplier).map(behaviorOf).some(b => ['transport_company', 'transport', 'driver'].includes(b)) && (
                   <button onClick={() => setViewTab('rates')} className={`py-3 text-sm font-medium border-b-2 transition-colors ${viewTab === 'rates' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                     Rates {supplierRates.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-gray-100 rounded text-xs">{supplierRates.length}</span>}
                   </button>
@@ -1224,7 +1231,7 @@ export default function SuppliersContent() {
               {viewTab === 'properties' && (
                 <SupplierPropertiesPanel
                   supplierId={selectedSupplier.id}
-                  supplierRoles={[behaviorOf(selectedSupplier.type)]}
+                  supplierRoles={typesOf(selectedSupplier).map(behaviorOf)}
                 />
               )}
 

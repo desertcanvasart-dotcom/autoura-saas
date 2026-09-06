@@ -3,7 +3,7 @@ import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 // All valid supplier fields (including new ones from migration)
 const VALID_FIELDS = [
-  'name', 'type', 'contact_name', 'contact_email', 'contact_phone',
+  'name', 'type', 'types', 'contact_name', 'contact_email', 'contact_phone',
   'phone2', 'whatsapp', 'website', 'address', 'city', 'country',
   'default_commission_rate', 'commission_type', 'payment_terms',
   'bank_details', 'status', 'notes',
@@ -87,6 +87,11 @@ export async function PUT(
     const body = await request.json()
 
     // Filter to only valid fields to prevent database errors
+    // One or more roles (340): the list wins, the primary is its first entry.
+    if (Array.isArray(body.types) && body.types.length) {
+      body.types = body.types.map(String).filter(Boolean)
+      body.type = body.types[0]
+    }
     const updateData = filterValidFields(body)
 
     // Remove fields that shouldn't be updated

@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       // company_name is NOT NULL and mirrors the legacy name column.
       company_name: r.name,
       type: r.type,
+      types: [r.type],
       contact_name: r.contact_name,
       contact_email: r.contact_email,
       contact_phone: r.contact_phone,
