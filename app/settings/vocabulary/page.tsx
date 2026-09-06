@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowDown, ArrowUp, BookA, Check, Eye, EyeOff, Globe2, Loader2, Pencil, Plus, RotateCcw, Trash2, X, AlertCircle,
+  CalendarRange,
 } from 'lucide-react'
 import { useRole } from '@/hooks/useRole'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
@@ -157,6 +158,20 @@ export default function VocabularySettingsPage() {
           </div>
         </div>
         <Link href="/settings/destinations" className="px-3 py-1.5 text-sm font-medium text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 whitespace-nowrap">Manage destinations</Link>
+      </div>
+
+      {/* Two things are called "season": the demand calendar (dates + uplift,
+          read by the engine) lives on its own page; the rate-row TAG is the
+          Rate seasons list below. */}
+      <div className="flex items-center justify-between gap-4 p-4 bg-white border border-gray-200 rounded-lg">
+        <div className="flex items-start gap-3">
+          <CalendarRange className="w-5 h-5 text-primary-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-gray-900">Seasonal premiums (your demand calendar)</p>
+            <p className="text-xs text-gray-500">The dates you charge more on, and by how much. The <span className="font-medium">Rate seasons</span> list below is different: it is only the season a supplier&rsquo;s rate is tagged with.</p>
+          </div>
+        </div>
+        <Link href="/settings/seasons" className="px-3 py-1.5 text-sm font-medium text-primary-600 border border-primary-200 rounded-lg hover:bg-primary-50 shrink-0">Manage seasons</Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">

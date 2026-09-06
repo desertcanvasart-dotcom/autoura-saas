@@ -17,7 +17,7 @@ export const VOCABULARY_KINDS = [
   'flight_cabin', 'flight_frequency', 'airport_service_type', 'hotel_service_type',
   'cuisine_type', 'restaurant_type', 'dietary_option', 'activity_category',
   'activity_type', 'activity_duration', 'activity_unit', 'guide_grade',
-  'guide_duration', 'guide_language',
+  'guide_duration', 'guide_language', 'rate_season',
 ] as const
 export type VocabularyKind = (typeof VOCABULARY_KINDS)[number]
 
@@ -316,6 +316,15 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     minItems: 1,
     example: 'English / Arabic / French / Mandarin',
   },
+  rate_season: {
+    kind: 'rate_season',
+    group: 'General',
+    title: 'Rate seasons',
+    description: "The supplier's season a rate row is tagged with (a sleeper fare for peak season, an entrance fee for summer). A label only: the dates and the uplift you charge are the Demand calendar under Settings → Seasonal Premiums.",
+    usedIn: 'Attraction, sleeping-train and other rate rows; CSV import',
+    minItems: 1,
+    example: 'All Year / Low Season / High Season / Peak Season',
+  },
 }
 
 /** The built-in supplier kinds the app knows how to treat. An agency's
@@ -571,6 +580,7 @@ export const VOCABULARY_COLUMNS: Record<string, VocabularyKind> = {
   guide_type: 'guide_grade',
   tour_duration: 'guide_duration',
   guide_language: 'guide_language',
+  season: 'rate_season',
 }
 
 /** Columns whose name means something DIFFERENT per table: `service_type`
