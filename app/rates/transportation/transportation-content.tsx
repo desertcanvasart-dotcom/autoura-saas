@@ -5,6 +5,7 @@ import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VocabSelect } from '@/components/vocabulary'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -104,16 +105,6 @@ const SERVICE_TYPES = [
   { value: 'multi_day', label: 'Multi-Day', needsDestination: false },
   { value: 'outside_dinner', label: 'Outside Dinner Transfer', needsDestination: false },
   { value: 'sound_light', label: 'Sound & Light Transfer', needsDestination: false },
-]
-
-const VEHICLE_TYPES = [
-  { value: 'Sedan', label: 'Sedan', minPax: 1, maxPax: 2 },
-  { value: 'Minivan', label: 'Minivan', minPax: 3, maxPax: 8 },
-  { value: 'Van', label: 'Van', minPax: 9, maxPax: 14 },
-  { value: 'Minibus', label: 'Minibus', minPax: 15, maxPax: 24 },
-  { value: 'Bus', label: 'Bus', minPax: 15, maxPax: 45 },
-  { value: 'SUV', label: 'SUV', minPax: 1, maxPax: 4 },
-  { value: '4x4', label: '4x4', minPax: 1, maxPax: 6 },
 ]
 
 
@@ -487,9 +478,11 @@ export default function TransportationContent() {
       (rate.destination_city && rate.destination_city.toLowerCase().includes(searchTerm.toLowerCase()))
     if (!matchesSearch) return false
     if (vehicleTypeFilter) {
-      const cls = WIDE_CLASSES.find(c => c.label === vehicleTypeFilter)
+      // The filter value is a vocabulary KEY ('sedan'); wide classes are keyed
+      // the same way, legacy tall rows may still carry the label ('Sedan').
+      const cls = WIDE_CLASSES.find(c => c.key === vehicleTypeFilter || c.label === vehicleTypeFilter)
       const offersWide = cls ? Number(rate[`${cls.key}_rate_eur`]) > 0 : false
-      const matchesLegacy = (rate.vehicle_type || '') === vehicleTypeFilter
+      const matchesLegacy = (rate.vehicle_type || '').toLowerCase() === vehicleTypeFilter.toLowerCase()
       if (!offersWide && !matchesLegacy) return false
     }
     return true
@@ -630,16 +623,8 @@ export default function TransportationContent() {
         </div>
 
         <div className="relative">
-          <select
-            value={vehicleTypeFilter}
-            onChange={(e) => setVehicleTypeFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
-          >
-            <option value="">All Vehicles</option>
-            {VEHICLE_TYPES.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
+          <VocabSelect kind="vehicle_type" value={vehicleTypeFilter} onChange={setVehicleTypeFilter} placeholder="All Vehicles"
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 

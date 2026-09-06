@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { activeKeys } from '@/lib/vocabulary-server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
@@ -20,7 +21,6 @@ const SERVICE_TYPES = [
 
 const DURATIONS = ['full_day', 'half_day', 'one_way'] as const
 
-const VEHICLE_TYPES = ['Sedan', 'Minivan', 'Van', 'Minibus', 'Bus', 'Horse Carriage'] as const
 
 const AREAS = [
   'east_bank',
@@ -103,7 +103,8 @@ export async function GET(request: NextRequest) {
       options: {
         serviceTypes: SERVICE_TYPES,
         durations: DURATIONS,
-        vehicleTypes: VEHICLE_TYPES,
+        // The tenant's own vehicle vocabulary (Settings → Your vocabulary).
+        vehicleTypes: await activeKeys(supabase, 'vehicle_type'),
         areas: AREAS
       }
     })

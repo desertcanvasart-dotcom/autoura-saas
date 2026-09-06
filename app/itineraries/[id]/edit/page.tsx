@@ -1,5 +1,6 @@
 'use client'
 
+import { VocabSelect } from '@/components/vocabulary'
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -153,7 +154,6 @@ const PACKAGE_TYPES = [
   { id: 'shore-excursions', name: 'Shore Excursions', icon: '⚓', desc: 'Port pickup, time-limited', advanced: true }
 ]
 
-const TIERS = ['budget', 'standard', 'deluxe', 'luxury']
 
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft', color: 'bg-gray-100 text-gray-700' },
@@ -1528,15 +1528,8 @@ export default function ItineraryEditorPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Tier</span>
-                <select
-                  value={itinerary.tier}
-                  onChange={(e) => setItinerary({ ...itinerary, tier: e.target.value })}
-                  className="font-semibold text-gray-900 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs border-none focus:outline-none"
-                >
-                  {TIERS.map(tier => (
-                    <option key={tier} value={tier}>{tier.toUpperCase()}</option>
-                  ))}
-                </select>
+                <VocabSelect kind="tier" value={itinerary.tier} onChange={tier => setItinerary({ ...itinerary, tier })} placeholder={null}
+                  className="font-semibold text-gray-900 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs border-none focus:outline-none" />
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Package</span>

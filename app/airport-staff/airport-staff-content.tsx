@@ -5,7 +5,8 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Crown, Star } from 'lucide-react'
+import { Star } from 'lucide-react'
+import { TierBadge, TierPicker } from '@/components/vocabulary'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
@@ -14,13 +15,6 @@ import { showToast } from '@/app/contexts/ToastContext'
 // ============================================
 // CONSTANTS
 // ============================================
-
-const TIER_OPTIONS = [
-  { value: 'budget', label: 'Budget', color: 'bg-gray-100 text-gray-700' },
-  { value: 'standard', label: 'Standard', color: 'bg-blue-100 text-blue-700' },
-  { value: 'deluxe', label: 'Deluxe', color: 'bg-purple-100 text-purple-700' },
-  { value: 'luxury', label: 'Luxury', color: 'bg-amber-100 text-amber-700' }
-]
 
 // ============================================
 // INTERFACES
@@ -47,15 +41,6 @@ interface AirportStaff {
 // ============================================
 // COMPONENTS
 // ============================================
-
-function TierBadge({ tier }: { tier: string | null }) {
-  const tierConfig = TIER_OPTIONS.find(t => t.value === tier) || TIER_OPTIONS[1]
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tierConfig.color}`}>
-      {tierConfig.label}
-    </span>
-  )
-}
 
 // ============================================
 // MAIN COMPONENT
@@ -773,27 +758,7 @@ export default function AirportStaffContent() {
                     Service Tier
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {TIER_OPTIONS.map((tier) => (
-                      <button
-                        key={tier.value}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, tier: tier.value })}
-                        className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
-                          formData.tier === tier.value
-                            ? tier.value === 'luxury' 
-                              ? 'bg-amber-600 text-white'
-                              : tier.value === 'deluxe'
-                              ? 'bg-purple-600 text-white'
-                              : tier.value === 'standard'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {tier.value === 'luxury' && <Crown className="w-3.5 h-3.5" />}
-                        {tier.label}
-                      </button>
-                    ))}
+                    <TierPicker variant="solid" size="sm" value={formData.tier} onChange={tier => setFormData({ ...formData, tier })} />
                   </div>
                 </div>
 

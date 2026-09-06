@@ -23,22 +23,16 @@ import {
   ChevronDown,
   AlertCircle,
   CheckCircle2,
-  Crown,
   Star
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import { useVocabulary } from '@/hooks/useVocabulary'
+import { TierBadge, TierPicker } from '@/components/vocabulary'
 
 // ============================================
 // CONSTANTS
 // ============================================
-
-const TIER_OPTIONS = [
-  { value: 'budget', label: 'Budget', color: 'bg-gray-100 text-gray-700' },
-  { value: 'standard', label: 'Standard', color: 'bg-blue-100 text-blue-700' },
-  { value: 'deluxe', label: 'Deluxe', color: 'bg-purple-100 text-purple-700' },
-  { value: 'luxury', label: 'Luxury', color: 'bg-amber-100 text-amber-700' }
-]
 
 // ============================================
 // EGYPTIAN CITIES
@@ -95,15 +89,6 @@ type ViewMode = 'table' | 'cards' | 'compact'
 // COMPONENTS
 // ============================================
 
-function TierBadge({ tier }: { tier: string | null }) {
-  const tierConfig = TIER_OPTIONS.find(t => t.value === tier) || TIER_OPTIONS[1]
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tierConfig.color}`}>
-      {tierConfig.label}
-    </span>
-  )
-}
-
 function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   useEffect(() => {
     const timer = setTimeout(onClose, 4000)
@@ -143,6 +128,7 @@ function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => vo
 
 export default function RestaurantsContent() {
   const { cities: cityOptions } = useDestinationCities()
+  const { items: mealTypeItems } = useVocabulary('meal_type')
   const dialog = useConfirmDialog()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -545,7 +531,6 @@ export default function RestaurantsContent() {
     ? (restaurants.reduce((sum, r) => sum + (r.rate_lunch_eur || r.rate_per_person_eur || 0), 0) / restaurants.filter(r => (r.rate_lunch_eur || 0) > 0 || (r.rate_per_person_eur || 0) > 0).length || 0).toFixed(0)
     : '0'
 
-  const mealTypesList = ['Breakfast', 'Lunch', 'Dinner', 'Snacks', 'Buffet', 'À la carte']
   const dietaryOptionsList = ['Vegetarian', 'Vegan', 'Halal', 'Kosher', 'Gluten-Free', 'Dairy-Free']
 
   if (loading) {
@@ -1150,27 +1135,7 @@ export default function RestaurantsContent() {
                     Service Tier
                   </label>
                   <div className="flex flex-wrap gap-2">
-                    {TIER_OPTIONS.map((tier) => (
-                      <button
-                        key={tier.value}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, tier: tier.value })}
-                        className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
-                          formData.tier === tier.value
-                            ? tier.value === 'luxury' 
-                              ? 'bg-amber-600 text-white'
-                              : tier.value === 'deluxe'
-                              ? 'bg-purple-600 text-white'
-                              : tier.value === 'standard'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {tier.value === 'luxury' && <Crown className="w-3.5 h-3.5" />}
-                        {tier.label}
-                      </button>
-                    ))}
+                    <TierPicker variant="solid" size="sm" value={formData.tier} onChange={tier => setFormData({ ...formData, tier })} />
                   </div>
                 </div>
 
@@ -1320,11 +1285,11 @@ export default function RestaurantsContent() {
                   Meal Types Offered
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {mealTypesList.map(mealType => (
-                    <label key={mealType} className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={formData.meal_types.includes(mealType)} onChange={() => toggleMealType(mealType)}
+                  {mealTypeItems.map(mt => (
+                    <label key={mt.key} className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={formData.meal_types.includes(mt.key)} onChange={() => toggleMealType(mt.key)}
                         className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500" />
-                      <span className="text-sm text-gray-700">{mealType}</span>
+                      <span className="text-sm text-gray-700">{mt.label}</span>
                     </label>
                   ))}
                 </div>

@@ -9,6 +9,7 @@ import { useSearchParams } from 'next/navigation'
 import { useCurrency } from '@/hooks/useCurrency'
 import { BedDouble, Plus, Edit, Trash2, X, Check, Copy, MapPin, Clock, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, ArrowRight, Moon, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
@@ -20,11 +21,6 @@ const SLEEPER_CITIES = [
   'Giza',
   'Luxor',
   'Aswan'
-]
-
-const CABIN_TYPES = [
-  'Half Twin Cabin',
-  'Single Cabin'
 ]
 
 const SEASONS = [
@@ -685,16 +681,8 @@ export default function SleepingTrainRatesContent() {
           </select>
 
           {/* Cabin Filter */}
-          <select
-            value={selectedCabin}
-            onChange={(e) => setSelectedCabin(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
-          >
-            <option value="">All Cabins</option>
-            {CABIN_TYPES.map(cabin => (
-              <option key={cabin} value={cabin}>{cabin}</option>
-            ))}
-          </select>
+          <VocabSelect kind="sleeper_cabin" value={selectedCabin} onChange={setSelectedCabin} placeholder="All Cabins"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
 
           {/* Active Only Toggle */}
           <button
@@ -853,7 +841,7 @@ export default function SleepingTrainRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">
-                        {rate.cabin_type || '—'}
+                        <VocabLabel kind="sleeper_cabin" value={rate.cabin_type} fallback="—" />
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -933,7 +921,7 @@ export default function SleepingTrainRatesContent() {
 
                 <div className="flex items-center gap-2 mb-3">
                   <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs">
-                    {rate.cabin_type}
+                    <VocabLabel kind="sleeper_cabin" value={rate.cabin_type} />
                   </span>
                   {rate.season && (
                     <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
@@ -996,7 +984,7 @@ export default function SleepingTrainRatesContent() {
                     {rate.origin_city} → {rate.destination_city}
                   </span>
                   <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs">
-                    {rate.cabin_type}
+                    <VocabLabel kind="sleeper_cabin" value={rate.cabin_type} />
                   </span>
                 </div>
                 <div className="flex items-center gap-4">
@@ -1218,18 +1206,7 @@ export default function SleepingTrainRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Cabin Type *</label>
-                    <select
-                      name="cabin_type"
-                      value={formData.cabin_type}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Cabin</option>
-                      {CABIN_TYPES.map(cabin => (
-                        <option key={cabin} value={cabin}>{cabin}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="sleeper_cabin" name="cabin_type" value={formData.cabin_type} onChange={v => setFormData(prev => ({ ...prev, cabin_type: v }))} required placeholder="Select Cabin" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Season</label>

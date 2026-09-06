@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { cityOptionsFor } from '@/components/CitySelect'
-import { PROPERTY_CATEGORIES, PROPERTY_CATEGORY_LABELS } from '@/lib/supplier-properties'
-import { TIERS } from '@/app/types/content-library'
 import { EGYPT_CITIES } from '@/lib/constants/egypt-cities'
 
 // Every city dropdown offers the shared vocabulary; a stored value outside
@@ -29,13 +27,3 @@ describe('cityOptionsFor', () => {
   })
 })
 
-describe('property categories', () => {
-  it('are the same four tiers the rates and quotes use', () => {
-    expect([...PROPERTY_CATEGORIES]).toEqual([...TIERS])
-    expect([...PROPERTY_CATEGORIES]).toEqual(['budget', 'standard', 'deluxe', 'luxury'])
-  })
-
-  it('every category has a label', () => {
-    for (const c of PROPERTY_CATEGORIES) expect(PROPERTY_CATEGORY_LABELS[c]).toBeTruthy()
-  })
-})

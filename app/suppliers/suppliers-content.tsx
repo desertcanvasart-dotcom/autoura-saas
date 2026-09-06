@@ -18,6 +18,9 @@ import {
 import SupplierPropertiesPanel from '@/components/SupplierPropertiesPanel'
 import SupplierDocumentsPanel from '@/components/SupplierDocumentsPanel'
 import { propertyTypesForRoles } from '@/lib/supplier-properties'
+import { useVocabulary } from '@/hooks/useVocabulary'
+import { pluralize } from '@/lib/vocabulary-ui'
+import { VocabLabel } from '@/components/vocabulary'
 
 // Types
 interface Supplier {
@@ -71,7 +74,6 @@ type SortField = 'name' | 'type' | 'city' | 'status' | 'commission'
 type SortDirection = 'asc' | 'desc'
 
 
-const VEHICLE_TYPES = ['Sedan', 'Minivan', 'Van', 'Bus', 'SUV', '4x4']
 
 const CUISINE_TYPES = [
   'Egyptian', 'Mediterranean', 'Italian', 'Middle Eastern', 'Asian',
@@ -81,7 +83,10 @@ const CUISINE_TYPES = [
 const CRUISE_ROUTES = ['Luxor to Aswan', 'Aswan to Luxor', 'Round Trip', 'Esna to Aswan', 'Lake Nasser']
 
 // Supplier type configuration
-  const TYPE_CONFIG: Record<string, { icon: any; label: string; singular: string; color: string; borderColor: string }> = {
+// Keyed by BEHAVIOUR — the built-in kind a supplier type behaves as. Labels
+// come from the tenant's vocabulary (Settings → Your vocabulary); these are
+// the fallbacks for rows whose type the vocabulary no longer lists.
+const BEHAVIOR_CONFIG: Record<string, { icon: any; label: string; singular: string; color: string; borderColor: string }> = {
   hotel: { icon: Building2, label: 'Hotels', singular: 'Hotel', color: 'bg-blue-100 text-blue-700', borderColor: 'border-blue-200' },
   transport_company: { icon: Car, label: 'Transport', singular: 'Transport Company', color: 'bg-cyan-100 text-cyan-700', borderColor: 'border-cyan-200' },
   airline: { icon: Plane, label: 'Airlines', singular: 'Airline', color: 'bg-sky-100 text-sky-700', borderColor: 'border-sky-200' },
@@ -191,6 +196,10 @@ export default function SuppliersContent() {
   const searchParams = useSearchParams()
   
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  // The agency's supplier types (Settings → Your vocabulary): what each is
+  // called, and which built-in kind it behaves as.
+  const { items: typeItems, all: allTypes } = useVocabulary('supplier_type')
+  const behaviorOf = (type: string) => allTypes.find(t => t.key === type)?.behavior ?? type
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -228,10 +237,10 @@ export default function SuppliersContent() {
 
   useEffect(() => {
     const typeParam = searchParams.get('type')
-    if (typeParam && (typeParam === 'all' || TYPE_CONFIG[typeParam])) {
+    if (typeParam && (typeParam === 'all' || allTypes.some(t => t.key === typeParam) || BEHAVIOR_CONFIG[typeParam])) {
       setSelectedType(typeParam)
     }
-  }, [searchParams])
+  }, [searchParams, allTypes])
 
   // Deep link (dashboard → a contract): /suppliers?supplier=<id>&tab=documents
   // opens that supplier on that tab once the list has loaded. Once per id.
@@ -347,7 +356,17 @@ export default function SuppliersContent() {
     return sortDirection === 'asc' ? <ChevronUp className="w-3.5 h-3.5 text-primary-600" /> : <ChevronDown className="w-3.5 h-3.5 text-primary-600" />
   }
 
-  const getTypeConfig = (type: string) => TYPE_CONFIG[type] || TYPE_CONFIG.other
+  const getTypeConfig = (type: string) => {
+    const item = allTypes.find(t => t.key === type)
+    const base = BEHAVIOR_CONFIG[item?.behavior ?? type] || BEHAVIOR_CONFIG.other
+    return item ? { ...base, singular: item.label, label: pluralize(item.label) } : base
+  }
+  // Tabs: the agency's active types in its order, then any type still on a
+  // row but no longer in the vocabulary (so nothing is ever invisible).
+  const tabTypes = [
+    ...typeItems.map(t => t.key),
+    ...Object.keys(stats).filter(k => k !== 'all' && !allTypes.some(t => t.key === k)),
+  ].filter(k => stats[k])
 
 
   const handleAdd = () => {
@@ -373,7 +392,7 @@ export default function SuppliersContent() {
     setOpenMenuId(null)
 
     // Fetch rates for transport companies
-    if (['transport_company', 'transport', 'driver'].includes(supplier.type)) {
+    if (['transport_company', 'transport', 'driver'].includes(behaviorOf(supplier.type))) {
       fetchSupplierRates(supplier.id)
     }
   }
@@ -535,7 +554,7 @@ export default function SuppliersContent() {
   // "Other" (reported), so classification comes from THIS file, not from
   // whatever another system exported.
   const handleSampleCsv = () => {
-    const validTypes = Object.keys(TYPE_CONFIG).join(' | ')
+    const validTypes = typeItems.map(t => t.key).join(' | ')
     const csv = [
       'Name,Type,Contact,Email,Phone,City,Country,Commission,Status,Notes,Website',
       `Nile Star Hotel,hotel,Ahmed Hassan,reservations@nilestar.example,+20 100 000 0000,Cairo,Egypt,10,active,Valid types: ${validTypes},https://nilestar.example`,
@@ -581,11 +600,11 @@ export default function SuppliersContent() {
   // display in the list; they just are not entered here any more.
   const getFormFields = (): Array<{
     name: string; key: string; type: string; required?: boolean
-    options?: string[]; description?: string
+    options?: string[]; optionLabels?: Record<string, string>; description?: string
   }> => {
     return [
       { name: 'Supplier Name', key: 'name', type: 'text', required: true },
-      { name: 'Type', key: 'type', type: 'select', required: true, options: Object.keys(TYPE_CONFIG).filter(k => k !== 'other') },
+      { name: 'Type', key: 'type', type: 'select', required: true, options: typeItems.map(t => t.key), optionLabels: Object.fromEntries(typeItems.map(t => [t.key, t.label])) },
       // Contact
       { name: 'Contact Person', key: 'contact_name', type: 'text' },
       { name: 'Email', key: 'contact_email', type: 'email' },
@@ -632,7 +651,7 @@ export default function SuppliersContent() {
         >
           <option value="">Select {field.name}</option>
           {field.options.map((opt: string) => (
-            <option key={opt} value={opt}>{opt.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
+            <option key={opt} value={opt}>{field.optionLabels?.[opt] ?? opt.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</option>
           ))}
         </select>
       )
@@ -741,7 +760,7 @@ export default function SuppliersContent() {
             >
               All <span className="px-1.5 py-0.5 bg-white/20 rounded-full">{stats.all || 0}</span>
             </button>
-            {Object.entries(TYPE_CONFIG).filter(([key]) => key !== 'other' && stats[key]).map(([key, config]) => (
+            {tabTypes.map(key => [key, getTypeConfig(key)] as const).map(([key, config]) => (
               <button
                 key={key}
                 onClick={() => handleTypeChange(key)}
@@ -894,7 +913,7 @@ export default function SuppliersContent() {
                       )}
                       {supplier.vehicle_types && supplier.vehicle_types.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-3">
-                          {supplier.vehicle_types.map(v => <span key={v} className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 rounded text-[10px]">{v}</span>)}
+                          {supplier.vehicle_types.map(v => <span key={v} className="px-1.5 py-0.5 bg-cyan-50 text-cyan-700 rounded text-[10px]"><VocabLabel kind="vehicle_type" value={v} /></span>)}
                         </div>
                       )}
                       {supplier.star_rating && (
@@ -1196,7 +1215,7 @@ export default function SuppliersContent() {
                   ) : (
                     <table className="w-full">
                       <thead><tr className="bg-gray-50"><th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Service</th><th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Vehicle</th><th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Route</th><th className="text-right px-3 py-2 text-xs font-semibold text-gray-600">Rate</th><th className="text-right px-3 py-2 text-xs font-semibold text-gray-600">Non-EUR passport</th></tr></thead>
-                      <tbody>{supplierRates.map(rate => (<tr key={rate.id} className="border-t border-gray-100"><td className="px-3 py-2 text-sm font-medium">{rate.service_code}</td><td className="px-3 py-2 text-sm">{rate.vehicle_type}</td><td className="px-3 py-2 text-sm">{rate.city}{rate.destination_city && ` → ${rate.destination_city}`}</td><td className="px-3 py-2 text-sm text-right font-medium text-green-600">{fmtRate(rate.base_rate_eur, rate, 0)}</td><td className="px-3 py-2 text-sm text-right">{fmtRate(rate.base_rate_non_eur, rate, 0)}</td></tr>))}</tbody>
+                      <tbody>{supplierRates.map(rate => (<tr key={rate.id} className="border-t border-gray-100"><td className="px-3 py-2 text-sm font-medium">{rate.service_code}</td><td className="px-3 py-2 text-sm"><VocabLabel kind="vehicle_type" value={rate.vehicle_type} /></td><td className="px-3 py-2 text-sm">{rate.city}{rate.destination_city && ` → ${rate.destination_city}`}</td><td className="px-3 py-2 text-sm text-right font-medium text-green-600">{fmtRate(rate.base_rate_eur, rate, 0)}</td><td className="px-3 py-2 text-sm text-right">{fmtRate(rate.base_rate_non_eur, rate, 0)}</td></tr>))}</tbody>
                     </table>
                   )}
                 </div>
@@ -1205,7 +1224,7 @@ export default function SuppliersContent() {
               {viewTab === 'properties' && (
                 <SupplierPropertiesPanel
                   supplierId={selectedSupplier.id}
-                  supplierRoles={[selectedSupplier.type]}
+                  supplierRoles={[behaviorOf(selectedSupplier.type)]}
                 />
               )}
 

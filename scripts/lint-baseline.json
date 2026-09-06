@@ -1,7 +1,7 @@
 {
   "totals": {
-    "errors": 1534,
-    "warnings": 571
+    "errors": 1533,
+    "warnings": 570
   },
   "rules": {
     "(no rule — parse or config error)": {
@@ -30,7 +30,7 @@
     },
     "@typescript-eslint/no-unused-vars": {
       "errors": 0,
-      "warnings": 466
+      "warnings": 465
     },
     "import/no-anonymous-default-export": {
       "errors": 0,
@@ -49,7 +49,7 @@
       "warnings": 82
     },
     "react/no-unescaped-entities": {
-      "errors": 97,
+      "errors": 96,
       "warnings": 0
     }
   }

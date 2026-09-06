@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/app/supabase'
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
+import { useVocabulary } from '@/hooks/useVocabulary'
+import { paletteAt, tierPosition } from '@/lib/vocabulary-ui'
 import {
   User,
   Mail,
@@ -108,13 +110,6 @@ const TIMEZONES = [
   { value: 'Australia/Sydney', label: 'Sydney (AEST/AEDT)' },
 ]
 
-const TIER_OPTIONS = [
-  { value: 'budget', label: 'Budget', description: 'Cost-effective options' },
-  { value: 'standard', label: 'Standard', description: 'Comfortable mid-range' },
-  { value: 'deluxe', label: 'Deluxe', description: 'Superior quality' },
-  { value: 'luxury', label: 'Luxury', description: 'Top-tier VIP experience' }
-]
-
 const COST_MODE_OPTIONS = [
   { 
     value: 'auto', 
@@ -163,6 +158,7 @@ function SettingsContent() {
     default_margin_percent: 25,
     default_currency: 'EUR'
   })
+  const { items: tierItems, all: allTiers } = useVocabulary('tier')
   const [exchangeRates, setExchangeRates] = useState<ExchangeRate[]>([
     { base_currency: 'EUR', target_currency: 'USD', rate: 1.08 },
     { base_currency: 'EUR', target_currency: 'GBP', rate: 0.86 },
@@ -934,34 +930,22 @@ function SettingsContent() {
         </p>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {TIER_OPTIONS.map((tier) => {
-            const isSelected = userPreferences.default_tier === tier.value
-
+          {tierItems.map((tier, i) => {
+            const isSelected = userPreferences.default_tier === tier.key
+            const palette = paletteAt(tierPosition(allTiers, tier.key))
             return (
               <button
-                key={tier.value}
-                onClick={() => setUserPreferences(prev => ({ ...prev, default_tier: tier.value }))}
-                className={`p-3 rounded-lg border-2 text-center transition-all ${
-                  isSelected
-                    ? tier.value === 'luxury'
-                      ? 'border-amber-500 bg-amber-50'
-                      : tier.value === 'deluxe'
-                      ? 'border-purple-500 bg-purple-50'
-                      : tier.value === 'standard'
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-500 bg-gray-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                key={tier.key}
+                onClick={() => setUserPreferences(prev => ({ ...prev, default_tier: tier.key }))}
+                className={`p-3 rounded-lg border-2 text-center transition-all ${isSelected ? palette.card : 'border-gray-200 hover:border-gray-300'}`}
               >
                 <div className="flex items-center justify-center gap-1 mb-1">
-                  {tier.value === 'luxury' && <Crown className="w-4 h-4 text-amber-600" />}
-                  <span className={`text-sm font-semibold ${
-                    isSelected ? 'text-gray-900' : 'text-gray-700'
-                  }`}>
+                  {i === tierItems.length - 1 && <Crown className="w-4 h-4 text-amber-600" />}
+                  <span className={`text-sm font-semibold ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>
                     {tier.label}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500">{tier.description}</p>
+                {tier.description && <p className="text-xs text-gray-500">{tier.description}</p>}
               </button>
             )
           })}
