@@ -32,6 +32,8 @@ export async function GET(request: NextRequest) {
     const airlineLabel = (key: string | null | undefined) => (key ? labelFor(airlines, key) : '')
     const directions = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'airport_direction')
     const directionLabel = (key: string | null | undefined) => labelFor(directions, key || 'both')
+    const pricingTypes = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'activity_pricing_type')
+    const pricingTypeLabel = (key: string | null | undefined) => (key ? labelFor(pricingTypes, key) : '')
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
@@ -174,7 +176,7 @@ export async function GET(request: NextRequest) {
           rateEur: toNum(r.rate_eur || r.base_rate_eur),
           rateNonEur: toNum(r.rate_non_eur || r.base_rate_non_eur || r.rate_eur || r.base_rate_eur),
           city: r.city,
-          details: r.pricing_type,
+          details: pricingTypeLabel(r.pricing_type),
         })),
 
       accommodation: (accommodationRates || []).map((r: any) => ({
@@ -224,7 +226,7 @@ export async function GET(request: NextRequest) {
           rateEur: toNum(r.rate_eur || r.base_rate_eur),
           rateNonEur: toNum(r.rate_non_eur || r.base_rate_non_eur || r.rate_eur || r.base_rate_eur),
           city: r.city,
-          details: r.pricing_type,
+          details: pricingTypeLabel(r.pricing_type),
         })),
 
       meals: (mealRates || []).map((r: any) => ({

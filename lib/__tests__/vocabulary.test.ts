@@ -50,6 +50,7 @@ describe('the kinds', () => {
     expect(vocabularyColumnsFor('guide_rates').guide_language).toBe('guide_language')
     expect(vocabularyColumnsFor('sleeping_train_rates').season).toBe('rate_season')
     expect(vocabularyColumnsFor('flight_rates').airline).toBe('airline')
+    expect(vocabularyColumnsFor('activity_rates').pricing_type).toBe('activity_pricing_type')
   })
 
   it('an airline carries its IATA code in meta', () => {
