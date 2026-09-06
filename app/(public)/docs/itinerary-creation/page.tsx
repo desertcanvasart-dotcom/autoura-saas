@@ -14,7 +14,7 @@ export default function ItineraryCreationPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Itinerary Creation</h1>
       <p className="text-gray-600 mb-8">
-        Autoura offers two connected paths for creating itineraries. The <strong>WhatsApp Parser</strong> extracts client details from a conversation, and the <strong>New Quote</strong> grid (the pricing grid) is where you build the full day-by-day itinerary with services, rates, and live pricing.
+        Autoura offers two connected paths for creating itineraries. The <strong>WhatsApp Parser</strong> extracts client details from a conversation, and the <strong>Pricing Grid</strong> grid (the pricing grid) is where you build the full day-by-day itinerary with services, rates, and live pricing.
       </p>
 
       {/* Two Paths */}

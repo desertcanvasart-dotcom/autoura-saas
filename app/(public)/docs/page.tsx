@@ -73,7 +73,7 @@ const CATEGORIES: DocCategory[] = [
   {
     label: 'Itineraries & Pricing',
     items: [
-      { href: '/docs/itinerary-creation', icon: Wand2, title: 'Itinerary Creation', description: 'AI-powered itinerary generation from WhatsApp conversations and the New Quote pricing grid.' },
+      { href: '/docs/itinerary-creation', icon: Wand2, title: 'Itinerary Creation', description: 'AI-powered itinerary generation from WhatsApp conversations and the Pricing Grid.' },
       { href: '/docs/itineraries', icon: Map, title: 'Itineraries', description: 'Build day-by-day trip plans with drag-and-drop reordering, shareable client links, and PDF export.' },
       { href: '/docs/b2c-pricing', icon: Calculator, title: 'B2C Pricing', description: 'Price itineraries interactively in the pricing grid with automatic rate lookup.' },
     ],
