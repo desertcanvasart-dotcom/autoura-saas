@@ -89,7 +89,6 @@ export default function TenantsListPage() {
               <tr className="border-b border-gray-700">
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Company</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Email</th>
-                <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Type</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Plan</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Users</th>
                 <th className="text-left text-xs text-gray-400 font-medium px-5 py-3">Created</th>
@@ -108,7 +107,6 @@ export default function TenantsListPage() {
                     </div>
                   </td>
                   <td className="px-5 py-3 text-sm text-gray-400">{t.contact_email || '-'}</td>
-                  <td className="px-5 py-3 text-xs text-gray-400 capitalize">{t.workspace_mode || '-'}</td>
                   <td className="px-5 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                       t.subscription?.status === 'active' ? 'bg-green-900/50 text-green-400' :

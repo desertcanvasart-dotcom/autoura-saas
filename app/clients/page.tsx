@@ -10,7 +10,6 @@ import {
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/app/supabase'
 import Link from 'next/link'
-import RequireFeature from '@/components/RequireFeature'
 import { showToast } from '@/app/contexts/ToastContext'
 
 interface ClientSummary {
@@ -297,7 +296,7 @@ export default function ClientsPage() {
   }
 
   return (
-    <RequireFeature feature="b2c">
+    <>
       <div className="min-h-screen bg-gray-50">
       {/* Delete Confirmation Modal */}
       {deleteModal.isOpen && (
@@ -798,6 +797,6 @@ export default function ClientsPage() {
         )}
       </div>
     </div>
-    </RequireFeature>
+    </>
   )
 }

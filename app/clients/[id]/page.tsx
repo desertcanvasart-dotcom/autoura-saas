@@ -14,7 +14,6 @@ import {
   FileText, Clock, AlertCircle, CheckCircle, Edit, Trash2, Plus, ArrowLeft,
   Building, Globe, CreditCard, Tag, Bell, Heart
 } from 'lucide-react'
-import RequireFeature from '@/components/RequireFeature'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { formatCurrency } from '@/lib/currency'
 
@@ -269,7 +268,7 @@ export default function ClientProfilePage() {
   const overdueFollowups = pendingFollowups.filter(f => new Date(f.due_date) < new Date())
 
   return (
-    <RequireFeature feature="b2c">
+    <>
       <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b">
@@ -1000,6 +999,6 @@ export default function ClientProfilePage() {
 />
 
     </div>
-    </RequireFeature>
+    </>
   )
 }

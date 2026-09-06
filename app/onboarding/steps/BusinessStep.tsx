@@ -11,30 +11,6 @@ interface BusinessStepProps {
   tenant: any
 }
 
-// A workspace preference, not an entitlement — every tier gets both, and this
-// only decides which sections appear in the sidebar. Changeable later in
-// Settings → Organization.
-const WORKSPACE_MODES = [
-  {
-    value: 'both',
-    label: 'B2C & B2B',
-    description: 'Serve both direct clients and partner agencies',
-    icon: '🌐'
-  },
-  {
-    value: 'b2c',
-    label: 'B2C Only',
-    description: 'Focus on direct client bookings',
-    icon: '👥'
-  },
-  {
-    value: 'b2b',
-    label: 'B2B Only',
-    description: 'Work exclusively with travel agencies',
-    icon: '🤝'
-  }
-]
-
 const CURRENCIES = [
   { value: 'EUR', label: 'EUR (€)', flag: '🇪🇺' },
   { value: 'USD', label: 'USD ($)', flag: '🇺🇸' },
@@ -58,7 +34,6 @@ const SERVICES = [
 ]
 
 export default function BusinessStep({ onNext, onBack, currentStep, tenant }: BusinessStepProps) {
-  const [workspaceMode, setWorkspaceMode] = useState(tenant?.workspace_mode || 'both')
   const [currency, setCurrency] = useState(tenant?.default_currency || 'EUR')
   const [locale, setLocale] = useState(tenant?.locale || 'en')
   const [services, setServices] = useState<string[]>(
@@ -89,7 +64,6 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workspace_mode: workspaceMode,
           default_currency: currency,
           locale,
           services_offered: services,
@@ -130,34 +104,6 @@ export default function BusinessStep({ onNext, onBack, currentStep, tenant }: Bu
         </div>
 
         <div className="space-y-6">
-          {/* Business Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              What type of business do you operate?
-            </label>
-            <div className="grid md:grid-cols-3 gap-3">
-              {WORKSPACE_MODES.map((type) => (
-                <button
-                  key={type.value}
-                  onClick={() => setWorkspaceMode(type.value)}
-                  className={`p-4 rounded-lg border-2 transition-all text-left ${
-                    workspaceMode === type.value
-                      ? 'border-[#2d3b2d] bg-green-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-2">{type.icon}</div>
-                  <div className="font-semibold text-gray-900 mb-1">
-                    {type.label}
-                  </div>
-                  <div className="text-xs text-gray-600">
-                    {type.description}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Currency */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">

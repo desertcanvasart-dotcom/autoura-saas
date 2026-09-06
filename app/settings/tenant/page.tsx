@@ -32,7 +32,6 @@ export default function TenantSettingsPage() {
   // Tenant basic info state
   const [companyName, setCompanyName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
-  const [workspaceMode, setWorkspaceMode] = useState<'b2c' | 'b2b' | 'both'>('both')
 
   // Feature toggles state
   const [whatsappIntegration, setWhatsappIntegration] = useState(true)
@@ -90,9 +89,6 @@ export default function TenantSettingsPage() {
       const t = tenant as { deposit_percent?: number | null; deposit_due_days?: number | null }
       setDepositPercent(t.deposit_percent === null || t.deposit_percent === undefined ? '' : String(t.deposit_percent))
       setDepositDueDays(t.deposit_due_days === null || t.deposit_due_days === undefined ? '' : String(t.deposit_due_days))
-      // Workspace visibility is a tenant preference, free on every tier —
-      // no longer derived from feature flags, which read like entitlements.
-      setWorkspaceMode(tenant.workspace_mode ?? 'both')
       setRatesCurrency((tenant as { rates_currency?: string | null }).rates_currency || '')
     }
 
@@ -242,7 +238,6 @@ export default function TenantSettingsPage() {
           company_name: companyName,
           contact_email: contactEmail,
           logo_url: finalLogoUrl,
-          workspace_mode: workspaceMode,
           primary_color: primaryColor,
           secondary_color: secondaryColor,
           // Empty field -> NULL -> the resolver falls through to the platform
@@ -477,27 +472,6 @@ export default function TenantSettingsPage() {
                 Days from booking creation until the deposit deadline.
               </p>
             </div>
-          </div>
-
-          <div className="mt-3">
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              Workspaces
-              <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Your choice &mdash; included on every plan)</span>
-            </label>
-            <select
-              value={workspaceMode}
-              onChange={(e) => setWorkspaceMode(e.target.value as 'b2c' | 'b2b' | 'both')}
-              disabled={!isAdmin}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] disabled:bg-gray-50 disabled:text-gray-500"
-            >
-              <option value="both">Direct clients and partners (B2C + B2B)</option>
-              <option value="b2c">Direct clients only (B2C)</option>
-              <option value="b2b">Partners only (B2B)</option>
-            </select>
-            <p className="mt-1.5 text-[11px] text-gray-500">
-              Hiding a workspace only tidies the sidebar. Every record stays reachable by link,
-              in search and in reports.
-            </p>
           </div>
 
           <div className="mt-3">

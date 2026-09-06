@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
-import { type WorkspaceMode } from '@/lib/workspace-mode'
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 
 export async function PATCH(request: NextRequest) {
@@ -29,7 +28,6 @@ export async function PATCH(request: NextRequest) {
     const {
       company_name,
       contact_email,
-      workspace_mode,
       logo_url,
       // Features
       whatsapp_integration,
@@ -45,16 +43,6 @@ export async function PATCH(request: NextRequest) {
     const tenantUpdates: any = {}
     if (company_name !== undefined) tenantUpdates.company_name = company_name
     if (contact_email !== undefined) tenantUpdates.contact_email = contact_email
-    // Workspace visibility. `workspace_mode` is the source of truth
-    // (migration 239); the legacy columns are written alongside it until the
-    // cutover migration drops them, so a deploy running older code still sees
-    // a consistent answer.
-    const resolvedMode: WorkspaceMode | undefined =
-      workspace_mode !== undefined ? (workspace_mode as WorkspaceMode) : undefined
-
-    if (resolvedMode !== undefined) {
-      tenantUpdates.workspace_mode = resolvedMode
-    }
     if (logo_url !== undefined) tenantUpdates.logo_url = logo_url
     // Run currency (C3.4): the currency ALL this tenant's stored rates are
     // read in. Changing it reinterprets stored numbers — the UI warns.

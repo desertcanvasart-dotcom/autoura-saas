@@ -11,7 +11,6 @@ import {
   DollarSign, Filter, ChevronRight, AlertCircle, Loader2,
   Trash2, Download, Check, X, SlidersHorizontal, ChevronLeft
 } from 'lucide-react'
-import RequireFeature from '@/components/RequireFeature'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -371,7 +370,7 @@ export default function B2CQuotesPage() {
   }
 
   return (
-    <RequireFeature feature="b2c">
+    <>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <div className="bg-white border-b border-gray-200">
@@ -990,6 +989,6 @@ export default function B2CQuotesPage() {
         )}
       </div>
       </div>
-    </RequireFeature>
+    </>
   )
 }

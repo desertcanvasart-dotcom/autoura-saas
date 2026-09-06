@@ -97,9 +97,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Business model is NOT derived from the tier any more. Which workspaces a
-    // tenant sees is a free per-tenant preference (tenants.workspace_mode), so a
-    // plan change must not silently rewrite it.
+    // Business model is NOT derived from the tier: every tenant sees the whole
+    // product, B2C and B2B, on every plan (migration 342 removed the last
+    // per-tenant workspace switch).
     //
     // Limits are NOT copied onto tenant_features either. They used to be
     // mirrored here, which meant the enforced number could drift from the plan

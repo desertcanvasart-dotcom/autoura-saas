@@ -31,7 +31,6 @@ import {
   Package,
   Handshake
 } from 'lucide-react'
-import { useTenant } from '../contexts/TenantContext'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -97,7 +96,7 @@ const ALL_CATEGORIES = [
   { id: 'all', label: 'All Templates', icon: FileText },
   { id: 'customer', label: 'Customer', icon: Users },
   { id: 'supplier', label: 'Supplier', icon: Package },
-  { id: 'partner', label: 'B2B Partner', icon: Handshake, requiresB2B: true },
+  { id: 'partner', label: 'B2B Partner', icon: Handshake },
   { id: 'internal', label: 'Internal', icon: Briefcase },
 ]
 
@@ -157,7 +156,6 @@ const SUBCATEGORY_TO_SUPPLIER_TYPE: Record<string, string> = {
 // ============================================
 
 export default function TemplatesPage() {
-  const { showsB2bWorkspace } = useTenant()
   const dialog = useConfirmDialog()
   const [templates, setTemplates] = useState<Template[]>([])
   const [placeholders, setPlaceholders] = useState<Placeholder[]>([])
@@ -166,10 +164,7 @@ export default function TemplatesPage() {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedChannel, setSelectedChannel] = useState('all')
 
-  // Filter categories based on tenant business type
-  const CATEGORIES = ALL_CATEGORIES.filter(cat =>
-    !cat.requiresB2B || showsB2bWorkspace
-  )
+  const CATEGORIES = ALL_CATEGORIES
   
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -840,7 +835,7 @@ export default function TemplatesPage() {
                   >
                     <option value="customer">Customer (B2C Travelers)</option>
                     <option value="supplier">Supplier (Hotels, Cruises, Guides)</option>
-                    {showsB2bWorkspace && <option value="partner">B2B Partner (Tour Operators)</option>}
+                    <option value="partner">B2B Partner (Tour Operators)</option>
                     <option value="internal">Internal (Team)</option>
                   </select>
                 </div>

@@ -9,12 +9,6 @@ interface Tenant {
   id: string
   company_name: string
   contact_email: string | null
-  /**
-   * Which workspaces this tenant chooses to see. A free preference on every
-   * tier — never an entitlement. Hiding one hides NAVIGATION only; records
-   * stay reachable (see lib/workspace-visibility.ts).
-   */
-  workspace_mode: 'b2c' | 'b2b' | 'both'
   logo_url: string | null
   // Branding — on TENANTS, the single source of truth since migration 255.
   // These were undeclared here while existing at runtime (select('*')),
@@ -89,10 +83,6 @@ interface TenantContextType {
   canManagePartners: boolean
 
   // Feature checks
-  /** Tenant chooses to see the direct-client workspace. Never a paywall. */
-  showsB2cWorkspace: boolean
-  /** Tenant chooses to see the partner workspace. Never a paywall. */
-  showsB2bWorkspace: boolean
   hasWhatsApp: boolean
   hasEmail: boolean
   hasPDF: boolean
@@ -184,10 +174,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         throw tenantError
       }
 
-      setTenant({
-        ...tenantData,
-        workspace_mode: tenantData.workspace_mode as Tenant['workspace_mode'],
-      })
+      setTenant(tenantData)
 
       // 3. Get tenant features
       const { data: featuresData, error: featuresError } = await supabase
@@ -230,13 +217,6 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const canDeleteQuotes = isManager
   const canManagePartners = isManager
 
-  // Workspace visibility — a PREFERENCE, read from tenants.workspace_mode.
-  // Defaults to showing everything while the tenant is still loading, so a
-  // slow context never briefly hides half the product.
-  const workspaceMode = tenant?.workspace_mode ?? 'both'
-  const showsB2cWorkspace = workspaceMode === 'b2c' || workspaceMode === 'both'
-  const showsB2bWorkspace = workspaceMode === 'b2b' || workspaceMode === 'both'
-
   const hasWhatsApp = features?.whatsapp_integration ?? false
   const hasEmail = features?.email_integration ?? false
   const hasPDF = features?.pdf_generation ?? false
@@ -257,9 +237,6 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     canDeleteQuotes,
     canManagePartners,
 
-    // Workspace preferences
-    showsB2cWorkspace,
-    showsB2bWorkspace,
     hasWhatsApp,
     hasEmail,
     hasPDF,
@@ -286,8 +263,6 @@ const noopTenantContext: TenantContextType = {
   canManagePartners: false,
 
   // Features (default to false during SSR)
-  showsB2cWorkspace: true,
-  showsB2bWorkspace: true,
   hasWhatsApp: false,
   hasEmail: false,
   hasPDF: false,
