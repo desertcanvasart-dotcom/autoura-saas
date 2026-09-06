@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { parseSuppliersCsv, splitAgainstExisting } from '@/lib/suppliers/import-csv'
+import { parseSuppliersCsv, splitAgainstExisting, splitTypes, resolveImportTypes } from '@/lib/suppliers/import-csv'
 
 // ============================================
 // Suppliers CSV import (B-item 7)
@@ -126,5 +126,43 @@ describe('the suppliers Sample CSV is the contract', () => {
     const src = readFileSync(join(__dirname, '..', '..', 'app', 'suppliers', 'suppliers-content.tsx'), 'utf8')
     expect(src).toContain('suppliers_sample.csv')
     expect(src).toContain('Sample CSV')
+  })
+})
+
+
+// A supplier can fill several roles (migration 340): the Type cell lists them.
+describe('several roles per row', () => {
+  const VOCAB = [
+    { key: 'hotel', label: 'Hotel' },
+    { key: 'transport_company', label: 'Fleet partner' },
+    { key: 'ground_handler', label: 'Ground handler' },
+    { key: 'other', label: 'Other' },
+  ]
+
+  it('splits the Type cell on | ; or /, slugified, first = primary', () => {
+    expect(splitTypes('Hotel | Transport company; ground-handler')).toEqual(['hotel', 'transport_company', 'ground_handler'])
+    expect(splitTypes('hotel/hotel')).toEqual(['hotel'])
+    expect(splitTypes('')).toEqual(['other'])
+    const r = parseSuppliersCsv([EXPORT_HEADERS, 'Sabena Group,cruise|hotel,,,,Luxor,,active'].join('\n'))
+    expect(r.records[0]).toMatchObject({ type: 'cruise', types: ['cruise', 'hotel'] })
+  })
+
+  it("resolves the agency's own words (labels) to keys and keeps the primary first", () => {
+    const parsed = parseSuppliersCsv([EXPORT_HEADERS, 'Nile Fleet,Fleet partner | Hotel,,,,Cairo,,active'].join('\n'))
+    const { records, refused } = resolveImportTypes(parsed.records, VOCAB)
+    expect(refused).toEqual([])
+    expect(records[0]).toMatchObject({ type: 'transport_company', types: ['transport_company', 'hotel'] })
+  })
+
+  it('refuses a row naming a role the agency does not have, and says which', () => {
+    const parsed = parseSuppliersCsv([EXPORT_HEADERS, 'Mystery Co,hotel|spaceship,,,,Cairo,,active', 'Fine Co,hotel,,,,Cairo,,active'].join('\n'))
+    const { records, refused } = resolveImportTypes(parsed.records, VOCAB)
+    expect(records.map(r => r.name)).toEqual(['Fine Co'])
+    expect(refused).toEqual([{ row: 2, reason: expect.stringMatching(/"Mystery Co": type "spaceship" is not in your supplier types/) }])
+  })
+
+  it('passes records through untouched when the vocabulary is empty (migration not applied)', () => {
+    const parsed = parseSuppliersCsv([EXPORT_HEADERS, 'Any Co,whatever,,,,Cairo,,active'].join('\n'))
+    expect(resolveImportTypes(parsed.records, []).records[0].types).toEqual(['whatever'])
   })
 })

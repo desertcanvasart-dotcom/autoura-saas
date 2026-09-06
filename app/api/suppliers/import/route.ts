@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { parseSuppliersCsv, splitAgainstExisting } from '@/lib/suppliers/import-csv'
+import { parseSuppliersCsv, splitAgainstExisting, resolveImportTypes } from '@/lib/suppliers/import-csv'
+import { loadVocabulary } from '@/lib/vocabulary-server'
 import type { Database } from '@/types/database.types'
 
 type SupplierInsert = Database['public']['Tables']['suppliers']['Insert']
@@ -33,10 +34,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: parsed.parseError }, { status: 400 })
     }
 
+    // Role words → the agency's vocabulary keys; an unknown word refuses its row.
+    const resolved = resolveImportTypes(parsed.records, await loadVocabulary(supabase, 'supplier_type'))
+    const refused = [...parsed.refused, ...resolved.refused].sort((a, b) => a.row - b.row)
     // Existing suppliers (this tenant): an import CREATES, never updates.
     const { data: existing } = await supabase.from('suppliers').select('name').eq('tenant_id', tenant_id)
     const { toInsert: creatable, skippedExisting } = splitAgainstExisting(
-      parsed.records,
+      resolved.records,
       (existing ?? []).map(s => String(s.name ?? ''))
     )
 
@@ -46,7 +50,7 @@ export async function POST(request: NextRequest) {
       // company_name is NOT NULL and mirrors the legacy name column.
       company_name: r.name,
       type: r.type,
-      types: [r.type],
+      types: r.types,
       contact_name: r.contact_name,
       contact_email: r.contact_email,
       contact_phone: r.contact_phone,
@@ -73,7 +77,7 @@ export async function POST(request: NextRequest) {
       totalRows: parsed.totalRows,
       inserted,
       skippedExisting,
-      refused: parsed.refused,
+      refused,
       typeDefaulted: parsed.typeDefaulted,
     })
   } catch (error) {

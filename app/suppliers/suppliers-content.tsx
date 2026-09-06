@@ -562,7 +562,7 @@ export default function SuppliersContent() {
     const validTypes = typeItems.map(t => t.key).join(' | ')
     const csv = [
       'Name,Type,Contact,Email,Phone,City,Country,Commission,Status,Notes,Website',
-      `Nile Star Hotel,hotel,Ahmed Hassan,reservations@nilestar.example,+20 100 000 0000,Cairo,Egypt,10,active,Valid types: ${validTypes},https://nilestar.example`,
+      `Nile Star Hotel,hotel|transport_company,Ahmed Hassan,reservations@nilestar.example,+20 100 000 0000,Cairo,Egypt,10,active,Valid types: ${validTypes} — several roles separated by |,https://nilestar.example`,
     ].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
