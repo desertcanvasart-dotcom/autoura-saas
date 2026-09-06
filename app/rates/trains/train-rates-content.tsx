@@ -1111,16 +1111,16 @@ export default function TrainRatesContent() {
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                   >
                     <option value="">Not recorded yet</option>
-                    {trainSuppliers.some(s => s.type === 'train_operator') && (
+                    {trainSuppliers.some(s => ((s as { types?: string[] }).types ?? [s.type]).includes('train_operator')) && (
                       <optgroup label="Train Operators">
-                        {trainSuppliers.filter(s => s.type === 'train_operator').map(s => (
+                        {trainSuppliers.filter(s => ((s as { types?: string[] }).types ?? [s.type]).includes('train_operator')).map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </optgroup>
                     )}
-                    {trainSuppliers.some(s => s.type !== 'train_operator') && (
+                    {trainSuppliers.some(s => !((s as { types?: string[] }).types ?? [s.type]).includes('train_operator')) && (
                       <optgroup label="Other suppliers">
-                        {trainSuppliers.filter(s => s.type !== 'train_operator').map(s => (
+                        {trainSuppliers.filter(s => !((s as { types?: string[] }).types ?? [s.type]).includes('train_operator')).map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </optgroup>

@@ -5,7 +5,7 @@ import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
 
 // All valid supplier fields (including hierarchical fields)
 const VALID_FIELDS = [
-  'name', 'type', 'contact_name', 'contact_email', 'contact_phone',
+  'name', 'type', 'types', 'contact_name', 'contact_email', 'contact_phone',
   'phone2', 'whatsapp', 'website', 'address', 'city', 'country',
   'default_commission_rate', 'commission_type', 'payment_terms',
   'bank_details', 'status', 'notes',
@@ -55,12 +55,9 @@ export async function GET(request: NextRequest) {
     // the hotel rates page.
     if (type) {
       const types = type.split(',').map(t => t.trim()).filter(Boolean)
+      // A supplier fills SEVERAL roles (340): match any of its types.
       const keys = await supplierTypeKeysForBehaviors(supabase, types)
-      if (keys.length === 1) {
-        query = query.eq('type', keys[0])
-      } else if (keys.length > 1) {
-        query = query.in('type', keys)
-      }
+      if (keys.length > 0) query = query.overlaps('types', keys)
     }
 
     if (status) {
@@ -105,17 +102,24 @@ export async function POST(request: NextRequest) {
     }
     const body = await request.json()
 
-    if (!body.name || !body.type) {
+    // One or more roles (340): `types` is the list, `type` the primary.
+    const types: string[] = Array.isArray(body.types) && body.types.length
+      ? body.types.map(String).filter(Boolean)
+      : body.type ? [String(body.type)] : []
+    if (!body.name || types.length === 0) {
       return NextResponse.json(
-        { error: 'Name and type are required' },
+        { error: 'Name and at least one type are required' },
         { status: 400 }
       )
     }
+    body.types = types
+    body.type = types[0]
 
     // Filter to only valid fields and set defaults
     const newSupplier: TablesInsert<'suppliers'> = {
       tenant_id, // ✅ Explicit tenant_id
       ...filterValidFields(body),
+      types,
       // company_name is NOT NULL in the DB; mirror the legacy name column
       company_name: body.name,
       country: body.country || 'Egypt',

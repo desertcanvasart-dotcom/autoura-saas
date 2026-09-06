@@ -8235,6 +8235,7 @@ export interface Database {
           type: string | null
           status: string | null
           tenant_id: string
+          types: string[]
         }
         Insert: {
           id?: string
@@ -8272,6 +8273,7 @@ export interface Database {
           type?: string | null
           status?: string | null
           tenant_id: string
+          types: string[]
         }
         Update: {
           id?: string
@@ -8309,6 +8311,7 @@ export interface Database {
           type?: string | null
           status?: string | null
           tenant_id?: string
+          types?: string[]
         }
         Relationships: [
           {

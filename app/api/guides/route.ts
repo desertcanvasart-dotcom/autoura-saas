@@ -175,6 +175,7 @@ export async function POST(request: NextRequest) {
       ...rateCurrencyWriteField(body),
       tenant_id: authResult.tenant_id,
       type: 'guide',
+      types: ['guide'],
       supplier_type: 'guide',
       name: body.name,
       company_name: body.name,
