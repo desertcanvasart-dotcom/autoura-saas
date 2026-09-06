@@ -38,6 +38,8 @@ describe('the kinds', () => {
   it('a column name that means different things per table resolves per table', () => {
     expect(vocabularyColumnsFor('transportation_rates').service_type).toBe('transport_service_type')
     expect(vocabularyColumnsFor('airport_staff_rates').service_type).toBe('airport_service_type')
+    expect(vocabularyColumnsFor('airport_staff_rates').direction).toBe('airport_direction')
+    expect(vocabularyColumnsFor('transportation_rates').direction).toBeUndefined()
     expect(vocabularyColumnsFor('hotel_staff_rates').service_type).toBe('hotel_service_type')
     expect(vocabularyColumnsFor('entrance_fees').category).toBe('attraction_category')
     // `duration` is a vocabulary word on activities but free text on transport.

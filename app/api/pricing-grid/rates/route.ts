@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
     const guideLanguageLabel = (key: string | null | undefined) => (key ? labelFor(guideLanguages, key) : '')
     const airlines = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'airline')
     const airlineLabel = (key: string | null | undefined) => (key ? labelFor(airlines, key) : '')
+    const directions = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'airport_direction')
+    const directionLabel = (key: string | null | undefined) => labelFor(directions, key || 'both')
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
@@ -133,11 +135,11 @@ export async function GET(request: NextRequest) {
 
       airport_services: (airportRates || []).map((r: any) => ({
         id: r.id,
-        name: `${r.airport_code} — ${r.direction || 'both'} (${r.airport_code})`,
+        name: `${r.airport_code} — ${directionLabel(r.direction)} (${r.airport_code})`,
         rateEur: toNum(r.rate_eur),
         rateNonEur: toNum(r.rate_eur),
         city: r.airport_code,
-        details: `${r.direction || 'both'} | ${r.description || ''}`.trim(),
+        details: `${directionLabel(r.direction)} | ${r.description || ''}`.trim(),
       })),
 
       hotel_services: (hotelServiceRates || []).map((r: any) => {

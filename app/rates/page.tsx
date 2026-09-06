@@ -1331,7 +1331,7 @@ export default function RatesPage() {
                           rate.direction === 'departure' ? 'bg-orange-100 text-orange-800' :
                           'bg-purple-100 text-purple-800'
                         }`}>
-                          {rate.direction}
+                          <VocabLabel kind="airport_direction" value={rate.direction} />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600">
