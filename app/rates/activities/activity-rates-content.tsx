@@ -14,17 +14,20 @@ import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurre
 import ActivityTiersEditor from '@/app/components/ActivityTiersEditor'
 import { parseTiers, type ActivityTier } from '@/lib/rates/activity-tiers'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
-import { VocabSelect, VocabLabel } from '@/components/vocabulary'
+import { VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 
 
 
-// NEW: Pricing types for add-ons
-const PRICING_TYPES = [
-  { value: 'per_person', label: 'Per Person', description: 'Rate multiplied by number of travelers', icon: PersonStanding },
-  { value: 'per_unit', label: 'Per Unit', description: 'Flat rate per boat/vehicle/ride', icon: Ship },
-  { value: 'flat', label: 'Flat Rate', description: 'Single price regardless of group size', icon: Banknote },
-  { value: 'tiered', label: 'Tiered', description: 'Per-person rate drops as the group grows', icon: TrendingDown }
-]
+// How a rate is priced. The four KEYS are the engine's (per_person, per_unit,
+// flat, tiered — each changes the arithmetic and what the form asks for); the
+// words and the one-line explanation come from the agency's vocabulary
+// (Settings → Your vocabulary → Activity pricing types). Icons stay by key.
+const PRICING_TYPE_ICONS: Record<string, typeof Ship> = {
+  per_person: PersonStanding,
+  per_unit: Ship,
+  flat: Banknote,
+  tiered: TrendingDown,
+}
 
 
 interface Supplier {
@@ -47,7 +50,8 @@ interface ActivityRate {
   base_rate_eur: number
   base_rate_non_eur: number
   // NEW: Add-on pricing fields
-  pricing_type?: 'per_person' | 'per_unit' | 'flat' | 'tiered'
+  /** A key from the Activity pricing types vocabulary; the engine prices per_person / per_unit / flat / tiered. */
+  pricing_type?: string
   unit_label?: string
   min_capacity?: number
   max_capacity?: number
@@ -86,6 +90,8 @@ export default function ActivityRatesContent() {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedSupplier, setSelectedSupplier] = useState(initialSupplierId)
   const [selectedPricingType, setSelectedPricingType] = useState('')
+  // The agency's words for pricing types (Settings → Your vocabulary); keys are the engine's.
+  const { items: pricingTypeItems, labelFor: pricingTypeLabel } = useVocabulary('activity_pricing_type')
   const [showInactive, setShowInactive] = useState(false)
 
   // UI State
@@ -146,7 +152,7 @@ export default function ActivityRatesContent() {
     base_rate_eur: 0,
     base_rate_non_eur: 0,
     // NEW: Add-on pricing fields
-    pricing_type: 'per_person' as 'per_person' | 'per_unit' | 'flat' | 'tiered',
+    pricing_type: 'per_person',
     unit_label: '',
     min_capacity: 1,
     max_capacity: 99,
@@ -481,17 +487,15 @@ export default function ActivityRatesContent() {
   const uniqueCities = [...new Set(rates.map(r => r.city).filter(Boolean))].length
 
   // Get pricing type badge
+  // Colour by key, word from the vocabulary; a blank type prices as per person.
   const getPricingTypeBadge = (pricingType: string | undefined) => {
-    switch (pricingType) {
-      case 'per_unit':
-        return <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">Per Unit</span>
-      case 'flat':
-        return <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">Flat</span>
-      case 'tiered':
-        return <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">Tiered</span>
-      default:
-        return <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">Per Person</span>
-    }
+    const key = pricingType || 'per_person'
+    const colour =
+      key === 'per_unit' ? 'bg-blue-100 text-blue-700' :
+      key === 'flat' ? 'bg-amber-100 text-amber-700' :
+      key === 'tiered' ? 'bg-purple-100 text-purple-700' :
+      'bg-green-100 text-green-700'
+    return <span className={`px-2 py-0.5 ${colour} rounded text-xs font-medium`}>{pricingTypeLabel(key)}</span>
   }
 
   // Headline rate for a row. A tiered row prices from its bands, never from
@@ -771,17 +775,8 @@ export default function ActivityRatesContent() {
           </div>
 
           {/* Pricing Type Filter */}
-          <select
-            value={selectedPricingType}
-            onChange={(e) => setSelectedPricingType(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
-          >
-            <option value="">All Pricing Types</option>
-            <option value="per_person">Per Person</option>
-            <option value="per_unit">Per Unit (Boat/Ride)</option>
-            <option value="flat">Flat Rate</option>
-            <option value="tiered">Tiered (Volume Discount)</option>
-          </select>
+          <VocabSelect kind="activity_pricing_type" value={selectedPricingType} onChange={setSelectedPricingType} placeholder="All Pricing Types"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
 
           {/* Category Filter */}
           <VocabSelect kind="activity_category" value={selectedCategory} onChange={setSelectedCategory} placeholder={"All Categories"}
@@ -1276,22 +1271,22 @@ export default function ActivityRatesContent() {
                 
                 {/* Pricing Type Selection */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                  {PRICING_TYPES.map((type) => {
-                    const Icon = type.icon
+                  {pricingTypeItems.map((type) => {
+                    const Icon = PRICING_TYPE_ICONS[type.key] ?? Ticket
                     return (
                       <button
-                        key={type.value}
+                        key={type.key}
                         type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, pricing_type: type.value as any }))}
+                        onClick={() => setFormData(prev => ({ ...prev, pricing_type: type.key }))}
                         className={`p-3 border-2 rounded-lg text-left transition-all ${
-                          formData.pricing_type === type.value
+                          formData.pricing_type === type.key
                             ? 'border-primary-600 bg-primary-50'
                             : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <Icon className={`w-4 h-4 ${formData.pricing_type === type.value ? 'text-primary-600' : 'text-gray-400'}`} />
-                          <span className={`text-sm font-semibold ${formData.pricing_type === type.value ? 'text-primary-600' : 'text-gray-900'}`}>
+                          <Icon className={`w-4 h-4 ${formData.pricing_type === type.key ? 'text-primary-600' : 'text-gray-400'}`} />
+                          <span className={`text-sm font-semibold ${formData.pricing_type === type.key ? 'text-primary-600' : 'text-gray-900'}`}>
                             {type.label}
                           </span>
                         </div>
@@ -1308,7 +1303,7 @@ export default function ActivityRatesContent() {
                   <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
                     <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                      This rate has {tiers.length} saved group-size band{tiers.length === 1 ? '' : 's'} that are only used by the Tiered pricing type. Saving as {PRICING_TYPES.find(t => t.value === formData.pricing_type)?.label ?? 'this type'} will remove them.
+                      This rate has {tiers.length} saved group-size band{tiers.length === 1 ? '' : 's'} that are only used by the Tiered pricing type. Saving as {pricingTypeLabel(formData.pricing_type)} will remove them.
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, pricing_type: 'tiered' }))}

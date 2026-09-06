@@ -18,7 +18,7 @@ export const VOCABULARY_KINDS = [
   'cuisine_type', 'restaurant_type', 'dietary_option', 'activity_category',
   'activity_type', 'activity_duration', 'activity_unit', 'guide_grade',
   'guide_duration', 'guide_language', 'rate_season', 'airline', 'hotel_supplement',
-  'airport_direction',
+  'airport_direction', 'activity_pricing_type',
 ] as const
 export type VocabularyKind = (typeof VOCABULARY_KINDS)[number]
 
@@ -353,6 +353,15 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     minItems: 1,
     example: 'Arrival / Departure / Both directions',
   },
+  activity_pricing_type: {
+    kind: 'activity_pricing_type',
+    group: 'Attractions & activities',
+    title: 'Activity pricing types',
+    description: 'How an activity or add-on is priced. The engine prices by key — per person, per unit, flat, or tiered — and the note on each entry is the explanation shown on the form. Rename freely; an entry you add is stored on rates but priced as per person.',
+    usedIn: 'Activities & add-ons, quotes, pricing engine',
+    minItems: 1,
+    example: 'Per Person / Per Unit / Flat Rate / Tiered',
+  },
 }
 
 /** The built-in supplier kinds the app knows how to treat. An agency's
@@ -610,6 +619,7 @@ export const VOCABULARY_COLUMNS: Record<string, VocabularyKind> = {
   guide_language: 'guide_language',
   season: 'rate_season',
   airline: 'airline',
+  pricing_type: 'activity_pricing_type',
 }
 
 /** Columns whose name means something DIFFERENT per table: `service_type`
