@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { GridConfig, GridTotals, Tier, ClientType, PassportType } from '../types'
+import type { GridConfig, GridTotals, ClientType, PassportType } from '../types'
+import { VocabSelect } from '@/components/vocabulary'
 import { convertAmount } from '../lib/calculator'
 
 interface GridHeaderProps {
@@ -16,13 +17,6 @@ interface B2BPartner {
   partner_code: string
   default_margin_percent: number
 }
-
-const TIERS: { value: Tier; label: string }[] = [
-  { value: 'budget', label: 'Budget' },
-  { value: 'standard', label: 'Standard' },
-  { value: 'deluxe', label: 'Deluxe' },
-  { value: 'luxury', label: 'Luxury' },
-]
 
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 
@@ -136,15 +130,8 @@ export default function GridHeader({ config, onChange, totals }: GridHeaderProps
           </button>
 
           {/* Tier */}
-          <select
-            value={config.tier}
-            onChange={(e) => update({ tier: e.target.value as Tier })}
-            className="px-2 py-1 text-sm border border-gray-200 rounded-lg font-medium bg-white focus:ring-2 focus:ring-blue-200 transition-all"
-          >
-            {TIERS.map(t => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
+          <VocabSelect kind="tier" value={config.tier} onChange={tier => update({ tier })} placeholder={null}
+            className="px-2 py-1 text-sm border border-gray-200 rounded-lg font-medium bg-white focus:ring-2 focus:ring-blue-200 transition-all" />
         </div>
 
         {/* ===== PRICING MODE GROUP ===== */}

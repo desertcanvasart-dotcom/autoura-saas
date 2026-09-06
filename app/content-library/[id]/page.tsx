@@ -7,6 +7,8 @@
 'use client'
 
 import { useState, useEffect, use } from 'react'
+import { useVocabulary } from '@/hooks/useVocabulary'
+import { paletteAt, tierPosition } from '@/lib/vocabulary-ui'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -53,7 +55,7 @@ interface ContentCategory {
 
 interface ContentVariation {
   id?: string
-  tier: 'budget' | 'standard' | 'deluxe' | 'luxury'
+  tier: string
   title: string
   description: string
   highlights: string[]
@@ -76,15 +78,18 @@ interface ContentItem {
   variations: ContentVariation[]
 }
 
-const TIERS = ['budget', 'standard', 'deluxe', 'luxury'] as const
-type Tier = typeof TIERS[number]
-
-const TIER_CONFIG: Record<Tier, { label: string; icon: typeof Wallet; color: string; bgColor: string }> = {
-  budget: { label: 'Budget', icon: Wallet, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
-  standard: { label: 'Standard', icon: Star, color: 'text-blue-600', bgColor: 'bg-blue-50' },
-  deluxe: { label: 'Deluxe', icon: Gem, color: 'text-purple-600', bgColor: 'bg-purple-50' },
-  luxury: { label: 'Luxury', icon: Crown, color: 'text-amber-600', bgColor: 'bg-amber-50' }
-}
+// Tiers come from the agency's vocabulary (Settings → Your vocabulary); icon,
+// colour and writing tip follow the tier's POSITION on the ladder.
+type Tier = string
+const TIER_ICONS = [Wallet, Star, Gem, Crown]
+const TIER_TIPS = [
+  <p key="0">Focus on <strong>value and essentials</strong>. Highlight what&apos;s included, emphasize good-value experiences, and use straightforward language.</p>,
+  <p key="1">Balance <strong>comfort and experience</strong>. Mention quality aspects, comfortable arrangements, and reliable service without excessive luxury language.</p>,
+  <p key="2">Emphasize <strong>enhanced experiences and refinement</strong>. Highlight superior quality, added comforts, and exclusive touches that elevate the experience.</p>,
+  <p key="3">Convey <strong>exclusivity and ultimate comfort</strong>. Use sophisticated language, emphasize private access, personalized service, and exceptional quality.</p>,
+]
+const ladderIndex = (position: number, total: number) => (total <= 1 || position < 0) ? 3 : Math.round((position * 3) / (total - 1))
+const emptyVariation = (tier: string): ContentVariation => ({ tier, title: '', description: '', highlights: [], inclusions: [], internal_notes: '', is_active: true })
 
 const CATEGORY_ICONS: Record<string, typeof Landmark> = {
   'Landmark': Landmark,
@@ -532,7 +537,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [categories, setCategories] = useState<ContentCategory[]>([])
-  const [activeTier, setActiveTier] = useState<Tier>('budget')
+  const [activeTier, setActiveTier] = useState<Tier>('')
   const [categorySchema, setCategorySchema] = useState<CategorySchema | null>(null)
 
   // Form state
@@ -546,16 +551,27 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
     tags: [],
     metadata: {},
     is_active: true,
-    variations: TIERS.map(tier => ({
-      tier,
-      title: '',
-      description: '',
-      highlights: [],
-      inclusions: [],
-      internal_notes: '',
-      is_active: true
-    }))
+    variations: []
   })
+
+  // One variation per tier of the agency's vocabulary, tabs in its order. A
+  // variation filed under a tier the vocabulary no longer lists stays, so a
+  // save never drops it.
+  const { items: tierItems, all: allTiers } = useVocabulary('tier')
+  useEffect(() => {
+    if (tierItems.length === 0) return
+    setFormData(prev => ({
+      ...prev,
+      variations: [
+        ...tierItems.map(t => prev.variations.find(v => v.tier === t.key) ?? emptyVariation(t.key)),
+        ...prev.variations.filter(v => !tierItems.some(t => t.key === v.tier)),
+      ],
+    }))
+    setActiveTier(prev => (prev && tierItems.some(t => t.key === prev)) ? prev : tierItems[0].key)
+  }, [tierItems])
+  const tierTabs = [...tierItems.map(t => t.key), ...formData.variations.map(v => v.tier).filter(k => !tierItems.some(t => t.key === k))]
+  const tierLabel = (key: string) => allTiers.find(t => t.key === key)?.label ?? key
+  const tierIcon = (key: string) => TIER_ICONS[ladderIndex(tierPosition(allTiers, key), tierItems.length)] ?? Star
 
   const [tagInput, setTagInput] = useState('')
 
@@ -593,29 +609,15 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
           const data = await res.json()
           
           // Ensure all tiers exist with proper defaults
-          const variations = TIERS.map(tier => {
-            const existing = data.variations?.find((v: ContentVariation) => v.tier === tier)
-            if (existing) {
-              return {
-                ...existing,
-                title: existing.title || '',
-                description: existing.description || '',
-                highlights: existing.highlights || [],
-                inclusions: existing.inclusions || [],
-                internal_notes: existing.internal_notes || '',
-                is_active: existing.is_active ?? true
-              }
-            }
-            return {
-              tier,
-              title: '',
-              description: '',
-              highlights: [],
-              inclusions: [],
-              internal_notes: '',
-              is_active: true
-            }
-          })
+          const variations: ContentVariation[] = (data.variations ?? []).map((existing: ContentVariation) => ({
+            ...existing,
+            title: existing.title || '',
+            description: existing.description || '',
+            highlights: existing.highlights || [],
+            inclusions: existing.inclusions || [],
+            internal_notes: existing.internal_notes || '',
+            is_active: existing.is_active ?? true,
+          }))
 
           setFormData({
             ...data,
@@ -968,9 +970,9 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
             <div className="bg-white rounded-xl border border-gray-200">
               {/* Tier Tabs */}
               <div className="flex border-b border-gray-200">
-                {TIERS.map((tier) => {
-                  const config = TIER_CONFIG[tier]
-                  const Icon = config.icon
+                {tierTabs.map((tier) => {
+                  const Icon = tierIcon(tier)
+                  const palette = paletteAt(tierPosition(allTiers, tier))
                   const status = getVariationStatus(tier)
 
                   return (
@@ -979,12 +981,12 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                       onClick={() => setActiveTier(tier)}
                       className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
                         activeTier === tier
-                          ? `${config.color} border-b-2 border-current`
+                          ? `${palette.text} border-b-2 border-current`
                           : 'text-gray-500 hover:text-gray-700'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
-                      {config.label}
+                      {tierLabel(tier)}
                       {status === 'complete' && (
                         <Check className="w-3.5 h-3.5 text-green-500" />
                       )}
@@ -1006,7 +1008,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                         type="text"
                         value={currentVariation.title}
                         onChange={(e) => updateVariation('title', e.target.value)}
-                        placeholder={`${TIER_CONFIG[activeTier].label} experience title...`}
+                        placeholder={`${tierLabel(activeTier)} experience title...`}
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47]"
                       />
                     </div>
@@ -1019,7 +1021,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                       <textarea
                         value={currentVariation.description}
                         onChange={(e) => updateVariation('description', e.target.value)}
-                        placeholder={`How you describe this at the ${activeTier} tier...`}
+                        placeholder={`How you describe this at the ${tierLabel(activeTier)} tier...`}
                         rows={6}
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#647C47]/20 focus:border-[#647C47] resize-none"
                       />
@@ -1072,18 +1074,7 @@ export default function ContentEditorPage({ params }: { params: Promise<{ id: st
                 💡 Tier Writing Tips
               </h3>
               <div className="text-sm text-gray-600 space-y-2">
-                {activeTier === 'budget' && (
-                  <p>Focus on <strong>value and essentials</strong>. Highlight what's included, emphasize good-value experiences, and use straightforward language.</p>
-                )}
-                {activeTier === 'standard' && (
-                  <p>Balance <strong>comfort and experience</strong>. Mention quality aspects, comfortable arrangements, and reliable service without excessive luxury language.</p>
-                )}
-                {activeTier === 'deluxe' && (
-                  <p>Emphasize <strong>enhanced experiences and refinement</strong>. Highlight superior quality, added comforts, and exclusive touches that elevate the experience.</p>
-                )}
-                {activeTier === 'luxury' && (
-                  <p>Convey <strong>exclusivity and ultimate comfort</strong>. Use sophisticated language, emphasize private access, personalized service, and exceptional quality.</p>
-                )}
+                {TIER_TIPS[ladderIndex(tierPosition(allTiers, activeTier), tierItems.length)]}
               </div>
             </div>
           </div>

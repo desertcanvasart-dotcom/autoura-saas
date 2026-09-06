@@ -1,5 +1,7 @@
 'use client'
 
+import { useVocabulary } from '@/hooks/useVocabulary'
+import { TierBadge } from '@/components/vocabulary'
 import { useState, useEffect } from 'react'
 import { todayLocal } from '@/lib/today'
 import { createClient } from '@/app/supabase'
@@ -46,14 +48,8 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; icon: any }> = {
   expired: { bg: 'bg-orange-100', text: 'text-orange-700', icon: AlertCircle }
 }
 
-const TIER_COLORS: Record<string, { bg: string; text: string }> = {
-  budget: { bg: 'bg-gray-50', text: 'text-gray-700' },
-  standard: { bg: 'bg-blue-50', text: 'text-blue-700' },
-  deluxe: { bg: 'bg-purple-50', text: 'text-purple-700' },
-  luxury: { bg: 'bg-amber-50', text: 'text-amber-700' }
-}
-
 export default function B2CQuotesPage() {
+  const { items: tierItems } = useVocabulary('tier')
   const supabase = createClient()
   const dialog = useConfirmDialog()
   const [quotes, setQuotes] = useState<B2CQuote[]>([])
@@ -500,7 +496,7 @@ export default function B2CQuotesPage() {
                   Tier
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {['budget', 'standard', 'deluxe', 'luxury'].map((tier) => (
+                  {tierItems.map(({ key: tier, label }) => (
                     <button
                       key={tier}
                       type="button"
@@ -511,7 +507,7 @@ export default function B2CQuotesPage() {
                           : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
                       }`}
                     >
-                      {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -806,7 +802,6 @@ export default function B2CQuotesPage() {
             <div className="space-y-3">
               {paginatedQuotes.map((quote) => {
               const statusConfig = STATUS_COLORS[quote.status] || STATUS_COLORS.draft
-              const tierConfig = TIER_COLORS[quote.tier] || TIER_COLORS.standard
               const StatusIcon = statusConfig.icon
               const isSelected = selectedQuotes.has(quote.id)
 
@@ -849,9 +844,7 @@ export default function B2CQuotesPage() {
                           <StatusIcon className="w-3 h-3" />
                           {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
                         </span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${tierConfig.bg} ${tierConfig.text}`}>
-                          {quote.tier.charAt(0).toUpperCase() + quote.tier.slice(1)}
-                        </span>
+                        <TierBadge tier={quote.tier} />
                       </div>
 
                       <div className="grid grid-cols-3 gap-4 text-sm">

@@ -6,8 +6,11 @@
 // ENUMS & CONSTANTS
 // =====================================================
 
+/** The Egypt PRESET. Screens read the tenant's own tiers (hooks/useVocabulary);
+ *  this list is the default a new tenant is seeded with (migration 334). */
 export const TIERS = ['budget', 'standard', 'deluxe', 'luxury'] as const
-export type Tier = typeof TIERS[number]
+/** A key from the tenant's tier vocabulary. */
+export type Tier = string
 
 export const RULE_CATEGORIES = ['tone', 'vocabulary', 'structure', 'formatting', 'brand'] as const
 export type RuleCategory = typeof RULE_CATEGORIES[number]

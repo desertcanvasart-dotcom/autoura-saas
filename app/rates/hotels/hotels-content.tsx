@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { TierBadge, TierPicker, VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
@@ -20,21 +21,6 @@ import { seasonsForRow, type RateSeason } from '@/lib/rates/rate-seasons'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
-
-const TIER_OPTIONS = [
-  { value: 'budget', label: 'Budget', color: 'bg-gray-100 text-gray-700' },
-  { value: 'standard', label: 'Standard', color: 'bg-blue-100 text-blue-700' },
-  { value: 'deluxe', label: 'Deluxe', color: 'bg-purple-100 text-purple-700' },
-  { value: 'luxury', label: 'Luxury', color: 'bg-amber-100 text-amber-700' }
-]
-
-const BOARD_BASIS_OPTIONS = [
-  { value: 'RO', label: 'Room Only' },
-  { value: 'BB', label: 'Bed & Breakfast' },
-  { value: 'HB', label: 'Half Board' },
-  { value: 'FB', label: 'Full Board' },
-  { value: 'AI', label: 'All Inclusive' }
-]
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
@@ -209,15 +195,6 @@ function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => vo
         <X className="w-4 h-4" />
       </button>
     </div>
-  )
-}
-
-function TierBadge({ tier }: { tier: string | undefined }) {
-  const tierConfig = TIER_OPTIONS.find(t => t.value === tier) || TIER_OPTIONS[1]
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tierConfig.color}`}>
-      {tierConfig.label}
-    </span>
   )
 }
 
@@ -400,7 +377,7 @@ export default function HotelsContent() {
     property_id: '',
     property_type: 'hotel',
     city: '',
-    board_basis: 'BB',
+    board_basis: 'bb',
     // Hotel contacts
     contact_name: '',
     contact_email: '',
@@ -589,7 +566,7 @@ export default function HotelsContent() {
     property_id: '',
       property_type: 'hotel',
       city: '',
-      board_basis: 'BB',
+      board_basis: 'bb',
       // Hotel contacts
       contact_name: '',
       contact_email: '',
@@ -727,7 +704,7 @@ export default function HotelsContent() {
       property_id: (rate as { property_id?: string | null }).property_id || '',
       property_type: rate.property_type || 'hotel',
       city: rate.city || '',
-      board_basis: rate.board_basis || 'BB',
+      board_basis: rate.board_basis || 'bb',
       // Hotel contacts
       contact_name: rate.contact_name || '',
       contact_email: rate.contact_email || '',
@@ -911,7 +888,7 @@ export default function HotelsContent() {
       property_id: (rate as { property_id?: string | null }).property_id || '',
       property_type: rate.property_type || 'hotel',
       city: rate.city || '',
-      board_basis: rate.board_basis || 'BB',
+      board_basis: rate.board_basis || 'bb',
       // Hotel contacts
       contact_name: rate.contact_name || '',
       contact_email: rate.contact_email || '',
@@ -1220,16 +1197,7 @@ export default function HotelsContent() {
 
             {/* Tier Filter */}
             <div className="relative">
-              <select
-                value={filterTier || 'all'}
-                onChange={(e) => setFilterTier(e.target.value === 'all' ? null : e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm appearance-none pr-8"
-              >
-                <option value="all">All Tiers</option>
-                {TIER_OPTIONS.map(t => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
+              <VocabSelect kind="tier" value={filterTier || 'all'} onChange={v => setFilterTier(v === 'all' ? null : v)} emptyValue="all" placeholder="All Tiers" className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm appearance-none pr-8" />
               <Crown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
             </div>
 
@@ -1371,7 +1339,7 @@ export default function HotelsContent() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">
-                          {rate.board_basis || 'BB'}
+                          <VocabLabel kind="board_basis" value={rate.board_basis} fallback="BB" />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -1475,7 +1443,7 @@ export default function HotelsContent() {
                     <div className="flex items-center gap-2 mb-3">
                       <TierBadge tier={rate.tier} />
                       <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium">
-                        {rate.board_basis || 'BB'}
+                        <VocabLabel kind="board_basis" value={rate.board_basis} fallback="BB" />
                       </span>
                       {rate.city && (
                         <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
@@ -1746,34 +1714,14 @@ export default function HotelsContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Property Type *</label>
-                    <select
-                      name="property_type"
-                      value={formData.property_type}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                    >
-                      <option value="hotel">🏨 Hotel</option>
-                      <option value="resort">🏖️ Resort</option>
-                      <option value="apartment">🏢 Apartment</option>
-                      <option value="guesthouse">🏠 Guesthouse</option>
-                      <option value="cruise">🚢 Cruise</option>
-                      <option value="camp">⛺ Camp</option>
-                    </select>
+                    <VocabSelect kind="hotel_property_type" name="property_type" value={formData.property_type} onChange={v => setFormData({ ...formData, property_type: v })} required placeholder={null}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm" />
                   </div>
                   <RateCurrencyField compact value={rateCurrency} onChange={setRateCurrency} />
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Board Basis</label>
-                    <select
-                      name="board_basis"
-                      value={formData.board_basis}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                    >
-                      {BOARD_BASIS_OPTIONS.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="board_basis" name="board_basis" value={formData.board_basis} onChange={v => setFormData({ ...formData, board_basis: v })} placeholder={null}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm" />
                   </div>
                 </div>
               </div>
@@ -1867,27 +1815,7 @@ export default function HotelsContent() {
                   Service Tier
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {TIER_OPTIONS.map((tier) => (
-                    <button
-                      key={tier.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, tier: tier.value })}
-                      className={`px-4 py-2 text-sm rounded-lg border-2 font-medium transition-all ${
-                        formData.tier === tier.value
-                          ? tier.value === 'budget'
-                            ? 'border-gray-600 bg-gray-100 text-gray-800'
-                            : tier.value === 'standard'
-                            ? 'border-blue-600 bg-blue-50 text-blue-800'
-                            : tier.value === 'deluxe'
-                            ? 'border-purple-600 bg-purple-50 text-purple-800'
-                            : 'border-amber-600 bg-amber-50 text-amber-800'
-                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
-                      }`}
-                    >
-                      {tier.value === 'luxury' && <Crown className="w-3.5 h-3.5 inline mr-1" />}
-                      {tier.label}
-                    </button>
-                  ))}
+                  <TierPicker value={formData.tier} onChange={tier => setFormData({ ...formData, tier })} />
                 </div>
               </div>
 

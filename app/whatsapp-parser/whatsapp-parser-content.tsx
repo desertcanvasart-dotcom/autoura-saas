@@ -2,6 +2,8 @@
 
 export const dynamic = 'force-dynamic'
 
+import { useVocabulary } from '@/hooks/useVocabulary'
+import { paletteAt, tierPosition } from '@/lib/vocabulary-ui'
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { DEFAULT_MARGIN_PERCENT } from '@/lib/ai/parsing-utils'
 import { createClient } from '@/app/supabase'
@@ -105,13 +107,6 @@ type QuoteType = 'b2c' | 'b2b' | 'both' | 'none'
 // CONSTANTS
 // ============================================
 
-const TIER_OPTIONS = [
-  { value: 'budget', label: 'Budget', icon: null, color: 'gray', description: 'Cost-effective, good value' },
-  { value: 'standard', label: 'Standard', icon: null, color: 'blue', description: 'Comfortable mid-range' },
-  { value: 'deluxe', label: 'Deluxe', icon: Star, color: 'purple', description: 'Superior quality' },
-  { value: 'luxury', label: 'Luxury', icon: Crown, color: 'amber', description: 'Top-tier VIP experience' }
-]
-
 // UPDATED: New package types
 const PACKAGE_TYPES = [
   { slug: 'day-trips', name: 'Day Trips', icon: Sun, description: 'No accommodation', color: 'amber' },
@@ -162,14 +157,10 @@ const mapBudgetToTier = (budgetLevel: string): string => {
   return mapping[budgetLevel?.toLowerCase()] || 'standard'
 }
 
-const getTierColor = (tier: string) => {
-  const colors: Record<string, { bg: string; border: string; text: string; ring: string }> = {
-    luxury: { bg: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-700', ring: 'ring-amber-500' },
-    deluxe: { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700', ring: 'ring-purple-500' },
-    standard: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', ring: 'ring-blue-500' },
-    budget: { bg: 'bg-gray-50', border: 'border-gray-300', text: 'text-gray-700', ring: 'ring-gray-500' }
-  }
-  return colors[tier] || colors.standard
+// Colour by the tier's position on the agency's ladder (Settings → Your vocabulary).
+const getTierColor = (tier: string, allTiers: { key: string; rank: number }[]) => {
+  const p = paletteAt(tierPosition(allTiers, tier))
+  return { bg: p.bg, border: p.border, text: p.text, ring: p.ring }
 }
 
 const parseConversation = (text: string): { sender: 'client' | 'agent'; message: string; highlight?: string[] }[] => {
@@ -354,7 +345,8 @@ function ClientConfirmationModal({
     nationality: extractedData.nationality || 'Unknown'
   })
 
-  const tierColor = getTierColor(tier)
+  const { all: allTiers } = useVocabulary('tier')
+  const tierColor = getTierColor(tier, allTiers)
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -944,6 +936,7 @@ export default function WhatsAppParserPage() {
 // ============================================
 
 function WhatsAppParserContent() {
+  const { items: tierItems, all: allTiers } = useVocabulary('tier')
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1432,7 +1425,7 @@ function WhatsAppParserContent() {
     )
   }
 
-  const tierColor = getTierColor(selectedTier)
+  const tierColor = getTierColor(selectedTier, allTiers)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1675,13 +1668,14 @@ function WhatsAppParserContent() {
                   </h3>
 
                   <div className="grid grid-cols-4 gap-2">
-                    {TIER_OPTIONS.map((tier) => {
-                      const isSelected = selectedTier === tier.value
-                      const color = getTierColor(tier.value)
+                    {tierItems.map((tier, i) => {
+                      const isSelected = selectedTier === tier.key
+                      const color = getTierColor(tier.key, allTiers)
+                      const Icon = i === tierItems.length - 1 ? Crown : (tierItems.length > 2 && i === tierItems.length - 2) ? Star : null
                       return (
                         <button
-                          key={tier.value}
-                          onClick={() => setSelectedTier(tier.value)}
+                          key={tier.key}
+                          onClick={() => setSelectedTier(tier.key)}
                           className={`p-3 rounded-xl border-2 text-left transition-all ${
                             isSelected 
                               ? `${color.border} ${color.bg} ring-2 ${color.ring} ring-offset-1` 
@@ -1689,10 +1683,10 @@ function WhatsAppParserContent() {
                           }`}
                         >
                           <div className="flex items-center gap-1.5 mb-1">
-                            {tier.icon && <tier.icon className={`w-4 h-4 ${color.text}`} />}
+                            {Icon && <Icon className={`w-4 h-4 ${color.text}`} />}
                             <span className={`text-sm font-semibold ${isSelected ? color.text : 'text-gray-600'}`}>{tier.label}</span>
                           </div>
-                          <p className="text-xs text-gray-500">{tier.description}</p>
+                          {tier.description && <p className="text-xs text-gray-500">{tier.description}</p>}
                         </button>
                       )
                     })}

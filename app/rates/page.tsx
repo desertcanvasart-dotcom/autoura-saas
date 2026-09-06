@@ -6,6 +6,7 @@ import { RATES_TAB_ORDER, firstTabWithData, type RatesTab } from '@/lib/rates/fi
 import Link from 'next/link'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { TierBadge, VocabLabel } from '@/components/vocabulary'
 
 // ============================================
 // INTERFACES
@@ -895,7 +896,7 @@ export default function RatesPage() {
                     <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
                       <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.service_type}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{rate.vehicle_type}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700"><VocabLabel kind="vehicle_type" value={rate.vehicle_type} /></td>
                       <td className="px-4 py-3">
                         <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                           {rate.city}
@@ -1036,11 +1037,7 @@ export default function RatesPage() {
                       <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.property_name}</td>
                       <td className="px-4 py-3">
-                        {rate.tier && (
-                          <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
-                            {rate.tier}
-                          </span>
-                        )}
+                        <TierBadge tier={rate.tier} />
                       </td>
                       <td className="px-4 py-3 text-center text-xs">
                         <span className="text-yellow-500">{'⭐'.repeat(rate.star_rating || 0)}</span>
@@ -1084,7 +1081,7 @@ export default function RatesPage() {
                     <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
                       <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.restaurant_name}</td>
-                      <td className="px-4 py-3 text-xs text-gray-700">{rate.meal_type}</td>
+                      <td className="px-4 py-3 text-xs text-gray-700"><VocabLabel kind="meal_type" value={rate.meal_type} /></td>
                       <td className="px-4 py-3">
                         <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                           {rate.city}
@@ -1153,12 +1150,8 @@ export default function RatesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          rate.cabin_type === 'suite' ? 'bg-purple-100 text-purple-800' :
-                          rate.cabin_type === 'deluxe' ? 'bg-indigo-100 text-indigo-800' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {rate.cabin_type}
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                          <VocabLabel kind="cruise_cabin" value={rate.cabin_type} />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
@@ -1213,10 +1206,8 @@ export default function RatesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          rate.cabin_type === 'single' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                        }`}>
-                          {rate.cabin_type}
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          <VocabLabel kind="sleeper_cabin" value={rate.cabin_type} />
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center text-sm text-gray-700">

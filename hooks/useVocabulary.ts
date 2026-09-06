@@ -12,7 +12,7 @@
 // comes back empty and callers keep their built-in lists (step 2 of the
 // vocabulary work swaps those in one by one).
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   activeInOrder,
   groupByKind,
@@ -74,9 +74,12 @@ export function useVocabulary(kind: VocabularyKind): UseVocabularyResult {
     return () => { alive = false }
   }, [])
 
-  const all = groupByKind(rows)[kind]
+  // Memoised so callers can put `items` in an effect's dependency list.
+  const grouped = useMemo(() => groupByKind(rows), [rows])
+  const all = grouped[kind]
+  const items = useMemo(() => activeInOrder(all), [all])
   return {
-    items: activeInOrder(all),
+    items,
     all,
     labelFor: key => labelForItems(all, key),
     loading,
@@ -102,5 +105,6 @@ export function useAllVocabularies(): { byKind: Record<VocabularyKind, Vocabular
     return () => { alive = false }
   }, [])
 
-  return { byKind: groupByKind(rows), loading, reload }
+  const byKind = useMemo(() => groupByKind(rows), [rows])
+  return { byKind, loading, reload }
 }

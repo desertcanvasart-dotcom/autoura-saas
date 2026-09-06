@@ -10,20 +10,11 @@ import { useSearchParams } from 'next/navigation'
 import { Utensils, Plus, Edit, Trash2, X, Check, Copy, MapPin, Users, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import { TierBadge, VocabSelect, VocabLabel } from '@/components/vocabulary'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
-
-const MEAL_TYPES = [
-  'Breakfast',
-  'Lunch',
-  'Dinner',
-  'Brunch',
-  'Snack',
-  'Full Board',
-  'Half Board'
-]
 
 const CUISINE_TYPES = [
   'Egyptian',
@@ -61,13 +52,6 @@ const DIETARY_OPTIONS = [
   'Dairy-Free',
   'Nut-Free',
   'Kosher'
-]
-
-const TIERS = [
-  { value: 'budget', label: 'Budget', color: 'bg-gray-100 text-gray-700' },
-  { value: 'standard', label: 'Standard', color: 'bg-blue-100 text-blue-700' },
-  { value: 'deluxe', label: 'Deluxe', color: 'bg-purple-100 text-purple-700' },
-  { value: 'luxury', label: 'Luxury', color: 'bg-amber-100 text-amber-700' }
 ]
 
 interface Supplier {
@@ -514,14 +498,7 @@ export default function MealRatesContent() {
   const uniqueCities = [...new Set(rates.map(r => r.city).filter(Boolean))].length
 
   // Get tier badge
-  const getTierBadge = (tier: string | undefined) => {
-    const tierConfig = TIERS.find(t => t.value === tier) || TIERS[1]
-    return (
-      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tierConfig.color}`}>
-        {tierConfig.label}
-      </span>
-    )
-  }
+  const getTierBadge = (tier: string | undefined) => <TierBadge tier={tier} />
 
   // Get notification icon
   const getNotificationIcon = (type: string) => {
@@ -769,16 +746,8 @@ export default function MealRatesContent() {
           </div>
 
           {/* Meal Type Filter */}
-          <select
-            value={selectedMealType}
-            onChange={(e) => setSelectedMealType(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
-          >
-            <option value="">All Meal Types</option>
-            {MEAL_TYPES.map(type => (
-              <option key={type} value={type}>{type}</option>
-            ))}
-          </select>
+          <VocabSelect kind="meal_type" value={selectedMealType} onChange={setSelectedMealType} placeholder="All Meal Types"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
 
           {/* City Filter */}
           <select
@@ -793,16 +762,8 @@ export default function MealRatesContent() {
           </select>
 
           {/* Tier Filter */}
-          <select
-            value={selectedTier}
-            onChange={(e) => setSelectedTier(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
-          >
-            <option value="">All Tiers</option>
-            {TIERS.map(tier => (
-              <option key={tier.value} value={tier.value}>{tier.label}</option>
-            ))}
-          </select>
+          <VocabSelect kind="tier" value={selectedTier} onChange={setSelectedTier} placeholder="All Tiers"
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
 
           {/* Active Only Toggle */}
           <button
@@ -947,7 +908,7 @@ export default function MealRatesContent() {
                     <td className="px-4 py-3">
                       {rate.meal_type ? (
                         <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">
-                          {rate.meal_type}
+                          <VocabLabel kind="meal_type" value={rate.meal_type} />
                         </span>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
@@ -1027,7 +988,7 @@ export default function MealRatesContent() {
                 <div className="flex items-center gap-2 mb-2">
                   {rate.meal_type && (
                     <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
-                      {rate.meal_type}
+                      <VocabLabel kind="meal_type" value={rate.meal_type} />
                     </span>
                   )}
                   {getTierBadge(rate.tier)}
@@ -1088,7 +1049,7 @@ export default function MealRatesContent() {
                   <span className="text-sm text-gray-500">{rate.city || '—'}</span>
                   {rate.meal_type && (
                     <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
-                      {rate.meal_type}
+                      <VocabLabel kind="meal_type" value={rate.meal_type} />
                     </span>
                   )}
                   {getTierBadge(rate.tier)}
@@ -1259,17 +1220,7 @@ export default function MealRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Meal Type</label>
-                    <select
-                      name="meal_type"
-                      value={formData.meal_type}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Meal Type</option>
-                      {MEAL_TYPES.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="meal_type" name="meal_type" value={formData.meal_type} onChange={v => setFormData(prev => ({ ...prev, meal_type: v }))} placeholder="Select Meal Type" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Cuisine Type</label>
@@ -1315,16 +1266,7 @@ export default function MealRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Service Tier</label>
-                    <select
-                      name="tier"
-                      value={formData.tier}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      {TIERS.map(tier => (
-                        <option key={tier.value} value={tier.value}>{tier.label}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="tier" name="tier" value={formData.tier} onChange={v => setFormData(prev => ({ ...prev, tier: v }))} placeholder={null} />
                   </div>
                 </div>
               </div>

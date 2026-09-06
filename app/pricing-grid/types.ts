@@ -6,7 +6,8 @@ import type { PackageType } from '@/lib/package-types'
 
 // --- Grid Configuration (header controls) ---
 
-export type Tier = 'budget' | 'standard' | 'deluxe' | 'luxury'
+/** A key from the tenant's tier vocabulary (Settings → Your vocabulary). */
+export type Tier = string
 export type ClientType = 'b2b' | 'b2c'
 export type PassportType = 'eu' | 'non_eu'
 

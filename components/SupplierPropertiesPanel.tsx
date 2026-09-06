@@ -12,9 +12,8 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { Loader2, Pencil, Plus, Ship, Building2, TrainFront, Trash2, X } from 'lucide-react'
 import CitySelect from '@/components/CitySelect'
+import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import {
-  PROPERTY_CATEGORIES,
-  PROPERTY_CATEGORY_LABELS,
   PROPERTY_TYPE_LABELS,
   propertyTypesForRoles,
   type PropertyType,
@@ -143,7 +142,7 @@ export default function SupplierPropertiesPanel({ supplierId, supplierRoles }: P
                 <tr key={p.id} className={`border-t border-gray-100 ${p.is_active ? '' : 'opacity-50'}`}>
                   <td className="px-3 py-2 text-sm font-medium flex items-center gap-2">
                     <Icon className="w-4 h-4 text-gray-400" /> {p.name}
-                    {p.category && <span className="px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-600">{p.category}</span>}
+                    {p.category && <span className="px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-600"><VocabLabel kind="tier" value={p.category} /></span>}
                   </td>
                   <td className="px-3 py-2 text-sm text-gray-600">{PROPERTY_TYPE_LABELS[p.property_type] ?? p.property_type}</td>
                   <td className="px-3 py-2 text-sm text-gray-600">{p.city || '—'}</td>
@@ -200,20 +199,8 @@ export default function SupplierPropertiesPanel({ supplierId, supplierRoles }: P
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
-              <select
-                value={draft.category}
-                onChange={e => setDraft({ ...draft, category: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-              >
-                <option value="">Select Category...</option>
-                {/* A legacy free-text category stays selectable until it is re-filed. */}
-                {draft.category && !(PROPERTY_CATEGORIES as readonly string[]).includes(draft.category) && (
-                  <option value={draft.category}>{draft.category}</option>
-                )}
-                {PROPERTY_CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{PROPERTY_CATEGORY_LABELS[cat]}</option>
-                ))}
-              </select>
+              {/* The property's tier, in the agency's words (Settings → Your vocabulary). */}
+              <VocabSelect kind="tier" value={draft.category} onChange={category => setDraft({ ...draft, category })} placeholder="Select Category..." />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Contact name</label>

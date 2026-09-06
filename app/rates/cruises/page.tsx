@@ -6,8 +6,9 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import { Ship, Plus, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Crown, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
+import { Ship, Plus, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { TierBadge, TierPicker, VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
@@ -19,17 +20,8 @@ import { averageRateInOneCurrency } from '@/lib/currency-totals'
 // CONSTANTS
 // ============================================
 
-const TIER_OPTIONS = [
-  { value: 'budget', label: 'Budget', color: 'bg-gray-100 text-gray-700' },
-  { value: 'standard', label: 'Standard', color: 'bg-blue-100 text-blue-700' },
-  { value: 'deluxe', label: 'Deluxe', color: 'bg-purple-100 text-purple-700' },
-  { value: 'luxury', label: 'Luxury', color: 'bg-amber-100 text-amber-700' }
-]
-
 const CITIES = ['Luxor', 'Aswan', 'Cairo', 'Abu Simbel']
 const DURATION_OPTIONS = [3, 4, 7, 10, 12, 13, 14]
-const SHIP_CATEGORIES = ['budget', 'standard', 'deluxe', 'luxury']
-const CABIN_TYPES = ['standard', 'deluxe', 'suite']
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 // ============================================
@@ -49,12 +41,12 @@ interface Cruise {
   id: string
   cruise_code: string
   ship_name: string
-  ship_category: 'budget' | 'standard' | 'deluxe' | 'luxury'
+  ship_category: string
   route_name: string
   embark_city: string
   disembark_city: string
   duration_nights: number | number[]
-  cabin_type: 'standard' | 'deluxe' | 'suite'
+  cabin_type: string
   // Legacy single-rate fields (kept for backward compatibility / display)
   rate_single_eur: number
   rate_double_eur: number
@@ -122,12 +114,12 @@ const NEW_SHIP = '__new__'
 interface CruiseFormData {
   cruise_code: string
   ship_name: string
-  ship_category: 'budget' | 'standard' | 'deluxe' | 'luxury'
+  ship_category: string
   route_name: string
   embark_city: string
   disembark_city: string
   duration_nights: number[]
-  cabin_type: 'standard' | 'deluxe' | 'suite'
+  cabin_type: string
   // PPD Model - Low Season
   ppd_eur: number
   ppd_non_eur: number
@@ -179,15 +171,6 @@ interface CruiseFormData {
 // ============================================
 // COMPONENTS
 // ============================================
-
-function TierBadge({ tier }: { tier: string | null }) {
-  const tierConfig = TIER_OPTIONS.find(t => t.value === tier) || TIER_OPTIONS[1]
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${tierConfig.color}`}>
-      {tierConfig.label}
-    </span>
-  )
-}
 
 // Multi-select component for duration
 function DurationMultiSelect({
@@ -778,9 +761,8 @@ export default function CruisesPage() {
       ...prev,
       property_id: value,
       ship_name: ship?.name || prev.ship_name,
-      ...(ship?.category && (SHIP_CATEGORIES as readonly string[]).includes(ship.category)
-        ? { ship_category: ship.category as CruiseFormData['ship_category'] }
-        : {}),
+      // The ship's category is a tier key from the agency's vocabulary.
+      ...(ship?.category ? { ship_category: ship.category } : {}),
     }))
   }
 
@@ -1198,37 +1180,11 @@ export default function CruisesPage() {
                 className="w-full pl-3 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent"
               />
             </div>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="all">All Categories</option>
-              {SHIP_CATEGORIES.map(cat => (
-                <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-              ))}
-            </select>
-            <select
-              value={selectedCabin}
-              onChange={(e) => setSelectedCabin(e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="all">All Cabins</option>
-              {CABIN_TYPES.map(type => (
-                <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
-              ))}
-            </select>
-            <select
-              value={filterTier || 'all'}
-              onChange={(e) => setFilterTier(e.target.value === 'all' ? null : e.target.value)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="all">All Tiers</option>
-              <option value="budget">Budget</option>
-              <option value="standard">Standard</option>
-              <option value="deluxe">Deluxe</option>
-              <option value="luxury">Luxury</option>
-            </select>
+            <VocabSelect kind="tier" value={selectedCategory} onChange={setSelectedCategory} emptyValue="all" placeholder="All Categories"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600" />
+            <VocabSelect kind="cruise_cabin" value={selectedCabin} onChange={setSelectedCabin} emptyValue="all" placeholder="All Cabins"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600" />
+            <VocabSelect kind="tier" value={filterTier || 'all'} onChange={v => setFilterTier(v === 'all' ? null : v)} emptyValue="all" placeholder="All Tiers" className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600" />
             <button
               onClick={() => setShowInactive(!showInactive)}
               className={`px-3 py-2 text-sm rounded-lg font-medium ${
@@ -1317,13 +1273,7 @@ export default function CruisesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        cruise.ship_category === 'luxury' ? 'bg-amber-100 text-amber-800' :
-                        cruise.ship_category === 'deluxe' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {cruise.ship_category}
-                      </span>
+                      <TierBadge tier={cruise.ship_category} />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {cruise.embark_city} → {cruise.disembark_city}
@@ -1338,12 +1288,8 @@ export default function CruisesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        cruise.cabin_type === 'suite' ? 'bg-purple-100 text-purple-800' :
-                        cruise.cabin_type === 'deluxe' ? 'bg-indigo-100 text-indigo-800' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {cruise.cabin_type}
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
+                        <VocabLabel kind="cruise_cabin" value={cruise.cabin_type} />
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -1488,16 +1434,8 @@ export default function CruisesPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Ship Category *</label>
-                  <select
-                    name="ship_category"
-                    value={formData.ship_category}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-                  >
-                    {SHIP_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-                    ))}
-                  </select>
+                  <VocabSelect kind="tier" name="ship_category" value={formData.ship_category} onChange={v => setFormData(prev => ({ ...prev, ship_category: v }))} placeholder={null}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600" />
                 </div>
               </div>
 
@@ -1542,16 +1480,8 @@ export default function CruisesPage() {
               {/* Section 4: Cabin Type */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Cabin Type *</label>
-                <select
-                  name="cabin_type"
-                  value={formData.cabin_type}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-                >
-                  {CABIN_TYPES.map(type => (
-                    <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
-                  ))}
-                </select>
+                <VocabSelect kind="cruise_cabin" name="cabin_type" value={formData.cabin_type} onChange={v => setFormData(prev => ({ ...prev, cabin_type: v }))} placeholder={null}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600" />
               </div>
 
               {/* Section 5: Service Tier & Preference */}
@@ -1561,27 +1491,7 @@ export default function CruisesPage() {
                   Service Tier
                 </h3>
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {TIER_OPTIONS.map((tier) => (
-                    <button
-                      key={tier.value}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, tier: tier.value })}
-                      className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors flex items-center gap-1.5 ${
-                        formData.tier === tier.value
-                          ? tier.value === 'luxury' 
-                            ? 'bg-amber-600 text-white'
-                            : tier.value === 'deluxe'
-                            ? 'bg-purple-600 text-white'
-                            : tier.value === 'standard'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {tier.value === 'luxury' && <Crown className="w-3.5 h-3.5" />}
-                      {tier.label}
-                    </button>
-                  ))}
+                  <TierPicker variant="solid" size="sm" value={formData.tier} onChange={tier => setFormData({ ...formData, tier })} />
                 </div>
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <label className="flex items-start gap-3 cursor-pointer">

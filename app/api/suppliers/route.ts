@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
+import { supplierTypeKeysForBehaviors } from '@/lib/vocabulary-server'
 
 // All valid supplier fields (including hierarchical fields)
 const VALID_FIELDS = [
@@ -48,13 +49,17 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('name', { ascending: true })
 
-    // Support comma-separated types (e.g., type=transport_company,transport,driver)
+    // Support comma-separated types (e.g., type=transport_company,transport,driver).
+    // A type here is a BEHAVIOUR as much as a key: the tenant's own supplier
+    // types that behave as `hotel` (Settings → Your vocabulary) are hotels to
+    // the hotel rates page.
     if (type) {
       const types = type.split(',').map(t => t.trim()).filter(Boolean)
-      if (types.length === 1) {
-        query = query.eq('type', types[0])
-      } else if (types.length > 1) {
-        query = query.in('type', types)
+      const keys = await supplierTypeKeysForBehaviors(supabase, types)
+      if (keys.length === 1) {
+        query = query.eq('type', keys[0])
+      } else if (keys.length > 1) {
+        query = query.in('type', keys)
       }
     }
 

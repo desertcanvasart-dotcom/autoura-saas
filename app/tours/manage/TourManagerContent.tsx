@@ -34,6 +34,7 @@ import {
 // Import DayBuilder component
 import DayBuilder from './DayBuilder'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { useTierConfigs } from '@/components/vocabulary'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 // ============================================
@@ -51,7 +52,7 @@ interface TourVariation {
   template_id: string
   variation_code: string
   variation_name: string
-  tier: 'budget' | 'standard' | 'deluxe' | 'luxury'
+  tier: string
   group_type: 'private' | 'shared'
   min_pax: number
   max_pax: number
@@ -189,74 +190,6 @@ const BEST_FOR_OPTIONS = [
   'History Buffs', 'Adventure Seekers', 'Photography', 'Relaxation',
   'First-time Visitors', 'Repeat Visitors', 'Luxury Travelers', 'Budget Travelers'
 ]
-
-// UPDATED: Now includes all 4 tiers including Deluxe
-const TIER_CONFIG = {
-  budget: {
-    label: 'Budget',
-    icon: '💰',
-    description: 'Essential experience at best value',
-    bgColor: 'bg-emerald-50',
-    textColor: 'text-emerald-700',
-    borderColor: 'border-emerald-200',
-    defaults: {
-      min_pax: 1,
-      max_pax: 15,
-      group_type: 'shared' as const,
-      vehicle_type: 'standard_van',
-      accommodation_standard: '3_star',
-      meal_quality: 'basic'
-    }
-  },
-  standard: {
-    label: 'Standard',
-    icon: '💎',
-    description: 'Comfortable experience with quality services',
-    bgColor: 'bg-blue-50',
-    textColor: 'text-blue-700',
-    borderColor: 'border-blue-200',
-    defaults: {
-      min_pax: 1,
-      max_pax: 10,
-      group_type: 'private' as const,
-      vehicle_type: 'modern_van',
-      accommodation_standard: '4_star',
-      meal_quality: 'good'
-    }
-  },
-  deluxe: {
-    label: 'Deluxe',
-    icon: '✨',
-    description: 'Enhanced experience with premium touches',
-    bgColor: 'bg-purple-50',
-    textColor: 'text-purple-700',
-    borderColor: 'border-purple-200',
-    defaults: {
-      min_pax: 1,
-      max_pax: 8,
-      group_type: 'private' as const,
-      vehicle_type: 'premium_van',
-      accommodation_standard: '4_star_plus',
-      meal_quality: 'premium'
-    }
-  },
-  luxury: {
-    label: 'Luxury',
-    icon: '👑',
-    description: 'Premium experience with exclusive perks',
-    bgColor: 'bg-amber-50',
-    textColor: 'text-amber-700',
-    borderColor: 'border-amber-200',
-    defaults: {
-      min_pax: 1,
-      max_pax: 6,
-      group_type: 'private' as const,
-      vehicle_type: 'luxury_suv',
-      accommodation_standard: '5_star',
-      meal_quality: 'gourmet'
-    }
-  }
-}
 
 // ============================================
 // TOAST COMPONENT
@@ -726,13 +659,10 @@ interface AddVariationModalProps {
 }
 
 function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVariationModalProps) {
+  // The agency's tiers, configured for variations (Settings → Your vocabulary).
+  const { entries: tierEntries, byKey: tierConfigs } = useTierConfigs()
   const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set(['standard']))
-  const [groupTypes, setGroupTypes] = useState<Record<string, 'private' | 'shared'>>({
-    budget: 'shared',
-    standard: 'private',
-    deluxe: 'private',
-    luxury: 'private'
-  })
+  const [groupTypes, setGroupTypes] = useState<Record<string, 'private' | 'shared'>>({})
   const [saving, setSaving] = useState(false)
 
   const toggleTier = (tier: string) => {
@@ -753,9 +683,9 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
 
     setSaving(true)
     
-    const variations = Array.from(selectedTiers).map(tier => {
-      const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG]
-      const groupType = groupTypes[tier]
+    const variations = Array.from(selectedTiers).filter(tier => tierConfigs[tier]).map(tier => {
+      const config = tierConfigs[tier]
+      const groupType = groupTypes[tier] ?? config.defaults.group_type
       
       return {
         template_id: template.id,
@@ -812,7 +742,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
           </p>
 
           <div className="space-y-3">
-            {(Object.entries(TIER_CONFIG) as [string, typeof TIER_CONFIG.budget][]).map(([tier, config]) => (
+            {tierEntries.map(config => [config.key, config] as const).map(([tier, config]) => (
               <div
                 key={tier}
                 className={`border rounded-lg p-4 cursor-pointer transition-all ${
@@ -845,7 +775,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
                             <input
                               type="radio"
                               name={`group-${tier}`}
-                              checked={groupTypes[tier] === 'private'}
+                              checked={(groupTypes[tier] ?? config.defaults.group_type) === 'private'}
                               onChange={() => setGroupTypes(prev => ({ ...prev, [tier]: 'private' }))}
                               className="w-4 h-4 text-green-600"
                             />
@@ -855,7 +785,7 @@ function AddVariationModal({ template, onClose, onSuccess, showToast }: AddVaria
                             <input
                               type="radio"
                               name={`group-${tier}`}
-                              checked={groupTypes[tier] === 'shared'}
+                              checked={(groupTypes[tier] ?? config.defaults.group_type) === 'shared'}
                               onChange={() => setGroupTypes(prev => ({ ...prev, [tier]: 'shared' }))}
                               className="w-4 h-4 text-green-600"
                             />
@@ -951,6 +881,8 @@ function DayBuilderModal({ template, onClose, onSave }: DayBuilderModalProps) {
 // ============================================
 
 export default function TourManagerContent() {
+  // The agency's tiers, configured for variations (Settings → Your vocabulary).
+  const { entries: tierEntries, byKey: tierConfigs } = useTierConfigs()
   const dialog = useConfirmDialog()
   const { submitting, guard } = useSubmitGuard()
   const [templates, setTemplates] = useState<TourTemplate[]>([])
@@ -981,12 +913,7 @@ export default function TourManagerContent() {
   
   // NEW TEMPLATE VARIATIONS STATE (for creating with template)
   const [newTemplateVariations, setNewTemplateVariations] = useState<Set<string>>(new Set(['standard']))
-  const [newTemplateGroupTypes, setNewTemplateGroupTypes] = useState<Record<string, 'private' | 'shared'>>({
-    budget: 'shared',
-    standard: 'private',
-    deluxe: 'private',
-    luxury: 'private'
-  })
+  const [newTemplateGroupTypes, setNewTemplateGroupTypes] = useState<Record<string, 'private' | 'shared'>>({})
   
   const [formData, setFormData] = useState({
     template_code: '',
@@ -1424,13 +1351,13 @@ export default function TourManagerContent() {
       if (data.success) {
         // If creating new template AND variations are selected, create them
         if (!editingTemplate && newTemplateVariations.size > 0 && data.data?.id) {
-          const variations = Array.from(newTemplateVariations).map(tier => {
-            const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG]
+          const variations = Array.from(newTemplateVariations).filter(tier => tierConfigs[tier]).map(tier => {
+            const config = tierConfigs[tier]
             return {
               template_id: data.data.id,
               variation_name: `${formData.template_name} - ${config.label}`,
               tier: tier,
-              group_type: newTemplateGroupTypes[tier],
+              group_type: newTemplateGroupTypes[tier] ?? config.defaults.group_type,
               min_pax: config.defaults.min_pax,
               max_pax: config.defaults.max_pax,
               vehicle_type: config.defaults.vehicle_type,
@@ -1523,7 +1450,7 @@ export default function TourManagerContent() {
   const featuredCount = templates.filter(t => t.is_featured).length
 
   const getTierBadge = (tier: string) => {
-    const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG]
+    const config = tierConfigs[tier]
     if (!config) return { style: 'bg-gray-50 text-gray-700', icon: '' }
     return { 
       style: `${config.bgColor} ${config.textColor} ${config.borderColor}`, 
@@ -2459,7 +2386,7 @@ export default function TourManagerContent() {
                   </div>
 
                   <div className="space-y-3">
-                    {(Object.entries(TIER_CONFIG) as [string, typeof TIER_CONFIG.budget][]).map(([tier, config]) => (
+                    {tierEntries.map(config => [config.key, config] as const).map(([tier, config]) => (
                       <div
                         key={tier}
                         className={`border rounded-lg p-4 cursor-pointer transition-all ${
@@ -2492,7 +2419,7 @@ export default function TourManagerContent() {
                                     <input
                                       type="radio"
                                       name={`new-group-${tier}`}
-                                      checked={newTemplateGroupTypes[tier] === 'private'}
+                                      checked={(newTemplateGroupTypes[tier] ?? config.defaults.group_type) === 'private'}
                                       onChange={() => setNewTemplateGroupTypes(prev => ({ ...prev, [tier]: 'private' }))}
                                       className="w-4 h-4 text-green-600"
                                     />
@@ -2502,7 +2429,7 @@ export default function TourManagerContent() {
                                     <input
                                       type="radio"
                                       name={`new-group-${tier}`}
-                                      checked={newTemplateGroupTypes[tier] === 'shared'}
+                                      checked={(newTemplateGroupTypes[tier] ?? config.defaults.group_type) === 'shared'}
                                       onChange={() => setNewTemplateGroupTypes(prev => ({ ...prev, [tier]: 'shared' }))}
                                       className="w-4 h-4 text-green-600"
                                     />
