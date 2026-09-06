@@ -8772,10 +8772,6 @@ export interface Database {
         Row: {
           id: string
           tenant_id: string
-          whatsapp_integration: boolean
-          email_integration: boolean
-          pdf_generation: boolean
-          analytics_enabled: boolean
           logo_url: string | null
           primary_color: string | null
           secondary_color: string | null
@@ -8794,10 +8790,6 @@ export interface Database {
         Insert: {
           id?: string
           tenant_id: string
-          whatsapp_integration?: boolean
-          email_integration?: boolean
-          pdf_generation?: boolean
-          analytics_enabled?: boolean
           logo_url?: string | null
           primary_color?: string | null
           secondary_color?: string | null
@@ -8816,10 +8808,6 @@ export interface Database {
         Update: {
           id?: string
           tenant_id?: string
-          whatsapp_integration?: boolean
-          email_integration?: boolean
-          pdf_generation?: boolean
-          analytics_enabled?: boolean
           logo_url?: string | null
           primary_color?: string | null
           secondary_color?: string | null
