@@ -11,9 +11,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { PROPERTY_TYPES, type PropertyType } from '@/lib/supplier-properties'
 
-const COLS = 'id, tenant_id, supplier_id, property_type, name, city, category, contact_name, contact_phone, contact_email, notes, is_active, created_at, updated_at'
+const COLS = 'id, tenant_id, supplier_id, property_type, name, city, category, accommodation_type, contact_name, contact_phone, contact_email, notes, is_active, created_at, updated_at'
 
-const WRITABLE = ['property_type', 'name', 'city', 'category', 'contact_name', 'contact_phone', 'contact_email', 'notes', 'is_active'] as const
+const WRITABLE = ['property_type', 'name', 'city', 'category', 'accommodation_type', 'contact_name', 'contact_phone', 'contact_email', 'notes', 'is_active'] as const
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -80,6 +80,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         name,
         city: (record.city as string | null) ?? null,
         category: (record.category as string | null) ?? null,
+        // Only hotels have one; blank from the form means "not classified".
+        accommodation_type: record.property_type === 'hotel' && record.accommodation_type ? String(record.accommodation_type) : null,
         contact_name: (record.contact_name as string | null) ?? null,
         contact_phone: (record.contact_phone as string | null) ?? null,
         contact_email: (record.contact_email as string | null) ?? null,

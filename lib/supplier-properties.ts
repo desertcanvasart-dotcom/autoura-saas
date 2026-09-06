@@ -17,6 +17,9 @@ export interface SupplierProperty {
   name: string
   city: string | null
   category: string | null
+  /** Hotels only: the agency's accommodation-type key (Settings → Your
+   *  vocabulary, "Accommodation types"). NULL for ships and trains. */
+  accommodation_type: string | null
   contact_name: string | null
   contact_phone: string | null
   contact_email: string | null

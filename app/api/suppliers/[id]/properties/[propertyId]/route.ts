@@ -5,9 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 
-const COLS = 'id, tenant_id, supplier_id, property_type, name, city, category, contact_name, contact_phone, contact_email, notes, is_active, created_at, updated_at'
+const COLS = 'id, tenant_id, supplier_id, property_type, name, city, category, accommodation_type, contact_name, contact_phone, contact_email, notes, is_active, created_at, updated_at'
 
-const WRITABLE = ['property_type', 'name', 'city', 'category', 'contact_name', 'contact_phone', 'contact_email', 'notes', 'is_active'] as const
+const WRITABLE = ['property_type', 'name', 'city', 'category', 'accommodation_type', 'contact_name', 'contact_phone', 'contact_email', 'notes', 'is_active'] as const
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string; propertyId: string }> }) {
   try {

@@ -370,7 +370,7 @@ export default function HotelsContent() {
   // Dated contract periods (C3.2). While any exist, they price the rate and
   // the fixed low/high/peak blocks below are only a fallback.
   const [periods, setPeriods] = useState<RateSeason[]>([])
-  const [hotelProps, setHotelProps] = useState<{ id: string; name: string; city: string | null }[]>([])
+  const [hotelProps, setHotelProps] = useState<{ id: string; name: string; city: string | null; accommodation_type?: string | null }[]>([])
   const [formData, setFormData] = useState({
     service_code: '',
     property_name: '',
@@ -518,11 +518,15 @@ export default function HotelsContent() {
       return
     }
     const prop = hotelProps.find(hp => hp.id === value)
+    // The property knows what kind of place it is (Suppliers → Properties →
+    // Accommodation type); the rate inherits it rather than asking again.
+    const inherited = prop?.accommodation_type
     setFormData(prev => ({
       ...prev,
       property_id: value,
       property_name: prop?.name || prev.property_name,
       ...(prop?.city ? { city: prev.city || prop.city } : {}),
+      ...(inherited ? { property_type: inherited } : {}),
     }))
   }
 
