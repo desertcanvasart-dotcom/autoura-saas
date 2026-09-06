@@ -9161,7 +9161,6 @@ export interface Database {
           is_primary: boolean | null
           locale: string
           stripe_customer_id: string | null
-          workspace_mode: string
           email_domain: string | null
           email_from_local: string
           resend_domain_id: string | null
@@ -9193,7 +9192,6 @@ export interface Database {
           is_primary?: boolean | null
           locale?: string
           stripe_customer_id?: string | null
-          workspace_mode?: string
           email_domain?: string | null
           email_from_local?: string
           resend_domain_id?: string | null
@@ -9225,7 +9223,6 @@ export interface Database {
           is_primary?: boolean | null
           locale?: string
           stripe_customer_id?: string | null
-          workspace_mode?: string
           email_domain?: string | null
           email_from_local?: string
           resend_domain_id?: string | null
