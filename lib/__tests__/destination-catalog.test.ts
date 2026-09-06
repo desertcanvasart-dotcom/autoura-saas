@@ -71,3 +71,24 @@ describe('citiesForDropdown', () => {
     expect(citiesForDropdown(shaped(['jo']))).toEqual([...EGYPT_CITIES])
   })
 })
+
+describe('city focus (migration 336)', () => {
+  it('null focus = every city; an array narrows dropdowns but keeps all_cities for the picker', async () => {
+    const { focusCities } = await import('../destination-catalog')
+    const shaped = shapeCatalog(CATALOG_ROWS, [
+      { catalog_id: 'eg', is_default: true, generation_brief: null, glossary: null, city_ids: ['c2', 'nope'] },
+    ])
+    const eg = shaped.find(d => d.country_code === 'EG')!
+    expect(eg.all_cities.map(c => c.name)).toEqual(['Cairo', 'Luxor'])
+    expect(eg.cities.map(c => c.name)).toEqual(['Luxor'])
+    expect(eg.city_ids).toEqual(['c2', 'nope'])
+    expect(citiesForDropdown(shaped)).toEqual(['Luxor'])
+    expect(focusCities(eg.all_cities, null).map(c => c.name)).toEqual(['Cairo', 'Luxor'])
+  })
+  it('a destination without a focus keeps every city', () => {
+    const shaped = shapeCatalog(CATALOG_ROWS, [
+      { catalog_id: 'eg', is_default: true, generation_brief: null, glossary: null },
+    ])
+    expect(citiesForDropdown(shaped)).toEqual(['Cairo', 'Luxor'])
+  })
+})

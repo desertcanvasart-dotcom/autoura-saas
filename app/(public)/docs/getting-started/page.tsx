@@ -37,8 +37,8 @@ export default function GettingStartedPage() {
         <ol className="list-decimal list-inside space-y-1 text-gray-700">
           <li><strong>Welcome</strong> &mdash; A quick introduction</li>
           <li><strong>Business</strong> &mdash; Your company details</li>
+          <li><strong>Your words</strong> &mdash; The cities you sell, what you call your service tiers, and the kinds of suppliers you work with. Egypt&apos;s defaults are pre-filled; every dropdown in the app follows your choices, and you can change them any time in Settings &rarr; Your vocabulary</li>
           <li><strong>Branding</strong> &mdash; Logo and colors used on your documents</li>
-          <li><strong>Catalog</strong> &mdash; Choose your starting rates and content</li>
           <li><strong>Team</strong> &mdash; Invite your teammates</li>
           <li><strong>Tour</strong> &mdash; A short tour of the app</li>
           <li><strong>Complete</strong> &mdash; You&apos;re ready to work</li>

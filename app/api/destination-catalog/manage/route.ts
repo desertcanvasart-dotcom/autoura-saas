@@ -21,7 +21,11 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 //   update_destination   { catalog_id, generation_brief?, glossary? }
 //   add_country          { country_code, name, name_ja? } — auto-selects
 //   add_city             { catalog_id, name, name_ja?, aliases? }
-//                        — warns on same-name city in another country
+//                        — warns on same-name city in another country;
+//                          joins the tenant's focus when one is set
+//   set_cities           { catalog_id, city_ids: uuid[] | null }
+//                        — the tenant's FOCUS within a destination (336):
+//                          null = every city; selects the destination if needed
 
 const ADMIN_ROLES = ['owner', 'admin']
 
@@ -160,6 +164,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, data: { id: created.id } })
       }
 
+      case 'set_cities': {
+        const catalogId = body.catalog_id as string
+        if (!catalogId) return badRequest('catalog_id is required')
+        const raw = body.city_ids
+        let cityIds: string[] | null = null
+        if (raw !== null && raw !== undefined) {
+          if (!Array.isArray(raw)) return badRequest('city_ids must be an array of ids, or null for every city')
+          // Only ids that belong to THIS destination survive.
+          const { data: known } = await admin.from('destination_cities').select('id').eq('catalog_id', catalogId)
+          const ok = new Set((known ?? []).map(c => c.id))
+          cityIds = raw.map(String).filter(id => ok.has(id))
+          if (cityIds.length === 0) return badRequest('Keep at least one city, or choose every city')
+        }
+        const { error } = await admin
+          .from('tenant_destinations')
+          .upsert({ tenant_id, catalog_id: catalogId, is_active: true, city_ids: cityIds }, { onConflict: 'tenant_id,catalog_id' })
+        if (error) return dbError(error)
+        return NextResponse.json({ success: true })
+      }
+
       case 'add_city': {
         const catalogId = body.catalog_id as string
         const name = String(body.name || '').trim()
@@ -202,6 +226,22 @@ export async function POST(request: NextRequest) {
         if (error) {
           if (error.code === '23505') return badRequest(`${name} already exists in this country`)
           return dbError(error)
+        }
+
+        // A city the agency adds itself is one it sells: when a focus is set
+        // (336), the new city joins it rather than being born hidden.
+        const { data: sel } = await admin
+          .from('tenant_destinations')
+          .select('city_ids')
+          .eq('tenant_id', tenant_id)
+          .eq('catalog_id', catalogId)
+          .maybeSingle()
+        if (sel?.city_ids) {
+          await admin
+            .from('tenant_destinations')
+            .update({ city_ids: [...sel.city_ids, created.id] })
+            .eq('tenant_id', tenant_id)
+            .eq('catalog_id', catalogId)
         }
 
         const warning = collisions?.length

@@ -28,7 +28,12 @@ export interface CatalogDestination {
   is_default: boolean
   generation_brief?: string | null
   glossary?: unknown
+  /** The cities this tenant SELLS here (its focus) — what dropdowns offer. */
   cities: CatalogCity[]
+  /** Every catalog city of the destination (the settings screen picks from these). */
+  all_cities: CatalogCity[]
+  /** The focus as stored: null = every city. */
+  city_ids: string[] | null
 }
 
 interface RawCatalogRow {
@@ -44,6 +49,7 @@ interface RawSelectionRow {
   is_default: boolean | null
   generation_brief: string | null
   glossary: unknown
+  city_ids?: string[] | null
 }
 
 /** Join the global catalog with this tenant's selections (route side). */
@@ -54,6 +60,10 @@ export function shapeCatalog(
   const byId = new Map(selections.map(s => [s.catalog_id, s]))
   return catalog.map(c => {
     const sel = byId.get(c.id)
+    const all_cities = (c.destination_cities ?? [])
+      .filter(city => city.is_active !== false)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    const city_ids = sel?.city_ids ?? null
     return {
       id: c.id,
       country_code: c.country_code,
@@ -63,11 +73,19 @@ export function shapeCatalog(
       is_default: sel?.is_default ?? false,
       generation_brief: sel?.generation_brief ?? null,
       glossary: sel?.glossary ?? null,
-      cities: (c.destination_cities ?? [])
-        .filter(city => city.is_active !== false)
-        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+      all_cities,
+      city_ids,
+      cities: focusCities(all_cities, city_ids),
     }
   })
+}
+
+/** The tenant's focus applied: null = every city; an array = those cities,
+ *  in catalog order. An id the catalog no longer has is ignored. */
+export function focusCities(all: CatalogCity[], cityIds: string[] | null | undefined): CatalogCity[] {
+  if (!cityIds) return all
+  const wanted = new Set(cityIds)
+  return all.filter(c => c.id && wanted.has(c.id))
 }
 
 /**

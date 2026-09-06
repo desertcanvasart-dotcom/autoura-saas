@@ -215,9 +215,44 @@ export default function DestinationSettingsPage() {
                   <div className="px-4 pb-4 pl-11 space-y-4">
                     {/* Cities */}
                     <div>
-                      <p className="text-xs font-medium text-gray-600 mb-1">Cities</p>
-                      {d.cities.length === 0 ? (
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-medium text-gray-600">
+                          Cities you sell
+                          <span className="font-normal text-gray-400"> · {d.cities.length} of {d.all_cities.length}</span>
+                        </p>
+                        {isAdmin && d.selected && d.all_cities.length > 0 && (
+                          <span className="text-xs text-gray-400">
+                            <button onClick={() => act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: null }, 'Every city')} disabled={busy !== null} className="hover:text-[#647C47]">All</button>
+                            {' · '}
+                            <button onClick={() => act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: [d.all_cities[0].id] }, 'Pick the cities you sell')} disabled={busy !== null} className="hover:text-[#647C47]">Just one</button>
+                          </span>
+                        )}
+                      </div>
+                      {d.all_cities.length === 0 ? (
                         <p className="text-sm text-gray-400">No cities yet — add the ones you operate.</p>
+                      ) : isAdmin && d.selected ? (
+                        /* Every catalog city as a chip; the ones you sell are filled. A
+                           country with no focus shows every chip filled. */
+                        <div className="flex flex-wrap gap-1.5">
+                          {d.all_cities.map(c => {
+                            const on = d.cities.some(x => x.id === c.id)
+                            const next = on
+                              ? d.cities.filter(x => x.id !== c.id).map(x => x.id!)
+                              : [...d.cities.map(x => x.id!), c.id!]
+                            return (
+                              <button
+                                key={c.id}
+                                type="button"
+                                disabled={busy !== null || (on && d.cities.length === 1)}
+                                title={on && d.cities.length === 1 ? 'Keep at least one city' : on ? 'Stop offering' : 'Offer this city'}
+                                onClick={() => act(`focus-${d.id}`, { action: 'set_cities', catalog_id: d.id, city_ids: next })}
+                                className={`px-2 py-0.5 rounded-full text-xs border transition-colors disabled:opacity-60 ${on ? 'bg-[#647C47] text-white border-[#647C47]' : 'bg-white text-gray-500 border-gray-300 hover:border-[#647C47] hover:text-[#647C47]'}`}
+                              >
+                                {c.name}
+                              </button>
+                            )
+                          })}
+                        </div>
                       ) : (
                         <p className="text-sm text-gray-600 leading-relaxed">
                           {d.cities.map(c => c.name).join(' · ')}
