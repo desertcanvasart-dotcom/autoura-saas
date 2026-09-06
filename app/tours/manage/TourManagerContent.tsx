@@ -897,15 +897,16 @@ export default function TourManagerContent() {
   })
   const { labelFor: trainClassLabel } = useVocabulary('train_class')
   const { labelFor: sleeperCabinLabel } = useVocabulary('sleeper_cabin')
+  const { labelFor: airlineLabel } = useVocabulary('airline')
   const ticketOptions = useMemo<Record<'flight' | 'train' | 'sleeping_train', TicketOption[]>>(() => {
     const opt = (rows: TicketRow[], label: (r: TicketRow) => string) => rows.map(r => ({ id: String(r.id), label: label(r) }))
     const str = (v: unknown) => (v == null ? '' : String(v))
     return {
-      flight: opt(ticketRows.flight, r => `${str(r.airline)}${r.flight_number ? ` ${str(r.flight_number)}` : ''} ${str(r.route_from)} → ${str(r.route_to)}${r.cabin_class ? ` (${str(r.cabin_class)})` : ''}`),
+      flight: opt(ticketRows.flight, r => `${airlineLabel(str(r.airline))}${r.flight_number ? ` ${str(r.flight_number)}` : ''} ${str(r.route_from)} → ${str(r.route_to)}${r.cabin_class ? ` (${str(r.cabin_class)})` : ''}`),
       train: opt(ticketRows.train, r => `${str(r.operator_name) || 'Train'}${r.class_type ? ` ${trainClassLabel(str(r.class_type))}` : ''} ${str(r.origin_city)} → ${str(r.destination_city)}`),
       sleeping_train: opt(ticketRows.sleeping_train, r => `${str(r.operator_name) || 'Sleeper'} ${sleeperCabinLabel(str(r.cabin_type))} ${str(r.origin_city)} → ${str(r.destination_city)}`),
     }
-  }, [ticketRows, trainClassLabel, sleeperCabinLabel])
+  }, [ticketRows, trainClassLabel, sleeperCabinLabel, airlineLabel])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTheme, setSelectedTheme] = useState('all')  // Renamed from selectedCategory

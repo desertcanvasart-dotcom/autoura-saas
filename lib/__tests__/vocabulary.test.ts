@@ -5,6 +5,7 @@ import {
   VOCABULARY_GROUPS,
   vocabularyColumnsFor,
   needsDestination,
+  airlineCode,
   SUPPLIER_BEHAVIORS,
   slugifyKey,
   uniqueKey,
@@ -46,6 +47,15 @@ describe('the kinds', () => {
     expect(vocabularyColumnsFor('train_rates').class_type).toBe('train_class')
     expect(vocabularyColumnsFor('guide_rates').guide_language).toBe('guide_language')
     expect(vocabularyColumnsFor('sleeping_train_rates').season).toBe('rate_season')
+    expect(vocabularyColumnsFor('flight_rates').airline).toBe('airline')
+  })
+
+  it('an airline carries its IATA code in meta', () => {
+    const items = [{ key: 'egyptair', meta: { code: 'ms' } }, { key: 'other', meta: {} }]
+    expect(airlineCode(items, 'egyptair')).toBe('MS')
+    expect(airlineCode(items, 'other')).toBe('')
+    expect(airlineCode(items, 'unknown')).toBe('')
+    expect(airlineCode(items, null)).toBe('')
   })
 
   it('a transport service type says whether it needs a destination', () => {

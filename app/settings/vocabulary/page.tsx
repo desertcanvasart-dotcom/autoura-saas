@@ -30,8 +30,8 @@ import {
 
 interface Notice { kind: 'success' | 'error'; text: string }
 
-type AddForm = { label: string; key: string; keyTouched: boolean; behavior: string; min_pax: string; max_pax: string; needs_destination: boolean; description: string }
-const EMPTY_ADD: AddForm = { label: '', key: '', keyTouched: false, behavior: 'other', min_pax: '1', max_pax: '4', needs_destination: false, description: '' }
+type AddForm = { label: string; key: string; keyTouched: boolean; behavior: string; min_pax: string; max_pax: string; needs_destination: boolean; code: string; description: string }
+const EMPTY_ADD: AddForm = { label: '', key: '', keyTouched: false, behavior: 'other', min_pax: '1', max_pax: '4', needs_destination: false, code: '', description: '' }
 
 const inputCls = 'px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent'
 
@@ -42,7 +42,7 @@ export default function VocabularySettingsPage() {
   const [kind, setKind] = useState<VocabularyKind>('tier')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
-  const [editing, setEditing] = useState<{ id: string; label: string; behavior: string; min_pax: string; max_pax: string; needs_destination: boolean } | null>(null)
+  const [editing, setEditing] = useState<{ id: string; label: string; behavior: string; min_pax: string; max_pax: string; needs_destination: boolean; code: string } | null>(null)
   const [add, setAdd] = useState<AddForm | null>(null)
 
   const info = VOCABULARY_KIND_INFO[kind]
@@ -104,6 +104,7 @@ export default function VocabularySettingsPage() {
     if (kind === 'supplier_type') body.behavior = editing.behavior
     if (kind === 'vehicle_type') body.meta = { ...item.meta, min_pax: Number(editing.min_pax), max_pax: Number(editing.max_pax) }
     if (kind === 'transport_service_type') body.meta = { ...item.meta, needs_destination: editing.needs_destination }
+    if (kind === 'airline') body.meta = { ...item.meta, code: editing.code.trim().toUpperCase() }
     if (await patch(item, body, 'Saved')) setEditing(null)
   }
 
@@ -114,6 +115,7 @@ export default function VocabularySettingsPage() {
     if (kind === 'supplier_type') body.behavior = add.behavior
     if (kind === 'vehicle_type') body.meta = { min_pax: Number(add.min_pax), max_pax: Number(add.max_pax) }
     if (kind === 'transport_service_type') body.meta = { needs_destination: add.needs_destination }
+    if (kind === 'airline') body.meta = { code: add.code.trim().toUpperCase() }
     if (await call('add', () => fetch('/api/vocabulary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), `"${add.label}" added`)) setAdd(null)
   }
 
@@ -121,6 +123,7 @@ export default function VocabularySettingsPage() {
     id: item.id, label: item.label, behavior: item.behavior || 'other',
     min_pax: String(item.meta?.min_pax ?? 1), max_pax: String(item.meta?.max_pax ?? 4),
     needs_destination: Boolean(item.meta?.needs_destination),
+    code: typeof item.meta?.code === 'string' ? item.meta.code : '',
   })
 
   return (
@@ -257,6 +260,10 @@ export default function VocabularySettingsPage() {
                               needs a destination
                             </label>
                           )}
+                          {kind === 'airline' && (
+                            <input value={editing.code} onChange={e => setEditing({ ...editing, code: e.target.value.toUpperCase().slice(0, 3) })} placeholder="IATA" maxLength={3}
+                              className={`${inputCls} w-20 font-mono uppercase`} aria-label="IATA code" />
+                          )}
                           <button type="button" onClick={() => void saveEdit()} disabled={busy !== null || !editing.label.trim()} className="p-1.5 text-green-600 hover:bg-green-50 rounded disabled:opacity-50" title="Save"><Check className="w-4 h-4" /></button>
                           <button type="button" onClick={() => setEditing(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded" title="Cancel"><X className="w-4 h-4" /></button>
                         </div>
@@ -269,6 +276,9 @@ export default function VocabularySettingsPage() {
                             )}
                             {kind === 'transport_service_type' && item.meta?.needs_destination === true && (
                               <span className="ml-2 text-xs font-normal text-gray-500">→ needs a destination</span>
+                            )}
+                            {kind === 'airline' && typeof item.meta?.code === 'string' && item.meta.code && (
+                              <span className="ml-2 text-xs font-mono font-normal text-gray-500">{String(item.meta.code)}</span>
                             )}
                           </p>
                           <p className="text-xs text-gray-400 font-mono">
@@ -336,6 +346,12 @@ export default function VocabularySettingsPage() {
                         <input type="checkbox" checked={add.needs_destination} onChange={e => setAdd({ ...add, needs_destination: e.target.checked })} className="w-3.5 h-3.5" />
                         needs a destination city
                       </label>
+                    )}
+                    {kind === 'airline' && (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">IATA code</label>
+                        <input value={add.code} onChange={e => setAdd({ ...add, code: e.target.value.toUpperCase().slice(0, 3) })} placeholder="MS" maxLength={3} className={`${inputCls} w-24 font-mono uppercase`} />
+                      </div>
                     )}
                     <div className="flex-1 min-w-[160px]">
                       <label className="block text-xs font-medium text-gray-600 mb-1">Note <span className="font-normal text-gray-400">(optional)</span></label>

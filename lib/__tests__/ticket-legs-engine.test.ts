@@ -208,3 +208,25 @@ describe('sleeping trains — the ticket IS the bed', () => {
     expect(berth.isPerPax).toBe(false)
   })
 })
+
+describe('airlines are a vocabulary word (348)', () => {
+  it("the flight line names the carrier in the agency's word, not the stored key", async () => {
+    clearVocabularyMemo()
+    const tables = ticketTables(
+      [day(1, 'Cairo'), day(2, 'Luxor', { transport_type: 'flight' })],
+      { flight_rates: [{ ...FLIGHT, airline: 'egyptair' }] }
+    ) as Record<string, Array<Record<string, unknown>>>
+    tables.tenant_vocabularies = [
+      { id: 'v-ms', tenant_id: 'test-tenant', kind: 'airline', key: 'egyptair', label: 'EgyptAir', rank: 1, is_active: true, meta: { code: 'MS' } },
+    ]
+    setMockTables(tables)
+    try {
+      const r = await calculateDayBasedPricing(BASE_PARAMS)
+      const line = r.services.find(s => s.serviceName.startsWith('Flight'))!
+      expect(line.serviceName).toContain('EgyptAir')
+      expect(line.serviceName).not.toContain('egyptair')
+    } finally {
+      clearVocabularyMemo()
+    }
+  })
+})

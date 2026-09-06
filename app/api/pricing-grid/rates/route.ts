@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
     // Guide rows store the language KEY (346); the grid shows the agency's word.
     const guideLanguages = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'guide_language')
     const guideLanguageLabel = (key: string | null | undefined) => (key ? labelFor(guideLanguages, key) : '')
+    const airlines = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'airline')
+    const airlineLabel = (key: string | null | undefined) => (key ? labelFor(airlines, key) : '')
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
@@ -200,11 +202,11 @@ export async function GET(request: NextRequest) {
 
       flights: (flightRates || []).map((r: any) => ({
         id: r.id,
-        name: `${r.airline} ${r.route_from}→${r.route_to} (${r.cabin_class})`,
+        name: `${airlineLabel(r.airline)} ${r.route_from}→${r.route_to} (${r.cabin_class})`,
         rateEur: toNum(r.base_rate_eur) + toNum(r.tax_eur),
         rateNonEur: toNum(r.base_rate_non_eur || r.base_rate_eur) + toNum(r.tax_non_eur || r.tax_eur),
         city: r.route_from,
-        details: `${r.airline} | ${r.flight_number || ''} | ${r.cabin_class}`,
+        details: `${airlineLabel(r.airline)} | ${r.flight_number || ''} | ${r.cabin_class}`,
         route_from: r.route_from,
         route_to: r.route_to,
         // Guide fare on the ticket: null = he pays the customer fare,

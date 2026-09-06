@@ -2177,6 +2177,10 @@ export async function calculateDayBasedPricing(
     const trainClassLabel = ticketLegs.some(l => l.mode === 'train')
       ? await tenantVocabularyLabeller(catalogScope.tenantId, 'train_class')
       : (key: string | null | undefined) => key ?? ''
+    // Airlines too: rows store the carrier KEY (348); lines and holes name the carrier.
+    const airlineLabel = ticketLegs.some(l => l.mode === 'flight')
+      ? await tenantVocabularyLabeller(catalogScope.tenantId, 'airline')
+      : (key: string | null | undefined) => key ?? ''
 
     for (const leg of ticketLegs) {
       const route = `${leg.from} → ${leg.to}`
@@ -2196,7 +2200,7 @@ export async function calculateDayBasedPricing(
         const candidates = (flightRows as unknown as FlightTicketRow[]).filter(
           r => rowServesRoute(r, leg) && validFor(r) && (!r.cabin_class || /econom/i.test(r.cabin_class))
         )
-        const sel = selectTicketRow(candidates, leg.namedRateId, r => `${r.airline}${r.flight_number ? ` ${r.flight_number}` : ''}${r.cabin_class ? ` (${r.cabin_class})` : ''}`)
+        const sel = selectTicketRow(candidates, leg.namedRateId, r => `${airlineLabel(r.airline)}${r.flight_number ? ` ${r.flight_number}` : ''}${r.cabin_class ? ` (${r.cabin_class})` : ''}`)
         if (sel.kind === 'named_missing') {
           addLegHole(`Day ${leg.dayNumber}'s picked flight is no longer in ${MODE_RATES_PAGE.flight} — re-pick it on the day editor.`, `flight id ${sel.namedId}`)
           continue
@@ -2212,7 +2216,7 @@ export async function calculateDayBasedPricing(
         const r = sel.row
         const base = passengerFare(r.base_rate_eur, r.base_rate_non_eur)
         if (base === null) {
-          addLegHole(`The ${r.airline} flight for ${route} has no fare yet. Price it in ${MODE_RATES_PAGE.flight}.`, `flight ${route}`)
+          addLegHole(`The ${airlineLabel(r.airline)} flight for ${route} has no fare yet. Price it in ${MODE_RATES_PAGE.flight}.`, `flight ${route}`)
           continue
         }
         const tax = passengerFare(r.tax_eur, r.tax_non_eur) ?? 0
@@ -2222,7 +2226,7 @@ export async function calculateDayBasedPricing(
           id: `day${leg.dayNumber}-flight-${r.id}`,
           dayNumber: leg.dayNumber,
           serviceType: 'flight',
-          serviceName: `Flight ${r.airline}${r.flight_number ? ` ${r.flight_number}` : ''} ${route} (economy)`,
+          serviceName: `Flight ${airlineLabel(r.airline)}${r.flight_number ? ` ${r.flight_number}` : ''} ${route} (economy)`,
           quantity: 1,
           quantityMode: 'per_pax',
           unitCost: farePerPax,

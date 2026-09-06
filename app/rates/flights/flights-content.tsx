@@ -6,7 +6,8 @@ import { todayLocal } from '@/lib/today'
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Edit2, Trash2, X, Plane, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Clock, Luggage, ArrowRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { VocabSelect } from '@/components/vocabulary'
+import { VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
+import { airlineCode as airlineCodeOf, resolveVocabularyKey, slugifyKey } from '@/lib/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -87,7 +88,7 @@ const initialFormData: FormData = {
   service_code: '',
   route_from: 'Cairo',
   route_to: 'Aswan',
-  airline: 'EgyptAir',
+  airline: 'egyptair',
   flight_number: '',
   flight_type: 'domestic',
   cabin_class: 'economy',
@@ -109,27 +110,6 @@ const initialFormData: FormData = {
   notes: '',
   is_active: true
 }
-
-// Common airlines in Egypt
-const AIRLINES = [
-  { code: 'MS', name: 'EgyptAir' },
-  { code: 'NP', name: 'Nile Air' },
-  { code: 'SM', name: 'Air Cairo' },
-  { code: 'FZ', name: 'FlyDubai' },
-  { code: 'EK', name: 'Emirates' },
-  { code: 'QR', name: 'Qatar Airways' },
-  { code: 'TK', name: 'Turkish Airlines' },
-  { code: 'LH', name: 'Lufthansa' },
-  { code: 'BA', name: 'British Airways' },
-  { code: 'AF', name: 'Air France' },
-  { code: 'KL', name: 'KLM' },
-  { code: 'EY', name: 'Etihad' },
-  { code: 'SV', name: 'Saudia' },
-  { code: 'RJ', name: 'Royal Jordanian' },
-  { code: 'ME', name: 'Middle East Airlines' },
-  { code: 'G9', name: 'Air Arabia' },
-  { code: 'Other', name: 'Other' }
-]
 
 
 // Popular flight routes in Egypt
@@ -163,6 +143,8 @@ export default function FlightsContent() {
   const [routeFromFilter, setRouteFromFilter] = useState('')
   const [routeToFilter, setRouteToFilter] = useState('')
   const [airlineFilter, setAirlineFilter] = useState('')
+  // The agency's carriers (Settings → Your vocabulary → Airlines), with IATA codes in meta.
+  const { all: airlineAll, labelFor: airlineLabel } = useVocabulary('airline')
   const [flightTypeFilter, setFlightTypeFilter] = useState('')
   const [cabinClassFilter, setCabinClassFilter] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
@@ -242,7 +224,8 @@ export default function FlightsContent() {
     if (!from || !to) return ''
     const fromCode = from.substring(0, 3).toUpperCase()
     const toCode = to.substring(0, 3).toUpperCase()
-    const airlineCode = AIRLINES.find(a => a.name === airline)?.code || airline.substring(0, 2).toUpperCase()
+    // The carrier's IATA code lives on the vocabulary entry (Settings → Your vocabulary → Airlines).
+    const airlineCode = airlineCodeOf(airlineAll, airline) || airline.replace(/[^a-z0-9]/gi, '').substring(0, 2).toUpperCase()
     const classCode = cabinClass.charAt(0).toUpperCase()
     return `FLT-${airlineCode}-${fromCode}-${toCode}-${classCode}`
   }
@@ -266,12 +249,12 @@ export default function FlightsContent() {
   }
 
   const handleAirlineChange = (airline: string) => {
-    const known = AIRLINES.find(a => a.name === airline)
+    const code = airlineCodeOf(airlineAll, airline)
     setFormData(prev => ({
       ...prev,
       airline,
-      // IATA auto-fills from the known-carrier list; stays editable.
-      airline_code: known && known.code !== 'Other' ? known.code : prev.airline_code,
+      // IATA auto-fills from the vocabulary entry; stays editable.
+      airline_code: code || prev.airline_code,
       service_code: generateServiceCode(prev.route_from, prev.route_to, airline, prev.cabin_class)
     }))
   }
@@ -289,15 +272,18 @@ export default function FlightsContent() {
     // The airline on a flight rate IS a supplier (B-item 7): picking an
     // air-carrier supplier names the airline too, and fills the IATA code
     // when the carrier is a known one.
-    const known = supplier && AIRLINES.find(a => a.name.toLowerCase() === supplier.name.toLowerCase())
+    // The supplier's name is matched to an Airlines vocabulary entry; a
+    // carrier the list does not know keeps a slug of its name until added.
+    const airlineKey = supplier ? (resolveVocabularyKey(airlineAll, supplier.name) ?? slugifyKey(supplier.name)) : ''
+    const code = airlineCodeOf(airlineAll, airlineKey)
     setFormData(prev => ({
       ...prev,
       supplier_id: supplierId,
       supplier_name: supplier?.name || '',
-      ...(supplier ? { airline: supplier.name } : {}),
-      ...(known && known.code !== 'Other' ? { airline_code: known.code } : {}),
+      ...(supplier ? { airline: airlineKey } : {}),
+      ...(code ? { airline_code: code } : {}),
       ...(supplier
-        ? { service_code: generateServiceCode(prev.route_from, prev.route_to, supplier.name, prev.cabin_class) }
+        ? { service_code: generateServiceCode(prev.route_from, prev.route_to, airlineKey, prev.cabin_class) }
         : {}),
     }))
   }
@@ -561,6 +547,7 @@ export default function FlightsContent() {
       (rate.route_from || '').toLowerCase().includes(search) ||
       (rate.route_to || '').toLowerCase().includes(search) ||
       (rate.airline || '').toLowerCase().includes(search) ||
+      airlineLabel(rate.airline).toLowerCase().includes(search) ||
       (rate.flight_number || '').toLowerCase().includes(search) ||
       (rate.supplier_name || '').toLowerCase().includes(search)
     return matchesSearch
@@ -715,16 +702,8 @@ export default function FlightsContent() {
         </div>
 
         <div className="relative">
-          <select
-            value={airlineFilter}
-            onChange={(e) => setAirlineFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
-          >
-            <option value="">All Airlines</option>
-            {AIRLINES.map(airline => (
-              <option key={airline.code} value={airline.name}>{airline.name}</option>
-            ))}
-          </select>
+          <VocabSelect kind="airline" value={airlineFilter} onChange={setAirlineFilter} placeholder={"All Airlines"}
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
@@ -828,7 +807,7 @@ export default function FlightsContent() {
                     </div>
                   </td>
                   <td className="px-4 py-2">
-                    <span className="text-sm text-gray-700">{rate.airline}</span>
+                    <span className="text-sm text-gray-700"><VocabLabel kind="airline" value={rate.airline} /></span>
                     {(rate as { airline_code?: string | null }).airline_code && (
                       <span className="ml-1.5 text-[10px] font-mono font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded px-1 py-0.5">
                         {(rate as { airline_code?: string | null }).airline_code}
@@ -1066,21 +1045,8 @@ export default function FlightsContent() {
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
                       Airline <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={formData.airline}
-                      onChange={(e) => handleAirlineChange(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                    >
-                      {/* An airline picked via the supplier dropdown may not
-                          be in the fixed list — keep it selectable. */}
-                      {formData.airline && !AIRLINES.some(a => a.name === formData.airline) && (
-                        <option value={formData.airline}>{formData.airline} (supplier)</option>
-                      )}
-                      {AIRLINES.map(airline => (
-                        <option key={airline.code} value={airline.name}>{airline.name}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="airline" value={formData.airline} onChange={handleAirlineChange} placeholder={null} required
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]" />
                     <div className="mt-2">
                       <label className="block text-xs font-medium text-gray-500 mb-1">IATA code</label>
                       <input
