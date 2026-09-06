@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { autoLinkEmails } from '@/lib/email-auto-link'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 
 // GET /api/email/links?userId=xxx&emailAddress=xxx
@@ -238,7 +239,9 @@ export async function DELETE(request: NextRequest) {
 }
 
 // PUT /api/email/links/auto
-// Auto-link emails based on email address matching
+// Auto-link emails based on email address matching. The same pass runs
+// after every email sync (lib/email-auto-link.ts); this endpoint is the
+// on-demand form of it.
 export async function PUT(request: NextRequest) {
   try {
     const authResult = await requireAuth()
@@ -248,7 +251,6 @@ export async function PUT(request: NextRequest) {
         { status: authResult.status }
       )
     }
-    const supabase = createAdminClient()
     const sessionUserId = authResult.user!.id
 
     const body = await request.json()
@@ -261,80 +263,8 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Get all clients for this tenant
-    const { data: clientsData, error: clientError } = await (supabase as any)
-      .from('clients')
-      .select('id, email')
-      .eq('tenant_id', authResult.tenant_id)
-
-    if (clientError) throw clientError
-
-    const clients = clientsData as any[]
-
-    // Create email -> client lookup
-    const emailToClient = new Map<string, string>()
-    clients?.forEach(client => {
-      if (client.email) {
-        emailToClient.set(client.email.toLowerCase(), client.id)
-      }
-    })
-
-    // Get existing links to avoid duplicates
-    const messageIds = emails.map(e => e.messageId)
-    const { data: linksData } = await (supabase as any)
-      .from('email_client_links')
-      .select('message_id')
-      .eq('user_id', sessionUserId)
-      .in('message_id', messageIds)
-
-    const existingLinks = linksData as any[]
-    const existingMessageIds = new Set(existingLinks?.map(l => l.message_id) || [])
-
-    // Find matches and create links
-    const linksToCreate: any[] = []
-
-    for (const email of emails) {
-      if (existingMessageIds.has(email.messageId)) continue
-
-      // Check from email
-      let clientId = emailToClient.get(email.fromEmail?.toLowerCase())
-
-      // Check to emails if not found
-      if (!clientId && email.toEmails) {
-        for (const toEmail of email.toEmails) {
-          clientId = emailToClient.get(toEmail.toLowerCase())
-          if (clientId) break
-        }
-      }
-
-      if (clientId) {
-        linksToCreate.push({
-          user_id: sessionUserId,
-          message_id: email.messageId,
-          thread_id: email.threadId || null,
-          client_id: clientId,
-          email_address: email.fromEmail,
-          auto_linked: true,
-        })
-      }
-    }
-
-    if (linksToCreate.length > 0) {
-      const { data, error } = await (supabase as any)
-        .from('email_client_links')
-        .insert(linksToCreate)
-        .select()
-
-      if (error) throw error
-
-      return NextResponse.json({ 
-        linked: data?.length || 0,
-        total: emails.length 
-      })
-    }
-
-    return NextResponse.json({ linked: 0, total: emails.length })
-
+    const result = await autoLinkEmails(createAdminClient() as unknown as Parameters<typeof autoLinkEmails>[0], authResult.tenant_id!, sessionUserId, emails)
+    return NextResponse.json(result)
   } catch (error: any) {
     console.error('Error auto-linking emails:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
