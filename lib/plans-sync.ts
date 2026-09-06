@@ -81,10 +81,9 @@ export function buildPlanRows(
       price_monthly: tier.monthlyPrice,
       price_yearly: tier.annualPrice,
       currency: PLAN_CURRENCY,
-      // Capabilities only — no limits. Anything needing a limit reads
-      // PRICING_TIERS, which is the one place they are defined.
+      // No limits (they are read from PRICING_TIERS) and no capabilities
+      // (there are none: every tier has the whole product, migration 343).
       features: {
-        ...tier.capabilities,
         publiclyPriced: tier.publiclyPriced,
       },
       is_active: true,

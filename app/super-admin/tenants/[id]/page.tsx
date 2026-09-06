@@ -90,10 +90,6 @@ export default function TenantDetailPage() {
   const { tenant, members, features, subscription, recentActivity, usage } = data
 
   const featureToggles = [
-    { key: 'whatsapp_integration', label: 'WhatsApp' },
-    { key: 'email_integration', label: 'Email' },
-    { key: 'pdf_generation', label: 'PDF Generation' },
-    { key: 'analytics_enabled', label: 'Analytics' },
     { key: 'concierge_enabled', label: 'AI Concierge' },
   ]
 

@@ -15,7 +15,7 @@ import {
   X,
   Image as ImageIcon,
   Loader2,
-  Settings as SettingsIcon,
+
   Users,
   FileText,
   Building,
@@ -33,11 +33,6 @@ export default function TenantSettingsPage() {
   const [companyName, setCompanyName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
 
-  // Feature toggles state
-  const [whatsappIntegration, setWhatsappIntegration] = useState(true)
-  const [emailIntegration, setEmailIntegration] = useState(true)
-  const [pdfGeneration, setPdfGeneration] = useState(true)
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(true)
 
   // Branding state
   const [primaryColor, setPrimaryColor] = useState('#647C47')
@@ -93,10 +88,6 @@ export default function TenantSettingsPage() {
     }
 
     if (features) {
-      setWhatsappIntegration(features.whatsapp_integration)
-      setEmailIntegration(features.email_integration)
-      setPdfGeneration(features.pdf_generation)
-      setAnalyticsEnabled(features.analytics_enabled)
       // column lands with migration 267; types regen follows
       setActivityEnabled((features as any)?.activity_summary_enabled === true)
     }
@@ -498,61 +489,8 @@ export default function TenantSettingsPage() {
           </div>
         </div>
 
-        {/* Features & Limits Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Features */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <SettingsIcon className="w-4 h-4 text-gray-600" />
-                <h2 className="text-sm font-semibold text-gray-900">Features</h2>
-              </div>
-              <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Plan controlled</span>
-            </div>
-
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
-                <input
-                  type="checkbox"
-                  checked={whatsappIntegration}
-                  disabled
-                  className="w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded cursor-not-allowed"
-                />
-                <span className="text-xs text-gray-700">WhatsApp Integration</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
-                <input
-                  type="checkbox"
-                  checked={emailIntegration}
-                  disabled
-                  className="w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded cursor-not-allowed"
-                />
-                <span className="text-xs text-gray-700">Email Integration</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
-                <input
-                  type="checkbox"
-                  checked={pdfGeneration}
-                  disabled
-                  className="w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded cursor-not-allowed"
-                />
-                <span className="text-xs text-gray-700">PDF Generation</span>
-              </label>
-
-              <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
-                <input
-                  type="checkbox"
-                  checked={analyticsEnabled}
-                  disabled
-                  className="w-3.5 h-3.5 text-[#647C47] border-gray-300 rounded cursor-not-allowed"
-                />
-                <span className="text-xs text-gray-700">Analytics</span>
-              </label>
-            </div>
-          </div>
-
+        {/* Limits */}
+        <div className="grid grid-cols-1 gap-4">
           {/* Limits */}
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-3">

@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server'
-
 /**
  * Billing Middleware
  * Handles usage tracking and limit enforcement for metered features
@@ -59,69 +57,3 @@ export async function logActivity(
   }
 }
 
-/**
- * Check if user has a specific feature based on their subscription plan
- */
-export async function hasFeature(
-  tenantId: string,
-  feature: string,
-  supabase: any
-): Promise<boolean> {
-  try {
-    const { data: subscription } = await supabase
-      .from('tenant_subscriptions')
-      .select(`
-        plan:subscription_plans(features)
-      `)
-      .eq('tenant_id', tenantId)
-      .in('status', ['trialing', 'active'])
-      .single()
-
-    if (!subscription || !subscription.plan) {
-      return false
-    }
-
-    const features = subscription.plan.features || []
-    return features.includes(feature)
-  } catch (err) {
-    console.error('Error checking feature:', err)
-    return false
-  }
-}
-
-/**
- * Get recommended plan for a feature
- */
-export function getRequiredPlanForFeature(feature: string): string | null {
-  const featureToPlan: Record<string, string> = {
-    'custom_branding': 'Professional',
-    'api_access': 'Professional',
-    'priority_support': 'Professional',
-    'unlimited_history': 'Professional',
-    'advanced_analytics': 'Enterprise',
-    'custom_integrations': 'Enterprise',
-    'dedicated_support': 'Enterprise',
-    'sla': 'Enterprise'
-  }
-
-  return featureToPlan[feature] || null
-}
-
-/**
- * Create a standardized "upgrade required" response
- */
-export function upgradeRequiredResponse(feature: string): NextResponse {
-  const requiredPlan = getRequiredPlanForFeature(feature)
-
-  return NextResponse.json(
-    {
-      success: false,
-      error: `This feature requires ${requiredPlan || 'a higher'} plan`,
-      feature_locked: true,
-      feature: feature,
-      required_plan: requiredPlan,
-      upgrade_url: '/settings/billing/plans'
-    },
-    { status: 403 }
-  )
-}
