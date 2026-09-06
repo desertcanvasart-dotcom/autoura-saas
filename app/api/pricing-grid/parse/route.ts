@@ -5,6 +5,8 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
+import { labelFor } from '@/lib/vocabulary'
 import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { packageRules } from '@/lib/ai/package-prompt-rules'
 import Anthropic from '@anthropic-ai/sdk'
@@ -71,6 +73,10 @@ async function fetchAllRates(tenantId: string, tier: string) {
     admin.from('sleeping_train_rates').select('id, origin_city, destination_city, cabin_type, rate_oneway_eur, operator_name, rate_currency').eq('tenant_id', tenantId).eq('is_active', true),
   ])
 
+  // Guide rows store the language KEY (346); the AI reads the agency's word.
+  const guideLanguages = await loadVocabularyForTenant(admin as Parameters<typeof loadVocabularyForTenant>[0], tenantId, 'guide_language')
+  const guideRows = (guideRes.data || []).map((r: { guide_language?: string | null }) => ({ ...r, guide_language: r.guide_language ? labelFor(guideLanguages, r.guide_language) : r.guide_language }))
+
   // Per-rate currency: a row priced in a contract currency (EGP, USD, JPY)
   // is converted into the tenant's run currency on a copy at this fetch
   // boundary -- the same treatment /api/pricing-grid/rates gives the
@@ -85,7 +91,7 @@ async function fetchAllRates(tenantId: string, tier: string) {
     accommodation, entrance_fees, flights, meals, cruises, sleeping_trains,
   ] = await Promise.all([
     norm('transportation_rates', transportRes.data),
-    norm('guide_rates', guideRes.data),
+    norm('guide_rates', guideRows),
     norm('airport_staff_rates', airportRes.data),
     norm('hotel_staff_rates', hotelStaffRes.data),
     norm('tipping_rates', tippingRes.data),

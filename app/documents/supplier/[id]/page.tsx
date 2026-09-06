@@ -2,6 +2,7 @@
 
 import { identityFromTenant } from '@/lib/company-identity'
 import { useTenant } from '@/app/contexts/TenantContext'
+import { useVocabulary } from '@/components/vocabulary'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -54,6 +55,19 @@ const DOCUMENT_TITLES: Record<string, string> = {
 
 export default function SupplierDocumentViewPage() {
   const { tenant } = useTenant()
+  // Guide lines store the language KEY (346); the PDF prints the agency's word.
+  // Every array on the document (services, selected_guides, …) is walked.
+  const { labelFor: guideLanguageLabel } = useVocabulary('guide_language')
+  const withLanguageLabels = <T extends object>(doc: T): T => {
+    const out: Record<string, unknown> = { ...(doc as Record<string, unknown>) }
+    for (const [k, v] of Object.entries(out)) {
+      if (!Array.isArray(v)) continue
+      out[k] = v.map(item => (item && typeof item === 'object' && typeof (item as { guide_language?: unknown }).guide_language === 'string'
+        ? { ...item, guide_language: guideLanguageLabel((item as { guide_language: string }).guide_language) }
+        : item))
+    }
+    return out as T
+  }
   const params = useParams()
   const router = useRouter()
   const [document, setDocument] = useState<SupplierDocument | null>(null)
@@ -89,7 +103,7 @@ export default function SupplierDocumentViewPage() {
     if (!document) return
 
     const { generateSupplierDocumentPDF } = await import('@/lib/supplier-document-pdf')
-    const pdf = generateSupplierDocumentPDF({ ...document, company: identityFromTenant(tenant) })
+    const pdf = generateSupplierDocumentPDF({ ...withLanguageLabels(document), company: identityFromTenant(tenant) })
     const filename = `${document.document_number}_${document.supplier_name.replace(/\s+/g, '_')}.pdf`
     pdf.save(filename)
   }
@@ -98,7 +112,7 @@ export default function SupplierDocumentViewPage() {
     if (!document) return
 
     const { generateSupplierDocumentPDF } = await import('@/lib/supplier-document-pdf')
-    const pdf = generateSupplierDocumentPDF({ ...document, company: identityFromTenant(tenant) })
+    const pdf = generateSupplierDocumentPDF({ ...withLanguageLabels(document), company: identityFromTenant(tenant) })
     const pdfBlob = pdf.output('blob')
     const pdfUrl = URL.createObjectURL(pdfBlob)
     
@@ -119,7 +133,7 @@ export default function SupplierDocumentViewPage() {
     setActionLoading('email')
     try {
       const { generateSupplierDocumentPDF } = await import('@/lib/supplier-document-pdf')
-      const pdf = generateSupplierDocumentPDF({ ...document, company: identityFromTenant(tenant) })
+      const pdf = generateSupplierDocumentPDF({ ...withLanguageLabels(document), company: identityFromTenant(tenant) })
       const pdfBase64 = pdf.output('datauristring').split(',')[1]
       
       const response = await fetch('/api/send-supplier-document', {
