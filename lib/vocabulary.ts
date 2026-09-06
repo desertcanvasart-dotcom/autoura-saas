@@ -5,12 +5,14 @@
 // useVocabulary hook. What a KIND is, which kinds exist, what a supplier
 // type's BEHAVIOUR means, and the pure helpers (slugs, ranks, lookups) —
 // all tested in lib/__tests__/vocabulary.test.ts. The Egypt preset itself
-// lives in SQL (migration 334, seed_tenant_vocabulary) so the database can
-// seed a brand-new tenant without the app in the loop.
+// lives in SQL (seed_tenant_vocabulary, first in migration 334, last
+// redefined in 341) so the database can seed a brand-new tenant without the
+// app in the loop.
 
 export const VOCABULARY_KINDS = [
   'tier', 'supplier_type', 'board_basis', 'vehicle_type',
   'cruise_cabin', 'sleeper_cabin', 'meal_type', 'hotel_property_type',
+  'train_class',
 ] as const
 export type VocabularyKind = (typeof VOCABULARY_KINDS)[number]
 
@@ -79,6 +81,14 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     usedIn: 'Sleeping-train rates',
     minItems: 1,
     example: 'Half Twin / Single',
+  },
+  train_class: {
+    kind: 'train_class',
+    title: 'Train classes',
+    description: 'Seat classes on day trains.',
+    usedIn: 'Train rates, quotes',
+    minItems: 1,
+    example: 'First Class / Second Class AC / Business Class',
   },
   meal_type: {
     kind: 'meal_type',
@@ -333,6 +343,7 @@ export const VOCABULARY_COLUMNS: Record<string, VocabularyKind> = {
   vehicle_type: 'vehicle_type',
   property_type: 'hotel_property_type',
   cabin_type: 'sleeper_cabin',
+  class_type: 'train_class',
   ship_category: 'tier',
 }
 

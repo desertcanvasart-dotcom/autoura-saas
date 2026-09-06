@@ -4,7 +4,8 @@
 // The agency's vocabulary, in every dropdown
 // ============================================
 // One fetch per session for all kinds (tiers, supplier types, board basis,
-// vehicle types, cabins, meals, accommodation types), shared by every form.
+// vehicle types, cabins, train classes, meals, accommodation types), shared
+// by every form.
 // Rate rows store KEYS; this hook turns them into the agency's LABELS and
 // offers the active entries in the agency's order.
 //
