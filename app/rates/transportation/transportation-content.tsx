@@ -2,10 +2,11 @@
 // @bulk-import
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { VocabSelect } from '@/components/vocabulary'
+import { VocabSelect, VocabLabel } from '@/components/vocabulary'
+import { useVocabulary } from '@/hooks/useVocabulary'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -17,70 +18,67 @@ interface TransportationRate {
   id: string
   route_name: string | null
   service_type: string
-  vehicle_type: string | null
-  capacity_min: number
+  /** A vehicle key from the tenant's vocabulary ('sedan'); older rows may carry a label. */
+  vehicle_type: string
+  capacity_min: number | null
   capacity_max: number | null
   city: string
+  origin_city?: string | null
   destination_city?: string | null
+  duration?: string | null
+  area?: string | null
+  includes?: string | null
   base_rate_eur: number | null
   base_rate_non: number
   base_rate_non_eur?: number | null
   is_active: boolean
   created_at: string
   updated_at: string
-  // WIDE columns — one row per route, per-class rates (matches the bulk
-  // importer and what the engine/grid expand)
-  sedan_rate_eur?: number | null
-  sedan_rate_non_eur?: number | null
-  sedan_capacity_min?: number | null
-  sedan_capacity_max?: number | null
-  minivan_rate_eur?: number | null
-  minivan_rate_non_eur?: number | null
-  minivan_capacity_min?: number | null
-  minivan_capacity_max?: number | null
-  van_rate_eur?: number | null
-  van_rate_non_eur?: number | null
-  van_capacity_min?: number | null
-  van_capacity_max?: number | null
-  minibus_rate_eur?: number | null
-  minibus_rate_non_eur?: number | null
-  minibus_capacity_min?: number | null
-  minibus_capacity_max?: number | null
-  bus_rate_eur?: number | null
-  bus_rate_non_eur?: number | null
-  bus_capacity_min?: number | null
-  bus_capacity_max?: number | null
-  [key: string]: unknown
 }
 
-// One entry per vehicle class in the route-first form. Strings because they
-// are text-input bound; blank rate = vehicle not offered on this route.
+/** A route as the page shows it: every vehicle priced on it (one row each,
+ *  migration 337). `id` is the first row's, so selection and keys work. */
+interface RouteGroup extends TransportationRate {
+  rows: TransportationRate[]
+  ids: string[]
+  vehicles: { key: string; eur: number }[]
+}
+
+const routeKeyOf = (r: TransportationRate) =>
+  [r.service_type, r.city, r.route_name ?? '', r.origin_city ?? '', r.destination_city ?? '', r.duration ?? '', r.area ?? ''].map(v => String(v).toLowerCase()).join('|')
+
+function groupRoutes(rows: TransportationRate[]): RouteGroup[] {
+  const groups = new Map<string, RouteGroup>()
+  for (const r of rows) {
+    const k = routeKeyOf(r)
+    const g = groups.get(k)
+    const chip = { key: String(r.vehicle_type || '').toLowerCase(), eur: Number(r.base_rate_eur) || 0 }
+    if (g) { g.rows.push(r); g.ids.push(r.id); g.vehicles.push(chip); g.is_active = g.is_active || r.is_active }
+    else groups.set(k, { ...r, rows: [r], ids: [r.id], vehicles: [chip] })
+  }
+  return [...groups.values()]
+}
+
+// One entry per vehicle in the route-first form. Strings because they are
+// text-input bound; blank rate = vehicle not offered on this route.
 interface VehicleRateEntry {
   rate_eur: string
   rate_non_eur: string
   capacity_min: string
   capacity_max: string
 }
-type VehicleClassKey = 'sedan' | 'minivan' | 'van' | 'minibus' | 'bus'
-// Capacity defaults mirror the engine's VEHICLE_CAPACITY ladder.
-const WIDE_CLASSES: { key: VehicleClassKey; label: string; defMin: number; defMax: number }[] = [
-  { key: 'sedan', label: 'Sedan', defMin: 1, defMax: 2 },
-  { key: 'minivan', label: 'Minivan', defMin: 3, defMax: 7 },
-  { key: 'van', label: 'Van', defMin: 8, defMax: 14 },
-  { key: 'minibus', label: 'Minibus', defMin: 15, defMax: 20 },
-  { key: 'bus', label: 'Bus', defMin: 21, defMax: 45 },
-]
-const emptyVehicles = (): Record<VehicleClassKey, VehicleRateEntry> =>
+interface VehicleClass { key: string; label: string; defMin: number; defMax: number }
+const emptyVehicles = (classes: VehicleClass[]): Record<string, VehicleRateEntry> =>
   Object.fromEntries(
-    WIDE_CLASSES.map((c) => [c.key, { rate_eur: '', rate_non_eur: '', capacity_min: String(c.defMin), capacity_max: String(c.defMax) }])
-  ) as Record<VehicleClassKey, VehicleRateEntry>
+    classes.map((c) => [c.key, { rate_eur: '', rate_non_eur: '', capacity_min: String(c.defMin), capacity_max: String(c.defMax) }])
+  )
 
 interface FormData {
   route_name: string
   service_type: string
   city: string
   destination_city: string
-  vehicles: Record<VehicleClassKey, VehicleRateEntry>
+  vehicles: Record<string, VehicleRateEntry>
   is_active: boolean
 }
 
@@ -89,7 +87,7 @@ const initialFormData: FormData = {
   service_type: 'airport_transfer',
   city: '',
   destination_city: '',
-  vehicles: emptyVehicles(),
+  vehicles: {},
   is_active: true
 }
 
@@ -116,7 +114,14 @@ export default function TransportationContent() {
   const { loading: currencyLoading } = useCurrency()
 
   const { fmtRate } = useRateRowFormat()
+  // The agency's vehicles (Settings → Your vocabulary), with their passenger bands.
+  const { items: vehicleItems } = useVocabulary('vehicle_type')
+  const vehicleClasses = useMemo<VehicleClass[]>(() => vehicleItems.map(v => ({
+    key: v.key, label: v.label,
+    defMin: Number(v.meta?.min_pax ?? 1) || 1, defMax: Number(v.meta?.max_pax ?? 4) || 4,
+  })), [vehicleItems])
   const [rates, setRates] = useState<TransportationRate[]>([])
+  const routes = useMemo(() => groupRoutes(rates), [rates])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [cityFilter, setCityFilter] = useState('')
@@ -124,7 +129,7 @@ export default function TransportationContent() {
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingRate, setEditingRate] = useState<TransportationRate | null>(null)
+  const [editingRate, setEditingRate] = useState<RouteGroup | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
   // Labels must name the currency the amounts are actually in (C3.4b).
@@ -195,7 +200,7 @@ export default function TransportationContent() {
     return `${cityCode}-${typeCode}`
   }
 
-  const handleVehicleFieldChange = (cls: VehicleClassKey, field: keyof VehicleRateEntry, value: string) => {
+  const handleVehicleFieldChange = (cls: string, field: keyof VehicleRateEntry, value: string) => {
     setFormData(prev => ({
       ...prev,
       vehicles: { ...prev.vehicles, [cls]: { ...prev.vehicles[cls], [field]: value } }
@@ -228,46 +233,38 @@ export default function TransportationContent() {
     }))
   }
 
-  // Load an existing row into the vehicle grid. Wide rows fill their classes;
-  // a legacy tall row (single vehicle_type + base_rate) fills just that class.
-  const rowToVehicles = (rate: TransportationRate): Record<VehicleClassKey, VehicleRateEntry> => {
-    const vehicles = emptyVehicles()
-    let hasWide = false
-    for (const c of WIDE_CLASSES) {
-      const rateEur = Number(rate[`${c.key}_rate_eur`])
-      if (rateEur > 0) {
-        hasWide = true
-        vehicles[c.key] = {
-          rate_eur: String(rateEur),
-          rate_non_eur: rate[`${c.key}_rate_non_eur`] != null ? String(rate[`${c.key}_rate_non_eur`]) : '',
-          capacity_min: rate[`${c.key}_capacity_min`] != null ? String(rate[`${c.key}_capacity_min`]) : String(c.defMin),
-          capacity_max: rate[`${c.key}_capacity_max`] != null ? String(rate[`${c.key}_capacity_max`]) : String(c.defMax),
-        }
-      }
-    }
-    if (!hasWide && rate.vehicle_type && Number(rate.base_rate_eur) > 0) {
-      const cls = WIDE_CLASSES.find(c => c.label.toLowerCase() === String(rate.vehicle_type).toLowerCase())
-      if (cls) {
-        vehicles[cls.key] = {
-          rate_eur: String(rate.base_rate_eur),
-          rate_non_eur: rate.base_rate_non_eur != null ? String(rate.base_rate_non_eur) : (rate.base_rate_non ? String(rate.base_rate_non) : ''),
-          capacity_min: rate.capacity_min ? String(rate.capacity_min) : String(cls.defMin),
-          capacity_max: rate.capacity_max ? String(rate.capacity_max) : String(cls.defMax),
-        }
+  // Load a route's rows into the vehicle grid: every vehicle in the agency's
+  // list, filled where the route prices it. A row whose vehicle is no longer
+  // in the list still shows, so editing never silently drops it.
+  const rowToVehicles = (group: RouteGroup): Record<string, VehicleRateEntry> => {
+    const vehicles = emptyVehicles(vehicleClasses)
+    for (const r of group.rows) {
+      const key = String(r.vehicle_type || '').toLowerCase()
+      const cls = vehicleClasses.find(c => c.key === key)
+      vehicles[key] = {
+        rate_eur: Number(r.base_rate_eur) > 0 ? String(r.base_rate_eur) : '',
+        rate_non_eur: r.base_rate_non_eur != null ? String(r.base_rate_non_eur) : '',
+        capacity_min: r.capacity_min != null ? String(r.capacity_min) : String(cls?.defMin ?? 1),
+        capacity_max: r.capacity_max != null ? String(r.capacity_max) : String(cls?.defMax ?? 4),
       }
     }
     return vehicles
   }
+  /** The grid's rows: the agency's vehicles, plus any vehicle a route still carries. */
+  const gridClasses = (vehicles: Record<string, VehicleRateEntry>): VehicleClass[] => [
+    ...vehicleClasses,
+    ...Object.keys(vehicles).filter(k => !vehicleClasses.some(c => c.key === k)).map(k => ({ key: k, label: k, defMin: 1, defMax: 4 })),
+  ]
 
   const openAddModal = () => {
     setEditingRate(null)
     setRateCurrency('')
-    setFormData(initialFormData)
+    setFormData({ ...initialFormData, vehicles: emptyVehicles(vehicleClasses) })
     setError(null)
     setIsModalOpen(true)
   }
 
-  const openEditModal = (rate: TransportationRate) => {
+  const openEditModal = (rate: RouteGroup) => {
     setEditingRate(rate)
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setError(null)
@@ -307,7 +304,8 @@ export default function TransportationContent() {
       return
     }
 
-    const offeredClasses = WIDE_CLASSES.filter(c => parseFloat(formData.vehicles[c.key].rate_eur) > 0)
+    const classes = gridClasses(formData.vehicles)
+    const offeredClasses = classes.filter(c => parseFloat(formData.vehicles[c.key]?.rate_eur ?? '') > 0)
     if (offeredClasses.length === 0) {
       setError('Enter a EUR rate for at least one vehicle (leave others blank if not offered)')
       setSaving(false)
@@ -326,23 +324,21 @@ export default function TransportationContent() {
     }
 
     try {
-      const url = editingRate
-        ? `/api/resources/transportation/${editingRate.id}`
-        : '/api/resources/transportation'
-
-      // One WIDE row per route: rates per vehicle class.
-      // Single-rate entry: mirror the EUR rate into the non-EU column so both
-      // DB columns stay filled and nationality-based selection keeps working.
+      // One row per offered vehicle. The route endpoint updates the route's
+      // existing rows in place, adds new vehicles and removes the ones left
+      // blank. Single-rate entry: the EUR rate is mirrored server-side.
       const submitData = {
-        ...formData,
-        ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency),
-        vehicles: Object.fromEntries(
-          Object.entries(formData.vehicles).map(([key, v]) => [key, { ...v, rate_non_eur: v.rate_eur }])
-        ) as Record<VehicleClassKey, VehicleRateEntry>,
+        route_name: formData.route_name,
+        service_type: formData.service_type,
+        city: formData.city,
+        destination_city: formData.destination_city,
+        is_active: formData.is_active,
+        ...rateCurrencyPatch(rateCurrency, editingRate?.rate_currency),
+        vehicles: offeredClasses.map(c => ({ vehicle_type: c.key, ...formData.vehicles[c.key] })),
+        existing_ids: editingRate?.ids ?? [],
       }
-      
-      const response = await fetch(url, {
-        method: editingRate ? 'PUT' : 'POST',
+      const response = await fetch('/api/resources/transportation', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(submitData)
       })
@@ -363,17 +359,17 @@ export default function TransportationContent() {
     }
   }
 
-  const handleDelete = async (rate: TransportationRate) => {
+  const handleDelete = async (rate: RouteGroup) => {
     const confirmed = await dialog.confirmDelete('Transportation Rate',
-      `Are you sure you want to delete "${rate.route_name || rate.city}"? This action cannot be undone.`
+      `Are you sure you want to delete "${rate.route_name || rate.city}" (${rate.ids.length} vehicle${rate.ids.length === 1 ? '' : 's'})? This action cannot be undone.`
     )
 
     if (!confirmed) return
 
     try {
-      const response = await fetch(`/api/resources/transportation/${rate.id}`, {
-        method: 'DELETE'
-      })
+      // A route is its rows: delete every vehicle on it.
+      const responses = await Promise.all(rate.ids.map(id => fetch(`/api/resources/transportation/${id}`, { method: 'DELETE' })))
+      const response = responses.find(r => !r.ok) ?? responses[0]
 
       if (response.ok) {
         fetchRates()
@@ -419,9 +415,14 @@ export default function TransportationContent() {
 
     setBulkDeleting(true)
     try {
+      // Selection is by ROUTE; each route is its rows.
       const ids = Array.from(selectedIds)
+      const rowIdsOf = (routeId: string) => routes.find(r => r.id === routeId)?.ids ?? [routeId]
       const results = await Promise.allSettled(
-        ids.map(id => fetch(`/api/resources/transportation/${id}`, { method: 'DELETE' }))
+        ids.map(async routeId => {
+          const rs = await Promise.all(rowIdsOf(routeId).map(id => fetch(`/api/resources/transportation/${id}`, { method: 'DELETE' })))
+          return rs.find(r => !r.ok) ?? rs[0]
+        })
       )
       const deletedIds = ids.filter((_, i) => {
         const result = results[i]
@@ -452,7 +453,7 @@ export default function TransportationContent() {
   }
 
   // Clone a rate - copy all fields to form and open modal for new entry
-  const handleClone = (rate: TransportationRate) => {
+  const handleClone = (rate: RouteGroup) => {
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setEditingRate(null)
     setError(null)
@@ -470,20 +471,16 @@ export default function TransportationContent() {
   // Export filtered rates to CSV
   // Import rates from CSV file
   // Filter rates
-  const filteredRates = rates.filter(rate => {
+  const filteredRates = routes.filter(rate => {
     const matchesSearch =
       (rate.route_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       rate.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (rate.vehicle_type || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      rate.vehicles.some(v => v.key.includes(searchTerm.toLowerCase())) ||
       (rate.destination_city && rate.destination_city.toLowerCase().includes(searchTerm.toLowerCase()))
     if (!matchesSearch) return false
     if (vehicleTypeFilter) {
-      // The filter value is a vocabulary KEY ('sedan'); wide classes are keyed
-      // the same way, legacy tall rows may still carry the label ('Sedan').
-      const cls = WIDE_CLASSES.find(c => c.key === vehicleTypeFilter || c.label === vehicleTypeFilter)
-      const offersWide = cls ? Number(rate[`${cls.key}_rate_eur`]) > 0 : false
-      const matchesLegacy = (rate.vehicle_type || '').toLowerCase() === vehicleTypeFilter.toLowerCase()
-      if (!offersWide && !matchesLegacy) return false
+      // The filter value is a vocabulary KEY ('sedan'); rows store keys, older rows may carry the label.
+      if (!rate.vehicles.some(v => v.key === vehicleTypeFilter.toLowerCase())) return false
     }
     return true
   })
@@ -506,14 +503,11 @@ export default function TransportationContent() {
   const goToNextPage = () => goToPage(currentPage + 1)
 
   // Stats
-  const totalRates = rates.length
-  const activeRates = rates.filter(r => r.is_active).length
+  const totalRates = routes.length
+  const activeRates = routes.filter(r => r.is_active).length
   const inactiveRates = totalRates - activeRates
   const uniqueCities = [...new Set(rates.map(r => r.city))].length
-  const uniqueVehicleTypes = [...new Set(rates.flatMap(r => {
-    const wide = WIDE_CLASSES.filter(c => Number(r[`${c.key}_rate_eur`]) > 0).map(c => c.label)
-    return wide.length > 0 ? wide : (r.vehicle_type ? [r.vehicle_type] : [])
-  }))].length
+  const uniqueVehicleTypes = [...new Set(rates.map(r => String(r.vehicle_type || '').toLowerCase()).filter(Boolean))].length
 
   if (loading) {
     return (
@@ -719,20 +713,12 @@ export default function TransportationContent() {
                       {/* One cell per route: every offered vehicle with its rate.
                           Legacy tall rows fall back to their single vehicle. */}
                       <div className="flex flex-wrap gap-1">
-                        {(() => {
-                          const chips = WIDE_CLASSES
-                            .filter(c => Number(rate[`${c.key}_rate_eur`]) > 0)
-                            .map(c => ({ label: c.label, eur: Number(rate[`${c.key}_rate_eur`]) }))
-                          if (chips.length === 0 && rate.vehicle_type && Number(rate.base_rate_eur) > 0) {
-                            chips.push({ label: rate.vehicle_type, eur: Number(rate.base_rate_eur) })
-                          }
-                          return chips.length > 0 ? chips.map(chip => (
-                            <span key={chip.label} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-700">
-                              <span className="font-medium">{chip.label}</span>
-                              <span>{fmtRate(chip.eur, rate, 0)}</span>
-                            </span>
-                          )) : <span className="text-sm text-gray-400">—</span>
-                        })()}
+                        {rate.vehicles.length > 0 ? rate.vehicles.map(chip => (
+                          <span key={chip.key} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-700">
+                            <span className="font-medium"><VocabLabel kind="vehicle_type" value={chip.key} /></span>
+                            <span>{fmtRate(chip.eur, rate, 0)}</span>
+                          </span>
+                        )) : <span className="text-sm text-gray-400">—</span>}
                       </div>
                     </td>
                     <td className="px-4 py-2">
@@ -1015,8 +1001,8 @@ export default function TransportationContent() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {WIDE_CLASSES.map(cls => {
-                        const v = formData.vehicles[cls.key]
+                      {gridClasses(formData.vehicles).map(cls => {
+                        const v = formData.vehicles[cls.key] ?? { rate_eur: '', rate_non_eur: '', capacity_min: String(cls.defMin), capacity_max: String(cls.defMax) }
                         const offered = parseFloat(v.rate_eur) > 0
                         return (
                           <tr key={cls.key} className={offered ? 'bg-white' : 'bg-gray-50/50'}>

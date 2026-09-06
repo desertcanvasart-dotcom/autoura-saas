@@ -166,14 +166,13 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
   transportation_rates: {
     tableName: 'transportation_rates',
     displayName: 'Transportation',
-    // transportation_rates has NO service_code; its identity is the FULL
-    // natural key. route_name alone was the match key once, and a route
-    // name is a human label two legitimately distinct rows share (the same
-    // route as an airport transfer and as a day tour, or in two cities) —
-    // matching on it alone silently overwrote one with the other, the
-    // "a create never updates" incident class (A-item 5). This table also
-    // has no season, validity dates, supplier_id or notes.
-    uniqueKey: ['route_name', 'service_type', 'city'],
+    // ONE ROW PER VEHICLE on a route (migration 337): the vehicle is part of
+    // the identity. transportation_rates has NO service_code; route_name
+    // alone is a human label two distinct rows share (the same route as an
+    // airport transfer and as a day tour) — matching on it alone silently
+    // overwrote one with the other (A-item 5). This table also has no
+    // season, validity dates, supplier_id or notes.
+    uniqueKey: ['route_name', 'service_type', 'city', 'vehicle_type'],
     columns: [
       id(),
       col('route_name', 'Route Name', 'text', true),
@@ -184,27 +183,13 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('duration', 'Duration', 'text', false),
       col('area', 'Area', 'text', false),
       col('includes', 'Includes', 'text', false),
-      // Vehicle rates
-      col('sedan_rate_eur', 'Sedan Rate', 'number', false),
-      legacyRate('sedan_rate_non_eur', 'Sedan Non-EUR (legacy)', 'sedan_rate_eur'),
-      col('sedan_capacity_min', 'Sedan Cap Min', 'number', false),
-      col('sedan_capacity_max', 'Sedan Cap Max', 'number', false),
-      col('minivan_rate_eur', 'Minivan Rate', 'number', false),
-      legacyRate('minivan_rate_non_eur', 'Minivan Non-EUR (legacy)', 'minivan_rate_eur'),
-      col('minivan_capacity_min', 'Minivan Cap Min', 'number', false),
-      col('minivan_capacity_max', 'Minivan Cap Max', 'number', false),
-      col('van_rate_eur', 'Van Rate', 'number', false),
-      legacyRate('van_rate_non_eur', 'Van Non-EUR (legacy)', 'van_rate_eur'),
-      col('van_capacity_min', 'Van Cap Min', 'number', false),
-      col('van_capacity_max', 'Van Cap Max', 'number', false),
-      col('minibus_rate_eur', 'Minibus Rate', 'number', false),
-      legacyRate('minibus_rate_non_eur', 'Minibus Non-EUR (legacy)', 'minibus_rate_eur'),
-      col('minibus_capacity_min', 'Minibus Cap Min', 'number', false),
-      col('minibus_capacity_max', 'Minibus Cap Max', 'number', false),
-      col('bus_rate_eur', 'Bus Rate', 'number', false),
-      legacyRate('bus_rate_non_eur', 'Bus Non-EUR (legacy)', 'bus_rate_eur'),
-      col('bus_capacity_min', 'Bus Cap Min', 'number', false),
-      col('bus_capacity_max', 'Bus Cap Max', 'number', false),
+      // The vehicle, in your own words (Settings → Your vocabulary); the
+      // importer turns "Sedan" into its key.
+      col('vehicle_type', 'Vehicle', 'text', true),
+      col('base_rate_eur', 'Rate', 'number', true),
+      legacyRate('base_rate_non_eur', 'Rate Non-EUR (legacy)', 'base_rate_eur'),
+      col('capacity_min', 'Min Pax', 'number', false),
+      col('capacity_max', 'Max Pax', 'number', false),
       isActive(), createdAt(), updatedAt(),
       rateCurrency(),
     ],
@@ -835,28 +820,13 @@ function sampleDate(name: string): string {
 /** Sample money. A row where every number is 100 does not show which column is
  *  the headline rate and which is a supplement — and a rate card where peak
  *  costs the same as low is not one either. */
-// The per-vehicle bands lib/transport-rate-utils.ts falls back to. The sample
-// must agree with them: a template that put 100 in every capacity column
-// taught agencies that every vehicle seats exactly 100, and because
-// getTransportRateForPax() matches a band and then falls back to the first
-// tier whose max fits, EVERY group -- a couple or forty people -- came out
-// priced as a sedan.
-const SAMPLE_CAPACITY: Record<string, [number, number]> = {
-  sedan: [1, 2],
-  minivan: [3, 7],
-  van: [8, 12],
-  minibus: [13, 20],
-  bus: [21, 45],
-}
-
+// A template that put 100 in every capacity column once taught agencies
+// that every vehicle seats exactly 100, and the engine priced every group —
+// a couple or forty people — as a sedan. The sample row is a sedan: 1–2 pax.
 function sampleNumber(name: string): string {
   // Capacities are counts of people, not money.
-  const cap = name.match(/^([a-z]+)_capacity_(min|max)$/)
-  if (cap) {
-    const band = SAMPLE_CAPACITY[cap[1]]
-    if (band) return String(cap[2] === 'min' ? band[0] : band[1])
-    return cap[2] === 'min' ? '1' : '45'
-  }
+  if (name === 'capacity_min') return '1'
+  if (name === 'capacity_max') return '2'
   if (/_capacity$|^capacity_/.test(name)) return '4'
 
   // Percentages are not money either. 100 in a discount column reads as
@@ -883,7 +853,9 @@ function sampleNumber(name: string): string {
 /** Plausible sample values, so the row reads as a real rate rather than as
  *  filler. Matched on the column name first, then the declared type. */
 function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
-  if (config.uniqueKey.includes(colDef.name)) return EXAMPLE_ROW_KEY
+  // isExampleRow checks the FIRST key column; the rest of a compound key can
+  // carry real samples (a route's vehicle, a service type).
+  if (colDef.name === config.uniqueKey[0]) return EXAMPLE_ROW_KEY
 
   const name = colDef.name
   if (/(^|_)(email)/.test(name)) return 'reservations@example-hotel.com'
@@ -893,6 +865,7 @@ function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
   if (name === 'property_type') return 'hotel'
   if (name === 'board_basis') return 'bb'
   if (name === 'tier') return 'standard'
+  if (name === 'vehicle_type') return 'sedan'
   if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
     return 'Example Name'
   }

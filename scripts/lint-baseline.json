@@ -1,6 +1,6 @@
 {
   "totals": {
-    "errors": 1533,
+    "errors": 1531,
     "warnings": 570
   },
   "rules": {
@@ -13,7 +13,7 @@
       "warnings": 12
     },
     "@typescript-eslint/no-explicit-any": {
-      "errors": 1406,
+      "errors": 1404,
       "warnings": 0
     },
     "@typescript-eslint/no-require-imports": {

@@ -1656,38 +1656,6 @@ export async function getTippingRate(
  * Build transport cache from database
  * Key format: "service_type|city|duration|area|vehicle_type"
  */
-// The bulk importer (lib/bulk-rate-service.ts, migration 200) writes a WIDE
-// transportation_rates row: no per-row vehicle_type/base_rate_eur, but one rate
-// column per vehicle class (sedan_rate_eur ... bus_rate_eur, each with a
-// _non_eur and capacity_min/max). The engine matches per vehicle_type with a
-// single base_rate_eur, so a wide row is invisible / prices at €0. We expand
-// each wide row into one synthetic tall rate per vehicle class that actually
-// has a rate — reading only real columns (no fabricated defaults).
-const WIDE_VEHICLE_CLASSES: { name: VehicleType; prefix: string }[] = [
-  { name: 'Sedan', prefix: 'sedan' },
-  { name: 'Minivan', prefix: 'minivan' },
-  { name: 'Van', prefix: 'van' },
-  { name: 'Minibus', prefix: 'minibus' },
-  { name: 'Bus', prefix: 'bus' },
-]
-
-function expandWideTransportRow(row: any): any[] {
-  const out: any[] = []
-  for (const { name, prefix } of WIDE_VEHICLE_CLASSES) {
-    const rateEur = Number(row[`${prefix}_rate_eur`]) || 0
-    if (rateEur <= 0) continue // no rate for this class → not a usable option
-    out.push({
-      ...row,
-      vehicle_type: name,
-      base_rate_eur: rateEur,
-      base_rate_non_eur: Number(row[`${prefix}_rate_non_eur`]) || 0,
-      capacity_min: row[`${prefix}_capacity_min`] ?? VEHICLE_CAPACITY[name].min,
-      capacity_max: row[`${prefix}_capacity_max`] ?? VEHICLE_CAPACITY[name].max,
-    })
-  }
-  return out
-}
-
 export async function buildTransportCache(scope: CatalogScope): Promise<Map<string, TransportRate>> {
   const { data: rawAllRates } = await getSupabaseAdmin()
     .from('transportation_rates')
@@ -1701,15 +1669,9 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
   if (!allRates) return cache
 
   for (const row of allRates) {
-    const wideRow = row as any
-    // A wide bulk-imported row has no vehicle_type but carries per-class rate
-    // columns; expand it. Normal (tall) rows pass through unchanged.
-    const isWide = !wideRow.vehicle_type &&
-      (wideRow.sedan_rate_eur || wideRow.minivan_rate_eur || wideRow.van_rate_eur ||
-       wideRow.minibus_rate_eur || wideRow.bus_rate_eur)
-    const expandedRates = isWide ? expandWideTransportRow(wideRow) : [wideRow]
-
-    for (const r of expandedRates) {
+    // One row per (route, vehicle) — migration 337 made the tall shape the
+    // only shape. The capacity band is the row's own.
+    for (const r of [row]) {
     const rate = r as any
     // Build multiple keys for flexible lookup
     const baseKey = [
