@@ -691,6 +691,7 @@ export interface Database {
           airport_name: string | null
           supplier_name: string | null
           rate_currency: string | null
+          supplier_id: string | null
         }
         Insert: {
           id?: string
@@ -708,6 +709,7 @@ export interface Database {
           airport_name?: string | null
           supplier_name?: string | null
           rate_currency?: string | null
+          supplier_id?: string | null
         }
         Update: {
           id?: string
@@ -725,6 +727,7 @@ export interface Database {
           airport_name?: string | null
           supplier_name?: string | null
           rate_currency?: string | null
+          supplier_id?: string | null
         }
         Relationships: [
           {
@@ -732,6 +735,13 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "airport_staff_rates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -5343,6 +5353,8 @@ export interface Database {
           updated_at: string | null
           destination: string | null
           rate_currency: string | null
+          supplier_id: string | null
+          supplier_name: string | null
         }
         Insert: {
           id?: string
@@ -5358,6 +5370,8 @@ export interface Database {
           updated_at?: string | null
           destination?: string | null
           rate_currency?: string | null
+          supplier_id?: string | null
+          supplier_name?: string | null
         }
         Update: {
           id?: string
@@ -5373,6 +5387,8 @@ export interface Database {
           updated_at?: string | null
           destination?: string | null
           rate_currency?: string | null
+          supplier_id?: string | null
+          supplier_name?: string | null
         }
         Relationships: [
           {
@@ -5380,6 +5396,13 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hotel_staff_rates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
