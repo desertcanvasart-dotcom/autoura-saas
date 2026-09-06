@@ -6,7 +6,7 @@ import Papa from 'papaparse'
 import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES } from '@/lib/rates/periods-csv'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
-import { resolveRecordKeys, VOCABULARY_COLUMNS, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
+import { resolveRecordKeys, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
 
 export async function POST(request: NextRequest) {
   try {
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     // so the preview names a word the agency does not use, and nothing is
     // written under a word it does not use.
     const vocabColumns = Object.fromEntries(
-      Object.entries(VOCABULARY_COLUMNS).filter(([column]) => config.columns.some(c => c.name === column && !c.exportOnly))
+      Object.entries(vocabularyColumnsFor(config.tableName)).filter(([column]) => config.columns.some(c => c.name === column && !c.exportOnly))
     ) as Record<string, VocabularyKind>
     const vocab: Partial<Record<VocabularyKind, VocabularyItem[]>> = {}
     for (const kind of new Set(Object.values(vocabColumns))) vocab[kind] = await loadVocabulary(supabase, kind)

@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { DollarSign, Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
@@ -17,9 +18,6 @@ import { useDestinationCities } from '@/hooks/useDestinationCities'
 // CONSTANTS
 // ============================================
 
-const ROLE_TYPES = ['guide', 'driver', 'boat_crew', 'porter', 'hotel_staff', 'restaurant', 'other']
-const CONTEXTS = ['day_tour', 'half_day_tour', 'cruise', 'transfer', 'airport', 'hotel', 'restaurant', 'felucca', 'motorboat']
-const RATE_UNITS = ['per_day', 'per_service', 'per_cruise', 'per_night', 'per_person']
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 // ============================================
@@ -178,6 +176,9 @@ export default function TippingPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedRole, setSelectedRole] = useState('all')
+  // The agency's words for roles and contexts (Settings → Your vocabulary), for the delete prompt.
+  const { labelFor: roleLabel } = useVocabulary('tipping_role')
+  const { labelFor: contextLabel } = useVocabulary('tipping_context')
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<TippingRate | null>(null)
@@ -311,8 +312,8 @@ export default function TippingPage() {
   }
 
   const handleDelete = async (rate: TippingRate) => {
-    const roleName = rate.role_type.replace('_', ' ')
-    const contextName = rate.context ? ` (${rate.context.replace('_', ' ')})` : ''
+    const roleName = roleLabel(rate.role_type)
+    const contextName = rate.context ? ` (${contextLabel(rate.context)})` : ''
 
     const confirmed = await dialog.confirmDelete('Tipping Rate',
       `Are you sure you want to delete the tipping rate for "${roleName}"${contextName}? This action cannot be undone.`
@@ -516,16 +517,8 @@ export default function TippingPage() {
                 className="w-full pl-3 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent" 
               />
             </div>
-            <select 
-              value={selectedRole} 
-              onChange={(e) => setSelectedRole(e.target.value)} 
-              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
-            >
-              <option value="all">All Roles</option>
-              {ROLE_TYPES.map(r => (
-                <option key={r} value={r}>{r.replace('_', ' ')}</option>
-              ))}
-            </select>
+            <VocabSelect kind="tipping_role" value={selectedRole} onChange={setSelectedRole} placeholder={"All Roles"} emptyValue="all"
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600" />
             <button 
               onClick={() => setShowInactive(!showInactive)} 
               className={`px-3 py-2 text-sm rounded-lg font-medium ${
@@ -613,18 +606,18 @@ export default function TippingPage() {
                         rate.role_type === 'restaurant' ? 'bg-amber-100 text-amber-800' :
                         'bg-gray-100 text-gray-700'
                       }`}>
-                        {rate.role_type.replace('_', ' ')}
+                        <VocabLabel kind="tipping_role" value={rate.role_type} />
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-gray-600">
-                      {rate.context?.replace('_', ' ') || '-'}
+                      {rate.context ? <VocabLabel kind="tipping_context" value={rate.context} /> : '-'}
                     </td>
                     <td className="px-4 py-3 text-center text-xs text-gray-600">
                       {rate.city || <span className="text-gray-400">Any city</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs font-medium">
-                        {rate.rate_unit.replace('_', ' ')}
+                        <VocabLabel kind="tipping_unit" value={rate.rate_unit} />
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
@@ -712,30 +705,13 @@ export default function TippingPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Role Type *</label>
-                  <select 
-                    name="role_type" 
-                    value={formData.role_type} 
-                    onChange={handleChange} 
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
-                  >
-                    {ROLE_TYPES.map(r => (
-                      <option key={r} value={r}>{r.replace('_', ' ')}</option>
-                    ))}
-                  </select>
+                  <VocabSelect kind="tipping_role" value={formData.role_type} onChange={v => setFormData(prev => ({ ...prev, role_type: v }))} placeholder={null} name="role_type"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Context</label>
-                  <select 
-                    name="context" 
-                    value={formData.context} 
-                    onChange={handleChange} 
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
-                  >
-                    <option value="">No specific context</option>
-                    {CONTEXTS.map(c => (
-                      <option key={c} value={c}>{c.replace('_', ' ')}</option>
-                    ))}
-                  </select>
+                  <VocabSelect kind="tipping_context" value={formData.context} onChange={v => setFormData(prev => ({ ...prev, context: v }))} placeholder={"No specific context"} name="context"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600" />
                 </div>
               </div>
               <div>
@@ -759,16 +735,8 @@ export default function TippingPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Rate Unit *</label>
-                  <select 
-                    name="rate_unit" 
-                    value={formData.rate_unit} 
-                    onChange={handleChange} 
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
-                  >
-                    {RATE_UNITS.map(u => (
-                      <option key={u} value={u}>{u.replace('_', ' ')}</option>
-                    ))}
-                  </select>
+                  <VocabSelect kind="tipping_unit" value={formData.rate_unit} onChange={v => setFormData(prev => ({ ...prev, rate_unit: v }))} placeholder={null} name="rate_unit"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Amount ({rateSymbol}) *</label>

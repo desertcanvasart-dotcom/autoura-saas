@@ -18,6 +18,7 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useAllVocabularies, clearVocabularyCache } from '@/hooks/useVocabulary'
 import {
   VOCABULARY_KINDS,
+  VOCABULARY_GROUPS,
   VOCABULARY_KIND_INFO,
   SUPPLIER_BEHAVIORS,
   slugifyKey,
@@ -28,8 +29,8 @@ import {
 
 interface Notice { kind: 'success' | 'error'; text: string }
 
-type AddForm = { label: string; key: string; keyTouched: boolean; behavior: string; min_pax: string; max_pax: string; description: string }
-const EMPTY_ADD: AddForm = { label: '', key: '', keyTouched: false, behavior: 'other', min_pax: '1', max_pax: '4', description: '' }
+type AddForm = { label: string; key: string; keyTouched: boolean; behavior: string; min_pax: string; max_pax: string; needs_destination: boolean; description: string }
+const EMPTY_ADD: AddForm = { label: '', key: '', keyTouched: false, behavior: 'other', min_pax: '1', max_pax: '4', needs_destination: false, description: '' }
 
 const inputCls = 'px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent'
 
@@ -40,7 +41,7 @@ export default function VocabularySettingsPage() {
   const [kind, setKind] = useState<VocabularyKind>('tier')
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
-  const [editing, setEditing] = useState<{ id: string; label: string; behavior: string; min_pax: string; max_pax: string } | null>(null)
+  const [editing, setEditing] = useState<{ id: string; label: string; behavior: string; min_pax: string; max_pax: string; needs_destination: boolean } | null>(null)
   const [add, setAdd] = useState<AddForm | null>(null)
 
   const info = VOCABULARY_KIND_INFO[kind]
@@ -101,6 +102,7 @@ export default function VocabularySettingsPage() {
     const body: Record<string, unknown> = { label: editing.label }
     if (kind === 'supplier_type') body.behavior = editing.behavior
     if (kind === 'vehicle_type') body.meta = { ...item.meta, min_pax: Number(editing.min_pax), max_pax: Number(editing.max_pax) }
+    if (kind === 'transport_service_type') body.meta = { ...item.meta, needs_destination: editing.needs_destination }
     if (await patch(item, body, 'Saved')) setEditing(null)
   }
 
@@ -110,12 +112,14 @@ export default function VocabularySettingsPage() {
     if (add.keyTouched && add.key) body.key = add.key
     if (kind === 'supplier_type') body.behavior = add.behavior
     if (kind === 'vehicle_type') body.meta = { min_pax: Number(add.min_pax), max_pax: Number(add.max_pax) }
+    if (kind === 'transport_service_type') body.meta = { needs_destination: add.needs_destination }
     if (await call('add', () => fetch('/api/vocabulary', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), `"${add.label}" added`)) setAdd(null)
   }
 
   const startEdit = (item: VocabularyItem) => setEditing({
     id: item.id, label: item.label, behavior: item.behavior || 'other',
     min_pax: String(item.meta?.min_pax ?? 1), max_pax: String(item.meta?.max_pax ?? 4),
+    needs_destination: Boolean(item.meta?.needs_destination),
   })
 
   return (
@@ -157,8 +161,12 @@ export default function VocabularySettingsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
         {/* Kind picker */}
-        <nav className="space-y-1">
-          {VOCABULARY_KINDS.map(k => {
+        <nav className="space-y-3">
+          {VOCABULARY_GROUPS.map(group => (
+            <div key={group}>
+              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{group}</p>
+              <div className="space-y-0.5">
+                {VOCABULARY_KINDS.filter(k => VOCABULARY_KIND_INFO[k].group === group).map(k => {
             const active = byKind[k].filter(i => i.is_active).length
             return (
               <button key={k} type="button" onClick={() => { setKind(k); setEditing(null); setAdd(null) }}
@@ -167,7 +175,10 @@ export default function VocabularySettingsPage() {
                 <span className={`text-xs px-1.5 py-0.5 rounded-full ${kind === k ? 'bg-white/20' : 'bg-gray-200 text-gray-600'}`}>{active}</span>
               </button>
             )
-          })}
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* The list */}
@@ -225,6 +236,12 @@ export default function VocabularySettingsPage() {
                               <input type="number" min={1} value={editing.max_pax} onChange={e => setEditing({ ...editing, max_pax: e.target.value })} className={`${inputCls} w-16`} /> pax
                             </span>
                           )}
+                          {kind === 'transport_service_type' && (
+                            <label className="flex items-center gap-1.5 text-sm text-gray-600">
+                              <input type="checkbox" checked={editing.needs_destination} onChange={e => setEditing({ ...editing, needs_destination: e.target.checked })} className="w-3.5 h-3.5" />
+                              needs a destination
+                            </label>
+                          )}
                           <button type="button" onClick={() => void saveEdit()} disabled={busy !== null || !editing.label.trim()} className="p-1.5 text-green-600 hover:bg-green-50 rounded disabled:opacity-50" title="Save"><Check className="w-4 h-4" /></button>
                           <button type="button" onClick={() => setEditing(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded" title="Cancel"><X className="w-4 h-4" /></button>
                         </div>
@@ -234,6 +251,9 @@ export default function VocabularySettingsPage() {
                             {item.label}
                             {kind === 'vehicle_type' && item.meta?.min_pax != null && (
                               <span className="ml-2 text-xs font-normal text-gray-500">{String(item.meta.min_pax)}–{String(item.meta.max_pax)} pax</span>
+                            )}
+                            {kind === 'transport_service_type' && item.meta?.needs_destination === true && (
+                              <span className="ml-2 text-xs font-normal text-gray-500">→ needs a destination</span>
                             )}
                           </p>
                           <p className="text-xs text-gray-400 font-mono">
@@ -295,6 +315,12 @@ export default function VocabularySettingsPage() {
                           <input type="number" min={1} value={add.max_pax} onChange={e => setAdd({ ...add, max_pax: e.target.value })} className={`${inputCls} w-16`} />
                         </span>
                       </div>
+                    )}
+                    {kind === 'transport_service_type' && (
+                      <label className="flex items-center gap-1.5 text-sm text-gray-600 self-end pb-2">
+                        <input type="checkbox" checked={add.needs_destination} onChange={e => setAdd({ ...add, needs_destination: e.target.checked })} className="w-3.5 h-3.5" />
+                        needs a destination city
+                      </label>
                     )}
                     <div className="flex-1 min-w-[160px]">
                       <label className="block text-xs font-medium text-gray-600 mb-1">Note <span className="font-normal text-gray-400">(optional)</span></label>

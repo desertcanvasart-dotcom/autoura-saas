@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Plus, Edit, Trash2, X, Check, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Sparkles, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -623,7 +624,6 @@ export default function AttractionsContent() {
 
   // Get unique values for filters
   const cities = Array.from(new Set(attractions.map(a => a.city))).filter(Boolean).sort()
-  const categories = Array.from(new Set(attractions.map(a => a.category))).filter(Boolean).sort()
 
   // Calculate stats
   const activeAttractions = attractions.filter(a => a.is_active).length
@@ -641,18 +641,6 @@ export default function AttractionsContent() {
       </div>
     )
   }
-
-  const categoryOptions = [
-    'temple', 'pyramid', 'museum', 'tomb', 'church', 'mosque', 
-    'fortress', 'palace', 'nature', 'entertainment', 'other'
-  ]
-
-  const feeTypeOptions = [
-    { value: 'standard', label: 'Standard' },
-    { value: 'free', label: 'Free Entry' },
-    { value: 'donation', label: 'Donation Based' },
-    { value: 'included', label: 'Included in Package' }
-  ]
 
   const seasonOptions = [
     { value: 'all_year', label: 'All Year' },
@@ -794,16 +782,8 @@ export default function AttractionsContent() {
               </select>
             </div>
             <div className="md:w-40">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-              >
-                <option value="all">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
+              <VocabSelect kind="attraction_category" value={selectedCategory} onChange={setSelectedCategory} placeholder={"All Categories"} emptyValue="all"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm" />
             </div>
             <button
               onClick={() => setShowInactive(!showInactive)}
@@ -925,8 +905,8 @@ export default function AttractionsContent() {
                     </td>
                     <td className="px-4 py-3">
                       {attraction.category && (
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium capitalize">
-                          {attraction.category}
+                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium">
+                          <VocabLabel kind="attraction_category" value={attraction.category} />
                         </span>
                       )}
                     </td>
@@ -1133,33 +1113,16 @@ export default function AttractionsContent() {
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       Category
                     </label>
-                    <select
-                      name="category"
-                      value={formData.category}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                    >
-                      <option value="">Select category...</option>
-                      {categoryOptions.map(cat => (
-                        <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="attraction_category" value={formData.category} onChange={v => setFormData(prev => ({ ...prev, category: v }))} placeholder={"Select category..."} name="category"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm" />
                   </div>
 
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       Fee Type
                     </label>
-                    <select
-                      name="fee_type"
-                      value={formData.fee_type}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                    >
-                      {feeTypeOptions.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="attraction_fee_type" value={formData.fee_type} onChange={v => setFormData(prev => ({ ...prev, fee_type: v }))} placeholder={null} name="fee_type"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm" />
                   </div>
 
                   <div>

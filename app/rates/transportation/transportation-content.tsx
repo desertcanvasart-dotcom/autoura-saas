@@ -7,6 +7,7 @@ import { Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, Ch
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useVocabulary } from '@/hooks/useVocabulary'
+import { needsDestination } from '@/lib/vocabulary'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -91,19 +92,6 @@ const initialFormData: FormData = {
   is_active: true
 }
 
-const SERVICE_TYPES = [
-  { value: 'airport_transfer', label: 'Airport Transfer', needsDestination: false },
-  { value: 'city_transfer', label: 'City Transfer', needsDestination: true },
-  { value: 'day_tour', label: 'Day Tour', needsDestination: false },
-  { value: 'half_day', label: 'Half Day', needsDestination: false },
-  { value: 'intercity_day_trip', label: 'Intercity Day Trip', needsDestination: true },
-  { value: 'intercity_dropoff', label: 'Intercity Drop-off', needsDestination: true },
-  { value: 'intercity_overnight', label: 'Intercity Overnight', needsDestination: true },
-  { value: 'long_day_tour', label: 'Long Day Tour', needsDestination: false },
-  { value: 'multi_day', label: 'Multi-Day', needsDestination: false },
-  { value: 'outside_dinner', label: 'Outside Dinner Transfer', needsDestination: false },
-  { value: 'sound_light', label: 'Sound & Light Transfer', needsDestination: false },
-]
 
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
@@ -180,10 +168,10 @@ export default function TransportationContent() {
   }, [searchTerm, cityFilter, serviceTypeFilter, vehicleTypeFilter, showInactive, itemsPerPage])
 
   // Check if service type needs destination city
-  const needsDestinationCity = (serviceType: string) => {
-    const type = SERVICE_TYPES.find(t => t.value === serviceType)
-    return type?.needsDestination || false
-  }
+  // The agency's journey types (Settings → Your vocabulary); each carries
+  // whether it needs a destination city (meta.needs_destination).
+  const { items: serviceTypeItems } = useVocabulary('transport_service_type')
+  const needsDestinationCity = (serviceType: string) => needsDestination(serviceTypeItems, serviceType)
 
   // Route-level code — one row per route now, so no vehicle suffix.
   const generateServiceCode = (city: string, serviceType: string, destinationCity?: string) => {
@@ -603,16 +591,8 @@ export default function TransportationContent() {
         </div>
 
         <div className="relative">
-          <select
-            value={serviceTypeFilter}
-            onChange={(e) => setServiceTypeFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
-          >
-            <option value="">All Service Types</option>
-            {SERVICE_TYPES.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
+          <VocabSelect kind="transport_service_type" value={serviceTypeFilter} onChange={setServiceTypeFilter} placeholder={"All Service Types"}
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
@@ -706,7 +686,7 @@ export default function TransportationContent() {
                     </td>
                     <td className="px-4 py-2">
                       <span className="text-sm text-gray-600">
-                        {SERVICE_TYPES.find(t => t.value === rate.service_type)?.label || rate.service_type}
+                        <VocabLabel kind="transport_service_type" value={rate.service_type} />
                       </span>
                     </td>
                     <td className="px-4 py-2">
@@ -900,16 +880,8 @@ export default function TransportationContent() {
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
                       Service Type <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={formData.service_type}
-                      onChange={(e) => handleServiceTypeChange(e.target.value)}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                    >
-                      {SERVICE_TYPES.map(type => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="transport_service_type" value={formData.service_type} onChange={handleServiceTypeChange} placeholder={null} required
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]" />
                   </div>
 
                 </div>

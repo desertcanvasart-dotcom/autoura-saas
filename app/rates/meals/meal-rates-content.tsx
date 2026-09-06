@@ -10,49 +10,12 @@ import { useSearchParams } from 'next/navigation'
 import { Utensils, Plus, Edit, Trash2, X, Check, Copy, MapPin, Users, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
-import { TierBadge, VocabSelect, VocabLabel } from '@/components/vocabulary'
+import { TierBadge, VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 
-const CUISINE_TYPES = [
-  'Egyptian',
-  'Mediterranean',
-  'Italian',
-  'Middle Eastern',
-  'Asian',
-  'International',
-  'Seafood',
-  'Lebanese',
-  'Turkish',
-  'Indian',
-  'Korean',
-  'Chinese',
-  'Japanese',
-  'French'
-]
-
-const RESTAURANT_TYPES = [
-  'Fine Dining',
-  'Casual Dining',
-  'Buffet',
-  'Local Restaurant',
-  'Hotel Restaurant',
-  'Cruise Restaurant',
-  'Street Food',
-  'Café'
-]
-
-const DIETARY_OPTIONS = [
-  'Vegetarian',
-  'Vegan',
-  'Halal',
-  'Gluten-Free',
-  'Dairy-Free',
-  'Nut-Free',
-  'Kosher'
-]
 
 interface Supplier {
   id: string
@@ -112,6 +75,7 @@ export default function MealRatesContent() {
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedMealType, setSelectedMealType] = useState('')
   const [selectedCuisine, setSelectedCuisine] = useState('')
+  const { items: dietaryItems } = useVocabulary('dietary_option')
   const [selectedTier, setSelectedTier] = useState('')
   const [selectedSupplier, setSelectedSupplier] = useState(initialSupplierId)
   const [showInactive, setShowInactive] = useState(false)
@@ -996,7 +960,7 @@ export default function MealRatesContent() {
 
                 <div className="space-y-1 text-sm text-gray-600 mb-3">
                   <p><span className="text-gray-400">City:</span> {rate.city || '—'}</p>
-                  <p><span className="text-gray-400">Cuisine:</span> {rate.cuisine_type || '—'}</p>
+                  <p><span className="text-gray-400">Cuisine:</span> <VocabLabel kind="cuisine_type" value={rate.cuisine_type} fallback="—" /></p>
                 </div>
 
                 <div className="flex items-center justify-between pt-3 border-t border-gray-100">
@@ -1224,31 +1188,13 @@ export default function MealRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Cuisine Type</label>
-                    <select
-                      name="cuisine_type"
-                      value={formData.cuisine_type}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Cuisine</option>
-                      {CUISINE_TYPES.map(cuisine => (
-                        <option key={cuisine} value={cuisine}>{cuisine}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="cuisine_type" value={formData.cuisine_type} onChange={v => setFormData(prev => ({ ...prev, cuisine_type: v }))} placeholder={"Select Cuisine"} name="cuisine_type"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Restaurant Type</label>
-                    <select
-                      name="restaurant_type"
-                      value={formData.restaurant_type}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Type</option>
-                      {RESTAURANT_TYPES.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="restaurant_type" value={formData.restaurant_type} onChange={v => setFormData(prev => ({ ...prev, restaurant_type: v }))} placeholder={"Select Type"} name="restaurant_type"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
@@ -1278,18 +1224,19 @@ export default function MealRatesContent() {
                   Dietary Options
                 </h3>
                 <div className="flex flex-wrap gap-2">
-                  {DIETARY_OPTIONS.map(option => (
+                  {/* Stored as keys; the chips wear the agency's words. */}
+                  {dietaryItems.map(item => (
                     <button
-                      key={option}
+                      key={item.key}
                       type="button"
-                      onClick={() => toggleDietaryOption(option)}
+                      onClick={() => toggleDietaryOption(item.key)}
                       className={`px-3 py-1.5 text-sm rounded-lg border-2 font-medium transition-colors ${
-                        formData.dietary_options.includes(option)
+                        formData.dietary_options.includes(item.key)
                           ? 'border-green-600 bg-green-50 text-green-700'
                           : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
                       }`}
                     >
-                      {option}
+                      {item.label}
                     </button>
                   ))}
                 </div>

@@ -14,50 +14,9 @@ import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurre
 import ActivityTiersEditor from '@/app/components/ActivityTiersEditor'
 import { parseTiers, type ActivityTier } from '@/lib/rates/activity-tiers'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 
 
-const ACTIVITY_CATEGORIES = [
-  'Ancient Sites',
-  'Museums',
-  'Desert Safari',
-  'Water Activities',
-  'Cultural Experience',
-  'Adventure',
-  'Religious Sites',
-  'Nature & Wildlife',
-  'Entertainment',
-  'Shopping Tours',
-  'Shows & Events',
-  'Nile Experience',
-  'Local Transport'
-]
-
-const ACTIVITY_TYPES = [
-  'Guided Tour',
-  'Self-Guided',
-  'Excursion',
-  'Day Trip',
-  'Half-Day Trip',
-  'Experience',
-  'Workshop',
-  'Show',
-  'Cruise',
-  'Ride',
-  'Activity'
-]
-
-const DURATIONS = [
-  '30 minutes',
-  '1 hour',
-  '1.5 hours',
-  '2 hours',
-  '3 hours',
-  '4 hours',
-  'Half Day (4-5h)',
-  'Full Day (6-8h)',
-  'Extended Day (8-10h)',
-  'Multi-Day'
-]
 
 // NEW: Pricing types for add-ons
 const PRICING_TYPES = [
@@ -67,18 +26,6 @@ const PRICING_TYPES = [
   { value: 'tiered', label: 'Tiered', description: 'Per-person rate drops as the group grows', icon: TrendingDown }
 ]
 
-// NEW: Common unit labels
-const UNIT_LABELS = [
-  'boat',
-  'felucca',
-  'ride',
-  'quad',
-  'vehicle',
-  'ticket',
-  'group',
-  'session',
-  'person'
-]
 
 interface Supplier {
   id: string
@@ -837,16 +784,8 @@ export default function ActivityRatesContent() {
           </select>
 
           {/* Category Filter */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
-          >
-            <option value="">All Categories</option>
-            {ACTIVITY_CATEGORIES.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+          <VocabSelect kind="activity_category" value={selectedCategory} onChange={setSelectedCategory} placeholder={"All Categories"}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
 
           {/* City Filter */}
           <select
@@ -1003,7 +942,7 @@ export default function ActivityRatesContent() {
                     <td className="px-4 py-3">
                       {rate.activity_category ? (
                         <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
-                          {rate.activity_category}
+                          <VocabLabel kind="activity_category" value={rate.activity_category} />
                         </span>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
@@ -1016,7 +955,7 @@ export default function ActivityRatesContent() {
                       <div className="flex flex-col items-center gap-1">
                         {getPricingTypeBadge(rate.pricing_type)}
                         {rate.pricing_type === 'per_unit' && rate.unit_label && (
-                          <span className="text-xs text-gray-500">/{rate.unit_label}</span>
+                          <span className="text-xs text-gray-500">/<VocabLabel kind="activity_unit" value={rate.unit_label} /></span>
                         )}
                       </div>
                     </td>
@@ -1088,7 +1027,7 @@ export default function ActivityRatesContent() {
                   {getPricingTypeBadge(rate.pricing_type)}
                   {rate.activity_category && (
                     <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
-                      {rate.activity_category}
+                      <VocabLabel kind="activity_category" value={rate.activity_category} />
                     </span>
                   )}
                 </div>
@@ -1102,7 +1041,7 @@ export default function ActivityRatesContent() {
                     </>
                   )}
                   {rate.duration && (
-                    <p><span className="text-gray-400">Duration:</span> {rate.duration}</p>
+                    <p><span className="text-gray-400">Duration:</span> <VocabLabel kind="activity_duration" value={rate.duration} /></p>
                   )}
                 </div>
 
@@ -1298,45 +1237,18 @@ export default function ActivityRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
-                    <select
-                      name="activity_category"
-                      value={formData.activity_category}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Category</option>
-                      {ACTIVITY_CATEGORIES.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="activity_category" value={formData.activity_category} onChange={v => setFormData(prev => ({ ...prev, activity_category: v }))} placeholder={"Select Category"} name="activity_category"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Activity Type</label>
-                    <select
-                      name="activity_type"
-                      value={formData.activity_type}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Type</option>
-                      {ACTIVITY_TYPES.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="activity_type" value={formData.activity_type} onChange={v => setFormData(prev => ({ ...prev, activity_type: v }))} placeholder={"Select Type"} name="activity_type"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Duration</label>
-                    <select
-                      name="duration"
-                      value={formData.duration}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Duration</option>
-                      {DURATIONS.map(dur => (
-                        <option key={dur} value={dur}>{dur}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="activity_duration" value={formData.duration} onChange={v => setFormData(prev => ({ ...prev, duration: v }))} placeholder={"Select Duration"} name="duration"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
@@ -1418,17 +1330,8 @@ export default function ActivityRatesContent() {
                     <div className="grid grid-cols-3 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Unit Label *</label>
-                        <select
-                          name="unit_label"
-                          value={formData.unit_label}
-                          onChange={handleChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                        >
-                          <option value="">Select unit</option>
-                          {UNIT_LABELS.map(label => (
-                            <option key={label} value={label}>{label}</option>
-                          ))}
-                        </select>
+                        <VocabSelect kind="activity_unit" value={formData.unit_label} onChange={v => setFormData(prev => ({ ...prev, unit_label: v }))} placeholder={"Select unit"} name="unit_label"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Min Capacity</label>

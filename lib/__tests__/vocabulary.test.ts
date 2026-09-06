@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   VOCABULARY_KINDS,
   VOCABULARY_KIND_INFO,
+  VOCABULARY_GROUPS,
+  vocabularyColumnsFor,
+  needsDestination,
   SUPPLIER_BEHAVIORS,
   slugifyKey,
   uniqueKey,
@@ -22,8 +25,33 @@ const item = (over: Partial<VocabularyItem>): VocabularyItem => ({
 })
 
 describe('the kinds', () => {
-  it('every kind has settings-screen info', () => {
-    for (const k of VOCABULARY_KINDS) expect(VOCABULARY_KIND_INFO[k].title).toBeTruthy()
+  it('every kind has settings-screen info and sits in a known group', () => {
+    for (const k of VOCABULARY_KINDS) {
+      expect(VOCABULARY_KIND_INFO[k].title).toBeTruthy()
+      expect(VOCABULARY_GROUPS).toContain(VOCABULARY_KIND_INFO[k].group)
+    }
+    // Every group has at least one kind, or the settings nav shows an empty heading.
+    for (const g of VOCABULARY_GROUPS) expect(VOCABULARY_KINDS.some(k => VOCABULARY_KIND_INFO[k].group === g), g).toBe(true)
+  })
+
+  it('a column name that means different things per table resolves per table', () => {
+    expect(vocabularyColumnsFor('transportation_rates').service_type).toBe('transport_service_type')
+    expect(vocabularyColumnsFor('airport_staff_rates').service_type).toBe('airport_service_type')
+    expect(vocabularyColumnsFor('hotel_staff_rates').service_type).toBe('hotel_service_type')
+    expect(vocabularyColumnsFor('entrance_fees').category).toBe('attraction_category')
+    // `duration` is a vocabulary word on activities but free text on transport.
+    expect(vocabularyColumnsFor('activity_rates').duration).toBe('activity_duration')
+    expect(vocabularyColumnsFor('transportation_rates').duration).toBeUndefined()
+    // The generic columns ride along everywhere.
+    expect(vocabularyColumnsFor('train_rates').class_type).toBe('train_class')
+  })
+
+  it('a transport service type says whether it needs a destination', () => {
+    const items = [{ key: 'day_tour', meta: {} }, { key: 'city_transfer', meta: { needs_destination: true } }]
+    expect(needsDestination(items, 'city_transfer')).toBe(true)
+    expect(needsDestination(items, 'day_tour')).toBe(false)
+    expect(needsDestination(items, 'unknown')).toBe(false)
+    expect(needsDestination(items, null)).toBe(false)
   })
 
   // The preset and the kind CHECK live in SQL. Each is read from the LAST

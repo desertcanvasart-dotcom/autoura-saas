@@ -6,6 +6,7 @@ import { todayLocal } from '@/lib/today'
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Edit2, Trash2, X, Plane, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Clock, Luggage, ArrowRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { VocabSelect } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -20,8 +21,8 @@ interface FlightRate {
   route_to: string
   airline: string
   flight_number: string | null
-  flight_type: 'domestic' | 'international'
-  cabin_class: 'economy' | 'business' | 'first'
+  flight_type: string
+  cabin_class: string
   base_rate_eur: number
   base_rate_non_eur: number
   tax_eur: number
@@ -58,8 +59,8 @@ interface FormData {
   route_to: string
   airline: string
   flight_number: string
-  flight_type: 'domestic' | 'international'
-  cabin_class: 'economy' | 'business' | 'first'
+  flight_type: string
+  cabin_class: string
   base_rate_eur: number
   base_rate_non_eur: number
   tax_eur: number
@@ -130,26 +131,6 @@ const AIRLINES = [
   { code: 'Other', name: 'Other' }
 ]
 
-const FLIGHT_TYPES = [
-  { value: 'domestic', label: 'Domestic' },
-  { value: 'international', label: 'International' }
-]
-
-const CABIN_CLASSES = [
-  { value: 'economy', label: 'Economy' },
-  { value: 'business', label: 'Business' },
-  { value: 'first', label: 'First Class' }
-]
-
-const FREQUENCIES = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekdays', label: 'Weekdays Only' },
-  { value: 'weekends', label: 'Weekends Only' },
-  { value: 'mon_wed_fri', label: 'Mon/Wed/Fri' },
-  { value: 'tue_thu_sat', label: 'Tue/Thu/Sat' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'charter', label: 'Charter/On Demand' }
-]
 
 // Popular flight routes in Egypt
 const POPULAR_ROUTES = [
@@ -295,7 +276,7 @@ export default function FlightsContent() {
     }))
   }
 
-  const handleCabinClassChange = (cabinClass: 'economy' | 'business' | 'first') => {
+  const handleCabinClassChange = (cabinClass: string) => {
     setFormData(prev => ({
       ...prev,
       cabin_class: cabinClass,
@@ -748,30 +729,14 @@ export default function FlightsContent() {
         </div>
 
         <div className="relative">
-          <select
-            value={flightTypeFilter}
-            onChange={(e) => setFlightTypeFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
-          >
-            <option value="">All Types</option>
-            {FLIGHT_TYPES.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
+          <VocabSelect kind="flight_type" value={flightTypeFilter} onChange={setFlightTypeFilter} placeholder={"All Types"}
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
         <div className="relative">
-          <select
-            value={cabinClassFilter}
-            onChange={(e) => setCabinClassFilter(e.target.value)}
-            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
-          >
-            <option value="">All Classes</option>
-            {CABIN_CLASSES.map(cls => (
-              <option key={cls.value} value={cls.value}>{cls.label}</option>
-            ))}
-          </select>
+          <VocabSelect kind="flight_cabin" value={cabinClassFilter} onChange={setCabinClassFilter} placeholder={"All Classes"}
+            className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] bg-white" />
           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
         </div>
 
@@ -1226,16 +1191,8 @@ export default function FlightsContent() {
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
                       Cabin Class <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={formData.cabin_class}
-                      onChange={(e) => handleCabinClassChange(e.target.value as 'economy' | 'business' | 'first')}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                    >
-                      {CABIN_CLASSES.map(cls => (
-                        <option key={cls.value} value={cls.value}>{cls.label}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="flight_cabin" value={formData.cabin_class} onChange={handleCabinClassChange} placeholder={null} required
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]" />
                   </div>
 
                   <div>
@@ -1303,15 +1260,8 @@ export default function FlightsContent() {
                     <label className="block text-sm font-medium text-gray-600 mb-1.5">
                       Frequency
                     </label>
-                    <select
-                      value={formData.frequency}
-                      onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value }))}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
-                    >
-                      {FREQUENCIES.map(freq => (
-                        <option key={freq.value} value={freq.value}>{freq.label}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="flight_frequency" value={formData.frequency} onChange={v => setFormData(prev => ({ ...prev, frequency: v }))} placeholder={null}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]" />
                   </div>
                 </div>
               </div>
