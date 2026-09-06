@@ -18,7 +18,7 @@ export default function ResourcesDocumentsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Suppliers</h2>
         <p className="text-gray-600 mb-4">
-          The <strong>Suppliers</strong> page (Operations &rarr; Suppliers) is where you manage the companies and people you work with: hotels, transport companies, guides, restaurants, cruise operators, and more &mdash; 12 supplier types in total.
+          The <strong>Suppliers</strong> page (Suppliers &amp; Rates &rarr; Suppliers) is where you manage the companies and people you work with: hotels, transport companies, guides, restaurants, cruise operators, and more &mdash; 12 supplier types in total.
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
           <li><strong>Views</strong> &mdash; Switch between grid, table, and list layouts, and filter by supplier type or status</li>

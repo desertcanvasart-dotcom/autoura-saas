@@ -14,7 +14,7 @@ export default function ContentLibraryPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Content Library &amp; Documents</h1>
       <p className="text-gray-600 mb-8">
-        The Content Library, AI Prompts and Writing Rules entries in the sidebar&rsquo;s Communication group (admins and managers) holds the building blocks the AI uses to write your itineraries &mdash; reusable content, prompt templates, and house-style rules &mdash; plus the Documents hub for customer and supplier paperwork.
+        The Content Library, AI Prompts and Writing Rules entries in the sidebar&rsquo;s Communicate group (admins and managers) holds the building blocks the AI uses to write your itineraries &mdash; reusable content, prompt templates, and house-style rules &mdash; plus the Documents hub for customer and supplier paperwork.
       </p>
 
       {/* Content Library */}

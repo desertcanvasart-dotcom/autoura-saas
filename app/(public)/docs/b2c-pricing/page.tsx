@@ -14,7 +14,7 @@ export default function B2CPricingPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">B2C Pricing</h1>
       <p className="text-gray-600 mb-8">
-        B2C pricing happens in the <strong>pricing grid</strong> (sidebar: Operations &rarr; <strong>Pricing Grid</strong>). The grid looks up hotel rates, guide fees, transport costs, entrance fees, meals, and more from your rate database, applies your profit margin, and recalculates the quote live as you edit.
+        B2C pricing happens in the <strong>pricing grid</strong> (sidebar: Sell &rarr; <strong>Pricing Grid</strong>). The grid looks up hotel rates, guide fees, transport costs, entrance fees, meals, and more from your rate database, applies your profit margin, and recalculates the quote live as you edit.
       </p>
 
       {/* How It Works */}
@@ -37,7 +37,7 @@ export default function B2CPricingPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Rate Sources</h2>
         <p className="text-gray-600 mb-3">
-          Pricing pulls from the rate tables managed under <strong>Rates</strong> in the sidebar (start at the <strong>Rates Hub</strong>). The 14 categories are:
+          Pricing pulls from the rate tables managed under <strong>Suppliers &amp; Rates</strong> in the sidebar (start at the <strong>Rates Hub</strong>). The 14 categories are:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Hotels</strong> &mdash; Per-person per night by city, tier (budget/standard/deluxe/luxury), and season</li>

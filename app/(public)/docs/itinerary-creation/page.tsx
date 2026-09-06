@@ -29,7 +29,7 @@ export default function ItineraryCreationPage() {
           <div className="border border-gray-200 rounded-lg p-4">
             <h3 className="font-semibold text-gray-900 mb-2">Pricing Grid</h3>
             <p className="text-sm text-gray-600 mb-2">The full itinerary builder. Accepts text, file uploads, or existing itineraries. AI parses input into a day-by-day grid with 15 service slots, each linked to your rate tables.</p>
-            <p className="text-xs text-gray-400">Sidebar: Operations &rarr; Pricing Grid</p>
+            <p className="text-xs text-gray-400">Sidebar: Sell &rarr; Pricing Grid</p>
           </div>
         </div>
         <p className="text-gray-600 mb-3">

@@ -41,7 +41,7 @@ export default function FollowupsRemindersPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Follow-ups Dashboard</h2>
         <p className="text-gray-600 mb-3">
-          Navigate to <strong>Follow-ups</strong> in the sidebar (under CRM). The page is a dashboard of everything pending:
+          Navigate to <strong>Follow-ups</strong> in the sidebar (under Operate). The page is a dashboard of everything pending:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li><strong>Four clickable stat cards</strong> &mdash; <strong>Due Today</strong>, <strong>This Week</strong>, <strong>Overdue</strong>, and <strong>All Pending</strong>. Click a card to filter the list</li>

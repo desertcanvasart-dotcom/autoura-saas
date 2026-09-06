@@ -58,7 +58,7 @@ export default function ToursRatesPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Rates</h2>
         <p className="text-gray-600 mb-4">
-          All your buying rates live under the <strong>Rates</strong> sidebar group. The <strong>Rates Hub</strong> entry opens the Rate Management overview, and each of the 14 rate categories has its own page beneath it.
+          All your buying rates live under the <strong>Suppliers &amp; Rates</strong> sidebar group, in four subgroups (Accommodation, Transport &amp; Tickets, Guides &amp; Services, Costs). The <strong>Rates Hub</strong> entry opens the Rate Management overview, and each of the 14 rate categories has its own page beneath it.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Rate Categories</h3>
@@ -100,7 +100,7 @@ export default function ToursRatesPage() {
           Adding and editing happens on the individual category pages, not the overview:
         </p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Open the relevant category from the sidebar (e.g., Rates &rarr; Hotels)</li>
+          <li>Open the relevant category from the sidebar (e.g., Suppliers &amp; Rates &rarr; Accommodation &rarr; Hotels)</li>
           <li>Add a new rate or click an existing rate to edit</li>
           <li>Fill in the details and save</li>
         </ol>
@@ -115,7 +115,7 @@ export default function ToursRatesPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Suppliers &amp; Rates</h3>
         <p className="text-gray-600">
-          Supplier records live in <strong>Operations &rarr; Suppliers</strong>. Each supplier has its own <strong>Rates</strong> tab, so you can see and manage the rates tied to a specific hotel, transport company, or other provider in one place. See <Link href="/docs/resources-documents" className="text-primary-600 hover:underline">Resources &amp; Documents</Link> for the full Suppliers guide.
+          Supplier records live in <strong>Suppliers &amp; Rates &rarr; Suppliers</strong>. Each supplier has its own <strong>Rates</strong> tab, so you can see and manage the rates tied to a specific hotel, transport company, or other provider in one place. See <Link href="/docs/resources-documents" className="text-primary-600 hover:underline">Resources &amp; Documents</Link> for the full Suppliers guide.
         </p>
       </section>
 

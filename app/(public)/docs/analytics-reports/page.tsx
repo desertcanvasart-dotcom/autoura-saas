@@ -21,7 +21,7 @@ export default function AnalyticsReportsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Analytics</h2>
         <p className="text-gray-600 mb-3">
-          Open <strong>Analytics</strong> in the sidebar (Main group) and pick a time range: Last 7, 30, or 90 Days, or Last Year. Key things to know about the numbers:
+          Open <strong>Analytics</strong> in the sidebar (Home group) and pick a time range: Last 7, 30, or 90 Days, or Last Year. Key things to know about the numbers:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>One Reporting Currency</strong> &mdash; Revenue is converted using historical exchange rates. An amber provenance banner explains any trips converted at today&rsquo;s rate or excluded because a rate was missing</li>
@@ -50,7 +50,7 @@ export default function AnalyticsReportsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Financial Reports</h2>
         <p className="text-gray-600 mb-3">
-          Open <strong>Reports</strong> in the sidebar (Reports group; admins and managers only). The page is headed <strong>Financial Reports</strong>, with a year selector and five tabs:
+          Open <strong>Reports</strong> in the sidebar (Home group; admins and managers only). The page is headed <strong>Financial Reports</strong>, with a year selector and five tabs:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Overview</strong> &mdash; Summary cards including profit margin, collection rate, and average trip value, plus Quarterly Performance and Monthly Revenue vs Expenses</li>

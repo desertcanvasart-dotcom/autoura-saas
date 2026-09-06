@@ -14,14 +14,14 @@ export default function CommunicationPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Communication</h1>
       <p className="text-gray-600 mb-8">
-        Everything you use to talk with clients lives in the <strong>Communication</strong> group in the sidebar: Conversations, Inbox (email), WhatsApp, the Copilot suite, Email Signatures, and Message Templates.
+        Everything you use to talk with clients lives in the <strong>Communicate</strong> group in the sidebar: Conversations, Inbox (email), WhatsApp, Copilot and its knowledge base, Message Templates, Email Signatures, and the Content Library.
       </p>
 
       {/* Conversations */}
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Conversations (Unified View)</h2>
         <p className="text-gray-600">
-          <strong>Conversations</strong> is the first item in the Communication group. It brings your WhatsApp chats and email threads together in one box, so you can see every exchange with a client regardless of channel. Use it when you want the full picture; use the dedicated WhatsApp and Inbox pages when you&apos;re working a single channel.
+          <strong>Conversations</strong> is the first item in the Communicate group. It brings your WhatsApp chats and email threads together in one box, so you can see every exchange with a client regardless of channel. Use it when you want the full picture; use the dedicated WhatsApp and Inbox pages when you&apos;re working a single channel.
         </p>
       </section>
 
@@ -122,7 +122,7 @@ export default function CommunicationPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Copilot (AI-Drafted Replies)</h2>
         <p className="text-gray-600 mb-3">
-          Copilot drafts replies to incoming messages for you &mdash; you always review and send; nothing goes out automatically. The suite has four pages in the Communication group:
+          Copilot drafts replies to incoming messages for you &mdash; you always review and send; nothing goes out automatically. The suite has four pages; the first two sit in the Communicate group, Copilot Settings under Settings (admins), and Copilot Analytics under Home:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Copilot</strong> &mdash; The review queue: read each drafted reply, edit it if needed, and send or dismiss it</li>
@@ -143,7 +143,7 @@ export default function CommunicationPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Concierge Leads</h2>
         <p className="text-gray-600">
-          Inquiries submitted through your concierge intake form arrive as briefs under <strong>Concierge Leads</strong> (in the CRM group). Treat it as another inbound channel: review each brief, then follow up by WhatsApp or email.
+          Inquiries submitted through your concierge intake form arrive as briefs under <strong>Concierge Leads</strong> (in the Operate group). Treat it as another inbound channel: review each brief, then follow up by WhatsApp or email.
         </p>
       </section>
 
