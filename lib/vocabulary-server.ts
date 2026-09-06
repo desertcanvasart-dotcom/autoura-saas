@@ -45,3 +45,36 @@ export async function supplierTypeKeysForBehaviors(supabase: Client, behaviors: 
   }
   return [...out]
 }
+
+// ------------------------------------------------------------------
+// Service-role reads (the pricing engine, cron): explicit tenant
+// ------------------------------------------------------------------
+
+import { PRESET_TIERS, type VehicleBand } from '@/lib/vocabulary'
+
+/** Every entry of one kind for a NAMED tenant, through a service-role
+ *  client. Only for code that already holds a tenant it has authorised. */
+export async function loadVocabularyForTenant(admin: Client, tenantId: string, kind: VocabularyKind): Promise<VocabularyItem[]> {
+  const { data, error } = await admin
+    .from('tenant_vocabularies')
+    .select('id, tenant_id, kind, key, label, description, behavior, rank, meta, is_active, created_at, updated_at')
+    .eq('tenant_id', tenantId)
+    .eq('kind', kind)
+    .order('rank')
+  if (error || !data) return []
+  return data as unknown as VocabularyItem[]
+}
+
+/** The tenant's tiers, lowest to highest — the preset when none exist. */
+export async function tierLadderForTenant(admin: Client, tenantId: string): Promise<string[]> {
+  const keys = activeInOrder(await loadVocabularyForTenant(admin, tenantId, 'tier')).map(i => i.key)
+  return keys.length ? keys : [...PRESET_TIERS]
+}
+
+/** The tenant's vehicles with their passenger bands, smallest first. Empty
+ *  when the tenant has none (callers keep their built-in bands). */
+export async function vehicleBandsForTenant(admin: Client, tenantId: string): Promise<VehicleBand[]> {
+  return activeInOrder(await loadVocabularyForTenant(admin, tenantId, 'vehicle_type'))
+    .map(i => ({ key: i.key, min_pax: Number(i.meta?.min_pax ?? 0), max_pax: Number(i.meta?.max_pax ?? 0) }))
+    .filter(v => v.max_pax > 0)
+}

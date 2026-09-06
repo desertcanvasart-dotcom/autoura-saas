@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       service_code: body.service_code || `HTL-${Date.now()}`,
       property_name: body.property_name,
       property_type: body.property_type || 'hotel',
-      board_basis: body.board_basis || 'BB',
+      board_basis: body.board_basis || 'bb',
       base_rate_eur: parseFloat(body.double_rate_eur) || 0,
       base_rate_non_eur: parseFloat(body.double_rate_non_eur) || 0,
       tier: body.tier || 'standard',

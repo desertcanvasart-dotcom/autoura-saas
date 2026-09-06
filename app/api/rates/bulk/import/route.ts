@@ -5,6 +5,8 @@ import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES } from '@/lib/rates/periods-csv'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
+import { loadVocabulary } from '@/lib/vocabulary-server'
+import { resolveRecordKeys, VOCABULARY_COLUMNS, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
 
 export async function POST(request: NextRequest) {
   try {
@@ -104,6 +106,27 @@ export async function POST(request: NextRequest) {
     }
 
     const preview = validateImportData(rows, config)
+
+    // The sheet says "Deluxe", "BB", "Sedan"; rows store the agency's keys
+    // (Settings → Your vocabulary). Resolve every vocabulary column up front
+    // so the preview names a word the agency does not use, and nothing is
+    // written under a word it does not use.
+    const vocabColumns = Object.fromEntries(
+      Object.entries(VOCABULARY_COLUMNS).filter(([column]) => config.columns.some(c => c.name === column && !c.exportOnly))
+    ) as Record<string, VocabularyKind>
+    const vocab: Partial<Record<VocabularyKind, VocabularyItem[]>> = {}
+    for (const kind of new Set(Object.values(vocabColumns))) vocab[kind] = await loadVocabulary(supabase, kind)
+    const vocabErrors: Array<{ row: number; column: string; message: string }> = []
+    const resolvedRows = rows.map((row, i) => {
+      const { record, errors } = resolveRecordKeys(row, vocab, vocabColumns)
+      for (const message of errors) vocabErrors.push({ row: i + 2, column: message.split(':')[0], message })
+      return record as Record<string, string>
+    })
+    if (vocabErrors.length > 0) {
+      const merged = { ...preview, invalidRows: preview.invalidRows + vocabErrors.length, validRows: Math.max(0, preview.validRows - vocabErrors.length), errors: [...preview.errors, ...vocabErrors] }
+      if (dryRun) return NextResponse.json({ success: true, dryRun: true, ...merged })
+      return NextResponse.json({ success: false, error: `${merged.invalidRows} rows have errors`, ...merged })
+    }
     if (dryRun) return NextResponse.json({ success: true, dryRun: true, ...preview })
     if (preview.invalidRows > 0) return NextResponse.json({ success: false, error: `${preview.invalidRows} rows have errors`, ...preview })
 
@@ -132,7 +155,7 @@ export async function POST(request: NextRequest) {
 
     const rowsToUpsert: Record<string, any>[] = []
     let exampleRowsSkipped = 0
-    for (const row of rows) {
+    for (const row of resolvedRows) {
       // The downloaded template ships one filled-in example row. Skip it, so
       // the classic mistake -- filling in the sheet underneath and importing
       // the sample along with it -- cannot land a junk rate.

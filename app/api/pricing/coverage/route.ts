@@ -14,8 +14,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { calculateDayBasedPricing, type ServiceTier } from '@/lib/auto-pricing-service'
 import { computeCoverage } from '@/lib/pricing-coverage'
-
-const ALL_TIERS: ServiceTier[] = ['budget', 'standard', 'deluxe', 'luxury']
+import { activeKeys } from '@/lib/vocabulary-server'
+import { PRESET_TIERS, defaultTierKey } from '@/lib/vocabulary'
 const MAX_TEMPLATES = 25 // bound the work for a single diagnostic request
 
 export async function GET(request: NextRequest) {
@@ -34,12 +34,15 @@ export async function GET(request: NextRequest) {
     const tierParam = searchParams.get('tier')
     const isEurPassport = searchParams.get('isEurPassport') !== 'false'
 
+    // The tenant's own ladder (Settings → Your vocabulary); the preset when empty.
+    const ladder = await activeKeys(supabase, 'tier')
+    const ALL_TIERS: ServiceTier[] = ladder.length ? ladder : [...PRESET_TIERS]
     const tiers: ServiceTier[] =
       tierParam === 'all'
         ? ALL_TIERS
-        : tierParam && ALL_TIERS.includes(tierParam as ServiceTier)
-          ? [tierParam as ServiceTier]
-          : ['standard']
+        : tierParam && ALL_TIERS.includes(tierParam)
+          ? [tierParam]
+          : [defaultTierKey(ALL_TIERS)]
 
     // RLS scopes templates to the caller's tenant.
     let query = supabase

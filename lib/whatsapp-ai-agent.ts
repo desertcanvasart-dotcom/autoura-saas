@@ -142,8 +142,7 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
         },
         budget_level: {
           type: 'string',
-          enum: ['budget', 'standard', 'deluxe', 'luxury'],
-          description: 'Budget preference'
+          description: "Budget preference, in the agency's own tier words if the customer used one (e.g. budget, standard, deluxe, luxury, 5 star); free text is normalised later"
         },
         special_requests: {
           type: 'string',
@@ -165,8 +164,7 @@ const AGENT_TOOLS: Anthropic.Messages.Tool[] = [
         },
         tier: {
           type: 'string',
-          enum: ['budget', 'standard', 'deluxe', 'luxury'],
-          description: 'Service tier for pricing'
+          description: "Service tier for pricing, in the agency's own tier words (free text is normalised later)"
         }
       },
       required: ['itinerary_id']

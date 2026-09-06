@@ -4,7 +4,9 @@
 // Type definitions, tier normalization, and raw-itinerary parsing helpers.
 // Pure functions — no DB access, no side effects.
 
-export type ServiceTier = 'budget' | 'standard' | 'deluxe' | 'luxury'
+/** A key from the tenant's tier vocabulary; the four preset words are the
+ *  Egypt default (lib/vocabulary: PRESET_TIERS). */
+export type ServiceTier = string
 export type InputMode = 'creative' | 'structured'
 // The AI path's package vocabulary. 'full-package' and 'shore-excursions'
 // come from the grid vocabulary (lib/package-types.ts); 'cruise-package' is
@@ -22,6 +24,8 @@ export type PackageType =
 // Default margin percentage (used if no user preference)
 export const DEFAULT_MARGIN_PERCENT = 25
 
+import { normalizeTierKey, presetTierFor } from '@/lib/vocabulary'
+
 export const VALID_TIERS: ServiceTier[] = ['budget', 'standard', 'deluxe', 'luxury']
 
 // Map legacy budget_level values to new tier system
@@ -37,7 +41,7 @@ export const TIER_MAP: Record<string, ServiceTier> = {
   'vip': 'luxury'
 }
 
-export const TIER_DESCRIPTIONS: Record<ServiceTier, string> = {
+export const TIER_DESCRIPTIONS: Record<string, string> = {
   'budget': 'cost-effective, good value',
   'standard': 'comfortable mid-range',
   'deluxe': 'superior quality, premium',
@@ -87,11 +91,23 @@ export function toNumber(value: any, fallback: number = 0): number {
   return Number(value)
 }
 
-// Helper to normalize tier value
-export function normalizeTier(value: string | null | undefined): ServiceTier {
+// Helper to normalize tier value. With the tenant's tiers (Settings → Your
+// vocabulary) the agency's own word wins, a synonym maps by position, and
+// the default is the ladder's "standard" position.
+export function normalizeTier(value: string | null | undefined, tierItems?: readonly { key: string; label: string }[]): ServiceTier {
+  if (tierItems && tierItems.length > 0) return normalizeTierKey(value, tierItems)
   if (!value) return 'standard'
   const normalized = value.toLowerCase().trim()
   return TIER_MAP[normalized] || 'standard'
+}
+
+/** The prompt-facing description of a tier: the agency's own note, else the
+ *  preset description at the same ladder position. */
+export function tierDescription(tier: ServiceTier, tierItems?: readonly { key: string; label: string; description?: string | null }[]): string {
+  const own = tierItems?.find(i => i.key === tier)?.description
+  if (own) return own
+  const ladder = (tierItems ?? []).map(i => i.key)
+  return TIER_DESCRIPTIONS[ladder.length ? presetTierFor(ladder, tier) : tier] ?? TIER_DESCRIPTIONS.standard
 }
 
 // ============================================

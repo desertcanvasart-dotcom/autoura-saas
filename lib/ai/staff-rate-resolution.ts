@@ -23,9 +23,12 @@
 // what a tier buys.
 
 import type { ServiceTier } from '@/lib/ai/parsing-utils'
+import { presetTierFor } from '@/lib/vocabulary'
 
-/** Airport assistance level sold at each tier. Operator decision. */
-export const AIRPORT_SERVICE_BY_TIER: Record<ServiceTier, string> = {
+/** Airport assistance level sold at each PRESET tier. Operator decision. A
+ *  tenant's own tier is mapped onto the preset by ladder position
+ *  (presetTierFor) before this is read. */
+export const AIRPORT_SERVICE_BY_TIER: Record<string, string> = {
   budget: 'meet_greet',
   standard: 'meet_greet',
   deluxe: 'full_service',
@@ -119,7 +122,7 @@ export type AirportResolution =
  */
 export function resolveAirportRates(
   rows: AirportStaffRateRow[] | null | undefined,
-  opts: { tier: ServiceTier; city: string | null | undefined }
+  opts: { tier: ServiceTier; city: string | null | undefined; ladder?: readonly string[] }
 ): AirportResolution {
   const code = airportCodeForCity(opts.city)
   if (!code) {
@@ -130,7 +133,7 @@ export function resolveAirportRates(
     }
   }
 
-  const serviceType = AIRPORT_SERVICE_BY_TIER[opts.tier]
+  const serviceType = AIRPORT_SERVICE_BY_TIER[presetTierFor(opts.ladder ?? [], opts.tier)]
   const forAirport = (rows ?? []).filter(r => r.airport_code === code)
   if (forAirport.length === 0) {
     return {
