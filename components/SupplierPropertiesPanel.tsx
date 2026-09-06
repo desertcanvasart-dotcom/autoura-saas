@@ -3,10 +3,14 @@
 // ============================================
 // The Properties tab of the supplier view modal
 // ============================================
-// Lists and edits the assets a supplier operates (ships now; hotels and
-// trains in later phases). This is where a cruise line's fleet lives — the
-// cruise rate form picks from here instead of typing a ship name into the
-// rate row.
+// Lists and edits the assets a supplier operates: ships, hotels, trains.
+// This is where a cruise line's fleet or a hotel group's hotels live — the
+// rate forms pick from here instead of typing a name into the rate row.
+//
+// Two "types" meet here and are deliberately named apart: the property's
+// KIND (ship / hotel / train — structural, follows the supplier's roles) and
+// a hotel's ACCOMMODATION TYPE (resort / camp / dahabiya… — the agency's own
+// vocabulary, Settings → Your vocabulary). The rate form inherits the latter.
 
 import { useCallback, useEffect, useState } from 'react'
 
@@ -14,6 +18,7 @@ import { Loader2, Pencil, Plus, Ship, Building2, TrainFront, Trash2, X } from 'l
 import CitySelect from '@/components/CitySelect'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import {
+  PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
   propertyTypesForRoles,
   type PropertyType,
@@ -38,19 +43,23 @@ type Draft = {
   name: string
   city: string
   category: string
+  accommodation_type: string
   contact_name: string
   contact_phone: string
   contact_email: string
 }
 
 const EMPTY = (type: PropertyType): Draft => ({
-  property_type: type, name: '', city: '', category: '',
+  property_type: type, name: '', city: '', category: '', accommodation_type: '',
   contact_name: '', contact_phone: '', contact_email: '',
 })
 
 export default function SupplierPropertiesPanel({ supplierId, supplierRoles }: Props) {
 
   const allowedTypes = propertyTypesForRoles(supplierRoles)
+  // Roles decide the kinds on offer; a supplier with no matching role (older
+  // data) may still add any kind.
+  const kindChoices: PropertyType[] = allowedTypes.length ? allowedTypes : [...PROPERTY_TYPES]
   const [properties, setProperties] = useState<SupplierProperty[]>([])
   const [loading, setLoading] = useState(true)
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -129,7 +138,7 @@ export default function SupplierPropertiesPanel({ supplierId, supplierRoles }: P
           <thead>
             <tr className="bg-gray-50">
               <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Name</th>
-              <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Type</th>
+              <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Kind</th>
               <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">City</th>
               <th className="text-left px-3 py-2 text-xs font-semibold text-gray-600">Contact</th>
               <th className="px-3 py-2" />
@@ -144,7 +153,12 @@ export default function SupplierPropertiesPanel({ supplierId, supplierRoles }: P
                     <Icon className="w-4 h-4 text-gray-400" /> {p.name}
                     {p.category && <span className="px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-600"><VocabLabel kind="tier" value={p.category} /></span>}
                   </td>
-                  <td className="px-3 py-2 text-sm text-gray-600">{PROPERTY_TYPE_LABELS[p.property_type] ?? p.property_type}</td>
+                  <td className="px-3 py-2 text-sm text-gray-600">
+                    {PROPERTY_TYPE_LABELS[p.property_type] ?? p.property_type}
+                    {p.property_type === 'hotel' && p.accommodation_type && (
+                      <span className="text-xs text-gray-400 block"><VocabLabel kind="hotel_property_type" value={p.accommodation_type} /></span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-sm text-gray-600">{p.city || '—'}</td>
                   <td className="px-3 py-2 text-sm text-gray-600">
                     {p.contact_name || '—'}
@@ -153,7 +167,7 @@ export default function SupplierPropertiesPanel({ supplierId, supplierRoles }: P
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button type="button" onClick={() => setDraft({
                       id: p.id, property_type: p.property_type, name: p.name,
-                      city: p.city || '', category: p.category || '',
+                      city: p.city || '', category: p.category || '', accommodation_type: p.accommodation_type || '',
                       contact_name: p.contact_name || '', contact_phone: p.contact_phone || '', contact_email: p.contact_email || '',
                     })} className="p-1.5 text-gray-400 hover:text-primary-600" title="Edit">
                       <Pencil className="w-4 h-4" />
@@ -176,23 +190,35 @@ export default function SupplierPropertiesPanel({ supplierId, supplierRoles }: P
             <button type="button" onClick={() => setDraft(null)} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-              <select
-                value={draft.property_type}
-                onChange={e => setDraft({ ...draft, property_type: e.target.value as PropertyType })}
-                disabled={!!draft.id}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-              >
-                {(allowedTypes.length ? allowedTypes : (['ship', 'hotel', 'train'] as PropertyType[])).map(pt => (
-                  <option key={pt} value={pt}>{PROPERTY_TYPE_LABELS[pt]}</option>
-                ))}
-              </select>
-            </div>
-            <div>
+            {/* The property's KIND. A supplier with one role has one possible
+                answer, so the field is not shown; it is fixed once saved. */}
+            {kindChoices.length > 1 && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Kind</label>
+                <select
+                  value={draft.property_type}
+                  onChange={e => setDraft({ ...draft, property_type: e.target.value as PropertyType, accommodation_type: '' })}
+                  disabled={!!draft.id}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+                >
+                  {kindChoices.map(pt => (
+                    <option key={pt} value={pt}>{PROPERTY_TYPE_LABELS[pt]}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className={kindChoices.length > 1 ? '' : 'col-span-2'}>
               <label className="block text-xs font-medium text-gray-600 mb-1">Name *</label>
               <input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
             </div>
+            {draft.property_type === 'hotel' && (
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Accommodation type</label>
+                {/* The agency's words (Settings → Your vocabulary → Accommodation
+                    types). Hotel rates picked from this property inherit it. */}
+                <VocabSelect kind="hotel_property_type" value={draft.accommodation_type} onChange={accommodation_type => setDraft({ ...draft, accommodation_type })} placeholder="Not classified" />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
               <CitySelect value={draft.city} onChange={city => setDraft({ ...draft, city })} />
