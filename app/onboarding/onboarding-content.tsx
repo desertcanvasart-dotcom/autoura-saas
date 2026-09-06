@@ -7,6 +7,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { Check } from 'lucide-react'
 import WelcomeStep from './steps/WelcomeStep'
 import BusinessStep from './steps/BusinessStep'
+import VocabularyStep from './steps/VocabularyStep'
 import BrandingStep from './steps/BrandingStep'
 import TeamSetupStep from './steps/TeamSetupStep'
 import QuickTourStep from './steps/QuickTourStep'
@@ -17,10 +18,13 @@ import CompleteStep from './steps/CompleteStep'
 const STEPS = [
   { id: 0, name: 'Welcome', component: WelcomeStep },
   { id: 1, name: 'Business', component: BusinessStep },
-  { id: 2, name: 'Branding', component: BrandingStep },
-  { id: 3, name: 'Team', component: TeamSetupStep },
-  { id: 4, name: 'Tour', component: QuickTourStep },
-  { id: 5, name: 'Complete', component: CompleteStep },
+  // The agency's own words — cities it sells, its tiers, its supplier types
+  // (migration 334/336). Egypt's defaults are pre-filled; editing is optional.
+  { id: 2, name: 'Your words', component: VocabularyStep },
+  { id: 3, name: 'Branding', component: BrandingStep },
+  { id: 4, name: 'Team', component: TeamSetupStep },
+  { id: 5, name: 'Tour', component: QuickTourStep },
+  { id: 6, name: 'Complete', component: CompleteStep },
 ]
 
 export default function OnboardingContent() {
@@ -47,8 +51,9 @@ export default function OnboardingContent() {
           }
           // Resume from last step if incomplete
           if (result.data.onboarding_step > 0) {
-            // Clamp: tenants saved a step index under the 7-step flow (with
-            // the retired Catalog step); the flow is 6 steps now.
+            // Clamp: the flow has changed length before (a Catalog step was
+            // retired; a Your-words step was added 2026-09-06) — a saved index
+            // must never point past the end.
             setCurrentStep(Math.min(result.data.onboarding_step, STEPS.length - 1))
           }
         }

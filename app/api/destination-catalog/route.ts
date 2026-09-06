@@ -34,7 +34,7 @@ export async function GET() {
         .order('name'),
       supabase
         .from('tenant_destinations')
-        .select('catalog_id, is_default, generation_brief, glossary, is_active')
+        .select('catalog_id, is_default, generation_brief, glossary, is_active, city_ids')
         .eq('is_active', true),
     ])
 
