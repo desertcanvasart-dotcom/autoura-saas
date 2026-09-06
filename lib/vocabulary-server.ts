@@ -65,6 +65,15 @@ export async function loadVocabularyForTenant(admin: Client, tenantId: string, k
   return data as unknown as VocabularyItem[]
 }
 
+/** The tenant's word for each stored key of one kind — hidden entries
+ *  included, so a rate filed under a class the agency has since retired
+ *  still reads as a word, not a slug. Empty when the tenant has none. */
+export async function vocabularyLabelsForTenant(admin: Client, tenantId: string, kind: VocabularyKind): Promise<Map<string, string>> {
+  const out = new Map<string, string>()
+  for (const item of await loadVocabularyForTenant(admin, tenantId, kind)) out.set(item.key, item.label)
+  return out
+}
+
 /** The tenant's tiers, lowest to highest — the preset when none exist. */
 export async function tierLadderForTenant(admin: Client, tenantId: string): Promise<string[]> {
   const keys = activeInOrder(await loadVocabularyForTenant(admin, tenantId, 'tier')).map(i => i.key)

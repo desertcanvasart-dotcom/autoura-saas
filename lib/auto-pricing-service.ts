@@ -40,7 +40,8 @@ import {
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { presetTierFor, tierMultiplier, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
-import { tierLadderForTenant, vehicleBandsForTenant } from '@/lib/vocabulary-server'
+import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant } from '@/lib/vocabulary-server'
+import type { VocabularyKind } from '@/lib/vocabulary'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
@@ -348,6 +349,7 @@ const vehicleKey = (v: unknown) => slugifyKey(String(v ?? ''))
 const VOCAB_TTL_MS = 60_000
 const ladderMemo = new Map<string, { at: number; value: string[] }>()
 const vehicleMemo = new Map<string, { at: number; value: VehicleBand[] }>()
+const labelMemo = new Map<string, { at: number; value: Map<string, string> }>()
 type VocabClient = Parameters<typeof tierLadderForTenant>[0]
 
 async function tenantTierLadder(tenantId: string): Promise<string[]> {
@@ -366,8 +368,24 @@ async function tenantVehicleBands(tenantId: string): Promise<VehicleBand[]> {
   return value
 }
 
+/** The agency's word for a stored key of `kind`, for service names and
+ *  hole messages ("Train ENR First Class", not "Train ENR first_class").
+ *  A key the vocabulary does not know reads as itself. */
+async function tenantVocabularyLabeller(tenantId: string, kind: VocabularyKind): Promise<(key: string | null | undefined) => string> {
+  const memoKey = `${tenantId}:${kind}`
+  const hit = labelMemo.get(memoKey)
+  let labels: Map<string, string>
+  if (hit && Date.now() - hit.at < VOCAB_TTL_MS) {
+    labels = hit.value
+  } else {
+    labels = await vocabularyLabelsForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId, kind)
+    labelMemo.set(memoKey, { at: Date.now(), value: labels })
+  }
+  return key => (key ? (labels.get(key) ?? key) : '')
+}
+
 /** Test seam: forget memoised vocabularies. */
-export function clearVocabularyMemo() { ladderMemo.clear(); vehicleMemo.clear() }
+export function clearVocabularyMemo() { ladderMemo.clear(); vehicleMemo.clear(); labelMemo.clear() }
 
 // NOTE: DEFAULT_RATES (hardcoded per-tier fallback prices) was REMOVED in the
 // pricing harness (Layer 1). Per policy — "never fabricate or invent rates" —
@@ -2135,6 +2153,11 @@ export async function calculateDayBasedPricing(
       rate_valid_from?: string | null; rate_valid_to?: string | null
     }
 
+    // Day-train classes in the agency's words (Settings → Your vocabulary).
+    const trainClassLabel = ticketLegs.some(l => l.mode === 'train')
+      ? await tenantVocabularyLabeller(catalogScope.tenantId, 'train_class')
+      : (key: string | null | undefined) => key ?? ''
+
     for (const leg of ticketLegs) {
       const route = `${leg.from} → ${leg.to}`
       const addLegHole = (message: string, lookup: string) =>
@@ -2207,7 +2230,7 @@ export async function calculateDayBasedPricing(
         }
       } else if (leg.mode === 'train') {
         const candidates = (trainRows as unknown as TrainTicketRow[]).filter(r => rowServesRoute(r, leg) && validFor(r))
-        const sel = selectTicketRow(candidates, leg.namedRateId, r => `${r.operator_name || 'Train'}${r.class_type ? ` ${r.class_type}` : ''}`)
+        const sel = selectTicketRow(candidates, leg.namedRateId, r => `${r.operator_name || 'Train'}${r.class_type ? ` ${trainClassLabel(r.class_type)}` : ''}`)
         if (sel.kind === 'named_missing') {
           addLegHole(`Day ${leg.dayNumber}'s picked train is no longer in ${MODE_RATES_PAGE.train} — re-pick it on the day editor.`, `train id ${sel.namedId}`)
           continue
@@ -2231,7 +2254,7 @@ export async function calculateDayBasedPricing(
           id: `day${leg.dayNumber}-train-${r.id}`,
           dayNumber: leg.dayNumber,
           serviceType: 'transportation',
-          serviceName: `Train ${r.operator_name || ''} ${route}${r.class_type ? ` (${r.class_type})` : ''}`.replace(/\s+/g, ' ').trim(),
+          serviceName: `Train ${r.operator_name || ''} ${route}${r.class_type ? ` (${trainClassLabel(r.class_type)})` : ''}`.replace(/\s+/g, ' ').trim(),
           quantity: 1,
           quantityMode: 'per_pax',
           unitCost: farePerPax,

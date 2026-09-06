@@ -16,7 +16,7 @@ vi.mock('@supabase/supabase-js', async () => {
   return { createClient: () => mock.createMockClient() }
 })
 
-import { calculateDayBasedPricing } from '@/lib/auto-pricing-service'
+import { calculateDayBasedPricing, clearVocabularyMemo } from '@/lib/auto-pricing-service'
 
 const TID = 'tmpl-tickets'
 const BASE_PARAMS = {
@@ -123,6 +123,30 @@ describe('day trains — the never-guess selection', () => {
     const hole = r.holes.find(h => /Several trains/.test(h.message))!
     expect(hole.message).toContain('OD Train')
     expect(hole.message).toContain('Express')
+  })
+
+  it("the class reads in the agency's word, in the line and in the hole", async () => {
+    clearVocabularyMemo()
+    const tables = ticketTables(days2, { train_rates: [TRAIN_A, TRAIN_B] }) as Record<string, Array<Record<string, unknown>>>
+    tables.tenant_vocabularies = [
+      { id: 'v1', tenant_id: 'test-tenant', kind: 'train_class', key: 'first', label: 'Première', rank: 1, is_active: true, meta: {} },
+      { id: 'v2', tenant_id: 'test-tenant', kind: 'train_class', key: 'second', label: 'Seconde', rank: 2, is_active: false, meta: {} },
+    ]
+    setMockTables(tables)
+    try {
+      const r = await calculateDayBasedPricing(BASE_PARAMS)
+      const hole = r.holes.find(h => /Several trains/.test(h.message))!
+      expect(hole.message).toContain('OD Train Première')
+      expect(hole.message).toContain('Express Seconde') // hidden entries still label old rows
+      expect(hole.message).not.toContain('first')
+
+      setMockTables({ ...tables, tour_templates: [{ ...tables.tour_templates[0], itinerary: [day(1, 'Cairo'), day(2, 'Luxor', { transport_type: 'train', transport_rate_id: 'tr-a' })] }] })
+      const named = await calculateDayBasedPricing(BASE_PARAMS)
+      const line = named.services.find(s => s.serviceName.startsWith('Train'))!
+      expect(line.serviceName).toContain('(Première)')
+    } finally {
+      clearVocabularyMemo()
+    }
   })
 
   it('naming THE train resolves the ambiguity', async () => {
