@@ -77,10 +77,10 @@ describe('drift detection actually detects drift', () => {
     expect(renderPlansArtifact(buildPlanRows(mutated))).toBe(before)
   })
 
-  it('a changed CAPABILITY changes the artifact', () => {
+  it('a changed publiclyPriced flag changes the artifact', () => {
     const before = renderPlansArtifact()
     const mutated = JSON.parse(JSON.stringify(PRICING_TIERS)) as typeof PRICING_TIERS
-    mutated.solo.capabilities.opsTeam = !mutated.solo.capabilities.opsTeam
+    mutated.solo.publiclyPriced = !mutated.solo.publiclyPriced
     expect(renderPlansArtifact(buildPlanRows(mutated))).not.toBe(before)
   })
 
@@ -114,8 +114,8 @@ describe('artifact shape is safe to upsert', () => {
     // The upsert sends the row object as-is: one key that is not a column
     // fails the entire write at boot. A `limits` key slipped in during the
     // tier restructure and would have broken the deploy sync.
-    // Migration 241 dropped every limit column, so this set is now identity,
-    // price and capabilities only.
+    // Migration 241 dropped every limit column, so this set is now identity
+    // and price only (features carries just publiclyPriced).
     const COLUMNS = new Set([
       'name', 'slug', 'description', 'price_monthly', 'price_yearly', 'currency',
       'stripe_price_id_monthly', 'stripe_price_id_yearly', 'stripe_product_id',

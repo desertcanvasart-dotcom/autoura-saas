@@ -298,37 +298,6 @@ export default function BillingPlansPage() {
                     </ul>
                   </div>
 
-                  {/* Features */}
-                  <div className="mb-4">
-                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Features</p>
-                    <ul className="space-y-1.5">
-                      {/* B2C and B2B are on every tier — never a differentiator. */}
-                      {tier.capabilities.opsTeam && (
-                        <li className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          Departments, task dispatch &amp; copilot analytics
-                        </li>
-                      )}
-                      {tier.capabilities.conciergeWebhook && (
-                        <li className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          Concierge brief webhook
-                        </li>
-                      )}
-                      {tier.capabilities.namedOnboarding && (
-                        <li className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          Named onboarding contact
-                        </li>
-                      )}
-                      {tier.capabilities.multiTenantConsole && (
-                        <li className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <Check className="w-3 h-3 text-[#647C47] flex-shrink-0" />
-                          Multiple companies, one console
-                        </li>
-                      )}
-                    </ul>
-                  </div>
 
                   {/* CTA */}
                   <button
@@ -402,20 +371,9 @@ export default function BillingPlansPage() {
               </ul>
             </div>
             <div>
-              {/* This said "Chat support (Business+)". There is no Business
-                  tier — the plans are Solo, Studio, Agency and Enterprise — so
-                  it named a plan nobody could buy. Named onboarding is a real
-                  capability in pricing-config, so it is derived rather than
-                  asserted. */}
               <p className="font-semibold text-gray-900 mb-1.5">Support</p>
               <ul className="space-y-0.5 text-gray-600">
                 <li>• Email support (all plans)</li>
-                <li>
-                  • Named onboarding contact ({TIER_ORDER
-                    .filter((k) => PRICING_TIERS[k].capabilities.namedOnboarding)
-                    .map((k) => PRICING_TIERS[k].name)
-                    .join(' and ')})
-                </li>
               </ul>
             </div>
           </div>

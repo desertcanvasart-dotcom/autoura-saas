@@ -7,10 +7,6 @@
     "price_yearly": 4490,
     "currency": "USD",
     "features": {
-      "opsTeam": true,
-      "conciergeWebhook": true,
-      "namedOnboarding": true,
-      "multiTenantConsole": false,
       "publiclyPriced": false
     },
     "is_active": true
@@ -23,10 +19,6 @@
     "price_yearly": null,
     "currency": "USD",
     "features": {
-      "opsTeam": true,
-      "conciergeWebhook": true,
-      "namedOnboarding": true,
-      "multiTenantConsole": true,
       "publiclyPriced": false
     },
     "is_active": true
@@ -39,10 +31,6 @@
     "price_yearly": 690,
     "currency": "USD",
     "features": {
-      "opsTeam": false,
-      "conciergeWebhook": false,
-      "namedOnboarding": false,
-      "multiTenantConsole": false,
       "publiclyPriced": true
     },
     "is_active": true
@@ -55,10 +43,6 @@
     "price_yearly": 1890,
     "currency": "USD",
     "features": {
-      "opsTeam": true,
-      "conciergeWebhook": false,
-      "namedOnboarding": false,
-      "multiTenantConsole": false,
       "publiclyPriced": true
     },
     "is_active": true

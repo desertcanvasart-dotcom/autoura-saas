@@ -22,7 +22,7 @@ import {
 // customer is actually charged or actually allowed to do.
 //
 // Tiers without a published price render "Talk to us" rather than a number.
-// That is driven by tier.publiclyPriced, so when Agency's missing capabilities
+// That is driven by tier.publiclyPriced, so when Agency's roadmap items
 // ship, flipping one boolean publishes it — no edits here.
 
 const formatMoney = (n: number) => `$${n.toLocaleString()}`
@@ -43,13 +43,6 @@ const LIMIT_ROWS: ComparisonRow[] = [
   { label: 'AI generations per month', value: t => formatLimit(t.limits.aiGenerationsPerMonth) },
   { label: 'B2B partners', value: t => formatLimit(t.limits.b2bPartners) },
   { label: 'Brands', value: t => formatLimit(t.limits.brands) },
-]
-
-const CAPABILITY_ROWS: Array<{ label: string; has: (t: PricingTier) => boolean }> = [
-  { label: 'Departments, task dispatch & copilot analytics', has: t => t.capabilities.opsTeam },
-  { label: 'Concierge brief webhook', has: t => t.capabilities.conciergeWebhook },
-  { label: 'Named onboarding contact', has: t => t.capabilities.namedOnboarding },
-  { label: 'Multiple companies, one console', has: t => t.capabilities.multiTenantConsole },
 ]
 
 /** On every tier, at every price. Listed so nobody has to ask. */
@@ -280,18 +273,6 @@ export default function PricingPage() {
                     <td className="py-3 pr-4 text-gray-600">{row.label}</td>
                     {TIER_ORDER.map(k => (
                       <td key={k} className="py-3 px-4 text-gray-900">{row.value(PRICING_TIERS[k])}</td>
-                    ))}
-                  </tr>
-                ))}
-                {CAPABILITY_ROWS.map(row => (
-                  <tr key={row.label}>
-                    <td className="py-3 pr-4 text-gray-600">{row.label}</td>
-                    {TIER_ORDER.map(k => (
-                      <td key={k} className="py-3 px-4">
-                        {row.has(PRICING_TIERS[k])
-                          ? <Check className="w-4 h-4 text-[#647C47]" />
-                          : <Minus className="w-4 h-4 text-gray-300" />}
-                      </td>
                     ))}
                   </tr>
                 ))}

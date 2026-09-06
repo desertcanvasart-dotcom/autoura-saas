@@ -14,13 +14,6 @@ import type { PricingTier } from '@/lib/pricing-config'
 // must come from this table, so a malformed entry (0 price, missing feature
 // flag, tier not in TIER_ORDER) is a data bug we want to catch at test time.
 
-const CAPABILITY_KEYS = [
-  'opsTeam',
-  'conciergeWebhook',
-  'namedOnboarding',
-  'multiTenantConsole',
-] as const
-
 const LIMIT_KEYS = [
   'users',
   'itinerariesPerYear',
@@ -42,16 +35,13 @@ describe('PRICING_TIERS — catalog integrity', () => {
     }
   })
 
-  it('BUSINESS MODEL IS NEVER GATED — no b2c/b2b flag may reappear', () => {
-    // A DMC doing both wholesale and direct is the core customer. Gating
-    // either left them with no tier that fit. If someone re-adds these as
-    // capabilities, this fails.
+  it('NOTHING BUT THROUGHPUT IS GATED — no capability flags may reappear', () => {
+    // Every tenant has the whole product on every tier (business model since
+    // 239; the last four display-only capability flags went with migration
+    // 343). Tiers are price + limits, nothing else. If someone re-adds a
+    // `capabilities` block, this fails.
     for (const tier of Object.values(PRICING_TIERS)) {
-      const keys = Object.keys(tier.capabilities)
-      expect(keys, `${tier.slug}`).not.toContain('b2c')
-      expect(keys, `${tier.slug}`).not.toContain('b2b')
-      // apiAccess had no mechanism behind it — a flag that gates nothing.
-      expect(keys, `${tier.slug}`).not.toContain('apiAccess')
+      expect(Object.keys(tier), tier.slug).not.toContain('capabilities')
     }
   })
 
@@ -104,14 +94,6 @@ describe('PRICING_TIERS — catalog integrity', () => {
     }
   })
 
-  it('every tier defines every capability as a boolean (no missing flags)', () => {
-    for (const tier of Object.values(PRICING_TIERS)) {
-      for (const key of CAPABILITY_KEYS) {
-        expect(typeof tier.capabilities[key], `${tier.slug}.capabilities.${key}`).toBe('boolean')
-      }
-      expect(Object.keys(tier.capabilities).sort()).toEqual([...CAPABILITY_KEYS].sort())
-    }
-  })
 
   it('exactly one tier is flagged popular (studio)', () => {
     const popular = Object.values(PRICING_TIERS).filter((t) => t.popular)
@@ -140,17 +122,6 @@ describe('PRICING_TIERS — catalog integrity', () => {
     })
   })
 
-  it('capabilities only ever accumulate up the ladder', () => {
-    for (let i = 1; i < TIER_ORDER.length; i++) {
-      const prev = PRICING_TIERS[TIER_ORDER[i - 1]]
-      const next = PRICING_TIERS[TIER_ORDER[i]]
-      for (const key of CAPABILITY_KEYS) {
-        if (prev.capabilities[key]) {
-          expect(next.capabilities[key], `${next.slug} lost ${key}`).toBe(true)
-        }
-      }
-    }
-  })
 })
 
 describe('TIER_ORDER — ordering defaults', () => {

@@ -110,11 +110,6 @@ export async function POST(request: NextRequest) {
     // it is worse than no flag.
     const updateData = {
       current_pricing_tier: tier,
-      // Always-on capabilities, kept true so existing gates do not regress.
-      whatsapp_integration: true,
-      email_integration: true,
-      pdf_generation: true,
-      analytics_enabled: true,
       updated_at: new Date().toISOString()
     }
 

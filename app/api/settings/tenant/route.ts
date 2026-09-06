@@ -29,11 +29,6 @@ export async function PATCH(request: NextRequest) {
       company_name,
       contact_email,
       logo_url,
-      // Features
-      whatsapp_integration,
-      email_integration,
-      pdf_generation,
-      analytics_enabled,
       primary_color,
       secondary_color,
       rates_currency,
@@ -76,10 +71,6 @@ export async function PATCH(request: NextRequest) {
 
     // Update tenant features
     const featureUpdates: any = {}
-    if (whatsapp_integration !== undefined) featureUpdates.whatsapp_integration = whatsapp_integration
-    if (email_integration !== undefined) featureUpdates.email_integration = email_integration
-    if (pdf_generation !== undefined) featureUpdates.pdf_generation = pdf_generation
-    if (analytics_enabled !== undefined) featureUpdates.analytics_enabled = analytics_enabled
     // Plan limits are NOT stored per tenant any more. They live in
     // lib/pricing-config.ts, are enforced from subscription_plans, and were
     // only ever decorative here — a fourth copy that nothing read.

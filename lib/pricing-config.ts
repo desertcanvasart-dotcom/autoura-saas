@@ -22,9 +22,10 @@ import { Zap, Sparkles, Crown, Building2, LucideIcon } from 'lucide-react'
 //   - all 29 messaging languages
 //   - the full 15-category rate engine
 //
-// Tiers differ on THROUGHPUT (the five limits below) and a small set of
-// capabilities that actually exist today. Capabilities that do not exist are
-// not modelled here — see ROADMAP_CAPABILITIES.
+// Tiers differ on THROUGHPUT ONLY (the five limits below). Nothing else is
+// gated by plan: every capability the product has is on every tier. Things
+// that do not exist yet are listed in ROADMAP_CAPABILITIES so the pricing
+// page can say so plainly — they are never modelled as tier flags.
 
 /**
  * Free trial length, in days. Single source: the Stripe checkout session and
@@ -78,20 +79,6 @@ export interface PricingTier {
     brands: Limit
   }
 
-  /**
-   * Capabilities that EXIST and are tier-differentiated. Anything always-on is
-   * absent by design rather than set true everywhere.
-   */
-  capabilities: {
-    /** Studio+: departments, task dispatch, resource conflicts, copilot analytics. */
-    opsTeam: boolean
-    /** Agency+: inbound concierge brief webhook. */
-    conciergeWebhook: boolean
-    /** Agency+: named onboarding contact (commercial, not enforced in code). */
-    namedOnboarding: boolean
-    /** Enterprise: multiple tenants under one super-admin console. */
-    multiTenantConsole: boolean
-  }
 }
 
 /**
@@ -124,12 +111,6 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
       b2bPartners: 3,
       brands: 1,
     },
-    capabilities: {
-      opsTeam: false,
-      conciergeWebhook: false,
-      namedOnboarding: false,
-      multiTenantConsole: false,
-    },
   },
   studio: {
     slug: 'studio',
@@ -148,12 +129,6 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
       aiGenerationsPerMonth: 300,
       b2bPartners: 15,
       brands: 1,
-    },
-    capabilities: {
-      opsTeam: true,
-      conciergeWebhook: false,
-      namedOnboarding: false,
-      multiTenantConsole: false,
     },
   },
   agency: {
@@ -175,12 +150,6 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
       b2bPartners: null,
       brands: 3,
     },
-    capabilities: {
-      opsTeam: true,
-      conciergeWebhook: true,
-      namedOnboarding: true,
-      multiTenantConsole: false,
-    },
   },
   enterprise: {
     slug: 'enterprise',
@@ -198,12 +167,6 @@ export const PRICING_TIERS: Record<string, PricingTier> = {
       aiGenerationsPerMonth: null,
       b2bPartners: null,
       brands: null,
-    },
-    capabilities: {
-      opsTeam: true,
-      conciergeWebhook: true,
-      namedOnboarding: true,
-      multiTenantConsole: true,
     },
   },
 }

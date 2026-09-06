@@ -54,10 +54,6 @@ interface TenantMember {
 interface TenantFeatures {
   id: string
   tenant_id: string
-  whatsapp_integration: boolean
-  email_integration: boolean
-  pdf_generation: boolean
-  analytics_enabled: boolean
   /** DEPRECATED (mig 255): branding lives on Tenant. Never read these. */
   logo_url: string | null
   primary_color: string | null
@@ -81,12 +77,6 @@ interface TenantContextType {
   canManageMembers: boolean
   canDeleteQuotes: boolean
   canManagePartners: boolean
-
-  // Feature checks
-  hasWhatsApp: boolean
-  hasEmail: boolean
-  hasPDF: boolean
-  hasAnalytics: boolean
 }
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined)
@@ -217,11 +207,6 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const canDeleteQuotes = isManager
   const canManagePartners = isManager
 
-  const hasWhatsApp = features?.whatsapp_integration ?? false
-  const hasEmail = features?.email_integration ?? false
-  const hasPDF = features?.pdf_generation ?? false
-  const hasAnalytics = features?.analytics_enabled ?? false
-
   const value = {
     tenant,
     tenantMember,
@@ -236,11 +221,6 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     canManageMembers,
     canDeleteQuotes,
     canManagePartners,
-
-    hasWhatsApp,
-    hasEmail,
-    hasPDF,
-    hasAnalytics,
   }
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>
@@ -261,12 +241,6 @@ const noopTenantContext: TenantContextType = {
   canManageMembers: false,
   canDeleteQuotes: false,
   canManagePartners: false,
-
-  // Features (default to false during SSR)
-  hasWhatsApp: false,
-  hasEmail: false,
-  hasPDF: false,
-  hasAnalytics: false,
 }
 
 export function useTenant() {
