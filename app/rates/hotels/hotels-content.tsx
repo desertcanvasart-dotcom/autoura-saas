@@ -12,7 +12,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { TierBadge, TierPicker, VocabSelect, VocabLabel } from '@/components/vocabulary'
+import { TierBadge, TierPicker, VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
@@ -39,10 +39,10 @@ interface Supplier {
   is_preferred?: boolean
 }
 
-// Supplement type definitions
-type SupplementType =
-  | 'view_nile' | 'view_sea' | 'view_pyramid' | 'view_garden' | 'view_pool'
-  | 'upper_floor' | 'half_board' | 'full_board' | 'all_inclusive' | 'ultra_all_inclusive'
+// A supplement's type is a key from the agency's Hotel supplements
+// vocabulary (Settings → Your vocabulary); `name` is the word at the time it
+// was added, kept so a rate still reads if the entry is later removed.
+type SupplementType = string
 
 interface Supplement {
   type: SupplementType
@@ -51,19 +51,6 @@ interface Supplement {
   high_season: { eur: number; non_eur: number }
   peak_season: { eur: number; non_eur: number }
 }
-
-const SUPPLEMENT_OPTIONS: { type: SupplementType; name: string; category: string }[] = [
-  { type: 'view_nile', name: 'Nile View', category: 'View' },
-  { type: 'view_sea', name: 'Sea View', category: 'View' },
-  { type: 'view_pyramid', name: 'Pyramid View', category: 'View' },
-  { type: 'view_garden', name: 'Garden View', category: 'View' },
-  { type: 'view_pool', name: 'Pool View', category: 'View' },
-  { type: 'upper_floor', name: 'Upper Floor', category: 'Room' },
-  { type: 'half_board', name: 'Half Board (HB)', category: 'Meal Plan' },
-  { type: 'full_board', name: 'Full Board (FB)', category: 'Meal Plan' },
-  { type: 'all_inclusive', name: 'All Inclusive (AI)', category: 'Meal Plan' },
-  { type: 'ultra_all_inclusive', name: 'Ultra All Inclusive (UAI)', category: 'Meal Plan' },
-]
 
 interface AccommodationRate {
   // The currency this row's amounts are in; blank means the tenant's.
@@ -433,6 +420,9 @@ export default function HotelsContent() {
 
   // Active supplement tab for editing
   const [activeSupplementTab, setActiveSupplementTab] = useState<SupplementType | null>(null)
+  const { items: supplementItems, all: supplementAll, labelFor: supplementLabelFor } = useVocabulary('hotel_supplement')
+  // The vocabulary's word when the key is known; the stored snapshot otherwise.
+  const supplementLabel = (s: Supplement) => (supplementAll.some(i => i.key === s.type) ? supplementLabelFor(s.type) : s.name)
 
   // Toast helpers
   const showToast = (type: 'success' | 'error' | 'info', message: string) => {
@@ -629,12 +619,12 @@ export default function HotelsContent() {
 
   // Add a supplement
   const handleAddSupplement = (type: SupplementType) => {
-    const option = SUPPLEMENT_OPTIONS.find(o => o.type === type)
+    const option = supplementItems.find(o => o.key === type)
     if (!option || formData.supplements.some(s => s.type === type)) return
 
     const newSupplement: Supplement = {
       type,
-      name: option.name,
+      name: option.label,
       low_season: { eur: 0, non_eur: 0 },
       high_season: { eur: 0, non_eur: 0 },
       peak_season: { eur: 0, non_eur: 0 },
@@ -1941,9 +1931,11 @@ export default function HotelsContent() {
                         className="w-full md:w-64 px-3 py-2 text-sm border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white appearance-none"
                       >
                         <option value="">Select a supplement to add...</option>
-                        {SUPPLEMENT_OPTIONS.filter(opt => !formData.supplements.some(s => s.type === opt.type)).map(opt => (
-                          <option key={opt.type} value={opt.type}>
-                            {opt.category}: {opt.name}
+                        {/* The agency's list (Settings → Your vocabulary → Hotel
+                            supplements); an entry's note is its group. */}
+                        {supplementItems.filter(opt => !formData.supplements.some(s => s.type === opt.key)).map(opt => (
+                          <option key={opt.key} value={opt.key}>
+                            {opt.description ? `${opt.description}: ` : ''}{opt.label}
                           </option>
                         ))}
                       </select>
@@ -1966,7 +1958,7 @@ export default function HotelsContent() {
                                 : 'bg-white text-purple-700 border border-purple-300 hover:bg-purple-100'
                             }`}
                           >
-                            {supp.name}
+                            {supplementLabel(supp)}
                             <X
                               className="w-3 h-3 hover:text-red-500"
                               onClick={(e) => {
@@ -1986,7 +1978,7 @@ export default function HotelsContent() {
                             if (!activeSupplement) return null
                             return (
                               <>
-                                <h4 className="text-sm font-semibold text-purple-800 mb-3">{activeSupplement.name} Rates (per person per night)</h4>
+                                <h4 className="text-sm font-semibold text-purple-800 mb-3">{supplementLabel(activeSupplement)} Rates (per person per night)</h4>
 
                                 {/* Low Season Supplement */}
                                 <div className="mb-3">

@@ -17,7 +17,7 @@ export const VOCABULARY_KINDS = [
   'flight_cabin', 'flight_frequency', 'airport_service_type', 'hotel_service_type',
   'cuisine_type', 'restaurant_type', 'dietary_option', 'activity_category',
   'activity_type', 'activity_duration', 'activity_unit', 'guide_grade',
-  'guide_duration', 'guide_language', 'rate_season', 'airline',
+  'guide_duration', 'guide_language', 'rate_season', 'airline', 'hotel_supplement',
 ] as const
 export type VocabularyKind = (typeof VOCABULARY_KINDS)[number]
 
@@ -333,6 +333,15 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     usedIn: 'Flight rates, quotes, pricing engine',
     minItems: 1,
     example: 'EgyptAir (MS) / Nile Air (NP) / Air Cairo (SM)',
+  },
+  hotel_supplement: {
+    kind: 'hotel_supplement',
+    group: 'Hotels & cruises',
+    title: 'Hotel supplements',
+    description: 'The extras a hotel rate can carry a per-night price for — a view, a floor, a meal plan. The note on each entry (View, Room, Meal Plan) groups the dropdown on the hotel rate form.',
+    usedIn: 'Hotel rates',
+    minItems: 1,
+    example: 'Nile View / Upper Floor / Half Board (HB)',
   },
 }
 
