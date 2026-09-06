@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowDown, ArrowUp, BookA, Check, Eye, EyeOff, Globe2, Loader2, Pencil, Plus, RotateCcw, Trash2, X, AlertCircle,
-  CalendarRange,
+  CalendarRange, ChevronDown, Search,
 } from 'lucide-react'
 import { useRole } from '@/hooks/useRole'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
@@ -44,6 +44,34 @@ export default function VocabularySettingsPage() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [editing, setEditing] = useState<{ id: string; label: string; behavior: string; min_pax: string; max_pax: string; needs_destination: boolean; code: string } | null>(null)
   const [add, setAdd] = useState<AddForm | null>(null)
+
+  // Thirty-five lists in six groups is a wall, so the group nav behaves like
+  // the main sidebar: groups collapse, the choice is remembered, the group
+  // holding the selected list is always open, and a search box cuts across
+  // groups by name.
+  const GROUPS_KEY = 'autoura-vocab-groups'
+  const [openGroups, setOpenGroups] = useState<string[]>(['General'])
+  const [query, setQuery] = useState('')
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(GROUPS_KEY)
+      if (saved) setOpenGroups(JSON.parse(saved))
+    } catch { /* private mode, or nothing saved: keep the default */ }
+  }, [])
+  useEffect(() => {
+    try { localStorage.setItem(GROUPS_KEY, JSON.stringify(openGroups)) } catch { /* ignore */ }
+  }, [openGroups])
+  useEffect(() => {
+    const g = VOCABULARY_KIND_INFO[kind].group
+    setOpenGroups(prev => (prev.includes(g) ? prev : [...prev, g]))
+  }, [kind])
+  const toggleGroup = (g: string) => setOpenGroups(prev => (prev.includes(g) ? prev.filter(x => x !== g) : [...prev, g]))
+  const q = query.trim().toLowerCase()
+  const matches = (k: VocabularyKind) => {
+    if (!q) return true
+    const i = VOCABULARY_KIND_INFO[k]
+    return `${i.title} ${i.example} ${i.usedIn}`.toLowerCase().includes(q)
+  }
 
   const info = VOCABULARY_KIND_INFO[kind]
   const items = byKind[kind]
@@ -179,24 +207,51 @@ export default function VocabularySettingsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
         {/* Kind picker */}
-        <nav className="space-y-3">
-          {VOCABULARY_GROUPS.map(group => (
-            <div key={group}>
-              <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{group}</p>
-              <div className="space-y-0.5">
-                {VOCABULARY_KINDS.filter(k => VOCABULARY_KIND_INFO[k].group === group).map(k => {
-            const active = byKind[k].filter(i => i.is_active).length
+        <nav className="space-y-1">
+          <div className="relative mb-2">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Find a list…"
+              aria-label="Find a list"
+              className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+          {VOCABULARY_GROUPS.map(group => {
+            const kinds = VOCABULARY_KINDS.filter(k => VOCABULARY_KIND_INFO[k].group === group && matches(k))
+            if (q && kinds.length === 0) return null
+            // A search shows every match open; otherwise the remembered state rules.
+            const open = q ? true : openGroups.includes(group)
+            const groupActive = kinds.reduce((n, k) => n + byKind[k].filter(i => i.is_active).length, 0)
             return (
-              <button key={k} type="button" onClick={() => { setKind(k); setEditing(null); setAdd(null) }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left ${kind === k ? 'bg-primary-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}>
-                <span>{VOCABULARY_KIND_INFO[k].title}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${kind === k ? 'bg-white/20' : 'bg-gray-200 text-gray-600'}`}>{active}</span>
-              </button>
-            )
-                })}
+              <div key={group}>
+                <button type="button" onClick={() => toggleGroup(group)} aria-expanded={open}
+                  className="w-full flex items-center justify-between px-3 py-1.5 rounded-md hover:bg-gray-50 group">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 group-hover:text-gray-600">{group}</span>
+                  <span className="flex items-center gap-1.5">
+                    {!open && <span className="text-[10px] text-gray-400">{kinds.length} lists · {groupActive}</span>}
+                    <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? '' : '-rotate-90'}`} />
+                  </span>
+                </button>
+                <div className={`space-y-0.5 overflow-hidden transition-all duration-200 ${open ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  {kinds.map(k => {
+                    const active = byKind[k].filter(i => i.is_active).length
+                    return (
+                      <button key={k} type="button" onClick={() => { setKind(k); setEditing(null); setAdd(null) }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left ${kind === k ? 'bg-primary-600 text-white' : 'text-gray-700 hover:bg-gray-100'}`}>
+                        <span>{VOCABULARY_KIND_INFO[k].title}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${kind === k ? 'bg-white/20' : 'bg-gray-200 text-gray-600'}`}>{active}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
+          {q && VOCABULARY_KINDS.every(k => !matches(k)) && (
+            <p className="px-3 py-2 text-xs text-gray-400">No list matches &ldquo;{query}&rdquo;.</p>
+          )}
         </nav>
 
         {/* The list */}
