@@ -18,7 +18,7 @@ export default function TransportPackagesDocsPage() {
       </p>
 
       <Tip>
-        <strong>Looking for activity pricing?</strong> Per-person, per-unit, flat, and tiered (volume-discount) rates for activities and add-ons are managed under Activities &amp; Add-ons (Rates &rarr; Activities) &mdash; the single catalog the whole app prices from. See <Link href="/docs/tours-rates" className="text-primary-600 hover:underline">Tours &amp; Rates</Link>. The old &ldquo;Activity Pricing Rules&rdquo; section has been retired in favor of it.
+        <strong>Looking for activity pricing?</strong> Per-person, per-unit, flat, and tiered (volume-discount) rates for activities and add-ons are managed under Activities &amp; Add-ons (Suppliers &amp; Rates &rarr; Guides &amp; Services &rarr; Activities) &mdash; the single catalog the whole app prices from. See <Link href="/docs/tours-rates" className="text-primary-600 hover:underline">Tours &amp; Rates</Link>. The old &ldquo;Activity Pricing Rules&rdquo; section has been retired in favor of it.
       </Tip>
 
       {/* Transport Packages */}

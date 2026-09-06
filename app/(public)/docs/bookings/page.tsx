@@ -37,7 +37,7 @@ export default function BookingsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Viewing Bookings</h2>
         <p className="text-gray-600 mb-3">
-          Go to <strong>All Bookings</strong> in the sidebar. Stat cards at the top show <strong>Total Bookings</strong>, <strong>Pending Deposit</strong>, <strong>Confirmed</strong>, <strong>In Progress</strong>, and <strong>Completed</strong> counts. Use the status filter dropdown to narrow the list, and the B2C / B2B tabs to switch between direct-client and partner bookings.
+          Go to <strong>Bookings</strong> in the sidebar (Sell group). Stat cards at the top show <strong>Total Bookings</strong>, <strong>Pending Deposit</strong>, <strong>Confirmed</strong>, <strong>In Progress</strong>, and <strong>Completed</strong> counts. Use the status filter dropdown to narrow the list, and the B2C / B2B tabs to switch between direct-client and partner bookings.
         </p>
         <p className="text-gray-600 mb-3">A booking moves through six statuses:</p>
         <ul className="list-disc list-inside space-y-1 text-gray-700">

@@ -86,99 +86,74 @@ interface NavSection {
   items: NavItem[]
 }
 
-// Define navigation with role-based visibility
+// Define navigation with role-based visibility.
+//
+// Nine sections, ordered by how often a person opens them, each named for the
+// work it holds rather than the kind of screen: Home (read the day), Sell
+// (quote → itinerary → booking), Operate (run what was sold), Tours (define
+// and price the catalogue), Suppliers & Rates (what you buy and what it
+// costs), People, Communicate, Finance, Settings. Section KEYS are kept from
+// the old layout where a section survived, so remembered collapse states
+// carry over. Role gates travel with the item, never with the section, so a
+// move never widens or narrows who sees a page.
 const navigation: NavSection[] = [
   {
-    title: 'Main',
+    title: 'Home',
     key: 'main',
     items: [
       { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { label: 'Analytics', href: '/analytics', icon: TrendingUp },
+      { label: 'Reports', href: '/financial-reports', icon: BarChart3, roles: ['admin', 'manager'] },
+      // How the Copilot is doing is analytics, not a Copilot setting.
+      { label: 'Copilot Analytics', href: '/settings/copilot-analytics', icon: BarChart3, roles: ['admin', 'manager'] },
     ]
   },
+  // The sale's lifecycle in one place: start it, price it, save it, book it,
+  // see it on a calendar. A sale starts in an email or a WhatsApp and lands in
+  // an itinerary, so New Quote opens the new-itinerary form — the same place
+  // the dashboard's quick action goes; the spreadsheet calculator is its own
+  // entry. Extras and Seasonal Premiums are selling-side (what you charge),
+  // which is why they are here and not with the buying rates.
   {
-    title: 'CRM',
-    key: 'crm',
-    roles: ['admin', 'manager', 'member'],
-    // The people and organisations the agency deals with come first
-    // (clients, partner agencies, its own staff), then the work around them.
-    items: [
-      { label: 'Clients', href: '/clients', icon: Users },
-      // Partners (partner agencies who buy from this tenant) moved here from
-      // the Tours section: they are a relationship, not a tour.
-      { label: 'Partners', href: '/b2b/partners', icon: Handshake, roles: ['admin', 'manager'] },
-      // Team Members (the staff directory tasks are assigned to — NOT logins,
-      // those are User Management) moved here from Operations: a directory
-      // of people belongs with the other directories of people.
-      { label: 'Team Members', href: '/team-members', icon: Users, roles: ['admin', 'manager'] },
-      { label: 'Concierge Leads', href: '/concierge-briefs', icon: ConciergeBell },
-      // 'Staff' (/contacts?type=staff) removed: the Contacts page duplicated
-      // Clients and showed airport staff under a misleading label — airport
-      // staff is managed via /airport-staff and the Resources page.
-      { label: 'Follow-ups', href: '/followups', icon: CheckSquare },
-      { label: 'Calendar', href: '/calendar', icon: Calendar },
-    ]
-  },
-  {
-    title: 'Communication',
-    key: 'communication',
+    title: 'Sell',
+    key: 'sell',
     roles: ['admin', 'manager', 'member'],
     items: [
-      // '/communications' is deliberately not listed: despite its "unified"
-      // components it only shows email conversations — redundant with both
-      // Conversations (the real unified box, unified_conversations) and
-      // Inbox (the full email client). Page stays live.
-      { label: 'Conversations', href: '/conversations', icon: MessageSquare },
-      { label: 'Inbox', href: '/inbox', icon: Mail },
-      { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageSquare },
-      { label: 'Copilot', href: '/copilot', icon: Sparkles },
-      { label: 'Copilot Knowledge', href: '/copilot-knowledge', icon: Sparkles },
-      { label: 'Copilot Settings', href: '/settings/copilot', icon: Sparkles },
-      { label: 'Copilot Analytics', href: '/settings/copilot-analytics', icon: BarChart3 },
-      { label: 'Email Signatures', href: '/settings/email-signatures', icon: PenLine },
-      // '/whatsapp-parser' is deliberately not listed: the page stays live
-      // (the inbox's "generate itinerary" action deep-links into it) but it
-      // is not a destination users should browse to directly.
-      { label: 'Message Templates', href: '/templates', icon: FileText },
-      // The library feeds the words the Copilot and the itinerary writer use,
-      // so it lives with the channels. Admin/manager as it was under Content.
-      { label: 'Content Library', href: '/content-library', icon: Library, roles: ['admin', 'manager'] },
-      { label: 'AI Prompts', href: '/content-library/prompts', icon: Library, roles: ['admin', 'manager'] },
-      { label: 'Writing Rules', href: '/content-library/rules', icon: BookOpen, roles: ['admin', 'manager'] },
-    ]
-  },
-  {
-    title: 'Operations',
-    key: 'operations',
-    // Group widened to agents for the quote items moved from the removed
-    // Quotes group; the original items keep admin/manager via item roles.
-    roles: ['admin', 'manager', 'member'],
-    items: [
-      // A sale starts in an email or a WhatsApp and lands in an itinerary, so
-      // New Quote opens the new-itinerary form — the same place the dashboard's
-      // quick action goes. The spreadsheet-style calculator keeps its own entry.
       { label: 'New Quote', href: '/itineraries/new', icon: Sparkles },
       { label: 'Pricing Grid', href: '/pricing-grid', icon: Grid3x3 },
       { label: 'B2C Quotes', href: '/quotes/b2c', icon: User },
-      { label: 'Suppliers', href: '/suppliers', icon: Building, roles: ['admin', 'manager'] },
+      // Single B2B quote store since migration 270 — calculator and
+      // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.
+      { label: 'B2B Quotes', href: '/quotes/b2b', icon: FileText, roles: ['admin', 'manager'] },
       { label: 'Itineraries', href: '/itineraries', icon: Route, roles: ['admin', 'manager'] },
-      { label: 'Tour Departures', href: '/departures', icon: Calendar, roles: ['admin', 'manager'] },
-      // The capacity calendar (how much the operation takes on per date, and
-      // which tours run when) moved here from Settings: it is planned
-      // alongside departures, not configured once. Route unchanged; still
-      // admin-only, as it was under Settings.
-      { label: 'Capacity Calendar', href: '/settings/capacity', icon: CalendarRange, roles: ['admin'] },
-      // 'Team Members' moved to CRM (a directory of people).
+      { label: 'Bookings', href: '/bookings', icon: BookOpen },
+      { label: 'Booking Calendar', href: '/calendar', icon: Calendar },
+      { label: 'Extras', href: '/rates/extras', icon: Sparkles, roles: ['admin', 'manager'] },
+      // The demand calendar: the dates you charge more on, and by how much.
+      // Built long before it was linked (lib/pricing/season-uplift.ts).
+      { label: 'Seasonal Premiums', href: '/settings/seasons', icon: CalendarRange, roles: ['admin', 'manager'] },
+    ]
+  },
+  // Running what was sold: the to-dos, the departures and how much the
+  // operation takes on per date, the client touchpoints, the paperwork.
+  {
+    title: 'Operate',
+    key: 'operations',
+    roles: ['admin', 'manager', 'member'],
+    items: [
       { label: 'Tasks', href: '/tasks', icon: CheckSquare, roles: ['admin', 'manager'] },
+      { label: 'Tour Departures', href: '/departures', icon: Calendar, roles: ['admin', 'manager'] },
+      // Planned alongside departures, not configured once. Still admin-only.
+      { label: 'Capacity Calendar', href: '/settings/capacity', icon: CalendarRange, roles: ['admin'] },
+      { label: 'Follow-ups', href: '/followups', icon: CheckSquare },
+      { label: 'Concierge Leads', href: '/concierge-briefs', icon: ConciergeBell },
       // Contracts and vouchers generated from itineraries — operational
-      // paperwork, not content. Moved here when the Content section dissolved.
+      // paperwork, not content.
       { label: 'Documents', href: '/documents', icon: FileText, roles: ['admin', 'manager'] },
     ]
   },
-  // 'Tours' sits directly under Operations (renamed from 'B2B' and moved up
-  // from near the bottom). The key stays 'b2b': the saved collapse state
-  // keys on it. Every tenant sees it — there is no B2B/B2C workspace
-  // preference any more (migration 342); the whole product is for everyone.
+  // The catalogue: tour templates, their variations and the packages that
+  // price them. The key stays 'b2b': saved collapse state keys on it.
   {
     title: 'Tours',
     key: 'b2b',
@@ -186,34 +161,20 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Tour Manager', href: '/tours/manage', icon: LayoutTemplate },
       { label: 'Tour Inventory', href: '/tours', icon: Package },
-      // 'Partners' moved to CRM (a relationship, not a tour).
-      // Single B2B quote store since migration 270 — calculator and
-      // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.
-      { label: 'Quotes', href: '/quotes/b2b', icon: FileText },
       { label: 'Transport Packages', href: '/b2b/pricing-rules', icon: Car },
     ]
   },
-  // There is deliberately no 'Quotes' group: New Quote and B2C Quotes live
-  // under Operations; the single B2B quotes list (b2b_quotes, /quotes/b2b)
-  // lives under the Tours section.
+  // What you buy and what it costs: the supplier roster, then the buying
+  // rates in four subgroups collapsed until needed; the subgroup holding the
+  // open page expands on its own. Parent hrefs are anchors on the hub: they
+  // only render as a link when the sidebar is collapsed to icons.
   {
-    title: 'Bookings',
-    key: 'bookings',
-    roles: ['admin', 'manager', 'member'],
-    items: [
-      { label: 'All Bookings', href: '/bookings', icon: BookOpen },
-    ]
-  },
-  {
-    title: 'Rates',
+    title: 'Suppliers & Rates',
     key: 'rates',
     roles: ['admin', 'manager'],
     items: [
+      { label: 'Suppliers', href: '/suppliers', icon: Building },
       { label: 'Rates Hub', href: '/rates', icon: Coins },
-      // Fifteen rate pages in four subgroups, collapsed until needed; the
-      // subgroup holding the open page expands on its own. Parent hrefs are
-      // anchors on the hub: they only render as a link when the sidebar is
-      // collapsed to icons.
       {
         label: 'Accommodation', href: '/rates#accommodation', icon: Hotel,
         children: [
@@ -239,7 +200,6 @@ const navigation: NavSection[] = [
           { label: 'Meals', href: '/rates/meals', icon: UtensilsCrossed },
           { label: 'Attractions', href: '/rates/attractions', icon: Building },
           { label: 'Activities', href: '/rates/activities', icon: Ticket },
-          { label: 'Extras', href: '/rates/extras', icon: Sparkles },
         ],
       },
       {
@@ -249,10 +209,42 @@ const navigation: NavSection[] = [
           { label: 'Fixed Costs', href: '/rates/fixed-costs', icon: DollarSign },
         ],
       },
-      // Built long before it was linked: the season-uplift engine
-      // (lib/pricing/season-uplift.ts) was already wired into auto-pricing,
-      // but the editor was reachable only from the Settings page.
-      { label: 'Seasonal Premiums', href: '/settings/seasons', icon: CalendarRange },
+    ]
+  },
+  // The people and organisations the agency deals with. The key stays 'crm'.
+  // 'Staff' (/contacts?type=staff) is deliberately absent: airport staff is
+  // managed via /airport-staff and the Resources page.
+  {
+    title: 'People',
+    key: 'crm',
+    roles: ['admin', 'manager', 'member'],
+    items: [
+      { label: 'Clients', href: '/clients', icon: Users },
+      { label: 'Partners', href: '/b2b/partners', icon: Handshake, roles: ['admin', 'manager'] },
+      // The staff directory tasks are assigned to — NOT logins (User Management).
+      { label: 'Team Members', href: '/team-members', icon: Users, roles: ['admin', 'manager'] },
+    ]
+  },
+  // The channels, the things used while writing in them, and the library
+  // that feeds the words the Copilot and the itinerary writer use.
+  // '/communications' and '/whatsapp-parser' are deliberately not listed:
+  // both pages stay live (the first duplicates Conversations + Inbox, the
+  // second is deep-linked from the inbox) but are not browse destinations.
+  {
+    title: 'Communicate',
+    key: 'communication',
+    roles: ['admin', 'manager', 'member'],
+    items: [
+      { label: 'Conversations', href: '/conversations', icon: MessageSquare },
+      { label: 'Inbox', href: '/inbox', icon: Mail },
+      { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageSquare },
+      { label: 'Copilot', href: '/copilot', icon: Sparkles },
+      { label: 'Copilot Knowledge', href: '/copilot-knowledge', icon: Sparkles },
+      { label: 'Message Templates', href: '/templates', icon: FileText },
+      { label: 'Email Signatures', href: '/settings/email-signatures', icon: PenLine },
+      { label: 'Content Library', href: '/content-library', icon: Library, roles: ['admin', 'manager'] },
+      { label: 'AI Prompts', href: '/content-library/prompts', icon: Library, roles: ['admin', 'manager'] },
+      { label: 'Writing Rules', href: '/content-library/rules', icon: BookOpen, roles: ['admin', 'manager'] },
     ]
   },
   {
@@ -271,14 +263,8 @@ const navigation: NavSection[] = [
       { label: 'Profit & Loss', href: '/profit-loss', icon: TrendingUp },
     ]
   },
-  {
-    title: 'Reports',
-    key: 'reports',
-    roles: ['admin', 'manager'],
-    items: [
-      { label: 'Reports', href: '/financial-reports', icon: BarChart3 },
-    ]
-  },
+  // Configured once. 'Team Management' (/settings/team) was consolidated into
+  // User Management (/users); the old route redirects there.
   {
     title: 'Settings',
     key: 'settings',
@@ -286,13 +272,12 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Settings', href: '/settings', icon: Settings },
       { label: 'Organization', href: '/settings/tenant', icon: Building },
-      // 'Team Management' (/settings/team) consolidated into User Management
-      // (/users) below; the old route redirects there.
       { label: 'Your Vocabulary', href: '/settings/vocabulary', icon: BookA },
       { label: 'Destinations', href: '/settings/destinations', icon: Globe },
       { label: 'Departments', href: '/settings/departments', icon: Building },
+      // Tenant-wide Copilot toggles: admin-only to change, so they live here.
+      { label: 'Copilot Settings', href: '/settings/copilot', icon: Sparkles },
       { label: 'WhatsApp', href: '/settings/whatsapp', icon: MessageSquare },
-      // 'Capacity' moved to Operations as 'Capacity Calendar' (same route).
       { label: 'Billing and Subscriptions', href: '/settings/billing', icon: CreditCard },
       { label: 'User Management', href: '/users', icon: Shield },
     ]
@@ -324,7 +309,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const { role, canAccess } = useRole()
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'crm', 'trips'])
+  const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'sell', 'crm', 'trips'])
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
   const [currentUrl, setCurrentUrl] = useState('')
 

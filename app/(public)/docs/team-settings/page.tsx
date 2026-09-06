@@ -21,7 +21,7 @@ export default function TeamSettingsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Team Members (Staff Directory)</h2>
         <p className="text-gray-600 mb-4">
-          Go to <strong>Team Members</strong> under CRM (admin/manager only). This is your staff directory &mdash; the people you assign tasks to. Adding someone here does <strong>not</strong> give them a login.
+          Go to <strong>Team Members</strong> under People (admin/manager only). This is your staff directory &mdash; the people you assign tasks to. Adding someone here does <strong>not</strong> give them a login.
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li>Click <strong>Add Member</strong> and fill in their details directly &mdash; no invitation email is sent</li>

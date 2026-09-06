@@ -113,7 +113,7 @@ export default function TourProgramsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Scheduling Departures</h2>
         <p className="text-gray-600">
-          Templates define the <em>what</em>; <strong>Tour Departures</strong> (Operations &rarr; Tour Departures) defines the <em>when</em>. Create dated departures on top of a template to schedule and operate actual trips. See <Link href="/docs/tasks-departures" className="text-primary-600 hover:underline">Tour Departures</Link> for details.
+          Templates define the <em>what</em>; <strong>Tour Departures</strong> (Operate &rarr; Tour Departures) defines the <em>when</em>. Create dated departures on top of a template to schedule and operate actual trips. See <Link href="/docs/tasks-departures" className="text-primary-600 hover:underline">Tour Departures</Link> for details.
         </p>
       </section>
 

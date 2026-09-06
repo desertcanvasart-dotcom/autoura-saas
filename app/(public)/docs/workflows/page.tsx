@@ -65,7 +65,7 @@ export default function WorkflowsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Triaging Concierge Leads</h2>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>Concierge Leads</strong> (CRM group) to see inbound briefs from your intake form</li>
+          <li>Go to <strong>Concierge Leads</strong> (Operate group) to see inbound briefs from your intake form</li>
           <li>Open a brief to review the trip request</li>
           <li>Follow up by WhatsApp or email, and create a client record for promising leads</li>
         </ol>
@@ -92,7 +92,7 @@ export default function WorkflowsPage() {
           <li>Click <strong>Download PDF</strong> and send it to the client</li>
         </ol>
         <Tip>
-          <strong>New Quote</strong> &mdash; on the Dashboard and in the sidebar (Operations group) &mdash; always opens the new-itinerary form: most sales start in an email or a WhatsApp and land in an itinerary. The spreadsheet-style quoting surface is its own entry, <strong>Pricing Grid</strong>, right below it.
+          <strong>New Quote</strong> &mdash; on the Dashboard and in the sidebar (Sell group) &mdash; always opens the new-itinerary form: most sales start in an email or a WhatsApp and land in an itinerary. The spreadsheet-style quoting surface is its own entry, <strong>Pricing Grid</strong>, right below it.
         </Tip>
       </section>
 

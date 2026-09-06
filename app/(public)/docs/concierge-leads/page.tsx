@@ -21,7 +21,7 @@ export default function ConciergeLeadsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Overview</h2>
         <p className="text-gray-600 mb-3">
-          Open <strong>Concierge Leads</strong> in the sidebar (CRM group). Briefs arrive automatically &mdash; there is nothing to import. The page is organized into tabs with live counts:
+          Open <strong>Concierge Leads</strong> in the sidebar (Operate group). Briefs arrive automatically &mdash; there is nothing to import. The page is organized into tabs with live counts:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Needs Review</strong> &mdash; New briefs nobody has picked up yet</li>

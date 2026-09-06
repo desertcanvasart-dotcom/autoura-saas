@@ -21,7 +21,7 @@ export default function CopilotPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">The Review Queue</h2>
         <p className="text-gray-600 mb-3">
-          Open <strong>Copilot</strong> in the sidebar (Communication group). The page is a review queue with a thread list on the left and a review panel on the right:
+          Open <strong>Copilot</strong> in the sidebar (Communicate group). The page is a review queue with a thread list on the left and a review panel on the right:
         </p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Thread List</strong> &mdash; Each thread shows an urgency dot, a channel icon (WhatsApp or email), the client, a message snippet, and an &ldquo;N drafts to review&rdquo; badge</li>
