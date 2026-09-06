@@ -41,11 +41,6 @@ export const RATE_MONETARY_COLUMNS: Record<string, string[]> = {
   b2b_transport_packages: ['sedan_rate', 'minivan_rate', 'van_rate', 'minibus_rate', 'bus_rate'],
   transportation_rates: [
     'base_rate_eur', 'base_rate_non_eur', 'rate_per_day',
-    'sedan_rate_eur', 'sedan_rate_non_eur',
-    'minivan_rate_eur', 'minivan_rate_non_eur',
-    'van_rate_eur', 'van_rate_non_eur',
-    'minibus_rate_eur', 'minibus_rate_non_eur',
-    'bus_rate_eur', 'bus_rate_non_eur',
   ],
   accommodation_rates: [
     'rate_low_season_sgl', 'rate_high_season_sgl', 'rate_peak_season_sgl',

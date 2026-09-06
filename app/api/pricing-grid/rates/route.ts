@@ -303,37 +303,8 @@ function vehicleSlug(v: any): string {
  * Each vehicle row keeps its own rate + capacity band (falling back to the
  * canonical tier band when the row's capacity columns are null).
  */
-// WIDE rows (one row per route, per-class rate columns — written by the bulk
-// importer and the route-first entry form) carry no base_rate_eur, so the
-// tall-row grouping below would skip them entirely and the grid would never
-// offer them. Expand each wide row into synthetic tall rows first, exactly
-// like the engine's expandWideTransportRow — real columns only, no defaults.
-const WIDE_CLASS_PREFIXES = ['sedan', 'minivan', 'van', 'minibus', 'bus'] as const
-type TransportRow = Record<string, unknown>
-function expandWideRows(rows: TransportRow[]): TransportRow[] {
-  const out: TransportRow[] = []
-  for (const r of rows) {
-    const wide = WIDE_CLASS_PREFIXES.filter((p) => toNum(r[`${p}_rate_eur`]) > 0)
-    if (wide.length === 0) {
-      out.push(r)
-      continue
-    }
-    for (const p of wide) {
-      out.push({
-        ...r,
-        vehicle_type: p.charAt(0).toUpperCase() + p.slice(1),
-        base_rate_eur: toNum(r[`${p}_rate_eur`]),
-        base_rate_non_eur: toNum(r[`${p}_rate_non_eur`]),
-        capacity_min: r[`${p}_capacity_min`],
-        capacity_max: r[`${p}_capacity_max`],
-      })
-    }
-  }
-  return out
-}
-
-export function groupVehicleRowsToTiers(rawRows: any[]): any[] {
-  const rows = expandWideRows(rawRows)
+export function groupVehicleRowsToTiers(rows: any[]): any[] {
+  // One row per (route, vehicle) since migration 337 — nothing to expand.
   const groupKey = (r: any) =>
     [normLower(r.service_type), normLower(r.city), normLower(r.origin_city),
      normLower(r.destination_city), normLower(r.route_name)].join('|')
@@ -364,8 +335,12 @@ export function groupVehicleRowsToTiers(rawRows: any[]): any[] {
     for (const r of sorted) {
       const rate = toNum(r.base_rate_eur)
       if (rate <= 0) continue // no usable rate for this vehicle row — skip
+      // The tier IS the row's vehicle (a key from the tenant's vocabulary since
+      // 334/337): an agency's "coaster" is its own option, never folded into a
+      // built-in class. The alias table only supplies a capacity band when the
+      // row has none.
       const tier = TIER_BY_ALIAS.get(normLower(r.vehicle_type))
-      let tierKey = tier ? tier.key : vehicleSlug(r.vehicle_type)
+      let tierKey = vehicleSlug(r.vehicle_type)
       // Disambiguate if two rows map to the same tier within a group (keeps option
       // ids unique; buildTransportTierIndex still groups by the `${keeperId}` prefix).
       const seen = usedTierKeys.get(tierKey) ?? 0
@@ -374,7 +349,7 @@ export function groupVehicleRowsToTiers(rawRows: any[]): any[] {
 
       const capMin = r.capacity_min != null ? Number(r.capacity_min) : (tier ? tier.capMin : 1)
       const capMax = r.capacity_max != null ? Number(r.capacity_max) : (tier ? tier.capMax : 99)
-      const vlabel = tier ? tier.key.charAt(0).toUpperCase() + tier.key.slice(1) : (r.vehicle_type || 'Vehicle')
+      const vlabel = String(r.vehicle_type || 'Vehicle').replace(/_/g, ' ').replace(/\b\w/g, (ch: string) => ch.toUpperCase())
 
       options.push({
         id: `${keeper.id}__${tierKey}`,

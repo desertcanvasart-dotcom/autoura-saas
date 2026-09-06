@@ -25,7 +25,9 @@ describe('uniqueKey per table is a pinned decision', () => {
       accommodation_rates: ['service_code'],
       // The full natural key: a route NAME is a human label two distinct
       // rows legitimately share (same route as transfer and as day tour).
-      transportation_rates: ['route_name', 'service_type', 'city'],
+      // …and since migration 337 the VEHICLE is part of it: one row per
+      // vehicle on a route.
+      transportation_rates: ['route_name', 'service_type', 'city', 'vehicle_type'],
       guide_rates: ['service_code'],
       meal_rates: ['service_code'],
       entrance_fees: ['service_code'],

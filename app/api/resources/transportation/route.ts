@@ -1,17 +1,30 @@
+// ============================================
+// /api/resources/transportation — routes and the vehicles priced on them
+// ============================================
+// GET  — every transportation_rates row for the tenant (one row per vehicle
+//        per route; the page groups them into routes)
+// POST — save a ROUTE: { route fields…, vehicles: [{ vehicle_type, rate_eur,
+//        rate_non_eur?, capacity_min?, capacity_max? }], existing_ids?: [] }
+//        Writes one row per offered vehicle, updating the route's existing
+//        rows (existing_ids) in place and deleting the ones no longer
+//        offered. Vehicle types are the tenant's vocabulary keys; labels are
+//        accepted and resolved. Migration 337: the tall shape is the only
+//        shape — there are no per-class columns any more.
+
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
+import { resolveVocabularyKey } from '@/lib/vocabulary'
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
-      )
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
-
     const searchParams = request.nextUrl.searchParams
     const city = searchParams.get('city')
     const serviceType = searchParams.get('serviceType')
@@ -19,19 +32,14 @@ export async function GET(request: NextRequest) {
     const supplierId = searchParams.get('supplier_id')
     const activeOnly = searchParams.get('activeOnly') === 'true'
 
-    // No supplier embed: transportation_rates.supplier_id has NO FK in the
-    // live schema, so `supplier:supplier_id(...)` makes PostgREST reject the
-    // whole query (PGRST200) — this GET silently returned an error and the
-    // page showed an empty list. The denormalized supplier_name column covers
-    // the display; a real FK + embed is a schema decision for later.
     let query = (createAdminClient() as any)
       .from('transportation_rates')
       .select('*')
       .eq('tenant_id', authResult.tenant_id)
       .order('city', { ascending: true })
       .order('service_type', { ascending: true })
-      .order('vehicle_type', { ascending: true })
-
+      .order('route_name', { ascending: true })
+      .order('capacity_max', { ascending: true })
     if (city) query = query.eq('city', city)
     if (serviceType) query = query.eq('service_type', serviceType)
     if (vehicleType) query = query.eq('vehicle_type', vehicleType)
@@ -39,144 +47,135 @@ export async function GET(request: NextRequest) {
     if (activeOnly) query = query.eq('is_active', true)
 
     const { data, error } = await query
-
     if (error) {
       console.error('Error fetching transportation rates:', error)
       return NextResponse.json({ error: 'Failed to fetch transportation rates' }, { status: 500 })
     }
-
-    const transformedData = (data || []).map((rate: any) => ({
-      ...rate,
-      capacity_min: getMinCapacityForVehicle(rate.vehicle_type),
-      base_rate_non: rate.base_rate_non_eur
-    }))
-
-    return NextResponse.json(transformedData)
+    return NextResponse.json((data || []).map((rate: any) => ({ ...rate, base_rate_non: rate.base_rate_non_eur })))
   } catch (error) {
     console.error('Error in transportation rates GET:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-function getMinCapacityForVehicle(vehicleType: string): number {
-  const capacities: Record<string, number> = {
-    'Sedan': 1, 'SUV': 1, '4x4': 1, 'Minivan': 3, 'Van': 9, 'Minibus': 15, 'Bus': 25
-  }
-  return capacities[vehicleType] || 1
-}
-
-// WIDE payload support: the route-first entry form sends `vehicles` —
-// { sedan: { rate_eur, rate_non_eur, capacity_min, capacity_max }, … } —
-// and one row per ROUTE is written with per-class columns, matching what the
-// bulk importer produces and what the engine/grid expand. A class with no
-// positive EUR rate writes NULLs (vehicle not offered), never a default.
-export const VEHICLE_CLASSES = ['sedan', 'minivan', 'van', 'minibus', 'bus'] as const
-
-interface VehiclePayloadEntry {
+export interface VehiclePayload {
+  vehicle_type: string
   rate_eur?: string | number
   rate_non_eur?: string | number
   capacity_min?: string | number
   capacity_max?: string | number
 }
 
-export function buildWideVehicleColumns(vehicles: Record<string, VehiclePayloadEntry> | undefined | null) {
-  const cols: Record<string, number | null> = {}
-  let offered = 0
-  for (const cls of VEHICLE_CLASSES) {
-    const v = vehicles?.[cls]
-    const rate = Number(v?.rate_eur)
-    if (v && Number.isFinite(rate) && rate > 0) {
-      offered++
-      cols[`${cls}_rate_eur`] = rate
-      const nonEur = Number(v.rate_non_eur)
-      cols[`${cls}_rate_non_eur`] = Number.isFinite(nonEur) && nonEur > 0 ? nonEur : null
-      const capMin = Math.trunc(Number(v.capacity_min))
-      const capMax = Math.trunc(Number(v.capacity_max))
-      cols[`${cls}_capacity_min`] = Number.isFinite(capMin) ? capMin : null
-      cols[`${cls}_capacity_max`] = Number.isFinite(capMax) ? capMax : null
+/** Route-level code — one per route, no vehicle suffix. */
+function routeCode(body: Record<string, any>): string {
+  const city = String(body.city || '').toUpperCase().replace(/\s+/g, '-')
+  const type = String(body.service_type || '').toUpperCase().replace(/_/g, '-')
+  const dest = body.destination_city ? '-TO-' + String(body.destination_city).toUpperCase().replace(/\s+/g, '-') : ''
+  return `${city}-${type}${dest}`
+}
+
+/**
+ * Save a route: one row per offered vehicle. `existingIds` are the route's
+ * current rows (from the page's grouping); a vehicle already on the route is
+ * updated, a new one inserted, a vehicle left blank deleted.
+ */
+export async function saveRoute(tenantId: string, body: Record<string, any>, existingIds: string[]): Promise<{ status: number; json: Record<string, unknown> }> {
+  const admin = createAdminClient() as any
+  if (!body.city || !body.service_type) {
+    return { status: 400, json: { success: false, error: 'City and service type are required' } }
+  }
+  // A legacy single-vehicle payload is one vehicle.
+  const vehiclesIn: VehiclePayload[] = Array.isArray(body.vehicles)
+    ? body.vehicles
+    : body.vehicle_type ? [{ vehicle_type: body.vehicle_type, rate_eur: body.base_rate_eur, rate_non_eur: body.base_rate_non_eur ?? body.base_rate_non, capacity_min: body.capacity_min, capacity_max: body.capacity_max }] : []
+
+  const vocab = await loadVocabularyForTenant(admin, tenantId, 'vehicle_type')
+  const offered: Array<{ key: string; rate_eur: number; rate_non_eur: number; capacity_min: number | null; capacity_max: number | null }> = []
+  for (const v of vehiclesIn) {
+    const rate = Number(v.rate_eur)
+    if (!Number.isFinite(rate) || rate <= 0) continue // blank = not offered on this route
+    const key = vocab.length ? resolveVocabularyKey(vocab, v.vehicle_type) : String(v.vehicle_type || '').trim().toLowerCase()
+    if (!key) return { status: 400, json: { success: false, error: `Vehicle "${v.vehicle_type}" is not in your vehicle list (Settings → Your vocabulary)` } }
+    const nonEur = Number(v.rate_non_eur)
+    const min = Math.trunc(Number(v.capacity_min)); const max = Math.trunc(Number(v.capacity_max))
+    if (Number.isFinite(min) && Number.isFinite(max) && min > max) {
+      return { status: 400, json: { success: false, error: `${key}: capacity min cannot exceed max` } }
+    }
+    if (offered.some(o => o.key === key)) return { status: 400, json: { success: false, error: `Vehicle "${key}" is listed twice` } }
+    offered.push({
+      key, rate_eur: rate,
+      rate_non_eur: Number.isFinite(nonEur) && nonEur > 0 ? nonEur : rate,
+      capacity_min: Number.isFinite(min) && min > 0 ? min : null,
+      capacity_max: Number.isFinite(max) && max > 0 ? max : null,
+    })
+  }
+  if (offered.length === 0) return { status: 400, json: { success: false, error: 'At least one vehicle needs a rate' } }
+
+  const routeFields = {
+    ...rateCurrencyWriteField(body),
+    route_name: body.route_name || routeCode(body),
+    service_type: body.service_type,
+    city: body.city,
+    origin_city: body.origin_city || null,
+    destination_city: body.destination_city || null,
+    duration: body.duration || null,
+    area: body.area || null,
+    includes: body.includes || null,
+    is_active: body.is_active !== undefined ? body.is_active : true,
+    updated_at: new Date().toISOString(),
+  }
+
+  // The route's current rows, by vehicle key.
+  let existing: any[] = []
+  if (existingIds.length) {
+    const { data } = await admin.from('transportation_rates').select('*').eq('tenant_id', tenantId).in('id', existingIds)
+    existing = data ?? []
+  }
+  const byKey = new Map<string, any>(existing.map(r => [String(r.vehicle_type || '').toLowerCase(), r]))
+  const out: any[] = []
+
+  for (const v of offered) {
+    const row = {
+      ...routeFields,
+      vehicle_type: v.key,
+      base_rate_eur: v.rate_eur,
+      base_rate_non_eur: v.rate_non_eur,
+      capacity_min: v.capacity_min,
+      capacity_max: v.capacity_max,
+    }
+    const current = byKey.get(v.key)
+    if (current) {
+      const { data, error } = await admin.from('transportation_rates').update(row).eq('id', current.id).eq('tenant_id', tenantId).select().single()
+      if (error) return { status: 500, json: { success: false, error: `Failed to update ${v.key}: ${error.message}` } }
+      out.push(data); byKey.delete(v.key)
     } else {
-      cols[`${cls}_rate_eur`] = null
-      cols[`${cls}_rate_non_eur`] = null
-      cols[`${cls}_capacity_min`] = null
-      cols[`${cls}_capacity_max`] = null
+      const { data, error } = await admin.from('transportation_rates').insert({ ...row, tenant_id: tenantId }).select().single()
+      if (error) {
+        if (error.code === '23505') return { status: 409, json: { success: false, error: `This route already prices "${v.key}" — edit that route instead of adding it again` } }
+        return { status: 500, json: { success: false, error: `Failed to add ${v.key}: ${error.message}` } }
+      }
+      out.push(data)
     }
   }
-  return { cols, offered }
+  // Vehicles no longer offered on this route.
+  const gone = [...byKey.values()].map(r => r.id)
+  if (gone.length) {
+    const { error } = await admin.from('transportation_rates').delete().eq('tenant_id', tenantId).in('id', gone)
+    if (error) return { status: 500, json: { success: false, error: `Failed to remove vehicles: ${error.message}` } }
+  }
+  return { status: 200, json: { success: true, data: out.map(r => ({ ...r, base_rate_non: r.base_rate_non_eur })) } }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const authResult = await requireAuth()
     if (authResult.error !== null) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
-      )
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
-
     const body = await request.json()
-    const isWide = body.vehicles && typeof body.vehicles === 'object'
-
-    if (!body.city || !body.service_type || (!isWide && !body.vehicle_type)) {
-      return NextResponse.json({ error: 'City, service type, and vehicle rates are required' }, { status: 400 })
-    }
-
-    let wideCols: Record<string, number | null> = {}
-    if (isWide) {
-      const { cols, offered } = buildWideVehicleColumns(body.vehicles)
-      if (offered === 0) {
-        return NextResponse.json({ error: 'At least one vehicle needs a EUR rate' }, { status: 400 })
-      }
-      wideCols = cols
-    } else if (body.base_rate_eur === undefined || body.base_rate_eur === null) {
-      return NextResponse.json({ error: 'EUR rate is required' }, { status: 400 })
-    }
-
-    const serviceCode = body.service_code ||
-      (isWide
-        ? `${body.city.toUpperCase().replace(/\s+/g, '-')}-${body.service_type.toUpperCase().replace(/_/g, '-')}${body.destination_city ? '-TO-' + body.destination_city.toUpperCase().replace(/\s+/g, '-') : ''}`
-        : `${body.city.toUpperCase().replace(/\s+/g, '-')}-${body.service_type.toUpperCase().replace(/_/g, '-')}-${body.vehicle_type.toUpperCase()}`)
-
-    // Real columns ONLY. The previous payload wrote service_code, season,
-    // rate_valid_from/to, supplier_id/name and notes — NONE of which exist in
-    // the live schema, so every create 400'd with PGRST204 and this page has
-    // never successfully saved a rate. route_name is the real identifier
-    // column (the grid's grouping key uses it).
-    const newRate = {
-      ...rateCurrencyWriteField(body),
-      tenant_id: authResult.tenant_id,
-      route_name: body.route_name || serviceCode,
-      service_type: body.service_type,
-      vehicle_type: isWide ? null : body.vehicle_type,
-      capacity: isWide ? null : (body.capacity_max || 2),
-      city: body.city,
-      base_rate_eur: isWide ? null : (parseFloat(body.base_rate_eur) || 0),
-      base_rate_non_eur: isWide ? null : (parseFloat(body.base_rate_non || body.base_rate_non_eur) || 0),
-      ...wideCols,
-      duration: body.duration || null,
-      area: body.area || null,
-      includes: body.includes || null,
-      is_active: body.is_active !== undefined ? body.is_active : true,
-      origin_city: body.origin_city || null,
-      destination_city: body.destination_city || null
-    }
-
-    const { data, error } = await (createAdminClient() as any)
-      .from('transportation_rates')
-      .insert([newRate])
-      .select('*')
-      .single()
-
-    if (error) {
-      console.error('Error creating transportation rate:', error)
-      return NextResponse.json({ error: `Failed to create: ${error.message}` }, { status: 500 })
-    }
-
-    return NextResponse.json({
-      ...data,
-      capacity_min: getMinCapacityForVehicle(data.vehicle_type),
-      base_rate_non: data.base_rate_non_eur
-    }, { status: 201 })
+    const existingIds = Array.isArray(body.existing_ids) ? body.existing_ids.map(String) : []
+    const { status, json } = await saveRoute(authResult.tenant_id!, body, existingIds)
+    return NextResponse.json(json, { status: status === 200 && existingIds.length === 0 ? 201 : status })
   } catch (error) {
     console.error('Error in transportation rates POST:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

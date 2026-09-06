@@ -10288,7 +10288,7 @@ export interface Database {
           id: string
           tenant_id: string
           service_type: string | null
-          vehicle_type: string | null
+          vehicle_type: string
           origin_city: string | null
           destination_city: string | null
           city: string | null
@@ -10301,35 +10301,17 @@ export interface Database {
           includes: string | null
           area: string | null
           duration: string | null
-          sedan_rate_eur: number | null
-          sedan_rate_non_eur: number | null
-          sedan_capacity_min: number | null
-          sedan_capacity_max: number | null
-          minivan_rate_eur: number | null
-          minivan_rate_non_eur: number | null
-          minivan_capacity_min: number | null
-          minivan_capacity_max: number | null
-          van_rate_eur: number | null
-          van_rate_non_eur: number | null
-          van_capacity_min: number | null
-          van_capacity_max: number | null
-          minibus_rate_eur: number | null
-          minibus_rate_non_eur: number | null
-          minibus_capacity_min: number | null
-          minibus_capacity_max: number | null
-          bus_rate_eur: number | null
-          bus_rate_non_eur: number | null
-          bus_capacity_min: number | null
-          bus_capacity_max: number | null
           is_active: boolean | null
           updated_at: string | null
           rate_currency: string | null
+          capacity_min: number | null
+          capacity_max: number | null
         }
         Insert: {
           id?: string
           tenant_id: string
           service_type?: string | null
-          vehicle_type?: string | null
+          vehicle_type: string
           origin_city?: string | null
           destination_city?: string | null
           city?: string | null
@@ -10342,35 +10324,17 @@ export interface Database {
           includes?: string | null
           area?: string | null
           duration?: string | null
-          sedan_rate_eur?: number | null
-          sedan_rate_non_eur?: number | null
-          sedan_capacity_min?: number | null
-          sedan_capacity_max?: number | null
-          minivan_rate_eur?: number | null
-          minivan_rate_non_eur?: number | null
-          minivan_capacity_min?: number | null
-          minivan_capacity_max?: number | null
-          van_rate_eur?: number | null
-          van_rate_non_eur?: number | null
-          van_capacity_min?: number | null
-          van_capacity_max?: number | null
-          minibus_rate_eur?: number | null
-          minibus_rate_non_eur?: number | null
-          minibus_capacity_min?: number | null
-          minibus_capacity_max?: number | null
-          bus_rate_eur?: number | null
-          bus_rate_non_eur?: number | null
-          bus_capacity_min?: number | null
-          bus_capacity_max?: number | null
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
+          capacity_min?: number | null
+          capacity_max?: number | null
         }
         Update: {
           id?: string
           tenant_id?: string
           service_type?: string | null
-          vehicle_type?: string | null
+          vehicle_type?: string
           origin_city?: string | null
           destination_city?: string | null
           city?: string | null
@@ -10383,29 +10347,11 @@ export interface Database {
           includes?: string | null
           area?: string | null
           duration?: string | null
-          sedan_rate_eur?: number | null
-          sedan_rate_non_eur?: number | null
-          sedan_capacity_min?: number | null
-          sedan_capacity_max?: number | null
-          minivan_rate_eur?: number | null
-          minivan_rate_non_eur?: number | null
-          minivan_capacity_min?: number | null
-          minivan_capacity_max?: number | null
-          van_rate_eur?: number | null
-          van_rate_non_eur?: number | null
-          van_capacity_min?: number | null
-          van_capacity_max?: number | null
-          minibus_rate_eur?: number | null
-          minibus_rate_non_eur?: number | null
-          minibus_capacity_min?: number | null
-          minibus_capacity_max?: number | null
-          bus_rate_eur?: number | null
-          bus_rate_non_eur?: number | null
-          bus_capacity_min?: number | null
-          bus_capacity_max?: number | null
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
+          capacity_min?: number | null
+          capacity_max?: number | null
         }
         Relationships: [
           {

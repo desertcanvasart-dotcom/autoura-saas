@@ -3,11 +3,10 @@
 // It had drifted twice over:
 //
 //   * every numeric column got the value 100, capacities included, so the
-//     transportation sample said each vehicle seats exactly 100. Because
-//     getTransportRateForPax() matches a capacity band and then falls back to
-//     the first tier whose max fits, an agency importing that sample priced
-//     EVERY group as a sedan -- a couple and a coachload alike. The same rule
-//     put 100 in student_discount_percentage: a 100% discount.
+//     transportation sample said each vehicle seats exactly 100 and an agency
+//     importing it priced EVERY group as a sedan -- a couple and a coachload
+//     alike. The same rule put 100 in student_discount_percentage: a 100%
+//     discount.
 //   * both templates still asked for the non-EU passport price that the
 //     transportation and attractions forms stopped collecting. On attractions
 //     it was REQUIRED, so a file written from the current form's fields was
@@ -25,12 +24,15 @@ const transport = RATE_TABLE_CONFIGS.transportation_rates
 const attractions = RATE_TABLE_CONFIGS.entrance_fees
 
 describe('rate CSV template matches the form', () => {
-  it('offers one rate per vehicle, not a passport split', () => {
+  it('is one row per vehicle: a vehicle column and one rate, not a passport split', () => {
     const headers = getTemplateHeaders(transport)
-    for (const tier of ['sedan', 'minivan', 'van', 'minibus', 'bus']) {
-      expect(headers, `${tier} rate`).toContain(`${tier}_rate_eur`)
-      expect(headers, `${tier} must not offer a non-EU column`).not.toContain(`${tier}_rate_non_eur`)
+    expect(headers).toContain('vehicle_type')
+    expect(headers).toContain('base_rate_eur')
+    expect(headers).not.toContain('base_rate_non_eur')
+    for (const cls of ['sedan', 'minivan', 'van', 'minibus', 'bus']) {
+      expect(headers, `${cls} must not have its own column (migration 337)`).not.toContain(`${cls}_rate_eur`)
     }
+    expect(transport.uniqueKey).toContain('vehicle_type')
   })
 
   it('offers one attraction rate, and does not require the dropped column', () => {
@@ -51,14 +53,10 @@ describe('rate CSV template matches the form', () => {
     }
   })
 
-  it('samples real capacity bands, never a flat 100', () => {
+  it('samples a real vehicle with a real capacity band, never a flat 100', () => {
     const row = buildTemplateRow(transport)
-    // The bands lib/transport-rate-utils.ts falls back to.
-    expect([row.sedan_capacity_min, row.sedan_capacity_max]).toEqual(['1', '2'])
-    expect([row.minivan_capacity_min, row.minivan_capacity_max]).toEqual(['3', '7'])
-    expect([row.van_capacity_min, row.van_capacity_max]).toEqual(['8', '12'])
-    expect([row.minibus_capacity_min, row.minibus_capacity_max]).toEqual(['13', '20'])
-    expect([row.bus_capacity_min, row.bus_capacity_max]).toEqual(['21', '45'])
+    expect(row.vehicle_type).toBe('sedan')
+    expect([row.capacity_min, row.capacity_max]).toEqual(['1', '2'])
   })
 
   it('never samples a 100% discount', () => {
@@ -127,7 +125,7 @@ describe('only hotels and cruises keep a passport split', () => {
 describe('the dropped columns still round-trip', () => {
   it('exports them, so existing data is never lost', () => {
     expect(getExportHeaders(attractions)).toContain('non_eur_rate')
-    expect(getExportHeaders(transport)).toContain('sedan_rate_non_eur')
+    expect(getExportHeaders(transport)).toContain('base_rate_non_eur')
   })
 
   it('still imports an OLD file that carries them', () => {
@@ -151,15 +149,13 @@ describe('the dropped columns still round-trip', () => {
     expect((preview.sampleData[0] as Record<string, number>).non_eur_rate).toBe(100)
   })
 
-  it('mirrors every vehicle rate too', () => {
+  it('mirrors the vehicle rate too', () => {
     const preview = validateImportData(
-      // This app keys transportation on route_name, not service_code.
-      [{ route_name: 'NEW-2', service_type: 'airport_transfer', city: 'Cairo',
-         sedan_rate_eur: '50', bus_rate_eur: '300' }],
+      // This app keys transportation on route + vehicle, not service_code.
+      [{ route_name: 'NEW-2', service_type: 'airport_transfer', city: 'Cairo', vehicle_type: 'Sedan', base_rate_eur: '50' }],
       transport
     )
     expect(preview.errors).toEqual([])
-    expect((preview.sampleData[0] as Record<string, number>).sedan_rate_non_eur).toBe(50)
-    expect((preview.sampleData[0] as Record<string, number>).bus_rate_non_eur).toBe(300)
+    expect((preview.sampleData[0] as Record<string, number>).base_rate_non_eur).toBe(50)
   })
 })
