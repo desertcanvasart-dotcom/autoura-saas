@@ -12,6 +12,8 @@ import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { parseSeasons } from '@/lib/rates/rate-seasons'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { loadVocabulary } from '@/lib/vocabulary-server'
+import { labelFor } from '@/lib/vocabulary'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,6 +25,9 @@ export async function GET(request: NextRequest) {
       )
     }
     const { supabase } = authResult
+    // Guide rows store the language KEY (346); the grid shows the agency's word.
+    const guideLanguages = await loadVocabulary(supabase as Parameters<typeof loadVocabulary>[0], 'guide_language')
+    const guideLanguageLabel = (key: string | null | undefined) => (key ? labelFor(guideLanguages, key) : '')
 
     const { searchParams } = new URL(request.url)
     const tier = searchParams.get('tier') || 'standard'
@@ -117,11 +122,11 @@ export async function GET(request: NextRequest) {
 
       guide: (guideRates || []).map((r: any) => ({
         id: r.id,
-        name: `${r.guide_language || 'Guide'} (${r.guide_type || 'Egyptologist'})`,
+        name: `${r.guide_language ? guideLanguageLabel(r.guide_language) : 'Guide'} (${r.guide_type || 'Egyptologist'})`,
         rateEur: toNum(r.base_rate_eur || r.rate_eur),
         rateNonEur: toNum(r.base_rate_non_eur || r.rate_non_eur || r.base_rate_eur || r.rate_eur),
         city: r.city,
-        details: r.guide_language,
+        details: guideLanguageLabel(r.guide_language),
       })),
 
       airport_services: (airportRates || []).map((r: any) => ({

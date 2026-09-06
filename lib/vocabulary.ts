@@ -17,7 +17,7 @@ export const VOCABULARY_KINDS = [
   'flight_cabin', 'flight_frequency', 'airport_service_type', 'hotel_service_type',
   'cuisine_type', 'restaurant_type', 'dietary_option', 'activity_category',
   'activity_type', 'activity_duration', 'activity_unit', 'guide_grade',
-  'guide_duration',
+  'guide_duration', 'guide_language',
 ] as const
 export type VocabularyKind = (typeof VOCABULARY_KINDS)[number]
 
@@ -307,6 +307,15 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     minItems: 1,
     example: 'Full Day (8h) / Half Day (4h) / Meet & Assist day',
   },
+  guide_language: {
+    kind: 'guide_language',
+    group: 'Guides & tipping',
+    title: 'Guide languages',
+    description: 'The languages you price guides in. A quote asks for a language by name ("English"); the engine matches it to one of these, so rename freely and add the languages you actually sell.',
+    usedIn: 'Guide rates, quotes, pricing engine',
+    minItems: 1,
+    example: 'English / Arabic / French / Mandarin',
+  },
 }
 
 /** The built-in supplier kinds the app knows how to treat. An agency's
@@ -561,6 +570,7 @@ export const VOCABULARY_COLUMNS: Record<string, VocabularyKind> = {
   unit_label: 'activity_unit',
   guide_type: 'guide_grade',
   tour_duration: 'guide_duration',
+  guide_language: 'guide_language',
 }
 
 /** Columns whose name means something DIFFERENT per table: `service_type`

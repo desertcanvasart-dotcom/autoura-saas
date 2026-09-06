@@ -13,13 +13,8 @@ import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
-import { VocabSelect, VocabLabel } from '@/components/vocabulary'
+import { VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 
-
-const LANGUAGES = [
-  'English', 'Arabic', 'French', 'German', 'Spanish', 'Italian',
-  'Russian', 'Chinese', 'Japanese', 'Portuguese', 'Dutch', 'Polish'
-]
 
 // The GRADE axis (B-item 1) and the day type both come from the agency's
 // vocabulary (Settings → Your vocabulary: Guide grades, Guide day types).
@@ -76,6 +71,8 @@ export default function GuideRatesContent() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
   const [selectedLanguage, setSelectedLanguage] = useState('')
+  // The agency's words for languages (Settings → Your vocabulary).
+  const { labelFor: languageLabel } = useVocabulary('guide_language')
   const [selectedGuide, setSelectedGuide] = useState(initialSupplierId)
   const [selectedGuideType, setSelectedGuideType] = useState('')
   const [showInactive, setShowInactive] = useState(false)
@@ -132,7 +129,7 @@ export default function GuideRatesContent() {
 
   const [formData, setFormData] = useState({
     service_code: '',
-    guide_language: 'English',
+    guide_language: 'english',
     guide_type: 'egyptologist',
     city: '',
     tour_duration: 'full_day',
@@ -212,7 +209,7 @@ export default function GuideRatesContent() {
     setRateCurrency('')
     setFormData({
       service_code: generateServiceCode(),
-      guide_language: 'English',
+      guide_language: 'english',
       guide_type: 'egyptologist',
       city: '',
       tour_duration: 'full_day',
@@ -233,7 +230,7 @@ export default function GuideRatesContent() {
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: rate.service_code || '',
-      guide_language: rate.guide_language || 'English',
+      guide_language: rate.guide_language || 'english',
       guide_type: rate.guide_type || 'egyptologist',
       city: rate.city || '',
       tour_duration: rate.tour_duration || 'full_day',
@@ -255,7 +252,7 @@ export default function GuideRatesContent() {
     setRateCurrency((rate as { rate_currency?: string | null }).rate_currency || '')
     setFormData({
       service_code: generateServiceCode(), // Generate new code
-      guide_language: rate.guide_language || 'English',
+      guide_language: rate.guide_language || 'english',
       guide_type: rate.guide_type || 'egyptologist',
       city: rate.city || '',
       tour_duration: rate.tour_duration || 'full_day',
@@ -396,6 +393,7 @@ export default function GuideRatesContent() {
   const filteredRates = rates.filter(rate => {
     const matchesSearch = searchTerm === '' ||
       rate.guide_language.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      languageLabel(rate.guide_language).toLowerCase().includes(searchTerm.toLowerCase()) ||
       rate.service_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rate.city?.toLowerCase().includes(searchTerm.toLowerCase())
 
@@ -694,16 +692,8 @@ export default function GuideRatesContent() {
           </select>
 
           {/* Language Filter */}
-          <select
-            value={selectedLanguage}
-            onChange={(e) => setSelectedLanguage(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600"
-          >
-            <option value="">All Languages</option>
-            {LANGUAGES.map(lang => (
-              <option key={lang} value={lang}>{lang}</option>
-            ))}
-          </select>
+          <VocabSelect kind="guide_language" value={selectedLanguage} onChange={setSelectedLanguage} placeholder={"All Languages"}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600" />
 
           {/* City Filter */}
           <select
@@ -850,13 +840,13 @@ export default function GuideRatesContent() {
                         onChange={() => toggleSelect(rate.id)}
                         onClick={(e) => e.stopPropagation()}
                         className="w-4 h-4 text-primary-600 border-gray-300 rounded"
-                        aria-label={`Select ${rate.guide_language} rate`}
+                        aria-label={`Select ${languageLabel(rate.guide_language)} rate`}
                       />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Globe className="w-4 h-4 text-purple-500" />
-                        <span className="text-sm font-semibold text-gray-900">{rate.guide_language}</span>
+                        <span className="text-sm font-semibold text-gray-900"><VocabLabel kind="guide_language" value={rate.guide_language} /></span>
                       </div>
                       <span className="text-xs text-gray-500">{rate.service_code}</span>
                     </td>
@@ -909,7 +899,7 @@ export default function GuideRatesContent() {
                           <Copy className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => confirmDelete(rate.id, rate.guide_language)}
+                          onClick={() => confirmDelete(rate.id, languageLabel(rate.guide_language))}
                           className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
                           title="Delete"
                         >
@@ -934,10 +924,10 @@ export default function GuideRatesContent() {
                       onChange={() => toggleSelect(rate.id)}
                       onClick={(e) => e.stopPropagation()}
                       className="w-4 h-4 text-primary-600 border-gray-300 rounded"
-                      aria-label={`Select ${rate.guide_language} rate`}
+                      aria-label={`Select ${languageLabel(rate.guide_language)} rate`}
                     />
                     <Globe className="w-5 h-5 text-purple-500" />
-                    <span className="font-semibold text-gray-900">{rate.guide_language}</span>
+                    <span className="font-semibold text-gray-900"><VocabLabel kind="guide_language" value={rate.guide_language} /></span>
                   </div>
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                     rate.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
@@ -980,7 +970,7 @@ export default function GuideRatesContent() {
                       <Copy className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => confirmDelete(rate.id, rate.guide_language)}
+                      onClick={() => confirmDelete(rate.id, languageLabel(rate.guide_language))}
                       className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
                       title="Delete"
                     >
@@ -1002,10 +992,10 @@ export default function GuideRatesContent() {
                     onChange={() => toggleSelect(rate.id)}
                     onClick={(e) => e.stopPropagation()}
                     className="w-4 h-4 text-primary-600 border-gray-300 rounded"
-                    aria-label={`Select ${rate.guide_language} rate`}
+                    aria-label={`Select ${languageLabel(rate.guide_language)} rate`}
                   />
                   <Globe className="w-4 h-4 text-purple-500" />
-                  <span className="font-medium text-gray-900">{rate.guide_language}</span>
+                  <span className="font-medium text-gray-900"><VocabLabel kind="guide_language" value={rate.guide_language} /></span>
                   <span className="text-sm text-gray-500">{rate.city || '—'}</span>
                   {rate.supplier_id && (
                     <span className="text-sm text-purple-600">{getGuideName(rate.supplier_id)}</span>
@@ -1025,7 +1015,7 @@ export default function GuideRatesContent() {
                     <button onClick={() => handleClone(rate)} className="p-1 text-gray-400 hover:text-blue-600" title="Clone">
                       <Copy className="w-4 h-4" />
                     </button>
-                    <button onClick={() => confirmDelete(rate.id, rate.guide_language)} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
+                    <button onClick={() => confirmDelete(rate.id, languageLabel(rate.guide_language))} className="p-1 text-gray-400 hover:text-red-600" title="Delete">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -1145,17 +1135,8 @@ export default function GuideRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Language *</label>
-                    <select
-                      name="guide_language"
-                      value={formData.guide_language}
-                      onChange={handleChange}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      {LANGUAGES.map(lang => (
-                        <option key={lang} value={lang}>{lang}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="guide_language" value={formData.guide_language} onChange={v => setFormData(prev => ({ ...prev, guide_language: v }))} placeholder={null} name="guide_language" required
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Guide Type *</label>

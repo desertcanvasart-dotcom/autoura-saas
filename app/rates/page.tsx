@@ -943,7 +943,7 @@ export default function RatesPage() {
                   {paginatedRates.guides.map((rate, index) => (
                     <tr key={rate.service_code || rate.id || index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}>
                       <td className="px-4 py-3 text-xs font-mono text-gray-500">{rate.service_code || rate.id?.slice(0, 8) || '-'}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{rate.guide_language}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900"><VocabLabel kind="guide_language" value={rate.guide_language} /></td>
                       <td className="px-4 py-3 text-sm text-gray-700"><VocabLabel kind="guide_grade" value={rate.guide_type} /></td>
                       <td className="px-4 py-3">
                         <span className="inline-block px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">

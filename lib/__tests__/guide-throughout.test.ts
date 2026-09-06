@@ -16,7 +16,7 @@ vi.mock('@supabase/supabase-js', async () => {
   return { createClient: () => mock.createMockClient() }
 })
 
-import { calculateDayBasedPricing, getGuideRate } from '@/lib/auto-pricing-service'
+import { calculateDayBasedPricing, getGuideRate, clearVocabularyMemo } from '@/lib/auto-pricing-service'
 import type { CatalogScope } from '@/lib/catalog-scope'
 
 const BASE_PARAMS = {
@@ -200,5 +200,26 @@ describe('throughout mode', () => {
     const fees = guideLines(r)
     expect(fees.map(f => f.unitCost)).toEqual([40, 110, 40])
     expect(r.complete).toBe(true)
+  })
+})
+
+describe('guide language is a vocabulary word (346)', () => {
+  it("a quote's language resolves to the stored KEY through the agency's vocabulary", async () => {
+    clearVocabularyMemo()
+    const tables = fullRateTables() as Record<string, Array<Record<string, unknown>>>
+    tables.guide_rates = [{ id: 'gr-en', guide_language: 'english', guide_type: 'egyptologist', tour_duration: 'full_day', full_day_rate: 70, is_active: true }]
+    tables.tenant_vocabularies = [
+      { id: 'v-en', tenant_id: 'test-tenant', kind: 'guide_language', key: 'english', label: 'Anglais', rank: 1, is_active: true, meta: {} },
+    ]
+    setMockTables(tables)
+    try {
+      // The agency calls it "Anglais"; the quote says "Anglais"; the row says english.
+      expect((await getGuideRate(SCOPE, 'Anglais', 'standard'))?.id).toBe('gr-en')
+      // The old label still resolves (slug), and so does the key itself.
+      expect((await getGuideRate(SCOPE, 'English', 'standard'))?.id).toBe('gr-en')
+      expect((await getGuideRate(SCOPE, 'english', 'standard'))?.id).toBe('gr-en')
+    } finally {
+      clearVocabularyMemo()
+    }
   })
 })

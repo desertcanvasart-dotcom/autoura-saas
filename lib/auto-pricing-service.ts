@@ -371,17 +371,35 @@ async function tenantVehicleBands(tenantId: string): Promise<VehicleBand[]> {
 /** The agency's word for a stored key of `kind`, for service names and
  *  hole messages ("Train ENR First Class", not "Train ENR first_class").
  *  A key the vocabulary does not know reads as itself. */
-async function tenantVocabularyLabeller(tenantId: string, kind: VocabularyKind): Promise<(key: string | null | undefined) => string> {
+async function tenantVocabularyLabels(tenantId: string, kind: VocabularyKind): Promise<Map<string, string>> {
   const memoKey = `${tenantId}:${kind}`
   const hit = labelMemo.get(memoKey)
-  let labels: Map<string, string>
-  if (hit && Date.now() - hit.at < VOCAB_TTL_MS) {
-    labels = hit.value
-  } else {
-    labels = await vocabularyLabelsForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId, kind)
-    labelMemo.set(memoKey, { at: Date.now(), value: labels })
-  }
+  if (hit && Date.now() - hit.at < VOCAB_TTL_MS) return hit.value
+  const labels = await vocabularyLabelsForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId, kind)
+  labelMemo.set(memoKey, { at: Date.now(), value: labels })
+  return labels
+}
+
+async function tenantVocabularyLabeller(tenantId: string, kind: VocabularyKind): Promise<(key: string | null | undefined) => string> {
+  const labels = await tenantVocabularyLabels(tenantId, kind)
   return key => (key ? (labels.get(key) ?? key) : '')
+}
+
+/** The stored KEY a request means. A quote says "English" (or "english",
+ *  or whatever the agency renamed it to); rate rows store the key. Matches
+ *  a key, a label, or the slug of either; falls back to the slug so a
+ *  tenant without the vocabulary behaves as before. */
+async function tenantVocabularyKey(tenantId: string, kind: VocabularyKind, value: string | null | undefined): Promise<string> {
+  const raw = String(value ?? '').trim()
+  if (!raw) return raw
+  const labels = await tenantVocabularyLabels(tenantId, kind)
+  if (labels.has(raw)) return raw
+  const lower = raw.toLowerCase()
+  for (const [k, l] of labels) if (l.toLowerCase() === lower) return k
+  const slug = slugifyKey(raw)
+  if (labels.has(slug)) return slug
+  for (const [k, l] of labels) if (slugifyKey(l) === slug) return k
+  return slug
 }
 
 /** Test seam: forget memoised vocabularies. */
@@ -1312,12 +1330,14 @@ export async function getGuideRate(
   const isDefaultAsk = grade === DEFAULT_GUIDE_GRADE && duration === 'full_day'
   try {
     // ---- guide_rates: the rate table, matched exactly ----
+    // The quote names a language; rows store the vocabulary KEY (346).
+    const languageKey = await tenantVocabularyKey(scope.tenantId, 'guide_language', language)
     const { data: rawRateRows } = await getSupabaseAdmin()
       .from('guide_rates')
       .select('id, guide_language, guide_type, tour_duration, full_day_rate, half_day_rate, base_rate_eur, base_rate_non_eur, rate_currency, is_active')
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
-      .ilike('guide_language', language)
+      .ilike('guide_language', languageKey)
       .eq('guide_type', grade)
       .eq('tour_duration', duration)
       .order('full_day_rate', { ascending: true })
