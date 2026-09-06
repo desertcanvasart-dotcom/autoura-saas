@@ -8141,7 +8141,6 @@ export interface Database {
           name: string
           city: string | null
           category: string | null
-          accommodation_type: string | null
           contact_name: string | null
           contact_phone: string | null
           contact_email: string | null
@@ -8149,6 +8148,7 @@ export interface Database {
           is_active: boolean
           created_at: string
           updated_at: string
+          accommodation_type: string | null
         }
         Insert: {
           id?: string
@@ -8158,7 +8158,6 @@ export interface Database {
           name: string
           city?: string | null
           category?: string | null
-          accommodation_type?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           contact_email?: string | null
@@ -8166,6 +8165,7 @@ export interface Database {
           is_active?: boolean
           created_at?: string
           updated_at?: string
+          accommodation_type?: string | null
         }
         Update: {
           id?: string
@@ -8175,7 +8175,6 @@ export interface Database {
           name?: string
           city?: string | null
           category?: string | null
-          accommodation_type?: string | null
           contact_name?: string | null
           contact_phone?: string | null
           contact_email?: string | null
@@ -8183,6 +8182,7 @@ export interface Database {
           is_active?: boolean
           created_at?: string
           updated_at?: string
+          accommodation_type?: string | null
         }
         Relationships: [
           {
