@@ -76,6 +76,8 @@ async function fetchAllRates(tenantId: string, tier: string) {
   // Guide rows store the language KEY (346); the AI reads the agency's word.
   const guideLanguages = await loadVocabularyForTenant(admin as Parameters<typeof loadVocabularyForTenant>[0], tenantId, 'guide_language')
   const airlines = await loadVocabularyForTenant(admin as Parameters<typeof loadVocabularyForTenant>[0], tenantId, 'airline')
+  const directions = await loadVocabularyForTenant(admin as Parameters<typeof loadVocabularyForTenant>[0], tenantId, 'airport_direction')
+  const airportRows = (airportRes.data || []).map((r: { direction?: string | null }) => ({ ...r, direction: r.direction ? labelFor(directions, r.direction) : r.direction }))
   const flightRows = (flightRes.data || []).map((r: { airline?: string | null }) => ({ ...r, airline: r.airline ? labelFor(airlines, r.airline) : r.airline }))
   const guideRows = (guideRes.data || []).map((r: { guide_language?: string | null }) => ({ ...r, guide_language: r.guide_language ? labelFor(guideLanguages, r.guide_language) : r.guide_language }))
 
@@ -94,7 +96,7 @@ async function fetchAllRates(tenantId: string, tier: string) {
   ] = await Promise.all([
     norm('transportation_rates', transportRes.data),
     norm('guide_rates', guideRows),
-    norm('airport_staff_rates', airportRes.data),
+    norm('airport_staff_rates', airportRows),
     norm('hotel_staff_rates', hotelStaffRes.data),
     norm('tipping_rates', tippingRes.data),
     norm('activity_rates', activityRes.data),

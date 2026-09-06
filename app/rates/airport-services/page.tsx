@@ -24,7 +24,6 @@ const AIRPORTS = [
   { code: 'HRG', name: 'Hurghada International' },
   { code: 'SSH', name: 'Sharm El-Sheikh' }
 ]
-const DIRECTIONS = ['arrival', 'departure', 'both']
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
 // ============================================
@@ -38,7 +37,8 @@ interface AirportStaffRate {
   service_code: string
   airport_code: string
   service_type: string
-  direction: 'arrival' | 'departure' | 'both'
+  /** A key from the agency's Airport directions vocabulary; the engine selects on arrival / departure / both. */
+  direction: string
   rate_eur: number
   description: string | null
   notes: string | null
@@ -60,10 +60,6 @@ interface Toast {
 
 function getAirportName(code: string): string {
   return AIRPORTS.find(a => a.code === code)?.name || code
-}
-
-function formatDirection(direction: string): string {
-  return direction.charAt(0).toUpperCase() + direction.slice(1)
 }
 
 // ============================================
@@ -199,6 +195,7 @@ export default function AirportServicesPage() {
   const [selectedService, setSelectedService] = useState('all')
   // The agency's words for the service levels (Settings → Your vocabulary).
   const { labelFor: formatServiceType } = useVocabulary('airport_service_type')
+  const { labelFor: formatDirection } = useVocabulary('airport_direction')
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<AirportStaffRate | null>(null)
@@ -220,7 +217,7 @@ export default function AirportServicesPage() {
     service_code: '',
     airport_code: 'CAI',
     service_type: 'meet_greet',
-    direction: 'arrival' as 'arrival' | 'departure' | 'both',
+    direction: 'arrival',
     rate_eur: 0,
     description: '',
     notes: '',
@@ -354,7 +351,7 @@ export default function AirportServicesPage() {
     const airportName = getAirportName(rate.airport_code)
 
     const confirmed = await dialog.confirmDelete('Airport Service Rate',
-      `Are you sure you want to delete the "${serviceName}" service at ${airportName} (${rate.direction})? This action cannot be undone.`
+      `Are you sure you want to delete the "${serviceName}" service at ${airportName} (${formatDirection(rate.direction)})? This action cannot be undone.`
     )
 
     if (!confirmed) return
@@ -776,16 +773,8 @@ export default function AirportServicesPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Direction *</label>
-                  <select 
-                    name="direction" 
-                    value={formData.direction} 
-                    onChange={handleChange} 
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600"
-                  >
-                    {DIRECTIONS.map(d => (
-                      <option key={d} value={d}>{formatDirection(d)}</option>
-                    ))}
-                  </select>
+                  <VocabSelect kind="airport_direction" value={formData.direction} onChange={v => setFormData(prev => ({ ...prev, direction: v }))} placeholder={null} name="direction"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-600" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Supplier</label>
