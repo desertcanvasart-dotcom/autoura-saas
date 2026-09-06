@@ -33,6 +33,8 @@ interface ClientLinkButtonProps {
   messageId: string
   threadId?: string
   fromEmail?: string
+  /** The sender's display name from the From header, for "Create … as a new client". */
+  fromName?: string
   /** Display snapshot, stored on the link so the client page can render the
    *  email without Gmail access — message ids are per-mailbox. */
   subject?: string
@@ -48,6 +50,7 @@ export default function ClientLinkButton({
   messageId,
   threadId,
   fromEmail,
+  fromName,
   subject,
   snippet,
   sentAt,
@@ -148,6 +151,41 @@ export default function ClientLinkButton({
       console.error('Error linking:', error)
     } finally {
       setLinking(false)
+    }
+  }
+
+  // A sender nobody has on record: create them as a prospect from the
+  // From header and link in the same step. Name splits on the first space
+  // (the clients API needs first_name); a bare address uses its local part.
+  const [creating, setCreating] = useState(false)
+  const suggestedName = (fromName || '').trim() || (fromEmail ? fromEmail.split('@')[0] : '')
+  const handleCreateAndLink = async () => {
+    if (!fromEmail || creating) return
+    setCreating(true)
+    try {
+      const [first, ...rest] = suggestedName.split(/\s+/)
+      const response = await fetch('/api/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: first || fromEmail.split('@')[0],
+          last_name: rest.join(' ') || undefined,
+          email: fromEmail,
+          status: 'prospect',
+          client_source: 'email',
+        }),
+      })
+      const data = await response.json()
+      const created = data?.data ?? data?.client
+      if (!response.ok || !created?.id) {
+        console.error('Error creating client:', data?.error || response.statusText)
+        return
+      }
+      await handleLink({ id: created.id, name: created.full_name || suggestedName, email: created.email || fromEmail })
+    } catch (error) {
+      console.error('Error creating client:', error)
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -268,8 +306,15 @@ export default function ClientLinkButton({
                   ))}
                 </div>
               ) : searchQuery ? (
-                <div className="py-6 text-center text-sm text-gray-500">
-                  No clients found
+                <div className="py-4 text-center text-sm text-gray-500 space-y-2">
+                  <div>No clients found</div>
+                  {fromEmail && (
+                    <button type="button" onClick={() => void handleCreateAndLink()} disabled={creating}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                      {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <User className="w-3.5 h-3.5" />}
+                      Create &ldquo;{suggestedName}&rdquo; as a new client
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="py-6 text-center text-sm text-gray-500">
@@ -293,6 +338,7 @@ export default function ClientLinkButton({
                       if (data.client) {
                         handleLink(data.client)
                       } else {
+                        // Not on record: show the search with the address, and the create button under it.
                         setSearchQuery(fromEmail)
                       }
                     } catch (error) {

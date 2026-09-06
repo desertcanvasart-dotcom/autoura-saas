@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { autoLinkEmails, type SyncedEmailRef } from '@/lib/email-auto-link'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 
@@ -98,11 +99,13 @@ export async function POST(request: NextRequest) {
     const response = await gmail.users.messages.list({ userId: 'me', maxResults: max_results, q: query || undefined })
     const messageIds = response.data.messages || []
 
-    const result = { success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0, history_id: null as string | null }
+    const result = { success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0, history_id: null as string | null, auto_linked: 0 }
 
     // Track conversation ids that received at least one new inbound message
     // during this sync — used to fire opt-in pre-generation after the loop.
     const conversationsWithNewInbound = new Set<string>()
+    // Every message stored this pass, for the auto-link step after the loop.
+    const syncedForLinking: SyncedEmailRef[] = []
 
     // Group by thread
     const threadMessages = new Map<string, any[]>()
@@ -256,6 +259,7 @@ export async function POST(request: NextRequest) {
           }
 
           result.messages_created++
+          syncedForLinking.push({ messageId: message.id!, threadId, fromEmail, toEmails: [toEmail, ...(ccEmails ?? [])].filter(Boolean) })
           if (msgDir === 'inbound') {
             conversationsWithNewInbound.add(unifiedId)
           }
@@ -285,6 +289,19 @@ export async function POST(request: NextRequest) {
         console.error('[Email Sync] Thread error:', threadErr?.message || threadErr)
       }
     }
+
+    // ============================================
+    // Auto-link: every new message whose sender (or recipient) is a client
+    // on record gets linked, so Link to Client is only for strangers.
+    // A failure here must not fail the sync — the mail is already stored.
+    // ============================================
+    let autoLinked = 0
+    try {
+      autoLinked = (await autoLinkEmails(createAdminClient() as unknown as Parameters<typeof autoLinkEmails>[0], tenant_id, userId, syncedForLinking)).linked
+    } catch (linkErr: unknown) {
+      console.error('[Email Sync] auto-link failed:', linkErr instanceof Error ? linkErr.message : linkErr)
+    }
+    result.auto_linked = autoLinked
 
     // ============================================
     // Draft-only pre-generation for new inbound emails (opt-in per tenant)

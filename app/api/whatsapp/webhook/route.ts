@@ -99,6 +99,7 @@ async function handleTwilioWebhook(request: NextRequest, rawBody: string) {
       toNumber: to.replace('whatsapp:', ''),
       body: params['Body'],
       messageSid: params['MessageSid'],
+      senderName: params['ProfileName'] || null,
       // Twilio hosts this one itself; we never copied it into our bucket.
       mediaUrl: params['MediaUrl0'] || null,
       mediaStoragePath: null,
@@ -163,6 +164,7 @@ async function handleMetaWebhook(request: NextRequest, rawBody: string) {
         toNumber: msg.to,
         body: msg.body,
         messageSid: msg.messageSid,
+        senderName: msg.profileName ?? null,
         // The bytes are ours now, in a private bucket — there is no external
         // URL to keep, and Meta's own download link expires in ~5 minutes.
         mediaUrl: null,
@@ -303,6 +305,53 @@ interface InboundWhatsAppMessage {
    *  ourselves (Meta hands us an id whose URL expires in ~5 minutes). */
   mediaStoragePath: string | null
   mediaType: string | null
+  /** The sender's WhatsApp profile name (Twilio ProfileName, Meta contacts[].profile.name); null when absent. */
+  senderName: string | null
+}
+
+/**
+ * A first-time WhatsApp contact becomes a prospect in the CRM, the way a
+ * concierge brief does (lib/concierge-brief-intake.ts): name from the
+ * profile, phone as the key. Needs a tenant — the platform has ONE WhatsApp
+ * number and nothing maps it to a tenant, so this runs only when the tenant
+ * is known from an existing conversation; a never-seen number still has
+ * nowhere to land (see the error below).
+ */
+async function createWhatsAppClient(
+  supabase: ReturnType<typeof createClient>,
+  tenantId: string,
+  phoneNumber: string,
+  senderName: string | null
+): Promise<{ id: string; full_name: string } | null> {
+  const name = (senderName || '').trim()
+  const [first, ...rest] = name ? name.split(/\s+/) : [phoneNumber]
+  const firstName = first || phoneNumber
+  const lastName = rest.join(' ') || firstName
+  const { data, error } = await supabase
+    .from('clients')
+    .insert({
+      tenant_id: tenantId,
+      first_name: firstName,
+      last_name: lastName,
+      full_name: name || phoneNumber,
+      phone: phoneNumber,
+      nationality: 'Unknown',
+      status: 'prospect',
+      client_type: 'individual',
+      passport_type: 'other',
+      preferred_language: 'English',
+      client_source: 'whatsapp',
+      vip_status: false,
+    })
+    .select('id, full_name')
+    .single()
+  if (error) {
+    console.error('❌ Could not create client for WhatsApp contact:', error.message)
+    return null
+  }
+  const fullName = data.full_name ?? (name || phoneNumber)
+  console.log(`👤 New WhatsApp contact filed as client ${data.id} (${fullName})`)
+  return { id: data.id, full_name: fullName }
 }
 
 async function processInboundWhatsAppMessage({
@@ -311,7 +360,8 @@ async function processInboundWhatsAppMessage({
   messageSid,
   mediaUrl,
   mediaStoragePath,
-  mediaType
+  mediaType,
+  senderName
 }: InboundWhatsAppMessage) {
   const supabase = createClient()
 
@@ -342,13 +392,24 @@ async function processInboundWhatsAppMessage({
 
   const { data: existingConversation } = await supabase
     .from('whatsapp_conversations')
-    .select('id, tenant_id')
+    .select('id, tenant_id, client_id')
     .eq('phone_number', phoneNumber)
     .single()
 
   if (existingConversation) {
     conversationId = existingConversation.id
     tenantId = existingConversation.tenant_id
+
+    // Known conversation, unknown person: file them as a prospect now, so
+    // the CRM has them and the update below links the conversation.
+    if (!clientId && !existingConversation.client_id && tenantId) {
+      const created = await createWhatsAppClient(supabase, tenantId, phoneNumber, senderName)
+      if (created) {
+        clientId = created.id
+        clientName = created.full_name
+        clientTenantId = tenantId
+      }
+    }
 
     // Update conversation with client info if we found one and it wasn't linked
     if (clientId) {
@@ -383,6 +444,10 @@ async function processInboundWhatsAppMessage({
       tenantId = newConversation.tenant_id || clientTenantId
     }
   } else {
+    // A never-seen number: nothing maps the platform's WhatsApp number to a
+    // tenant, so there is no tenant to file the contact or the conversation
+    // under. Mapping the number to a tenant is the fix; see the comment on
+    // createWhatsAppClient.
     console.error('❌ Cannot create conversation: no tenant found for', phoneNumber)
   }
 

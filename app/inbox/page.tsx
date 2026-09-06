@@ -1353,6 +1353,7 @@ ${bodyText}`
                           messageId={selectedEmail.id}
                           threadId={selectedEmail.threadId}
                           fromEmail={extractEmailAddress(selectedEmail.from)}
+                  fromName={extractName(selectedEmail.from)}
                           subject={selectedEmail.subject}
                           snippet={selectedEmail.snippet}
                           sentAt={selectedEmail.date}
@@ -1431,6 +1432,7 @@ ${bodyText}`
                   messageId={selectedEmail.id}
                   threadId={selectedEmail.threadId}
                   fromEmail={extractEmailAddress(selectedEmail.from)}
+                  fromName={extractName(selectedEmail.from)}
                   subject={selectedEmail.subject}
                   snippet={selectedEmail.snippet}
                   sentAt={selectedEmail.date}
