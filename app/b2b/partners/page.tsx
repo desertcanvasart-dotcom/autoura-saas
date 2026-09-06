@@ -9,7 +9,6 @@ import {
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import RequireFeature from '@/components/RequireFeature'
 
 // ============================================
 // B2B PARTNERS PAGE
@@ -225,7 +224,7 @@ export default function B2BPartnersPage() {
   }
 
   return (
-    <RequireFeature feature="b2b">
+    <>
       <div className="min-h-screen bg-gray-50 p-6">
         {/* Tenant Context */}
         <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
@@ -398,6 +397,6 @@ export default function B2BPartnersPage() {
         </div>
       )}
       </div>
-    </RequireFeature>
+    </>
   )
 }

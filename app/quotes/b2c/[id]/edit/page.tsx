@@ -7,7 +7,6 @@ import Link from 'next/link'
 import {
   ArrowLeft, Save, Loader2, AlertCircle
 } from 'lucide-react'
-import RequireFeature from '@/components/RequireFeature'
 
 interface B2CQuote {
   id: string
@@ -179,7 +178,7 @@ export default function EditB2CQuotePage({ params }: { params: { id: string } })
   if (!quote) return null
 
   return (
-    <RequireFeature feature="b2c">
+    <>
       <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
@@ -434,6 +433,6 @@ export default function EditB2CQuotePage({ params }: { params: { id: string } })
         </form>
       </div>
     </div>
-    </RequireFeature>
+    </>
   )
 }

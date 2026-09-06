@@ -107,7 +107,7 @@ export default function TenantDetailPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-white">{tenant.company_name || 'Unnamed Tenant'}</h1>
-            <p className="text-sm text-gray-400">{tenant.contact_email} | {tenant.workspace_mode}</p>
+            <p className="text-sm text-gray-400">{tenant.contact_email}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">

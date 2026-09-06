@@ -77,7 +77,6 @@ interface NavItem {
   icon: any
   roles?: UserRole[]
   children?: NavSubItem[]
-  businessTypes?: string[] // Which business types can see this item
 }
 
 interface NavSection {
@@ -104,11 +103,10 @@ const navigation: NavSection[] = [
     // The people and organisations the agency deals with come first
     // (clients, partner agencies, its own staff), then the work around them.
     items: [
-      { label: 'Clients', href: '/clients', icon: Users, businessTypes: ['b2c_only', 'b2c_and_b2b'] },
+      { label: 'Clients', href: '/clients', icon: Users },
       // Partners (partner agencies who buy from this tenant) moved here from
-      // the Tours section: they are a relationship, not a tour. Still only
-      // for B2B-workspace tenants and admin/manager, exactly as before.
-      { label: 'Partners', href: '/b2b/partners', icon: Handshake, roles: ['admin', 'manager'], businessTypes: ['b2b_only', 'b2c_and_b2b'] },
+      // the Tours section: they are a relationship, not a tour.
+      { label: 'Partners', href: '/b2b/partners', icon: Handshake, roles: ['admin', 'manager'] },
       // Team Members (the staff directory tasks are assigned to — NOT logins,
       // those are User Management) moved here from Operations: a directory
       // of people belongs with the other directories of people.
@@ -152,12 +150,7 @@ const navigation: NavSection[] = [
     roles: ['admin', 'manager', 'member'],
     items: [
       { label: 'New Quote', href: '/pricing-grid', icon: Grid3x3 },
-      {
-        label: 'B2C Quotes',
-        href: '/quotes/b2c',
-        icon: User,
-        businessTypes: ['b2c_only', 'b2c_and_b2b']
-      },
+      { label: 'B2C Quotes', href: '/quotes/b2c', icon: User },
       { label: 'Suppliers', href: '/suppliers', icon: Building, roles: ['admin', 'manager'] },
       { label: 'Itineraries', href: '/itineraries', icon: Route, roles: ['admin', 'manager'] },
       { label: 'Tour Departures', href: '/departures', icon: Calendar, roles: ['admin', 'manager'] },
@@ -171,8 +164,9 @@ const navigation: NavSection[] = [
     ]
   },
   // 'Tours' sits directly under Operations (renamed from 'B2B' and moved up
-  // from near the bottom). Still gated to B2B-workspace tenants — the key
-  // stays 'b2b', which the visibility filter and collapse state key on.
+  // from near the bottom). The key stays 'b2b': the saved collapse state
+  // keys on it. Every tenant sees it — there is no B2B/B2C workspace
+  // preference any more (migration 342); the whole product is for everyone.
   {
     title: 'Tours',
     key: 'b2b',
@@ -301,7 +295,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname()
   const { profile, signOut, isSuperAdmin } = useAuth()
-  const { tenant, showsB2bWorkspace, showsB2cWorkspace } = useTenant()
+  const { tenant } = useTenant()
   const { role, canAccess } = useRole()
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -309,42 +303,14 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
   const [currentUrl, setCurrentUrl] = useState('')
 
-  // Filter navigation based on user role AND feature flags
-  const filteredNavigation = navigation.filter(section => {
-    // Filter by role
-    if (section.roles && !canAccess(section.roles)) return false
-
-    // Filter by feature flags
-    if (section.key === 'b2b' && !showsB2bWorkspace) return false
-
-    return true
-  }).map(section => ({
-    ...section,
-    items: section.items.filter(item => {
-      // Filter by role
-      if (item.roles && !canAccess(item.roles)) return false
-
-      // Filter by feature flags instead of business type
-      if (item.businessTypes) {
-        // Determine current business type from feature flags
-        let currentBusinessType: string
-        if (showsB2cWorkspace && showsB2bWorkspace) {
-          currentBusinessType = 'b2c_and_b2b'
-        } else if (showsB2cWorkspace && !showsB2bWorkspace) {
-          currentBusinessType = 'b2c_only'
-        } else if (!showsB2cWorkspace && showsB2bWorkspace) {
-          currentBusinessType = 'b2b_only'
-        } else {
-          return false // No features enabled
-        }
-
-        // Show item if current business type matches any allowed type
-        return item.businessTypes.includes(currentBusinessType)
-      }
-
-      return true
-    })
-  }))
+  // Filter navigation by the user's role. Nothing else hides an item: the
+  // whole product is available to every tenant on every plan.
+  const filteredNavigation = navigation
+    .filter(section => !section.roles || canAccess(section.roles))
+    .map(section => ({
+      ...section,
+      items: section.items.filter(item => !item.roles || canAccess(item.roles)),
+    }))
 
   // Load saved section states from localStorage
   useEffect(() => {

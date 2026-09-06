@@ -7,7 +7,6 @@ import {
   ArrowRight, Layers, Sparkles,
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
-import { useTenant } from '@/app/contexts/TenantContext'
 import TodayOnTheGround from '@/app/components/TodayOnTheGround'
 import NeedsAttention from './NeedsAttention'
 import ExpiringContracts from './ExpiringContracts'
@@ -58,11 +57,6 @@ interface DashboardData {
 const supabase = createClient()
 
 export default function DashboardPage() {
-  // Workspace mode is a free preference on every tier, not an entitlement:
-  // a B2C-only operator should not be offered B2B entry points. The previous
-  // dashboard gated these and dropping that would have been a quiet
-  // regression.
-  const { showsB2bWorkspace, showsB2cWorkspace } = useTenant()
   const [data, setData] = useState<DashboardData | null>(null)
   const [userName, setUserName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -333,16 +327,9 @@ export default function DashboardPage() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <h2 className="text-sm font-semibold text-gray-900 mb-3">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <QuickAction
-            href={showsB2cWorkspace ? '/itineraries/new' : '/tours/manage'}
-            icon={Sparkles}
-            title="New Quote"
-            hint={showsB2cWorkspace ? 'Create an itinerary' : 'Create a B2B package'}
-          />
+          <QuickAction href="/itineraries/new" icon={Sparkles} title="New Quote" hint="Create an itinerary" />
           <QuickAction href="/rates" icon={Layers} title="Rates Hub" hint="Hotels, guides & services" />
-          {showsB2bWorkspace && (
-            <QuickAction href="/tours/manage" icon={FileText} title="B2B Packages" hint="Ready-made tours" />
-          )}
+          <QuickAction href="/tours/manage" icon={FileText} title="B2B Packages" hint="Ready-made tours" />
           <QuickAction href="/clients" icon={Users} title="Clients" hint={`${clients.total} total`} />
         </div>
       </div>

@@ -7,7 +7,6 @@ import {
   BookOpen, User, Calendar, Eye, DollarSign, Filter, ChevronRight, AlertCircle, Loader2, Clock, CheckCircle2,
   Plane, PartyPopper, XCircle, Users, Building2
 } from 'lucide-react'
-import { useTenant } from '@/app/contexts/TenantContext'
 
 interface Booking {
   id: string
@@ -61,16 +60,13 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function BookingsPage() {
   const router = useRouter()
-  const { showsB2cWorkspace, showsB2bWorkspace } = useTenant()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Determine default booking type based on tenant mode
-  const defaultBookingType = showsB2cWorkspace && showsB2bWorkspace ? 'all' : showsB2cWorkspace ? 'b2c' : 'b2b'
-  const [bookingType, setBookingType] = useState<'all' | 'b2c' | 'b2b'>(defaultBookingType)
+  const [bookingType, setBookingType] = useState<'all' | 'b2c' | 'b2b'>('all')
 
   useEffect(() => {
     fetchBookings()
@@ -132,8 +128,6 @@ export default function BookingsPage() {
     completed: statusCounts.completed
   }
 
-  // Show tabs only if tenant has both B2C and B2B
-  const showBookingTypeTabs = showsB2cWorkspace && showsB2bWorkspace
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -153,7 +147,7 @@ export default function BookingsPage() {
           </div>
 
           {/* B2C/B2B Tabs - Only show if tenant has both */}
-          {showBookingTypeTabs && (
+          {(
             <div className="flex items-center gap-2 mt-4 border-b border-gray-200">
               <button
                 type="button"

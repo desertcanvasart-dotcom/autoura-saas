@@ -10,7 +10,6 @@ import {
   ArrowLeft, Edit, Download, Send, Eye, CheckCircle, XCircle,
   Clock, AlertCircle, Loader2, MapPin, Users, MessageCircle, BookOpen
 } from 'lucide-react'
-import RequireFeature from '@/components/RequireFeature'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -300,7 +299,7 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
   const costBreakdownEntries = Object.entries(quote.cost_breakdown || {}).filter(([_, value]) => value > 0)
 
   return (
-    <RequireFeature feature="b2c">
+    <>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <div className="bg-white border-b border-gray-200">
@@ -738,6 +737,6 @@ export default function B2CQuoteDetailPage({ params }: { params: { id: string } 
         </div>
       </div>
     </div>
-    </RequireFeature>
+    </>
   )
 }

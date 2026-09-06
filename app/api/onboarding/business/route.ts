@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { workspaceModeFromBusinessType, type WorkspaceMode } from '@/lib/workspace-mode'
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,29 +28,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Both workspaces default ON: onboarding OFFERS the choice rather than
-    // assuming one, so a tenant who skips the question keeps the whole product.
-    //
-    // `business_type` is still accepted as a fallback. The column is gone
-    // (migration 240) but the wire format outlives it — a browser holding a
-    // cached bundle can still POST the old field mid-deploy.
-    const onboardingMode: WorkspaceMode = body.workspace_mode
-      ?? workspaceModeFromBusinessType(body.business_type)
-
-    // Reject bad input here rather than letting migration 239's CHECK turn it
-    // into a 500.
-    if (!['b2c', 'b2b', 'both'].includes(onboardingMode)) {
-      return NextResponse.json(
-        { success: false, error: 'workspace_mode must be one of: b2c, b2b, both' },
-        { status: 400 }
-      )
-    }
-
-    // Update tenant with business configuration
+    // Update tenant with business configuration. (`workspace_mode` is no
+    // longer accepted: every tenant sees the whole product — migration 342.)
     const { error: tenantError } = await supabase
       .from('tenants')
       .update({
-        workspace_mode: onboardingMode,
         default_currency: body.default_currency,
         ...(body.locale !== undefined ? { locale: body.locale } : {}),
         services_offered: body.services_offered,

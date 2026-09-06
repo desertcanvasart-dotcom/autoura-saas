@@ -50,7 +50,7 @@ export default function AirportStaffContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
-  const { tenant, loading: tenantLoading, isManager, canManagePartners, showsB2cWorkspace, showsB2bWorkspace } = useTenant()
+  const { tenant, loading: tenantLoading, isManager, canManagePartners } = useTenant()
   const dialog = useConfirmDialog()
 
   const [staff, setStaff] = useState<AirportStaff[]>([])
@@ -341,11 +341,6 @@ export default function AirportStaffContent() {
                 <div className="mt-1 flex items-center gap-2">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     {tenant.company_name}
-                  </span>
-                  <span className="text-xs text-gray-500">
-                    {showsB2cWorkspace && !showsB2bWorkspace && '(B2C Only)'}
-                    {!showsB2cWorkspace && showsB2bWorkspace && '(B2B Only)'}
-                    {showsB2cWorkspace && showsB2bWorkspace && '(B2C + B2B)'}
                   </span>
                 </div>
               )}

@@ -87,8 +87,8 @@ base, margins, and internal notes can never leak.
 - Usage windows are computed from the subscription anniversary, never stored
   and cron-advanced (`lib/usage-window.ts`).
 - Enforcement ordering: check → create → increment (`lib/usage-enforcement.ts`).
-- Workspace **preference** (B2C/B2B visibility) must never block data access —
-  only entitlement can block (`lib/workspace-visibility.ts`).
+- There is no B2C/B2B workspace switch, per tenant or per plan: every tenant
+  sees the whole product (migration 342 dropped `tenants.workspace_mode`).
 
 ## 6. One implementation, enforced by test
 

@@ -8,7 +8,6 @@ import {
   User, Mail, Phone, MapPin, Globe, Building, CreditCard, Tag,
   Star, Bell, Heart, ArrowLeft, Save, X, ChevronRight
 } from 'lucide-react'
-import RequireFeature from '@/components/RequireFeature'
 import { CityDatalist } from '@/components/CitySelect'
 import { useTenant } from '@/app/contexts/TenantContext'
 
@@ -133,7 +132,7 @@ export default function NewClientPage() {
   const labelClass = "block text-xs font-medium text-gray-600 mb-1"
 
   return (
-    <RequireFeature feature="b2c">
+    <>
       <div className="min-h-screen bg-gray-50/50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
@@ -745,6 +744,6 @@ export default function NewClientPage() {
         </div>
       </form>
     </div>
-    </RequireFeature>
+    </>
   )
 }

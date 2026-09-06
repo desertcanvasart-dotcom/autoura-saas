@@ -5,7 +5,6 @@ import { createClient } from '@/app/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Loader2, User, Mail, Phone, Globe, Building, Star, Tag } from 'lucide-react'
-import RequireFeature from '@/components/RequireFeature'
 
 const LEAD_SOURCES = [
   { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
@@ -218,7 +217,7 @@ export default function EditClientPage() {
   }
 
   return (
-    <RequireFeature feature="b2c">
+    <>
       <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
@@ -599,6 +598,6 @@ export default function EditClientPage() {
         </form>
       </div>
     </div>
-    </RequireFeature>
+    </>
   )
 }

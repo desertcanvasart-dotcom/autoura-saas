@@ -39,7 +39,6 @@ export async function GET(request: NextRequest) {
         id: tenantData.id,
         company_name: tenantData.company_name,
         contact_email: tenantData.contact_email,
-        workspace_mode: tenantData.workspace_mode,
         logo_url: tenantData.logo_url,
         primary_color: tenantData.primary_color,
         secondary_color: tenantData.secondary_color,
