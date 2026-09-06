@@ -24,12 +24,11 @@ import { join } from 'path'
 
 const ROOT = join(__dirname, '..', '..')
 
-// Known exception, tracked rather than hidden. The flights form DOES have a
-// supplier select, but its AIRLINES entries carry an IATA `code` used to build
-// flight numbers, and `suppliers` has nowhere to put one — so replacing the
-// list is a feature, not a rename. The second test below fails the moment that
-// reason stops being true. Remove the entry then; do not add to it.
-const KNOWN_UNMIGRATED = new Set(['app/rates/flights/flights-content.tsx'])
+// There are no known exceptions any more. The flights form used to carry
+// AIRLINES because its entries held an IATA code and `suppliers` had nowhere
+// to put one; since migration 348 the Airlines vocabulary carries the code in
+// meta, and the form reads it from there (see the second test).
+const KNOWN_UNMIGRATED = new Set<string>()
 
 function walk(dir: string, out: string[] = []): string[] {
   let entries: string[]
@@ -65,15 +64,15 @@ describe('no hardcoded supplier vocabulary', () => {
     ).toEqual([])
   })
 
-  it('the flights exemption still has the reason it claims', () => {
-    // The exemption rests on one fact: AIRLINES carries an IATA code that the
-    // form turns into a flight number. If that stops being true the list is a
-    // plain roster copy and the exemption has to go.
+  it('the flights form takes its carriers and their IATA codes from the vocabulary', () => {
+    // The old exemption rested on the IATA code living in a form-local list.
+    // It now lives on the Airlines vocabulary entry (meta.code, migration
+    // 348): the form reads the list through useVocabulary and the code
+    // through airlineCode. If either goes, a local list is creeping back.
     const src = readFileSync(join(ROOT, 'app/rates/flights/flights-content.tsx'), 'utf8')
-    expect(
-      src.includes('?.code || airline.substring(0, 2).toUpperCase()'),
-      'flights no longer derives a code from AIRLINES — drop it from KNOWN_UNMIGRATED and read the roster from /api/suppliers'
-    ).toBe(true)
+    expect(src, 'flights must read carriers from the Airlines vocabulary').toContain("useVocabulary('airline')")
+    expect(src, 'flights must take the IATA code from the vocabulary entry').toContain('airlineCodeOf(airlineAll,')
+    expect(src, 'flights must still offer the supplier roster').toContain('/api/suppliers?status=active')
   })
 
   it('a train rate form can name both the operator and the train', () => {

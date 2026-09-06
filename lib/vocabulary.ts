@@ -17,7 +17,7 @@ export const VOCABULARY_KINDS = [
   'flight_cabin', 'flight_frequency', 'airport_service_type', 'hotel_service_type',
   'cuisine_type', 'restaurant_type', 'dietary_option', 'activity_category',
   'activity_type', 'activity_duration', 'activity_unit', 'guide_grade',
-  'guide_duration', 'guide_language', 'rate_season',
+  'guide_duration', 'guide_language', 'rate_season', 'airline',
 ] as const
 export type VocabularyKind = (typeof VOCABULARY_KINDS)[number]
 
@@ -325,6 +325,15 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     minItems: 1,
     example: 'All Year / Low Season / High Season / Peak Season',
   },
+  airline: {
+    kind: 'airline',
+    group: 'Transport & tickets',
+    title: 'Airlines',
+    description: 'The carriers you price flights on, each with its IATA code (the code fills the flight rate\'s service code). An airline can also be a supplier; picking an airline supplier on a flight rate looks it up here by name.',
+    usedIn: 'Flight rates, quotes, pricing engine',
+    minItems: 1,
+    example: 'EgyptAir (MS) / Nile Air (NP) / Air Cairo (SM)',
+  },
 }
 
 /** The built-in supplier kinds the app knows how to treat. An agency's
@@ -581,6 +590,7 @@ export const VOCABULARY_COLUMNS: Record<string, VocabularyKind> = {
   tour_duration: 'guide_duration',
   guide_language: 'guide_language',
   season: 'rate_season',
+  airline: 'airline',
 }
 
 /** Columns whose name means something DIFFERENT per table: `service_type`
@@ -599,6 +609,13 @@ export const TABLE_VOCABULARY_COLUMNS: Record<string, Record<string, VocabularyK
 /** The vocabulary columns of one import table. */
 export function vocabularyColumnsFor(table: string): Record<string, VocabularyKind> {
   return { ...VOCABULARY_COLUMNS, ...(TABLE_VOCABULARY_COLUMNS[table] ?? {}) }
+}
+
+/** airline meta: the IATA code behind a key ('egyptair' → 'MS'); '' when none. */
+export function airlineCode(items: readonly Pick<VocabularyItem, 'key' | 'meta'>[], key: string | null | undefined): string {
+  if (!key) return ''
+  const code = items.find(i => i.key === key)?.meta?.code
+  return typeof code === 'string' ? code.trim().toUpperCase() : ''
 }
 
 /** transport_service_type meta: does this journey need a destination city? */

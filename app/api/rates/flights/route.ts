@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadVocabulary } from '@/lib/vocabulary-server'
+import { airlineCode } from '@/lib/vocabulary'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
@@ -11,24 +13,6 @@ import { requireAuth } from '@/lib/supabase-server'
 const FLIGHT_TYPES = ['domestic', 'international'] as const
 const CABIN_CLASSES = ['economy', 'business', 'first'] as const
 
-const AIRLINES = [
-  { code: 'MS', name: 'EgyptAir' },
-  { code: 'NP', name: 'Nile Air' },
-  { code: 'SM', name: 'Air Cairo' },
-  { code: 'FZ', name: 'FlyDubai' },
-  { code: 'EK', name: 'Emirates' },
-  { code: 'QR', name: 'Qatar Airways' },
-  { code: 'TK', name: 'Turkish Airlines' },
-  { code: 'LH', name: 'Lufthansa' },
-  { code: 'BA', name: 'British Airways' },
-  { code: 'AF', name: 'Air France' },
-  { code: 'KL', name: 'KLM' },
-  { code: 'EY', name: 'Etihad' },
-  { code: 'SV', name: 'Saudia' },
-  { code: 'RJ', name: 'Royal Jordanian' },
-  { code: 'ME', name: 'Middle East Airlines' },
-  { code: 'G9', name: 'Air Arabia' }
-] as const
 
 const FREQUENCIES = [
   'daily',
@@ -105,7 +89,6 @@ export async function GET(request: NextRequest) {
       options: {
         flightTypes: FLIGHT_TYPES,
         cabinClasses: CABIN_CLASSES,
-        airlines: AIRLINES,
         frequencies: FREQUENCIES
       }
     })
@@ -136,14 +119,14 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
+    // Airline IATA code: sent, or looked up on the vocabulary entry (348).
+    const airlineCode = body.airline_code || await airlineCodeFor(supabase as Parameters<typeof loadVocabulary>[0], body.airline)
+
     // Generate service code if not provided
-    const serviceCode = body.service_code || generateServiceCode(body)
+    const serviceCode = body.service_code || generateServiceCode(body, airlineCode)
 
     // Generate route name if not provided
     const routeName = body.route_name || `${body.route_from} to ${body.route_to}`
-
-    // Get airline code
-    const airlineCode = body.airline_code || getAirlineCode(body.airline)
 
     // ✅ MULTI-TENANT: tenant_id is auto-populated by database trigger
     // See migration: 007_create_tours_templates_tables.sql (creates auto_set_tenant_id trigger)
@@ -268,7 +251,7 @@ export async function PUT(request: NextRequest) {
     // The explicit IATA code on the rate wins (B-item 7); recompute from
     // the airline name only when no code was sent.
     if (updates.airline && !updates.airline_code) {
-      updates.airline_code = getAirlineCode(updates.airline)
+      updates.airline_code = await airlineCodeFor(supabase as Parameters<typeof loadVocabulary>[0], updates.airline)
     }
 
     // Parse numeric fields
@@ -364,17 +347,18 @@ export async function DELETE(request: NextRequest) {
 // HELPER FUNCTIONS
 // ============================================
 
-function getAirlineCode(airlineName: string): string {
-  const airline = AIRLINES.find(a => 
-    a.name.toLowerCase() === airlineName.toLowerCase()
-  )
-  return airline?.code || airlineName.substring(0, 2).toUpperCase()
+/** The IATA code of an airline KEY, from the tenant's Airlines vocabulary
+ *  (meta.code); failing that, the first two letters of the key. */
+async function airlineCodeFor(supabase: Parameters<typeof loadVocabulary>[0], airline: unknown): Promise<string> {
+  const key = String(airline ?? '').trim()
+  if (!key) return ''
+  const code = airlineCode(await loadVocabulary(supabase, 'airline'), key)
+  return code || key.replace(/[^a-z0-9]/gi, '').substring(0, 2).toUpperCase()
 }
 
-function generateServiceCode(data: any): string {
+function generateServiceCode(data: any, airlineCode: string): string {
   const fromCode = getCityCode(data.route_from)
   const toCode = getCityCode(data.route_to)
-  const airlineCode = getAirlineCode(data.airline)
   const classCode = (data.cabin_class || 'economy').substring(0, 3).toUpperCase()
   
   return `FLT-${airlineCode}-${fromCode}-${toCode}-${classCode}`

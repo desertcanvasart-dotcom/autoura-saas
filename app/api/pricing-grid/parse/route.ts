@@ -75,6 +75,8 @@ async function fetchAllRates(tenantId: string, tier: string) {
 
   // Guide rows store the language KEY (346); the AI reads the agency's word.
   const guideLanguages = await loadVocabularyForTenant(admin as Parameters<typeof loadVocabularyForTenant>[0], tenantId, 'guide_language')
+  const airlines = await loadVocabularyForTenant(admin as Parameters<typeof loadVocabularyForTenant>[0], tenantId, 'airline')
+  const flightRows = (flightRes.data || []).map((r: { airline?: string | null }) => ({ ...r, airline: r.airline ? labelFor(airlines, r.airline) : r.airline }))
   const guideRows = (guideRes.data || []).map((r: { guide_language?: string | null }) => ({ ...r, guide_language: r.guide_language ? labelFor(guideLanguages, r.guide_language) : r.guide_language }))
 
   // Per-rate currency: a row priced in a contract currency (EGP, USD, JPY)
@@ -98,7 +100,7 @@ async function fetchAllRates(tenantId: string, tier: string) {
     norm('activity_rates', activityRes.data),
     norm('accommodation_rates', accommodationRes.data),
     norm('entrance_fees', entranceRes.data),
-    norm('flight_rates', flightRes.data),
+    norm('flight_rates', flightRows),
     norm('meal_rates', mealRes.data),
     norm('nile_cruises', cruiseRes.data),
     norm('sleeping_train_rates', sleepingTrainRes.data),
