@@ -45,6 +45,7 @@ describe('the kinds', () => {
     // The generic columns ride along everywhere.
     expect(vocabularyColumnsFor('train_rates').class_type).toBe('train_class')
     expect(vocabularyColumnsFor('guide_rates').guide_language).toBe('guide_language')
+    expect(vocabularyColumnsFor('sleeping_train_rates').season).toBe('rate_season')
   })
 
   it('a transport service type says whether it needs a destination', () => {

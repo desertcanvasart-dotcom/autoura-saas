@@ -642,14 +642,6 @@ export default function AttractionsContent() {
     )
   }
 
-  const seasonOptions = [
-    { value: 'all_year', label: 'All Year' },
-    { value: 'high_season', label: 'High Season' },
-    { value: 'low_season', label: 'Low Season' },
-    { value: 'summer', label: 'Summer' },
-    { value: 'winter', label: 'Winter' }
-  ]
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Toasts */}
@@ -1129,16 +1121,8 @@ export default function AttractionsContent() {
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       Season
                     </label>
-                    <select
-                      name="season"
-                      value={formData.season}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                    >
-                      {seasonOptions.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="rate_season" value={formData.season} onChange={v => setFormData(prev => ({ ...prev, season: v }))} placeholder={null} name="season"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm" />
                   </div>
                 </div>
               </div>

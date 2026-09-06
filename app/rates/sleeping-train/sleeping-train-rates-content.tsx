@@ -23,13 +23,6 @@ const SLEEPER_CITIES = [
   'Aswan'
 ]
 
-const SEASONS = [
-  'Peak Season',
-  'High Season',
-  'Low Season',
-  'Year Round'
-]
-
 interface SleepingTrainRate {
   // The currency this row's amounts are in; blank means the tenant's.
   rate_currency?: string | null
@@ -925,7 +918,7 @@ export default function SleepingTrainRatesContent() {
                   </span>
                   {rate.season && (
                     <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
-                      {rate.season}
+                      <VocabLabel kind="rate_season" value={rate.season} />
                     </span>
                   )}
                 </div>
@@ -1210,17 +1203,8 @@ export default function SleepingTrainRatesContent() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Season</label>
-                    <select
-                      name="season"
-                      value={formData.season}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Season</option>
-                      {SEASONS.map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
+                    <VocabSelect kind="rate_season" value={formData.season} onChange={v => setFormData(prev => ({ ...prev, season: v }))} placeholder={"Select Season"} name="season"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                 </div>
               </div>
