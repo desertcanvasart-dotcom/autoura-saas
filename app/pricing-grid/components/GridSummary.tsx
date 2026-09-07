@@ -111,7 +111,7 @@ export default function GridSummary({ totals, config, dayCount, unpricedGuideBed
 
             {/* Success message */}
             {saveMessage && (
-              <span className="text-sm text-green-600 font-medium">{saveMessage}</span>
+              <span className={`text-sm font-medium whitespace-pre-line ${saveMessage.includes('not created') ? 'text-amber-700' : 'text-green-600'}`}>{saveMessage}</span>
             )}
           </div>
 
