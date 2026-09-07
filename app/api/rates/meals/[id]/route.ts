@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
+import { clearPreferredSiblings } from '@/lib/rates/preferred'
 import { requireAuth } from '@/lib/supabase-server'
 
 export async function GET(
@@ -92,6 +93,15 @@ Object.assign(updateData, rateCurrencyWriteField(body))
     if (body.notes !== undefined) updateData.notes = body.notes || null
     if (body.is_preferred !== undefined) updateData.is_preferred = body.is_preferred === true
     if (body.is_active !== undefined) updateData.is_active = body.is_active
+
+    // One preferred restaurant per tier + meal (migration 354): flagging this
+    // one clears its siblings first, so the form can never trip the index.
+    if (updateData.is_preferred === true) {
+      const { data: current } = await supabase.from('meal_rates').select('tier, meal_type').eq('id', id).eq('tenant_id', authResult.tenant_id).maybeSingle()
+      const scopeRow = { ...(current || {}), ...updateData }
+      const cleared = await clearPreferredSiblings(supabase, 'meal_rates', authResult.tenant_id!, scopeRow, id)
+      if (cleared.error) return NextResponse.json({ success: false, error: cleared.error }, { status: 500 })
+    }
 
     const { data, error } = await supabase
       .from('meal_rates')

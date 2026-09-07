@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Utensils, Plus, Edit, Trash2, X, Check, Copy, MapPin, Users, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
+import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import { TierBadge, VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
@@ -151,6 +152,15 @@ export default function MealRatesContent() {
   })
 
   // Fetch rates
+
+  // The preferred star: the engine's default among several restaurants for
+  // the same tier + meal (one per scope, migration 354).
+  const onPreferredToggled = (r: PreferredToggleResult) => {
+    if (r.ok) showNotification('success', r.preferred ? 'Preferred' : 'Preference cleared', r.preferred ? `${r.name || 'Restaurant'} is now the preferred choice for ${r.scope}` : `${r.name || 'Restaurant'} is no longer preferred`)
+    else showNotification('error', 'Could not update', r.error || '')
+    fetchRates()
+  }
+
   const fetchRates = async () => {
     try {
       const params = new URLSearchParams()
@@ -897,6 +907,7 @@ export default function MealRatesContent() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
+                        <PreferredStar table="meal_rates" id={rate.id} preferred={rate.is_preferred} onToggled={onPreferredToggled} />
                         <button
                           onClick={() => handleEdit(rate)}
                           className="p-1.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
@@ -969,6 +980,7 @@ export default function MealRatesContent() {
                     <p className="text-lg font-bold text-green-600">{fmtRate(Number(rate.base_rate_eur), rate, 2)}</p>
                   </div>
                   <div className="flex gap-1">
+                    <PreferredStar table="meal_rates" id={rate.id} preferred={rate.is_preferred} onToggled={onPreferredToggled} className="p-2" />
                     <button
                       onClick={() => handleEdit(rate)}
                       className="p-2 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
@@ -1026,6 +1038,7 @@ export default function MealRatesContent() {
                     {rate.is_active ? 'Active' : 'Inactive'}
                   </span>
                   <div className="flex gap-1">
+                    <PreferredStar table="meal_rates" id={rate.id} preferred={rate.is_preferred} onToggled={onPreferredToggled} className="p-1" />
                     <button onClick={() => handleEdit(rate)} className="p-1 text-gray-400 hover:text-primary-600" title="Edit">
                       <Edit className="w-4 h-4" />
                     </button>
