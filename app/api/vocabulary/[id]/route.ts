@@ -15,7 +15,7 @@ import {
   wouldBreakMinimum,
   VOCABULARY_KIND_INFO,
 } from '@/lib/vocabulary'
-import { COLS, WRITE_ROLES } from '../route'
+import { COLS, WRITE_ROLES, WRITE_DENIED } from '../route'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +27,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const { supabase, role } = auth
     if (!supabase) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
-    if (!WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: 'Admin access required' }, { status: 403 })
+    if (!WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: WRITE_DENIED }, { status: 403 })
 
     const { id } = await params
     const { data: current } = await supabase.from('tenant_vocabularies').select(COLS).eq('id', id).maybeSingle()
@@ -75,7 +75,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const { supabase, role } = auth
     if (!supabase) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
-    if (!WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: 'Admin access required' }, { status: 403 })
+    if (!WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: WRITE_DENIED }, { status: 403 })
 
     const { id } = await params
     const { data: current } = await supabase.from('tenant_vocabularies').select('id, kind').eq('id', id).maybeSingle()

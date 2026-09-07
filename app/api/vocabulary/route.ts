@@ -27,6 +27,10 @@ export const dynamic = 'force-dynamic'
 // rename and delete in Settings → Your vocabulary — and the red notice sat at
 // the top of a long page, out of view, so it read as "nothing happens".
 export const WRITE_ROLES = ['owner', 'admin']
+// The refusal, in one place, says WHO can and WHAT to do — the same words
+// the page shows read-only viewers, so a refused request never reads as
+// "the app is broken".
+export const WRITE_DENIED = 'Only the agency owner or an admin can change the vocabulary. Ask one of them to make the change, or to make you an admin under Settings → User Management.'
 export const COLS = 'id, tenant_id, kind, key, label, description, behavior, rank, meta, is_active, created_at, updated_at'
 
 export async function GET() {
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const { supabase, tenant_id, role } = auth
     if (!supabase || !tenant_id) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
-    if (!WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: 'Admin access required' }, { status: 403 })
+    if (!WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: WRITE_DENIED }, { status: 403 })
 
     const body = await request.json().catch(() => ({})) as Record<string, unknown>
     const kind = String(body.kind ?? '')
