@@ -365,7 +365,7 @@ export default function ItineraryEditorPage() {
     try {
       const { data, error } = await supabase
         .from('activity_rates')
-        .select('id, activity_name, city, base_rate_eur, base_rate_non_eur')
+        .select('id, activity_name, city, base_rate_eur, base_rate_non_eur, rate_currency')
         .eq('is_active', true)
         .order('city')
         .order('activity_name')

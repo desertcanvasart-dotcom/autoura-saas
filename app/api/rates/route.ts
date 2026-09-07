@@ -152,7 +152,10 @@ export async function GET(request: NextRequest) {
           base_rate_eur: rate.base_rate_eur || 0,
           base_rate_non_eur: rate.base_rate_non_eur || rate.base_rate_eur || 0,
           eur_rate: rate.base_rate_eur || 0,
-          non_eur_rate: rate.base_rate_non_eur || rate.base_rate_eur || 0
+          non_eur_rate: rate.base_rate_non_eur || rate.base_rate_eur || 0,
+          // The overview formats each row in ITS currency; the other
+          // hand-built shapes here already carry it, this one did not.
+          rate_currency: rate.rate_currency ?? null
         }))
         error = transportResult.error
         break

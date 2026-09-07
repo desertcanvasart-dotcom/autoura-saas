@@ -11,6 +11,8 @@ import { join } from 'path'
 const ROOT = join(__dirname, '..', '..')
 const LIST = readFileSync(join(ROOT, 'app', 'api', 'rates', 'attractions', 'route.ts'), 'utf8')
 const ONE = readFileSync(join(ROOT, 'app', 'api', 'rates', 'attractions', '[id]', 'route.ts'), 'utf8')
+const OVERVIEW = readFileSync(join(ROOT, 'app', 'api', 'rates', 'route.ts'), 'utf8')
+const ITINERARY_EDIT = readFileSync(join(ROOT, 'app', 'itineraries', '[id]', 'edit', 'page.tsx'), 'utf8')
 
 function transformBlock(src: string, opener: RegExp): string {
   const start = src.search(opener)
@@ -28,5 +30,22 @@ describe('attractions routes return the stored rate currency', () => {
   it('the single-row transform carries rate_currency through', () => {
     const block = transformBlock(ONE, /const transformed = \{/)
     expect(block).toMatch(/rate_currency:\s*data\.rate_currency/)
+  })
+})
+
+// The same defect in the two other hand-built rate shapes found by the
+// production sweep: the overview's transportation tab rebuilt its rows
+// without the currency, and the itinerary editor's activity picker selected
+// amounts without it — both then formatted EGP numbers with a euro sign.
+describe('other hand-built rate shapes keep the currency', () => {
+  it('the rates overview transportation transform carries rate_currency', () => {
+    const start = OVERVIEW.indexOf("case 'transportation'")
+    const end = OVERVIEW.indexOf("case 'guide'", start)
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    expect(OVERVIEW.slice(start, end)).toMatch(/rate_currency:\s*rate\.rate_currency/)
+  })
+  it('the itinerary editor selects rate_currency with activity amounts', () => {
+    expect(ITINERARY_EDIT).toMatch(/from\('activity_rates'\)[\s\S]{0,200}select\('[^']*rate_currency[^']*'\)/)
   })
 })
