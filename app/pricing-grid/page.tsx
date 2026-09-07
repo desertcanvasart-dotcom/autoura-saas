@@ -637,6 +637,18 @@ function PricingGridContent() {
               })
             })
             const quoteData = await quoteRes.json()
+            // Incomplete pricing is refused, not saved with holes (harness:
+            // deliverable only when complete). Say what is missing and stop.
+            if (!quoteData.success) {
+              const holes: { message: string }[] = quoteData.holes || []
+              setSavedQuoteId(null)
+              setSavedQuoteNumber(null)
+              setSaveMessage(
+                `Saved as ${data.itineraryCode} — B2B quote not created: ${quoteData.error || 'pricing failed'}` +
+                (holes.length ? `\n• ${holes.map(h => h.message).join('\n• ')}` : '')
+              )
+              return
+            }
             const quoteId = quoteData.data?.id || quoteData.id
             const quoteNum = quoteData.data?.quote_number || quoteData.quote_number
             if (quoteId) {

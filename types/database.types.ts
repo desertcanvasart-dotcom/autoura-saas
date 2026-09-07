@@ -101,6 +101,7 @@ export interface Database {
           rate_valid_to: string | null
           notes: string | null
           is_active: boolean | null
+          is_preferred: boolean
           updated_at: string | null
           hotel_id: string | null
           star_rating: number | null
@@ -213,6 +214,7 @@ export interface Database {
           rate_valid_to?: string | null
           notes?: string | null
           is_active?: boolean | null
+          is_preferred?: boolean
           updated_at?: string | null
           hotel_id?: string | null
           star_rating?: number | null
@@ -325,6 +327,7 @@ export interface Database {
           rate_valid_to?: string | null
           notes?: string | null
           is_active?: boolean | null
+          is_preferred?: boolean
           updated_at?: string | null
           hotel_id?: string | null
           star_rating?: number | null
@@ -6110,6 +6113,8 @@ export interface Database {
           commission_status: string | null
           is_preferred_supplier: boolean | null
           vehicle_type: string | null
+          rate_table: string | null
+          rate_id: string | null
           is_optional: boolean | null
           service_code: string | null
           selling_price: number | null
@@ -6152,6 +6157,8 @@ export interface Database {
           commission_status?: string | null
           is_preferred_supplier?: boolean | null
           vehicle_type?: string | null
+          rate_table?: string | null
+          rate_id?: string | null
           is_optional?: boolean | null
           service_code?: string | null
           selling_price?: number | null
@@ -6194,6 +6201,8 @@ export interface Database {
           commission_status?: string | null
           is_preferred_supplier?: boolean | null
           vehicle_type?: string | null
+          rate_table?: string | null
+          rate_id?: string | null
           is_optional?: boolean | null
           service_code?: string | null
           selling_price?: number | null

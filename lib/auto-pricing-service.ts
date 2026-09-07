@@ -39,6 +39,7 @@ import {
 } from '@/lib/pricing/ticket-legs'
 import type { RateSource, PricingHole } from './pricing-types'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
+import { pickCandidate, ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
 import { presetTierFor, tierMultiplier, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
 import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant } from '@/lib/vocabulary-server'
 import type { VocabularyKind } from '@/lib/vocabulary'
@@ -899,9 +900,12 @@ export async function getCruiseRates(
   scope: CatalogScope,
   tier: ServiceTier,
   embarkCity?: string,
-  travelDate?: string
+  travelDate?: string,
+  opts?: { rateId?: string | null }
 ): Promise<{
   shipName: string
+  /** The nile_cruises row priced from — the pin a caller may store. */
+  cruiseId?: string
   ppdNight: number
   singleSuppNight: number
   tripleRedNight: number
@@ -916,28 +920,58 @@ export async function getCruiseRates(
    *  date — a pricing hole naming the uncovered night, never a base-column
    *  fallback (the base columns mirror the FIRST period's rate). */
   periodGap?: { propertyName: string; date: string }
+  /** Several ships fit and none (or more than one) is preferred — a hole
+   *  naming the candidates; the engine refuses to pick one (see
+   *  lib/pricing/candidate-selection.ts). */
+  ambiguous?: Ambiguity
 } | null> {
   try {
-    let query = getSupabaseAdmin()
+    let cruise: any
+    const base = () => getSupabaseAdmin()
       .from('nile_cruises')
       .select('*')
       .or(catalogOrExpr(scope))
-      .eq('tier', tier)
       .eq('is_active', true)
+    if (opts?.rateId) {
+      // Layer 1: the itinerary's pin. An id is a decision — no tier, city or
+      // preference logic; a missing/deactivated id is a re-pick hole (null).
+      const { data: rawPinned } = await base().eq('id', opts.rateId).limit(1)
+      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      if (!pinned || pinned.length === 0) return null
+      cruise = pinned[0]
+    } else {
+      let query = base().eq('tier', tier)
 
-    if (embarkCity) {
-      query = query.ilike('embark_city', `%${embarkCity}%`)
+      if (embarkCity) {
+        query = query.ilike('embark_city', `%${embarkCity}%`)
+      }
+
+      // Every candidate, then the refuse-to-guess rule — not `limit(1)`,
+      // which priced whichever ship Postgres happened to return first.
+      const { data: rawCruises, error } = await query.limit(AMBIGUITY_SCAN_LIMIT)
+      const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawCruises, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+
+      if (error || !cruises || cruises.length === 0) {
+        // No exact cruise rate for this tier — flag a hole, never guess.
+        return null
+      }
+
+      const pick = pickCandidate(cruises as any[], (c: any) => c.ship_name || c.id)
+      if (pick.kind === 'ambiguous') {
+        return {
+          shipName: '',
+          ppdNight: 0,
+          singleSuppNight: 0,
+          tripleRedNight: 0,
+          durationNights: 0,
+          season: 'low',
+          source: 'missing',
+          ambiguous: { count: pick.count, names: pick.names, preferredCount: pick.preferredCount },
+        }
+      }
+      if (pick.kind === 'none') return null
+      cruise = pick.row
     }
-
-    const { data: rawCruises, error } = await query.limit(1)
-    const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawCruises, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
-
-    if (error || !cruises || cruises.length === 0) {
-      // No exact cruise rate for this tier — flag a hole, never guess.
-      return null
-    }
-
-    const cruise = cruises[0] as any
     const durationNights = cruise.duration_nights || 4
 
     // Use new PPD fields if available, otherwise derive from legacy fields
@@ -959,6 +993,7 @@ export async function getCruiseRates(
     if (cruisePeriod.kind === 'gap') {
       return {
         shipName: cruise.ship_name,
+        cruiseId: cruise.id,
         ppdNight: 0,
         singleSuppNight: 0,
         tripleRedNight: 0,
@@ -1011,6 +1046,7 @@ export async function getCruiseRates(
 
     return {
       shipName: cruise.ship_name,
+      cruiseId: cruise.id,
       ppdNight,
       singleSuppNight,
       tripleRedNight: Math.max(0, tripleRedNight),
@@ -1063,9 +1099,12 @@ export async function getHotelRates(
   scope: CatalogScope,
   city: string,
   tier: ServiceTier,
-  travelDate?: string
+  travelDate?: string,
+  opts?: { rateId?: string | null }
 ): Promise<{
   hotelName: string
+  /** The accommodation_rates row priced from — the pin a caller may store. */
+  hotelId?: string
   ppdNight: number
   singleSuppNight: number
   tripleRedNight: number
@@ -1079,6 +1118,10 @@ export async function getHotelRates(
    *  date — a pricing hole naming the uncovered night, never a base-column
    *  fallback (the base columns mirror the FIRST period's rate). */
   periodGap?: { propertyName: string; date: string }
+  /** Several hotels fit and none (or more than one) is preferred — a hole
+   *  naming the candidates; the engine refuses to pick one (see
+   *  lib/pricing/candidate-selection.ts). */
+  ambiguous?: Ambiguity
 } | null> {
   const cityNorm = city.trim().toLowerCase()
 
@@ -1094,6 +1137,7 @@ export async function getHotelRates(
       const name = hotel.property_name || hotel.name
       return {
         hotelName: name,
+        hotelId: hotel.id,
         ppdNight: 0,
         singleSuppNight: 0,
         tripleRedNight: 0,
@@ -1105,6 +1149,7 @@ export async function getHotelRates(
     if (period.kind === 'period') {
       return {
         hotelName: hotel.property_name || hotel.name,
+        hotelId: hotel.id,
         ppdNight: period.rates.ppd_eur,
         singleSuppNight: Math.max(0, period.rates.single_supplement_eur),
         tripleRedNight: Math.max(0, period.rates.triple_reduction_eur),
@@ -1136,6 +1181,7 @@ export async function getHotelRates(
 
     return {
       hotelName: hotel.property_name || hotel.name,
+      hotelId: hotel.id,
       ppdNight: ppd,
       singleSuppNight: Math.max(0, singleSupp),
       tripleRedNight: Math.max(0, tripleRed),
@@ -1147,24 +1193,48 @@ export async function getHotelRates(
   }
 
   try {
-    // Primary: exact tier; city matched by ilike (substring).
-    const { data: rawHotels, error } = await getSupabaseAdmin()
+    const base = () => getSupabaseAdmin()
       .from('accommodation_rates')
       .select('*')
       .or(catalogOrExpr(scope))
-      .eq('tier', tier)
       .eq('is_active', true)
+    if (opts?.rateId) {
+      // Layer 1: the itinerary's pin. An id is a decision — no tier, city or
+      // preference logic; a missing/deactivated id is a re-pick hole (null).
+      const { data: rawPinned } = await base().eq('id', opts.rateId).limit(1)
+      const pinned = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawPinned, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+      if (!pinned || pinned.length === 0) return null
+      return mapRow(pinned[0], 'db')
+    }
+
+    // Primary: exact tier; city matched by ilike (substring). EVERY candidate
+    // is fetched and the refuse-to-guess rule decides — not `limit(1)`, which
+    // priced whichever hotel Postgres happened to return first.
+    const { data: rawHotels, error } = await base()
+      .eq('tier', tier)
       .ilike('city', `%${city}%`)
-      .limit(1)
+      .limit(AMBIGUITY_SCAN_LIMIT)
     const hotels = await normalizeRateRows(getSupabaseAdmin(), 'accommodation_rates', rawHotels, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (!error && hotels && hotels.length > 0) {
-      const hotel = hotels[0] as any
       // ilike can match a DIFFERENT city ("Cairo" ~ "New Cairo"). Only an exact
       // city name (case-insensitive) counts as a definite 'db' match; otherwise
       // it is a fuzzy match and must be confirmed (treated as a hole).
-      const exactCity = String(hotel.city ?? '').trim().toLowerCase() === cityNorm
-      return mapRow(hotel, exactCity ? 'db' : 'fuzzy')
+      const exact = (hotels as any[]).filter(h => String(h.city ?? '').trim().toLowerCase() === cityNorm)
+      const pool = exact.length > 0 ? exact : (hotels as any[])
+      const pick = pickCandidate(pool, (h: any) => h.property_name || h.name || h.id)
+      if (pick.kind === 'ambiguous') {
+        return {
+          hotelName: '',
+          ppdNight: 0,
+          singleSuppNight: 0,
+          tripleRedNight: 0,
+          season: 'low',
+          source: 'missing',
+          ambiguous: { count: pick.count, names: pick.names, preferredCount: pick.preferredCount },
+        }
+      }
+      if (pick.kind === 'one') return mapRow(pick.row, exact.length > 0 ? 'db' : 'fuzzy')
     }
 
     // Fallback: any tier for this city — wrong tier ⇒ fuzzy, never deliverable.
@@ -1324,7 +1394,7 @@ export async function getGuideRate(
   language: string,
   tier: ServiceTier,
   opts?: { grade?: GuideGrade; duration?: 'full_day' | 'half_day' | 'meet_greet' }
-): Promise<{ id: string; name: string; dailyRate: number; source: RateSource } | null> {
+): Promise<{ id: string; name: string; dailyRate: number; source: RateSource; ambiguous?: Ambiguity } | null> {
   const grade = opts?.grade ?? DEFAULT_GUIDE_GRADE
   const duration = opts?.duration ?? 'full_day'
   const isDefaultAsk = grade === DEFAULT_GUIDE_GRADE && duration === 'full_day'
@@ -1371,7 +1441,20 @@ export async function getGuideRate(
     const guides = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawGuides, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     if (!error && guides && guides.length > 0) {
-      const tierMatch = (guides as any[]).find((g: any) => g.tier === tier)
+      // Several guides in the requested tier: the preferred one, else a hole
+      // naming them — never the first row (refuse-to-guess rule).
+      const tierMatches = (guides as any[]).filter((g: any) => g.tier === tier)
+      const pick = pickCandidate(tierMatches, (g: any) => g.name || g.id)
+      if (pick.kind === 'ambiguous') {
+        return {
+          id: '',
+          name: '',
+          dailyRate: 0,
+          source: 'missing',
+          ambiguous: { count: pick.count, names: pick.names, preferredCount: pick.preferredCount },
+        }
+      }
+      const tierMatch = pick.kind === 'one' ? pick.row : null
       const selected = (tierMatch || guides[0]) as any
       if (!selected.daily_rate) return null
       return {
@@ -1407,13 +1490,35 @@ export async function getGuideRate(
   }
 }
 
+/** Candidate rows scanned before the refuse-to-guess rule decides. */
+const AMBIGUITY_SCAN_LIMIT = 200
+
+/** The meal hole's message: the ambiguity when that is the cause, else the
+ *  plain "no rate" text. */
+export function mealHoleMessage(
+  mealRates: MealRatesResult | null,
+  kind: 'lunch' | 'dinner',
+  tier: string
+): string {
+  const a = mealRates?.source === 'missing' ? mealRates.ambiguous[kind] : undefined
+  return a
+    ? ambiguityMessage(`${tier} ${kind} restaurants`, a, 'Rates → Meals')
+    : 'No meal rate. Add lunch/dinner rates in Rates → Meals.'
+}
+
 /**
  * Get meal rates
  */
+export type MealRatesResult =
+  | { lunch: number; dinner: number; source: 'db'; ambiguous?: undefined }
+  /** A meal has several restaurants in this tier and none (or more than one)
+   *  is preferred — a hole per meal naming the candidates. */
+  | { lunch?: undefined; dinner?: undefined; source: 'missing'; ambiguous: { lunch?: Ambiguity; dinner?: Ambiguity } }
+
 export async function getMealRates(
   scope: CatalogScope,
   tier: ServiceTier
-): Promise<{ lunch: number; dinner: number; source: RateSource } | null> {
+): Promise<MealRatesResult | null> {
   try {
     // meal_rates holds one row per meal_type AND tier, with the rate in
     // `base_rate_eur`. This selected `lunch_rate_eur, dinner_rate_eur`, which
@@ -1430,19 +1535,34 @@ export async function getMealRates(
     const mealRows = await normalizeRateRows(getSupabaseAdmin(), 'meal_rates', rawMealRows, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
     const rows = (mealRows ?? []) as Array<{
+      id?: string
       meal_type?: string | null
+      restaurant_name?: string | null
       base_rate_eur?: number | string | null
+      is_preferred?: boolean | null
     }>
 
+    // Several restaurants serve the same meal in this tier: the preferred
+    // one, else a hole naming them — never `find()`'s first row.
+    const ambiguous: { lunch?: Ambiguity; dinner?: Ambiguity } = {}
     const pick = (kind: 'lunch' | 'dinner'): number | null => {
-      const row = rows.find((r) => String(r.meal_type ?? '').toLowerCase().includes(kind))
-      const n = Number(row?.base_rate_eur)
+      const matches = rows.filter((r) => String(r.meal_type ?? '').toLowerCase().includes(kind))
+      const chosen = pickCandidate(matches, (r) => r.restaurant_name || r.meal_type || r.id || '?')
+      if (chosen.kind === 'ambiguous') {
+        ambiguous[kind] = { count: chosen.count, names: chosen.names, preferredCount: chosen.preferredCount }
+        return null
+      }
+      if (chosen.kind === 'none') return null
+      const n = Number(chosen.row.base_rate_eur)
       // Zero is bad data, not a free meal.
       return Number.isFinite(n) && n > 0 ? n : null
     }
 
     const lunch = pick('lunch')
     const dinner = pick('dinner')
+    if (ambiguous.lunch || ambiguous.dinner) {
+      return { source: 'missing', ambiguous }
+    }
     if (lunch === null || dinner === null) {
       return null
     }
@@ -1945,6 +2065,15 @@ export async function calculateDayBasedPricing(
     const cr = await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate)
     if (cr && cr.source === 'db') {
       cruiseRates = cr
+    } else if (cr?.ambiguous) {
+      addHole({
+        kind: 'cruise',
+        reason: 'missing',
+        tier,
+        city: firstCruiseDay?.city,
+        lookupAttempted: `cruise rate (${tier})`,
+        message: ambiguityMessage(`${tier} cruises${firstCruiseDay?.city ? ` from ${firstCruiseDay.city}` : ''}`, cr.ambiguous, 'Rates → Cruises'),
+      })
     } else if (cr?.periodGap) {
       // The cruise EXISTS and has contract periods — the travel date falls in
       // a gap between them. One hole naming the uncovered date; never the
@@ -1980,6 +2109,15 @@ export async function calculateDayBasedPricing(
     const rates = hotelResults[i]
     if (rates && rates.source === 'db') {
       hotelRatesMap.set(city, rates)
+    } else if (rates?.ambiguous) {
+      addHole({
+        kind: 'hotel',
+        reason: 'missing',
+        tier,
+        city,
+        lookupAttempted: `hotel rate (${city}, ${tier})`,
+        message: ambiguityMessage(`${tier} hotels in ${city}`, rates.ambiguous, 'Rates → Hotels'),
+      })
     } else if (rates?.periodGap) {
       // The hotel EXISTS and has contract periods — the travel date falls in
       // a gap between them. One hole per property naming the uncovered date;
@@ -2433,13 +2571,15 @@ export async function calculateDayBasedPricing(
       } else {
         addHole({
           kind: 'guide',
-          reason: dayRate ? 'fuzzy' : 'missing',
+          reason: dayRate && !dayRate.ambiguous ? 'fuzzy' : 'missing',
           tier,
           dayNumber: day.day,
           lookupAttempted: hasSightseeing
             ? `${language} ${gradeLabel}guide full_day (${tier})`
             : `${language} ${gradeLabel}guide meet_greet (${tier})`,
-          message: hasSightseeing
+          message: dayRate?.ambiguous
+            ? ambiguityMessage(`${tier} ${language}-speaking guides`, dayRate.ambiguous, 'CRM → Guides')
+            : hasSightseeing
             ? `No ${language} ${gradeLabel.toLowerCase()}guide full-day rate. Add it in Rates → Guides.`
             : `No ${language} ${gradeLabel.toLowerCase()}guide "Meet & Assist" rate for the throughout guide's non-sightseeing days. Add a meet_greet duration row in Rates → Guides.`,
         })
@@ -2463,10 +2603,12 @@ export async function calculateDayBasedPricing(
       } else {
         addHole({
           kind: 'guide',
-          reason: guideRate ? 'fuzzy' : 'missing',
+          reason: guideRate && !guideRate.ambiguous ? 'fuzzy' : 'missing',
           tier,
           lookupAttempted: `${language} ${gradeLabel}guide (${tier})`,
-          message: `No exact ${tier} ${language}-speaking ${gradeLabel.toLowerCase()}guide rate. Add it in Rates → Guides.`,
+          message: guideRate?.ambiguous
+            ? ambiguityMessage(`${tier} ${language}-speaking guides`, guideRate.ambiguous, 'CRM → Guides')
+            : `No exact ${tier} ${language}-speaking ${gradeLabel.toLowerCase()}guide rate. Add it in Rates → Guides.`,
         })
       }
     }
@@ -2777,7 +2919,7 @@ export async function calculateDayBasedPricing(
 
   for (const day of itinerary) {
     if (day.meals.lunch === 'external') {
-      if (mealRates) {
+      if (mealRates?.source === 'db') {
         externalMealsPerPax += mealRates.lunch
         services.push({
           id: `day${day.day}-lunch`,
@@ -2798,13 +2940,13 @@ export async function calculateDayBasedPricing(
           reason: 'missing',
           tier,
           lookupAttempted: 'meal rates (lunch/dinner)',
-          message: 'No meal rate. Add lunch/dinner rates in Rates → Meals.',
+          message: mealHoleMessage(mealRates, 'lunch', tier),
         })
       }
     }
 
     if (day.meals.dinner === 'external') {
-      if (mealRates) {
+      if (mealRates?.source === 'db') {
         externalMealsPerPax += mealRates.dinner
         services.push({
           id: `day${day.day}-dinner`,
@@ -2825,7 +2967,7 @@ export async function calculateDayBasedPricing(
           reason: 'missing',
           tier,
           lookupAttempted: 'meal rates (lunch/dinner)',
-          message: 'No meal rate. Add lunch/dinner rates in Rates → Meals.',
+          message: mealHoleMessage(mealRates, 'dinner', tier),
         })
       }
     }
@@ -2838,7 +2980,7 @@ export async function calculateDayBasedPricing(
   // REQUESTED pax; the multi-pax sheet keeps the line at every count — a
   // documented approximation, exactly as in the sibling. (Missing meal
   // rates are already holes above; no second hole for the guide's plate.)
-  if (throughoutGuide && requestedPax != null && requestedPax <= GUIDE_MEALS_MAX_PAX && mealRates) {
+  if (throughoutGuide && requestedPax != null && requestedPax <= GUIDE_MEALS_MAX_PAX && mealRates?.source === 'db') {
     for (const day of itinerary) {
       for (const meal of ['lunch', 'dinner'] as const) {
         if (day.meals[meal] !== 'external') continue

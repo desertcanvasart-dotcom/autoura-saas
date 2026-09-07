@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
+import { ratePin } from '@/lib/pricing/rate-pin'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
 
@@ -255,6 +256,10 @@ export async function POST(request: NextRequest) {
             unit_cost: rate,
             total_cost: isGroup ? rate : rate * pax,
             is_included: true,
+            // The pin (migration 353): which rate row this line was priced
+            // from, so a later re-price (B2B quote, single supplement) reads
+            // THAT row instead of re-choosing one by tier.
+            ...ratePin(slot.slotId, item.rateId),
           })
         }
       }
