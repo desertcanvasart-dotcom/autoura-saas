@@ -47,6 +47,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { createClient } from '@/app/supabase'
+import { isBusinessEmail } from '@/lib/inbox-business-filter'
 import { sanitizeEmailHtml } from '@/lib/sanitize-html'
 
 // Email body formatter - converts ■ bullets to styled lists.
@@ -165,7 +166,7 @@ interface Client {
   phone?: string
 }
 
-type FilterType = 'all' | 'unread' | 'starred'
+type FilterType = 'business' | 'all' | 'unread' | 'starred'
 type FolderType = 'inbox' | 'sent' | 'drafts'
 
 export default function InboxPage() {
@@ -180,7 +181,10 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null)
   const [showCompose, setShowCompose] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [filter, setFilter] = useState<FilterType>('all')
+  // Business is the default view: Gmail's noise categories and machine
+  // senders hidden, anyone on record always shown (lib/inbox-business-filter).
+  const [filter, setFilter] = useState<FilterType>('business')
+  const [knownAddresses, setKnownAddresses] = useState<Set<string>>(new Set())
   const [folder, setFolder] = useState<FolderType>('inbox')
   const [starredEmails, setStarredEmails] = useState<Set<string>>(new Set())
   const [isFolderCollapsed, setIsFolderCollapsed] = useState(false)
@@ -674,12 +678,35 @@ ${bodyText}`
       .replace(/&quot;/g, '"')
   }
 
+  // The addresses on record — clients and suppliers — that the Business view
+  // never hides. Loaded once per session; a failure just means no exception.
+  useEffect(() => {
+    if (!user?.id) return
+    let alive = true
+    ;(async () => {
+      const known = new Set<string>()
+      const add = (v: unknown) => { if (typeof v === 'string' && v.includes('@')) known.add(v.trim().toLowerCase()) }
+      try {
+        const [c, s] = await Promise.all([
+          fetch('/api/clients?limit=2000').then(r => r.json()).catch(() => null),
+          fetch('/api/suppliers?status=active').then(r => r.json()).catch(() => null),
+        ])
+        for (const row of (c?.data ?? c?.clients ?? []) as Array<Record<string, unknown>>) add(row.email)
+        for (const row of (s?.data ?? s?.suppliers ?? []) as Array<Record<string, unknown>>) { add(row.email); add(row.contact_email) }
+      } catch { /* keep whatever we got */ }
+      if (alive) setKnownAddresses(known)
+    })()
+    return () => { alive = false }
+  }, [user?.id])
+
   // Filtering and Grouping Logic
   const filteredEmails = emails.filter(email => {
+    if (filter === 'business') return isBusinessEmail(email, knownAddresses)
     if (filter === 'unread') return email.isUnread
     if (filter === 'starred') return starredEmails.has(email.id)
     return true
   })
+  const hiddenAsNoise = filter === 'business' ? emails.length - filteredEmails.length : 0
 
   const groupEmailsByDate = (emails: Email[]) => {
     const groups: Record<string, Email[]> = {}
@@ -964,7 +991,8 @@ ${bodyText}`
                 <p className="px-2 text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Filters</p>
                 <nav className="space-y-0.5">
                   {[
-                    { id: 'all' as FilterType, label: 'All Mail' },
+                    { id: 'business' as FilterType, label: 'Business' },
+                    { id: 'all' as FilterType, label: 'Everything' },
                     { id: 'unread' as FilterType, label: 'Unread' },
                     { id: 'starred' as FilterType, label: 'Starred' },
                   ].map((item) => (
@@ -1066,7 +1094,7 @@ ${bodyText}`
               {/* Email count indicator */}
               {selectedEmails.size === 0 && (
                 <span className="text-xs text-gray-400 ml-auto">
-                  {filteredEmails.length} emails
+                  {filteredEmails.length} emails{hiddenAsNoise > 0 && <span className="text-gray-400"> · {hiddenAsNoise} hidden as noise</span>}
                 </span>
               )}
             </div>

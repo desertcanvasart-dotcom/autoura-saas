@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { autoLinkEmails, type SyncedEmailRef } from '@/lib/email-auto-link'
+import { syncQueries } from '@/lib/inbox-business-filter'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 
@@ -96,8 +97,25 @@ export async function POST(request: NextRequest) {
       query = `after:${daysAgo.getFullYear()}/${String(daysAgo.getMonth() + 1).padStart(2, '0')}/${String(daysAgo.getDate()).padStart(2, '0')}`
     }
 
-    const response = await gmail.users.messages.list({ userId: 'me', maxResults: max_results, q: query || undefined })
-    const messageIds = response.data.messages || []
+    // Scope: Gmail's Promotions, Social and Forums never enter the system
+    // (Updates does — hotel and airline confirmations live there). A sender
+    // already on record is rescued from those categories by a second pass,
+    // so a client Gmail misfiled is never lost. See lib/inbox-business-filter.
+    const { data: knownRows } = await createAdminClient().from('clients').select('email').eq('tenant_id', tenant_id).not('email', 'is', null)
+    const { main: mainQuery, rescues } = syncQueries(query, (knownRows ?? []).map((r: { email: string | null }) => r.email || ''))
+
+    const response = await gmail.users.messages.list({ userId: 'me', maxResults: max_results, q: mainQuery })
+    const seen = new Set<string>()
+    const messageIds: Array<{ id?: string | null; threadId?: string | null }> = []
+    for (const m of response.data.messages || []) { if (m.id && !seen.has(m.id)) { seen.add(m.id); messageIds.push(m) } }
+    for (const q of rescues) {
+      try {
+        const rescued = await gmail.users.messages.list({ userId: 'me', maxResults: 50, q })
+        for (const m of rescued.data.messages || []) { if (m.id && !seen.has(m.id)) { seen.add(m.id); messageIds.push(m) } }
+      } catch (rescueErr: unknown) {
+        console.error('[Email Sync] rescue query failed:', rescueErr instanceof Error ? rescueErr.message : rescueErr)
+      }
+    }
 
     const result = { success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0, history_id: null as string | null, auto_linked: 0 }
 
