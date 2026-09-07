@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   }
   const { supabase, tenant_id, role } = auth
 
-  if (role !== 'admin' && role !== 'manager') {
+  if (!['owner', 'admin', 'manager'].includes(role || '')) {
     return NextResponse.json({ success: false, error: 'Admins and managers only' }, { status: 403 })
   }
 

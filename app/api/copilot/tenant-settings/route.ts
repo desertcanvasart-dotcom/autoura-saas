@@ -38,7 +38,7 @@ export async function PATCH(request: NextRequest) {
   }
   const { supabase, tenant_id, role } = auth
 
-  if (role !== 'admin') {
+  if (!['owner', 'admin'].includes(role || '')) {
     return NextResponse.json({ success: false, error: 'Only admins can change copilot settings' }, { status: 403 })
   }
 

@@ -101,7 +101,6 @@ export interface Database {
           rate_valid_to: string | null
           notes: string | null
           is_active: boolean | null
-          is_preferred: boolean
           updated_at: string | null
           hotel_id: string | null
           star_rating: number | null
@@ -133,6 +132,7 @@ export interface Database {
           rate_currency: string | null
           seasons: Json | null
           property_id: string | null
+          is_preferred: boolean
         }
         Insert: {
           id?: string
@@ -214,7 +214,6 @@ export interface Database {
           rate_valid_to?: string | null
           notes?: string | null
           is_active?: boolean | null
-          is_preferred?: boolean
           updated_at?: string | null
           hotel_id?: string | null
           star_rating?: number | null
@@ -246,6 +245,7 @@ export interface Database {
           rate_currency?: string | null
           seasons?: Json | null
           property_id?: string | null
+          is_preferred?: boolean
         }
         Update: {
           id?: string
@@ -327,7 +327,6 @@ export interface Database {
           rate_valid_to?: string | null
           notes?: string | null
           is_active?: boolean | null
-          is_preferred?: boolean
           updated_at?: string | null
           hotel_id?: string | null
           star_rating?: number | null
@@ -359,6 +358,7 @@ export interface Database {
           rate_currency?: string | null
           seasons?: Json | null
           property_id?: string | null
+          is_preferred?: boolean
         }
         Relationships: [
           {
@@ -6113,8 +6113,6 @@ export interface Database {
           commission_status: string | null
           is_preferred_supplier: boolean | null
           vehicle_type: string | null
-          rate_table: string | null
-          rate_id: string | null
           is_optional: boolean | null
           service_code: string | null
           selling_price: number | null
@@ -6129,6 +6127,8 @@ export interface Database {
           exchange_rate_used: number | null
           cost_per_unit: number | null
           sold_by_supplier_id: string | null
+          rate_table: string | null
+          rate_id: string | null
         }
         Insert: {
           id?: string
@@ -6157,8 +6157,6 @@ export interface Database {
           commission_status?: string | null
           is_preferred_supplier?: boolean | null
           vehicle_type?: string | null
-          rate_table?: string | null
-          rate_id?: string | null
           is_optional?: boolean | null
           service_code?: string | null
           selling_price?: number | null
@@ -6173,6 +6171,8 @@ export interface Database {
           exchange_rate_used?: number | null
           cost_per_unit?: number | null
           sold_by_supplier_id?: string | null
+          rate_table?: string | null
+          rate_id?: string | null
         }
         Update: {
           id?: string
@@ -6201,8 +6201,6 @@ export interface Database {
           commission_status?: string | null
           is_preferred_supplier?: boolean | null
           vehicle_type?: string | null
-          rate_table?: string | null
-          rate_id?: string | null
           is_optional?: boolean | null
           service_code?: string | null
           selling_price?: number | null
@@ -6217,6 +6215,8 @@ export interface Database {
           exchange_rate_used?: number | null
           cost_per_unit?: number | null
           sold_by_supplier_id?: string | null
+          rate_table?: string | null
+          rate_id?: string | null
         }
         Relationships: [
           {
@@ -10327,9 +10327,9 @@ export interface Database {
           is_active: boolean | null
           updated_at: string | null
           rate_currency: string | null
-          supplier_id: string | null
           capacity_min: number | null
           capacity_max: number | null
+          supplier_id: string | null
         }
         Insert: {
           id?: string
@@ -10351,9 +10351,9 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
-          supplier_id?: string | null
           capacity_min?: number | null
           capacity_max?: number | null
+          supplier_id?: string | null
         }
         Update: {
           id?: string
@@ -10375,9 +10375,9 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
-          supplier_id?: string | null
           capacity_min?: number | null
           capacity_max?: number | null
+          supplier_id?: string | null
         }
         Relationships: [
           {
@@ -10385,6 +10385,13 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transportation_rates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]

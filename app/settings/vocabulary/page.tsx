@@ -8,7 +8,7 @@
 // dropdown reads these lists (hooks/useVocabulary). Egypt's defaults are a
 // preset the admin can come back to per list. Writes are admin-only.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowDown, ArrowUp, BookA, Check, Eye, EyeOff, Globe2, Loader2, Pencil, Plus, RotateCcw, Trash2, X, AlertCircle,
@@ -77,7 +77,16 @@ export default function VocabularySettingsPage() {
   const items = byKind[kind]
   const behaviorLabel = useMemo(() => Object.fromEntries(SUPPLIER_BEHAVIORS.map(b => [b.key, b.label])) as Record<string, string>, [])
 
-  useEffect(() => { if (notice) { const t = setTimeout(() => setNotice(null), 4000); return () => clearTimeout(t) } }, [notice])
+  // A refused action must be SEEN: the notice renders above a list that can be
+  // taller than the screen, so scroll it into view — and give an error longer
+  // than a success to be read.
+  const noticeRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!notice) return
+    noticeRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    const t = setTimeout(() => setNotice(null), notice.kind === 'error' ? 8000 : 4000)
+    return () => clearTimeout(t)
+  }, [notice])
 
   const call = async (key: string, fn: () => Promise<Response>, okText: string) => {
     setBusy(key)
@@ -174,7 +183,7 @@ export default function VocabularySettingsPage() {
       )}
 
       {notice && (
-        <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${notice.kind === 'success' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+        <div ref={noticeRef} role={notice.kind === 'error' ? 'alert' : 'status'} className={`p-3 rounded-lg text-sm flex items-center gap-2 ${notice.kind === 'success' ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-700'}`}>
           {notice.kind === 'success' ? <Check className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />} {notice.text}
         </div>
       )}
