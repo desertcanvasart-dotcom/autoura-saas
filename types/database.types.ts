@@ -10327,6 +10327,7 @@ export interface Database {
           is_active: boolean | null
           updated_at: string | null
           rate_currency: string | null
+          supplier_id: string | null
           capacity_min: number | null
           capacity_max: number | null
         }
@@ -10350,6 +10351,7 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
+          supplier_id?: string | null
           capacity_min?: number | null
           capacity_max?: number | null
         }
@@ -10373,6 +10375,7 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
+          supplier_id?: string | null
           capacity_min?: number | null
           capacity_max?: number | null
         }
