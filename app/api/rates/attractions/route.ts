@@ -86,6 +86,10 @@ export async function GET(request: NextRequest) {
       is_sellable_extra: (item as Record<string, unknown>).is_sellable_extra === true,
       addon_note: item.addon_note,
       supplier_id: item.supplier_id,
+      // The currency the amounts are stored in (migration 295). PR #235 wired
+      // the WRITE side of this route but not this hand-built read shape, so
+      // an EGP row rendered as EUR and the edit form reopened on the default.
+      rate_currency: item.rate_currency ?? null,
       created_at: item.created_at,
       updated_at: item.updated_at
     })) || []
