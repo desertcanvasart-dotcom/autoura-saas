@@ -22,7 +22,11 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-export const WRITE_ROLES = ['admin']
+// The tenant's owner is its first admin. This named admin alone, so the
+// person who created the agency got "Admin access required" on every edit,
+// rename and delete in Settings → Your vocabulary — and the red notice sat at
+// the top of a long page, out of view, so it read as "nothing happens".
+export const WRITE_ROLES = ['owner', 'admin']
 export const COLS = 'id, tenant_id, kind, key, label, description, behavior, rank, meta, is_active, created_at, updated_at'
 
 export async function GET() {
