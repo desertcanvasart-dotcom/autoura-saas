@@ -682,7 +682,7 @@ export async function POST(request: NextRequest) {
           duration_days = cruiseContent.content.duration_days
         }
 
-        const cruiseRate = await getCruiseRate(tier, cruiseContent.recommendedSuppliers, supabase)
+        const cruiseRate = await getCruiseRate({ tenantId: tenant_id, tier, recommendedSuppliers: cruiseContent.recommendedSuppliers, travelDate: start_date })
 
 
         const nights = duration_days - 1
@@ -1194,6 +1194,7 @@ export async function POST(request: NextRequest) {
 
     // Create days and services
     const { totalSupplierCost, totalClientPrice } = await createLandItineraryServices(supabase, {
+      tenantId: tenant_id,
       days: itineraryData.days || [], itineraryId: itinerary.id, startDateObj,
       durationDays: duration_days, effectiveCity, totalPax, isEuroPassport,
       skipPricing: effectiveSkipPricing, withMargin, tier, finalLanguage,
@@ -1220,7 +1221,7 @@ export async function POST(request: NextRequest) {
     // Auto-assign cruise resource if this itinerary includes cruise days
     if (cruiseDetection.isCruise) {
       try {
-        const cruiseRate = await getCruiseRate(tier, [], supabase)
+        const cruiseRate = await getCruiseRate({ tenantId: tenant_id, tier, travelDate: start_date })
         if (cruiseRate.found && cruiseRate.supplierId) {
           const cruiseRouteLabelMap: Record<string, string> = {
             'luxor-aswan': 'Luxor → Aswan',

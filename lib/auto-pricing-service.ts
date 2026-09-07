@@ -901,11 +901,21 @@ export async function getCruiseRates(
   tier: ServiceTier,
   embarkCity?: string,
   travelDate?: string,
-  opts?: { rateId?: string | null }
+  opts?: {
+    rateId?: string | null
+    /** Price one of THESE ships by name (the AI's recommendation). A named
+     *  ask is not narrowed by tier; the refuse-to-guess rule still applies
+     *  among them. Falls back to the tier's ships when none matches. */
+    shipNames?: string[]
+  }
 ): Promise<{
   shipName: string
   /** The nile_cruises row priced from — the pin a caller may store. */
   cruiseId?: string
+  /** The company the ship is bought from, when the row names one. */
+  supplierId?: string | null
+  /** The cabin the rate is for, as the row spells it. */
+  cabinType?: string | null
   ppdNight: number
   singleSuppNight: number
   tripleRedNight: number
@@ -940,21 +950,30 @@ export async function getCruiseRates(
       if (!pinned || pinned.length === 0) return null
       cruise = pinned[0]
     } else {
-      let query = base().eq('tier', tier)
-
-      if (embarkCity) {
-        query = query.ilike('embark_city', `%${embarkCity}%`)
+      // Candidates: the ships the caller named, else the tier's ships.
+      const named = (opts?.shipNames ?? []).map(n => String(n ?? '').trim()).filter(Boolean)
+      let rows: unknown[] | null = null
+      if (named.length > 0) {
+        const { data } = await base().in('ship_name', named).limit(AMBIGUITY_SCAN_LIMIT)
+        if (data && data.length > 0) rows = data
       }
+      if (!rows) {
+        let query = base().eq('tier', tier)
 
-      // Every candidate, then the refuse-to-guess rule — not `limit(1)`,
-      // which priced whichever ship Postgres happened to return first.
-      const { data: rawCruises, error } = await query.limit(AMBIGUITY_SCAN_LIMIT)
-      const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rawCruises, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+        if (embarkCity) {
+          query = query.ilike('embark_city', `%${embarkCity}%`)
+        }
 
-      if (error || !cruises || cruises.length === 0) {
-        // No exact cruise rate for this tier — flag a hole, never guess.
-        return null
+        // Every candidate, then the refuse-to-guess rule — not `limit(1)`,
+        // which priced whichever ship Postgres happened to return first.
+        const { data, error } = await query.limit(AMBIGUITY_SCAN_LIMIT)
+        if (error || !data || data.length === 0) {
+          // No exact cruise rate for this tier — flag a hole, never guess.
+          return null
+        }
+        rows = data
       }
+      const cruises = await normalizeRateRows(getSupabaseAdmin(), 'nile_cruises', rows as Record<string, unknown>[], await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
 
       const pick = pickCandidate(cruises as any[], (c: any) => c.ship_name || c.id)
       if (pick.kind === 'ambiguous') {
@@ -994,6 +1013,8 @@ export async function getCruiseRates(
       return {
         shipName: cruise.ship_name,
         cruiseId: cruise.id,
+        supplierId: cruise.supplier_id ?? null,
+        cabinType: cruise.cabin_type ?? null,
         ppdNight: 0,
         singleSuppNight: 0,
         tripleRedNight: 0,
@@ -1047,6 +1068,8 @@ export async function getCruiseRates(
     return {
       shipName: cruise.ship_name,
       cruiseId: cruise.id,
+      supplierId: cruise.supplier_id ?? null,
+      cabinType: cruise.cabin_type ?? null,
       ppdNight,
       singleSuppNight,
       tripleRedNight: Math.max(0, tripleRedNight),
