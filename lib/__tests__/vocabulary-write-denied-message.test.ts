@@ -8,7 +8,11 @@ import { join } from 'path'
 const ROOT = join(__dirname, '..', '..')
 const API = join(ROOT, 'app', 'api', 'vocabulary')
 function walk(dir: string, out: string[] = []): string[] {
-  for (const e of readdirSync(dir)) { const f = join(dir, e); statSync(f).isDirectory() ? walk(f, out) : f.endsWith('.ts') && out.push(f) }
+  for (const e of readdirSync(dir)) {
+    const f = join(dir, e)
+    if (statSync(f).isDirectory()) walk(f, out)
+    else if (f.endsWith('.ts')) out.push(f)
+  }
   return out
 }
 
