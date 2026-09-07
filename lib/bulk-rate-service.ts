@@ -171,7 +171,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
     // alone is a human label two distinct rows share (the same route as an
     // airport transfer and as a day tour) — matching on it alone silently
     // overwrote one with the other (A-item 5). This table also has no
-    // season, validity dates, supplier_id or notes.
+    // season, validity dates or notes; supplier_id arrived with migration 355.
     uniqueKey: ['route_name', 'service_type', 'city', 'vehicle_type'],
     columns: [
       id(),
@@ -188,6 +188,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('vehicle_type', 'Vehicle', 'text', true),
       col('base_rate_eur', 'Rate', 'number', true),
       legacyRate('base_rate_non_eur', 'Rate Non-EUR (legacy)', 'base_rate_eur'),
+      supplierId(),
       col('capacity_min', 'Min Pax', 'number', false),
       col('capacity_max', 'Max Pax', 'number', false),
       isActive(), createdAt(), updatedAt(),

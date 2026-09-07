@@ -29,6 +29,8 @@ interface TransportationRate {
   duration?: string | null
   area?: string | null
   includes?: string | null
+  /** The transport company this route is bought from (migration 355). */
+  supplier_id?: string | null
   base_rate_eur: number | null
   base_rate_non: number
   base_rate_non_eur?: number | null
@@ -80,6 +82,7 @@ interface FormData {
   city: string
   destination_city: string
   vehicles: Record<string, VehicleRateEntry>
+  supplier_id: string
   is_active: boolean
 }
 
@@ -89,7 +92,14 @@ const initialFormData: FormData = {
   city: '',
   destination_city: '',
   vehicles: {},
+  supplier_id: '',
   is_active: true
+}
+
+interface Supplier {
+  id: string
+  name: string
+  city?: string | null
 }
 
 
@@ -123,6 +133,10 @@ export default function TransportationContent() {
   // Labels must name the currency the amounts are actually in (C3.4b).
   const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   const [formData, setFormData] = useState<FormData>(initialFormData)
+  // Transport companies — the supplier types that behave as transport_company
+  // (Settings → Your vocabulary), active only.
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const supplierName = (id?: string | null) => (id && suppliers.find(s => s.id === id)?.name) || null
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -158,6 +172,15 @@ export default function TransportationContent() {
   useEffect(() => {
     fetchRates()
   }, [fetchRates])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/suppliers?type=transport_company&status=active')
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setSuppliers(Array.isArray(d?.data) ? d.data : Array.isArray(d) ? d : []) })
+      .catch(err => console.error('Error fetching transport suppliers:', err))
+    return () => { cancelled = true }
+  }, [])
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -262,6 +285,7 @@ export default function TransportationContent() {
       city: rate.city,
       destination_city: rate.destination_city || '',
       vehicles: rowToVehicles(rate),
+      supplier_id: rate.supplier_id || '',
       is_active: rate.is_active
     })
     setIsModalOpen(true)
@@ -320,6 +344,7 @@ export default function TransportationContent() {
         service_type: formData.service_type,
         city: formData.city,
         destination_city: formData.destination_city,
+        supplier_id: formData.supplier_id || null,
         is_active: formData.is_active,
         ...rateCurrencyPatch(rateCurrency, editingRate?.rate_currency),
         vehicles: offeredClasses.map(c => ({ vehicle_type: c.key, ...formData.vehicles[c.key] })),
@@ -451,6 +476,7 @@ export default function TransportationContent() {
       city: rate.city,
       destination_city: rate.destination_city || '',
       vehicles: rowToVehicles(rate),
+      supplier_id: rate.supplier_id || '',
       is_active: rate.is_active
     })
     setIsModalOpen(true)
@@ -683,6 +709,9 @@ export default function TransportationContent() {
                     </td>
                     <td className="px-4 py-2">
                       <span className="text-sm font-medium text-gray-900">{rate.route_name || '—'}</span>
+                      {supplierName(rate.supplier_id) && (
+                        <p className="text-xs text-gray-500">{supplierName(rate.supplier_id)}</p>
+                      )}
                     </td>
                     <td className="px-4 py-2">
                       <span className="text-sm text-gray-600">
@@ -1017,6 +1046,23 @@ export default function TransportationContent() {
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-gray-700 border-b pb-2">Additional Information</h3>
                 
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Transport company</label>
+                  <select
+                    value={formData.supplier_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, supplier_id: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#647C47] focus:border-transparent bg-white"
+                  >
+                    <option value="">No supplier linked</option>
+                    {suppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}{s.city ? ` — ${s.city}` : ''}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Who drives this route. Only suppliers whose type behaves as a transport company are listed; add one under CRM → Suppliers.
+                  </p>
+                </div>
+
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"

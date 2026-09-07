@@ -122,6 +122,8 @@ export async function saveRoute(tenantId: string, body: Record<string, any>, exi
     area: body.area || null,
     includes: body.includes || null,
     is_active: body.is_active !== undefined ? body.is_active : true,
+    // The transport company (migration 355) — one per route, on every row.
+    supplier_id: body.supplier_id || null,
     updated_at: new Date().toISOString(),
   }
 
