@@ -5,6 +5,7 @@ import { getCruiseRate } from './cruise-pricing'
 export async function createLandItineraryServices(
   supabase: any,
   params: {
+    tenantId: string;
     days: any[]; itineraryId: string; startDateObj: Date; durationDays: number;
     effectiveCity: string; totalPax: number; isEuroPassport: boolean; skipPricing: boolean;
     withMargin: (cost: number) => number; tier: ServiceTier; finalLanguage: string;
@@ -16,6 +17,7 @@ export async function createLandItineraryServices(
   }
 ): Promise<{ totalSupplierCost: number; totalClientPrice: number }> {
   const {
+    tenantId,
     days, itineraryId, startDateObj, durationDays,
     effectiveCity, totalPax, isEuroPassport, skipPricing,
     withMargin, tier, finalLanguage,
@@ -346,7 +348,7 @@ export async function createLandItineraryServices(
 
     // Cruise accommodation (for cruise days)
     if (isCruiseDay && !isLastDay) {
-      const cruiseRate = await getCruiseRate(tier, [], supabase)
+      const cruiseRate = await getCruiseRate({ tenantId, tier, travelDate: startDateObj.toISOString().split('T')[0] })
       const nightCost = cruiseRate.perPersonPerNight * totalPax
       services.push({
         service_type: 'cruise',

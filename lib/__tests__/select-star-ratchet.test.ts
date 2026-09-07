@@ -16,10 +16,11 @@ import { join } from 'path'
 const ROOT = join(__dirname, '..', '..')
 const STAR = /\.select\(\s*['"`]\*['"`]/g
 
-// The count on 2026-08-31, after narrowing the head:true count queries (where
-// the star was inert). Lower this — never raise it — as star-selects are
-// replaced with explicit column lists.
-const BASELINE = 277
+// The count on 2026-09-07, after lib/ai/cruise-pricing.ts stopped querying
+// nile_cruises itself (three stars) and delegated to the canonical engine
+// lookup. Lower this — never raise it — as star-selects are replaced with
+// explicit column lists.
+const BASELINE = 274
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
