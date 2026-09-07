@@ -178,7 +178,8 @@ export default function VocabularySettingsPage() {
 
       {!isAdmin && (
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4" /> Only admins can change the vocabulary. You can read it here.
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>You can read these lists but not change them. Only the agency owner or an admin can — ask one of them to make the change, or to make you an admin under <Link href="/users" className="underline">Settings → User Management</Link>.</span>
         </div>
       )}
 

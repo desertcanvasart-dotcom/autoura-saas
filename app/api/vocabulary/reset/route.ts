@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { isVocabularyKind } from '@/lib/vocabulary'
-import { WRITE_ROLES } from '../route'
+import { WRITE_ROLES, WRITE_DENIED } from '../route'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     if (auth.error !== null) return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     const { supabase, role } = auth
     if (!supabase) return NextResponse.json({ success: false, error: 'Authentication failed' }, { status: 401 })
-    if (!WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: 'Admin access required' }, { status: 403 })
+    if (!WRITE_ROLES.includes(role || '')) return NextResponse.json({ success: false, error: WRITE_DENIED }, { status: 403 })
 
     const body = await request.json().catch(() => ({})) as { kind?: unknown }
     if (!isVocabularyKind(body.kind)) return NextResponse.json({ success: false, error: 'Unknown vocabulary kind' }, { status: 400 })
