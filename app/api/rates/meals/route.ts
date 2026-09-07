@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
+import { clearPreferredSiblings } from '@/lib/rates/preferred'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
 
@@ -110,6 +111,12 @@ export async function POST(request: NextRequest) {
       notes: body.notes || null,
       is_preferred: body.is_preferred === true,
       is_active: body.is_active !== false
+    }
+
+    // One preferred restaurant per tier + meal (migration 354).
+    if (newRate.is_preferred) {
+      const cleared = await clearPreferredSiblings(supabase, 'meal_rates', authResult.tenant_id!, newRate, '00000000-0000-0000-0000-000000000000')
+      if (cleared.error) return NextResponse.json({ success: false, error: cleared.error }, { status: 500 })
     }
 
     const { data, error } = await supabase

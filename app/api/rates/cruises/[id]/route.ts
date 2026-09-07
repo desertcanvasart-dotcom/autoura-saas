@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
+import { clearPreferredSiblings } from '@/lib/rates/preferred'
 import { requireAuth } from '@/lib/supabase-server'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
@@ -160,6 +161,13 @@ export async function PUT(
       supplements: body.supplements || [],
 
       updated_at: new Date().toISOString()
+    }
+
+    // One preferred ship per tier (migration 354): flagging this one clears
+    // its siblings first, so the form can never trip the index.
+    if (updateData.is_preferred) {
+      const cleared = await clearPreferredSiblings(supabase, 'nile_cruises', authResult.tenant_id!, updateData, id)
+      if (cleared.error) return NextResponse.json({ success: false, error: cleared.error }, { status: 500 })
     }
 
     const { data, error } = await supabase

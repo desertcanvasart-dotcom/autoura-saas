@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
 import { TierBadge, TierPicker, VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -53,6 +54,8 @@ interface Supplement {
 }
 
 interface AccommodationRate {
+  // The engine's default among several hotels in this city + tier (mig 353).
+  is_preferred?: boolean | null
   // The currency this row's amounts are in; blank means the tenant's.
   rate_currency?: string | null
   id: string
@@ -443,6 +446,15 @@ export default function HotelsContent() {
   }
 
   // Fetch rates
+
+  // The preferred star: the engine's default among several hotels in the
+  // same city + tier (one per scope, migration 354).
+  const onPreferredToggled = (r: PreferredToggleResult) => {
+    if (r.ok) showToast('success', r.preferred ? `${r.name || 'Hotel'} is now the preferred hotel for ${r.scope}` : `${r.name || 'Hotel'} is no longer preferred`)
+    else showToast('error', r.error || 'Could not update')
+    fetchRates()
+  }
+
   const fetchRates = async () => {
     try {
       const response = await fetch('/api/rates/hotels')
@@ -1357,6 +1369,7 @@ export default function HotelsContent() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
+                          <PreferredStar table="accommodation_rates" id={rate.id} preferred={rate.is_preferred} onToggled={onPreferredToggled} />
                           <button
                             onClick={() => handleEdit(rate)}
                             className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
@@ -1487,6 +1500,9 @@ export default function HotelsContent() {
                   </div>
 
                   <div className="flex border-t border-gray-200 divide-x divide-gray-200">
+                    <div className="flex items-center justify-center px-1">
+                      <PreferredStar table="accommodation_rates" id={rate.id} preferred={rate.is_preferred} onToggled={onPreferredToggled} />
+                    </div>
                     <button
                       onClick={() => handleEdit(rate)}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
@@ -1553,6 +1569,7 @@ export default function HotelsContent() {
                   <div className="flex items-center gap-4">
                     <span className="text-sm font-bold text-green-600">{ppdCell(rate, 'current')}</span>
                     <div className="flex items-center gap-1">
+                      <PreferredStar table="accommodation_rates" id={rate.id} preferred={rate.is_preferred} onToggled={onPreferredToggled} className="p-1" />
                       <button
                         onClick={() => handleEdit(rate)}
                         className="p-1 text-gray-400 hover:text-primary-600 transition-colors"

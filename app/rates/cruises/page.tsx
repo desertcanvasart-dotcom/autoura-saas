@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Ship, Plus, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
 import { TierBadge, TierPicker, VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
@@ -687,6 +688,15 @@ export default function CruisesPage() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
   }
 
+
+  // The preferred star: the engine's default among several ships in the
+  // same tier (one per scope, migration 354).
+  const onPreferredToggled = (r: PreferredToggleResult) => {
+    if (r.ok) showToast('success', r.preferred ? `${r.name || 'Ship'} is now the preferred ${r.scope} cruise` : `${r.name || 'Ship'} is no longer preferred`)
+    else showToast('error', r.error || 'Could not update')
+    fetchCruises()
+  }
+
   const fetchCruises = async () => {
     try {
       const response = await fetch('/api/rates/cruises')
@@ -1313,6 +1323,7 @@ export default function CruisesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-1">
+                        <PreferredStar table="nile_cruises" id={cruise.id} preferred={cruise.is_preferred} onToggled={onPreferredToggled} className="p-1" />
                         <button onClick={() => handleEdit(cruise)} className="p-1 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded" title="Edit">
                           <Edit className="w-4 h-4" />
                         </button>
