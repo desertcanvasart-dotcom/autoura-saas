@@ -4,7 +4,6 @@
   "app/api/ai/generate-itinerary/route.ts": 3,
   "app/api/ai/parse-supplier-invoice/route.ts": 2,
   "app/api/pricing-grid/parse/route.ts": 17,
-  "app/api/rates/available/route.ts": 3,
   "app/api/tours/browse/route.ts": 3,
   "app/b2b/calculator/[id]/page.tsx": 21,
   "app/b2b/pricing-rules/page.tsx": 11,
