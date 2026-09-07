@@ -227,7 +227,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate client stats
     const totalClients = clients.length
-    const newClients = clients.filter(c => c.status === 'lead' || c.status === 'prospect').length
+    const newClients = clients.filter(c => c.status === 'lead').length
     const returningClients = clients.filter(c => c.status === 'customer').length
 
     // Calculate conversion rate (confirmed / total inquiries). Denominator

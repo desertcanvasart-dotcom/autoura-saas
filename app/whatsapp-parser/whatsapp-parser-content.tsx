@@ -1259,7 +1259,7 @@ function WhatsAppParserContent() {
           email: clientEmail,
           phone: clientPhone,
           nationality: clientNationality,
-          status: 'prospect',
+          status: 'lead',
           client_type: extractedData.num_adults > 2 ? 'family' : 'individual',
           passport_type: 'other',
           preferred_language: extractedData.conversation_language || 'English',

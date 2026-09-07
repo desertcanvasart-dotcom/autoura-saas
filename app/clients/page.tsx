@@ -9,6 +9,7 @@ import {
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/app/supabase'
+import { CLIENT_STAGES, clientStageBadge, clientStageLabel, isLead, isCustomer } from '@/lib/client-stage'
 import Link from 'next/link'
 import { showToast } from '@/app/contexts/ToastContext'
 
@@ -70,6 +71,7 @@ export default function ClientsPage() {
   // Stats
   const [stats, setStats] = useState({
     total: 0,
+    leads: 0,
     active: 0,
     vip: 0,
     newThisMonth: 0,
@@ -232,10 +234,11 @@ export default function ClientsPage() {
 
         setStats({
           total: allClients.length,
-          active: allClients.filter(c => c.status === 'active').length,
+          leads: allClients.filter(c => isLead(c.status)).length,
+          active: allClients.filter(c => isCustomer(c.status)).length,
           vip: allClients.filter(c => c.vip_status).length,
           newThisMonth: allClients.filter(c => c.created_at !== null && new Date(c.created_at) >= firstDayOfMonth).length,
-          totalRevenue: 0 // Revenue tracking not yet implemented
+          totalRevenue: 0, // Revenue tracking not yet implemented
         })
       }
     } catch (error) {
@@ -270,15 +273,8 @@ export default function ClientsPage() {
     filters.dateTo ||
     filters.sortBy !== 'recent'
 
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800'
-      case 'inactive': return 'bg-gray-100 text-gray-800'
-      case 'prospect': return 'bg-primary-100 text-primary-800'
-      case 'blacklisted': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
+  // Lead → Customer (lib/client-stage): the badge colour and word in one place.
+  const getStatusColor = (status: string | null) => clientStageBadge(status)
 
   const getTypeColor = (type: string | null) => {
     switch (type) {
@@ -417,7 +413,7 @@ export default function ClientsPage() {
                 <div className="w-1.5 h-1.5 rounded-full bg-green-600" />
               </div>
             </div>
-            <p className="text-xs text-gray-600">Active</p>
+            <p className="text-xs text-gray-600">Customers</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{stats.active}</p>
           </div>
 
@@ -453,10 +449,8 @@ export default function ClientsPage() {
                 <div className="w-1.5 h-1.5 rounded-full bg-purple-600" />
               </div>
             </div>
-            <p className="text-xs text-gray-600">Total Revenue</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              €{stats.totalRevenue.toLocaleString()}
-            </p>
+            <p className="text-xs text-gray-600">Leads</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.leads}</p>
           </div>
         </div>
 
@@ -516,11 +510,8 @@ export default function ClientsPage() {
                     onChange={(e) => handleFilterChange('status', e.target.value)}
                     className="w-full px-3 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white shadow-sm"
                   >
-                    <option value="all">All Statuses</option>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="prospect">Prospect</option>
-                    <option value="blacklisted">Blacklisted</option>
+                    <option value="all">All stages</option>
+                    {CLIENT_STAGES.map(st => <option key={st.key} value={st.key}>{st.label}</option>)}
                   </select>
                 </div>
 
@@ -732,7 +723,7 @@ export default function ClientsPage() {
                               {client.client_type}
                             </span>
                             <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(client.status)}`}>
-                              {client.status}
+                              {clientStageLabel(client.status)}
                             </span>
                           </div>
                         </td>

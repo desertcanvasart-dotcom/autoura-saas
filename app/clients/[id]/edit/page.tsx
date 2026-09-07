@@ -5,6 +5,7 @@ import { createClient } from '@/app/supabase'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Save, Loader2, User, Mail, Phone, Globe, Building, Star, Tag } from 'lucide-react'
+import { CLIENT_STAGES, DEFAULT_CLIENT_STAGE, normalizeClientStage } from '@/lib/client-stage'
 
 const LEAD_SOURCES = [
   { value: 'whatsapp', label: 'WhatsApp', icon: '💬' },
@@ -57,7 +58,7 @@ export default function EditClientPage() {
     preferred_contact_method: '',
     client_type: 'individual',
     vip_status: false,
-    status: 'prospect',
+    status: DEFAULT_CLIENT_STAGE,
     lead_source: '',
     company_name: '',
     internal_notes: '',
@@ -97,7 +98,7 @@ export default function EditClientPage() {
           preferred_contact_method: data.preferred_contact_method || '',
           client_type: data.client_type || 'individual',
           vip_status: data.vip_status || false,
-          status: data.status || 'prospect',
+          status: normalizeClientStage(data.status),
           lead_source: data.lead_source || '',
           company_name: data.company_name || '',
           internal_notes: data.internal_notes || '',
@@ -369,10 +370,8 @@ export default function EditClientPage() {
                   onChange={handleChange}
                   className="w-full px-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm bg-white"
                 >
-                  <option value="prospect">Prospect</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="blacklisted">Blacklisted</option>
+                  {/* Lead → Customer happens on the first booking (a database trigger); here an admin can still set it by hand. */}
+                  {CLIENT_STAGES.map(st => <option key={st.key} value={st.key}>{st.label} — {st.hint}</option>)}
                 </select>
               </div>
               <div>

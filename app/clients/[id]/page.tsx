@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { formatCurrency } from '@/lib/currency'
+import { clientStageBadge, clientStageLabel } from '@/lib/client-stage'
 
 interface Client {
   id: string
@@ -254,15 +255,7 @@ export default function ClientProfilePage() {
     )
   }
   
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800'
-      case 'inactive': return 'bg-gray-100 text-gray-800'
-      case 'prospect': return 'bg-blue-100 text-blue-800'
-      case 'blacklisted': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
+  const getStatusColor = (status: string | null) => clientStageBadge(status)
   
   const pendingFollowups = followups.filter(f => f.status === 'pending')
   const overdueFollowups = pendingFollowups.filter(f => new Date(f.due_date) < new Date())
@@ -320,7 +313,7 @@ export default function ClientProfilePage() {
                 </div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getStatusColor(client.status)}`}>
-                    {client.status}
+                    {clientStageLabel(client.status)}
                   </span>
                   <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
                     {client.client_type}

@@ -7,6 +7,7 @@ import {
   Filter, X, Star, TrendingUp, Calendar,
   User, Building, Users, ChevronDown, SlidersHorizontal
 } from 'lucide-react'
+import { CLIENT_STAGES } from '@/lib/client-stage'
 
 const supabase = createClient()
 
@@ -107,11 +108,8 @@ export function ClientFilters({ onFilterChange }: { onFilterChange: (filters: an
                 onChange={(e) => handleFilterChange('status', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="all">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="prospect">Prospect</option>
-                <option value="blacklisted">Blacklisted</option>
+                <option value="all">All stages</option>
+                {CLIENT_STAGES.map(st => <option key={st.key} value={st.key}>{st.label}</option>)}
               </select>
             </div>
 

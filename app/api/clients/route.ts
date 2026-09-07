@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { DEFAULT_CLIENT_STAGE } from '@/lib/client-stage'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 /**
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
       email: body.email || null,
       phone: body.phone || null,
       nationality: body.nationality || 'Unknown',
-      status: body.status || 'prospect',
+      status: body.status || DEFAULT_CLIENT_STAGE,
       client_type: body.client_type || 'individual',
       passport_type: body.passport_type || 'other',
       preferred_language: body.preferred_language || 'English',
