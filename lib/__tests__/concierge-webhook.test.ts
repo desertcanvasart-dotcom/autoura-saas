@@ -220,7 +220,7 @@ describe('mapBrief', () => {
     expect(m.isActionable).toBe(false)
     expect(m.flags).toContain('unactionable_no_contact')
     expect(m.client.client_source).toBe('concierge')
-    expect(m.client.status).toBe('prospect')
+    expect(m.client.status).toBe('lead') // a brief is a lead until the first booking (352)
   })
 
   it('produces an actionable mapping with email', () => {

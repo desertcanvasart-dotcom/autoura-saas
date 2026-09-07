@@ -336,7 +336,7 @@ async function createWhatsAppClient(
       full_name: name || phoneNumber,
       phone: phoneNumber,
       nationality: 'Unknown',
-      status: 'prospect',
+      status: 'lead',
       client_type: 'individual',
       passport_type: 'other',
       preferred_language: 'English',

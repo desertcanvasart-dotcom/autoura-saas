@@ -25,7 +25,8 @@ export default function ClientsPage() {
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Finding a Client</h3>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li>Type in the <strong>Search</strong> bar (searches name, email, phone, or client code)</li>
-          <li>Use the <strong>Filters</strong> to narrow by status, client type, lead source, VIP status, or a date range</li>
+          <li>Use the <strong>Filters</strong> to narrow by stage, client type, lead source, VIP status, or a date range</li>
+          <li>Every client has a <strong>stage</strong>: a <strong>Lead</strong> has asked but not booked (that is how an inbound email, WhatsApp or concierge brief starts); the first booking makes them a <strong>Customer</strong> automatically. Inactive and Blocked are set by hand.</li>
           <li><strong>Sort</strong> by Most Recent, Oldest First, Name A-Z / Z-A, Revenue (high or low), or Bookings (Most)</li>
         </ul>
         <Tip>

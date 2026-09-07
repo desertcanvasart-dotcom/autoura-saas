@@ -171,7 +171,7 @@ export default function ClientLinkButton({
           first_name: first || fromEmail.split('@')[0],
           last_name: rest.join(' ') || undefined,
           email: fromEmail,
-          status: 'prospect',
+          status: 'lead',
           client_source: 'email',
         }),
       })

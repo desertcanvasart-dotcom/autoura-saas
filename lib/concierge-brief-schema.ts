@@ -3,7 +3,7 @@
 // ============================================
 // Validates the inbound payload and maps it onto:
 //   - a concierge_briefs row
-//   - a clients upsert (status='prospect', client_source='concierge')
+//   - a clients upsert (status='lead', client_source='concierge')
 //   - client_preferences + client_notes payloads
 //
 // Pure functions only, so the webhook route AND the dry-run preview
@@ -293,7 +293,7 @@ export function mapBrief(p: ConciergeBriefPayload): MappedBrief {
       email,
       phone,
       nationality: nonEmpty(trip.nationality) ?? 'Unknown',
-      status: 'prospect',
+      status: 'lead',
       client_type: 'individual',
       passport_type: 'other',
       preferred_language: mapLanguageToLabel(p.language),
