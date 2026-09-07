@@ -33,6 +33,7 @@ import { presetTierFor, tierMultiplier } from '@/lib/vocabulary'
 import { generateFromStructuredInput, generateCreativeItinerary } from '@/lib/ai/prompt-builder'
 import { loadDestinationPromptContext } from '@/lib/ai/destination-context'
 import { getTenantRunCurrency, DEFAULT_RUN_CURRENCY } from '@/lib/rates/run-currency'
+import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { createCruiseItineraryServices } from '@/lib/ai/cruise-service-creation'
 import { createLandItineraryServices } from '@/lib/ai/service-creation'
 
@@ -878,6 +879,21 @@ export async function POST(request: NextRequest) {
     const { holes, addHole } = createHoleCollector()
     const rateHoles = { holes, addHole }
 
+    // Per-rate currency (P3, migration 295): a rate row may be recorded in the
+    // supplier's contract currency. Every table below was read RAW, so an
+    // EGP 6,000 hotel-staff rate was spent as if it were 6,000 of the run
+    // currency — and the quote's currency label (set far above) already
+    // promises the run currency, so nothing downstream could notice. Convert
+    // a COPY at this fetch boundary, the same seam the pricing engine uses;
+    // the stored rows never change. A row whose currency has no usable
+    // exchange rate comes back with its amounts NULLED (never-guess), which
+    // the requireUsableRate checks below already report as a gap.
+    //
+    // `vehicles` and `hotel_contacts` are deliberately absent: neither carries
+    // rate_currency, so their amounts are single-currency by design.
+    const inRunCurrency = <T extends Record<string, unknown>>(table: string, rows: T[] | null | undefined) =>
+      normalizeRateRows(supabase, table, rows, tenantRunCurrency)
+
     const { data: vehicles, error: vehiclesError } = await supabase.from('vehicles').select('*').eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false })
     requireRates(rateHoles, {
       kind: 'transport', tier, table: 'vehicles', error: vehiclesError, rows: vehicles,
@@ -906,7 +922,8 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const { data: guides, error: guidesError } = await supabase.from('guides').select('*').eq('is_active', true).eq('tier', tier).contains('languages', [finalLanguage]).limit(5)
+    const { data: raw_guides, error: guidesError } = await supabase.from('guides').select('*').eq('is_active', true).eq('tier', tier).contains('languages', [finalLanguage]).limit(5)
+    const guides = await inRunCurrency('guides', raw_guides as Record<string, unknown>[])
     requireRates(rateHoles, {
       kind: 'guide', tier, table: 'guides', error: guidesError, rows: guides,
       lookupAttempted: `guides where is_active, tier = '${tier}', speaks '${finalLanguage}'`,
@@ -914,7 +931,8 @@ export async function POST(request: NextRequest) {
     })
     const selectedGuide = guides?.[0] as any
 
-    const { data: allEntranceFees, error: entranceFeesError } = await supabase.from('entrance_fees').select('*').eq('is_active', true)
+    const { data: raw_allEntranceFees, error: entranceFeesError } = await supabase.from('entrance_fees').select('*').eq('is_active', true)
+    const allEntranceFees = await inRunCurrency('entrance_fees', raw_allEntranceFees as Record<string, unknown>[])
     requireRates(rateHoles, {
       kind: 'entrance', tier, table: 'entrance_fees', error: entranceFeesError, rows: allEntranceFees,
       lookupAttempted: 'entrance_fees where is_active',
@@ -928,8 +946,9 @@ export async function POST(request: NextRequest) {
     // Because the table is already tier-scoped, the old `tierMealMultiplier`
     // is gone: multiplying a deluxe rate by a deluxe factor charges the
     // uplift twice.
-    const { data: mealRates, error: mealRatesError } = await supabase
+    const { data: raw_mealRates, error: mealRatesError } = await supabase
       .from('meal_rates').select('*').eq('is_active', true).eq('tier', tier)
+    const mealRates = await inRunCurrency('meal_rates', raw_mealRates as Record<string, unknown>[])
     const haveMealRates = requireRates(rateHoles, {
       kind: 'meal', tier, table: 'meal_rates', error: mealRatesError, rows: mealRates,
       lookupAttempted: `meal_rates where is_active and tier = '${tier}'`,
@@ -968,7 +987,8 @@ export async function POST(request: NextRequest) {
     // Multiplicity is handled in service-creation, which adds one occurrence
     // per qualifying day, so an itinerary returning to the same city is charged
     // each time. See lib/ai/staff-rate-resolution.ts for the tier mapping.
-    const { data: airportStaffRates, error: airportStaffRatesError } = await supabase.from('airport_staff_rates').select('*').eq('is_active', true)
+    const { data: raw_airportStaffRates, error: airportStaffRatesError } = await supabase.from('airport_staff_rates').select('*').eq('is_active', true)
+    const airportStaffRates = await inRunCurrency('airport_staff_rates', raw_airportStaffRates as Record<string, unknown>[])
     const haveAirportRows = requireRates(rateHoles, {
       kind: 'airport_service', tier, table: 'airport_staff_rates', error: airportStaffRatesError, rows: airportStaffRates,
       lookupAttempted: 'airport_staff_rates where is_active',
@@ -992,7 +1012,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: hotelStaffRates, error: hotelStaffRatesError } = await supabase.from('hotel_staff_rates').select('*').eq('is_active', true)
+    const { data: raw_hotelStaffRates, error: hotelStaffRatesError } = await supabase.from('hotel_staff_rates').select('*').eq('is_active', true)
+    const hotelStaffRates = await inRunCurrency('hotel_staff_rates', raw_hotelStaffRates as Record<string, unknown>[])
     const haveHotelRows = requireRates(rateHoles, {
       kind: 'hotel_service', tier, table: 'hotel_staff_rates', error: hotelStaffRatesError, rows: hotelStaffRates,
       lookupAttempted: 'hotel_staff_rates where is_active',
@@ -1040,7 +1061,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: tippingRates, error: tippingRatesError } = await supabase.from('tipping_rates').select('*').eq('is_active', true)
+    const { data: raw_tippingRates, error: tippingRatesError } = await supabase.from('tipping_rates').select('*').eq('is_active', true)
+    const tippingRates = await inRunCurrency('tipping_rates', raw_tippingRates as Record<string, unknown>[])
     requireRates(rateHoles, {
       kind: 'tipping', tier, table: 'tipping_rates', error: tippingRatesError, rows: tippingRates,
       lookupAttempted: 'tipping_rates where is_active',
