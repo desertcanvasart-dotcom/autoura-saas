@@ -52,6 +52,7 @@ import {
   closestCenter
 } from '@dnd-kit/core'
 import { showToast } from '@/app/contexts/ToastContext'
+import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
 
 interface BookingResource {
   id: string
@@ -124,6 +125,8 @@ export default function CalendarPage() {
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [pendingMove, setPendingMove] = useState<{ bookingId: string, newDate: Date } | null>(null)
+  // Booking whose resources are being assigned inline from the calendar
+  const [assignBooking, setAssignBooking] = useState<Booking | null>(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showStats, setShowStats] = useState(true)
   const [stats, setStats] = useState<Stats>({
@@ -269,6 +272,32 @@ export default function CalendarPage() {
     }
 
     setConflicts(conflictIds)
+  }
+
+  /**
+   * Resource conflicts a move WOULD create: other bookings whose dates would
+   * overlap the booking's proposed [newStart, newEnd] and that share a guide,
+   * vehicle, or other assigned resource. Same rule as detectConflicts, applied
+   * to the proposed dates so the reschedule confirmation can warn first.
+   */
+  const getMoveConflicts = (booking: Booking, newStart: Date, newEnd: Date) => {
+    const results: { other: Booking; resources: string[] }[] = []
+    for (const other of bookings) {
+      if (other.id === booking.id) continue
+      const os = parseISO(other.start_date)
+      const oe = parseISO(other.end_date)
+      if (!(newStart <= oe && newEnd >= os)) continue
+      const shared: string[] = []
+      for (const r of booking.resources) {
+        if (r.resource_id && other.resources.some(r2 => r2.resource_type === r.resource_type && r2.resource_id === r.resource_id)) {
+          shared.push(r.resource_name)
+        }
+      }
+      if (booking.assigned_guide_id && booking.assigned_guide_id === other.assigned_guide_id) shared.push(booking.guide_name || 'Guide')
+      if (booking.assigned_vehicle_id && booking.assigned_vehicle_id === other.assigned_vehicle_id) shared.push(booking.vehicle_name || 'Vehicle')
+      if (shared.length) results.push({ other, resources: Array.from(new Set(shared)) })
+    }
+    return results
   }
 
   const applyFilters = () => {
@@ -543,6 +572,15 @@ export default function CalendarPage() {
       </div>
     )
   }
+
+  const pendingMoveBooking = pendingMove ? bookings.find(b => b.id === pendingMove.bookingId) : null
+  const pendingMoveConflicts = (pendingMove && pendingMoveBooking)
+    ? getMoveConflicts(
+        pendingMoveBooking,
+        startOfDay(pendingMove.newDate),
+        addDays(startOfDay(pendingMove.newDate), differenceInDays(parseISO(pendingMoveBooking.end_date), parseISO(pendingMoveBooking.start_date)))
+      )
+    : []
 
   return (
     <DndContext
@@ -903,9 +941,9 @@ export default function CalendarPage() {
         </div>
 
         {/* Calendar Views */}
-        {viewMode === 'month' && <MonthView currentDate={currentDate} bookings={filteredBookings} conflicts={conflicts} getBookingsForDate={getBookingsForDate} getStatusColor={getStatusColor} />}
-        {viewMode === 'week' && <WeekView currentDate={currentDate} bookings={filteredBookings} conflicts={conflicts} getBookingsForDate={getBookingsForDate} getStatusColor={getStatusColor} />}
-        {viewMode === 'timeline' && <TimelineView bookings={filteredBookings} conflicts={conflicts} getStatusColor={getStatusColor} />}
+        {viewMode === 'month' && <MonthView currentDate={currentDate} bookings={filteredBookings} conflicts={conflicts} getBookingsForDate={getBookingsForDate} getStatusColor={getStatusColor} onSelectBooking={setAssignBooking} />}
+        {viewMode === 'week' && <WeekView currentDate={currentDate} bookings={filteredBookings} conflicts={conflicts} getBookingsForDate={getBookingsForDate} getStatusColor={getStatusColor} onSelectBooking={setAssignBooking} />}
+        {viewMode === 'timeline' && <TimelineView bookings={filteredBookings} conflicts={conflicts} getStatusColor={getStatusColor} onSelectBooking={setAssignBooking} />}
 
         {/* Drag Overlay */}
         <DragOverlay>
@@ -928,9 +966,54 @@ export default function CalendarPage() {
           <ConfirmMoveModal
             booking={bookings.find(b => b.id === pendingMove.bookingId)!}
             newDate={pendingMove.newDate}
+            conflicts={pendingMoveConflicts}
             onConfirm={confirmMove}
             onCancel={cancelMove}
           />
+        )}
+
+        {/* Inline resource assignment — reuses the itinerary's assignment UI
+            (with its own server-side conflict check) in a modal on the calendar. */}
+        {assignBooking && (
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setAssignBooking(null)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">{assignBooking.client_name}</h3>
+                  <p className="text-xs text-gray-600">
+                    {assignBooking.itinerary_code} · {format(parseISO(assignBooking.start_date), 'MMM d')} – {format(parseISO(assignBooking.end_date), 'MMM d, yyyy')}
+                  </p>
+                  <Link href={`/itineraries/${assignBooking.id}`} className="text-xs text-primary-600 hover:underline">
+                    Open full itinerary →
+                  </Link>
+                </div>
+                <button
+                  onClick={() => setAssignBooking(null)}
+                  className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-5">
+                <ResourceAssignmentV2
+                  itineraryId={assignBooking.id}
+                  startDate={assignBooking.start_date}
+                  endDate={assignBooking.end_date}
+                  numTravelers={assignBooking.num_travelers}
+                  clientName={assignBooking.client_name}
+                  tripName={assignBooking.itinerary_code}
+                  onUpdate={fetchData}
+                />
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </DndContext>
@@ -967,7 +1050,7 @@ function StatCard({ icon, label, value, color, badge }: any) {
   )
 }
 
-function MonthView({ currentDate, bookings, conflicts, getBookingsForDate, getStatusColor }: any) {
+function MonthView({ currentDate, bookings, conflicts, getBookingsForDate, getStatusColor, onSelectBooking }: any) {
   const { useDroppable } = require('@dnd-kit/core')
   
   const monthStart = startOfMonth(currentDate)
@@ -997,6 +1080,7 @@ function MonthView({ currentDate, bookings, conflicts, getBookingsForDate, getSt
           isPast={isPast}
           conflicts={conflicts}
           getStatusColor={getStatusColor}
+          onSelectBooking={onSelectBooking}
         />
       )
       day = addDays(day, 1)
@@ -1023,7 +1107,7 @@ function MonthView({ currentDate, bookings, conflicts, getBookingsForDate, getSt
   )
 }
 
-function CalendarCell({ date, bookings, isCurrentMonth, isToday, isPast, conflicts, getStatusColor }: any) {
+function CalendarCell({ date, bookings, isCurrentMonth, isToday, isPast, conflicts, getStatusColor, onSelectBooking }: any) {
   const { useDroppable } = require('@dnd-kit/core')
   
   const { setNodeRef, isOver } = useDroppable({
@@ -1060,6 +1144,7 @@ function CalendarCell({ date, bookings, isCurrentMonth, isToday, isPast, conflic
             booking={booking}
             getStatusColor={getStatusColor}
             conflicts={conflicts}
+            onSelect={onSelectBooking}
           />
         ))}
         {bookings.length > 3 && (
@@ -1072,9 +1157,9 @@ function CalendarCell({ date, bookings, isCurrentMonth, isToday, isPast, conflic
   )
 }
 
-function DraggableBooking({ booking, getStatusColor, conflicts }: any) {
+function DraggableBooking({ booking, getStatusColor, conflicts, onSelect }: any) {
   const { useDraggable } = require('@dnd-kit/core')
-  
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: booking.id,
   })
@@ -1089,7 +1174,9 @@ function DraggableBooking({ booking, getStatusColor, conflicts }: any) {
       style={style}
       {...listeners}
       {...attributes}
-      className={`text-xs p-1 rounded ${getStatusColor(booking.payment_status)} text-white hover:opacity-80 transition-opacity cursor-grab active:cursor-grabbing ${
+      onClick={() => { if (!isDragging) onSelect?.(booking) }}
+      title="Click to assign resources · drag to reschedule"
+      className={`text-xs p-1 rounded ${getStatusColor(booking.payment_status)} text-white hover:opacity-80 transition-opacity cursor-pointer active:cursor-grabbing ${
         conflicts.includes(booking.id) ? 'ring-2 ring-orange-700' : ''
       } ${isDragging ? 'opacity-50' : ''}`}
     >
@@ -1105,7 +1192,7 @@ function DraggableBooking({ booking, getStatusColor, conflicts }: any) {
   )
 }
 
-function WeekView({ currentDate, bookings, conflicts, getBookingsForDate, getStatusColor }: any) {
+function WeekView({ currentDate, bookings, conflicts, getBookingsForDate, getStatusColor, onSelectBooking }: any) {
   const weekStart = startOfWeek(currentDate)
   const weekDays = []
   
@@ -1142,10 +1229,11 @@ function WeekView({ currentDate, bookings, conflicts, getBookingsForDate, getSta
                   </div>
                 ) : (
                   dayBookings.map((booking: any) => (
-                    <Link
+                    <button
+                      type="button"
                       key={booking.id}
-                      href={`/itineraries/${booking.id}`}
-                      className={`block p-2 rounded-lg ${getStatusColor(booking.payment_status)} text-white hover:opacity-80 transition-opacity ${
+                      onClick={() => onSelectBooking?.(booking)}
+                      className={`block w-full text-left p-2 rounded-lg ${getStatusColor(booking.payment_status)} text-white hover:opacity-80 transition-opacity ${
                         conflicts.includes(booking.id) ? 'ring-2 ring-orange-700' : ''
                       }`}
                     >
@@ -1176,7 +1264,7 @@ function WeekView({ currentDate, bookings, conflicts, getBookingsForDate, getSta
                           <span>Conflict</span>
                         </div>
                       )}
-                    </Link>
+                    </button>
                   ))
                 )}
               </div>
@@ -1188,7 +1276,7 @@ function WeekView({ currentDate, bookings, conflicts, getBookingsForDate, getSta
   )
 }
 
-function TimelineView({ bookings, conflicts, getStatusColor }: any) {
+function TimelineView({ bookings, conflicts, getStatusColor, onSelectBooking }: any) {
   const sortedBookings = [...bookings].sort((a, b) => 
     new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
   )
@@ -1259,8 +1347,9 @@ function TimelineView({ bookings, conflicts, getStatusColor }: any) {
                 </div>
 
                 <div className="relative h-12 bg-gray-100 rounded-lg overflow-hidden">
-                  <Link
-                    href={`/itineraries/${booking.id}`}
+                  <button
+                    type="button"
+                    onClick={() => onSelectBooking?.(booking)}
                     className={`absolute top-1.5 h-9 rounded-lg ${getStatusColor(booking.payment_status)} hover:opacity-80 transition-all ${
                       hasConflict ? 'ring-2 ring-orange-700 z-10' : ''
                     }`}
@@ -1277,7 +1366,7 @@ function TimelineView({ bookings, conflicts, getStatusColor }: any) {
                         {booking.num_travelers} pax
                       </div>
                     </div>
-                  </Link>
+                  </button>
                 </div>
 
                 <div className="flex items-center justify-between mt-1 text-xs text-gray-500">
@@ -1309,7 +1398,8 @@ function TimelineView({ bookings, conflicts, getStatusColor }: any) {
   )
 }
 
-function ConfirmMoveModal({ booking, newDate, onConfirm, onCancel }: any) {
+function ConfirmMoveModal({ booking, newDate, conflicts = [], onConfirm, onCancel }: any) {
+  const hasConflicts = conflicts.length > 0
   const currentStart = parseISO(booking.start_date)
   const currentEnd = parseISO(booking.end_date)
   const duration = differenceInDays(currentEnd, currentStart)
@@ -1353,6 +1443,27 @@ function ConfirmMoveModal({ booking, newDate, onConfirm, onCancel }: any) {
           </div>
         </div>
 
+        {hasConflicts && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-orange-800">
+                <p className="font-semibold mb-1">
+                  Resource conflict{conflicts.length > 1 ? 's' : ''} on the new dates
+                </p>
+                <ul className="space-y-0.5">
+                  {conflicts.map((c: any, i: number) => (
+                    <li key={i}>
+                      {c.resources.join(', ')} also on{' '}
+                      <span className="font-medium">{c.other.client_name}</span> ({c.other.itinerary_code})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <button
             onClick={onCancel}
@@ -1362,9 +1473,11 @@ function ConfirmMoveModal({ booking, newDate, onConfirm, onCancel }: any) {
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 font-medium transition-colors"
+            className={`flex-1 px-3 py-2 text-white text-sm rounded-lg font-medium transition-colors ${
+              hasConflicts ? 'bg-orange-600 hover:bg-orange-700' : 'bg-primary-600 hover:bg-primary-700'
+            }`}
           >
-            Confirm Move
+            {hasConflicts ? 'Reschedule anyway' : 'Confirm Move'}
           </button>
         </div>
       </div>
