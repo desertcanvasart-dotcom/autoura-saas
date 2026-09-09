@@ -49,6 +49,9 @@ export async function POST(request: NextRequest) {
       name: r.name,
       // company_name is NOT NULL and mirrors the legacy name column.
       company_name: r.name,
+      // Carry the portable code so a fresh-tenant import creates suppliers the
+      // rate CSVs can link to by code (undefined when the sheet has none).
+      ...(r.supplier_code ? { supplier_code: r.supplier_code } : {}),
       type: r.type,
       types: r.types,
       contact_name: r.contact_name,

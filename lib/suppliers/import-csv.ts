@@ -33,6 +33,11 @@ const HEADER_MAP: Record<string, string> = {
   company_name: 'name',
   supplier: 'name',
   supplier_name: 'name',
+  // The portable cross-install key (SUP-0001). Carried through so importing a
+  // supplier export into a fresh tenant creates suppliers WITH their codes, and
+  // rate CSVs then link by code with no separate reconciliation step.
+  code: 'supplier_code',
+  supplier_code: 'supplier_code',
   type: 'type',
   supplier_type: 'type',
   category: 'type',
@@ -55,6 +60,8 @@ export interface SupplierImportRecord {
   /** 1-based CSV line (header is line 1). */
   row: number
   name: string
+  /** Portable supplier code (SUP-0001) from the other install, when the sheet carries it. */
+  supplier_code?: string
   /** The PRIMARY role (types[0]). */
   type: string
   /** Every role the Type cell named, as slugs (or vocabulary keys after resolveImportTypes). */
