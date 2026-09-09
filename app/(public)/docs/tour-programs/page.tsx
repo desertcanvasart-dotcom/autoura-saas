@@ -83,6 +83,28 @@ export default function TourProgramsPage() {
       </section>
 
       {/* Managing Variations */}
+      {/* Bulk create from CSV */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Bulk-creating from a CSV</h2>
+        <p className="text-gray-600 mb-3">
+          When you have many tours to load, you do not have to add them one by one. The header
+          carries <strong>Sample CSV</strong>, <strong>Export</strong> and <strong>Import</strong>:
+          download the sample, put one tour per row, and import.
+        </p>
+        <p className="text-gray-600 mb-3">
+          A bulk import creates the flat metadata &mdash; code, name, type, duration, cities,
+          descriptions and the featured/active flags. It does <strong>not</strong> carry the
+          day-by-day itinerary, hotels or variations, which you build per tour in the editor
+          afterwards. Import matches on the template code, so re-importing an existing code updates
+          its metadata and never touches an itinerary you have already built.
+        </p>
+        <Tip>
+          The same Sample &rarr; Export &rarr; Import pattern is used for suppliers and rates too.
+          The shared rules &mdash; what a sheet carries, how it upserts by code &mdash; are in{' '}
+          <Link href="/docs/bulk-csv" className="text-primary-600 hover:underline">Bulk Import (CSV)</Link>.
+        </Tip>
+      </section>
+
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Managing Variations</h2>
         <p className="text-gray-600 mb-3">

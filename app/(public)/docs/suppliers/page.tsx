@@ -14,7 +14,7 @@ export default function SuppliersPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-4">Suppliers</h1>
       <p className="text-gray-600 mb-8">
-        The Suppliers page is your central directory of every company and individual you work with &mdash; hotels, transport companies, guides, cruises, restaurants, and more. You&rsquo;ll find it in the sidebar under <strong>Operations</strong>; it&rsquo;s available to admin and manager roles.
+        The Suppliers page is your central directory of every company and individual you work with &mdash; hotels, transport companies, guides, cruises, restaurants, and more. You&rsquo;ll find it in the sidebar under <strong>Suppliers &amp; Rates</strong>; it&rsquo;s available to admin and manager roles.
       </p>
 
       {/* Supplier Types */}
@@ -53,6 +53,40 @@ export default function SuppliersPage() {
           The header carries two actions: <strong>Export</strong> downloads the directory as CSV, and <strong>Add Supplier</strong> opens the creation form.
         </p>
         <DocScreenshot src="/docs/suppliers/suppliers-grid.jpg" alt="Suppliers directory in grid view with the type filter, search bar, and the Export and Add Supplier buttons in the header" />
+      </section>
+
+      {/* Supplier code + CSV */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">The supplier code (SUP-####)</h2>
+        <p className="text-gray-600 mb-3">
+          Every supplier is given a short, stable code &mdash; <strong>SUP-0001</strong>,
+          <strong> SUP-0002</strong>, and so on &mdash; assigned automatically in order. It is yours
+          to edit if you keep your own numbering, as long as it stays unique.
+        </p>
+        <p className="text-gray-600">
+          This code is what makes rates <em>portable</em>. A supplier&rsquo;s internal id is unique
+          to this install, so it means nothing anywhere else; the SUP-#### code travels with the
+          supplier. When you export rates and import them elsewhere, each rate carries its supplier
+          code and re-attaches to the supplier with the matching code &mdash; instead of every rate
+          becoming an orphan you re-link by hand.
+        </p>
+      </section>
+
+      {/* CSV import / export */}
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Importing &amp; exporting suppliers</h2>
+        <p className="text-gray-600 mb-3">
+          Alongside <strong>Export</strong>, the directory has <strong>Sample CSV</strong> and{' '}
+          <strong>Import</strong>. Import reads a filled-in sheet, matching each row on its supplier
+          code so an existing supplier updates rather than duplicates, and everything lands in your
+          own organization&rsquo;s directory.
+        </p>
+        <Tip>
+          Import suppliers <em>before</em> their rates. A rate whose supplier code is not yet in your
+          organization is reported and skipped, not guessed &mdash; so the order is suppliers first,
+          then rates. The shared CSV rules live in{' '}
+          <Link href="/docs/bulk-csv" className="text-primary-600 hover:underline">Bulk Import (CSV)</Link>.
+        </Tip>
       </section>
 
       {/* Adding */}

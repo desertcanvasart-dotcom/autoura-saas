@@ -8,70 +8,15 @@ import {
   ArrowLeft,
   Menu,
   X,
-  Rocket,
-  LayoutDashboard,
-  Users,
-  Map,
-  CalendarCheck,
-  FileText,
-  Wallet,
-  MessageCircle,
-  Globe,
-  FolderOpen,
-  Settings,
-  Lightbulb,
   Camera,
   BookOpen,
-  MailPlus,
-  Wand2,
-  Calculator,
-  Briefcase,
-  ClipboardList,
-  FileCheck,
-  Bell,
-  TrendingUp,
-  BarChart3,
-  Sparkles,
-  ConciergeBell,
-  PackageSearch,
-  FileInput,
-  Building2,
-  CheckSquare,
-  Library,
-  Activity,
+  Lightbulb,
 } from 'lucide-react'
-
-const NAV_ITEMS = [
-  { href: '/docs/getting-started', label: 'Getting Started', icon: Rocket },
-  { href: '/docs/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/docs/analytics-reports', label: 'Analytics & Reports', icon: BarChart3 },
-  { href: '/docs/communication', label: 'Communication', icon: MessageCircle },
-  { href: '/docs/copilot', label: 'AI Copilot', icon: Sparkles },
-  { href: '/docs/concierge-leads', label: 'Concierge Leads', icon: ConciergeBell },
-  { href: '/docs/clients', label: 'Clients (CRM)', icon: Users },
-  { href: '/docs/itinerary-creation', label: 'Itinerary Creation', icon: Wand2 },
-  { href: '/docs/itineraries', label: 'Itineraries', icon: Map },
-  { href: '/docs/b2c-pricing', label: 'B2C Pricing', icon: Calculator },
-  { href: '/docs/b2b-pricing', label: 'B2B Pricing', icon: Briefcase },
-  { href: '/docs/b2b-pricing-rules', label: 'Transport Packages', icon: PackageSearch },
-  { href: '/docs/tour-programs', label: 'Tour Manager', icon: ClipboardList },
-  { href: '/docs/b2b-quotes', label: 'B2B Quotes', icon: FileCheck },
-  { href: '/docs/b2b-import', label: 'Converting to B2B', icon: FileInput },
-  { href: '/docs/bookings', label: 'Bookings', icon: CalendarCheck },
-  { href: '/docs/suppliers', label: 'Suppliers', icon: Building2 },
-  { href: '/docs/tasks-departures', label: 'Tasks, Departures & Capacity', icon: CheckSquare },
-  { href: '/docs/invoices-payments', label: 'Invoices & Payments', icon: FileText },
-  { href: '/docs/expenses-commissions', label: 'Expenses & Commissions', icon: Wallet },
-  { href: '/docs/profit-loss', label: 'Profit & Loss', icon: TrendingUp },
-  { href: '/docs/followups-reminders', label: 'Follow-ups & Reminders', icon: Bell },
-  { href: '/docs/tours-rates', label: 'Tours & Rates', icon: Globe },
-  { href: '/docs/resources-documents', label: 'Resources & Documents', icon: FolderOpen },
-  { href: '/docs/content-library', label: 'Content Library', icon: Library },
-  { href: '/docs/message-templates', label: 'Message Templates', icon: MailPlus },
-  { href: '/docs/team-settings', label: 'Team & Settings', icon: Settings },
-  { href: '/docs/activity-summary', label: 'Team Activity', icon: Activity },
-  { href: '/docs/workflows', label: 'Workflows & Tips', icon: Lightbulb },
-]
+// One list, both renderers — the sidebar and the /docs index render the same
+// app/(public)/docs/toc.ts. The sidebar used to carry its own flat NAV_ITEMS
+// copy that had already drifted from the index (different order and grouping,
+// and it had dropped the Integrations entry).
+import { CATEGORIES } from './toc'
 
 export function ScreenshotPlaceholder({ caption }: { caption: string }) {
   return (
@@ -187,29 +132,38 @@ export default function DocsLayout({
               ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             `}
           >
-            <nav className="p-4 space-y-1">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon
-                const isActive = pathname === item.href
+            <nav className="p-4 space-y-4">
+              {CATEGORIES.map((category) => (
+                <div key={category.label}>
+                  <p className="px-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                    {category.label}
+                  </p>
+                  <div className="space-y-0.5">
+                    {category.items.map((item) => {
+                      const Icon = item.icon
+                      const isActive = pathname === item.href
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-                      ${isActive
-                        ? 'bg-primary-50 text-primary-700 border-l-2 border-primary-600 ml-0'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                      }
-                    `}
-                  >
-                    <Icon className={`w-4.5 h-4.5 flex-shrink-0 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
-                    {item.label}
-                  </Link>
-                )
-              })}
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setSidebarOpen(false)}
+                          className={`
+                            flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                            ${isActive
+                              ? 'bg-primary-50 text-primary-700 border-l-2 border-primary-600 ml-0'
+                              : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            }
+                          `}
+                        >
+                          <Icon className={`w-4.5 h-4.5 flex-shrink-0 ${isActive ? 'text-primary-600' : 'text-gray-400'}`} />
+                          {item.navLabel ?? item.title}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </nav>
           </aside>
 
