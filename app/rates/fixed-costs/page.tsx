@@ -20,6 +20,7 @@ interface FixedCost {
 function FixedCostsContent() {
   const { fmtRate } = useRateRowFormat()
   const [costs, setCosts] = useState<FixedCost[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -88,6 +89,13 @@ function FixedCostsContent() {
     setShowForm(true)
   }
 
+  const q = searchTerm.trim().toLowerCase()
+  const filtered = q
+    ? costs.filter(c =>
+        c.cost_type.toLowerCase().includes(q) ||
+        (c.description || '').toLowerCase().includes(q))
+    : costs
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4">
@@ -109,13 +117,27 @@ function FixedCostsContent() {
       </header>
 
       <div className="max-w-4xl mx-auto p-6">
+        {!loading && costs.length > 0 && (
+          <div className="mb-4">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search fixed costs…"
+              className="w-full md:w-80 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+            />
+          </div>
+        )}
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
         ) : costs.length === 0 && !showForm ? (
           <div className="text-center py-12 text-gray-400">No fixed costs defined yet.</div>
         ) : (
           <div className="space-y-3">
-            {costs.map(c => (
+            {filtered.length === 0 && (
+              <div className="text-center py-12 text-gray-400">No matches.</div>
+            )}
+            {filtered.map(c => (
               <div key={c.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
                 <div>
                   <h3 className="font-medium text-gray-800">{c.cost_type}</h3>
