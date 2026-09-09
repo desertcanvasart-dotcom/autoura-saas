@@ -914,28 +914,30 @@ export default function AttractionsContent() {
                     </td>
                     {/* NEW: Add-on toggle column */}
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => toggleAddonStatus(attraction)}
-                        disabled={togglingAddon === attraction.id}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
-                          attraction.is_addon ? 'bg-orange-500' : 'bg-gray-200'
-                        } ${togglingAddon === attraction.id ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
-                        title={attraction.is_addon ? 'Currently excluded from the automatic price — click to include it' : 'Click to exclude from the automatic price (include only when the customer asks)'}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            attraction.is_addon ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleSellable(attraction)}
-                            title={attraction.is_sellable_extra ? 'Customers can add this after booking — click to stop offering it' : 'Let customers add this site after booking (a sellable extra)'}
-                            className={`px-2 py-1 text-xs rounded border ${attraction.is_sellable_extra ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'}`}
-                          >
-                            {attraction.is_sellable_extra ? 'Sellable' : 'Sell as extra'}
-                          </button>
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          onClick={() => toggleAddonStatus(attraction)}
+                          disabled={togglingAddon === attraction.id}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 ${
+                            attraction.is_addon ? 'bg-orange-500' : 'bg-gray-200'
+                          } ${togglingAddon === attraction.id ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
+                          title={attraction.is_addon ? 'Currently excluded from the automatic price — click to include it' : 'Click to exclude from the automatic price (include only when the customer asks)'}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              attraction.is_addon ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleSellable(attraction)}
+                          title={attraction.is_sellable_extra ? 'Customers can add this after booking — click to stop offering it' : 'Let customers add this site after booking (a sellable extra)'}
+                          className={`px-2 py-1 text-xs rounded border ${attraction.is_sellable_extra ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'}`}
+                        >
+                          {attraction.is_sellable_extra ? 'Sellable' : 'Sell as extra'}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
