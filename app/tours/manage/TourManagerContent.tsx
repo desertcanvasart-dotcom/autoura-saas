@@ -6,11 +6,13 @@ export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
+import { sampleTemplateCsv } from '@/lib/tours/template-csv'
 import {
   Map,
   Plus,
   Download,
   Upload,
+  FileText,
   Edit,
   Trash2,
   X,
@@ -1227,6 +1229,16 @@ export default function TourManagerContent() {
 
   const bulkFileRef = useRef<HTMLInputElement>(null)
 
+  // The sheet to start a bulk upload from: headers + one example row.
+  const handleSampleCsv = () => {
+    const blob = new Blob([sampleTemplateCsv()], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'tour-templates-sample.csv'
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   // Flat CSV of the portable template metadata (this tenant). Server builds it.
   const handleExportTemplates = () => {
     window.location.href = '/api/tours/bulk/export'
@@ -1556,6 +1568,10 @@ export default function TourManagerContent() {
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportFile(f) }}
               />
+              <button onClick={handleSampleCsv} title="Download a sample CSV with the columns and one example row — fill in a row per tour, then Import" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                <FileText className="w-4 h-4" />
+                Sample CSV
+              </button>
               <button onClick={handleExportTemplates} title="Download all templates as a CSV (portable metadata: code, name, type, duration, cities, status)" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
                 <Download className="w-4 h-4" />
                 Export
