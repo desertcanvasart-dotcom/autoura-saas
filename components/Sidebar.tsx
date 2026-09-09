@@ -129,9 +129,6 @@ const navigation: NavSection[] = [
       { label: 'Bookings', href: '/bookings', icon: BookOpen },
       { label: 'Booking Calendar', href: '/calendar', icon: Calendar },
       { label: 'Extras', href: '/rates/extras', icon: Sparkles, roles: ['admin', 'manager'] },
-      // The demand calendar: the dates you charge more on, and by how much.
-      // Built long before it was linked (lib/pricing/season-uplift.ts).
-      { label: 'Seasonal Premiums', href: '/settings/seasons', icon: CalendarRange, roles: ['admin', 'manager'] },
     ]
   },
   // Running what was sold: the to-dos, the departures and how much the
@@ -268,18 +265,24 @@ const navigation: NavSection[] = [
   {
     title: 'Settings',
     key: 'settings',
-    roles: ['admin'],
+    // admin + manager: the section renders for managers so they can still reach
+    // Seasonal Premiums (a selling-side pricing tool). Every other item is
+    // pinned admin-only so widening the section does not expose admin config.
+    roles: ['admin', 'manager'],
     items: [
-      { label: 'Settings', href: '/settings', icon: Settings },
-      { label: 'Organization', href: '/settings/tenant', icon: Building },
-      { label: 'Your Vocabulary', href: '/settings/vocabulary', icon: BookA },
-      { label: 'Destinations', href: '/settings/destinations', icon: Globe },
-      { label: 'Departments', href: '/settings/departments', icon: Building },
+      { label: 'Settings', href: '/settings', icon: Settings, roles: ['admin'] },
+      { label: 'Organization', href: '/settings/tenant', icon: Building, roles: ['admin'] },
+      { label: 'Your Vocabulary', href: '/settings/vocabulary', icon: BookA, roles: ['admin'] },
+      { label: 'Destinations', href: '/settings/destinations', icon: Globe, roles: ['admin'] },
+      // The demand calendar: the dates you charge more on, and by how much
+      // (lib/pricing/season-uplift.ts). Managers price, so they keep this.
+      { label: 'Seasonal Premiums', href: '/settings/seasons', icon: CalendarRange, roles: ['admin', 'manager'] },
+      { label: 'Departments', href: '/settings/departments', icon: Building, roles: ['admin'] },
       // Tenant-wide Copilot toggles: admin-only to change, so they live here.
-      { label: 'Copilot Settings', href: '/settings/copilot', icon: Sparkles },
-      { label: 'WhatsApp', href: '/settings/whatsapp', icon: MessageSquare },
-      { label: 'Billing and Subscriptions', href: '/settings/billing', icon: CreditCard },
-      { label: 'User Management', href: '/users', icon: Shield },
+      { label: 'Copilot Settings', href: '/settings/copilot', icon: Sparkles, roles: ['admin'] },
+      { label: 'WhatsApp', href: '/settings/whatsapp', icon: MessageSquare, roles: ['admin'] },
+      { label: 'Billing and Subscriptions', href: '/settings/billing', icon: CreditCard, roles: ['admin'] },
+      { label: 'User Management', href: '/users', icon: Shield, roles: ['admin'] },
     ]
   }
 ]

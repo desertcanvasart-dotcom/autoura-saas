@@ -91,7 +91,6 @@ export const CATEGORIES: DocCategory[] = [
       { href: '/docs/b2b-import', icon: FileInput, title: 'Converting Itineraries to B2B', description: 'Turn standard itineraries into B2B quotes, templates, and partner rate sheets.' },
       { href: '/docs/bookings', icon: CalendarCheck, title: 'Bookings', description: 'Convert quotes to bookings, manage passengers, and track payments and status.' },
       { href: '/docs/extras', icon: Sparkles, title: 'Extras & Upgrades', description: 'Add-ons, upgrades and options offered on top of a trip — priced off-margin, per-row currency, and attached from the itinerary.' },
-      { href: '/docs/seasonal-premiums', icon: CalendarRange, title: 'Seasonal Premiums', description: 'Your high-demand dates as a premium on the whole price after margin — set the dated windows once and every quote in them lifts automatically.' },
     ],
   },
   {
@@ -146,6 +145,7 @@ export const CATEGORIES: DocCategory[] = [
     items: [
       { href: '/docs/team-settings', icon: Settings, title: 'Team & Settings', description: 'Team management, user roles, organization branding, billing, and the preferences that reach across the app — Vocabulary, Extras and Seasonal Premiums.' },
       { href: '/docs/vocabulary', icon: BookOpen, title: 'Your Vocabulary', description: 'Relabel the product in your own words — the built-in terms, per tenant — without renaming anything under the hood.' },
+      { href: '/docs/seasonal-premiums', icon: CalendarRange, title: 'Seasonal Premiums', description: 'Your high-demand dates as a premium on the whole price after margin — set the dated windows once and every quote in them lifts automatically.' },
       { href: '/docs/activity-summary', icon: Activity, title: 'Team Activity', description: 'Optional, transparent activity summaries: last seen, focused time, and work counts per member.' },
       { href: '/integrations', icon: Link2, title: 'Integrations', description: 'WhatsApp Business API and Gmail OAuth, both live today. Accounting sync (Xero, QuickBooks) is on the roadmap for Q3 2026.' },
     ],
