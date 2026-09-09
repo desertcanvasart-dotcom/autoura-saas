@@ -87,7 +87,10 @@ export function VocabSelect({
       required={required}
       disabled={disabled}
       aria-label={ariaLabel}
-      className={className}
+      // min-w-0 lets the select shrink inside a flex filter row instead of
+      // holding its (long-option) content width and starving a sibling search
+      // box. Harmless in forms, where selects are w-full or grid-sized.
+      className={`min-w-0 ${className}`}
     >
       {placeholder !== null && <option value={emptyValue}>{placeholder}</option>}
       {legacy !== null && <option value={value}>{legacy}</option>}
