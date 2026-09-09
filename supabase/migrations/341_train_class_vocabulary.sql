@@ -18,12 +18,25 @@
 
 BEGIN;
 
+-- The kind_check lists the FULL final set of vocabulary kinds (== migration
+-- 351), not just the kinds up to this file. Reason: the app runtime-seeds every
+-- kind via lib/vocabulary.ts, so a live database already holds rows for kinds
+-- this file predates. An incremental (narrower) constraint here would fail its
+-- own ADD against that existing data. Listing the full set is a safe superset —
+-- it only PERMITS kinds; each kind is still seeded by its own migration below /
+-- later. 345–350 carry the same full list for the same reason.
 ALTER TABLE tenant_vocabularies DROP CONSTRAINT IF EXISTS tenant_vocabularies_kind_check;
 ALTER TABLE tenant_vocabularies ADD CONSTRAINT tenant_vocabularies_kind_check
   CHECK (kind IN (
-    'tier', 'supplier_type', 'board_basis', 'vehicle_type',
-    'cruise_cabin', 'sleeper_cabin', 'meal_type', 'hotel_property_type',
-    'train_class'
+    'tier', 'supplier_type', 'board_basis', 'vehicle_type', 'cruise_cabin',
+    'sleeper_cabin', 'meal_type', 'hotel_property_type', 'train_class',
+    'attraction_category', 'attraction_fee_type', 'tipping_role',
+    'tipping_context', 'tipping_unit', 'transport_service_type', 'flight_type',
+    'flight_cabin', 'flight_frequency', 'airport_service_type',
+    'hotel_service_type', 'cuisine_type', 'restaurant_type', 'dietary_option',
+    'activity_category', 'activity_type', 'activity_duration', 'activity_unit',
+    'guide_grade', 'guide_duration', 'guide_language', 'rate_season', 'airline',
+    'hotel_supplement', 'airport_direction', 'activity_pricing_type'
   ));
 
 -- ----------------------------------------------------------------------------
