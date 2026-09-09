@@ -121,6 +121,14 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
       if (v === '') continue
       record[field] = field === 'default_commission_rate' ? Number(v) || 0 : v
     }
+    // WhatsApp is the only reachable number for many suppliers (the Phone cell
+    // is blank). Fall it back into contact_phone so those rows keep a number,
+    // without a separate WhatsApp column on the table. Header is normalized to
+    // 'whatsapp' (lowercased, spaces → underscores) by transformHeader.
+    if (!record.contact_phone) {
+      const wa = String((raw as Record<string, string>).whatsapp ?? '').trim()
+      if (wa) record.contact_phone = wa
+    }
     const name = String(record.name ?? '').trim()
     if (!name) {
       refused.push({ row: rowNum, reason: 'missing Name' })

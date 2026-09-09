@@ -39,6 +39,13 @@ describe('parseSuppliersCsv', () => {
     expect(r.records[1].type).toBe('airline')
   })
 
+  it('falls WhatsApp back into contact_phone when Phone is blank; Phone wins when both present', () => {
+    const r = parseSuppliersCsv('Name,Type,Phone,WhatsApp\nWaOnly,transport,,01005712009\nBoth,transport,0100111,0100999')
+    const byName = Object.fromEntries(r.records.map(x => [x.name, x.contact_phone]))
+    expect(byName['WaOnly']).toBe('01005712009')
+    expect(byName['Both']).toBe('0100111')
+  })
+
   it('carries the portable supplier_code from a Code column (fresh-tenant migration)', () => {
     const r = parseSuppliersCsv('Code,Name,Type\nSUP-0007,EgyptAir,air_carrier\n,Local Co,transport')
     expect(r.records[0].supplier_code).toBe('SUP-0007')
