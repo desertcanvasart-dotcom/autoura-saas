@@ -752,7 +752,7 @@ export default function AttractionsContent() {
         {/* Search and Filters - UPDATED */}
         <div className="bg-white rounded-lg shadow-md border border-gray-200 p-3 mb-4">
           <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex-1 relative">
+            <div className="flex-1 relative min-w-[14rem]">
               <input
                 type="text"
                 placeholder="Search by name, city, code, or category..."
