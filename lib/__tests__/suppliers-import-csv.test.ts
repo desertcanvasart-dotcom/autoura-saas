@@ -39,6 +39,13 @@ describe('parseSuppliersCsv', () => {
     expect(r.records[1].type).toBe('airline')
   })
 
+  it('carries the portable supplier_code from a Code column (fresh-tenant migration)', () => {
+    const r = parseSuppliersCsv('Code,Name,Type\nSUP-0007,EgyptAir,air_carrier\n,Local Co,transport')
+    expect(r.records[0].supplier_code).toBe('SUP-0007')
+    // A row without a code carries none (left for the DB / a later reconcile).
+    expect(r.records[1].supplier_code).toBeUndefined()
+  })
+
   it('normalizes multi-word types to snake_case', () => {
     const r = parseSuppliersCsv('Name,Type\nDesert Wheels,Transport Company')
     expect(r.records[0].type).toBe('transport_company')
