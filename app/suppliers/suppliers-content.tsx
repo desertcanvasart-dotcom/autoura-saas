@@ -2,6 +2,7 @@
 
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import ReconcileCodes from '@/components/suppliers/ReconcileCodes'
 
 import { useState, useEffect, useRef } from 'react'
 import { showToast } from '@/app/contexts/ToastContext'
@@ -753,6 +754,7 @@ export default function SuppliersContent() {
               <button onClick={handleExport} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
                 <Download className="w-4 h-4" /> Export
               </button>
+              <ReconcileCodes onApplied={fetchSuppliers} />
               <button onClick={handleAdd} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
                 <Plus className="w-4 h-4" /> Add Supplier
               </button>
