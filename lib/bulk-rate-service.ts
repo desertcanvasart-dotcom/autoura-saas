@@ -510,6 +510,21 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
   },
 }
 
+// supplier_code is the portable, human-readable supplier key (SUP-0001) shared
+// with the sibling install. It is a VIRTUAL column on rates: no rate table
+// stores it — the export fills it by joining the supplier (see the export
+// route), and the import resolves it back to THIS tenant's supplier_id and then
+// strips it (see the import route). Injected once here, right after
+// supplier_id, so every supplier-bearing rate config carries it without editing
+// each block. Optional: a row still resolves by supplier_id or supplier_name
+// when no code is given.
+for (const cfg of Object.values(RATE_TABLE_CONFIGS)) {
+  const sidIdx = cfg.columns.findIndex(c => c.name === 'supplier_id')
+  if (sidIdx >= 0 && !cfg.columns.some(c => c.name === 'supplier_code')) {
+    cfg.columns.splice(sidIdx + 1, 0, col('supplier_code', 'Supplier Code', 'text', false))
+  }
+}
+
 // ============================================
 // VALIDATION
 // ============================================

@@ -64,6 +64,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
+    // supplier_code lives on suppliers, not on the rate row, so fill it in by
+    // joining: one RLS-scoped query for the codes of every supplier referenced
+    // here, keyed back onto each row. This is what lets a rate exported here
+    // re-link to a supplier in the sibling install by its portable code. A
+    // separate lookup, not a PostgREST embed, so a table without a supplier FK
+    // relationship can't fail the whole export.
+    if (headers.includes('supplier_code')) {
+      const supplierIds = [...new Set((data || []).map(r => r.supplier_id).filter(Boolean))] as string[]
+      const codeById = new Map<string, string>()
+      if (supplierIds.length > 0) {
+        const { data: sup } = await (supabase
+          .from('suppliers') as unknown as {
+            select(c: string): { in(c: string, v: string[]): PromiseLike<{ data: Array<{ id: string; supplier_code: string | null }> | null }> }
+          })
+          .select('id, supplier_code')
+          .in('id', supplierIds)
+        for (const s of sup || []) if (s.supplier_code) codeById.set(s.id, s.supplier_code)
+      }
+      for (const row of data || []) {
+        ;(row as Record<string, unknown>).supplier_code = row.supplier_id ? codeById.get(row.supplier_id as string) ?? '' : ''
+      }
+    }
+
     // exportCellValue reads a cell's column OR its alias partner, so a hotel
     // saved through the form (engine family only) exports real numbers.
     const rows = (data || []).map(row =>
