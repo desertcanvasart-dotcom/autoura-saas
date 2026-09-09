@@ -3,7 +3,7 @@
 // accepted and ignored; required-field and duplicate-code rows are refused.
 import { describe, it, expect } from 'vitest'
 import Papa from 'papaparse'
-import { serializeTemplatesCsv, parseTemplatesCsv, TEMPLATE_CSV_COLUMNS } from '@/lib/tours/template-csv'
+import { serializeTemplatesCsv, parseTemplatesCsv, sampleTemplateCsv, TEMPLATE_CSV_COLUMNS } from '@/lib/tours/template-csv'
 
 const papa = (csv: string) => {
   const p = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() })
@@ -35,6 +35,12 @@ describe('parseTemplatesCsv', () => {
     const { records } = parseTemplatesCsv('Code,Name,Name (JA),Type,Duration Days\nX-1,Foo,フー,day_tour,1\n', papa)
     expect(records[0].template_code).toBe('X-1')
     expect(records[0]).not.toHaveProperty('name_ja')
+  })
+
+  it('skips the sample sheet’s EXAMPLE- guide row (uploading it unedited is a no-op)', () => {
+    const { records, refused } = parseTemplatesCsv(sampleTemplateCsv(), papa)
+    expect(records).toEqual([])
+    expect(refused).toEqual([])
   })
 
   it('refuses required-field and duplicate-code rows', () => {

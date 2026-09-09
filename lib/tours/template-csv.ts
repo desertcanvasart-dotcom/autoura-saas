@@ -45,6 +45,27 @@ export function serializeTemplatesCsv(rows: Array<Record<string, unknown>>): str
   return [header, ...body].join('\n') + '\n'
 }
 
+/**
+ * The sheet to start a bulk upload from: header row + one filled-in example.
+ * Add a row per tour and Import. Only flat metadata; the day-by-day itinerary
+ * is added per tour in the editor. The example's EXAMPLE- code is skipped on
+ * import, so uploading the sample unedited is a safe no-op.
+ */
+export function sampleTemplateCsv(): string {
+  return serializeTemplatesCsv([{
+    template_code: 'EXAMPLE-DAY-001',
+    template_name: 'Giza Pyramids & Egyptian Museum',
+    tour_type: 'day_tour',
+    duration_days: 1,
+    duration_nights: 0,
+    cities_covered: ['Cairo', 'Giza'],
+    short_description: 'A classic full-day tour of Cairo’s headline sights.',
+    long_description: 'Pyramids of Giza, the Sphinx, and the Egyptian Museum, with lunch.',
+    is_featured: false,
+    is_active: true,
+  }])
+}
+
 export interface TemplateCsvRecord {
   template_code: string
   template_name: string
@@ -113,6 +134,9 @@ export function parseTemplatesCsv(
 
     const code = String(rec.template_code ?? '').trim()
     if (!code) { refused.push({ row: rowNum, reason: 'missing Code' }); return }
+    // The sample sheet's guide row — skip it so uploading the sample unedited
+    // can't create a tour called EXAMPLE-…
+    if (/^example[-_]/i.test(code)) return
     if (!String(rec.template_name ?? '').trim()) { refused.push({ row: rowNum, reason: `"${code}": missing Name` }); return }
     if (!String(rec.tour_type ?? '').trim()) { refused.push({ row: rowNum, reason: `"${code}": missing Type` }); return }
     if (rec.duration_days == null || !Number.isFinite(rec.duration_days as number) || (rec.duration_days as number) < 1) {
