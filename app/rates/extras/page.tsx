@@ -61,6 +61,7 @@ export default function ExtrasPage() {
   const rateCurrency = tenant?.rates_currency || 'EUR'
   const dialog = useConfirmDialog()
   const [extras, setExtras] = useState<Extra[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [saving, setSaving] = useState(false)
@@ -110,6 +111,14 @@ export default function ExtrasPage() {
   const money = (n: number | null) =>
     n == null ? <span className="text-gray-400">Not priced</span> : `${rateCurrency} ${n}`
 
+  const q = searchTerm.trim().toLowerCase()
+  const filtered = q
+    ? extras.filter(x =>
+        x.name.toLowerCase().includes(q) ||
+        (x.description || '').toLowerCase().includes(q) ||
+        (x.category || '').toLowerCase().includes(q))
+    : extras
+
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-start justify-between mb-1">
@@ -145,6 +154,18 @@ export default function ExtrasPage() {
           )}
 
           {extras.length > 0 && (
+            <div className="mb-4">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Search extras…"
+                className="w-full md:w-80 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              />
+            </div>
+          )}
+
+          {extras.length > 0 && (
             <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -158,7 +179,10 @@ export default function ExtrasPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {extras.map(x => (
+                  {filtered.length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-400">No matches.</td></tr>
+                  )}
+                  {filtered.map(x => (
                     <tr key={x.id} className={`border-t border-gray-100 ${x.is_active ? '' : 'opacity-50'}`}>
                       <td className="px-4 py-2 text-sm font-medium text-gray-900">
                         {x.name}

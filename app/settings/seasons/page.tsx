@@ -30,6 +30,7 @@ interface Season {
 export default function SeasonsPage() {
   const { isAdmin } = useRole()
   const [seasons, setSeasons] = useState<Season[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
@@ -105,6 +106,9 @@ export default function SeasonsPage() {
     if (ok) setDateForms(prev => ({ ...prev, [seasonId]: { start: '', end: '', label: '' } }))
   }
 
+  const q = searchTerm.trim().toLowerCase()
+  const filtered = q ? seasons.filter(s => s.name.toLowerCase().includes(q)) : seasons
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="mb-6">
@@ -156,7 +160,23 @@ export default function SeasonsPage() {
             </div>
           )}
 
-          {seasons.map(s => (
+          {seasons.length > 0 && (
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search seasons…"
+              className="w-full md:w-80 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+            />
+          )}
+
+          {seasons.length > 0 && filtered.length === 0 && (
+            <div className="rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-400 text-center">
+              No matches.
+            </div>
+          )}
+
+          {filtered.map(s => (
             <div key={s.id} className="bg-white border border-gray-200 rounded-xl p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
