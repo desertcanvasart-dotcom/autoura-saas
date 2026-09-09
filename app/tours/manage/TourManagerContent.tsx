@@ -9,6 +9,8 @@ import Link from 'next/link'
 import {
   Map,
   Plus,
+  Download,
+  Upload,
   Edit,
   Trash2,
   X,
@@ -1223,6 +1225,37 @@ export default function TourManagerContent() {
     return `${city.substring(0, 3).toUpperCase()}-${type.substring(0, 3)}-${random}`
   }
 
+  const bulkFileRef = useRef<HTMLInputElement>(null)
+
+  // Flat CSV of the portable template metadata (this tenant). Server builds it.
+  const handleExportTemplates = () => {
+    window.location.href = '/api/tours/bulk/export'
+  }
+
+  // Import that CSV: upserts by template_code (portable fields only, never the
+  // itinerary) — used to receive the other install's template export.
+  const handleImportFile = async (file: File) => {
+    try {
+      const text = await file.text()
+      const res = await fetch('/api/tours/bulk/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvData: text, dryRun: false }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        showToast('success', `Imported: ${json.created} created, ${json.updated} updated${json.refusedRows ? `, ${json.refusedRows} skipped` : ''}`)
+        fetchTemplates()
+      } else {
+        showToast('error', json.error || 'Import failed')
+      }
+    } catch (e: any) {
+      showToast('error', e?.message || 'Import failed')
+    } finally {
+      if (bulkFileRef.current) bulkFileRef.current.value = ''
+    }
+  }
+
   const handleAddNew = () => {
     setEditingTemplate(null)
     setFormData({
@@ -1515,6 +1548,21 @@ export default function TourManagerContent() {
               <button onClick={handleAddNew} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
                 <Plus className="w-4 h-4" />
                 Add Template
+              </button>
+              <input
+                ref={bulkFileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportFile(f) }}
+              />
+              <button onClick={handleExportTemplates} title="Download all templates as a CSV (portable metadata: code, name, type, duration, cities, status)" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <button onClick={() => bulkFileRef.current?.click()} title="Import templates from a CSV (upserts by code; itinerary and variations are untouched)" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                <Upload className="w-4 h-4" />
+                Import
               </button>
               <Link href="/tours" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
                 <Eye className="w-4 h-4" />
