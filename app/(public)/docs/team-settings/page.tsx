@@ -102,6 +102,17 @@ export default function TeamSettingsPage() {
         <p className="mt-4 text-gray-600">
           WhatsApp is configured on its own admin page &mdash; <strong>WhatsApp</strong> in the Settings group &mdash; not as a Settings tab.
         </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Settings that reach across the app</h3>
+        <p className="text-gray-600 mb-3">
+          A few settings are less about your account and more about how the whole product behaves.
+          They each have their own page:
+        </p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong><Link href="/docs/vocabulary" className="text-primary-600 hover:underline">Your Vocabulary</Link></strong> &mdash; relabel the product&rsquo;s built-in terms in your own words (Settings group).</li>
+          <li><strong><Link href="/docs/seasonal-premiums" className="text-primary-600 hover:underline">Seasonal Premiums</Link></strong> &mdash; the dated windows that lift every quote travelling in them.</li>
+          <li><strong><Link href="/docs/extras" className="text-primary-600 hover:underline">Extras &amp; Upgrades</Link></strong> &mdash; the add-ons, upgrades and options you can attach to any trip.</li>
+        </ul>
       </section>
 
       {/* Other admin pages */}

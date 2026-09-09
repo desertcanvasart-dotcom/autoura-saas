@@ -78,7 +78,7 @@ export default function ToursRatesPage() {
               <tr className="border-b border-gray-100"><td className="px-4 py-2.5 font-medium">Trains</td><td className="px-4 py-2.5">Regular (daytime) train rates</td></tr>
               <tr className="border-b border-gray-100 bg-gray-50/50"><td className="px-4 py-2.5 font-medium">Meals</td><td className="px-4 py-2.5">Lunch and dinner rates by quality tier</td></tr>
               <tr className="border-b border-gray-100"><td className="px-4 py-2.5 font-medium">Attractions</td><td className="px-4 py-2.5">Entrance fees, with European and non-European prices</td></tr>
-              <tr className="border-b border-gray-100 bg-gray-50/50"><td className="px-4 py-2.5 font-medium">Tour Guides</td><td className="px-4 py-2.5">Guide rates by language and specialty</td></tr>
+              <tr className="border-b border-gray-100 bg-gray-50/50"><td className="px-4 py-2.5 font-medium">Tour Guides</td><td className="px-4 py-2.5">Guide rates by language and grade (e.g. Egyptologist, senior), plus a &ldquo;throughout&rdquo; guide who accompanies the whole trip</td></tr>
               <tr className="border-b border-gray-100"><td className="px-4 py-2.5 font-medium">Activities</td><td className="px-4 py-2.5">Optional activities and excursions</td></tr>
               <tr className="border-b border-gray-100 bg-gray-50/50"><td className="px-4 py-2.5 font-medium">Transportation</td><td className="px-4 py-2.5">Vehicle rates by type and group size</td></tr>
               <tr className="border-b border-gray-100"><td className="px-4 py-2.5 font-medium">Airport Services</td><td className="px-4 py-2.5">Meet &amp; greet, transfers, and similar services</td></tr>
@@ -115,7 +115,26 @@ export default function ToursRatesPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Suppliers &amp; Rates</h3>
         <p className="text-gray-600">
-          Supplier records live in <strong>Suppliers &amp; Rates &rarr; Suppliers</strong>. Each supplier has its own <strong>Rates</strong> tab, so you can see and manage the rates tied to a specific hotel, transport company, or other provider in one place. See <Link href="/docs/resources-documents" className="text-primary-600 hover:underline">Resources &amp; Documents</Link> for the full Suppliers guide.
+          Supplier records live in <strong>Suppliers &amp; Rates &rarr; Suppliers</strong>. Each supplier has its own <strong>Rates</strong> tab, so you can see and manage the rates tied to a specific hotel, transport company, or other provider in one place. See <Link href="/docs/suppliers" className="text-primary-600 hover:underline">Suppliers</Link> for the full guide.
+        </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Importing rates from a spreadsheet</h3>
+        <p className="text-gray-600">
+          Each rate category has its own CSV import, so you can load a whole contract at once instead
+          of typing rows. Every rate sheet carries a <strong>supplier code</strong> column, so each
+          rate attaches to the right supplier &mdash; and a rate whose code is not yet in your
+          organization is reported and skipped rather than guessed. See{' '}
+          <Link href="/docs/bulk-csv" className="text-primary-600 hover:underline">Bulk Import (CSV)</Link>{' '}
+          for the shared rules and <Link href="/docs/suppliers" className="text-primary-600 hover:underline">Suppliers</Link>{' '}
+          for why the code matters.
+        </p>
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">Labels in your own words</h3>
+        <p className="text-gray-600">
+          The category names you rate against &mdash; and the wording throughout the hub &mdash;
+          follow your <Link href="/docs/vocabulary" className="text-primary-600 hover:underline">Vocabulary</Link>.
+          If your team calls a guide a &ldquo;lecturer&rdquo; or a tour a &ldquo;programme&rdquo;,
+          relabel it once and the Rates Hub reads in your words.
         </p>
       </section>
 
