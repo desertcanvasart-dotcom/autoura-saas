@@ -194,6 +194,43 @@ export async function POST(request: NextRequest) {
       rowsToUpsert.push(record)
     }
 
+    // supplier_code is the portable cross-install key. Resolve it to THIS
+    // tenant's supplier_id FIRST — it wins over the incoming supplier_id, which
+    // is the other install's UUID and meaningless here. A code that matches no
+    // supplier in this tenant errors and drops the row (suppliers must be
+    // migrated before their rates) rather than silently importing it unlinked.
+    // The column is virtual — no rate table stores it — so it is stripped from
+    // every row afterwards.
+    const supplierCodeErrors: any[] = []
+    {
+      const codes = [...new Set(rowsToUpsert.map(r => String(r.supplier_code ?? '').trim()).filter(Boolean))]
+      if (codes.length > 0) {
+        const { data: byCode } = await (supabase
+          .from('suppliers') as unknown as {
+            select(c: string): { in(c: string, v: string[]): { eq(c: string, v: string): PromiseLike<{ data: Array<{ id: string; supplier_code: string | null }> | null }> } }
+          })
+          .select('id, supplier_code')
+          .in('supplier_code', codes)
+          .eq('tenant_id', tenant_id)
+        const idByCode = new Map((byCode ?? []).filter(s => s.supplier_code).map(s => [String(s.supplier_code).toLowerCase(), s.id]))
+        const survivors: Record<string, any>[] = []
+        for (const r of rowsToUpsert) {
+          const code = String(r.supplier_code ?? '').trim()
+          if (!code) { survivors.push(r); continue }
+          const id = idByCode.get(code.toLowerCase())
+          if (id) { r.supplier_id = id; survivors.push(r) }
+          else supplierCodeErrors.push({
+            row: uniqueKey.map(c => `${c}=${String(r[c] ?? '')}`).join(', '),
+            operation: 'refused',
+            message: `supplier_code "${code}" matches no supplier here — migrate suppliers before their rates, or fix the code`,
+          })
+        }
+        rowsToUpsert.length = 0
+        rowsToUpsert.push(...survivors)
+      }
+      for (const r of rowsToUpsert) delete r.supplier_code
+    }
+
     // supplier_id is a LINK, not a rate: a file exported from another system
     // (the sibling app's template carries its own supplier UUIDs) names
     // suppliers this database has never seen, and the FK then fails EVERY
@@ -226,11 +263,14 @@ export async function POST(request: NextRequest) {
     const partition = partitionImportRows(rowsToUpsert, uniqueKey)
 
     let inserted = 0, updated = 0
-    const importErrors: any[] = partition.duplicates.map(d => ({
-      row: uniqueKey.map(c => `${c}=${String(d.record[c])}`).join(', '),
-      operation: 'refused',
-      message: d.message,
-    }))
+    const importErrors: any[] = [
+      ...supplierCodeErrors,
+      ...partition.duplicates.map(d => ({
+        row: uniqueKey.map(c => `${c}=${String(d.record[c])}`).join(', '),
+        operation: 'refused',
+        message: d.message,
+      })),
+    ]
     const BATCH_SIZE = 50
 
     for (let i = 0; i < partition.rows.length; i += BATCH_SIZE) {
@@ -275,7 +315,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, errors: importErrors })
+    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, supplierCodeErrors: supplierCodeErrors.length, errors: importErrors })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
