@@ -388,6 +388,8 @@ function PPDSeasonalRateSection({
   showSecondPeriod = false,
   subtitle,
   hideDates = false,
+  collapsible = false,
+  defaultOpen = true,
   borderColor = 'border-gray-200',
   bgColor = 'bg-white',
   // The symbol the amounts are actually in — the cruise's own currency, or
@@ -396,7 +398,7 @@ function PPDSeasonalRateSection({
   rateSymbol = '€'
 }: {
   title: string
-  seasonNumber: number
+  seasonNumber?: number
   startDate: string
   endDate: string
   startDate2?: string
@@ -417,20 +419,30 @@ function PPDSeasonalRateSection({
   showSecondPeriod?: boolean
   subtitle?: string
   hideDates?: boolean
+  collapsible?: boolean
+  defaultOpen?: boolean
   borderColor?: string
   bgColor?: string
   rateSymbol?: string
 }) {
-  return (
-    <div className={`border ${borderColor} rounded-lg p-4 ${bgColor}`}>
-      <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-        <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">
-          {seasonNumber}
-        </span>
+  const [open, setOpen] = useState(defaultOpen)
+
+  const header = (
+    <div>
+      <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+        {seasonNumber != null && (
+          <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">
+            {seasonNumber}
+          </span>
+        )}
         {title}
       </h4>
-      {subtitle && <p className="text-xs text-gray-500 -mt-2 mb-3 italic">{subtitle}</p>}
+      {subtitle && <p className="text-xs text-gray-500 mt-1 italic">{subtitle}</p>}
+    </div>
+  )
 
+  const body = (
+    <>
       {/* Date Range */}
       {!hideDates && (
       <div className="grid grid-cols-2 gap-3 mb-4">
@@ -586,6 +598,26 @@ function PPDSeasonalRateSection({
           </div>
         )}
       </div>
+    </>
+  )
+
+  if (collapsible) {
+    return (
+      <details
+        open={open}
+        onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+        className={`border ${borderColor} rounded-lg ${bgColor}`}
+      >
+        <summary className="p-4 cursor-pointer select-none">{header}</summary>
+        <div className="px-4 pb-4">{body}</div>
+      </details>
+    )
+  }
+
+  return (
+    <div className={`border ${borderColor} rounded-lg p-4 ${bgColor}`}>
+      {header}
+      <div className="mt-3">{body}</div>
     </div>
   )
 }
@@ -1534,13 +1566,15 @@ export default function CruisesPage() {
                 currencyLabel={rateCurrency || 'EUR'}
               />
 
-              {/* Section 6: Base Rate — used when no contract period covers the date */}
+              {/* Default rate — the fallback used when no contract period covers the date.
+                  Collapsed once the rate has periods; expanded when periods do the pricing. */}
               <PPDSeasonalRateSection
                 rateSymbol={rateSymbol}
-                title="Base Rate"
-                subtitle="Used when no contract period covers the travel date. Amounts are in the rate's own currency."
+                title="Default rate"
+                subtitle="The fallback price — used only for travel dates no contract period above covers. Add periods above for dated pricing. Amounts are in the rate's own currency."
                 hideDates
-                seasonNumber={3}
+                collapsible
+                defaultOpen={periods.length === 0}
                 startDate={formData.low_season_start}
                 endDate={formData.low_season_end}
                 onStartDateChange={(value) => setFormData({ ...formData, low_season_start: value })}

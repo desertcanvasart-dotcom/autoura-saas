@@ -7,7 +7,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 // Hotel picker option that reveals the free-text input for a new hotel.
 const NEW_PROPERTY = '__new__'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign } from 'lucide-react'
@@ -306,6 +306,32 @@ function Pagination({
 // ============================================
 // MAIN COMPONENT
 // ============================================
+
+// The default (fallback) rate, shown as a collapsible so it reads as
+// subordinate to the contract periods above. Collapsed once the rate has
+// periods (they do the pricing); expanded when there are none. Mounts with the
+// edit modal, so defaultOpen reflects the rate being edited.
+function CollapsibleDefaultRate({
+  defaultOpen,
+  summary,
+  children,
+}: {
+  defaultOpen: boolean
+  summary: ReactNode
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <details
+      open={open}
+      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
+      className="border border-blue-200 rounded-lg bg-blue-50/40"
+    >
+      <summary className="p-4 cursor-pointer select-none">{summary}</summary>
+      <div className="px-4 pb-4">{children}</div>
+    </details>
+  )
+}
 
 export default function HotelsContent() {
   // City vocabulary from the destination catalog (Egypt fallback pre-migration).
@@ -1841,13 +1867,18 @@ export default function HotelsContent() {
                   />
                 </div>
 
-                <h3 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">4</span>
-                  Base Rate
-                  <span className="text-xs font-normal text-gray-500 ml-2">(PPD Model — used when no contract period covers the travel date)</span>
-                </h3>
-                <p className="text-xs text-gray-500 mb-2 italic">Enter amounts in the rate&rsquo;s own currency — the Currency field above names it.</p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <CollapsibleDefaultRate
+                  defaultOpen={periods.length === 0}
+                  summary={
+                    <div>
+                      <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                        Default rate
+                        <span className="text-xs font-normal text-gray-500">(PPD Model)</span>
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1 italic">The fallback price — used only for travel dates no contract period above covers. Enter amounts in the rate&rsquo;s own currency.</p>
+                    </div>
+                  }
+                >
 
                   {/* EU Passport Holders - PPD Model */}
                   <p className="text-xs font-medium text-gray-600 mb-2">EU Passport Holders</p>
@@ -1922,7 +1953,7 @@ export default function HotelsContent() {
                       </div>
                     </div>
                   )}
-                </div>
+                </CollapsibleDefaultRate>
               </div>
 
               {/* SECTION 7: Supplements */}
