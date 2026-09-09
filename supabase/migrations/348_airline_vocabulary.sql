@@ -27,14 +27,15 @@ BEGIN;
 ALTER TABLE tenant_vocabularies DROP CONSTRAINT IF EXISTS tenant_vocabularies_kind_check;
 ALTER TABLE tenant_vocabularies ADD CONSTRAINT tenant_vocabularies_kind_check
   CHECK (kind IN (
-    'tier', 'supplier_type', 'board_basis', 'vehicle_type',
-    'cruise_cabin', 'sleeper_cabin', 'meal_type', 'hotel_property_type',
-    'train_class', 'attraction_category', 'attraction_fee_type', 'tipping_role',
+    'tier', 'supplier_type', 'board_basis', 'vehicle_type', 'cruise_cabin',
+    'sleeper_cabin', 'meal_type', 'hotel_property_type', 'train_class',
+    'attraction_category', 'attraction_fee_type', 'tipping_role',
     'tipping_context', 'tipping_unit', 'transport_service_type', 'flight_type',
-    'flight_cabin', 'flight_frequency', 'airport_service_type', 'hotel_service_type',
-    'cuisine_type', 'restaurant_type', 'dietary_option', 'activity_category',
-    'activity_type', 'activity_duration', 'activity_unit', 'guide_grade',
-    'guide_duration', 'guide_language', 'rate_season', 'airline'
+    'flight_cabin', 'flight_frequency', 'airport_service_type',
+    'hotel_service_type', 'cuisine_type', 'restaurant_type', 'dietary_option',
+    'activity_category', 'activity_type', 'activity_duration', 'activity_unit',
+    'guide_grade', 'guide_duration', 'guide_language', 'rate_season', 'airline',
+    'hotel_supplement', 'airport_direction', 'activity_pricing_type'
   ));
 
 CREATE OR REPLACE FUNCTION seed_tenant_vocabulary(p_tenant UUID, p_kind TEXT DEFAULT NULL)
