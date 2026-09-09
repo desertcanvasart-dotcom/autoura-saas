@@ -1210,7 +1210,10 @@ export default function CruisesPage() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Filters — search box + category/cabin/tier. The search has shipped
+            since 2025-12-08 but a stale Railway build chunk was serving this
+            route without it on getautoura.net; touching this file forces the
+            chunk to rebuild with a fresh hash (2026-09-09). */}
         <div className="bg-white rounded-lg shadow-md border p-3 mb-4">
           <div className="flex flex-col md:flex-row gap-3">
             <div className="flex-1 relative">
