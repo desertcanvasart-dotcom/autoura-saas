@@ -78,7 +78,7 @@ export default function RatePeriodsEditor({
             Name each one whatever your contract calls it — up to {MAX_RATE_PERIODS} periods. When a
             departure falls in two overlapping windows the <strong>shorter</strong> one is used, so a
             Christmas window inside a winter one works the way a contract reads.
-            {periods.length > 0 && ' The base rate below is used only for dates no period covers.'}
+            {periods.length > 0 && ' The default rate below is used only for dates no period covers.'}
           </p>
         </div>
         <button
@@ -94,7 +94,7 @@ export default function RatePeriodsEditor({
 
       {periods.length === 0 ? (
         <p className="text-xs text-gray-400">
-          No periods yet — this rate prices from the base rate below for every date.
+          No periods yet — this rate prices from the default rate below for every date.
         </p>
       ) : (
         <div className="space-y-3">
