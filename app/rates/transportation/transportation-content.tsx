@@ -3,7 +3,7 @@
 import BulkRateImportExport from '@/app/components/BulkRateImportExport'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Car, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Building2, Copy, LayoutGrid, List, Table2 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, VocabLabel } from '@/components/vocabulary'
 import { useVocabulary } from '@/hooks/useVocabulary'
@@ -46,6 +46,8 @@ interface RouteGroup extends TransportationRate {
   ids: string[]
   vehicles: { key: string; eur: number }[]
 }
+
+type ViewMode = 'table' | 'cards' | 'compact'
 
 const routeKeyOf = (r: TransportationRate) =>
   [r.service_type, r.city, r.route_name ?? '', r.origin_city ?? '', r.destination_city ?? '', r.duration ?? '', r.area ?? ''].map(v => String(v).toLowerCase()).join('|')
@@ -126,6 +128,7 @@ export default function TransportationContent() {
   const [serviceTypeFilter, setServiceTypeFilter] = useState('')
   const [vehicleTypeFilter, setVehicleTypeFilter] = useState('')
   const [showInactive, setShowInactive] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRate, setEditingRate] = useState<RouteGroup | null>(null)
   // Which currency this rate's amounts are entered in ('' = EUR default)
@@ -516,6 +519,96 @@ export default function TransportationContent() {
   const goToPrevPage = () => goToPage(currentPage - 1)
   const goToNextPage = () => goToPage(currentPage + 1)
 
+  // Shared pagination bar — reused across table/cards/compact views
+  const paginationBar = totalItems > 0 ? (
+    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500">Show</span>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => setItemsPerPage(Number(e.target.value))}
+            className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] bg-white"
+          >
+            {ITEMS_PER_PAGE_OPTIONS.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+          <span className="text-sm text-gray-500">per page</span>
+        </div>
+        <span className="text-sm text-gray-500">
+          Showing {startIndex + 1}-{endIndex} of {totalItems} rates
+        </span>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <button
+          onClick={goToFirstPage}
+          disabled={currentPage === 1}
+          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          title="First page"
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </button>
+        <button
+          onClick={goToPrevPage}
+          disabled={currentPage === 1}
+          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          title="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        {/* Page numbers */}
+        <div className="flex items-center gap-1 mx-2">
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            let pageNum: number
+            if (totalPages <= 5) {
+              pageNum = i + 1
+            } else if (currentPage <= 3) {
+              pageNum = i + 1
+            } else if (currentPage >= totalPages - 2) {
+              pageNum = totalPages - 4 + i
+            } else {
+              pageNum = currentPage - 2 + i
+            }
+
+            return (
+              <button
+                key={pageNum}
+                onClick={() => goToPage(pageNum)}
+                className={`min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors ${
+                  currentPage === pageNum
+                    ? 'bg-[#647C47] text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {pageNum}
+              </button>
+            )
+          })}
+        </div>
+
+        <button
+          onClick={goToNextPage}
+          disabled={currentPage === totalPages}
+          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          title="Next page"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <button
+          onClick={goToLastPage}
+          disabled={currentPage === totalPages}
+          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          title="Last page"
+        >
+          <ChevronsRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  ) : null
+
   // Stats
   const totalRates = routes.length
   const activeRates = routes.filter(r => r.is_active).length
@@ -638,6 +731,31 @@ export default function TransportationContent() {
         >
           {showInactive ? 'Hide Inactive' : 'Show Inactive'}
         </button>
+
+        {/* View Toggle */}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 ml-auto">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`p-1.5 rounded ${viewMode === 'table' ? 'bg-white shadow text-[#647C47]' : 'text-gray-500 hover:text-gray-700'}`}
+            title="Table View"
+          >
+            <Table2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`p-1.5 rounded ${viewMode === 'cards' ? 'bg-white shadow text-[#647C47]' : 'text-gray-500 hover:text-gray-700'}`}
+            title="Card View"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('compact')}
+            className={`p-1.5 rounded ${viewMode === 'compact' ? 'bg-white shadow text-[#647C47]' : 'text-gray-500 hover:text-gray-700'}`}
+            title="Compact View"
+          >
+            <List className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Bulk action bar */}
@@ -663,7 +781,8 @@ export default function TransportationContent() {
         </div>
       )}
 
-      {/* Table — one row per route, vehicles as chips */}
+      {/* TABLE VIEW — one row per route, vehicles as chips */}
+      {viewMode === 'table' && (
       <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         <table className="w-full">
           <thead>
@@ -785,96 +904,173 @@ export default function TransportationContent() {
           </tbody>
         </table>
 
-        {/* Pagination */}
-        {totalItems > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">Show</span>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] bg-white"
-                >
-                  {ITEMS_PER_PAGE_OPTIONS.map(option => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-500">per page</span>
-              </div>
-              <span className="text-sm text-gray-500">
-                Showing {startIndex + 1}-{endIndex} of {totalItems} rates
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                onClick={goToFirstPage}
-                disabled={currentPage === 1}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                title="First page"
-              >
-                <ChevronsLeft className="h-4 w-4" />
-              </button>
-              <button
-                onClick={goToPrevPage}
-                disabled={currentPage === 1}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                title="Previous page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-
-              {/* Page numbers */}
-              <div className="flex items-center gap-1 mx-2">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum: number
-                  if (totalPages <= 5) {
-                    pageNum = i + 1
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i
-                  } else {
-                    pageNum = currentPage - 2 + i
-                  }
-                  
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => goToPage(pageNum)}
-                      className={`min-w-[32px] h-8 px-2 text-sm rounded-md transition-colors ${
-                        currentPage === pageNum
-                          ? 'bg-[#647C47] text-white'
-                          : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <button
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                title="Next page"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-              <button
-                onClick={goToLastPage}
-                disabled={currentPage === totalPages}
-                className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                title="Last page"
-              >
-                <ChevronsRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
+        {paginationBar}
       </div>
+      )}
+
+      {/* CARDS VIEW — one card per route */}
+      {viewMode === 'cards' && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedRates.length === 0 ? (
+              <div className="col-span-full bg-white rounded-lg border border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+                No transportation rates found
+              </div>
+            ) : paginatedRates.map((rate) => {
+              const isIntercity = needsDestinationCity(rate.service_type)
+              return (
+                <div key={rate.id} className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="min-w-0">
+                        <h3 className="text-base font-semibold text-gray-900 truncate">{rate.route_name || '—'}</h3>
+                        <p className="text-xs text-gray-500">
+                          <VocabLabel kind="transport_service_type" value={rate.service_type} />
+                        </p>
+                      </div>
+                      <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        rate.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {rate.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-sm mb-3">
+                      {isIntercity && rate.destination_city ? (
+                        <>
+                          <span className="text-gray-900">{rate.city}</span>
+                          <span className="text-gray-400">→</span>
+                          <span className="text-gray-900">{rate.destination_city}</span>
+                        </>
+                      ) : (
+                        <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{rate.city}</span>
+                      )}
+                    </div>
+
+                    {supplierName(rate.supplier_id) && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600 mb-3">
+                        <Building2 className="w-4 h-4" />
+                        <span className="truncate">{supplierName(rate.supplier_id)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-1 pt-3 border-t border-gray-100">
+                      {rate.vehicles.length > 0 ? rate.vehicles.map(chip => (
+                        <span key={chip.key} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-700">
+                          <span className="font-medium"><VocabLabel kind="vehicle_type" value={chip.key} /></span>
+                          <span>{fmtRate(chip.eur, rate, 0)}</span>
+                        </span>
+                      )) : <span className="text-sm text-gray-400">—</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex border-t border-gray-200 divide-x divide-gray-200">
+                    <button
+                      onClick={() => openEditModal(rate)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleClone(rate)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-green-600 hover:bg-green-50 transition-colors"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Clone
+                    </button>
+                    <button
+                      onClick={() => handleDelete(rate)}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {totalItems > 0 && (
+            <div className="mt-4 bg-white rounded-lg border border-gray-200 overflow-hidden">
+              {paginationBar}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* COMPACT VIEW — dense one-line rows */}
+      {viewMode === 'compact' && (
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="divide-y divide-gray-100">
+            {paginatedRates.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-gray-500">No transportation rates found</div>
+            ) : paginatedRates.map((rate) => {
+              const isIntercity = needsDestinationCity(rate.service_type)
+              return (
+                <div key={rate.id} className="flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${rate.is_active ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <span className="text-sm font-medium text-gray-900 truncate">{rate.route_name || '—'}</span>
+                    <span className="hidden md:inline text-xs text-gray-500">
+                      <VocabLabel kind="transport_service_type" value={rate.service_type} />
+                    </span>
+                    {isIntercity && rate.destination_city ? (
+                      <span className="hidden lg:flex items-center gap-1 text-xs text-gray-600">
+                        {rate.city} <span className="text-gray-400">→</span> {rate.destination_city}
+                      </span>
+                    ) : (
+                      <span className="hidden md:inline px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{rate.city}</span>
+                    )}
+                    {supplierName(rate.supplier_id) && (
+                      <span className="hidden lg:flex items-center gap-1 text-xs text-gray-500">
+                        <Building2 className="w-3 h-3" />
+                        <span className="truncate max-w-[140px]">{supplierName(rate.supplier_id)}</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="hidden sm:flex flex-wrap justify-end gap-1 max-w-[280px]">
+                      {rate.vehicles.slice(0, 4).map(chip => (
+                        <span key={chip.key} className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-gray-100 rounded text-xs text-gray-700">
+                          <span className="font-medium"><VocabLabel kind="vehicle_type" value={chip.key} /></span>
+                          <span>{fmtRate(chip.eur, rate, 0)}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEditModal(rate)}
+                        className="p-1 text-gray-400 hover:text-[#647C47] transition-colors"
+                        title="Edit"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleClone(rate)}
+                        className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                        title="Duplicate"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(rate)}
+                        className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {paginationBar}
+        </div>
+      )}
 
       {/* Add/Edit Modal — route once, vehicle-rate grid */}
       {isModalOpen && (

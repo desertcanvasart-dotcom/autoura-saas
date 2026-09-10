@@ -1638,6 +1638,35 @@ export default function HotelsContent() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Company / Supplier</label>
+                    <select
+                      value={formData.supplier_id}
+                      onChange={(e) => handleSupplierSelect(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
+                    >
+                      <option value="">Select company (optional)...</option>
+                      {suppliers.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <Link href="/suppliers?type=hotel" className="text-primary-600 hover:underline flex items-center gap-1 inline">
+                        <Plus className="w-3 h-3" /> Add new company
+                      </Link>
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Service Code</label>
+                    <input
+                      type="text"
+                      name="service_code"
+                      value={formData.service_code}
+                      onChange={handleChange}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm bg-gray-50"
+                      placeholder="Auto-generated"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Hotel Name *</label>
                     {/* Supplier-HAS-properties: with a supplier chosen, the
                         hotel comes from that supplier's properties (Suppliers →
@@ -1678,35 +1707,6 @@ export default function HotelsContent() {
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
                       />
                     )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Service Code</label>
-                    <input
-                      type="text"
-                      name="service_code"
-                      value={formData.service_code}
-                      onChange={handleChange}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm bg-gray-50"
-                      placeholder="Auto-generated"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Company / Supplier</label>
-                    <select
-                      value={formData.supplier_id}
-                      onChange={(e) => handleSupplierSelect(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent shadow-sm"
-                    >
-                      <option value="">Select company (optional)...</option>
-                      {suppliers.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      <Link href="/suppliers?type=hotel" className="text-primary-600 hover:underline flex items-center gap-1 inline">
-                        <Plus className="w-3 h-3" /> Add new company
-                      </Link>
-                    </p>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">City *</label>
