@@ -33,6 +33,7 @@ import {
   Map,
   RefreshCcw
 } from 'lucide-react'
+import AutouraGrowthWidget from '@/components/AutouraGrowthWidget'
 
 // Animation hook for scroll reveal
 function useScrollReveal() {
@@ -1032,6 +1033,9 @@ export default function AutouraHomepage() {
           </div>
         </div>
       )}
+
+      {/* Autoura Growth — Inbound Concierge launcher (GTM widget) */}
+      <AutouraGrowthWidget />
     </div>
   )
 }
