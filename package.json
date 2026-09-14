@@ -21,7 +21,7 @@
     "verify:rls": "node scripts/verify-rls.mjs",
     "stripe:plans": "node scripts/setup-stripe-plans.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
-    "analyze": "ANALYZE=true npm run build",
+    "analyze": "node scripts/analyze-chunks.mjs",
     "plans:check": "node scripts/sync-plans.mjs --check",
     "plans:generate": "vitest run lib/__tests__/plans-sync.test.ts -u",
     "types:generate": "node scripts/generate-db-types.mjs",
@@ -78,7 +78,6 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@eslint/eslintrc": "^3",
-    "@next/bundle-analyzer": "^16.2.10",
     "@playwright/test": "^1.62.1",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^20",

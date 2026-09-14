@@ -24,6 +24,7 @@ Database migrations live in `supabase/migrations/` (the only migration directory
 | `npm run verify:rls` | Anon key must read nothing; service role must read everything |
 | `npm run lint:ratchet` | Lint debt must not exceed `scripts/lint-baseline.json` |
 | `npm run check:bundle` | Gzipped client-JS budget |
+| `npm run analyze` | What is in each client chunk, and how many routes load it up front (needs a build first) |
 | `npm run plans:check` | Billing plan config vs generated `plans.json` drift |
 | `npm run stripe:plans` | Sync Stripe products/prices from plan config (dry-run by default) |
 
