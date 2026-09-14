@@ -108,6 +108,12 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       // The engine matches hotels BY TIER — a file without it lands rows in
       // the default bucket (2026-09-05 sweep).
       col('tier', 'Tier', 'text', false),
+      // The hotel's SUPPLIER, not just its name. accommodation_rates has
+      // carried supplier_id since the property work (migration 312) and the
+      // form writes it, but the CSV only ever spelled supplier_name — so a
+      // round-trip dropped the link, and with it the only thing the property
+      // could be resolved under (2026-09-14).
+      supplierId(),
       col('supplier_name', 'Supplier Name', 'text', false),
       // Low season EUR
       col('pp_double_eur', 'Low PP Double EUR', 'number', false),
@@ -351,6 +357,10 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('direction', 'Direction', 'text', true),
       col('rate_eur', 'Rate', 'number', true),
       col('description', 'Description', 'text', false),
+      // The ground handler this rate is bought from. The form has always had
+      // the picker; only the CSV was blind to it, so a round-trip silently
+      // unlinked every row (same audit as the property links, 2026-09-14).
+      supplierId(),
       notes(), isActive(),
       rateCurrency(),
     ],
@@ -366,6 +376,7 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('hotel_category', 'Hotel Category', 'text', true),
       col('rate_eur', 'Rate', 'number', true),
       col('description', 'Description', 'text', false),
+      supplierId(),
       notes(), isActive(),
       rateCurrency(),
     ],
@@ -492,6 +503,9 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('supplier_cost', 'Supplier Cost', 'number', false),
       col('selling_price', 'Selling Price (pin, optional)', 'number', false),
       col('unit', 'Unit', 'text', false),
+      // Who the extra is bought from — stored and read back by the extras API,
+      // and dropped by every CSV round-trip until now.
+      supplierId(),
       isActive(),
     ],
   },
@@ -523,6 +537,63 @@ for (const cfg of Object.values(RATE_TABLE_CONFIGS)) {
   if (sidIdx >= 0 && !cfg.columns.some(c => c.name === 'supplier_code')) {
     cfg.columns.splice(sidIdx + 1, 0, col('supplier_code', 'Supplier Code', 'text', false))
   }
+}
+
+// ============================================
+// The property behind the rate (supplier-HAS-properties)
+// ============================================
+// Four rate tables carry `property_id` — WHICH ship, WHICH hotel, WHICH train
+// the rate prices. None of them carried it through the CSV, so export → delete
+// → re-import came back with every property link NULL. On trains the damage is
+// visible: the train's name lives ONLY on supplier_properties, so the Train
+// column simply emptied (reported 2026-09-14, verified on train_rates).
+//
+// The link travels as the property's NAME, never its UUID — (supplier_id,
+// property_type, name) is the table's own unique key (migration 311), and a
+// foreign install's UUID means nothing here (the same reasoning that made
+// supplier_code the portable supplier key). The import resolves the name back
+// to a property under that supplier, creating it when it is missing, via the
+// find-or-create the rate FORMS already use (lib/suppliers/resolve-property).
+//
+// Hotels and cruises already spell the name on the rate row itself
+// (property_name / ship_name), so those need no new column — only the import
+// half. Trains have nowhere to put it, so `property_name` is injected as a
+// VIRTUAL column below: exported by joining supplier_properties, stripped
+// before the insert (no train table has such a column).
+export interface RatePropertyLink {
+  propertyType: 'ship' | 'hotel' | 'train'
+  /** The CSV column carrying the property's name. */
+  nameColumn: string
+  /** True when no rate table column backs it — export joins it, import strips it. */
+  virtual: boolean
+}
+
+export const RATE_PROPERTY_LINK: Record<string, RatePropertyLink> = {
+  accommodation_rates: { propertyType: 'hotel', nameColumn: 'property_name', virtual: false },
+  nile_cruises: { propertyType: 'ship', nameColumn: 'ship_name', virtual: false },
+  train_rates: { propertyType: 'train', nameColumn: 'property_name', virtual: true },
+  sleeping_train_rates: { propertyType: 'train', nameColumn: 'property_name', virtual: true },
+}
+
+/** The property link for a rate table, or null when it prices no property. */
+export function propertyLinkFor(table: string): RatePropertyLink | null {
+  return RATE_PROPERTY_LINK[table] ?? null
+}
+
+// Give the virtual ones a real column so the export writes a header, the
+// template offers it, and the importer reads it. Placed after supplier_code:
+// the property is meaningless without the supplier it hangs from, and reading
+// them side by side is how somebody filling the sheet in by hand understands
+// that.
+for (const [table, link] of Object.entries(RATE_PROPERTY_LINK)) {
+  if (!link.virtual) continue
+  const cfg = RATE_TABLE_CONFIGS[table]
+  if (!cfg || cfg.columns.some(c => c.name === link.nameColumn)) continue
+  const after = cfg.columns.findIndex(c => c.name === 'supplier_code')
+  const label = link.propertyType === 'train' ? 'Train' : link.propertyType === 'ship' ? 'Ship' : 'Hotel'
+  const column = col(link.nameColumn, label, 'text', false)
+  if (after >= 0) cfg.columns.splice(after + 1, 0, column)
+  else cfg.columns.push(column)
 }
 
 // ============================================

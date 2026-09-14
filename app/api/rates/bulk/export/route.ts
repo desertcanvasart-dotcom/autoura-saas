@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { RATE_TABLE_CONFIGS, getExportHeaders, getTemplateHeaders, buildTemplateRow, exportCellValue } from '@/lib/bulk-rate-service'
+import { RATE_TABLE_CONFIGS, getExportHeaders, getTemplateHeaders, buildTemplateRow, exportCellValue, propertyLinkFor } from '@/lib/bulk-rate-service'
 import type { Database } from '@/types/database.types'
 import Papa from 'papaparse'
 
@@ -84,6 +84,31 @@ export async function GET(request: NextRequest) {
       }
       for (const row of data || []) {
         ;(row as Record<string, unknown>).supplier_code = row.supplier_id ? codeById.get(row.supplier_id as string) ?? '' : ''
+      }
+    }
+
+    // The property behind the rate — WHICH train, WHICH ship. Hotels and
+    // cruises spell it on the rate row already; trains keep it only on
+    // supplier_properties, so without this join the exported file has no trace
+    // of the train at all and a re-import cannot put it back (2026-09-14).
+    // Separate lookup, not a PostgREST embed, for the same reason as the
+    // supplier codes above: a missing FK must cost the name, never the export.
+    const propertyLink = propertyLinkFor(table)
+    if (propertyLink?.virtual) {
+      const propertyIds = [...new Set((data || []).map(r => r.property_id).filter(Boolean))] as string[]
+      const nameById = new Map<string, string>()
+      if (propertyIds.length > 0) {
+        const { data: props } = await (supabase
+          .from('supplier_properties') as unknown as {
+            select(c: string): { in(c: string, v: string[]): PromiseLike<{ data: Array<{ id: string; name: string }> | null }> }
+          })
+          .select('id, name')
+          .in('id', propertyIds)
+        for (const prop of props || []) nameById.set(prop.id, prop.name)
+      }
+      for (const row of data || []) {
+        ;(row as Record<string, unknown>)[propertyLink.nameColumn] =
+          row.property_id ? nameById.get(row.property_id as string) ?? '' : ''
       }
     }
 
