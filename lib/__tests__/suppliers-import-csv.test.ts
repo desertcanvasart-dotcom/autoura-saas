@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseSuppliersCsv, splitAgainstExisting, splitTypes, resolveImportTypes } from '@/lib/suppliers/import-csv'
+import { SUPPLIER_CSV_COLUMNS, SUPPLIER_CSV_HEADERS, supplierCsvSampleRow } from '@/lib/suppliers/csv-schema'
 
 // ============================================
 // Suppliers CSV import (B-item 7)
@@ -11,14 +12,22 @@ import { parseSuppliersCsv, splitAgainstExisting, splitTypes, resolveImportTypes
 // existing tenant suppliers are skipped — an import creates, it never
 // silently updates.
 
-const EXPORT_HEADERS = 'Name,Type,Contact,Email,Phone,City,Commission,Status'
+// The header line the export actually writes — derived, not a fifth
+// hand-written copy. A literal here is how this test kept passing while the
+// export and the importer had already drifted apart.
+const EXPORT_HEADERS = SUPPLIER_CSV_HEADERS.join(',')
+
+/** A CSV row in the export's own column order, from field → value. */
+function exportRow(values: Record<string, string>): string {
+  return SUPPLIER_CSV_COLUMNS.map(c => values[c.field] ?? '').join(',')
+}
 
 describe('parseSuppliersCsv', () => {
   it("round-trips the Export button's own format", () => {
     const csv = [
       EXPORT_HEADERS,
-      'Nile Star Hotel,Hotel,Ahmed,ahmed@nilestar.eg,+20100000000,Cairo,10,active',
-      'EgyptAir,Airline,,sales@egyptair.com,,Cairo,5,active',
+      exportRow({ name: 'Nile Star Hotel', type: 'Hotel', contact_name: 'Ahmed', contact_email: 'ahmed@nilestar.eg', contact_phone: '+20100000000', city: 'Cairo', default_commission_rate: '10', status: 'active' }),
+      exportRow({ name: 'EgyptAir', type: 'Airline', contact_email: 'sales@egyptair.com', city: 'Cairo', default_commission_rate: '5', status: 'active' }),
     ].join('\n')
     const r = parseSuppliersCsv(csv)
     expect(r.parseError).toBeUndefined()
@@ -120,8 +129,8 @@ describe('the suppliers Sample CSV is the contract', () => {
   it("the sample's own example row imports with a real type and zero refusals", () => {
     // Mirrors handleSampleCsv in app/suppliers/suppliers-content.tsx.
     const sample = [
-      'Name,Type,Contact,Email,Phone,City,Country,Commission,Status,Notes,Website',
-      'Nile Star Hotel,hotel,Ahmed Hassan,reservations@nilestar.example,+20 100 000 0000,Cairo,Egypt,10,active,Valid types: hotel | airline,https://nilestar.example',
+      SUPPLIER_CSV_HEADERS.join(','),
+      supplierCsvSampleRow('hotel').map(c => `"${String(c).replace(/"/g, '""')}"`).join(','),
     ].join('\n')
     const r = parseSuppliersCsv(sample)
     expect(r.refused).toEqual([])
@@ -157,26 +166,26 @@ describe('several roles per row', () => {
     expect(splitTypes('Hotel | Transport company; ground-handler')).toEqual(['hotel', 'transport_company', 'ground_handler'])
     expect(splitTypes('hotel/hotel')).toEqual(['hotel'])
     expect(splitTypes('')).toEqual(['other'])
-    const r = parseSuppliersCsv([EXPORT_HEADERS, 'Sabena Group,cruise|hotel,,,,Luxor,,active'].join('\n'))
+    const r = parseSuppliersCsv([EXPORT_HEADERS, exportRow({ name: 'Sabena Group', type: 'cruise|hotel', city: 'Luxor', status: 'active' })].join('\n'))
     expect(r.records[0]).toMatchObject({ type: 'cruise', types: ['cruise', 'hotel'] })
   })
 
   it("resolves the agency's own words (labels) to keys and keeps the primary first", () => {
-    const parsed = parseSuppliersCsv([EXPORT_HEADERS, 'Nile Fleet,Fleet partner | Hotel,,,,Cairo,,active'].join('\n'))
+    const parsed = parseSuppliersCsv([EXPORT_HEADERS, exportRow({ name: 'Nile Fleet', type: 'Fleet partner | Hotel', city: 'Cairo', status: 'active' })].join('\n'))
     const { records, refused } = resolveImportTypes(parsed.records, VOCAB)
     expect(refused).toEqual([])
     expect(records[0]).toMatchObject({ type: 'transport_company', types: ['transport_company', 'hotel'] })
   })
 
   it('refuses a row naming a role the agency does not have, and says which', () => {
-    const parsed = parseSuppliersCsv([EXPORT_HEADERS, 'Mystery Co,hotel|spaceship,,,,Cairo,,active', 'Fine Co,hotel,,,,Cairo,,active'].join('\n'))
+    const parsed = parseSuppliersCsv([EXPORT_HEADERS, exportRow({ name: 'Mystery Co', type: 'hotel|spaceship', city: 'Cairo', status: 'active' }), exportRow({ name: 'Fine Co', type: 'hotel', city: 'Cairo', status: 'active' })].join('\n'))
     const { records, refused } = resolveImportTypes(parsed.records, VOCAB)
     expect(records.map(r => r.name)).toEqual(['Fine Co'])
     expect(refused).toEqual([{ row: 2, reason: expect.stringMatching(/"Mystery Co": type "spaceship" is not in your supplier types/) }])
   })
 
   it('passes records through untouched when the vocabulary is empty (migration not applied)', () => {
-    const parsed = parseSuppliersCsv([EXPORT_HEADERS, 'Any Co,whatever,,,,Cairo,,active'].join('\n'))
+    const parsed = parseSuppliersCsv([EXPORT_HEADERS, exportRow({ name: 'Any Co', type: 'whatever', city: 'Cairo', status: 'active' })].join('\n'))
     expect(resolveImportTypes(parsed.records, []).records[0].types).toEqual(['whatever'])
   })
 })

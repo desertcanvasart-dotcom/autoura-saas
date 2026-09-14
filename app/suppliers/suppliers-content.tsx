@@ -19,6 +19,7 @@ import {
 import SupplierPropertiesPanel from '@/components/SupplierPropertiesPanel'
 import SupplierDocumentsPanel from '@/components/SupplierDocumentsPanel'
 import { propertyTypesForRoles } from '@/lib/supplier-properties'
+import { SUPPLIER_CSV_HEADERS, supplierCsvSampleRow } from '@/lib/suppliers/csv-schema'
 import { useVocabulary } from '@/hooks/useVocabulary'
 import { pluralize } from '@/lib/vocabulary-ui'
 import { VocabLabel } from '@/components/vocabulary'
@@ -539,12 +540,15 @@ export default function SuppliersContent() {
         return
       }
       const bits = [`${data.inserted} imported`]
+      if (data.propertiesCreated) bits.push(`${data.propertiesCreated} properties created`)
+      if (data.propertiesSkippedExisting) bits.push(`${data.propertiesSkippedExisting} properties skipped (their supplier already existed)`)
+      if (data.propertyWarnings?.length) bits.push(`${data.propertyWarnings.length} properties not placed (${data.propertyWarnings.slice(0, 2).map((w: { reason: string }) => w.reason).join('; ')}${data.propertyWarnings.length > 2 ? '…' : ''})`)
       if (data.typeDefaulted?.length) bits.push(`${data.typeDefaulted.length} had no Type — imported as "Other", reclassify when convenient`)
       if (data.skippedExisting?.length) bits.push(`${data.skippedExisting.length} already existed (skipped)`)
       if (data.refused?.length) bits.push(`${data.refused.length} refused (${data.refused.slice(0, 3).map((r: { reason: string }) => r.reason).join('; ')}${data.refused.length > 3 ? '…' : ''})`)
       // A result that still needs the user's attention (refusals to fix,
       // types to reclassify) is a WARNING — sticky until dismissed.
-      const needsAttention = Boolean(data.refused?.length || data.typeDefaulted?.length)
+      const needsAttention = Boolean(data.refused?.length || data.typeDefaulted?.length || data.propertyWarnings?.length)
       showToast(needsAttention ? 'warning' : 'success', `Suppliers import: ${bits.join(' · ')}`)
       fetchSuppliers()
     } catch (err) {
@@ -562,8 +566,8 @@ export default function SuppliersContent() {
   const handleSampleCsv = () => {
     const validTypes = typeItems.map(t => t.key).join(' | ')
     const csv = [
-      'Name,Type,Contact,Email,Phone,City,Country,Commission,Status,Notes,Website',
-      `Nile Star Hotel,hotel|transport_company,Ahmed Hassan,reservations@nilestar.example,+20 100 000 0000,Cairo,Egypt,10,active,Valid types: ${validTypes} — several roles separated by |,https://nilestar.example`,
+      SUPPLIER_CSV_HEADERS.join(','),
+      supplierCsvSampleRow(validTypes).map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','),
     ].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -576,26 +580,37 @@ export default function SuppliersContent() {
     URL.revokeObjectURL(url)
   }
 
-  const handleExport = () => {
-    const csv = [
-      ['Name', 'Type', 'Contact', 'Email', 'Phone', 'City', 'Commission', 'Status'].join(','),
-      ...filteredSuppliers.map(s => [
-        s.name, 
-        typesOf(s).join('|'), 
-        s.contact_name, 
-        s.contact_email, 
-        s.contact_phone, 
-        s.city, 
-        s.default_commission_rate, 
-        s.status
-      ].map(v => `"${v || ''}"`).join(','))
-    ].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `suppliers-${todayLocal()}.csv`
-    a.click()
+  // The server builds the file: properties live in another table, the column
+  // set is shared with the importer (lib/suppliers/csv-schema.ts), and
+  // Papa.unparse escapes quotes and commas that the old hand-built string
+  // silently corrupted. The browser still decides WHAT to export — the rows
+  // the current filters left on screen.
+  const handleExport = async () => {
+    try {
+      const res = await fetch('/api/suppliers/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: filteredSuppliers.map(s => s.id) }),
+      })
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null)
+        showToast('error', `Export failed: ${detail?.error || `server returned ${res.status}`}`)
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `suppliers-${todayLocal()}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      showToast('error', `Export failed: ${err instanceof Error ? err.message : 'network error'}`)
+    }
   }
+
 
   // The form collects WHO the supplier is and how to reach them — nothing
   // more. Property type, star rating, ship name, languages, commission and

@@ -1,10 +1,11 @@
 // ============================================
 // Suppliers CSV import — pure parsing/classification (B-item 7)
 // ============================================
-// The suppliers page could export but never import. The format is the
-// export's own: Name, Type, Contact, Email, Phone, City, Commission,
-// Status (headers case-insensitive; unknown columns ignored), so an
-// exported file round-trips.
+// The suppliers page could export but never import. The format is the export's
+// own (headers case-insensitive; unknown columns ignored), so an exported file
+// round-trips — a promise that was FALSE until 2026-09-14, because the export
+// and this parser each kept their own column list. Both now derive from
+// lib/suppliers/csv-schema.ts, and a parity test fails if they part ways.
 //
 // The natural-key doctrine (A-item 5) applies:
 //   - two rows in one file sharing a name → the later rows are REFUSED
@@ -20,6 +21,11 @@
 
 import Papa from 'papaparse'
 import { resolveVocabularyKey } from '@/lib/vocabulary'
+import {
+  supplierCsvHeaderMap,
+  parsePropertiesCell,
+  type ParsedPropertyEntry,
+} from '@/lib/suppliers/csv-schema'
 
 // A supplier can fill SEVERAL roles (migration 340): the Type cell may list
 // them separated by | ; or / — "hotel | transport company" — in the agency's
@@ -27,34 +33,10 @@ import { resolveVocabularyKey } from '@/lib/vocabulary'
 // and REFUSES a row naming a role the agency does not have, so a typo never
 // lands as a bogus type (the database would refuse it anyway, as a 500).
 
-const HEADER_MAP: Record<string, string> = {
-  name: 'name',
-  company: 'name',
-  company_name: 'name',
-  supplier: 'name',
-  supplier_name: 'name',
-  // The portable cross-install key (SUP-0001). Carried through so importing a
-  // supplier export into a fresh tenant creates suppliers WITH their codes, and
-  // rate CSVs then link by code with no separate reconciliation step.
-  code: 'supplier_code',
-  supplier_code: 'supplier_code',
-  type: 'type',
-  supplier_type: 'type',
-  category: 'type',
-  contact: 'contact_name',
-  contact_name: 'contact_name',
-  email: 'contact_email',
-  contact_email: 'contact_email',
-  phone: 'contact_phone',
-  contact_phone: 'contact_phone',
-  city: 'city',
-  country: 'country',
-  commission: 'default_commission_rate',
-  default_commission_rate: 'default_commission_rate',
-  status: 'status',
-  notes: 'notes',
-  website: 'website',
-}
+// Derived from lib/suppliers/csv-schema.ts — the one place the column set is
+// written down. It used to be a second hand-maintained copy here, and the two
+// drifted until the export wrote 8 columns the importer read 12 of.
+const HEADER_MAP: Record<string, string> = supplierCsvHeaderMap()
 
 export interface SupplierImportRecord {
   /** 1-based CSV line (header is line 1). */
@@ -69,12 +51,20 @@ export interface SupplierImportRecord {
   contact_name?: string
   contact_email?: string
   contact_phone?: string
+  phone2?: string
+  whatsapp?: string
+  address?: string
   city?: string
   country?: string
+  commission_type?: string
   default_commission_rate?: number
   status?: string
   notes?: string
   website?: string
+  /** The assets this supplier operates, as the Properties cell named them.
+   *  Resolved to supplier_properties rows by the import ROUTE, which is where
+   *  the supplier's id and its allowed property types are known. */
+  properties?: ParsedPropertyEntry[]
 }
 
 export interface SupplierImportParseResult {
@@ -122,13 +112,18 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
       record[field] = field === 'default_commission_rate' ? Number(v) || 0 : v
     }
     // WhatsApp is the only reachable number for many suppliers (the Phone cell
-    // is blank). Fall it back into contact_phone so those rows keep a number,
-    // without a separate WhatsApp column on the table. Header is normalized to
-    // 'whatsapp' (lowercased, spaces → underscores) by transformHeader.
-    if (!record.contact_phone) {
-      const wa = String((raw as Record<string, string>).whatsapp ?? '').trim()
-      if (wa) record.contact_phone = wa
+    // is blank). It is a column of its own now, but it STILL falls back into
+    // contact_phone when Phone is empty — files written against the old
+    // behaviour must keep landing a reachable number.
+    if (!record.contact_phone && record.whatsapp) {
+      record.contact_phone = record.whatsapp
     }
+    // The Properties cell is a list, not a scalar: take it off the record so
+    // the string cannot reach a `suppliers` column, and hand the route the
+    // parsed entries instead.
+    const propertyCell = typeof record.properties === 'string' ? record.properties : ''
+    delete record.properties
+    const properties = parsePropertiesCell(propertyCell)
     const name = String(record.name ?? '').trim()
     if (!name) {
       refused.push({ row: rowNum, reason: 'missing Name' })
@@ -155,6 +150,7 @@ export function parseSuppliersCsv(csvData: string): SupplierImportParseResult {
       name,
       type: types[0],
       types,
+      ...(properties.length > 0 ? { properties } : {}),
     })
   })
 
