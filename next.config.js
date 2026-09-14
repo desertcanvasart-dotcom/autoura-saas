@@ -31,9 +31,8 @@ const nextConfig = {
   },
 }
 
-// `npm run analyze` — treemap of what's inside each client chunk. Kept out of
-// normal builds; the require is conditional so production doesn't need the dep.
-module.exports = process.env.ANALYZE === 'true'
-  ? // eslint-disable-next-line @typescript-eslint/no-require-imports -- next.config.js is CommonJS; conditional so prod installs don't need the dep
-    require('@next/bundle-analyzer')({ enabled: true })(nextConfig)
-  : nextConfig
+// `npm run analyze` reads the BUILT output (scripts/analyze-chunks.mjs) rather
+// than hooking the bundler. @next/bundle-analyzer lived here and hooked
+// config.webpack, which Next 16 never calls because this app builds with
+// Turbopack — so it silently produced no report at all. See the script header.
+module.exports = nextConfig
