@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows, applyCanonicalAliases, deriveImportSeasons } from '@/lib/bulk-rate-service'
+import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows, applyCanonicalAliases, deriveImportSeasons, propertyLinkFor } from '@/lib/bulk-rate-service'
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES } from '@/lib/rates/periods-csv'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { resolveRecordKeys, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
+import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 
 export async function POST(request: NextRequest) {
   try {
@@ -257,6 +258,54 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // WHICH ship / hotel / train this rate prices. The rate FORMS resolve this
+    // on every save; the bulk import never did, so export → delete → re-import
+    // came back with every property link NULL — visibly so on trains, whose
+    // name lives only on supplier_properties (2026-09-14).
+    //
+    // The name is the portable key, resolved under the row's OWN supplier —
+    // after the supplier resolution above, so it resolves against THIS tenant's
+    // supplier_id and never the foreign UUID the file arrived with. Resolved
+    // once per distinct (supplier, name) pair, not once per row: a fleet has a
+    // handful of ships and hundreds of rates.
+    let propertyLinksUnresolved = 0
+    {
+      const link = propertyLinkFor(config.tableName)
+      if (link) {
+        const nameOf = (r: Record<string, unknown>) => String(r[link.nameColumn] ?? '').trim()
+        const supplierOf = (r: Record<string, unknown>) => String(r.supplier_id ?? '').trim()
+        const resolved = new Map<string, string | null>()
+        for (const r of rowsToUpsert) {
+          const name = nameOf(r)
+          const supplierId = supplierOf(r)
+          if (!supplierId || !name) continue
+          const cacheKey = `${supplierId}::${name.toLowerCase()}`
+          if (!resolved.has(cacheKey)) {
+            const prop = await resolveRateProperty(supabase, {
+              tenantId: tenant_id,
+              propertyType: link.propertyType,
+              supplierId,
+              name,
+            })
+            resolved.set(cacheKey, prop.property_id)
+          }
+          const propertyId = resolved.get(cacheKey) ?? null
+          // Omitted when null so an install that has not run migration 311/313
+          // still imports its rates — the link is a named gap, never a refusal.
+          if (propertyId) r.property_id = propertyId
+        }
+        // A row that named a property but could not be linked: no supplier to
+        // hang it from, or the find-or-create lost its race. Reported, never
+        // silent — the rate itself still lands.
+        for (const r of rowsToUpsert) {
+          if (nameOf(r) && !r.property_id) propertyLinksUnresolved++
+        }
+        // Virtual column: no train table has one, so it must not reach the
+        // insert (the same contract supplier_code keeps above).
+        if (link.virtual) for (const r of rowsToUpsert) delete r[link.nameColumn]
+      }
+    }
+
     // Two rows in the same file sharing one natural key: the second would
     // silently overwrite the first ("13 creates, 0 inserts"). Refuse them
     // row-wise with the collision named, import the rest.
@@ -315,7 +364,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, supplierCodeErrors: supplierCodeErrors.length, errors: importErrors })
+    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, propertyLinksUnresolved, supplierCodeErrors: supplierCodeErrors.length, errors: importErrors })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }

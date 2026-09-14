@@ -168,6 +168,12 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
         if (data.supplierLinksCleared > 0) {
           showToast('warning', `${data.supplierLinksCleared} rows named a supplier this workspace doesn't have — imported without the supplier link; set suppliers on them when convenient.`)
         }
+        // A named ship/hotel/train that could not be hung off a supplier —
+        // almost always because the row carries no supplier. The rate lands;
+        // the property link is a gap the operator can see and close.
+        if (data.propertyLinksUnresolved > 0) {
+          showToast('warning', `${data.propertyLinksUnresolved} rows named a property that couldn't be linked — they need a supplier first; set it on those rows and re-import to link them.`)
+        }
         setImportState(prev => ({
           ...prev,
           step: 'done',
