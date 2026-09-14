@@ -541,7 +541,7 @@ export default function SuppliersContent() {
       }
       const bits = [`${data.inserted} imported`]
       if (data.propertiesCreated) bits.push(`${data.propertiesCreated} properties created`)
-      if (data.propertiesSkippedExisting) bits.push(`${data.propertiesSkippedExisting} properties skipped (their supplier already existed)`)
+      if (data.propertiesAlreadyPresent) bits.push(`${data.propertiesAlreadyPresent} properties already on file`)
       if (data.propertyWarnings?.length) bits.push(`${data.propertyWarnings.length} properties not placed (${data.propertyWarnings.slice(0, 2).map((w: { reason: string }) => w.reason).join('; ')}${data.propertyWarnings.length > 2 ? '…' : ''})`)
       if (data.typeDefaulted?.length) bits.push(`${data.typeDefaulted.length} had no Type — imported as "Other", reclassify when convenient`)
       if (data.skippedExisting?.length) bits.push(`${data.skippedExisting.length} already existed (skipped)`)
@@ -578,6 +578,74 @@ export default function SuppliersContent() {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+
+  // ---- The properties sheet: one row per asset, for bulk editing ----
+  // Separate from the suppliers CSV on purpose. That file carries properties as
+  // NAMES in one cell, which round-trips the link and nothing else; a property
+  // also has a city, a category, an accommodation type and its own contacts,
+  // and nesting a record inside a CSV cell makes a file nobody can edit by hand.
+  const propertiesInputRef = useRef<HTMLInputElement | null>(null)
+
+  const handleExportProperties = async () => {
+    try {
+      const res = await fetch('/api/suppliers/properties/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplierIds: filteredSuppliers.map(s => s.id) }),
+      })
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null)
+        showToast('error', `Properties export failed: ${detail?.error || `server returned ${res.status}`}`)
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `supplier-properties-${todayLocal()}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      showToast('error', `Properties export failed: ${err instanceof Error ? err.message : 'network error'}`)
+    }
+  }
+
+  const handleImportProperties = async (file: File) => {
+    try {
+      const csvData = await file.text()
+      const res = await fetch('/api/suppliers/properties/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvData }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok || !data) {
+        showToast('error', `Properties import failed: ${data?.error || `server returned ${res.status}`}`)
+        return
+      }
+      if (data.error && !data.created && !data.updated) {
+        showToast('error', `Properties import failed: ${data.error}`)
+        return
+      }
+      const bits: string[] = []
+      if (data.created) bits.push(`${data.created} created`)
+      if (data.updated) bits.push(`${data.updated} updated`)
+      if (!bits.length) bits.push('nothing changed')
+      // Refusals are the point of this import: a row it could not place must be
+      // named, not counted and forgotten.
+      if (data.refused?.length) {
+        bits.push(`${data.refused.length} refused (${data.refused.slice(0, 2).map((r: { row: number; reason: string }) => `row ${r.row}: ${r.reason}`).join('; ')}${data.refused.length > 2 ? '…' : ''})`)
+      }
+      showToast(data.refused?.length ? 'warning' : 'success', `Properties: ${bits.join(' · ')}`)
+      if (selectedSupplier) void handleView(selectedSupplier, 'properties')
+    } catch (err) {
+      showToast('error', `Properties import failed: ${err instanceof Error ? err.message : 'network error'}`)
+    } finally {
+      if (propertiesInputRef.current) propertiesInputRef.current.value = ''
+    }
   }
 
   // The server builds the file: properties live in another table, the column
@@ -768,6 +836,28 @@ export default function SuppliersContent() {
               </button>
               <button onClick={handleExport} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
                 <Download className="w-4 h-4" /> Export
+              </button>
+              <div className="w-px h-6 bg-gray-200" />
+              <input
+                ref={propertiesInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportProperties(f) }}
+              />
+              <button
+                onClick={handleExportProperties}
+                title="Download every property (ships, hotels, trains) as one row each — edit in a spreadsheet and import it back"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <Ship className="w-4 h-4" /> Properties CSV
+              </button>
+              <button
+                onClick={() => propertiesInputRef.current?.click()}
+                title="Import an edited properties sheet — rows update by Property ID, or by supplier + kind + name"
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <Upload className="w-4 h-4" /> Import Properties
               </button>
               <ReconcileCodes onApplied={fetchSuppliers} />
               <button onClick={handleAdd} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">

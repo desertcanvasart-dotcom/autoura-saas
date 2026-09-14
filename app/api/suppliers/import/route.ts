@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { parseSuppliersCsv, splitAgainstExisting, resolveImportTypes } from '@/lib/suppliers/import-csv'
 import { loadVocabulary } from '@/lib/vocabulary-server'
-import { propertyTypesForRoles, PROPERTY_TYPE_LABELS, type PropertyType } from '@/lib/supplier-properties'
+import { planNamedProperties, type NamedPropertyEntry, type SupplierRef, type ExistingProperty } from '@/lib/suppliers/property-csv-plan'
 import type { Database } from '@/types/database.types'
 
 type SupplierInsert = Database['public']['Tables']['suppliers']['Insert']
@@ -37,10 +37,17 @@ export async function POST(request: NextRequest) {
 
     // Role words → the agency's vocabulary keys; an unknown word refuses its row.
     const supplierTypeVocab = await loadVocabulary(supabase, 'supplier_type')
+    const behaviorOf = (key: string) => supplierTypeVocab.find(v => v.key === key)?.behavior ?? key
     const resolved = resolveImportTypes(parsed.records, supplierTypeVocab)
     const refused = [...parsed.refused, ...resolved.refused].sort((a, b) => a.row - b.row)
-    // Existing suppliers (this tenant): an import CREATES, never updates.
-    const { data: existing } = await supabase.from('suppliers').select('name').eq('tenant_id', tenant_id)
+    // Existing suppliers (this tenant): an import CREATES, never updates the
+    // supplier row. Their ids and ROLES are read too — a property may be topped
+    // up onto one, and it is validated against what that supplier actually is,
+    // not what this file claims.
+    const { data: existing } = await supabase
+      .from('suppliers')
+      .select('id, name, supplier_code, type, types')
+      .eq('tenant_id', tenant_id)
     const { toInsert: creatable, skippedExisting } = splitAgainstExisting(
       resolved.records,
       (existing ?? []).map(s => String(s.name ?? ''))
@@ -72,93 +79,85 @@ export async function POST(request: NextRequest) {
     }))
 
     let inserted = 0
-    let createdSuppliers: Array<{ id: string; name: string }> = []
+    let createdSuppliers: Array<{ id: string; name: string; types: string[] }> = []
     if (rows.length > 0) {
-      const { data, error } = await supabase.from('suppliers').insert(rows).select('id, name')
+      const { data, error } = await supabase.from('suppliers').insert(rows).select('id, name, type, types')
       if (error) {
         console.error('suppliers import insert failed:', error)
         return NextResponse.json({ success: false, error: `Insert failed: ${error.message}` }, { status: 500 })
       }
-      createdSuppliers = (data ?? []).map(d => ({ id: String(d.id), name: String(d.name) }))
+      createdSuppliers = (data ?? []).map(d => ({
+        id: String(d.id),
+        name: String(d.name),
+        types: (Array.isArray(d.types) && d.types.length ? d.types : [d.type]).filter(Boolean).map(String),
+      }))
       inserted = rows.length
     }
 
     // ---- The assets each supplier operates (the Properties column) ----
-    // Resolved HERE because this is where the supplier's new id and its roles
-    // are both known. A property that cannot be placed is REPORTED and the
-    // supplier still lands — the rate is never held hostage to its ship.
-    const behaviorOf = (key: string) =>
-      supplierTypeVocab.find(v => v.key === key)?.behavior ?? key
-    const idByName = new Map(createdSuppliers.map(s => [s.name.trim().toLowerCase(), s.id]))
-    const propertyRows: Array<{ tenant_id: string; supplier_id: string; property_type: PropertyType; name: string }> = []
-    const propertyWarnings: Array<{ row: number; reason: string }> = []
-    const seenProperty = new Set<string>()
+    // Every judgement lives in planNamedProperties (pure, tested): which kinds
+    // a supplier's roles allow, refusing to guess between two, naming a prefix
+    // that is not a kind. It TOPS UP — a property the supplier already has is
+    // left alone, one it lacks is created, whether the supplier arrived in this
+    // file or was already here.
+    const asRef = (row: { id: unknown; name: unknown; supplier_code?: unknown; type?: unknown; types?: unknown }): SupplierRef => ({
+      id: String(row.id),
+      name: String(row.name ?? ''),
+      supplier_code: row.supplier_code ? String(row.supplier_code) : null,
+      types: (Array.isArray(row.types) && row.types.length ? row.types : [row.type])
+        .filter(Boolean)
+        .map(String),
+    })
+    const knownSuppliers: SupplierRef[] = [
+      ...createdSuppliers.map(s => asRef({ id: s.id, name: s.name, types: s.types })),
+      ...(existing ?? []).map(asRef),
+    ]
 
-    for (const record of creatable) {
-      if (!record.properties?.length) continue
-      const supplierId = idByName.get(record.name.trim().toLowerCase())
-      if (!supplierId) continue // its insert did not land; nothing to hang them off
-      // Which kinds of asset this supplier's ROLES allow it to own — the same
-      // rule the Properties tab uses, so the sheet cannot create something the
-      // UI would refuse to show.
-      const allowed = propertyTypesForRoles(record.types.map(behaviorOf))
+    const entries: NamedPropertyEntry[] = resolved.records.flatMap(record =>
+      (record.properties ?? []).map(p => ({
+        row: record.row,
+        supplierName: record.name,
+        type: p.type,
+        rawType: p.rawType,
+        name: p.name,
+      }))
+    )
 
-      for (const entry of record.properties) {
-        if (entry.rawType && !entry.type) {
-          propertyWarnings.push({
-            row: record.row,
-            reason: `"${record.name}": "${entry.rawType}" is not a kind of property — use ${Object.keys(PROPERTY_TYPE_LABELS).join(', ')}`,
-          })
-          continue
-        }
-        let type = entry.type
-        if (!type) {
-          // No prefix. One allowed kind is unambiguous; more than one is not,
-          // and guessing would silently file a ship under hotels.
-          if (allowed.length === 1) type = allowed[0]
-          else {
-            propertyWarnings.push({
-              row: record.row,
-              reason: allowed.length === 0
-                ? `"${record.name}": its roles own no properties, so "${entry.name}" has nowhere to go`
-                : `"${record.name}": say which kind "${entry.name}" is (${allowed.join(' or ')}:${entry.name}) — its roles allow more than one`,
-            })
-            continue
-          }
-        }
-        if (!allowed.includes(type)) {
-          propertyWarnings.push({
-            row: record.row,
-            reason: `"${record.name}": a ${record.types.join('/')} does not own a ${type} ("${entry.name}")`,
-          })
-          continue
-        }
-        // (supplier, type, name) is the table's unique key — a file naming the
-        // same ship twice must not bounce the whole insert.
-        const dedupe = `${supplierId}::${type}::${entry.name.toLowerCase()}`
-        if (seenProperty.has(dedupe)) continue
-        seenProperty.add(dedupe)
-        propertyRows.push({ tenant_id, supplier_id: supplierId, property_type: type, name: entry.name })
-      }
+    // What those suppliers already own, so a top-up adds only what is missing.
+    let existingProperties: ExistingProperty[] = []
+    if (entries.length > 0 && knownSuppliers.length > 0) {
+      const { data } = await supabase
+        .from('supplier_properties')
+        .select('id, supplier_id, property_type, name')
+        .eq('tenant_id', tenant_id)
+        .in('supplier_id', knownSuppliers.map(s => s.id))
+      existingProperties = (data ?? []) as ExistingProperty[]
     }
 
+    const propertyPlan = planNamedProperties({
+      tenantId: tenant_id,
+      entries,
+      suppliers: knownSuppliers,
+      existing: existingProperties,
+      behaviorOf,
+    })
+    const propertyWarnings = propertyPlan.warnings
+
     let propertiesCreated = 0
-    if (propertyRows.length > 0) {
-      const { error } = await supabase.from('supplier_properties').insert(propertyRows)
+    if (propertyPlan.creates.length > 0) {
+      const { error } = await supabase.from('supplier_properties').insert(propertyPlan.creates as never)
       if (error) {
         // The suppliers are already in. Say what did not follow them rather
         // than reporting a success that is only partly true.
         propertyWarnings.push({ row: 0, reason: `Properties could not be saved: ${error.message}` })
       } else {
-        propertiesCreated = propertyRows.length
+        propertiesCreated = propertyPlan.creates.length
       }
     }
-
-    // Properties named against a supplier that already existed are NOT created:
-    // an import creates, it never reaches into a supplier already on file.
-    const propertiesSkippedExisting = resolved.records
-      .filter(r => r.properties?.length && skippedExisting.includes(r.name))
-      .reduce((n, r) => n + (r.properties?.length ?? 0), 0)
+    // Named but not created because the supplier already had them — reported so
+    // "0 created" never reads as "something went wrong".
+    const propertiesAlreadyPresent =
+      entries.length - propertyPlan.creates.length - propertyWarnings.filter(w => w.row !== 0).length
 
     return NextResponse.json({
       success: true,
@@ -168,7 +167,7 @@ export async function POST(request: NextRequest) {
       refused,
       typeDefaulted: parsed.typeDefaulted,
       propertiesCreated,
-      propertiesSkippedExisting,
+      propertiesAlreadyPresent,
       propertyWarnings,
     })
   } catch (error) {
