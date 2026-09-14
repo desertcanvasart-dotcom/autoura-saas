@@ -20,7 +20,10 @@ const { POST } = await import('../import/route')
 const TENANT = 'tenant-1'
 
 let insertedProperties: Record<string, unknown>[]
-let existingSupplierNames: string[]
+/** Suppliers already in the tenant, with the roles they actually have. */
+let existingSuppliers: Array<{ id: string; name: string; type: string; types: string[] }>
+/** Properties those suppliers already own. */
+let existingProperties: Array<{ id: string; supplier_id: string; property_type: string; name: string }>
 
 // The agency's own words: 'nile_cruise_line' is this tenant's name for a
 // cruise company. Behaviour, not key, decides what it can own.
@@ -32,22 +35,32 @@ const VOCAB = [
   { key: 'restaurant', label: 'Restaurant', behavior: 'restaurant' },
 ]
 
+/** A thenable that answers every filter in the chain with the same rows. */
+function rows<T>(data: T[]) {
+  const chain: Record<string, unknown> = {
+    then: (resolve: (v: { data: T[]; error: null }) => unknown) => resolve({ data, error: null }),
+  }
+  for (const method of ['eq', 'in', 'order', 'select']) chain[method] = () => chain
+  return chain
+}
+
 function stubDb() {
   return {
     from: (table: string) => {
       if (table === 'supplier_properties') {
         return {
-          insert: async (rows: Record<string, unknown>[]) => {
-            insertedProperties.push(...rows)
+          select: () => rows(existingProperties),
+          insert: async (inserted: Record<string, unknown>[]) => {
+            insertedProperties.push(...inserted)
             return { error: null }
           },
         }
       }
       return {
-        select: () => ({ eq: async () => ({ data: existingSupplierNames.map(name => ({ name })) }) }),
-        insert: (rows: { name: string }[]) => ({
+        select: () => rows(existingSuppliers),
+        insert: (inserting: { name: string; type: string; types: string[] }[]) => ({
           select: async () => ({
-            data: rows.map((r, i) => ({ id: `supplier-${i}`, name: r.name })),
+            data: inserting.map((r, i) => ({ id: `supplier-${i}`, name: r.name, type: r.type, types: r.types })),
             error: null,
           }),
         }),
@@ -67,7 +80,8 @@ const placed = () => insertedProperties.map(p => `${p.property_type}:${p.name}`)
 beforeEach(() => {
   vi.clearAllMocks()
   insertedProperties = []
-  existingSupplierNames = []
+  existingSuppliers = []
+  existingProperties = []
   mockAuth.mockResolvedValue({ error: null, supabase: stubDb(), tenant_id: TENANT })
   mockVocab.mockResolvedValue(VOCAB)
 })
@@ -123,7 +137,7 @@ describe('it refuses to guess, and says why', () => {
     const res = await importCsv(['Sunboat Cruises,cruise,boat:MS Hapi'])
     expect(res.propertiesCreated).toBe(0)
     expect(res.propertyWarnings[0].reason).toMatch(/"boat" is not a kind of property/)
-    expect(res.propertyWarnings[0].reason).toMatch(/ship, hotel, train/)
+    expect(res.propertyWarnings[0].reason).toMatch(/ship, hotel or train/)
   })
 
   it('says so when the supplier\'s roles own no properties', async () => {
@@ -144,15 +158,47 @@ describe('it refuses to guess, and says why', () => {
   })
 })
 
-describe('an import creates, it never reaches into a supplier already on file', () => {
-  it('skips properties named against an existing supplier, and counts them', async () => {
-    existingSupplierNames = ['Sunboat Cruises']
+describe('a re-import TOPS UP a supplier already on file', () => {
+  beforeEach(() => {
+    existingSuppliers = [{ id: 'existing-1', name: 'Sunboat Cruises', type: 'cruise', types: ['cruise'] }]
+  })
+
+  it('adds the ships it does not have yet, without touching the supplier row', async () => {
     const res = await importCsv(['Sunboat Cruises,cruise,ship:MS Hapi | ship:MS Isis'])
-    expect(res.inserted).toBe(0)
+    expect(res.inserted).toBe(0) // the supplier itself is never re-created
     expect(res.skippedExisting).toEqual(['Sunboat Cruises'])
+    expect(res.propertiesCreated).toBe(2)
+    expect(placed()).toEqual(['ship:MS Hapi', 'ship:MS Isis'])
+    expect(insertedProperties[0]).toMatchObject({ supplier_id: 'existing-1' })
+  })
+
+  it('leaves a property it already owns exactly as it is', async () => {
+    existingProperties = [
+      { id: 'prop-1', supplier_id: 'existing-1', property_type: 'ship', name: 'MS Hapi' },
+    ]
+    const res = await importCsv(['Sunboat Cruises,cruise,ship:MS Hapi | ship:MS Isis'])
+    expect(res.propertiesCreated).toBe(1)
+    expect(placed()).toEqual(['ship:MS Isis'])
+    expect(res.propertiesAlreadyPresent).toBe(1)
+  })
+
+  it('matches what it already owns case-insensitively', async () => {
+    // The DB's unique key is case-SENSITIVE, so without this "MS HAPI" would
+    // become a second ship alongside "MS Hapi".
+    existingProperties = [
+      { id: 'prop-1', supplier_id: 'existing-1', property_type: 'ship', name: 'MS Hapi' },
+    ]
+    const res = await importCsv(['Sunboat Cruises,cruise,ship:MS HAPI'])
     expect(res.propertiesCreated).toBe(0)
-    // Counted, not silent — the operator can see what did not happen.
-    expect(res.propertiesSkippedExisting).toBe(2)
+    expect(insertedProperties).toEqual([])
+  })
+
+  it('validates against the roles the supplier ACTUALLY has, not the file\'s claim', async () => {
+    // The sheet says hotel; the supplier on file is a cruise company. Nothing
+    // updates the supplier, so a hotel cannot be hung off it.
+    const res = await importCsv(['Sunboat Cruises,hotel,hotel:Nile Star'])
+    expect(res.propertiesCreated).toBe(0)
+    expect(res.propertyWarnings[0].reason).toMatch(/does not own a hotel/)
   })
 })
 
