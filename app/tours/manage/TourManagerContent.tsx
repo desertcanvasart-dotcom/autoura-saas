@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
 import { sampleTemplateCsv } from '@/lib/tours/template-csv'
 import { sampleDaysCsv } from '@/lib/tours/itinerary-csv'
+import { readDayMeals, summarizeMeals, mealStatusLabel, MEAL_SLOTS, type DayMeals, type DayMealStatus, type MealSlot } from '@/lib/tours/day-meals'
 import {
   Map,
   Plus,
@@ -91,39 +92,14 @@ interface TourTemplate {
   pricing_mode?: string
   variations?: TourVariation[]
   itinerary?: ItineraryDay[]
+  meals_included?: string[]
+  pickup_required?: boolean
+  age_suitability?: string
   inclusions?: string[]   // NEW: What's included
   exclusions?: string[]   // NEW: What's not included
 }
 
 // NEW: Itinerary Day interface
-/** How a day records its meals. TWO shapes exist and both are live:
- *  - string[]  — what this editor has always written: ["Breakfast"]
- *  - object    — richer, and what the days CSV and the pricing engine use.
- *                It can say 'external' (eaten out, not included), which an
- *                array cannot express at all.
- *  parseItinerary() in the pricing engine reads both; this editor read only
- *  the array, so an imported day's meals rendered as nothing. */
-export type DayMealStatus = 'included' | 'external' | 'none'
-export type DayMeals = string[] | { breakfast?: DayMealStatus; lunch?: DayMealStatus; dinner?: DayMealStatus }
-
-/** Either shape to the three statuses, so the editor can show what it is
- *  looking at whoever wrote it. */
-export function readDayMeals(meals: DayMeals | undefined): Record<'breakfast' | 'lunch' | 'dinner', DayMealStatus> {
-  const out = { breakfast: 'none' as DayMealStatus, lunch: 'none' as DayMealStatus, dinner: 'none' as DayMealStatus }
-  if (!meals) return out
-  if (Array.isArray(meals)) {
-    const lower = meals.map(m => String(m).toLowerCase())
-    for (const k of ['breakfast', 'lunch', 'dinner'] as const) {
-      if (lower.includes(k)) out[k] = 'included'
-    }
-    return out
-  }
-  for (const k of ['breakfast', 'lunch', 'dinner'] as const) {
-    if (meals[k]) out[k] = meals[k]!
-  }
-  return out
-}
-
 interface ItineraryDay {
   day: number
   title: string
@@ -393,7 +369,10 @@ interface ItineraryEditorProps {
 function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions }: ItineraryEditorProps) {
   const [dayTitle, setDayTitle] = useState('')
   const [dayDescription, setDayDescription] = useState('')
-  const [dayMeals, setDayMeals] = useState<string[]>([])
+  // Tri-state per meal. The checkboxes could only say included-or-nothing,
+  // so a restaurant lunch the operator prices separately had no way to be
+  // recorded here, only via the days sheet.
+  const [dayMeals, setDayMeals] = useState<Record<MealSlot, DayMealStatus>>({ breakfast: 'none', lunch: 'none', dinner: 'none' })
   // Picked BY ID from the entrance-fee catalogue: the engine prices these
   // rows exactly and ignores the title's wording (A-item 13).
   const [dayAttractions, setDayAttractions] = useState<Array<{ id: string; name: string }>>([])
@@ -401,13 +380,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   const [dayTransportType, setDayTransportType] = useState<'' | 'flight' | 'train' | 'sleeping_train'>('')
   const [dayTransportRateId, setDayTransportRateId] = useState('')
 
-  const toggleMeal = (meal: string) => {
-    setDayMeals(prev => 
-      prev.includes(meal) 
-        ? prev.filter(m => m !== meal) 
-        : [...prev, meal]
-    )
-  }
+  const setMeal = (slot: MealSlot, status: DayMealStatus) =>
+    setDayMeals(prev => ({ ...prev, [slot]: status }))
 
   const addDayAttraction = (id: string) => {
     if (!id) return
@@ -427,11 +401,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       // pricing engine calls the new format, what the days CSV round-trips,
       // and the only one that can say 'external'. Existing array days keep
       // working — readDayMeals() handles both.
-      meals: {
-        breakfast: dayMeals.includes('Breakfast') ? 'included' : 'none',
-        lunch: dayMeals.includes('Lunch') ? 'included' : 'none',
-        dinner: dayMeals.includes('Dinner') ? 'included' : 'none',
-      } as DayMeals,
+      meals: { ...dayMeals } as DayMeals,
       ...(dayAttractions.length > 0
         ? {
             attractions: dayAttractions.map(a => a.name),
@@ -451,7 +421,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     // Reset form
     setDayTitle('')
     setDayDescription('')
-    setDayMeals([])
+    setDayMeals({ breakfast: 'none', lunch: 'none', dinner: 'none' })
     setDayAttractions([])
     setDayTransportType('')
     setDayTransportRateId('')
@@ -510,18 +480,24 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
           />
         </div>
 
-        {/* Meals */}
-        <div className="flex items-center gap-4">
+        {/* Meals — per day, per meal, three states, named by what the pricing
+            engine does with them: in the hotel rate, at a restaurant we price
+            separately, or not provided. A cost line and part of the agreement
+            with the customer, so it lives on the day. */}
+        <div className="flex flex-wrap items-center gap-4">
           <span className="text-xs text-gray-500">Meals:</span>
-          {['Breakfast', 'Lunch', 'Dinner'].map(meal => (
-            <label key={meal} className="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={dayMeals.includes(meal)}
-                onChange={() => toggleMeal(meal)}
-                className="w-4 h-4 text-green-600 border-gray-300 rounded"
-              />
-              <span className="text-xs text-gray-700">{meal}</span>
+          {MEAL_SLOTS.map(slot => (
+            <label key={slot} className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-700 capitalize">{slot}</span>
+              <select
+                value={dayMeals[slot]}
+                onChange={(e) => setMeal(slot, e.target.value as DayMealStatus)}
+                className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white"
+              >
+                <option value="none">Not provided</option>
+                <option value="included">In hotel rate</option>
+                <option value="external">Restaurant (priced)</option>
+              </select>
             </label>
           ))}
         </div>
@@ -650,16 +626,11 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                   </p>
                 )}
                 {(() => {
-                  // Both shapes, one reader. day.meals.length is undefined on
-                  // the object form, so the old check rendered NOTHING for
-                  // every day that came from the days CSV.
+                  // Both shapes, one reader (lib/tours/day-meals.ts).
                   const m = readDayMeals(day.meals)
                   const shown = (['breakfast', 'lunch', 'dinner'] as const)
                     .filter(k => m[k] !== 'none')
-                    .map(k => {
-                      const label = k[0].toUpperCase() + k.slice(1)
-                      return m[k] === 'external' ? `${label} (own expense)` : label
-                    })
+                    .map(k => `${k[0].toUpperCase() + k.slice(1)} (${mealStatusLabel(m[k])})`)
                   return shown.length > 0 ? (
                     <p className="text-xs text-blue-600 mt-1">
                       🍽️ {shown.join(', ')}
@@ -1157,15 +1128,6 @@ export default function TourManagerContent() {
     }))
   }
 
-  const toggleMeal = (meal: string) => {
-    setFormData(prev => ({
-      ...prev,
-      meals_included: prev.meals_included.includes(meal)
-        ? prev.meals_included.filter(m => m !== meal)
-        : [...prev.meals_included, meal]
-    }))
-  }
-
   const addHighlight = () => {
     if (highlightInput.trim()) {
       setFormData(prev => ({
@@ -1410,9 +1372,11 @@ export default function TourManagerContent() {
       main_attractions: template.main_attractions || [],
       best_for: template.best_for || [],
       physical_level: template.physical_level || 'moderate',
-      age_suitability: 'all_ages',
-      pickup_required: true,
-      meals_included: [],
+      // These three were hard-coded here while every neighbour read the
+      // template, so opening a tour and pressing Update silently reset them.
+      age_suitability: template.age_suitability || 'all_ages',
+      pickup_required: template.pickup_required ?? true,
+      meals_included: template.meals_included || [],
       image_url: template.image_url || '',
       is_featured: template.is_featured,
       is_active: template.is_active,
@@ -1473,6 +1437,9 @@ export default function TourManagerContent() {
       duration_days: singleDay ? 1 : formData.duration_days,
       duration_nights: singleDay ? 0 : formData.duration_nights,
       duration_hours: singleDay ? (formData.duration_hours || null) : null,
+      // Derived from the days, never typed: stated BY DAY, and unable to
+      // disagree with the itinerary it summarises (lib/tours/day-meals.ts).
+      meals_included: summarizeMeals(formData.itinerary),
     }
     
     try {

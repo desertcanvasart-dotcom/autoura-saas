@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import Papa from 'papaparse'
 import { parseDaysCsv } from '@/lib/tours/itinerary-csv'
+import { summarizeMeals } from '@/lib/tours/day-meals'
 
 /**
  * POST /api/tours/bulk/import-days
@@ -87,8 +88,10 @@ export async function POST(request: NextRequest) {
     const errors: Array<{ code: string; message: string }> = []
     for (const code of willUpdate) {
       const itinerary = byTemplate.get(code)!
+      // meals_included is derived from the days it summarises, in the same
+      // write, so the two can never disagree.
       const { error } = await db
-        .update({ itinerary })
+        .update({ itinerary, meals_included: summarizeMeals(itinerary) })
         .eq('template_code', code)
         .eq('tenant_id', tenant_id)
       if (error) errors.push({ code, message: error.message })

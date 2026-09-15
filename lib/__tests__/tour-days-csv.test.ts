@@ -110,6 +110,23 @@ describe('values the engine prices from are checked, not stored blindly', () => 
     expect(parseDaysCsv(csv, papa).refused[0].reason).toContain('sleeping_train')
   })
 
+  it('refuses an external breakfast, which the engine could not price', () => {
+    // Lunch and dinner have an external (restaurant) pricing block; breakfast
+    // does not — it is assumed to travel with the hotel. Storing it would be
+    // a meal that is silently never priced.
+    const csv = 'Template Code,Day,Breakfast\nCAI-1,1,external\n'
+    const { byTemplate, refused } = parseDaysCsv(csv, papa)
+    expect(byTemplate.size).toBe(0)
+    expect(refused[0].reason).toContain('hotel rate')
+  })
+
+  it('accepts an external lunch, which the engine prices from meal rates', () => {
+    const csv = 'Template Code,Day,Lunch\nCAI-1,1,external\n'
+    const { byTemplate, refused } = parseDaysCsv(csv, papa)
+    expect(refused).toEqual([])
+    expect((byTemplate.get('CAI-1')![0].meals as { lunch: string }).lunch).toBe('external')
+  })
+
   it('is case-insensitive about the ones it accepts', () => {
     const csv = 'Template Code,Day,Accommodation,Breakfast\nCAI-1,1,HOTEL,Included\n'
     const { byTemplate, refused } = parseDaysCsv(csv, papa)

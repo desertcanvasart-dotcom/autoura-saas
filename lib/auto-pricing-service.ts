@@ -75,6 +75,13 @@ function getSupabaseAdmin() {
  *  (lib/vocabulary: presetTierFor). */
 export type ServiceTier = string
 export type AccommodationType = 'hotel' | 'cruise' | 'none'
+/** What a day does about a meal — and what the engine does with it:
+ *    included  in the hotel/cruise rate (board basis); no separate line.
+ *    external  the operator takes them to a restaurant; priced per pax from
+ *              meal rates (lunch and dinner — there is no external-breakfast
+ *              block, breakfast is assumed to travel with the hotel).
+ *    none      not provided; the customer's own arrangement.
+ *  'external' is therefore a COST, not "own expense" — that is 'none'. */
 export type MealStatus = 'included' | 'external' | 'none'
 
 // Transport service types (normalized)

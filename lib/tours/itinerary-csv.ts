@@ -28,6 +28,13 @@
 // contiguous run starting at 1. A sheet that skips or restarts numbering is
 // REFUSED, which turns the destructive accident into an error message.
 //
+// ── Meal statuses, and what the pricing engine does with each ───────────────
+// included  in the hotel/cruise rate (board basis) — no separate line
+// external  the operator takes them to a restaurant — priced per pax from
+//           meal rates (lunch and dinner only; see the breakfast refusal)
+// none      not provided — the customer's own arrangement
+// 'external' is a COST. "Own expense" is 'none'.
+//
 // ── What this sheet will never carry ────────────────────────────────────────
 // attraction_ids and transport_rate_id: UUIDs into this install's own rows.
 // They do not survive a move between installs, and a wrong id is worse than an
@@ -249,6 +256,18 @@ export function parseDaysCsv(
         return
       }
       rec[col.name] = v
+    }
+
+    // The engine prices an external lunch and dinner from meal rates but has
+    // no external-BREAKFAST block: breakfast is assumed to come with the
+    // hotel. Accepting 'external' here would store a meal that is silently
+    // never priced — worse than refusing it.
+    if (rec.breakfast === 'external') {
+      refused.push({
+        row: rowNum,
+        reason: `"${code}" day ${day}: Breakfast cannot be "external" — the engine prices breakfast through the hotel rate only. Use "included" (with the hotel) or "none".`,
+      })
+      return
     }
 
     if (!rowsByCode.has(code)) rowsByCode.set(code, [])
