@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 142
+ * Tables: 141
  */
 
 export type Json =
@@ -9294,59 +9294,6 @@ export interface Database {
           },
         ]
       }
-      tour_categories: {
-        Row: {
-          id: string
-          tenant_id: string
-          category_name: string
-          slug: string | null
-          description: string | null
-          icon: string | null
-          created_at: string | null
-          category_code: string | null
-          is_active: boolean | null
-          sort_order: number | null
-          name: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          tenant_id: string
-          category_name: string
-          slug?: string | null
-          description?: string | null
-          icon?: string | null
-          created_at?: string | null
-          category_code?: string | null
-          is_active?: boolean | null
-          sort_order?: number | null
-          name?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          tenant_id?: string
-          category_name?: string
-          slug?: string | null
-          description?: string | null
-          icon?: string | null
-          created_at?: string | null
-          category_code?: string | null
-          is_active?: boolean | null
-          sort_order?: number | null
-          name?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tour_categories_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tour_day_activities: {
         Row: {
           id: string
@@ -9832,7 +9779,6 @@ export interface Database {
           long_description: string | null
           duration_days: number
           duration_nights: number
-          category_id: string | null
           destination_id: string | null
           highlights: string[] | null
           main_attractions: string[] | null
@@ -9845,7 +9791,6 @@ export interface Database {
           destinations_covered: string[] | null
           best_for: string[] | null
           physical_level: string | null
-          tour_theme: string | null
           age_suitability: string | null
           pickup_required: boolean | null
           accommodation_nights: number | null
@@ -9865,6 +9810,7 @@ export interface Database {
           cached_starting_tier: string | null
           cached_price_updated_at: string | null
           duration_hours: number | null
+          tour_theme: string | null
         }
         Insert: {
           id?: string
@@ -9875,7 +9821,6 @@ export interface Database {
           long_description?: string | null
           duration_days?: number
           duration_nights?: number
-          category_id?: string | null
           destination_id?: string | null
           highlights?: string[] | null
           main_attractions?: string[] | null
@@ -9888,7 +9833,6 @@ export interface Database {
           destinations_covered?: string[] | null
           best_for?: string[] | null
           physical_level?: string | null
-          tour_theme?: string | null
           age_suitability?: string | null
           pickup_required?: boolean | null
           accommodation_nights?: number | null
@@ -9908,6 +9852,7 @@ export interface Database {
           cached_starting_tier?: string | null
           cached_price_updated_at?: string | null
           duration_hours?: number | null
+          tour_theme?: string | null
         }
         Update: {
           id?: string
@@ -9918,7 +9863,6 @@ export interface Database {
           long_description?: string | null
           duration_days?: number
           duration_nights?: number
-          category_id?: string | null
           destination_id?: string | null
           highlights?: string[] | null
           main_attractions?: string[] | null
@@ -9931,7 +9875,6 @@ export interface Database {
           destinations_covered?: string[] | null
           best_for?: string[] | null
           physical_level?: string | null
-          tour_theme?: string | null
           age_suitability?: string | null
           pickup_required?: boolean | null
           accommodation_nights?: number | null
@@ -9951,6 +9894,7 @@ export interface Database {
           cached_starting_tier?: string | null
           cached_price_updated_at?: string | null
           duration_hours?: number | null
+          tour_theme?: string | null
         }
         Relationships: [
           {
@@ -9958,13 +9902,6 @@ export interface Database {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tour_templates_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "tour_categories"
             referencedColumns: ["id"]
           },
           {
@@ -10763,7 +10700,6 @@ export interface Database {
           id: string
           email: string
           full_name: string | null
-          role: string | null
           company_name: string | null
           phone: string | null
           is_active: boolean | null
@@ -10776,7 +10712,6 @@ export interface Database {
           id: string
           email: string
           full_name?: string | null
-          role?: string | null
           company_name?: string | null
           phone?: string | null
           is_active?: boolean | null
@@ -10789,7 +10724,6 @@ export interface Database {
           id?: string
           email?: string
           full_name?: string | null
-          role?: string | null
           company_name?: string | null
           phone?: string | null
           is_active?: boolean | null
@@ -11526,6 +11460,13 @@ export interface Database {
       }
       next_supplier_invoice_reference: {
         Args: Record<PropertyKey, never>
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
+      pending_invitation_tenant: {
+        Args: {
+          p_email?: string
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Returns: any
       }
