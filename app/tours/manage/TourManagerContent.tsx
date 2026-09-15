@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic'
 import React, { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
 import { sampleTemplateCsv } from '@/lib/tours/template-csv'
+import { sampleDaysCsv } from '@/lib/tours/itinerary-csv'
 import {
   Map,
   Plus,
@@ -1201,6 +1202,7 @@ export default function TourManagerContent() {
   }
 
   const bulkFileRef = useRef<HTMLInputElement>(null)
+  const daysFileRef = useRef<HTMLInputElement>(null)
 
   // The sheet to start a bulk upload from: headers + one example row.
   const handleSampleCsv = () => {
@@ -1210,6 +1212,49 @@ export default function TourManagerContent() {
     a.download = 'tour-templates-sample.csv'
     a.click()
     URL.revokeObjectURL(a.href)
+  }
+
+  // The days sheet: one row per itinerary day. Separate from the template
+  // sheet because a day is a nested record and a flat row cannot hold one —
+  // the same split as the supplier properties sheet.
+  const handleSampleDaysCsv = () => {
+    const blob = new Blob([sampleDaysCsv()], { type: 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = 'tour-days-sample.csv'
+    a.click()
+  }
+
+  const handleExportDays = () => {
+    window.location.href = '/api/tours/bulk/export-days'
+  }
+
+  const handleImportDays = async (file: File) => {
+    try {
+      const text = await file.text()
+      const res = await fetch('/api/tours/bulk/import-days', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvData: text, dryRun: false }),
+      })
+      const json = await res.json()
+      const firstReason = Array.isArray(json.refused) && json.refused.length
+        ? ` — ${json.refused[0].reason}` : ''
+      if (json.success) {
+        showToast(
+          json.refusedRows ? 'info' : 'success',
+          `Itineraries updated: ${json.days} day(s) across ${json.updated} tour(s)` +
+          (json.refusedRows ? `, ${json.refusedRows} skipped${firstReason}` : '')
+        )
+        fetchTemplates()
+      } else {
+        showToast('error', json.error || 'Day import failed')
+      }
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : 'Day import failed')
+    } finally {
+      if (daysFileRef.current) daysFileRef.current.value = ''
+    }
   }
 
   // Flat CSV of the portable template metadata (this tenant). Server builds it.
@@ -1566,7 +1611,26 @@ export default function TourManagerContent() {
                 <Download className="w-4 h-4" />
                 Export
               </button>
-              <button onClick={() => bulkFileRef.current?.click()} title="Import templates from a CSV (upserts by code; itinerary and variations are untouched)" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+              <input
+                ref={daysFileRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportDays(f) }}
+              />
+              <button onClick={handleSampleDaysCsv} title="Download a sample days sheet — one row per itinerary day, keyed by Template Code. This is what Auto-Pricing reads." className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                <FileText className="w-4 h-4" />
+                Sample Days
+              </button>
+              <button onClick={handleExportDays} title="Download every tour's day-by-day itinerary as a CSV (one row per day)" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                <Download className="w-4 h-4" />
+                Export Days
+              </button>
+              <button onClick={() => daysFileRef.current?.click()} title="Import a days sheet — REPLACES the whole itinerary of each tour it names; tours it does not name are untouched" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+                <Upload className="w-4 h-4" />
+                Import Days
+              </button>
+                            <button onClick={() => bulkFileRef.current?.click()} title="Import templates from a CSV (upserts by code; itinerary and variations are untouched)" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
                 <Upload className="w-4 h-4" />
                 Import
               </button>
