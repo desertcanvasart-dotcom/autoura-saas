@@ -165,8 +165,13 @@ describe('the sample sheet does not fail silently', () => {
   })
 
   it('counts example rows without discarding the real ones beside them', () => {
-    const csv = sampleTemplateCsv().trimEnd() +
-      '\n"CAI-002","Second Tour","day_tour","1","0","Cairo","cultural","easy","families","s","l","false","true"\n'
+    // Built with the serializer, not hand-typed: a literal row goes stale the
+    // moment a column is added, and then fails as a field-count parse error
+    // that looks nothing like the thing under test.
+    const extraRow = serializeTemplatesCsv([
+      { template_code: 'CAI-002', template_name: 'Second Tour', tour_type: 'day_tour', duration_days: 1 },
+    ]).split('\n').slice(1).join('\n')
+    const csv = sampleTemplateCsv().trimEnd() + '\n' + extraRow
     const r = parseTemplatesCsv(csv, papa)
     expect(r.records.map(x => x.template_code)).toEqual(['CAI-002'])
     expect(r.exampleRows).toBe(1)
@@ -312,5 +317,82 @@ describe('a genuinely empty Code cell names its row', () => {
     expect(r.records.map(x => x.template_code)).toEqual(['CAI-2'])
     expect(r.refused[0].reason).toContain('row 2')
     expect(r.refused[0].reason).toContain('Code column')
+  })
+})
+
+// ============================================================================
+// A real sheet arrived carrying Highlights, Main Attractions, Inclusions,
+// Exclusions, Meals Included, Image URL and Pickup Required — seven columns
+// that all exist on tour_templates, that the sheet did not carry, and that the
+// importer discarded without a word. The tour would have imported with none of
+// its substance and nothing would have said so.
+// ============================================================================
+
+describe('the content columns ride the sheet', () => {
+  const row = {
+    template_code: 'CAI-020',
+    template_name: 'Cairo & Luxor',
+    tour_type: 'package',
+    duration_days: 4,
+    duration_nights: 3,
+    highlights: ['Old Cairo', 'Giza Plateau'],
+    main_attractions: ['Karnak Temple', 'Valley of the Kings'],
+    inclusions: ['Guide', 'Transport'],
+    exclusions: ['International flights', 'Tickets'],
+    meals_included: ['Breakfast'],
+    image_url: 'https://example.com/a.jpg',
+    pickup_required: true,
+  }
+
+  it('has a column for each of them', () => {
+    const header = serializeTemplatesCsv([row]).trim().split('\n')[0]
+    for (const label of ['Highlights', 'Main Attractions', 'Inclusions', 'Exclusions',
+                         'Meals Included', 'Image URL', 'Pickup Required']) {
+      expect(header, label).toContain(label)
+    }
+  })
+
+  it('returns every value unchanged', () => {
+    const { records, refused } = parseTemplatesCsv(serializeTemplatesCsv([row]), papa)
+    expect(refused).toEqual([])
+    const r = records[0]
+    expect(r.highlights).toEqual(['Old Cairo', 'Giza Plateau'])
+    expect(r.main_attractions).toEqual(['Karnak Temple', 'Valley of the Kings'])
+    expect(r.inclusions).toEqual(['Guide', 'Transport'])
+    expect(r.exclusions).toEqual(['International flights', 'Tickets'])
+    expect(r.meals_included).toEqual(['Breakfast'])
+    expect(r.image_url).toBe('https://example.com/a.jpg')
+    expect(r.pickup_required).toBe(true)
+  })
+
+  it('the sample fills them in, so the format is self-teaching', () => {
+    const { records } = parseTemplatesCsv(
+      sampleTemplateCsv().replace(/EXAMPLE-REPLACE-THIS-CODE/, 'REAL-1'), papa)
+    expect(records[0].inclusions?.length).toBeGreaterThan(0)
+    expect(records[0].highlights?.length).toBeGreaterThan(0)
+    expect(records[0].pickup_required).toBe(true)
+  })
+})
+
+describe('a column this importer does not read is named, not swallowed', () => {
+  it('lists the unknown columns', () => {
+    const r = parseTemplatesCsv(
+      'Code,Name,Type,Duration Days,Sales Notes,Internal Ref\nCAI-1,T,day_tour,1,x,y\n', papa)
+    expect(r.records).toHaveLength(1)
+    expect(r.ignoredHeaders).toEqual(['Sales Notes', 'Internal Ref'])
+  })
+
+  it('does not nag about a column ignored on purpose', () => {
+    // Name (JA) comes from the bilingual install's export and is dropped by
+    // design; listing it would be noise, not information.
+    const r = parseTemplatesCsv(
+      'Code,Name,Name (JA),Type,Duration Days\nCAI-2,T,テスト,day_tour,1\n', papa)
+    expect(r.ignoredHeaders).toEqual([])
+  })
+
+  it('says nothing when every column was read', () => {
+    const r = parseTemplatesCsv(
+      sampleTemplateCsv().replace('EXAMPLE-REPLACE-THIS-CODE', 'CAI-3'), papa)
+    expect(r.ignoredHeaders).toEqual([])
   })
 })

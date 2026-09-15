@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'csvData is required' }, { status: 400 })
     }
 
-    const { records: parsed, refused: parseRefused, exampleRows, parseError, headerError } = parseTemplatesCsv(csvData, (csv) => {
+    const { records: parsed, refused: parseRefused, exampleRows, ignoredHeaders, parseError, headerError } = parseTemplatesCsv(csvData, (csv) => {
       const p = Papa.parse<Record<string, string>>(csv, {
         header: true, skipEmptyLines: true, transformHeader: (h: string) => h.trim(),
       })
@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
       refusedRows: refused.length,
       refused,
       exampleRows,
+      ignoredHeaders,
     }
     if (dryRun) return NextResponse.json({ success: true, dryRun: true, ...preview })
 
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: errors.length === 0,
       ...(errors.length ? { error: `Import failed for ${errors.length} row(s): ${errors[0].message}` } : {}),
-      created, updated, refusedRows: refused.length, refused, exampleRows, errors,
+      created, updated, refusedRows: refused.length, refused, exampleRows, ignoredHeaders, errors,
     })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: `Import failed: ${error?.message || 'Unknown error'}` }, { status: 500 })
