@@ -638,16 +638,16 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                   </p>
                 )}
                 {(() => {
-                  // Both shapes, one reader (lib/tours/day-meals.ts).
+                  // Both shapes, one reader (lib/tours/day-meals.ts). ALL
+                  // THREE, always: "not provided" is a stated decision and a
+                  // cost line, and hiding it made a day that said so look the
+                  // same as a day that had never said anything.
                   const m = readDayMeals(day.meals)
-                  const shown = (['breakfast', 'lunch', 'dinner'] as const)
-                    .filter(k => m[k] !== 'none')
-                    .map(k => `${k[0].toUpperCase() + k.slice(1)} (${mealStatusLabel(m[k])})`)
-                  return shown.length > 0 ? (
+                  return (
                     <p className="text-xs text-blue-600 mt-1">
-                      🍽️ {shown.join(', ')}
+                      🍽️ {MEAL_SLOTS.map(k => `${k[0].toUpperCase() + k.slice(1)}: ${mealStatusLabel(m[k])}`).join(' · ')}
                     </p>
-                  ) : null
+                  )
                 })()}
               </div>
               <button
@@ -2031,6 +2031,18 @@ export default function TourManagerContent() {
                       <MapPin className="w-4 h-4" />
                       <span>{template.cities_covered?.join(', ') || 'No cities set'}</span>
                     </div>
+                    {/* Meals by day, derived LIVE from the days rather than read
+                        from meals_included: that column only refreshes on save,
+                        and a summary that can lag its own itinerary is a second
+                        source of truth. */}
+                    {(template.itinerary?.length ?? 0) > 0 && (
+                      <div className="flex items-start gap-2 text-gray-600">
+                        <span className="w-4 text-center flex-shrink-0">🍽️</span>
+                        <span className="text-xs leading-5">
+                          {summarizeMeals(template.itinerary).join(' · ') || 'No meals provided on any day'}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 text-gray-600">
                       <Layers className="w-4 h-4" />
                       <span>{template.variations?.length || 0} variations</span>

@@ -105,6 +105,22 @@ describe('the form neither edits nor wipes the summary', () => {
   })
 })
 
+describe('meals are visible where a tour is read', () => {
+  const form = codeOnly(read('app/tours/manage/TourManagerContent.tsx'))
+
+  it('the day list states all three, never hiding "not provided"', () => {
+    // A day that says "lunch not provided" must not look the same as a day
+    // that never said anything about lunch — that was the whole confusion.
+    expect(form).not.toContain(".filter(k => m[k] !== 'none')")
+    expect(form).toContain("MEAL_SLOTS.map(k => `${k[0].toUpperCase() + k.slice(1)}: ${mealStatusLabel(m[k])}`)")
+  })
+
+  it('the tour card shows meals by day, derived live from the itinerary', () => {
+    // Not from meals_included, which only refreshes on save and can lag.
+    expect(form).toContain('summarizeMeals(template.itinerary)')
+  })
+})
+
 describe('the days import keeps the summary in step', () => {
   it('writes meals_included in the same update as the itinerary', () => {
     const route = codeOnly(read('app/api/tours/bulk/import-days/route.ts'))
