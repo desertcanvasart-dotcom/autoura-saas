@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
         { status: authResult.status }
       )
     }
-    const { supabase } = authResult
+    const { supabase, tenant_id } = authResult
     if (!supabase) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
@@ -166,6 +166,11 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('entrance_fees')
       .insert({
+        // The row belongs to the caller's workspace. Every other rate route
+        // stamps this; this one never did, and since migration 259 the
+        // insert policy on entrance_fees is `tenant_id = get_user_tenant_id()`,
+        // so a NULL tenant_id was rejected by RLS on every manual add.
+        tenant_id,
         ...rateCurrencyWriteField(body),
         service_code: service_code || `ENT-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         attraction_name,
