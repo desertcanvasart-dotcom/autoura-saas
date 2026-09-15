@@ -291,6 +291,21 @@ const navigation: NavSection[] = [
 const STORAGE_KEY = 'autoura-sidebar-sections'
 
 // Role badge colors
+// Which build you are looking at — shown beside the tenant's name.
+//
+// There are two Autoura apps and they read identically in a screenshot: this
+// one (getautoura.net, the SaaS) and the autoura.net "Autoura Ops" app. The
+// tag exists to tell them apart while working on them.
+//
+// It is therefore OFF in production by default. The slot it sits next to is
+// white-label — a paying agency should see their own brand, not a label
+// describing our deployment topology. Set NEXT_PUBLIC_APP_LABEL to show it
+// anywhere you do want it (a staging deploy, say); it is inlined at build
+// time like any NEXT_PUBLIC_ value.
+const APP_LABEL =
+  process.env.NEXT_PUBLIC_APP_LABEL ||
+  (process.env.NODE_ENV !== 'production' ? 'SaaS' : '')
+
 const ROLE_COLORS: Record<UserRole, string> = {
   admin: 'bg-purple-100 text-purple-700',
   manager: 'bg-blue-100 text-blue-700',
@@ -449,9 +464,21 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                 className="w-full h-full object-contain"
               />
             </div>
-            {!isCollapsed && tenant && (
-              <span className="text-sm font-semibold text-gray-900 truncate">
-                {tenant.company_name}
+            {!isCollapsed && (tenant || APP_LABEL) && (
+              // The tenant's own brand is the whole point of this slot, so the
+              // build tag sits OUTSIDE the truncating name — visible when it
+              // is there at all, and never eating into their name.
+              <span className="flex items-center gap-1.5 min-w-0">
+                {tenant && (
+                  <span className="text-sm font-semibold text-gray-900 truncate">
+                    {tenant.company_name}
+                  </span>
+                )}
+                {APP_LABEL && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 flex-shrink-0">
+                    {APP_LABEL}
+                  </span>
+                )}
               </span>
             )}
           </Link>
