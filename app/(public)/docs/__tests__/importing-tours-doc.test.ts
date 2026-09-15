@@ -5,7 +5,10 @@ import { join } from 'node:path'
 // The Importing Tours page is the operator's contract for what the import
 // does. These pin the sentences that must not drift from the code they
 // describe (lib/tours/template-csv.ts, lib/tours/itinerary-csv.ts).
+// Whitespace-normalised: the page is JSX, and a sentence wrapped across a
+// source line is still one sentence to the reader.
 const doc = readFileSync(join(process.cwd(), 'app/(public)/docs/importing-tours/page.tsx'), 'utf8')
+  .replace(/\s+/g, ' ')
 
 describe('Importing Tours doc states the rules the code enforces', () => {
   it('two sheets, imported in order', () => {
