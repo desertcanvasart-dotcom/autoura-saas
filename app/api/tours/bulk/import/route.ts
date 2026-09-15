@@ -34,13 +34,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'csvData is required' }, { status: 400 })
     }
 
-    const { records: parsed, refused: parseRefused, exampleRows, parseError } = parseTemplatesCsv(csvData, (csv) => {
+    const { records: parsed, refused: parseRefused, exampleRows, parseError, headerError } = parseTemplatesCsv(csvData, (csv) => {
       const p = Papa.parse<Record<string, string>>(csv, {
         header: true, skipEmptyLines: true, transformHeader: (h: string) => h.trim(),
       })
       return { data: p.data, errors: p.errors.map(e => ({ message: e.message })) }
     })
     if (parseError) return NextResponse.json({ success: false, error: `CSV parsing failed: ${parseError}` }, { status: 400 })
+
+    // A header problem is about the FILE, not a row. Reported on its own so it
+    // cannot read as "your rows are missing a Code" when the rows are fine and
+    // the column is simply named something else.
+    if (headerError) return NextResponse.json({ success: false, error: headerError }, { status: 400 })
 
     // The sample sheet ships one row whose Code starts with EXAMPLE-, and that
     // row is skipped so uploading the sample unedited creates nothing. Filling
