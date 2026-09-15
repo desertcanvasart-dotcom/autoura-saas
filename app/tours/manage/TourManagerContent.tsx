@@ -182,9 +182,12 @@ const formatTourDuration = (t: {
 // ============================================
 function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   useEffect(() => {
-    const timer = setTimeout(onClose, 4000)
+    // An error now carries an instruction ("replace the Code column…", "add it
+    // in Settings…"). Four seconds is not long enough to read one, and a toast
+    // that vanishes mid-sentence is the same as no message at all.
+    const timer = setTimeout(onClose, toast.type === 'error' ? 12000 : 4000)
     return () => clearTimeout(timer)
-  }, [onClose])
+  }, [onClose, toast.type])
 
   const bgColor = toast.type === 'success' ? 'bg-green-50 border-green-200' :
                   toast.type === 'error' ? 'bg-red-50 border-red-200' :
@@ -199,14 +202,14 @@ function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => vo
                     'text-blue-800'
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg ${bgColor} animate-slide-in`}>
+    <div className={`flex items-start gap-3 px-4 py-3 rounded-lg border shadow-lg max-w-xl ${bgColor} animate-slide-in`}>
       {toast.type === 'success' ? (
-        <CheckCircle2 className={`w-5 h-5 ${iconColor}`} />
+        <CheckCircle2 className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconColor}`} />
       ) : (
-        <AlertCircle className={`w-5 h-5 ${iconColor}`} />
+        <AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconColor}`} />
       )}
       <span className={`text-sm font-medium ${textColor}`}>{toast.message}</span>
-      <button onClick={onClose} className={`ml-2 ${iconColor} hover:opacity-70`}>
+      <button onClick={onClose} className={`ml-2 flex-shrink-0 ${iconColor} hover:opacity-70`}>
         <X className="w-4 h-4" />
       </button>
     </div>
@@ -1224,11 +1227,21 @@ export default function TourManagerContent() {
         body: JSON.stringify({ csvData: text, dryRun: false }),
       })
       const json = await res.json()
+      // The server names WHICH row failed and why. Dropping that on the floor
+      // left every failed import as a bare "Import failed" — the reasons were
+      // being computed and then thrown away.
+      const firstReason = Array.isArray(json.refused) && json.refused.length
+        ? ` — ${json.refused[0].reason}`
+        : ''
       if (json.success) {
-        showToast('success', `Imported: ${json.created} created, ${json.updated} updated${json.refusedRows ? `, ${json.refusedRows} skipped` : ''}`)
+        showToast(
+          'success',
+          `Imported: ${json.created} created, ${json.updated} updated` +
+          (json.refusedRows ? `, ${json.refusedRows} skipped${firstReason}` : '')
+        )
         fetchTemplates()
       } else {
-        showToast('error', json.error || 'Import failed')
+        showToast('error', (json.error || 'Import failed') + (json.error ? '' : firstReason))
       }
     } catch (e: any) {
       showToast('error', e?.message || 'Import failed')
@@ -1537,7 +1550,7 @@ export default function TourManagerContent() {
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportFile(f) }}
               />
-              <button onClick={handleSampleCsv} title="Download a sample CSV with the columns and one example row — fill in a row per tour, then Import" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+              <button onClick={handleSampleCsv} title="Download a sample CSV with the columns and one example row. Replace the Code column with your own tour code — any row still starting EXAMPLE- is skipped on import." className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
                 <FileText className="w-4 h-4" />
                 Sample CSV
               </button>

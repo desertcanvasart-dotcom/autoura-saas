@@ -59,12 +59,18 @@ export function serializeTemplatesCsv(rows: Array<Record<string, unknown>>): str
 /**
  * The sheet to start a bulk upload from: header row + one filled-in example.
  * Add a row per tour and Import. Only flat metadata; the day-by-day itinerary
- * is added per tour in the editor. The example's EXAMPLE- code is skipped on
- * import, so uploading the sample unedited is a safe no-op.
+ * is added per tour in the editor.
+ *
+ * Any row whose Code starts with EXAMPLE- is skipped on import, so uploading
+ * the sample unedited is a safe no-op. That safety is also the commonest way
+ * an import "does nothing": people fill the example row in and leave its Code
+ * alone. Hence EXAMPLE-REPLACE-THIS-CODE rather than a plausible-looking
+ * EXAMPLE-DAY-001 — the cell now says what to do with it, and the import
+ * names this as the reason when every row is still an example.
  */
 export function sampleTemplateCsv(): string {
   return serializeTemplatesCsv([{
-    template_code: 'EXAMPLE-DAY-001',
+    template_code: 'EXAMPLE-REPLACE-THIS-CODE',
     template_name: 'Giza Pyramids & Egyptian Museum',
     tour_type: 'day_tour',
     duration_days: 1,
@@ -96,9 +102,109 @@ export interface TemplateCsvRecord {
   is_active?: boolean
 }
 
+// ---------------------------------------------------------------------------
+// Vocabulary columns
+// ---------------------------------------------------------------------------
+// Four columns hold tenant-vocabulary values, and the row stores a KEY. A
+// person filling this sheet in reads the labels off the Tour Manager form and
+// types THOSE — "Day Tour", not "day_tour". Storing that verbatim produces a
+// value no dropdown can show and that isSingleDayTourType() reads as
+// multi-day: a tour silently measured in the wrong unit.
+//
+// So a label is accepted and converted, and anything that resolves to nothing
+// is REFUSED with the valid options named, rather than written and forgotten.
+
+export interface VocabChoice { key: string; label: string }
+
+export const TEMPLATE_VOCAB_COLUMNS = [
+  { field: 'tour_type', kind: 'tour_type', label: 'Type', multi: false, required: true },
+  { field: 'tour_theme', kind: 'tour_theme', label: 'Theme', multi: false, required: false },
+  { field: 'physical_level', kind: 'tour_physical_level', label: 'Physical Level', multi: false, required: false },
+  { field: 'best_for', kind: 'tour_best_for', label: 'Best For', multi: true, required: false },
+] as const
+
+/**
+ * A raw cell to a vocabulary key: the key itself, the agency's label, or
+ * anything that slugifies to a key ("Day Tour", "day tour", "DAY_TOUR").
+ * null when it matches nothing — the caller refuses the row.
+ */
+export function resolveVocabKey(choices: VocabChoice[], raw: string): string | null {
+  const v = String(raw ?? '').trim()
+  if (!v) return null
+  const lower = v.toLowerCase()
+  const exact = choices.find(c => c.key === v)
+  if (exact) return exact.key
+  const byKey = choices.find(c => c.key.toLowerCase() === lower)
+  if (byKey) return byKey.key
+  const byLabel = choices.find(c => c.label.trim().toLowerCase() === lower)
+  if (byLabel) return byLabel.key
+  const slugged = slug(v)
+  const bySlug = choices.find(c => c.key === slugged)
+  return bySlug ? bySlug.key : null
+}
+
+/**
+ * Resolve every vocabulary column on every record, in place. A row carrying a
+ * value that is not in this tenant's vocabulary is refused and named — that
+ * value would otherwise be invisible in the app the moment it was written.
+ */
+export function resolveTemplateVocabulary(
+  records: TemplateCsvRecord[],
+  choicesByKind: Record<string, VocabChoice[]>,
+): { records: TemplateCsvRecord[]; refused: Array<{ row: number; reason: string }> } {
+  const kept: TemplateCsvRecord[] = []
+  const refused: Array<{ row: number; reason: string }> = []
+
+  for (const rec of records) {
+    const r = rec as unknown as Record<string, unknown>
+    let bad: string | null = null
+
+    for (const col of TEMPLATE_VOCAB_COLUMNS) {
+      const choices = choicesByKind[col.kind] ?? []
+      const raw = r[col.field]
+      if (raw == null || raw === '' || (Array.isArray(raw) && raw.length === 0)) continue
+
+      // With no vocabulary loaded at all, leave the value alone rather than
+      // refuse everything — an empty list is a fetch problem, not bad input.
+      if (choices.length === 0) continue
+
+      const options = choices.map(c => c.label).join(', ')
+      if (col.multi) {
+        const out: string[] = []
+        for (const one of raw as string[]) {
+          const key = resolveVocabKey(choices, one)
+          if (!key) { bad = `${col.label} "${one}" is not one of your options (${options})`; break }
+          out.push(key)
+        }
+        if (bad) break
+        r[col.field] = out
+      } else {
+        const key = resolveVocabKey(choices, String(raw))
+        if (!key) { bad = `${col.label} "${raw}" is not one of your options (${options})`; break }
+        r[col.field] = key
+      }
+    }
+
+    if (bad) {
+      refused.push({
+        row: 0,
+        reason: `"${rec.template_code}": ${bad}. Add it in Settings → Your vocabulary, or correct the spelling.`,
+      })
+    } else {
+      kept.push(rec)
+    }
+  }
+
+  return { records: kept, refused }
+}
+
 export interface TemplateCsvParseResult {
   records: TemplateCsvRecord[]
   refused: Array<{ row: number; reason: string }>
+  /** Rows skipped because they still carry the sample's EXAMPLE- code. Counted
+   *  rather than silently dropped: a sheet that is ALL example rows is the
+   *  commonest failed import, and "no valid rows" does not explain it. */
+  exampleRows: number
   parseError?: string
 }
 
@@ -128,11 +234,12 @@ export function parseTemplatesCsv(
   parse: (csv: string) => { data: Array<Record<string, string>>; errors: Array<{ message: string }> },
 ): TemplateCsvParseResult {
   const parsed = parse(csvData)
-  if (parsed.errors.length > 0) return { records: [], refused: [], parseError: parsed.errors[0].message }
+  if (parsed.errors.length > 0) return { records: [], refused: [], exampleRows: 0, parseError: parsed.errors[0].message }
 
   const records: TemplateCsvRecord[] = []
   const refused: Array<{ row: number; reason: string }> = []
   const seen = new Set<string>()
+  let exampleRows = 0
 
   parsed.data.forEach((raw, i) => {
     const rowNum = i + 2
@@ -152,8 +259,11 @@ export function parseTemplatesCsv(
     const code = String(rec.template_code ?? '').trim()
     if (!code) { refused.push({ row: rowNum, reason: 'missing Code' }); return }
     // The sample sheet's guide row — skip it so uploading the sample unedited
-    // can't create a tour called EXAMPLE-…
-    if (/^example[-_]/i.test(code)) return
+    // can't create a tour called EXAMPLE-…. COUNTED, not silently dropped:
+    // filling the sample in and leaving its Code alone is the commonest failed
+    // import, and it used to end in "no valid rows" with nothing refused and
+    // no hint that the Code column was the problem.
+    if (/^example[-_]/i.test(code)) { exampleRows++; return }
     if (!String(rec.template_name ?? '').trim()) { refused.push({ row: rowNum, reason: `"${code}": missing Name` }); return }
     if (!String(rec.tour_type ?? '').trim()) { refused.push({ row: rowNum, reason: `"${code}": missing Type` }); return }
     if (rec.duration_days == null || !Number.isFinite(rec.duration_days as number) || (rec.duration_days as number) < 1) {
@@ -166,5 +276,5 @@ export function parseTemplatesCsv(
     records.push(rec as unknown as TemplateCsvRecord)
   })
 
-  return { records, refused }
+  return { records, refused, exampleRows }
 }
