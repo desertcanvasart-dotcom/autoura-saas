@@ -10,7 +10,7 @@ function lookups(over: Partial<QuoteLookups> = {}): QuoteLookups {
   return {
     hotel: vi.fn(async () => ({ hotelName: 'Nile View', ppdNight: 100, singleSuppNight: 30, source: 'db' as const })),
     cruise: vi.fn(async () => ({ shipName: 'MS Ra', ppdNight: 150, singleSuppNight: 50, source: 'db' as const })),
-    meals: vi.fn(async () => ({ lunch: 15, dinner: 25, source: 'db' as const })),
+    meals: vi.fn(async () => ({ source: 'db' as const, rates: { lunch: 15, dinner: 25 }, ambiguous: {} })),
     guide: vi.fn(async () => ({ dailyRate: 80, source: 'db' as const })),
     entrance: vi.fn(async () => ({ rate: 12 })),
     tieredActivity: vi.fn(async () => null),
@@ -121,7 +121,7 @@ describe('rule 3 — refuse to guess: holes, never 0', () => {
     expect(r.holes[0].message).toMatch(/No exact standard hotel rate for Cairo/)
   })
   it('an ambiguous restaurant is a per-meal hole', async () => {
-    const L = lookups({ meals: vi.fn(async () => ({ source: 'missing' as const, ambiguous: { dinner: { count: 2, names: ['Naguib', 'Abou El Sid'], preferredCount: 0 } } })) })
+    const L = lookups({ meals: vi.fn(async () => ({ source: 'db' as const, rates: {}, ambiguous: { dinner: { count: 2, names: ['Naguib', 'Abou El Sid'], preferredCount: 0 } } })) })
     const r = await repriceItineraryServices([day(1, [{ service_type: 'meal', service_name: 'Dinner', quantity: 4 }])], ctx, L)
     expect(r.holes[0].message).toMatch(/2 standard dinner restaurants \(Naguib, Abou El Sid\)/)
   })

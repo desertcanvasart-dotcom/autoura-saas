@@ -91,23 +91,37 @@ describe('getCruiseRates', () => {
   })
 })
 
-describe('getMealRates', () => {
+describe('getMealRates — per meal, never all-or-nothing', () => {
   const meal = (id: string, type: string, restaurant: string, rate: number, extra: Record<string, unknown> = {}) => ({
     id, meal_type: type, restaurant_name: restaurant, tier: 'standard', is_active: true, base_rate_eur: rate, ...extra,
   })
   it('one restaurant per meal → priced', async () => {
     setMockTables({ meal_rates: [meal('m1', 'lunch', 'Felfela', 15), meal('m2', 'dinner', 'Naguib', 25)] })
-    expect(await getMealRates(SCOPE, 'standard')).toEqual({ lunch: 15, dinner: 25, source: 'db' })
+    expect(await getMealRates(SCOPE, 'standard')).toEqual({ source: 'db', rates: { lunch: 15, dinner: 25 }, ambiguous: {} })
+  })
+  it('a breakfast rate is priced like any other meal', async () => {
+    // Guests who land before check-in eat at a restaurant; that is a cost.
+    setMockTables({ meal_rates: [meal('m0', 'breakfast', 'Café Riche', 8), meal('m1', 'lunch', 'Felfela', 15)] })
+    expect((await getMealRates(SCOPE, 'standard'))?.rates).toEqual({ breakfast: 8, lunch: 15 })
+  })
+  it('a missing meal does not unprice the others', async () => {
+    // Used to return null unless BOTH lunch and dinner existed: a tenant with
+    // no dinner rate silently lost every lunch. Now the caller records a hole
+    // only for the meal a day actually asks for.
+    setMockTables({ meal_rates: [meal('m1', 'lunch', 'Felfela', 15)] })
+    const r = await getMealRates(SCOPE, 'standard')
+    expect(r?.rates).toEqual({ lunch: 15 })
+    expect(r?.rates.dinner).toBeUndefined()
   })
   it('two dinner restaurants, none preferred → an ambiguous hole for dinner only', async () => {
     setMockTables({ meal_rates: [meal('m1', 'lunch', 'Felfela', 15), meal('m2', 'dinner', 'Naguib', 25), meal('m3', 'dinner', 'Abou El Sid', 30)] })
     const r = await getMealRates(SCOPE, 'standard')
-    expect(r?.source).toBe('missing')
+    expect(r?.rates).toEqual({ lunch: 15 })
     expect(r?.ambiguous).toEqual({ dinner: { count: 2, names: ['Naguib', 'Abou El Sid'], preferredCount: 0 } })
   })
   it('the preferred restaurant resolves it', async () => {
     setMockTables({ meal_rates: [meal('m1', 'lunch', 'Felfela', 15), meal('m2', 'dinner', 'Naguib', 25), meal('m3', 'dinner', 'Abou El Sid', 30, { is_preferred: true })] })
-    expect(await getMealRates(SCOPE, 'standard')).toEqual({ lunch: 15, dinner: 30, source: 'db' })
+    expect((await getMealRates(SCOPE, 'standard'))?.rates).toEqual({ lunch: 15, dinner: 30 })
   })
 })
 

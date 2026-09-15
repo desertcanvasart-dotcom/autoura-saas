@@ -65,8 +65,10 @@ describe('a day survives the round trip', () => {
 })
 
 describe('a sheet replaces an itinerary, so it must be whole', () => {
+  // Every row states all three meals, because the sheet refuses one that does
+  // not — that rule is tested on its own below.
   const sheet = (rows: string[]) =>
-    ['Template Code,Day,Title,City', ...rows].join('\n') + '\n'
+    ['Template Code,Day,Title,City,Breakfast,Lunch,Dinner', ...rows.map(r => r + ',none,none,none')].join('\n') + '\n'
 
   it('refuses a gap rather than deleting the day it skips', () => {
     // Days 1 and 3 of a 3-day tour: writing this would silently drop day 2.
@@ -110,8 +112,25 @@ describe('values the engine prices from are checked, not stored blindly', () => 
     expect(parseDaysCsv(csv, papa).refused[0].reason).toContain('sleeping_train')
   })
 
+  it('accepts an external breakfast — a restaurant breakfast is a real cost', () => {
+    const csv = 'Template Code,Day,Breakfast,Lunch,Dinner\nCAI-1,1,external,none,none\n'
+    const { byTemplate, refused } = parseDaysCsv(csv, papa)
+    expect(refused).toEqual([])
+    expect((byTemplate.get('CAI-1')![0].meals as { breakfast: string }).breakfast).toBe('external')
+  })
+
+  it('refuses a day that leaves a meal unstated — a blank is not "none"', () => {
+    // THE RULE: hotel, restaurant, or none — stated, for every meal, every
+    // day. An itinerary that has not said where lunch is, is badly written,
+    // and a cost line is never inferred.
+    const csv = 'Template Code,Day,Breakfast,Dinner\nCAI-1,1,included,none\n'
+    const { byTemplate, refused } = parseDaysCsv(csv, papa)
+    expect(byTemplate.size).toBe(0)
+    expect(refused[0].reason).toContain('Lunch is not stated')
+  })
+
   it('is case-insensitive about the ones it accepts', () => {
-    const csv = 'Template Code,Day,Accommodation,Breakfast\nCAI-1,1,HOTEL,Included\n'
+    const csv = 'Template Code,Day,Accommodation,Breakfast,Lunch,Dinner\nCAI-1,1,HOTEL,Included,none,none\n'
     const { byTemplate, refused } = parseDaysCsv(csv, papa)
     expect(refused).toEqual([])
     expect(byTemplate.get('CAI-1')![0].accommodation_type).toBe('hotel')

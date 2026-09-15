@@ -360,7 +360,9 @@ describe('the content columns ride the sheet', () => {
     expect(r.main_attractions).toEqual(['Karnak Temple', 'Valley of the Kings'])
     expect(r.inclusions).toEqual(['Guide', 'Transport'])
     expect(r.exclusions).toEqual(['International flights', 'Tickets'])
-    expect(r.meals_included).toEqual(['Breakfast'])
+    // Meals Included is EXPORTED (it describes the tour) but never IMPORTED:
+    // it is derived from the days, and a typed value could contradict them.
+    expect(r).not.toHaveProperty('meals_included')
     expect(r.image_url).toBe('https://example.com/a.jpg')
     expect(r.pickup_required).toBe(true)
   })

@@ -16,7 +16,7 @@
 //      at 0; the route refuses to create the quote while any exist.
 
 import { ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
-import { mealHoleMessage, type MealRatesResult } from '@/lib/auto-pricing-service'
+import { mealHoleMessage, type MealKind, type MealRatesResult } from '@/lib/auto-pricing-service'
 import { applyActivityTiers, type ActivityTier } from '@/lib/rates/activity-tiers'
 
 export interface ItineraryServiceRow {
@@ -179,9 +179,9 @@ export async function repriceItineraryServices(
         }
       } else if (isMealType(type)) {
         const m = await resolveMeals()
-        const kind: 'lunch' | 'dinner' = /dinner/i.test(name) ? 'dinner' : 'lunch'
-        if (m?.source === 'db') {
-          unitCost = m[kind]
+        const kind: MealKind = /breakfast/i.test(name) ? 'breakfast' : /dinner/i.test(name) ? 'dinner' : 'lunch'
+        if (m?.rates[kind] != null) {
+          unitCost = m.rates[kind]
           lineTotal = unitCost * ctx.numPax
           quantityMode = 'per_pax'
           rateSource = 'meal_rates'

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { readDayMeals } from '@/app/tours/manage/TourManagerContent'
+import { readDayMeals } from '@/lib/tours/day-meals'
 
 // ============================================================================
 // Two live shapes for a day's meals:
@@ -34,8 +34,8 @@ describe('readDayMeals understands both shapes', () => {
   })
 
   it('keeps external, which the array cannot express', () => {
-    // A meal eaten out: on the itinerary, not on the bill. Flattening it to
-    // the array form would either invent an inclusion or lose the fact.
+    // A restaurant meal the operator prices separately from the hotel.
+    // Flattening it to the array form would collapse it into the hotel rate.
     expect(readDayMeals({ lunch: 'external' }).lunch).toBe('external')
   })
 
@@ -74,6 +74,6 @@ describe('the editor no longer assumes an array', () => {
   it('writes the object shape for new days', () => {
     // So a day added by hand and a day imported from the sheet are stored the
     // same way, and the engine sees one format going forward.
-    expect(src).toContain("breakfast: dayMeals.includes('Breakfast') ? 'included' : 'none'")
+    expect(src).toContain('meals: { ...dayMeals } as DayMeals')
   })
 })

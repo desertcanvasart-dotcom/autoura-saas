@@ -21,6 +21,8 @@ export interface TemplateCsvColumn {
   label: string
   required?: boolean
   kind?: 'text' | 'int' | 'bool' | 'list'
+  /** Written on export, never read back as a value to store. */
+  readOnly?: boolean
 }
 
 export const TEMPLATE_CSV_COLUMNS: TemplateCsvColumn[] = [
@@ -37,7 +39,9 @@ export const TEMPLATE_CSV_COLUMNS: TemplateCsvColumn[] = [
   { name: 'main_attractions', label: 'Main Attractions', kind: 'list' },
   { name: 'inclusions', label: 'Inclusions', kind: 'list' },
   { name: 'exclusions', label: 'Exclusions', kind: 'list' },
-  { name: 'meals_included', label: 'Meals Included', kind: 'list' },
+  // Derived from the days, by day (lib/tours/day-meals.ts). Exported so the
+  // sheet describes the tour; ignored on import so it can never contradict them.
+  { name: 'meals_included', label: 'Meals Included', kind: 'list', readOnly: true },
   { name: 'short_description', label: 'Short Description' },
   { name: 'long_description', label: 'Long Description' },
   { name: 'image_url', label: 'Image URL' },
@@ -90,7 +94,7 @@ export function sampleTemplateCsv(): string {
     main_attractions: ['Giza Plateau', 'Egyptian Museum'],
     inclusions: ['Licensed Egyptologist guide', 'Air-conditioned transport', 'Lunch'],
     exclusions: ['Entrance tickets', 'Gratuities'],
-    meals_included: ['Lunch'],
+    meals_included: ['Day 1: Lunch'],
     short_description: 'A classic full-day tour of Cairo’s headline sights.',
     long_description: 'Pyramids of Giza, the Sphinx, and the Egyptian Museum, with lunch.',
     image_url: 'https://example.com/giza.jpg',
@@ -314,6 +318,7 @@ export function parseTemplatesCsv(
       const v = (value ?? '').trim()
       if (v === '') continue
       const col = TEMPLATE_CSV_COLUMNS.find(c => c.name === field)!
+      if (col.readOnly) continue
       if (col.kind === 'int') rec[field] = Number(v)
       else if (col.kind === 'bool') rec[field] = truthy(v)
       else if (col.kind === 'list') rec[field] = v.split(/[;|]/).map(s => s.trim()).filter(Boolean)

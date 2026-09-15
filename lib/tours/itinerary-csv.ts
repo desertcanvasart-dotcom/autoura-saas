@@ -28,6 +28,16 @@
 // contiguous run starting at 1. A sheet that skips or restarts numbering is
 // REFUSED, which turns the destructive accident into an error message.
 //
+// ── Meal statuses, and what the pricing engine does with each ───────────────
+// included  in the hotel/cruise rate (board basis) — no separate line
+// external  the operator takes them to a restaurant — priced per pax from
+//           meal rates. ANY meal, breakfast included.
+// none      not provided — the customer's own arrangement
+// 'external' is a COST. "Own expense" is 'none'.
+// EVERY meal on EVERY day must be stated. A blank cell is refused, not read as
+// 'none': an itinerary that has not said where lunch is, is badly written, and
+// a cost line is never inferred.
+//
 // ── What this sheet will never carry ────────────────────────────────────────
 // attraction_ids and transport_rate_id: UUIDs into this install's own rows.
 // They do not survive a move between installs, and a wrong id is worse than an
@@ -249,6 +259,19 @@ export function parseDaysCsv(
         return
       }
       rec[col.name] = v
+    }
+
+    // THE RULE: every meal on every day is stated — hotel (included),
+    // restaurant (external), or none. A blank is not 'none'; it is an
+    // itinerary that has not said, and a cost line cannot be left unsaid.
+    for (const slot of ['breakfast', 'lunch', 'dinner'] as const) {
+      if (rec[slot] == null) {
+        refused.push({
+          row: rowNum,
+          reason: `"${code}" day ${day}: ${slot[0].toUpperCase() + slot.slice(1)} is not stated — every meal must be included (hotel), external (restaurant), or none`,
+        })
+        return
+      }
     }
 
     if (!rowsByCode.has(code)) rowsByCode.set(code, [])
