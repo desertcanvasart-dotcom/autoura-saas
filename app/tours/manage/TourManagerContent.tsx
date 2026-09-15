@@ -2267,6 +2267,23 @@ export default function TourManagerContent() {
                     />
                   </div>
 
+                  <div>
+                    {/* The long description was the one imported field with no
+                        editor at all: carried in form state, loaded from the
+                        template and saved back, but never shown. A CSV import
+                        filled it in and the tour looked as though it had
+                        arrived empty. */}
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Long Description</label>
+                    <textarea
+                      name="long_description"
+                      value={formData.long_description}
+                      onChange={handleChange}
+                      rows={8}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-normal"
+                      placeholder="The full write-up — day by day, what is included, who it suits. Line breaks are kept."
+                    />
+                  </div>
+
                   {/* Options Row */}
                   <div className="flex items-center gap-6">
                     <label className="flex items-center gap-2 cursor-pointer">
