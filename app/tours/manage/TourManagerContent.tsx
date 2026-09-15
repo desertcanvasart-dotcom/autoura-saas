@@ -2273,15 +2273,26 @@ export default function TourManagerContent() {
                         template and saved back, but never shown. A CSV import
                         filled it in and the tour looked as though it had
                         arrived empty. */}
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Long Description</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Long Description
+                      <span className="ml-2 text-gray-400 font-normal">(the write-up travellers read)</span>
+                    </label>
                     <textarea
                       name="long_description"
                       value={formData.long_description}
                       onChange={handleChange}
                       rows={8}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-normal"
-                      placeholder="The full write-up — day by day, what is included, who it suits. Line breaks are kept."
+                      placeholder="The full write-up — what the trip is, what is included, who it suits. Line breaks are kept."
                     />
+                    {/* The two read alike when this field holds "Day 1 … Day 2 …",
+                        which is what a CSV import produces. Prose here is not the
+                        day structure, and only the structure can be priced. */}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Prose only. Writing &ldquo;Day 1…&rdquo; here does not build the itinerary —
+                      the day structure lives under <strong>Details → Day-by-Day Itinerary</strong>,
+                      and that is what Auto-Pricing reads.
+                    </p>
                   </div>
 
                   {/* Options Row */}
@@ -2367,6 +2378,14 @@ export default function TourManagerContent() {
 
                   {/* 3. Day-by-Day Itinerary (with meals per day) */}
                   <div className="border-t pt-6">
+                    {/* Nights, meals and transport are counted from THESE days,
+                        never from Duration (Nights) — so an empty structure is
+                        a tour the day builder cannot price. */}
+                    <p className="mb-3 text-xs text-gray-500">
+                      The structured days. Nights, meals and transport are counted from here —
+                      not from the Duration fields — so <strong>Auto-Pricing needs these days</strong>.
+                      The narrative travellers read is the Long Description, on the Basic tab.
+                    </p>
                     <ItineraryEditor
                       itinerary={formData.itinerary}
                       onChange={handleItineraryChange}

@@ -2050,6 +2050,26 @@ export async function calculateDayBasedPricing(
   const totalDays = itinerary.length || t.duration_days || 1
 
   if (itinerary.length === 0) {
+    // A HOLE, not a warning. hotelNights/cruiseNights are counted from the
+    // itinerary's days, never from duration_nights — so a 3-night package with
+    // no day structure priced with ZERO accommodation and still reported a
+    // number. A warning in the response is not enough when the output is a
+    // price: the harness rule is that a price is deliverable only when
+    // complete, and complete means no holes (pricing-types.ts).
+    //
+    // 'template' is the existing kind for a gap found before any rate lookup —
+    // the same shape the AI build-quote route uses when no template matches.
+    addHole({
+      kind: 'template',
+      reason: 'missing',
+      tier,
+      lookupAttempted: `tour_templates.itinerary for template ${templateId}`,
+      message:
+        'This tour has no day-by-day itinerary, so its nights, meals and ' +
+        'transport cannot be priced. Add the days under Details → Day-by-Day ' +
+        'Itinerary, or price this tour through its variations instead of the ' +
+        'day builder.',
+    })
     warnings.push('No itinerary data found - using defaults')
   }
 
