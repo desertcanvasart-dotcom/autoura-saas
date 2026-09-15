@@ -45,12 +45,6 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 // INTERFACES
 // ============================================
 
-interface TourTheme {
-  id: string
-  category_name: string  // Keep DB field name, just rename interface
-  category_code: string
-}
-
 interface TourVariation {
   id: string
   template_id: string
@@ -76,7 +70,7 @@ interface TourTemplate {
   id: string
   template_code: string
   template_name: string
-  category_id?: string
+  tour_theme?: string
   tour_type: string
   duration_days: number
   duration_nights?: number
@@ -94,7 +88,6 @@ interface TourTemplate {
   created_at: string
   uses_day_builder?: boolean
   pricing_mode?: string
-  category?: TourTheme  // Renamed to theme conceptually, DB field stays same
   variations?: TourVariation[]
   itinerary?: ItineraryDay[]
   inclusions?: string[]   // NEW: What's included
@@ -158,15 +151,15 @@ const EGYPTIAN_CITIES = [
   'White Desert', 'Black Desert', 'Kharga Oasis', 'Dakhla Oasis'
 ]
 
-const TOUR_TYPES = [
-  { value: 'day_tour', label: 'Day Tour', minDays: 1, maxDays: 1 },
-  { value: 'multi_day', label: 'Multi-Day Tour', minDays: 2, maxDays: 99 },
-  { value: 'stopover', label: 'Stopover Tour', minDays: 1, maxDays: 1 }
-]
+// The WORDS for tour types, physical levels, "best for" and themes are the
+// agency's own now — Settings → Your vocabulary (migration 358). The KEYS
+// below are still the app's: day_tour and stopover are what make a tour
+// measured in hours instead of days, so that logic stays keyed, not worded.
+const SINGLE_DAY_TOUR_TYPES = ['day_tour', 'stopover'] as const
 
 // Single-day tour types are measured in HOURS, not days/nights.
 const isSingleDayTourType = (tourType: string) =>
-  tourType === 'day_tour' || tourType === 'stopover'
+  (SINGLE_DAY_TOUR_TYPES as readonly string[]).includes(tourType)
 
 // Human-readable duration: hours for a single-day tour that has them, else the
 // classic "days/nights" shorthand.
@@ -183,19 +176,6 @@ const formatTourDuration = (t: {
   const nights = t.duration_nights || 0
   return `${days}D${nights ? `/${nights}N` : ''}`
 }
-
-const PHYSICAL_LEVELS = [
-  { value: 'easy', label: 'Easy - Suitable for all' },
-  { value: 'moderate', label: 'Moderate - Some walking' },
-  { value: 'challenging', label: 'Challenging - Active travelers' },
-  { value: 'demanding', label: 'Demanding - Fit travelers only' }
-]
-
-const BEST_FOR_OPTIONS = [
-  'Families', 'Couples', 'Solo Travelers', 'Groups', 'Seniors',
-  'History Buffs', 'Adventure Seekers', 'Photography', 'Relaxation',
-  'First-time Visitors', 'Repeat Visitors', 'Luxury Travelers', 'Budget Travelers'
-]
 
 // ============================================
 // TOAST COMPONENT
@@ -892,7 +872,13 @@ export default function TourManagerContent() {
   const dialog = useConfirmDialog()
   const { submitting, guard } = useSubmitGuard()
   const [templates, setTemplates] = useState<TourTemplate[]>([])
-  const [themes, setThemes] = useState<TourTheme[]>([])  // Renamed from categories
+  // All four tour dropdowns come from the tenant's vocabulary. Themes used to
+  // be tour_categories — a table nothing seeded and no screen could add to, so
+  // the dropdown was empty for everyone (retired in 359).
+  const { items: tourTypeItems, labelFor: tourTypeLabel } = useVocabulary('tour_type')
+  const { items: physicalLevelItems } = useVocabulary('tour_physical_level')
+  const { items: bestForItems } = useVocabulary('tour_best_for')
+  const { items: themeItems } = useVocabulary('tour_theme')
   const [attractions, setAttractions] = useState<Attraction[]>([])  // NEW: Attractions from DB
   // Ticket catalogues for the Travel picker (B-item 2), labelled
   // operator/class/route so the operator can name THE train or flight.
@@ -936,7 +922,7 @@ export default function TourManagerContent() {
   const [formData, setFormData] = useState({
     template_code: '',
     template_name: '',
-    category_id: '',
+    tour_theme: '',
     tour_type: 'day_tour',
     duration_days: 1,
     duration_nights: 0,
@@ -993,22 +979,6 @@ export default function TourManagerContent() {
     }
   }
 
-  const fetchThemes = async () => {  // Renamed from fetchCategories
-    try {
-      const response = await fetch('/api/tours/categories')  // API endpoint stays same
-      if (!response.ok) {
-        console.error('Categories API error:', response.status)
-        return
-      }
-      const data = await response.json()
-      if (data.success) {
-        setThemes(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching themes:', error)
-    }
-  }
-
   // NEW: Fetch attractions from entrance_fees table
   const fetchAttractions = async () => {
     try {
@@ -1059,7 +1029,6 @@ export default function TourManagerContent() {
 
     Promise.all([
       fetchTemplates(),
-      fetchThemes(),  // Renamed from fetchCategories
       fetchAttractions(),  // NEW: Fetch attractions on load
       fetchTicketOptions()  // Ticket catalogues for the Travel picker (B2)
     ]).finally(() => {
@@ -1273,7 +1242,7 @@ export default function TourManagerContent() {
     setFormData({
       template_code: '',
       template_name: '',
-      category_id: themes[0]?.id || '',
+      tour_theme: themeItems[0]?.key || '',
       tour_type: 'day_tour',
       duration_days: 1,
       duration_nights: 0,
@@ -1315,7 +1284,7 @@ export default function TourManagerContent() {
     setFormData({
       template_code: template.template_code,
       template_name: template.template_name,
-      category_id: template.category_id || '',
+      tour_theme: template.tour_theme || '',
       tour_type: template.tour_type,
       duration_days: template.duration_days,
       duration_nights: template.duration_nights || 0,
@@ -1497,7 +1466,7 @@ export default function TourManagerContent() {
       template.template_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
       template.cities_covered?.some(c => c.toLowerCase().includes(searchTerm.toLowerCase()))
     
-    const matchesTheme = selectedTheme === 'all' || template.category_id === selectedTheme
+    const matchesTheme = selectedTheme === 'all' || template.tour_theme === selectedTheme
     const matchesType = selectedType === 'all' || template.tour_type === selectedType
     const matchesActive = showInactive || template.is_active
     
@@ -1648,8 +1617,8 @@ export default function TourManagerContent() {
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm appearance-none"
               >
                 <option value="all">All Themes</option>
-                {themes.map(theme => (
-                  <option key={theme.id} value={theme.id}>{theme.category_name}</option>
+                {themeItems.map(theme => (
+                  <option key={theme.key} value={theme.key}>{theme.label}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -1661,8 +1630,8 @@ export default function TourManagerContent() {
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent shadow-sm appearance-none"
               >
                 <option value="all">All Types</option>
-                {TOUR_TYPES.map(type => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
+                {tourTypeItems.map(type => (
+                  <option key={type.key} value={type.key}>{type.label}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
@@ -1749,7 +1718,7 @@ export default function TourManagerContent() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
-                            {TOUR_TYPES.find(t => t.value === template.tour_type)?.label || template.tour_type}
+                            {tourTypeLabel(template.tour_type)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -1943,7 +1912,7 @@ export default function TourManagerContent() {
                         ? `${template.duration_hours} hours`
                         : `${template.duration_days} day${template.duration_days > 1 ? 's' : ''}`}</span>
                       <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">
-                        {TOUR_TYPES.find(t => t.value === template.tour_type)?.label}
+                        {tourTypeLabel(template.tour_type)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-600">
@@ -2162,14 +2131,14 @@ export default function TourManagerContent() {
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Theme</label>
                       <select
-                        name="category_id"
-                        value={formData.category_id}
+                        name="tour_theme"
+                        value={formData.tour_theme}
                         onChange={handleChange}
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                       >
                         <option value="">Select Theme...</option>
-                        {themes.map(theme => (
-                          <option key={theme.id} value={theme.id}>{theme.category_name}</option>
+                        {themeItems.map(theme => (
+                          <option key={theme.key} value={theme.key}>{theme.label}</option>
                         ))}
                       </select>
                     </div>
@@ -2181,8 +2150,8 @@ export default function TourManagerContent() {
                         onChange={handleChange}
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                       >
-                        {TOUR_TYPES.map(type => (
-                          <option key={type.value} value={type.value}>{type.label}</option>
+                        {tourTypeItems.map(type => (
+                          <option key={type.key} value={type.key}>{type.label}</option>
                         ))}
                       </select>
                     </div>
@@ -2237,8 +2206,10 @@ export default function TourManagerContent() {
                         onChange={handleChange}
                         className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                       >
-                        {PHYSICAL_LEVELS.map(level => (
-                          <option key={level.value} value={level.value}>{level.label}</option>
+                        {physicalLevelItems.map(level => (
+                          <option key={level.key} value={level.key}>
+                            {level.description ? `${level.label} — ${level.description}` : level.label}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -2438,15 +2409,15 @@ export default function TourManagerContent() {
                   <div className="border-t pt-6">
                     <label className="block text-xs font-medium text-gray-600 mb-2">Best For</label>
                     <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-                      {BEST_FOR_OPTIONS.map(option => (
-                        <label key={option} className="flex items-center gap-2 cursor-pointer">
+                      {bestForItems.map(option => (
+                        <label key={option.key} className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={formData.best_for.includes(option)}
-                            onChange={() => toggleBestFor(option)}
+                            checked={formData.best_for.includes(option.key)}
+                            onChange={() => toggleBestFor(option.key)}
                             className="w-4 h-4 text-green-600 border-gray-300 rounded"
                           />
-                          <span className="text-xs text-gray-700">{option}</span>
+                          <span className="text-xs text-gray-700">{option.label}</span>
                         </label>
                       ))}
                     </div>

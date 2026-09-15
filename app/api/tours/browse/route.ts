@@ -9,11 +9,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { getTemplatePriceRange } from '@/lib/auto-pricing-service'
+import { loadVocabulary } from '@/lib/vocabulary-server'
 
 export async function GET(request: NextRequest) {
   try {
     // Use authenticated client - RLS automatically filters by tenant
     const supabase = await createAuthenticatedClient()
+
+    // The theme is stored as a vocabulary key; the card shows the agency's own
+    // word for it. RLS scopes this to the caller's tenant like every other read.
+    const themeLabels = new Map(
+      (await loadVocabulary(supabase, 'tour_theme')).map(i => [i.key, i.label])
+    )
 
     const { searchParams } = new URL(request.url)
 
@@ -48,11 +55,7 @@ export async function GET(request: NextRequest) {
         image_url,
         uses_day_builder,
         pricing_mode,
-        tour_categories (
-          id,
-          category_name,
-          category_code
-        ),
+        tour_theme,
         tour_variations (
           id,
           variation_name,
@@ -73,7 +76,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (category) {
-      query = query.eq('category_id', category)
+      query = query.eq('tour_theme', category)
     }
 
     if (city) {
@@ -161,7 +164,8 @@ export async function GET(request: NextRequest) {
           short_description: template.short_description,
           is_featured: template.is_featured,
           cover_image_url: template.image_url,
-          category: template.tour_categories,
+          tour_theme: template.tour_theme || null,
+          theme_name: template.tour_theme ? (themeLabels.get(template.tour_theme) || template.tour_theme) : null,
           
           // Where "View Details" lands: the detail page is variation-centric
           // (looks up by variation_code), so hand the card the code of the

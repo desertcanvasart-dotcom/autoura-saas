@@ -17,7 +17,7 @@ export async function GET(
       .from('tour_templates')
       .select(`
         *,
-        category:tour_categories(id, category_name, category_code)
+        tour_theme
       `)
       .eq('id', id)
       .single()
@@ -182,7 +182,7 @@ export async function PUT(
     // Only update fields that are provided
     if (body.template_code !== undefined) updateData.template_code = body.template_code
     if (body.template_name !== undefined) updateData.template_name = body.template_name
-    if (body.category_id !== undefined) updateData.category_id = body.category_id || null
+    if (body.tour_theme !== undefined) updateData.tour_theme = body.tour_theme || null
     if (body.tour_type !== undefined) updateData.tour_type = body.tour_type
     if (body.duration_days !== undefined) updateData.duration_days = body.duration_days
     if (body.duration_nights !== undefined) updateData.duration_nights = body.duration_nights

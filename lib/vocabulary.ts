@@ -19,6 +19,7 @@ export const VOCABULARY_KINDS = [
   'activity_type', 'activity_duration', 'activity_unit', 'guide_grade',
   'guide_duration', 'guide_language', 'rate_season', 'airline', 'hotel_supplement',
   'airport_direction', 'activity_pricing_type',
+  'tour_type', 'tour_physical_level', 'tour_best_for', 'tour_theme',
 ] as const
 export type VocabularyKind = (typeof VOCABULARY_KINDS)[number]
 
@@ -28,7 +29,7 @@ export function isVocabularyKind(v: unknown): v is VocabularyKind {
 
 /** How the settings screen groups the kinds — a flat list of 29 is a wall. */
 export const VOCABULARY_GROUPS = [
-  'General', 'Hotels & cruises', 'Transport & tickets', 'Guides & tipping', 'Meals', 'Attractions & activities',
+  'General', 'Hotels & cruises', 'Transport & tickets', 'Guides & tipping', 'Meals', 'Attractions & activities', 'Tours',
 ] as const
 export type VocabularyGroup = (typeof VOCABULARY_GROUPS)[number]
 
@@ -361,6 +362,42 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     usedIn: 'Activities & add-ons, quotes, pricing engine',
     minItems: 1,
     example: 'Per Person / Per Unit / Flat Rate / Tiered',
+  },
+  tour_type: {
+    kind: 'tour_type',
+    group: 'Tours',
+    title: 'Tour types',
+    description: 'The shapes of tour you sell. Two keys change behaviour: day_tour and stopover are measured in HOURS and held to a single day, while anything else is measured in days and nights. Rename freely; an entry you add behaves like a multi-day tour.',
+    usedIn: 'Tour Manager, tour templates, CSV import/export',
+    minItems: 1,
+    example: 'Day Tour / Multi-Day Tour / Stopover — or "Excursion" and "Grand Tour"',
+  },
+  tour_physical_level: {
+    kind: 'tour_physical_level',
+    group: 'Tours',
+    title: 'Physical levels',
+    description: 'How demanding a tour is, so a traveller knows what they are booking. The note on each entry is the explanation shown beside it on the form.',
+    usedIn: 'Tour Manager, tour templates, CSV import/export',
+    minItems: 1,
+    example: 'Easy / Moderate / Challenging / Demanding',
+  },
+  tour_best_for: {
+    kind: 'tour_best_for',
+    group: 'Tours',
+    title: 'Best for',
+    description: 'Who a tour suits. A tour can carry several of these at once, so keep them short — they read as tags.',
+    usedIn: 'Tour Manager, tour templates, CSV import/export',
+    minItems: 1,
+    example: 'Families / Couples / Solo Travellers / History Buffs',
+  },
+  tour_theme: {
+    kind: 'tour_theme',
+    group: 'Tours',
+    title: 'Tour themes',
+    description: 'What a tour is ABOUT, as opposed to how long it runs or who it suits. Replaces the old tour-categories table, which had no way to add an entry and was empty for every agency.',
+    usedIn: 'Tour Manager, tour templates, CSV import/export',
+    minItems: 1,
+    example: 'Cultural / Adventure / Beach & Relaxation / Religious',
   },
 }
 

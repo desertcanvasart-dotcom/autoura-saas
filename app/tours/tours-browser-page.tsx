@@ -15,11 +15,8 @@ interface TourTemplate {
   short_description: string | null
   is_featured: boolean
   cover_image_url: string | null
-  category: {
-    id: string
-    category_name: string
-    category_code: string
-  } | null
+  tour_theme: string | null
+  theme_name: string | null
   default_variation_code: string | null
   variations_count: number
   available_tiers: string[]
@@ -68,7 +65,7 @@ export default function ToursBrowsePage() {
     const matchesTier = filterTier === 'all' || tour.available_tiers?.includes(filterTier)
     
     // Filter by category
-    const matchesCategory = filterCategory === 'all' || tour.category?.category_name === filterCategory
+    const matchesCategory = filterCategory === 'all' || tour.theme_name === filterCategory
     
     // Search by name, description, or cities
     const searchLower = searchQuery.toLowerCase()
@@ -81,7 +78,11 @@ export default function ToursBrowsePage() {
   })
 
   // Get unique categories from the tours
-  const uniqueCategories = [...new Set(tours.map(t => t.category?.category_name).filter(Boolean))]
+  // Predicate filter, not filter(Boolean): the latter does not narrow away the
+  // null, and an <option value={null}> is a type error.
+  const uniqueCategories = [...new Set(
+    tours.map(t => t.theme_name).filter((n): n is string => Boolean(n))
+  )]
 
   const getTierBadge = (tier: string) => {
     const styles: Record<string, string> = {
@@ -304,10 +305,10 @@ export default function ToursBrowsePage() {
                   <span className="text-gray-400">👥</span>
                   <span>{tour.min_pax || 1}-{tour.max_pax || 15} passengers</span>
                 </div>
-                {tour.category && (
+                {tour.theme_name && (
                   <div className="flex items-center gap-2">
                     <span className="text-gray-400">🏷️</span>
-                    <span className="text-gray-500 text-xs">{tour.category.category_name}</span>
+                    <span className="text-gray-500 text-xs">{tour.theme_name}</span>
                   </div>
                 )}
                 {tour.uses_day_builder && (

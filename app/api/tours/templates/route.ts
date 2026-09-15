@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const category = searchParams.get('category_id')
+    const category = searchParams.get('tour_theme')
     const tourType = searchParams.get('tour_type')
     const isActive = searchParams.get('is_active')
 
@@ -26,12 +26,12 @@ export async function GET(request: NextRequest) {
       .from('tour_templates')
       .select(`
         *,
-        category:tour_categories(id, category_name, category_code)
+        tour_theme
       `)
       .order('template_name', { ascending: true })
 
     if (category) {
-      query = query.eq('category_id', category)
+      query = query.eq('tour_theme', category)
     }
 
     if (tourType) {
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       tenant_id, // ✅ Explicit tenant_id
       template_code: templateCode,
       template_name: body.template_name,
-      category_id: body.category_id || null,
+      tour_theme: body.tour_theme || null,
       tour_type: body.tour_type,
       duration_days: body.duration_days || 1,
       // `|| null` swallowed the wizard's legitimate 0 (a day tour has zero

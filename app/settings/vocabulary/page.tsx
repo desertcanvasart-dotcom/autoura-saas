@@ -45,7 +45,7 @@ export default function VocabularySettingsPage() {
   const [editing, setEditing] = useState<{ id: string; label: string; behavior: string; min_pax: string; max_pax: string; needs_destination: boolean; code: string } | null>(null)
   const [add, setAdd] = useState<AddForm | null>(null)
 
-  // Thirty-five lists in six groups is a wall, so the group nav behaves like
+  // Thirty-nine lists in seven groups is a wall, so the group nav behaves like
   // the main sidebar: groups collapse, the choice is remembered, the group
   // holding the selected list is always open, and a search box cuts across
   // groups by name.
