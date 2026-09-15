@@ -7,6 +7,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/app/supabase'
 import { SUPPORTED_CURRENCIES, getCurrencySymbol } from '@/lib/currency'
 import { useVocabulary } from '@/hooks/useVocabulary'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { paletteAt, tierPosition } from '@/lib/vocabulary-ui'
 import {
   User,
@@ -140,6 +141,13 @@ function SettingsContent() {
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+
+  // The role shown below is the MEMBERSHIP role — the one that actually
+  // governs access. This field used to be an editable input bound to
+  // user_profiles.role, which was a lie twice over: /api/profile's schema
+  // strips `role` so edits were silently discarded, and nothing reads that
+  // column for permissions any more (lib/roles.ts).
+  const { tenantMember } = useTenant()
 
   // Data states
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -598,10 +606,10 @@ function SettingsContent() {
           <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
           <input
             type="text"
-            value={profile?.role || ''}
-            onChange={(e) => setProfile(prev => prev ? { ...prev, role: e.target.value } : null)}
-            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-            placeholder="Admin, Manager, etc."
+            value={tenantMember?.role || ''}
+            readOnly
+            title="Your role is set by an administrator."
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500 outline-none cursor-not-allowed capitalize"
           />
         </div>
 

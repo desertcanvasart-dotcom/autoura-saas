@@ -1,9 +1,13 @@
 'use client'
 
 import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { toPermissionRole, type PermissionRole } from '@/lib/roles'
 import { useMemo } from 'react'
 
-export type UserRole = 'admin' | 'manager' | 'member' | 'viewer'
+// Kept as an alias so every `roles={['admin']}` call site stays put; the
+// definition now lives in lib/roles.ts alongside the membership vocabulary.
+export type UserRole = PermissionRole
 
 interface UseRoleReturn {
   role: UserRole
@@ -27,15 +31,20 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
 }
 
 export function useRole(): UseRoleReturn {
-  const { profile, isSuperAdmin } = useAuth()
+  const { isSuperAdmin } = useAuth()
+  const { tenantMember } = useTenant()
 
   // A platform owner is 'admin' everywhere they browse, whatever their
-  // ordinary user_profiles row says. The server already agrees (requireAuth
-  // grants role 'admin' when impersonating; middleware exempts super admins
-  // from the per-tenant gate) — the client was the one layer still reading
-  // the profile row alone, which hid the whole Settings section from a super
-  // admin whose own row happened to say 'manager'.
-  const role = isSuperAdmin ? 'admin' : (profile?.role as UserRole) || 'viewer'
+  // ordinary membership says. The server already agrees (requireAuth grants
+  // role 'admin' when impersonating; middleware exempts super admins from the
+  // per-tenant gate).
+  //
+  // Otherwise the role comes from the MEMBERSHIP, matching the middleware and
+  // the API routes. Reading user_profiles.role here meant the sidebar showed
+  // whatever someone was given at signup, for ever: nothing in the app writes
+  // that column, so a role change in the Team UI never reached this hook.
+  // toPermissionRole folds 'owner' into 'admin' — the sidebar has no 'owner'.
+  const role = isSuperAdmin ? 'admin' : toPermissionRole(tenantMember?.role)
 
   return useMemo(() => {
     const roleLevel = ROLE_HIERARCHY[role] || 0

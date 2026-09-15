@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isSuperAdmin } from '@/lib/super-admin-shared'
+import { toPermissionRole } from '@/lib/roles'
 
 // ============================================
 // API ROUTES THAT SELF-AUTHENTICATE
@@ -46,7 +47,9 @@ export const SELF_AUTH_API_PREFIXES = [
 ]
 
 // Define route permissions - which roles can access which routes
-const ROUTE_PERMISSIONS: Record<string, string[]> = {
+// Exported so lib/__tests__/roles.test.ts can assert the invariant that makes
+// toPermissionRole necessary: no entry here is ever 'owner'.
+export const ROUTE_PERMISSIONS: Record<string, string[]> = {
   // Admin only
   '/settings': ['admin'],
   '/users': ['admin'],
@@ -245,12 +248,25 @@ export async function middleware(request: NextRequest) {
     })
 
     if (matchedRoute) {
-      // Get user's role from profile
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('role, is_active')
-        .eq('id', user.id)
-        .single()
+      // is_active still comes from the profile; the ROLE comes from the
+      // membership. They used to both come from the profile, which is why a
+      // role changed in the Team UI never reached this gate — nothing in the
+      // app writes user_profiles.role at all. See lib/roles.ts.
+      const [{ data: profile }, { data: membership }] = await Promise.all([
+        supabase
+          .from('user_profiles')
+          .select('is_active')
+          .eq('id', user.id)
+          .single(),
+        supabase
+          .from('tenant_members')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+      ])
 
       // Check if user is active
       if (profile && !profile.is_active) {
@@ -269,7 +285,10 @@ export async function middleware(request: NextRequest) {
         return redirect
       }
 
-      const userRole = profile?.role || 'viewer'
+      // toPermissionRole, not the raw value: ROUTE_PERMISSIONS has no 'owner'
+      // entry, so passing a membership role straight through would bounce
+      // every tenant owner out of their own settings.
+      const userRole = toPermissionRole(membership?.role)
       const allowedRoles = ROUTE_PERMISSIONS[matchedRoute]
 
       // Check if user's role is allowed

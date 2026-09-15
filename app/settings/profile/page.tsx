@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/app/contexts/AuthContext'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { showToast } from '@/app/contexts/ToastContext'
 import { createClient } from '@/app/supabase'
 import { 
@@ -67,6 +68,8 @@ const ACTIVITY_STRIP_DAYS = 7
 
 export default function ProfilePage() {
   const { user, profile } = useAuth()
+  // Membership role, not user_profiles.role — see lib/roles.ts.
+  const { tenantMember } = useTenant()
   const supabase = createClient()
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile')
   const [loading, setLoading] = useState(false)
@@ -78,7 +81,8 @@ export default function ProfilePage() {
     email: profile?.email || '',
     phone: profile?.phone || '',
     company: profile?.company_name || '',
-    role: profile?.role || '',
+    role: '', // display-only; rendered live from the membership below
+
     avatar: profile?.avatar_url || ''
   })
 
@@ -294,7 +298,7 @@ export default function ProfilePage() {
                 
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">{profileData.name}</h2>
-                  <p className="text-xs text-primary-600 font-medium">{profileData.role}</p>
+                  <p className="text-xs text-primary-600 font-medium capitalize">{tenantMember?.role || ''}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{profileData.company}</p>
                 </div>
               </div>
@@ -383,7 +387,7 @@ export default function ProfilePage() {
                           <input
                             type="text"
                             name="role"
-                            value={profileData.role}
+                            value={tenantMember?.role || ''}
                             readOnly
                             title="Your role is set by an administrator."
                             className="w-full h-9 px-3 text-sm border border-gray-200 rounded-md shadow-sm bg-gray-50 text-gray-500 outline-none cursor-not-allowed capitalize"

@@ -28,12 +28,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const memberRows = membersRes.data ?? []
     const memberUserIds = [...new Set(memberRows.map(m => m.user_id).filter(Boolean))] as string[]
     const { data: profiles } = memberUserIds.length
-      ? await admin.from('user_profiles').select('id, email, full_name, role, is_active').in('id', memberUserIds)
+      ? await admin.from('user_profiles').select('id, email, full_name, is_active').in('id', memberUserIds)
       : { data: [] }
     const profileById = new Map((profiles ?? []).map(p => [p.id, p]))
     const members = memberRows.map(m => ({
       ...m,
-      // The shape the embed was supposed to produce.
+      // The shape the embed was supposed to produce. The ROLE the panel renders
+      // is m.role — the membership — not the profile's, which is why the
+      // profile select above no longer asks for it.
       user: (m.user_id && profileById.get(m.user_id)) || null,
     }))
 

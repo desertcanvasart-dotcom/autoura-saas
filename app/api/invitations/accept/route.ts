@@ -22,26 +22,6 @@ import { createAdminClient } from '@/lib/supabase-server'
  * signing up again says "already registered") but every login fails.
  */
 
-// tenant_members.role is per-membership; user_profiles.role is what the UI and
-// middleware actually enforce (227). The invited role has to reach both, or an
-// invited manager lands with a stripped sidebar and 403s.
-const PROFILE_ROLE: Record<string, string> = {
-  owner: 'admin',
-  admin: 'admin',
-  manager: 'manager',
-  member: 'member',
-  viewer: 'viewer',
-}
-
-// Used only to avoid DOWNGRADING someone who already holds a higher profile
-// role — see the note where it is applied.
-const ROLE_RANK: Record<string, number> = {
-  admin: 4,
-  manager: 3,
-  member: 2,
-  viewer: 1,
-}
-
 type AcceptAction = 'created' | 'confirmed_existing' | 'linked_existing'
 
 export async function POST(request: NextRequest) {
@@ -94,7 +74,7 @@ export async function POST(request: NextRequest) {
     // is reachable through PostgREST.
     const { data: existingProfile } = await db
       .from('user_profiles')
-      .select('id, role')
+      .select('id')
       .eq('email', email)
       .maybeSingle()
 
@@ -199,20 +179,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // ---- 4. The profile role the UI actually reads ------------------------
-    // max(existing, invited): one profile carries one role for the whole app,
-    // so writing the invited role flat would DOWNGRADE someone who already
-    // administers another workspace. (227 notes the single-role design as a
-    // known wart; this keeps it from biting.)
-    const invitedProfileRole = PROFILE_ROLE[invitation.role] ?? 'member'
-    const currentRank = ROLE_RANK[existingProfile?.role ?? ''] ?? 0
-    const profileRole =
-      currentRank > (ROLE_RANK[invitedProfileRole] ?? 0)
-        ? existingProfile!.role
-        : invitedProfileRole
-
+    // ---- 4. The profile's display fields ----------------------------------
+    // No role here any more: tenant_members.role is the single source of
+    // permissions (lib/roles.ts), so the membership inserted above IS the
+    // grant. This used to write a max(existing, invited) profile role to avoid
+    // downgrading someone who administers another workspace — an artefact of
+    // one global role per account, which no longer decides anything.
     const profileUpdate: Record<string, unknown> = {
-      role: profileRole,
       updated_at: new Date().toISOString(),
     }
     // Only name the company for someone who has just joined their first one.
@@ -227,9 +200,8 @@ export async function POST(request: NextRequest) {
       .eq('id', userId)
 
     if (profileError) {
-      // Not fatal: they are a member, they can sign in. Permissions may read
-      // low until an admin corrects the role, so make it loud in the logs.
-      console.error('Membership created but profile role not set:', profileError)
+      // Not fatal: the membership is what grants access, and it exists.
+      console.error('Membership created but profile details not updated:', profileError)
     }
 
     // ---- 5. Now the invitation is genuinely used --------------------------
