@@ -147,7 +147,7 @@ describe('the same guards as the template sheet', () => {
   it('counts the sample rows it skips', () => {
     const r = parseDaysCsv(sampleDaysCsv(), papa)
     expect(r.byTemplate.size).toBe(0)
-    expect(r.exampleRows).toBe(2)
+    expect(r.exampleRows).toBe(1)
   })
 
   it('names columns it does not read', () => {

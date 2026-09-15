@@ -129,31 +129,30 @@ export function serializeDaysCsv(
   return [header, ...rows].join('\n') + '\n'
 }
 
-/** The sheet to start from: a two-day tour with the columns filled in. */
+/**
+ * The one tour both sample sheets describe. The template sample and the days
+ * sample must agree — same code, same length, same meals — or a person using
+ * them "exactly as they are" imports a one-day tour whose itinerary claims
+ * hotel nights. The template sample's Meals Included cell is DERIVED from
+ * this fixture (template-csv.ts), so the two cannot drift apart.
+ */
+export const SAMPLE_TOUR_DAYS = [
+  {
+    day: 1, title: 'Giza Pyramids and Egyptian Museum', city: 'Giza',
+    // A day tour: no bed tonight, so no hotel night for the engine to count.
+    accommodation_type: 'none',
+    // Lunch is in the template sample's Inclusions — on a day tour that is a
+    // restaurant, priced per pax. The other two are stated as not provided.
+    meals: { breakfast: 'none', lunch: 'external', dinner: 'none' },
+    attractions: ['Giza Plateau', 'Egyptian Museum'],
+    services: { airport_arrival: false, airport_departure: false, hotel_checkin: false, hotel_checkout: false, guide_required: true },
+    description: 'Giza Plateau in the morning, lunch, then the Egyptian Museum.',
+  },
+] as const
+
+/** The sheet to start from: the sample tour's day, every column filled in. */
 export function sampleDaysCsv(): string {
-  return serializeDaysCsv([{
-    template_code: 'EXAMPLE-REPLACE-THIS-CODE',
-    itinerary: [
-      {
-        day: 1, title: 'Arrival and Old Cairo', city: 'Cairo',
-        accommodation_type: 'hotel',
-        meals: { breakfast: 'none', lunch: 'none', dinner: 'included' },
-        attractions: ['Khan el-Khalili'],
-        transport_type: 'road',
-        services: { airport_arrival: true, airport_departure: false, hotel_checkin: true, hotel_checkout: false, guide_required: true },
-        description: 'Airport pickup, hotel check-in, evening walk.',
-      },
-      {
-        day: 2, title: 'Pyramids and Egyptian Museum', city: 'Giza',
-        accommodation_type: 'hotel',
-        meals: { breakfast: 'included', lunch: 'included', dinner: 'none' },
-        attractions: ['Giza Plateau', 'Egyptian Museum'],
-        transport_type: 'road',
-        services: { airport_arrival: false, airport_departure: false, hotel_checkin: false, hotel_checkout: false, guide_required: true },
-        description: 'Giza in the morning, the museum after lunch.',
-      },
-    ],
-  }])
+  return serializeDaysCsv([{ template_code: 'EXAMPLE-REPLACE-THIS-CODE', itinerary: SAMPLE_TOUR_DAYS }])
 }
 
 export interface DayCsvRecord {
