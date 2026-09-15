@@ -96,11 +96,39 @@ interface TourTemplate {
 }
 
 // NEW: Itinerary Day interface
+/** How a day records its meals. TWO shapes exist and both are live:
+ *  - string[]  — what this editor has always written: ["Breakfast"]
+ *  - object    — richer, and what the days CSV and the pricing engine use.
+ *                It can say 'external' (eaten out, not included), which an
+ *                array cannot express at all.
+ *  parseItinerary() in the pricing engine reads both; this editor read only
+ *  the array, so an imported day's meals rendered as nothing. */
+export type DayMealStatus = 'included' | 'external' | 'none'
+export type DayMeals = string[] | { breakfast?: DayMealStatus; lunch?: DayMealStatus; dinner?: DayMealStatus }
+
+/** Either shape to the three statuses, so the editor can show what it is
+ *  looking at whoever wrote it. */
+export function readDayMeals(meals: DayMeals | undefined): Record<'breakfast' | 'lunch' | 'dinner', DayMealStatus> {
+  const out = { breakfast: 'none' as DayMealStatus, lunch: 'none' as DayMealStatus, dinner: 'none' as DayMealStatus }
+  if (!meals) return out
+  if (Array.isArray(meals)) {
+    const lower = meals.map(m => String(m).toLowerCase())
+    for (const k of ['breakfast', 'lunch', 'dinner'] as const) {
+      if (lower.includes(k)) out[k] = 'included'
+    }
+    return out
+  }
+  for (const k of ['breakfast', 'lunch', 'dinner'] as const) {
+    if (meals[k]) out[k] = meals[k]!
+  }
+  return out
+}
+
 interface ItineraryDay {
   day: number
   title: string
   description: string
-  meals: string[]
+  meals: DayMeals
   /** Names, for display and for the engine's text fallback. */
   attractions?: string[]
   /** Explicit entrance_fees ids — the engine prices THESE and ignores
@@ -395,7 +423,15 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       day: itinerary.length + 1,
       title: dayTitle.trim(),
       description: dayDescription.trim(),
-      meals: dayMeals,
+      // Written in the object shape, not the legacy array: it is what the
+      // pricing engine calls the new format, what the days CSV round-trips,
+      // and the only one that can say 'external'. Existing array days keep
+      // working — readDayMeals() handles both.
+      meals: {
+        breakfast: dayMeals.includes('Breakfast') ? 'included' : 'none',
+        lunch: dayMeals.includes('Lunch') ? 'included' : 'none',
+        dinner: dayMeals.includes('Dinner') ? 'included' : 'none',
+      } as DayMeals,
       ...(dayAttractions.length > 0
         ? {
             attractions: dayAttractions.map(a => a.name),
@@ -613,11 +649,23 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                     {day.transport_rate_id ? ' (named rate)' : ' (auto by route)'}
                   </p>
                 )}
-                {day.meals && day.meals.length > 0 && (
-                  <p className="text-xs text-blue-600 mt-1">
-                    🍽️ {day.meals.join(', ')}
-                  </p>
-                )}
+                {(() => {
+                  // Both shapes, one reader. day.meals.length is undefined on
+                  // the object form, so the old check rendered NOTHING for
+                  // every day that came from the days CSV.
+                  const m = readDayMeals(day.meals)
+                  const shown = (['breakfast', 'lunch', 'dinner'] as const)
+                    .filter(k => m[k] !== 'none')
+                    .map(k => {
+                      const label = k[0].toUpperCase() + k.slice(1)
+                      return m[k] === 'external' ? `${label} (own expense)` : label
+                    })
+                  return shown.length > 0 ? (
+                    <p className="text-xs text-blue-600 mt-1">
+                      🍽️ {shown.join(', ')}
+                    </p>
+                  ) : null
+                })()}
               </div>
               <button
                 type="button"
