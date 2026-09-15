@@ -106,6 +106,7 @@ export const CATEGORIES: DocCategory[] = [
     label: 'Tours',
     items: [
       { href: '/docs/tour-programs', icon: ClipboardList, title: 'Tour Manager', description: 'Create tour templates one at a time or bulk-create them from a Sample CSV, manage variations, and feed the template into pricing.' },
+      { href: '/docs/importing-tours', icon: Upload, title: 'Importing Tours', description: 'The two-sheet procedure — the tour and its day-by-day itinerary — in order, with the rules the import enforces: every meal stated, nothing guessed.' },
       { href: '/docs/b2b-pricing-rules', icon: PackageSearch, title: 'Transport Packages', description: 'Route packages with five vehicle tiers (sedan to bus) and automatic vehicle stepping.' },
     ],
   },

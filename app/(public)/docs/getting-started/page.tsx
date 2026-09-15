@@ -54,11 +54,12 @@ export default function GettingStartedPage() {
         <p className="text-gray-600 mb-3">If you received an invitation email from your team admin:</p>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
           <li>Click the invitation link in the email</li>
-          <li>Enter a <strong>Password</strong> and <strong>Confirm Password</strong> (minimum 8 characters)</li>
-          <li>You will be taken to the dashboard</li>
+          <li>Enter your <strong>Full Name</strong>, a <strong>Password</strong> and <strong>Confirm Password</strong> (minimum 8 characters)</li>
+          <li>You will be taken to the dashboard &mdash; no separate confirmation email is needed, the invitation link already proves it is your address</li>
         </ol>
         <Tip>
           <strong>Tip:</strong> Check your spam folder if you don&apos;t see the invitation email within a few minutes.
+          If you already use Autoura with another company, the same link adds this workspace to your existing account &mdash; sign in with your usual password.
         </Tip>
       </section>
 

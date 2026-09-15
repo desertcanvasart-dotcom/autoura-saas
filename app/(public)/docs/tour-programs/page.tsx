@@ -30,7 +30,7 @@ export default function TourProgramsPage() {
           <div className="border border-gray-200 rounded-lg p-4">
             <h3 className="font-semibold text-gray-900 mb-1">Tour Variation</h3>
             <p className="text-sm text-gray-600">
-              A specific pricing version of a template. Each variation has its own budget tier (Budget, Standard, Deluxe, or Luxury), group type, and min&ndash;max pax range. One template can have multiple variations.
+              A specific pricing version of a template. Each variation has its own service tier (your own tiers, from your vocabulary), group type, and min&ndash;max pax range. One template can have multiple variations.
             </p>
           </div>
         </div>
@@ -85,22 +85,23 @@ export default function TourProgramsPage() {
       {/* Managing Variations */}
       {/* Bulk create from CSV */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Bulk-creating from a CSV</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Importing tours from spreadsheets</h2>
         <p className="text-gray-600 mb-3">
-          When you have many tours to load, you do not have to add them one by one. The header
-          carries <strong>Sample CSV</strong>, <strong>Export</strong> and <strong>Import</strong>:
-          download the sample, put one tour per row, and import.
+          When you have many tours to load, you do not have to add them one by one. A tour is{' '}
+          <strong>two sheets</strong>: the tour itself (<strong>Sample CSV / Export / Import</strong>)
+          and its day-by-day itinerary, one row per day (<strong>Sample Days / Export Days / Import
+          Days</strong>). They are linked by the tour&rsquo;s code; import the tour first, then its days.
         </p>
         <p className="text-gray-600 mb-3">
-          A bulk import creates the flat metadata &mdash; code, name, type, duration, cities,
-          descriptions and the featured/active flags. It does <strong>not</strong> carry the
-          day-by-day itinerary, hotels or variations, which you build per tour in the editor
-          afterwards. Import matches on the template code, so re-importing an existing code updates
-          its metadata and never touches an itinerary you have already built.
+          The template sheet carries everything flat &mdash; code, name, type, theme, duration, cities,
+          highlights, attractions, inclusions, exclusions, descriptions, image and flags. The days sheet
+          carries the itinerary: city, accommodation, the three meals, attractions, travel mode and the
+          service flags for every day. Every meal on every day must be stated.
         </p>
         <Tip>
-          The same Sample &rarr; Export &rarr; Import pattern is used for suppliers and rates too.
-          The shared rules &mdash; what a sheet carries, how it upserts by code &mdash; are in{' '}
+          The full procedure, the columns, and the rules the import enforces are on{' '}
+          <Link href="/docs/importing-tours" className="text-primary-600 hover:underline">Importing Tours</Link>.
+          The pattern shared with suppliers and rates is in{' '}
           <Link href="/docs/bulk-csv" className="text-primary-600 hover:underline">Bulk Import (CSV)</Link>.
         </Tip>
       </section>
@@ -112,12 +113,12 @@ export default function TourProgramsPage() {
         </p>
         <ul className="list-disc list-inside space-y-1 text-gray-700 mb-3">
           <li><strong>Variation Name</strong></li>
-          <li><strong>Budget Tier</strong> &mdash; Budget, Standard, Deluxe, or Luxury</li>
+          <li><strong>Service Tier</strong> &mdash; one of your own tiers</li>
           <li><strong>Group Type</strong> and <strong>min&ndash;max pax</strong> range</li>
           <li><strong>Calculator Link</strong> &mdash; Click the calculator icon to open the B2B Price Calculator for this variation</li>
         </ul>
         <p className="text-gray-600">
-          Use <strong>Add Variation</strong> to add a single variation. If a template has no variations yet, the empty state offers a bulk-add that creates all four tiers (Budget, Standard, Deluxe, Luxury) in one click.
+          Use <strong>Add Variation</strong> to add a single variation. If a template has no variations yet, the empty state offers a bulk-add that creates one variation per tier in your vocabulary in one click.
         </p>
       </section>
 
