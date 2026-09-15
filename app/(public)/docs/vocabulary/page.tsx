@@ -22,7 +22,7 @@ export default function VocabularyPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">What you can relabel</h2>
         <p className="text-gray-600 mb-3">
-          The built-in terms are the kinds of thing the app talks about: tours and packages,
+          The built-in terms are the kinds of thing the app talks about: tours and packages (their types, physical levels, themes and who they suit),
           suppliers, guides, hotels, itineraries, quotes, and so on. Each has a default label, and
           you can override it with your own.
         </p>

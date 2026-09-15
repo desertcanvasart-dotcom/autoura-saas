@@ -42,7 +42,7 @@ export default function TeamSettingsPage() {
         <ul className="list-disc list-inside space-y-2 text-gray-700 mb-3">
           <li>Click <strong>Invite User</strong>, enter their email, and pick an access role &mdash; they receive an email to set up their account</li>
           <li>Access roles are <strong>Administrator</strong> (full access), <strong>Manager</strong> (clients, tasks, and reports), <strong>Member</strong> (assigned work), and <strong>Viewer</strong> (read-only)</li>
-          <li>Change a user&apos;s role from the inline dropdown, or deactivate a user to revoke access</li>
+          <li>Change a user&apos;s role from the inline dropdown &mdash; it takes effect on their next page load &mdash; or deactivate a user to revoke access</li>
           <li><strong>Pending Invites</strong> and <strong>Expired Invites</strong> sections let you resend or revoke invitations</li>
           <li>A <strong>Role Permissions</strong> reference table at the bottom of the page shows what each role can do</li>
         </ul>
@@ -94,7 +94,7 @@ export default function TeamSettingsPage() {
         <p className="text-gray-600 mb-3">Titled <strong>Itinerary Preferences</strong> &mdash; defaults for new itineraries:</p>
         <ul className="list-disc list-inside space-y-2 text-gray-700">
           <li><strong>Default Cost Mode</strong> &mdash; Auto-Calculate (use rates database) or Manual Entry (enter costs by hand)</li>
-          <li><strong>Default Tier</strong> &mdash; Budget, Standard, Deluxe, or Luxury</li>
+          <li><strong>Default Tier</strong> &mdash; one of your own service tiers (see <Link href="/docs/vocabulary" className="text-primary-600 hover:underline">Your Vocabulary</Link>)</li>
           <li><strong>Default Margin</strong> &mdash; Default markup percentage</li>
           <li><strong>Default Currency</strong> &mdash; Your preferred currency (EUR, USD, etc.)</li>
         </ul>

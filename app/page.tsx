@@ -226,7 +226,7 @@ const aiDemoItinerary = [
 
 const pricingPills = [
   { icon: DollarSign, label: '15 Rate Categories' },
-  { icon: Star, label: '4 Tiers (Budget → Luxury)' },
+  { icon: Star, label: 'Your Own Service Tiers' },
   { icon: Globe, label: 'Dual Passport Pricing' },
   { icon: Truck, label: 'Auto Vehicle Selection' },
   { icon: RefreshCcw, label: 'Multi-Currency Support' },
@@ -289,7 +289,7 @@ const capabilityClusters = [
       '15 rate categories from transport to tipping',
       'Seasonal pricing with automatic date selection',
       'EU/non-EU dual passport rates on every service',
-      'Bulk import/export with full audit trail',
+      'Bulk import/export — rates, suppliers, and whole tours day by day',
     ],
     badge: '15 rate tables',
   },

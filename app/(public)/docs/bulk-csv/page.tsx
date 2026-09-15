@@ -48,13 +48,30 @@ export default function BulkCsvPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">What a sheet does and does not carry</h2>
         <p className="text-gray-600 mb-3">
-          A flat sheet carries the flat facts &mdash; names, types, durations, contact details,
-          prices. It does <strong>not</strong> carry the nested things a spreadsheet cannot hold: a
-          tour&rsquo;s day-by-day itinerary, its hotels, or its variations. Importing tour rows
-          creates the <em>shells</em>; you build each itinerary in the editor afterwards. Crucially,
-          import writes only the columns in the sheet, so re-importing a template never wipes an
-          itinerary you have already built.
+          A row carries flat facts &mdash; names, types, durations, contact details, prices, and
+          semicolon-separated lists. It cannot carry a <em>nested</em> record. So where a thing has
+          children of its own, the children get a sheet of their own, one row each: a supplier&rsquo;s
+          properties, and a tour&rsquo;s days. Import writes only the columns in the sheet, so
+          re-importing a tour never wipes the days you have already built.
         </p>
+        <Tip>
+          Tours are the clearest case: the tour is one sheet, its day-by-day itinerary is another, and
+          they are linked by the tour code. See{' '}
+          <Link href="/docs/importing-tours" className="text-primary-600 hover:underline">Importing Tours</Link>{' '}
+          for the order and the rules.
+        </Tip>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Nothing is guessed</h2>
+        <p className="text-gray-600 mb-3">The same rules apply to every sheet:</p>
+        <ul className="list-disc list-inside space-y-2 text-gray-700">
+          <li><strong>Headers are forgiving.</strong> Column order does not matter, and common variants of a name are accepted. A required column that is genuinely missing is reported once, about the file, with the columns it found instead.</li>
+          <li><strong>Unknown columns are named.</strong> A column the import does not read is listed in the result rather than silently dropped, so you can tell &ldquo;it was never read&rdquo; from &ldquo;it did not import&rdquo;.</li>
+          <li><strong>Vocabulary values accept words or keys.</strong> Type what you see on the form or the key behind it; a value that matches nothing in your vocabulary is refused by name with your valid options listed.</li>
+          <li><strong>A bad row is refused, not repaired.</strong> The reason names the row, the column and the value. Good rows in the same file still import.</li>
+          <li><strong>The example row is skipped.</strong> Any <code>EXAMPLE-</code> code is ignored, so a sample imported unedited creates nothing &mdash; and if every row is still an example, the import tells you that is why.</li>
+        </ul>
       </section>
 
       <section className="mb-10">
