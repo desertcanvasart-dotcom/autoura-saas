@@ -32,6 +32,8 @@ function AcceptInvitationContent() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [invitation, setInvitation] = useState<InvitationData | null>(null)
+  const [companyName, setCompanyName] = useState<string | null>(null)
+  const [needsSignIn, setNeedsSignIn] = useState(false)
   
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
@@ -89,43 +91,47 @@ function AcceptInvitationContent() {
     setSubmitting(true)
 
     try {
-      // Create Supabase auth account
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: invitation!.email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          }
-        }
-      })
-
-      if (authError) {
-        throw new Error(authError.message)
-      }
-
-      if (!authData.user) {
-        throw new Error('Failed to create account')
-      }
-
-      // Mark invitation as accepted
-      const acceptRes = await fetch('/api/invitations/accept', {
+      // The account is created server-side by the accept route, which holds
+      // the invitation token and can therefore confirm the address without a
+      // second email. Calling supabase.auth.signUp() from the browser here is
+      // what stranded invitees: with confirmation on, the account existed but
+      // was unusable, and signing up again only said "already registered".
+      const res = await fetch('/api/invitations/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
+        body: JSON.stringify({ token, password, full_name: fullName })
       })
-      // Checked, not fire-and-forget: if this fails the account exists with no
-      // tenant membership, and silently redirecting to /dashboard strands them
-      // in an app that shows nothing.
-      if (!acceptRes.ok) {
-        throw new Error('Your account was created, but the invitation could not be completed. Please contact whoever invited you.')
+      const payload = await res.json()
+
+      if (!res.ok || !payload.success) {
+        throw new Error(payload.error || 'Could not accept the invitation')
       }
 
+      setCompanyName(payload.data?.company_name ?? null)
+
+      // Someone who already had a working account keeps their own password:
+      // the one typed above was deliberately never applied, so there is
+      // nothing to sign in with here.
+      if (payload.data?.needs_existing_password) {
+        setNeedsSignIn(true)
+        setSuccess(true)
+        setTimeout(() => router.push('/login'), 3000)
+        return
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: payload.data?.email ?? invitation!.email,
+        password
+      })
+
+      // The membership exists either way — only the session failed, and
+      // logging in fixes that. Never report this as a failed invitation.
+      if (signInError) setNeedsSignIn(true)
+
       setSuccess(true)
-      
-      // Redirect to dashboard after 2 seconds
+
       setTimeout(() => {
-        router.push('/dashboard')
+        router.push(signInError ? '/login' : '/dashboard')
       }, 2000)
 
     } catch (err: any) {
@@ -176,9 +182,17 @@ function AcceptInvitationContent() {
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Welcome to Autoura!</h1>
-          <p className="text-gray-600 mb-4">Your account has been created successfully.</p>
-          <p className="text-sm text-gray-500">Redirecting to dashboard...</p>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">
+            {companyName ? `You've joined ${companyName}` : 'Welcome to Autoura!'}
+          </h1>
+          <p className="text-gray-600 mb-4">
+            {needsSignIn
+              ? 'Your place on the team is set up. Please sign in with your existing password to continue.'
+              : 'Your account is ready — no confirmation email needed.'}
+          </p>
+          <p className="text-sm text-gray-500">
+            {needsSignIn ? 'Redirecting to sign in...' : 'Redirecting to dashboard...'}
+          </p>
         </div>
       </div>
     )
