@@ -3,7 +3,7 @@
 // accepted and ignored; required-field and duplicate-code rows are refused.
 import { describe, it, expect } from 'vitest'
 import Papa from 'papaparse'
-import { serializeTemplatesCsv, parseTemplatesCsv, sampleTemplateCsv, TEMPLATE_CSV_COLUMNS } from '@/lib/tours/template-csv'
+import { serializeTemplatesCsv, parseTemplatesCsv, sampleTemplateCsv, resolveTemplateVocabulary, TEMPLATE_CSV_COLUMNS } from '@/lib/tours/template-csv'
 
 const papa = (csv: string) => {
   const p = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true, transformHeader: h => h.trim() })
@@ -130,5 +130,128 @@ describe('the vocabulary fields survive the round trip', () => {
     expect(records[0].tour_theme).toBeTruthy()
     expect(records[0].physical_level).toBeTruthy()
     expect(records[0].best_for?.length).toBeGreaterThan(0)
+  })
+})
+
+// ============================================================================
+// The reported failure: download the sample, fill it in, upload, and get
+// "No valid template rows found" with nothing refused and no clue why. The
+// sample's own Code is EXAMPLE-REPLACE-THIS-CODE, which the parser skips on purpose so
+// uploading it unedited creates nothing — but the skip was invisible.
+// ============================================================================
+
+describe('the sample sheet does not fail silently', () => {
+  it('counts the example rows it skips', () => {
+    const r = parseTemplatesCsv(sampleTemplateCsv(), papa)
+    expect(r.records).toHaveLength(0)
+    expect(r.refused).toHaveLength(0)
+    // The number that lets the caller say WHY nothing imported.
+    expect(r.exampleRows).toBe(1)
+  })
+
+  it('still skips a filled-in row whose Code was left alone — and counts it', () => {
+    const csv = sampleTemplateCsv()
+      .replace('Giza Pyramids & Egyptian Museum', 'My Real Tour')
+      .replace('Cairo; Giza', 'Luxor')
+    const r = parseTemplatesCsv(csv, papa)
+    expect(r.records).toHaveLength(0)
+    expect(r.exampleRows).toBe(1)
+  })
+
+  it('imports the moment the Code is replaced', () => {
+    const r = parseTemplatesCsv(sampleTemplateCsv().replace('EXAMPLE-REPLACE-THIS-CODE', 'CAI-001'), papa)
+    expect(r.records).toHaveLength(1)
+    expect(r.exampleRows).toBe(0)
+  })
+
+  it('counts example rows without discarding the real ones beside them', () => {
+    const csv = sampleTemplateCsv().trimEnd() +
+      '\n"CAI-002","Second Tour","day_tour","1","0","Cairo","cultural","easy","families","s","l","false","true"\n'
+    const r = parseTemplatesCsv(csv, papa)
+    expect(r.records.map(x => x.template_code)).toEqual(['CAI-002'])
+    expect(r.exampleRows).toBe(1)
+  })
+})
+
+describe('a human may type the words they see on the form', () => {
+  const choices = {
+    tour_type: [
+      { key: 'day_tour', label: 'Day Tour' },
+      { key: 'multi_day', label: 'Multi-Day Tour' },
+    ],
+    tour_theme: [{ key: 'cultural', label: 'Cultural' }],
+    tour_physical_level: [{ key: 'easy', label: 'Easy' }],
+    tour_best_for: [
+      { key: 'families', label: 'Families' },
+      { key: 'first_time_visitors', label: 'First-time Visitors' },
+    ],
+  }
+
+  // typed = the five vocabulary-bearing cells, in header order:
+  // Type, Duration Days, Theme, Physical Level, Best For
+  const parse = (typed: string) => {
+    const csv = [
+      'Code,Name,Type,Duration Days,Theme,Physical Level,Best For',
+      `CAI-010,Real Tour,${typed}`,
+    ].join('\n')
+    const p = parseTemplatesCsv(csv, papa)
+    // Surface a structural refusal rather than letting it look like a
+    // vocabulary result of zero rows.
+    expect(p.refused, 'row was refused before resolution').toEqual([])
+    return resolveTemplateVocabulary(p.records, choices)
+  }
+
+  it('converts labels to the keys the row stores', () => {
+    // Typing "Day Tour" used to be stored verbatim — a value no dropdown can
+    // show, and one isSingleDayTourType() reads as multi-day, so the tour is
+    // silently measured in days instead of hours.
+    const { records, refused } = parse('Day Tour,1,Cultural,Easy,Families; First-time Visitors')
+    expect(refused).toEqual([])
+    // The one that changes behaviour, not just display: a stored "Day Tour"
+    // reads as multi-day, so the tour is measured in days instead of hours.
+    expect(records[0].tour_type).toBe('day_tour')
+    expect(records[0].tour_theme).toBe('cultural')
+    expect(records[0].physical_level).toBe('easy')
+    expect(records[0].best_for).toEqual(['families', 'first_time_visitors'])
+  })
+
+  it('accepts keys unchanged, so an export re-imports', () => {
+    const { records, refused } = parse('day_tour,1,cultural,easy,families')
+    expect(refused).toEqual([])
+    expect(records[0].tour_theme).toBe('cultural')
+  })
+
+  it('is forgiving about case and spacing', () => {
+    const { records } = parse('DAY_TOUR,1,CULTURAL,  easy  ,families')
+    expect(records[0].tour_type).toBe('day_tour')
+    expect(records[0].tour_theme).toBe('cultural')
+    expect(records[0].physical_level).toBe('easy')
+  })
+
+  it('refuses a value that is in neither, and names the options', () => {
+    // Storing it would create a row the form cannot display and nobody can
+    // find — the refuse-to-guess rule.
+    const { records, refused } = parse('Day Tour,1,Mythology,Easy,Families')
+    expect(records).toHaveLength(0)
+    expect(refused[0].reason).toContain('Mythology')
+    expect(refused[0].reason).toContain('Cultural')
+    expect(refused[0].reason).toContain('Settings')
+  })
+
+  it('refuses one bad tag out of several rather than dropping it quietly', () => {
+    const { records, refused } = parse('Day Tour,1,Cultural,Easy,Families; Astronauts')
+    expect(records).toHaveLength(0)
+    expect(refused[0].reason).toContain('Astronauts')
+  })
+
+  it('leaves values alone when the vocabulary could not be loaded', () => {
+    // An empty list is a fetch failure, not bad input; refusing every row then
+    // would turn a blip into "your whole sheet is invalid".
+    const { records, refused } = resolveTemplateVocabulary(
+      parseTemplatesCsv('Code,Name,Type,Duration Days,Theme\nCAI-011,T,day_tour,1,cultural', papa).records,
+      {}
+    )
+    expect(refused).toEqual([])
+    expect(records[0].tour_theme).toBe('cultural')
   })
 })
