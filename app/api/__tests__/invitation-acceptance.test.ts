@@ -58,9 +58,12 @@ describe('accepting an invitation creates the membership', () => {
     expect(body).toContain('deleteUser')
   })
 
-  it('sets the profile role too, which is what the UI enforces (227)', () => {
-    expect(body).toContain('PROFILE_ROLE')
-    expect(body).toMatch(/from\(['"]user_profiles['"]\)[\s\S]{0,80}\.update\(/)
+  it('does not write a profile role — the membership IS the grant', () => {
+    // Was max(existing, invited) against user_profiles.role, back when that
+    // column was what the UI enforced. tenant_members.role is now the single
+    // source (lib/roles.ts), so writing a second one could only drift.
+    expect(codeOnly(body)).not.toContain('PROFILE_ROLE')
+    expect(codeOnly(body)).not.toMatch(/profileUpdate\s*=\s*\{[^}]*\brole\b/)
   })
 })
 
