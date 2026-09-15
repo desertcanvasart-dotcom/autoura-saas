@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { loadVocabulary } from '@/lib/vocabulary-server'
 
 // ============================================
 // TOUR DETAIL API - WITH VARIATION_ID
@@ -28,7 +29,7 @@ export async function GET(
           main_attractions,
           duration_days,
           duration_nights,
-          tour_categories (category_name),
+          tour_theme,
           destinations (destination_name)
         )
       `
@@ -131,13 +132,20 @@ export async function GET(
       ...legacyNames.filter((n) => !optionNames.includes(n)),
     ]
 
+    // The theme is a vocabulary key; show the agency's own word for it.
+    const themeLabels = new Map(
+      (await loadVocabulary(supabase, 'tour_theme')).map(i => [i.key, i.label])
+    )
+    const themeKey = variation.tour_templates?.tour_theme || null
+
     // Format response - INCLUDE variation_id for dynamic pricing
     const tourDetail = {
       variation_id: variation.id,  // <-- KEY ADDITION FOR DYNAMIC PRICING
       template_id: variation.tour_templates?.id,
       template_name: variation.tour_templates?.template_name,
       template_code: variation.tour_templates?.template_code,
-      category_name: variation.tour_templates?.tour_categories?.category_name || 'Uncategorized',
+      tour_theme: themeKey,
+      category_name: themeKey ? (themeLabels.get(themeKey) || themeKey) : 'Uncategorized',
       destination_name: variation.tour_templates?.destinations?.destination_name || 'Various',
       duration_days: variation.tour_templates?.duration_days,
       duration_nights: variation.tour_templates?.duration_nights || 0,

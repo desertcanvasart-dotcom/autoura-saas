@@ -9845,6 +9845,7 @@ export interface Database {
           destinations_covered: string[] | null
           best_for: string[] | null
           physical_level: string | null
+          tour_theme: string | null
           age_suitability: string | null
           pickup_required: boolean | null
           accommodation_nights: number | null
@@ -9887,6 +9888,7 @@ export interface Database {
           destinations_covered?: string[] | null
           best_for?: string[] | null
           physical_level?: string | null
+          tour_theme?: string | null
           age_suitability?: string | null
           pickup_required?: boolean | null
           accommodation_nights?: number | null
@@ -9929,6 +9931,7 @@ export interface Database {
           destinations_covered?: string[] | null
           best_for?: string[] | null
           physical_level?: string | null
+          tour_theme?: string | null
           age_suitability?: string | null
           pickup_required?: boolean | null
           accommodation_nights?: number | null

@@ -2,11 +2,19 @@
 // (Ported from travel-ops-pro; this install is English-only, so no name_ja.)
 //
 // A template also has an itinerary (day-by-day JSON), hotels, variations and
-// version rows, plus install-local UUID links (category, destinations). None
-// of those fit a flat sheet or survive a move between installs, so this carries
-// ONLY the flat, portable columns: the code (the stable key), name, type,
-// duration, the free-text city list, descriptions and the two flags. Import
-// upserts by template_code and never touches a template's itinerary/hotels.
+// version rows, plus install-local UUID links (destinations). None of those fit
+// a flat sheet or survive a move between installs, so this carries ONLY the
+// flat, portable columns: the code (the stable key), name, type, duration, the
+// free-text city list, descriptions, the two flags, and the four vocabulary
+// fields. Import upserts by template_code and never touches a template's
+// itinerary/hotels.
+//
+// The vocabulary fields travel as KEYS, not labels — 'day_tour', not whatever
+// this agency renamed it to. A key is the stable thing: it survives a rename,
+// and it is what the row actually stores. The theme used to be a UUID pointing
+// at tour_categories and was therefore left out of the sheet entirely, which
+// is how a field can quietly stop round-tripping (see the supplier CSV work,
+// #399–#402); as a key it travels like the rest.
 
 export interface TemplateCsvColumn {
   name: string
@@ -22,6 +30,9 @@ export const TEMPLATE_CSV_COLUMNS: TemplateCsvColumn[] = [
   { name: 'duration_days', label: 'Duration Days', required: true, kind: 'int' },
   { name: 'duration_nights', label: 'Duration Nights', kind: 'int' },
   { name: 'cities_covered', label: 'Cities', kind: 'list' },
+  { name: 'tour_theme', label: 'Theme' },
+  { name: 'physical_level', label: 'Physical Level' },
+  { name: 'best_for', label: 'Best For', kind: 'list' },
   { name: 'short_description', label: 'Short Description' },
   { name: 'long_description', label: 'Long Description' },
   { name: 'is_featured', label: 'Featured', kind: 'bool' },
@@ -59,6 +70,9 @@ export function sampleTemplateCsv(): string {
     duration_days: 1,
     duration_nights: 0,
     cities_covered: ['Cairo', 'Giza'],
+    tour_theme: 'cultural',
+    physical_level: 'moderate',
+    best_for: ['families', 'first_time_visitors'],
     short_description: 'A classic full-day tour of Cairo’s headline sights.',
     long_description: 'Pyramids of Giza, the Sphinx, and the Egyptian Museum, with lunch.',
     is_featured: false,
@@ -73,6 +87,9 @@ export interface TemplateCsvRecord {
   duration_days: number
   duration_nights?: number
   cities_covered?: string[]
+  tour_theme?: string
+  physical_level?: string
+  best_for?: string[]
   short_description?: string
   long_description?: string
   is_featured?: boolean

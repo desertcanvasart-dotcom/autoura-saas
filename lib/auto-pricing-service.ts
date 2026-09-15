@@ -2006,12 +2006,7 @@ export async function calculateDayBasedPricing(
       template_code,
       duration_days,
       tour_type,
-      category_id,
-      itinerary,
-      tour_categories (
-        id,
-        category_name
-      )
+      itinerary
     `)
     .eq('id', templateId)
     .single()

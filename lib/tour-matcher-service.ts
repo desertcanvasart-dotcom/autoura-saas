@@ -348,8 +348,7 @@ export async function getTemplateWithPricing(
     const { data: template, error: templateError } = await supabase
       .from('tour_templates')
       .select(`
-        *,
-        category:tour_categories(id, category_name)
+        *
       `)
       .eq('id', templateId)
       .single()
