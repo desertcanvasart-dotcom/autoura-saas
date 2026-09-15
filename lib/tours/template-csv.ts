@@ -33,8 +33,15 @@ export const TEMPLATE_CSV_COLUMNS: TemplateCsvColumn[] = [
   { name: 'tour_theme', label: 'Theme' },
   { name: 'physical_level', label: 'Physical Level' },
   { name: 'best_for', label: 'Best For', kind: 'list' },
+  { name: 'highlights', label: 'Highlights', kind: 'list' },
+  { name: 'main_attractions', label: 'Main Attractions', kind: 'list' },
+  { name: 'inclusions', label: 'Inclusions', kind: 'list' },
+  { name: 'exclusions', label: 'Exclusions', kind: 'list' },
+  { name: 'meals_included', label: 'Meals Included', kind: 'list' },
   { name: 'short_description', label: 'Short Description' },
   { name: 'long_description', label: 'Long Description' },
+  { name: 'image_url', label: 'Image URL' },
+  { name: 'pickup_required', label: 'Pickup Required', kind: 'bool' },
   { name: 'is_featured', label: 'Featured', kind: 'bool' },
   { name: 'is_active', label: 'Active', kind: 'bool' },
 ]
@@ -79,8 +86,15 @@ export function sampleTemplateCsv(): string {
     tour_theme: 'cultural',
     physical_level: 'moderate',
     best_for: ['families', 'first_time_visitors'],
+    highlights: ['Great Pyramid of Khufu', 'The Sphinx at sunset', 'Tutankhamun galleries'],
+    main_attractions: ['Giza Plateau', 'Egyptian Museum'],
+    inclusions: ['Licensed Egyptologist guide', 'Air-conditioned transport', 'Lunch'],
+    exclusions: ['Entrance tickets', 'Gratuities'],
+    meals_included: ['Lunch'],
     short_description: 'A classic full-day tour of Cairo’s headline sights.',
     long_description: 'Pyramids of Giza, the Sphinx, and the Egyptian Museum, with lunch.',
+    image_url: 'https://example.com/giza.jpg',
+    pickup_required: true,
     is_featured: false,
     is_active: true,
   }])
@@ -96,8 +110,15 @@ export interface TemplateCsvRecord {
   tour_theme?: string
   physical_level?: string
   best_for?: string[]
+  highlights?: string[]
+  main_attractions?: string[]
+  inclusions?: string[]
+  exclusions?: string[]
+  meals_included?: string[]
   short_description?: string
   long_description?: string
+  image_url?: string
+  pickup_required?: boolean
   is_featured?: boolean
   is_active?: boolean
 }
@@ -206,6 +227,11 @@ export interface TemplateCsvParseResult {
    *  commonest failed import, and "no valid rows" does not explain it. */
   exampleRows: number
   parseError?: string
+  /** Columns in the sheet that this importer does not carry. Reported rather
+   *  than dropped in silence: a person who put Inclusions in their file and
+   *  got a tour with none would have no way to tell that the column was simply
+   *  not read. Deliberately-ignored columns (Name (JA)) are not listed. */
+  ignoredHeaders: string[]
   /** The header row is unusable — a required column is not in it at all.
    *  Distinct from parseError (the CSV is well-formed) and from a row-level
    *  refusal (the rows may be perfect; nothing can find them). */
@@ -243,7 +269,7 @@ export function parseTemplatesCsv(
   parse: (csv: string) => { data: Array<Record<string, string>>; errors: Array<{ message: string }> },
 ): TemplateCsvParseResult {
   const parsed = parse(csvData)
-  if (parsed.errors.length > 0) return { records: [], refused: [], exampleRows: 0, parseError: parsed.errors[0].message }
+  if (parsed.errors.length > 0) return { records: [], refused: [], exampleRows: 0, ignoredHeaders: [], parseError: parsed.errors[0].message }
 
   // Check the HEADER before the rows. A header the map does not recognise
   // ("Tour Code" instead of "Code", or a sheet saved with its header row
@@ -261,6 +287,7 @@ export function parseTemplatesCsv(
         records: [],
         refused: [],
         exampleRows: 0,
+        ignoredHeaders: [],
         headerError:
           `The header row is missing ${missing.length === 1 ? 'a required column' : 'required columns'}: ` +
           `${missing.join(', ')}. It has: ${headers.join(', ')}. ` +
@@ -268,6 +295,10 @@ export function parseTemplatesCsv(
       }
     }
   }
+
+  // Anything the map has no entry for at all. '_ignore' entries are left out:
+  // those are ignored on purpose and saying so would be noise.
+  const ignoredHeaders = headers.filter(h => !HEADER_MAP[slug(h)])
 
   const records: TemplateCsvRecord[] = []
   const refused: Array<{ row: number; reason: string }> = []
@@ -314,5 +345,5 @@ export function parseTemplatesCsv(
     records.push(rec as unknown as TemplateCsvRecord)
   })
 
-  return { records, refused, exampleRows }
+  return { records, refused, exampleRows, ignoredHeaders }
 }

@@ -182,10 +182,11 @@ const formatTourDuration = (t: {
 // ============================================
 function ToastNotification({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   useEffect(() => {
-    // An error now carries an instruction ("replace the Code column…", "add it
-    // in Settings…"). Four seconds is not long enough to read one, and a toast
-    // that vanishes mid-sentence is the same as no message at all.
-    const timer = setTimeout(onClose, toast.type === 'error' ? 12000 : 4000)
+    // Anything that is not a plain success now carries something to act on —
+    // an instruction, a refusal reason, a list of columns that were not read.
+    // Four seconds is not long enough to read one, and a toast that vanishes
+    // mid-sentence is the same as no message at all.
+    const timer = setTimeout(onClose, toast.type === 'success' ? 4000 : 12000)
     return () => clearTimeout(timer)
   }, [onClose, toast.type])
 
@@ -1233,11 +1234,18 @@ export default function TourManagerContent() {
       const firstReason = Array.isArray(json.refused) && json.refused.length
         ? ` — ${json.refused[0].reason}`
         : ''
+      // Columns the sheet carried that this importer does not read. Saying so
+      // is the difference between "my inclusions did not import" and knowing
+      // the column was never read.
+      const ignored = Array.isArray(json.ignoredHeaders) && json.ignoredHeaders.length
+        ? ` — columns not imported: ${json.ignoredHeaders.join(', ')}`
+        : ''
       if (json.success) {
         showToast(
-          'success',
+          json.refusedRows || ignored ? 'info' : 'success',
           `Imported: ${json.created} created, ${json.updated} updated` +
-          (json.refusedRows ? `, ${json.refusedRows} skipped${firstReason}` : '')
+          (json.refusedRows ? `, ${json.refusedRows} skipped${firstReason}` : '') +
+          ignored
         )
         fetchTemplates()
       } else {
