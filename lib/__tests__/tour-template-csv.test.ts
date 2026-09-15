@@ -255,3 +255,62 @@ describe('a human may type the words they see on the form', () => {
     expect(records[0].tour_theme).toBe('cultural')
   })
 })
+
+// ============================================================================
+// Second report: "No rows could be imported. missing Code". The rows were
+// fine — the HEADER was not recognised, so nothing could find a code in them,
+// and every row was then blamed for a missing cell. A header problem is about
+// the file and has to be said once, about the file.
+// ============================================================================
+
+describe('an unusable header row is reported as such', () => {
+  it('names the required columns it could not find, and what it found instead', () => {
+    const r = parseTemplatesCsv('Reference,Title,Kind,Length\nCAI-1,My Tour,day_tour,1\n', papa)
+    expect(r.records).toHaveLength(0)
+    // Not a pile of per-row refusals blaming the cells.
+    expect(r.refused).toEqual([])
+    expect(r.headerError).toContain('Code')
+    expect(r.headerError).toContain('Reference')
+    expect(r.headerError).toContain('Sample CSV')
+  })
+
+  it('catches a sheet whose header row was deleted', () => {
+    const r = parseTemplatesCsv('CAI-1,Tour One,day_tour,1\nCAI-2,Tour Two,day_tour,1\n', papa)
+    expect(r.headerError).toBeTruthy()
+  })
+
+  it('names a single missing column in the singular', () => {
+    const r = parseTemplatesCsv('Code,Name,Duration Days\nCAI-3,Tour,1\n', papa)
+    expect(r.headerError).toContain('a required column: Type')
+  })
+
+  it('says nothing when the header is good', () => {
+    const r = parseTemplatesCsv(sampleTemplateCsv().replace('EXAMPLE-REPLACE-THIS-CODE', 'CAI-4'), papa)
+    expect(r.headerError).toBeUndefined()
+    expect(r.records).toHaveLength(1)
+  })
+})
+
+describe('headers a person would reasonably type are accepted', () => {
+  it('takes Tour Code / Tour Name / Days', () => {
+    const r = parseTemplatesCsv('Tour Code,Tour Name,Type,Days\nCAI-9,My Tour,day_tour,1\n', papa)
+    expect(r.headerError).toBeUndefined()
+    expect(r.records[0].template_code).toBe('CAI-9')
+    expect(r.records[0].duration_days).toBe(1)
+  })
+
+  it('does not need the columns in the sample order', () => {
+    const r = parseTemplatesCsv('Name,Type,Duration Days,Code\nMy Tour,day_tour,1,CAI-10\n', papa)
+    expect(r.records[0].template_code).toBe('CAI-10')
+  })
+})
+
+describe('a genuinely empty Code cell names its row', () => {
+  it('points at the row, since there is no code to point at', () => {
+    const r = parseTemplatesCsv(
+      'Code,Name,Type,Duration Days\n,Tour One,day_tour,1\nCAI-2,Tour Two,day_tour,1\n', papa)
+    expect(r.records.map(x => x.template_code)).toEqual(['CAI-2'])
+    expect(r.refused[0].reason).toContain('row 2')
+    expect(r.refused[0].reason).toContain('Code column')
+  })
+})

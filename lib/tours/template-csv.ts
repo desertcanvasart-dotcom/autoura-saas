@@ -206,6 +206,10 @@ export interface TemplateCsvParseResult {
    *  commonest failed import, and "no valid rows" does not explain it. */
   exampleRows: number
   parseError?: string
+  /** The header row is unusable — a required column is not in it at all.
+   *  Distinct from parseError (the CSV is well-formed) and from a row-level
+   *  refusal (the rows may be perfect; nothing can find them). */
+  headerError?: string
 }
 
 const slug = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
@@ -218,6 +222,11 @@ const HEADER_MAP: Record<string, string> = (() => {
   }
   m['code'] = 'template_code'
   m['name'] = 'template_name'
+  // Sensible things a person types instead of the sample's header.
+  m['tour_code'] = 'template_code'
+  m['tour_name'] = 'template_name'
+  m['days'] = 'duration_days'
+  m['nights'] = 'duration_nights'
   // Accept a Name (JA) column from a bilingual export, but drop it (English-only here).
   m['name_ja'] = '_ignore'
   return m
@@ -235,6 +244,30 @@ export function parseTemplatesCsv(
 ): TemplateCsvParseResult {
   const parsed = parse(csvData)
   if (parsed.errors.length > 0) return { records: [], refused: [], exampleRows: 0, parseError: parsed.errors[0].message }
+
+  // Check the HEADER before the rows. A header the map does not recognise
+  // ("Tour Code" instead of "Code", or a sheet saved with its header row
+  // deleted) leaves every row without a template_code, and each one is then
+  // refused for "missing Code" — which points at the cells, when the cells are
+  // fine and the header is the problem. Say that once, about the file.
+  const headers = Object.keys(parsed.data[0] ?? {})
+  if (headers.length > 0) {
+    const mapped = new Set(headers.map(h => HEADER_MAP[slug(h)]).filter(Boolean))
+    const missing = TEMPLATE_CSV_COLUMNS
+      .filter(c => c.required && !mapped.has(c.name))
+      .map(c => c.label)
+    if (missing.length > 0) {
+      return {
+        records: [],
+        refused: [],
+        exampleRows: 0,
+        headerError:
+          `The header row is missing ${missing.length === 1 ? 'a required column' : 'required columns'}: ` +
+          `${missing.join(', ')}. It has: ${headers.join(', ')}. ` +
+          `Download a fresh Sample CSV to see the header this expects.`,
+      }
+    }
+  }
 
   const records: TemplateCsvRecord[] = []
   const refused: Array<{ row: number; reason: string }> = []
@@ -257,7 +290,12 @@ export function parseTemplatesCsv(
     }
 
     const code = String(rec.template_code ?? '').trim()
-    if (!code) { refused.push({ row: rowNum, reason: 'missing Code' }); return }
+    // Name the ROW: there is no code to identify this row by, and "missing
+    // Code" on its own tells you nothing about where to look.
+    if (!code) {
+      refused.push({ row: rowNum, reason: `row ${rowNum} has no Code — every tour needs its own code in the Code column` })
+      return
+    }
     // The sample sheet's guide row — skip it so uploading the sample unedited
     // can't create a tour called EXAMPLE-…. COUNTED, not silently dropped:
     // filling the sample in and leaving its Code alone is the commonest failed
