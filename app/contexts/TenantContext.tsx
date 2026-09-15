@@ -133,16 +133,34 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
       if (!tenant) setLoading(true)
 
       // 1. Get user's tenant membership
+      // maybeSingle + limit(1), not single(): the schema allows a user to hold
+      // memberships in several tenants (tenant_members is UNIQUE per
+      // tenant/user PAIR), and single() errors on 2+ rows as well as on 0 —
+      // so a second membership broke the context outright, and someone with
+      // none at all was reported as a fetch failure and retried forever.
+      // Oldest membership wins, which is stable across reloads.
       const { data: memberData, error: memberError } = await supabase
         .from('tenant_members')
         .select('*')
         .eq('user_id', user.id)
         .eq('status', 'active')
-        .single()
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
 
       if (memberError) {
         console.error('Error fetching tenant member:', memberError)
         throw memberError
+      }
+
+      // No active membership is a real state, not an error: an invitation
+      // that failed halfway, or a suspended account. Retrying cannot conjure
+      // one, so stop here and let the app render its empty state.
+      if (!memberData) {
+        setTenantMember(null)
+        setTenant(null)
+        setFeatures(null)
+        return
       }
 
       // role/status are DB-constrained strings; narrow them to the app-level unions

@@ -173,11 +173,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Check if user needs onboarding
     try {
+      // Same shape as TenantContext: several memberships are legal, and
+      // single() errors on 2+ rows — which silently skipped the onboarding
+      // redirect. status is filtered too, so a suspended membership cannot
+      // decide where login lands.
       const { data: memberData } = await supabase
         .from('tenant_members')
         .select('tenant_id')
         .eq('user_id', data.user.id)
-        .single()
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
 
       if (memberData?.tenant_id) {
         const { data: featuresData } = await supabase

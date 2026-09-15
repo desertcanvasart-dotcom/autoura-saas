@@ -153,18 +153,32 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
 
-    // Check if user already exists
-    const { data: existingUser } = await (supabase as any)
+    // Refuse only if they are already in THIS workspace.
+    // user_profiles has no tenant_id — it is one global row per account for
+    // the whole platform — so asking it "does this email exist?" asked whether
+    // the person had ever signed up anywhere, and blocked every invitation to
+    // anyone who already uses Autoura at another company. Membership is what
+    // makes someone a colleague, and it lives in tenant_members.
+    const { data: existingProfile } = await (supabase as any)
       .from('user_profiles')
-      .select('id, email')
+      .select('id')
       .eq('email', email.toLowerCase())
-      .single()
+      .maybeSingle()
 
-    if (existingUser) {
-      return NextResponse.json(
-        { success: false, error: 'User with this email already exists' },
-        { status: 400 }
-      )
+    if (existingProfile) {
+      const { data: existingMember } = await (supabase as any)
+        .from('tenant_members')
+        .select('id')
+        .eq('tenant_id', tenant_id)
+        .eq('user_id', existingProfile.id)
+        .maybeSingle()
+
+      if (existingMember) {
+        return NextResponse.json(
+          { success: false, error: 'This person is already a member of this workspace' },
+          { status: 400 }
+        )
+      }
     }
 
     // Check if there's already a pending invitation for this tenant
