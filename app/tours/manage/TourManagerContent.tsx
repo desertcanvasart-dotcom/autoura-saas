@@ -372,7 +372,10 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   // Tri-state per meal. The checkboxes could only say included-or-nothing,
   // so a restaurant lunch the operator prices separately had no way to be
   // recorded here, only via the days sheet.
-  const [dayMeals, setDayMeals] = useState<Record<MealSlot, DayMealStatus>>({ breakfast: 'none', lunch: 'none', dinner: 'none' })
+  // '' = not yet stated. THE RULE: a day is not added until all three meals are
+  // stated — hotel, restaurant, or not provided. A cost line is never defaulted.
+  const [dayMeals, setDayMeals] = useState<Record<MealSlot, DayMealStatus | ''>>({ breakfast: '', lunch: '', dinner: '' })
+  const [dayMealsError, setDayMealsError] = useState<string | null>(null)
   // Picked BY ID from the entrance-fee catalogue: the engine prices these
   // rows exactly and ignores the title's wording (A-item 13).
   const [dayAttractions, setDayAttractions] = useState<Array<{ id: string; name: string }>>([])
@@ -380,8 +383,10 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   const [dayTransportType, setDayTransportType] = useState<'' | 'flight' | 'train' | 'sleeping_train'>('')
   const [dayTransportRateId, setDayTransportRateId] = useState('')
 
-  const setMeal = (slot: MealSlot, status: DayMealStatus) =>
+  const setMeal = (slot: MealSlot, status: DayMealStatus | '') => {
+    setDayMealsError(null)
     setDayMeals(prev => ({ ...prev, [slot]: status }))
+  }
 
   const addDayAttraction = (id: string) => {
     if (!id) return
@@ -391,6 +396,11 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   }
 
   const addDay = () => {
+    const unstated = MEAL_SLOTS.filter(k => dayMeals[k] === '')
+    if (unstated.length) {
+      setDayMealsError(`State ${unstated.join(', ')} for this day — hotel, restaurant, or not provided. A meal is a cost line and part of the agreement with the customer.`)
+      return
+    }
     if (!dayTitle.trim()) return
     
     const newDay: ItineraryDay = {
@@ -421,7 +431,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     // Reset form
     setDayTitle('')
     setDayDescription('')
-    setDayMeals({ breakfast: 'none', lunch: 'none', dinner: 'none' })
+    setDayMeals({ breakfast: '', lunch: '', dinner: '' })
     setDayAttractions([])
     setDayTransportType('')
     setDayTransportRateId('')
@@ -494,13 +504,15 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                 onChange={(e) => setMeal(slot, e.target.value as DayMealStatus)}
                 className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white"
               >
-                <option value="none">Not provided</option>
+                <option value="" disabled>Choose…</option>
                 <option value="included">In hotel rate</option>
                 <option value="external">Restaurant (priced)</option>
+                <option value="none">Not provided</option>
               </select>
             </label>
           ))}
         </div>
+        {dayMealsError && <p className="text-xs text-red-600">{dayMealsError}</p>}
 
         {/* Attractions — picked BY ID so the engine prices the exact fee
             rows and ignores the title's wording (A-item 13). */}

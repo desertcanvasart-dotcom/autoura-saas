@@ -78,11 +78,15 @@ export type AccommodationType = 'hotel' | 'cruise' | 'none'
 /** What a day does about a meal — and what the engine does with it:
  *    included  in the hotel/cruise rate (board basis); no separate line.
  *    external  the operator takes them to a restaurant; priced per pax from
- *              meal rates (lunch and dinner — there is no external-breakfast
- *              block, breakfast is assumed to travel with the hotel).
+ *              meal rates. ANY meal — a restaurant breakfast is real (guests
+ *              who land before check-in and cannot yet visit anything).
  *    none      not provided; the customer's own arrangement.
- *  'external' is therefore a COST, not "own expense" — that is 'none'. */
+ *  'external' is therefore a COST, not "own expense" — that is 'none'.
+ *  The rule the builder enforces: every meal on every day is STATED as one
+ *  of these. An unstated meal is a badly written itinerary, not a 'none'. */
 export type MealStatus = 'included' | 'external' | 'none'
+export type MealKind = 'breakfast' | 'lunch' | 'dinner'
+export const MEAL_KINDS: readonly MealKind[] = ['breakfast', 'lunch', 'dinner']
 
 // Transport service types (normalized)
 export type TransportServiceType = 
@@ -1527,23 +1531,34 @@ const AMBIGUITY_SCAN_LIMIT = 200
  *  plain "no rate" text. */
 export function mealHoleMessage(
   mealRates: MealRatesResult | null,
-  kind: 'lunch' | 'dinner',
+  kind: MealKind,
   tier: string
 ): string {
-  const a = mealRates?.source === 'missing' ? mealRates.ambiguous[kind] : undefined
+  const a = mealRates?.ambiguous[kind]
   return a
     ? ambiguityMessage(`${tier} ${kind} restaurants`, a, 'Rates → Meals')
-    : 'No meal rate. Add lunch/dinner rates in Rates → Meals.'
+    : `No ${kind} rate. Add a ${kind} rate in Rates → Meals.`
 }
 
 /**
- * Get meal rates
+ * Get meal rates — PER MEAL.
+ *
+ * Returns whatever unambiguous, priced rates exist, keyed by meal, plus the
+ * ambiguity per meal where several restaurants compete. It never returns
+ * nothing because ONE meal is missing: a tenant with lunch and dinner rates
+ * and no breakfast rate still prices its lunches and dinners, and only a day
+ * that actually asks for a restaurant breakfast records a breakfast hole.
+ * (It used to return null unless BOTH lunch and dinner existed — a missing
+ * dinner rate silently unpriced every lunch.)
  */
-export type MealRatesResult =
-  | { lunch: number; dinner: number; source: 'db'; ambiguous?: undefined }
-  /** A meal has several restaurants in this tier and none (or more than one)
-   *  is preferred — a hole per meal naming the candidates. */
-  | { lunch?: undefined; dinner?: undefined; source: 'missing'; ambiguous: { lunch?: Ambiguity; dinner?: Ambiguity } }
+export type MealRatesResult = {
+  source: 'db'
+  /** Only the meals a real, unambiguous, >0 rate was found for. */
+  rates: Partial<Record<MealKind, number>>
+  /** A meal with several restaurants in this tier and none (or more than
+   *  one) preferred — a hole per meal naming the candidates. */
+  ambiguous: Partial<Record<MealKind, Ambiguity>>
+}
 
 export async function getMealRates(
   scope: CatalogScope,
@@ -1572,38 +1587,27 @@ export async function getMealRates(
       is_preferred?: boolean | null
     }>
 
-    // Several restaurants serve the same meal in this tier: the preferred
-    // one, else a hole naming them — never `find()`'s first row.
-    const ambiguous: { lunch?: Ambiguity; dinner?: Ambiguity } = {}
-    const pick = (kind: 'lunch' | 'dinner'): number | null => {
+    const rates: Partial<Record<MealKind, number>> = {}
+    const ambiguous: Partial<Record<MealKind, Ambiguity>> = {}
+
+    for (const kind of MEAL_KINDS) {
+      // Several restaurants serve the same meal in this tier: the preferred
+      // one, else a hole naming them — never `find()`'s first row.
       const matches = rows.filter((r) => String(r.meal_type ?? '').toLowerCase().includes(kind))
       const chosen = pickCandidate(matches, (r) => r.restaurant_name || r.meal_type || r.id || '?')
       if (chosen.kind === 'ambiguous') {
         ambiguous[kind] = { count: chosen.count, names: chosen.names, preferredCount: chosen.preferredCount }
-        return null
+        continue
       }
-      if (chosen.kind === 'none') return null
+      if (chosen.kind === 'none') continue
       const n = Number(chosen.row.base_rate_eur)
       // Zero is bad data, not a free meal.
-      return Number.isFinite(n) && n > 0 ? n : null
+      // No tier multiplier: the query is already tier-scoped, so applying one
+      // would charge the tier uplift twice.
+      if (Number.isFinite(n) && n > 0) rates[kind] = Math.round(n)
     }
 
-    const lunch = pick('lunch')
-    const dinner = pick('dinner')
-    if (ambiguous.lunch || ambiguous.dinner) {
-      return { source: 'missing', ambiguous }
-    }
-    if (lunch === null || dinner === null) {
-      return null
-    }
-
-    // No tier multiplier: the query is already tier-scoped, so applying one
-    // would charge the tier uplift twice.
-    return {
-      lunch: Math.round(lunch),
-      dinner: Math.round(dinner),
-      source: 'db',
-    }
+    return { source: 'db', rates, ambiguous }
   } catch (err) {
     return null
   }
@@ -2960,21 +2964,29 @@ export async function calculateDayBasedPricing(
   })
 
   // ----- External Meals (per pax) -----
+  // Any meal a day states as 'external' — the operator takes the group to a
+  // restaurant — is a per-pax line from meal rates. Breakfast included: a
+  // restaurant breakfast is real for guests who land before check-in.
+  // Per meal: a missing breakfast rate is a breakfast hole on the day that
+  // asked for one, and nothing else.
   let externalMealsPerPax = 0
+  const MEAL_LABEL: Record<MealKind, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' }
 
   for (const day of itinerary) {
-    if (day.meals.lunch === 'external') {
-      if (mealRates?.source === 'db') {
-        externalMealsPerPax += mealRates.lunch
+    for (const kind of MEAL_KINDS) {
+      if (day.meals[kind] !== 'external') continue
+      const rate = mealRates?.rates[kind]
+      if (rate != null) {
+        externalMealsPerPax += rate
         services.push({
-          id: `day${day.day}-lunch`,
+          id: `day${day.day}-${kind}`,
           dayNumber: day.day,
           serviceType: 'meal',
-          serviceName: 'Lunch',
+          serviceName: MEAL_LABEL[kind],
           quantity: 1,
           quantityMode: 'per_pax',
-          unitCost: mealRates.lunch,
-          lineTotal: mealRates.lunch,
+          unitCost: rate,
+          lineTotal: rate,
           rateSource: 'meal_rates',
           isPerPax: true,
           isOptional: false
@@ -2984,52 +2996,26 @@ export async function calculateDayBasedPricing(
           kind: 'meal',
           reason: 'missing',
           tier,
-          lookupAttempted: 'meal rates (lunch/dinner)',
-          message: mealHoleMessage(mealRates, 'lunch', tier),
-        })
-      }
-    }
-
-    if (day.meals.dinner === 'external') {
-      if (mealRates?.source === 'db') {
-        externalMealsPerPax += mealRates.dinner
-        services.push({
-          id: `day${day.day}-dinner`,
           dayNumber: day.day,
-          serviceType: 'meal',
-          serviceName: 'Dinner',
-          quantity: 1,
-          quantityMode: 'per_pax',
-          unitCost: mealRates.dinner,
-          lineTotal: mealRates.dinner,
-          rateSource: 'meal_rates',
-          isPerPax: true,
-          isOptional: false
-        })
-      } else {
-        addHole({
-          kind: 'meal',
-          reason: 'missing',
-          tier,
-          lookupAttempted: 'meal rates (lunch/dinner)',
-          message: mealHoleMessage(mealRates, 'dinner', tier),
+          lookupAttempted: `meal rates (${kind})`,
+          message: mealHoleMessage(mealRates, kind, tier),
         })
       }
     }
   }
 
-  // ----- THROUGHOUT GUIDE: meals at group rates when the party is small -----
   // Operator's rule (B-item 1): with 4+ guests the restaurants feed the
   // guide free; at ≤ GUIDE_MEALS_MAX_PAX guests his portion is bought at
   // the group rate — one FIXED line per external meal. Priced at the
   // REQUESTED pax; the multi-pax sheet keeps the line at every count — a
   // documented approximation, exactly as in the sibling. (Missing meal
   // rates are already holes above; no second hole for the guide's plate.)
-  if (throughoutGuide && requestedPax != null && requestedPax <= GUIDE_MEALS_MAX_PAX && mealRates?.source === 'db') {
+  if (throughoutGuide && requestedPax != null && requestedPax <= GUIDE_MEALS_MAX_PAX && mealRates) {
     for (const day of itinerary) {
-      for (const meal of ['lunch', 'dinner'] as const) {
+      for (const meal of MEAL_KINDS) {
         if (day.meals[meal] !== 'external') continue
-        const rate = mealRates[meal]
+        const rate = mealRates.rates[meal]
+        if (rate == null) continue // its hole is already recorded above
         fixedCosts += rate
         services.push({
           id: `day${day.day}-guide-${meal}`,

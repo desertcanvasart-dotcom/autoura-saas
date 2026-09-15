@@ -31,9 +31,12 @@
 // ── Meal statuses, and what the pricing engine does with each ───────────────
 // included  in the hotel/cruise rate (board basis) — no separate line
 // external  the operator takes them to a restaurant — priced per pax from
-//           meal rates (lunch and dinner only; see the breakfast refusal)
+//           meal rates. ANY meal, breakfast included.
 // none      not provided — the customer's own arrangement
 // 'external' is a COST. "Own expense" is 'none'.
+// EVERY meal on EVERY day must be stated. A blank cell is refused, not read as
+// 'none': an itinerary that has not said where lunch is, is badly written, and
+// a cost line is never inferred.
 //
 // ── What this sheet will never carry ────────────────────────────────────────
 // attraction_ids and transport_rate_id: UUIDs into this install's own rows.
@@ -258,16 +261,17 @@ export function parseDaysCsv(
       rec[col.name] = v
     }
 
-    // The engine prices an external lunch and dinner from meal rates but has
-    // no external-BREAKFAST block: breakfast is assumed to come with the
-    // hotel. Accepting 'external' here would store a meal that is silently
-    // never priced — worse than refusing it.
-    if (rec.breakfast === 'external') {
-      refused.push({
-        row: rowNum,
-        reason: `"${code}" day ${day}: Breakfast cannot be "external" — the engine prices breakfast through the hotel rate only. Use "included" (with the hotel) or "none".`,
-      })
-      return
+    // THE RULE: every meal on every day is stated — hotel (included),
+    // restaurant (external), or none. A blank is not 'none'; it is an
+    // itinerary that has not said, and a cost line cannot be left unsaid.
+    for (const slot of ['breakfast', 'lunch', 'dinner'] as const) {
+      if (rec[slot] == null) {
+        refused.push({
+          row: rowNum,
+          reason: `"${code}" day ${day}: ${slot[0].toUpperCase() + slot.slice(1)} is not stated — every meal must be included (hotel), external (restaurant), or none`,
+        })
+        return
+      }
     }
 
     if (!rowsByCode.has(code)) rowsByCode.set(code, [])

@@ -14,6 +14,7 @@
 // The three statuses mean what the PRICING ENGINE does with them:
 //   included  in the hotel/cruise rate (board basis) — inside the room rate
 //   external  the operator takes them to a restaurant — a priced per-pax line
+//             (any meal, breakfast included)
 //   none      not provided — the customer's own arrangement
 // Both 'included' and 'external' are on the bill; only 'none' is not.
 
