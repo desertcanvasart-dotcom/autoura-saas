@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { Plus, Edit, Trash2, Copy, Star, Eye, X, Loader2, Sparkles } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { CLAUDE_MODEL, CLAUDE_MODEL_OPTIONS } from '@/lib/ai/models'
 
 interface PromptTemplate {
   id: string
@@ -31,15 +32,11 @@ const PURPOSES = [
   { value: 'transfer', label: 'Transfer' },
 ]
 
-const MODELS = [
-  { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
-  { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-  { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' },
-]
+const MODELS = CLAUDE_MODEL_OPTIONS
 
 const EMPTY_FORM: Omit<PromptTemplate, 'id' | 'created_at' | 'version'> = {
   name: '', purpose: 'itinerary_full', description: '', system_prompt: '',
-  user_prompt_template: '', variables: [], model: 'claude-sonnet-4-20250514',
+  user_prompt_template: '', variables: [], model: CLAUDE_MODEL,
   temperature: 0.7, max_tokens: 2000, is_active: true, is_default: false,
 }
 

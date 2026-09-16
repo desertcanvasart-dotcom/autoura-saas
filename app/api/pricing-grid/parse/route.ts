@@ -10,6 +10,7 @@ import { labelFor } from '@/lib/vocabulary'
 import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { packageRules } from '@/lib/ai/package-prompt-rules'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
@@ -257,12 +258,12 @@ function buildRateMap(rates: Record<string, any[]>): Map<string, { rate: number;
 // text for a platform fault. Now a service failure THROWS (the caller answers
 // with aiServiceFailure, which names it), and only a reply that is not usable
 // JSON comes back as null.
-const PARSE_MODEL = 'claude-sonnet-4-20250514'
-
 async function askForJson(system: string, userContent: string): Promise<unknown> {
   const response = await createMessageWithRetry({
-    model: PARSE_MODEL,
-    max_tokens: 8192,
+    model: CLAUDE_MODEL,
+    max_tokens: 16000,
+    // Matching lines to rate ids needs some reasoning, not deep thought.
+    output_config: { effort: 'medium' },
     system,
     messages: [{ role: 'user', content: userContent }],
   })

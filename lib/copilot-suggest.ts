@@ -9,9 +9,10 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from './ai/anthropic-client'
+import { whatsappModel } from './ai/models'
 import { retrieveKnowledge, formatRetrievalContext, type RetrievedItem } from './copilot-retrieval'
 
-const MODEL = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
+const MODEL = whatsappModel()
 
 export type Tone = 'professional' | 'friendly' | 'formal'
 export type Channel = 'whatsapp' | 'email'
@@ -181,7 +182,8 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
   try {
     const resp = await createMessageWithRetry({
       model: MODEL,
-      max_tokens: channel === 'email' ? 3072 : 2048,
+      // Room for adaptive thinking (on by default since Sonnet 5) plus the drafts.
+      max_tokens: 16000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPromptParts.join('\n') }],
     })

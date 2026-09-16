@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { createNotification } from '@/lib/notifications'
 import { createMessageWithRetry, getUserFriendlyError } from '@/lib/ai/anthropic-client'
+import { CLAUDE_MODEL } from '@/lib/ai/models'
 import {
   buildTaskGenerationPrompt,
   parseTaskGenerationResponse,
@@ -106,8 +107,9 @@ export async function POST(
       trip_name: itinerary.trip_name ?? undefined,
     }, daysWithServices)
     const message = await createMessageWithRetry({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      model: CLAUDE_MODEL,
+      max_tokens: 16000,
+      output_config: { effort: 'low' },
       messages: [{ role: 'user', content: prompt }],
     })
 

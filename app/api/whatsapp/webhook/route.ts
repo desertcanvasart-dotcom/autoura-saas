@@ -26,6 +26,7 @@ import {
   type MetaStatusUpdate
 } from '@/lib/whatsapp-cloud-api'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
+import { whatsappModel } from '@/lib/ai/models'
 
 const TWIML_EMPTY = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
 
@@ -614,7 +615,7 @@ async function processInboundWhatsAppMessage({
               metadata: {
                 ai_generated: true,
                 ai_confidence: aiResponse.confidence,
-                ai_model: process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514',
+                ai_model: whatsappModel(),
                 tools_used: aiResponse.toolsUsed || [],
                 actions_performed: aiResponse.actionsPerformed || []
               }
@@ -686,7 +687,7 @@ export async function GET(request: NextRequest) {
 
   const aiEnabled = process.env.WHATSAPP_AI_ENABLED === 'true'
   const aiToolsEnabled = process.env.WHATSAPP_AI_TOOLS_ENABLED === 'true'
-  const aiModel = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
+  const aiModel = whatsappModel()
   const provider = process.env.WHATSAPP_PROVIDER === 'meta' ? 'meta' : 'twilio'
 
   return NextResponse.json({
@@ -747,7 +748,7 @@ export async function GET(request: NextRequest) {
 //   WHATSAPP_AI_ENABLED      - Set to 'true' to enable AI auto-responses
 //   WHATSAPP_AI_TOOLS_ENABLED - Set to 'true' to enable AI tool calling (Phase 2)
 //   ANTHROPIC_API_KEY        - Anthropic API key for Claude
-//   WHATSAPP_AI_MODEL        - Claude model ID (default: claude-sonnet-4-20250514)
+//   WHATSAPP_AI_MODEL        - Claude model ID (default: CLAUDE_MODEL in lib/ai/models.ts)
 //
 // Business Info:
 //   BUSINESS_NAME            - Your business name (default: Travel2Egypt)

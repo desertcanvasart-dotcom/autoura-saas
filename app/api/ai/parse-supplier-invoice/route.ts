@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createMessageWithRetry, getUserFriendlyError } from '@/lib/ai/anthropic-client'
+import { CLAUDE_MODEL } from '@/lib/ai/models'
 
 const ACCEPTED_TYPES: Record<string, 'pdf' | 'image'> = {
   'application/pdf': 'pdf',
@@ -101,8 +102,10 @@ export async function POST(request: NextRequest) {
     contentBlocks.push({ type: 'text', text: EXTRACTION_PROMPT })
 
     const message = await createMessageWithRetry({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      model: CLAUDE_MODEL,
+      max_tokens: 16000,
+      // Field extraction from an invoice.
+      output_config: { effort: 'low' },
       messages: [{ role: 'user', content: contentBlocks }],
     })
 

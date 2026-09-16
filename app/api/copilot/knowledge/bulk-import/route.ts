@@ -8,12 +8,13 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { whatsappModel } from '@/lib/ai/models'
 import { requireAuth } from '@/lib/supabase-server'
 import { chunkText, embedBatch, EMBEDDING_MODEL, toPgVector } from '@/lib/embeddings'
 
 type KbSourceType = 'kb_faq' | 'kb_policy' | 'kb_tour' | 'kb_custom'
 const KB_TYPES: KbSourceType[] = ['kb_faq', 'kb_policy', 'kb_tour', 'kb_custom']
-const MODEL = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
+const MODEL = whatsappModel()
 
 interface ExtractedEntry {
   source_type: KbSourceType
@@ -52,7 +53,9 @@ Limit to at most 40 entries per call.`
 
   const resp = await createMessageWithRetry({
     model: MODEL,
-    max_tokens: 8192,
+    max_tokens: 16000,
+    // Segmenting pasted text into entries.
+    output_config: { effort: 'low' },
     system: systemPrompt,
     messages: [{ role: 'user', content: `Structure the following text into knowledge entries:\n\n${text}` }],
   })

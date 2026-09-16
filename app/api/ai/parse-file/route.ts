@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { CLAUDE_MODEL } from '@/lib/ai/models'
 
 const MAX_FILE_SIZE = 32 * 1024 * 1024 // 32MB
 
@@ -139,8 +140,10 @@ async function extractTextWithVision(base64Data: string, mediaType: string): Pro
   }
 
   const response = await createMessageWithRetry({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
+    model: CLAUDE_MODEL,
+    max_tokens: 16000,
+    // Transcription, not reasoning.
+    output_config: { effort: 'low' },
     messages: [{
       role: 'user',
       content: [
@@ -167,8 +170,10 @@ async function extractTextWithVision(base64Data: string, mediaType: string): Pro
 // --- Extract text from PDF using Claude ---
 async function extractTextFromPdf(base64Data: string): Promise<string> {
   const response = await createMessageWithRetry({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
+    model: CLAUDE_MODEL,
+    max_tokens: 16000,
+    // Transcription, not reasoning.
+    output_config: { effort: 'low' },
     messages: [{
       role: 'user',
       content: [

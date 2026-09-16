@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { CLAUDE_MODEL } from '@/lib/ai/models'
 
 const VALID_PURPOSES = [
   'itinerary_full', 'day_description', 'site_description',
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
         system_prompt: system_prompt || null,
         user_prompt_template,
         variables: finalVariables,
-        model: model || 'claude-sonnet-4-20250514',
+        model: model || CLAUDE_MODEL,
         temperature: finalTemperature,
         max_tokens: max_tokens || 2000,
         is_default: is_default || false,

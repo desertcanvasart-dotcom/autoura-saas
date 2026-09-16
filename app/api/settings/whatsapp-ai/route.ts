@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { whatsappModel } from '@/lib/ai/models'
 
 /**
  * GET /api/settings/whatsapp-ai
@@ -45,7 +46,7 @@ export async function GET() {
         apiKeyConfigured,
         globalEnabled,
         toolsEnabled,
-        model: process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514',
+        model: whatsappModel(),
         canEnable: apiKeyConfigured && globalEnabled,
         availableTools: toolsEnabled ? [
           'Search customer trips & quotes',
