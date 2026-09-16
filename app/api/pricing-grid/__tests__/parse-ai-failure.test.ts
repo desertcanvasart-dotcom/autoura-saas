@@ -44,6 +44,7 @@ vi.mock('@/lib/rates/run-currency', () => ({ getTenantRunCurrency: async () => '
 vi.mock('@/lib/rates/rate-currency', () => ({ normalizeRateRows: async (_db: unknown, _t: string, rows: unknown) => rows }))
 
 const { POST } = await import('@/app/api/pricing-grid/parse/route')
+const { parsedDaysToGrid } = await import('@/app/pricing-grid/lib/parsed-days')
 
 const post = (body: Record<string, unknown>) =>
   POST(new Request('http://x/api/pricing-grid/parse', { method: 'POST', body: JSON.stringify(body) }) as unknown as Parameters<typeof POST>[0])
@@ -107,5 +108,23 @@ describe('pricing-grid parse — AI service failures are named', () => {
     expect(json.success).toBe(true)
     expect(json.generationMode).toBe('parsed')
     expect(json.days).toHaveLength(1)
+  })
+
+  // The page read the route's slot ARRAY as an object keyed by slot id, so every
+  // matched service was dropped and the grid priced $0.00 (2026-09-16).
+  it('the grid page keeps the services the route matched', async () => {
+    create.mockResolvedValue(reply(JSON.stringify({
+      metadata: {},
+      days: [{ dayNumber: 1, title: 'Giza', city: 'Cairo', slots: { entrance_fees: ['ent-1'] } }],
+    })))
+    const res = await post({ text: TEXT })
+    const json = await res.json()
+    let n = 0
+    const [day] = parsedDaysToGrid(json.days, () => `id-${n++}`)
+    const slot = (id: string) => day.slots.find(s => s.slotId === id)!
+    expect(slot('entrance_fees').selectedItems).toEqual([
+      { rateId: 'ent-1', name: 'Pyramids of Giza', rateEur: 20, rateNonEur: 10 },
+    ])
+    expect(slot('water').customAmount).toBe(1)
   })
 })
