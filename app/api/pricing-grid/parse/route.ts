@@ -9,7 +9,7 @@ import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { packageRules } from '@/lib/ai/package-prompt-rules'
-import { createMessageWithRetry, getUserFriendlyError } from '@/lib/ai/anthropic-client'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
@@ -255,28 +255,17 @@ function buildRateMap(rates: Record<string, any[]>): Map<string, { rate: number;
 // generative fallback, failed identically there, and reached the operator as
 // "Could not parse or generate itinerary from the provided text" — blaming their
 // text for a platform fault. Now a service failure THROWS (the caller answers
-// with getUserFriendlyError, which names it), and only a reply that is not
-// usable JSON comes back as null.
+// with aiServiceFailure, which names it), and only a reply that is not usable
+// JSON comes back as null.
 const PARSE_MODEL = 'claude-sonnet-4-20250514'
 
-class AiServiceError extends Error {
-  constructor(readonly original: unknown) {
-    super('AI service call failed')
-  }
-}
-
 async function askForJson(system: string, userContent: string): Promise<unknown> {
-  let response
-  try {
-    response = await createMessageWithRetry({
-      model: PARSE_MODEL,
-      max_tokens: 8192,
-      system,
-      messages: [{ role: 'user', content: userContent }],
-    })
-  } catch (error) {
-    throw new AiServiceError(error)
-  }
+  const response = await createMessageWithRetry({
+    model: PARSE_MODEL,
+    max_tokens: 8192,
+    system,
+    messages: [{ role: 'user', content: userContent }],
+  })
 
   const content = response.content[0]
   if (!content || content.type !== 'text') return null
@@ -294,8 +283,8 @@ async function askForJson(system: string, userContent: string): Promise<unknown>
   }
 }
 
-function aiServiceFailure(error: AiServiceError) {
-  const { message, status } = getUserFriendlyError(error.original)
+function aiServiceFailure(error: unknown) {
+  const { message, status } = getUserFriendlyError(error)
   return NextResponse.json({ success: false, error: message }, { status })
 }
 
@@ -544,7 +533,7 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
     })
 
   } catch (error: any) {
-    if (error instanceof AiServiceError) return aiServiceFailure(error)
+    if (isAiServiceError(error)) return aiServiceFailure(error)
     console.error('Pricing grid parse error:', error)
     return NextResponse.json(
       { success: false, error: error.message || 'Parse failed' },
@@ -722,7 +711,7 @@ Common patterns (list ALL that apply):
       `Parse this travel inquiry into a structured day-by-day itinerary (no pricing):\n\n${text}`,
     )
   } catch (error) {
-    if (error instanceof AiServiceError) return aiServiceFailure(error)
+    if (isAiServiceError(error)) return aiServiceFailure(error)
     throw error
   }
   if (!aiResult) {

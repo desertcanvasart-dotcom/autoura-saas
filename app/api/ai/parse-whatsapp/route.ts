@@ -1,20 +1,7 @@
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/supabase-server'
-
-// Lazy-initialized Anthropic client (avoids build-time errors when env vars unavailable)
-let _anthropic: Anthropic | null = null
-
-function getAnthropic(): Anthropic {
-  if (!_anthropic) {
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY is not defined in environment variables')
-    }
-    _anthropic = new Anthropic({ apiKey })
-  }
-  return _anthropic
-}
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
 
 // ============================================
 // EGYPTIAN TRAVEL ABBREVIATIONS
@@ -428,7 +415,7 @@ export async function POST(request: Request) {
       : buildGeneralExtractionPrompt()
 
     // Call Claude to analyze the conversation
-    const message = await getAnthropic().messages.create({
+    const message = await createMessageWithRetry({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 8192,
       messages: [
@@ -445,17 +432,21 @@ export async function POST(request: Request) {
       .map(block => block.text)
       .join('')
 
-    // Parse JSON from response
-    let extracted: any = {}
+    // Parse JSON from response. An unreadable reply is a FAILURE: this used to
+    // carry on with `{}` and answer success — "Egypt Tour", 2 adults,
+    // confidence 0.8 — every field a default the customer never said.
+    let extracted: any = null
     try {
-      // Find JSON in the response
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        extracted = JSON.parse(jsonMatch[0])
-      }
+      if (jsonMatch) extracted = JSON.parse(jsonMatch[0])
     } catch (e) {
       console.error('Failed to parse Claude response:', e)
-
+    }
+    if (!extracted || typeof extracted !== 'object') {
+      return NextResponse.json(
+        { success: false, error: 'Could not read the AI\'s analysis of this conversation. Please try again.' },
+        { status: 422 }
+      )
     }
 
     // Helper to validate date
@@ -521,6 +512,10 @@ export async function POST(request: Request) {
     })
 
   } catch (error) {
+    if (isAiServiceError(error)) {
+      const { message, status } = getUserFriendlyError(error)
+      return NextResponse.json({ success: false, error: message }, { status })
+    }
     console.error('Error parsing conversation:', error)
     return NextResponse.json(
       { 

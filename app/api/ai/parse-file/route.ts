@@ -5,16 +5,8 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/supabase-server'
-
-let _anthropic: Anthropic | null = null
-function getAnthropic() {
-  if (!_anthropic) {
-    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-  }
-  return _anthropic
-}
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
 
 const MAX_FILE_SIZE = 32 * 1024 * 1024 // 32MB
 
@@ -41,10 +33,15 @@ export async function POST(request: NextRequest) {
     const lowerName = (filename || '').toLowerCase()
     let extractedText = ''
 
-    // --- DOC (legacy): use Claude to extract text ---
-    if (lowerName.endsWith('.doc') && !lowerName.endsWith('.docx') || mimeType === 'application/msword') {
-      // Legacy .doc files can't be parsed as ZIP — send to Claude as-is
-      extractedText = await extractTextWithVision(file, 'image/png')
+    // --- DOC (legacy): refused, not guessed at ---
+    // This used to send the .doc bytes to Claude labelled image/png, which the
+    // API rejects every time — the operator then saw an AI error for a file
+    // format we simply do not read.
+    if (lowerName.endsWith('.doc') || mimeType === 'application/msword') {
+      return NextResponse.json({
+        success: false,
+        error: 'Old Word (.doc) files cannot be read. Save it as .docx or PDF and upload again.',
+      }, { status: 400 })
     }
     // --- DOCX: extract text from XML ---
     else if (lowerName.endsWith('.docx') || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
@@ -84,6 +81,10 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
+    if (isAiServiceError(error)) {
+      const { message, status } = getUserFriendlyError(error)
+      return NextResponse.json({ success: false, error: message }, { status })
+    }
     console.error('Parse file error:', error)
     return NextResponse.json(
       { success: false, error: error.message || 'File processing failed' },
@@ -100,10 +101,7 @@ async function extractTextFromDocx(buffer: Buffer): Promise<string> {
     const JSZip = (await import('jszip')).default
     const zip = await JSZip.loadAsync(buffer)
     const docXml = await zip.file('word/document.xml')?.async('string')
-
-    if (!docXml) {
-      throw new Error('Could not find document.xml in DOCX file')
-    }
+    if (!docXml) return ''
 
     // Strip XML tags, keep text content
     const text = docXml
@@ -120,18 +118,16 @@ async function extractTextFromDocx(buffer: Buffer): Promise<string> {
       .trim()
 
     return text
-  } catch (err: any) {
-    console.error('DOCX extraction error:', err.message)
-    // Fallback: try Claude vision
-    const base64 = buffer.toString('base64')
-    return extractTextWithVision(base64, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+  } catch (err) {
+    // Not a readable ZIP. There is no AI fallback: the old one sent the bytes
+    // as an image, which the API always rejects. Empty text → the handler's 422.
+    console.error('DOCX extraction error:', (err as Error).message)
+    return ''
   }
 }
 
 // --- Extract text from image using Claude vision ---
 async function extractTextWithVision(base64Data: string, mediaType: string): Promise<string> {
-  const anthropic = getAnthropic()
-
   const validMediaTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
   type ValidMediaType = typeof validMediaTypes[number]
 
@@ -142,7 +138,7 @@ async function extractTextWithVision(base64Data: string, mediaType: string): Pro
     resolvedType = 'image/jpeg'
   }
 
-  const response = await anthropic.messages.create({
+  const response = await createMessageWithRetry({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4096,
     messages: [{
@@ -170,9 +166,7 @@ async function extractTextWithVision(base64Data: string, mediaType: string): Pro
 
 // --- Extract text from PDF using Claude ---
 async function extractTextFromPdf(base64Data: string): Promise<string> {
-  const anthropic = getAnthropic()
-
-  const response = await anthropic.messages.create({
+  const response = await createMessageWithRetry({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 4096,
     messages: [{
