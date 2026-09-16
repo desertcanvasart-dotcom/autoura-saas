@@ -8,6 +8,7 @@ import { SLOT_DEFINITIONS } from './types'
 import { calculateGrandTotals, calculateDay } from './lib/calculator'
 import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/throughout-guide'
 import { mapServicesToSlots } from './lib/slot-mapping'
+import { parsedDaysToGrid } from './lib/parsed-days'
 import GridHeader from './components/GridHeader'
 import ClientInfoBar from './components/ClientInfoBar'
 import InputPanel from './components/InputPanel'
@@ -439,28 +440,7 @@ function PricingGridContent() {
       })
       const data = await res.json()
       if (data.success && data.days) {
-        const parsedDays: GridDay[] = data.days.map((pd: any, idx: number) => ({
-          id: crypto.randomUUID(),
-          dayNumber: pd.dayNumber || idx + 1,
-          title: pd.title || `Day ${idx + 1}`,
-          city: pd.city || '',
-          description: pd.description || '',
-          isExpanded: false,
-          slots: SLOT_DEFINITIONS.map(def => {
-            const slotData = pd.slots?.[def.slotId]
-            if (!slotData) return { slotId: def.slotId, selectedItems: [], customAmount: 0 }
-            return {
-              slotId: def.slotId,
-              selectedItems: (slotData.selectedItems || []).map((item: any) => ({
-                rateId: item.rateId,
-                name: item.name,
-                rateEur: item.rateEur || 0,
-                rateNonEur: item.rateNonEur || 0,
-              })),
-              customAmount: slotData.customAmount || 0,
-            }
-          }),
-        }))
+        const parsedDays: GridDay[] = parsedDaysToGrid(data.days, () => crypto.randomUUID())
         setDays(parsedDays)
         // Show indicator if itinerary was AI-generated (not parsed from detailed text)
         if (data.generationMode === 'generated') {
