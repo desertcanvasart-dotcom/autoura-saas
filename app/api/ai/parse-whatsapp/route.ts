@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/supabase-server'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { CLAUDE_MODEL } from '@/lib/ai/models'
 
 // ============================================
 // EGYPTIAN TRAVEL ABBREVIATIONS
@@ -416,8 +417,10 @@ export async function POST(request: Request) {
 
     // Call Claude to analyze the conversation
     const message = await createMessageWithRetry({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 8192,
+      model: CLAUDE_MODEL,
+      max_tokens: 16000,
+      // Field extraction from a conversation.
+      output_config: { effort: 'low' },
       messages: [
         {
           role: 'user',

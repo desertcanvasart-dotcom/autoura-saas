@@ -8,6 +8,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { whatsappModel } from '@/lib/ai/models'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
@@ -1012,7 +1013,7 @@ export class WhatsAppAIAgent {
 
     this.businessName = process.env.BUSINESS_NAME || ''
     this.businessEmail = process.env.BUSINESS_EMAIL || ''
-    this.modelId = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
+    this.modelId = whatsappModel()
     this.toolsEnabled = process.env.WHATSAPP_AI_TOOLS_ENABLED === 'true'
     this.maxToolIterations = 3 // Prevent infinite loops
   }
@@ -1267,7 +1268,9 @@ Email: ${this.businessEmail}
       // Call Claude API without tools (legacy mode)
       const response = await createMessageWithRetry({
         model: this.modelId,
-        max_tokens: 500,
+        // Thinking counts against max_tokens; 500 would truncate. A chat reply: low effort.
+        max_tokens: 4096,
+        output_config: { effort: 'low' },
         system: systemPrompt,
         messages
       })
@@ -1333,7 +1336,8 @@ Email: ${this.businessEmail}
         // Call Claude API with tools
         const response = await createMessageWithRetry({
           model: this.modelId,
-          max_tokens: 1024,
+          max_tokens: 4096,
+          output_config: { effort: 'low' },
           // Cache the system block (in array form) so the tools+system prefix
           // is reused across the iterations of this tool loop (same systemPrompt
           // each pass). The tools breakpoint on AGENT_TOOLS additionally lets

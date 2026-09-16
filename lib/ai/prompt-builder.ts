@@ -4,6 +4,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import { createMessageWithRetry } from '@/lib/ai/anthropic-client'
+import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { egyptPromptContext, type DestinationPromptContext } from './destination-context'
 import type { ServiceTier, ExtractedDay, PackageType } from './parsing-utils'
 import { tierDescription, calculateExpectedDays, preParseRawItinerary } from './parsing-utils'
@@ -76,7 +77,7 @@ ${seg.rawContent}
 
 
   const message = await createMessageWithRetry({
-    model: 'claude-sonnet-4-20250514',
+    model: CLAUDE_MODEL,
     max_tokens: 16384,
     messages: [
       {
@@ -164,8 +165,8 @@ export async function generateCreativeItinerary(
     : prompt
 
   const message = await createMessageWithRetry({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 8192,
+    model: CLAUDE_MODEL,
+    max_tokens: 16384,
     messages: [
       {
         role: 'user',

@@ -56,6 +56,15 @@ describe('one Anthropic client', () => {
   })
 })
 
+describe('one model name', () => {
+  // 2026-09-16: claude-sonnet-4-20250514 was retired while hard-coded in ~15
+  // places, and every AI feature 404'd at once. lib/ai/models.ts names it.
+  it('no model id is written as a string literal outside lib/ai/models.ts', () => {
+    const offenders = files.filter(f => f !== 'lib/ai/models.ts' && /['"`]claude-[a-z0-9.-]+['"`]/.test(read(f)))
+    expect(offenders).toEqual([])
+  })
+})
+
 describe('isAiServiceError — the service failed, not the reply', () => {
   const headers = new Headers()
 
