@@ -31,6 +31,7 @@ import { getUserPreferences } from '@/lib/ai/user-preferences'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { presetTierFor, tierMultiplier } from '@/lib/vocabulary'
 import { generateFromStructuredInput, generateCreativeItinerary } from '@/lib/ai/prompt-builder'
+import { getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
 import { loadDestinationPromptContext } from '@/lib/ai/destination-context'
 import { getTenantRunCurrency, DEFAULT_RUN_CURRENCY } from '@/lib/rates/run-currency'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
@@ -1358,6 +1359,10 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: any) {
+    if (isAiServiceError(error)) {
+      const { message, status } = getUserFriendlyError(error)
+      return NextResponse.json({ success: false, error: message }, { status })
+    }
     console.error('❌ Error generating itinerary:', error)
     return NextResponse.json(
       { success: false, error: error.message || 'Failed to generate itinerary' },

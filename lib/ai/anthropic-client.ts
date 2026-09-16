@@ -7,13 +7,15 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 
+const MISSING_KEY_MESSAGE = 'ANTHROPIC_API_KEY is not configured'
+
 // Singleton client instance
 let _client: Anthropic | null = null
 
 export function getAnthropicClient(): Anthropic {
   if (!_client) {
     if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY is not configured')
+      throw new Error(MISSING_KEY_MESSAGE)
     }
     _client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   }
@@ -129,6 +131,25 @@ function getStatusCode(error: unknown): number | null {
 }
 
 // ============================================
+// A FAILED CALL IS NOT A FAILED REPLY
+// ============================================
+
+/**
+ * True when the AI service itself failed — rejected key, no credit, rate
+ * limit, outage, unreachable — as opposed to a reply we could not use.
+ *
+ * Routes must tell the two apart. When they didn't, a revoked production key
+ * reached operators as "Could not parse or generate itinerary from the
+ * provided text" (2026-09-16), blaming their input for a platform fault.
+ * Answer a service failure with getUserFriendlyError; keep "could not
+ * parse" for replies that really are unusable.
+ */
+export function isAiServiceError(error: unknown): boolean {
+  if (error instanceof Anthropic.APIError) return true // includes connection errors
+  return error instanceof Error && error.message === MISSING_KEY_MESSAGE
+}
+
+// ============================================
 // USER-FRIENDLY ERROR MESSAGES
 // ============================================
 
@@ -161,13 +182,22 @@ export function getUserFriendlyError(error: unknown): { message: string; status:
       return { message: 'AI service is temporarily unavailable. Please try again shortly.', status: 503 }
     case 401:
       return { message: 'AI service authentication failed. Please contact support.', status: 500 }
+    case 403:
+      return { message: 'AI service refused this request (permission denied). Please contact support.', status: 500 }
+    case 404:
+      return { message: 'The AI model this feature uses is no longer available. Please contact support.', status: 500 }
     case 400:
       return { message: 'The request was too large or malformed for the AI service. Try shortening the input.', status: 400 }
   }
 
   // Check for missing API key (thrown by getAnthropicClient)
-  if (error instanceof Error && error.message === 'ANTHROPIC_API_KEY is not configured') {
+  if (error instanceof Error && error.message === MISSING_KEY_MESSAGE) {
     return { message: 'AI service is not configured. Please contact support.', status: 500 }
+  }
+
+  // Timeout / DNS / socket — the SDK's connection errors carry no status
+  if (error instanceof Anthropic.APIConnectionError) {
+    return { message: 'Could not reach the AI service. Please try again in a moment.', status: 503 }
   }
 
   // Fallback

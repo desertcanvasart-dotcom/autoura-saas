@@ -7,19 +7,13 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
 import { requireAuth } from '@/lib/supabase-server'
 import { chunkText, embedBatch, EMBEDDING_MODEL, toPgVector } from '@/lib/embeddings'
 
 type KbSourceType = 'kb_faq' | 'kb_policy' | 'kb_tour' | 'kb_custom'
 const KB_TYPES: KbSourceType[] = ['kb_faq', 'kb_policy', 'kb_tour', 'kb_custom']
 const MODEL = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
-
-let _anthropic: Anthropic | null = null
-function getAnthropic() {
-  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-  return _anthropic
-}
 
 interface ExtractedEntry {
   source_type: KbSourceType
@@ -29,8 +23,6 @@ interface ExtractedEntry {
 }
 
 async function aiExtract(text: string): Promise<ExtractedEntry[]> {
-  const anthropic = getAnthropic()
-
   const systemPrompt = `You are a content structurer for a travel agency knowledge base. Given a blob of pasted text (which may contain FAQs, policies, tour descriptions, or general info), split it into discrete knowledge entries.
 
 CATEGORIES
@@ -58,7 +50,7 @@ OUTPUT
 
 Limit to at most 40 entries per call.`
 
-  const resp = await anthropic.messages.create({
+  const resp = await createMessageWithRetry({
     model: MODEL,
     max_tokens: 8192,
     system: systemPrompt,
@@ -106,6 +98,11 @@ export async function POST(request: NextRequest) {
     try {
       entries = await aiExtract(text)
     } catch (err: any) {
+      // A failed call names the service fault; only an unusable reply is an extraction failure.
+      if (isAiServiceError(err)) {
+        const { message, status } = getUserFriendlyError(err)
+        return NextResponse.json({ success: false, error: message }, { status })
+      }
       return NextResponse.json({ success: false, error: `AI extraction failed: ${err?.message}` }, { status: 502 })
     }
     if (entries.length === 0) {

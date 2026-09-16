@@ -8,16 +8,10 @@
 // ============================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import Anthropic from '@anthropic-ai/sdk'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from './ai/anthropic-client'
 import { retrieveKnowledge, formatRetrievalContext, type RetrievedItem } from './copilot-retrieval'
 
 const MODEL = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
-
-let _anthropic: Anthropic | null = null
-function getAnthropic() {
-  if (!_anthropic) _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-  return _anthropic
-}
 
 export type Tone = 'professional' | 'friendly' | 'formal'
 export type Channel = 'whatsapp' | 'email'
@@ -178,34 +172,31 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
 
   // Call Claude
   const startedAt = Date.now()
-  const anthropic = getAnthropic()
   let rawDrafts: any[] = []
   let lastError: string | null = null
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const resp = await anthropic.messages.create({
-        model: MODEL,
-        max_tokens: channel === 'email' ? 3072 : 2048,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPromptParts.join('\n') }],
-      })
-      const first = resp.content[0]
-      if (first?.type !== 'text') throw new Error('Non-text response')
-      let jsonText = first.text.trim()
-      jsonText = jsonText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
-      const parsed = JSON.parse(jsonText)
-      if (!parsed || !Array.isArray(parsed.drafts) || parsed.drafts.length === 0) throw new Error('No drafts in response')
-      rawDrafts = parsed.drafts.slice(0, count)
-      if (rawDrafts.length === 0) throw new Error('All drafts were empty')
-      break
-    } catch (err: any) {
-      lastError = err?.message || String(err)
-      const status = err?.status || err?.error?.status || 0
-      const retryable = status === 429 || status === 529 || /overloaded|timeout/i.test(lastError || '')
-      if (!retryable || attempt === 3) break
-      await new Promise((r) => setTimeout(r, attempt * 1500))
-    }
+  // The shared client retries 429/529/500/503. A service failure is named
+  // (getUserFriendlyError) — it used to reach the operator as the SDK's raw
+  // "401 {"type":"error",...}" text. Only an unusable reply keeps its own message.
+  try {
+    const resp = await createMessageWithRetry({
+      model: MODEL,
+      max_tokens: channel === 'email' ? 3072 : 2048,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPromptParts.join('\n') }],
+    })
+    const first = resp.content[0]
+    if (first?.type !== 'text') throw new Error('Non-text response')
+    let jsonText = first.text.trim()
+    jsonText = jsonText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
+    const parsed = JSON.parse(jsonText)
+    if (!parsed || !Array.isArray(parsed.drafts) || parsed.drafts.length === 0) throw new Error('No drafts in response')
+    rawDrafts = parsed.drafts.slice(0, count)
+    if (rawDrafts.length === 0) throw new Error('All drafts were empty')
+  } catch (err: any) {
+    lastError = isAiServiceError(err)
+      ? getUserFriendlyError(err).message
+      : err?.message || String(err)
   }
 
   const generationTimeMs = Date.now() - startedAt

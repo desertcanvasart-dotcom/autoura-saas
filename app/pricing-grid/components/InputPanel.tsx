@@ -117,8 +117,14 @@ export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onC
       const extractRes = await fetch('/api/ai/parse-file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // One file per call — the shape /api/ai/parse-file reads. This panel was
+        // ported from travel-ops-pro, whose route takes `files[]` and answers
+        // `data.raw_itinerary`; ours never did, so every upload got "No file
+        // provided". Ours returns the file's plain text, which step 2 parses.
         body: JSON.stringify({
-          files: [{ name: uploadedFile.name, type: uploadedFile.type, data: uploadedFile.data, size: uploadedFile.size }],
+          file: uploadedFile.data,
+          filename: uploadedFile.name,
+          mimeType: uploadedFile.type,
         })
       })
 
@@ -135,7 +141,7 @@ export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onC
       }
 
       // Step 2: Feed extracted text into the existing parse pipeline
-      const rawText = extractData.data?.raw_itinerary || ''
+      const rawText: string = extractData.text || ''
       if (!rawText.trim()) {
         setUploadError('No itinerary text found in the file.')
         return

@@ -7,6 +7,7 @@
 // ============================================
 
 import Anthropic from '@anthropic-ai/sdk'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 
@@ -986,12 +987,18 @@ class ToolExecutor {
   }
 }
 
+// A failed AI call is named (rejected key, no credit, outage), not passed on as
+// the SDK's raw "401 {json}" text. Anything else keeps its own message.
+function agentErrorMessage(error: unknown): string {
+  if (isAiServiceError(error)) return getUserFriendlyError(error).message
+  return error instanceof Error ? error.message : String(error)
+}
+
 // ============================================
 // AI AGENT CLASS
 // ============================================
 
 export class WhatsAppAIAgent {
-  private anthropic: Anthropic
   private businessName: string
   private businessEmail: string
   private modelId: string
@@ -999,12 +1006,10 @@ export class WhatsAppAIAgent {
   private maxToolIterations: number
 
   constructor() {
-    const apiKey = process.env.ANTHROPIC_API_KEY
-    if (!apiKey) {
+    if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error('ANTHROPIC_API_KEY not configured')
     }
 
-    this.anthropic = new Anthropic({ apiKey })
     this.businessName = process.env.BUSINESS_NAME || ''
     this.businessEmail = process.env.BUSINESS_EMAIL || ''
     this.modelId = process.env.WHATSAPP_AI_MODEL || 'claude-sonnet-4-20250514'
@@ -1260,7 +1265,7 @@ Email: ${this.businessEmail}
       }
 
       // Call Claude API without tools (legacy mode)
-      const response = await this.anthropic.messages.create({
+      const response = await createMessageWithRetry({
         model: this.modelId,
         max_tokens: 500,
         system: systemPrompt,
@@ -1290,7 +1295,7 @@ Email: ${this.businessEmail}
         success: false,
         shouldRespond: false,
         confidence: 0,
-        error: error.message
+        error: agentErrorMessage(error)
       }
     }
   }
@@ -1326,7 +1331,7 @@ Email: ${this.businessEmail}
         iterations++
 
         // Call Claude API with tools
-        const response = await this.anthropic.messages.create({
+        const response = await createMessageWithRetry({
           model: this.modelId,
           max_tokens: 1024,
           // Cache the system block (in array form) so the tools+system prefix
@@ -1431,7 +1436,7 @@ Email: ${this.businessEmail}
         success: false,
         shouldRespond: false,
         confidence: 0,
-        error: error.message,
+        error: agentErrorMessage(error),
         toolsUsed,
         actionsPerformed
       }
@@ -1570,7 +1575,7 @@ export async function processIncomingMessage(
       success: false,
       shouldRespond: false,
       confidence: 0,
-      error: error.message
+      error: agentErrorMessage(error)
     }
   }
 }
