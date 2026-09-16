@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { createNotification } from '@/lib/notifications'
-import { createMessageWithRetry, getUserFriendlyError } from '@/lib/ai/anthropic-client'
+import { createMessageWithRetry, getUserFriendlyError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 import {
   buildTaskGenerationPrompt,
@@ -113,10 +113,7 @@ export async function POST(
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const responseText = message.content
-      .filter(block => block.type === 'text')
-      .map(block => (block as { type: 'text'; text: string }).text)
-      .join('')
+    const responseText = replyText(message)
 
     // 7. Parse AI response
     let aiTasks

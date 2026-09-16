@@ -9,7 +9,7 @@ import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { packageRules } from '@/lib/ai/package-prompt-rules'
-import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
@@ -268,12 +268,12 @@ async function askForJson(system: string, userContent: string): Promise<unknown>
     messages: [{ role: 'user', content: userContent }],
   })
 
-  const content = response.content[0]
-  if (!content || content.type !== 'text') return null
+  const text = replyText(response)
+  if (!text.trim()) return null
   if (response.stop_reason === 'max_tokens') {
     console.error('Pricing grid parse: AI reply hit max_tokens — JSON is truncated')
   }
-  const jsonText = content.text.trim()
+  const jsonText = text.trim()
     .replace(/^```(?:json)?\s*\n?/i, '')
     .replace(/\n?```\s*$/i, '')
   try {

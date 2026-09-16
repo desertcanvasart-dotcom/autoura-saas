@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
-import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 
 const MAX_FILE_SIZE = 32 * 1024 * 1024 // 32MB
@@ -163,8 +163,7 @@ async function extractTextWithVision(base64Data: string, mediaType: string): Pro
     }],
   })
 
-  const content = response.content[0]
-  return content.type === 'text' ? content.text : ''
+  return replyText(response)
 }
 
 // --- Extract text from PDF using Claude ---
@@ -193,6 +192,5 @@ async function extractTextFromPdf(base64Data: string): Promise<string> {
     }],
   })
 
-  const content = response.content[0]
-  return content.type === 'text' ? content.text : ''
+  return replyText(response)
 }

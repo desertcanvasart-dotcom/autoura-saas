@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import type Anthropic from '@anthropic-ai/sdk'
 import { requireAuth } from '@/lib/supabase-server'
-import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 
 // ============================================
@@ -430,10 +429,7 @@ export async function POST(request: Request) {
     })
 
     // Extract text content from Claude's response
-    const responseText = message.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map(block => block.text)
-      .join('')
+    const responseText = replyText(message)
 
     // Parse JSON from response. An unreadable reply is a FAILURE: this used to
     // carry on with `{}` and answer success — "Egypt Tour", 2 adults,

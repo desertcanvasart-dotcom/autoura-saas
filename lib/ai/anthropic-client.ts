@@ -131,6 +131,31 @@ function getStatusCode(error: unknown): number | null {
 }
 
 // ============================================
+// READING A REPLY
+// ============================================
+
+/**
+ * The reply's text: every text block, joined. Never `content[0]`.
+ *
+ * Since Sonnet 5 the model thinks adaptively by default, so the first block is
+ * usually `thinking` and the answer comes after it. Code that read
+ * `content[0]` saw "no text" on every call — the pricing grid answered
+ * "Could not parse or generate itinerary" with nothing in the logs
+ * (2026-09-16). An empty result is logged with the stop reason, so a refusal
+ * or a max_tokens cut-off is visible.
+ */
+export function replyText(message: Anthropic.Message): string {
+  const text = message.content
+    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+  if (!text.trim()) {
+    console.error(`[AI] reply has no text (stop_reason=${message.stop_reason}, blocks=${message.content.map(b => b.type).join(',') || 'none'})`)
+  }
+  return text
+}
+
+// ============================================
 // A FAILED CALL IS NOT A FAILED REPLY
 // ============================================
 

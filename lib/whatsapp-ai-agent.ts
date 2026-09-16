@@ -7,7 +7,7 @@
 // ============================================
 
 import Anthropic from '@anthropic-ai/sdk'
-import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { whatsappModel } from '@/lib/ai/models'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
@@ -1276,10 +1276,7 @@ Email: ${this.businessEmail}
       })
 
       // Extract the response text
-      const reply = response.content
-        .filter(block => block.type === 'text')
-        .map(block => (block as Anthropic.Messages.TextBlock).text)
-        .join('\n')
+      const reply = replyText(response)
 
       // Determine confidence based on stop reason
       const confidence = response.stop_reason === 'end_turn' ? 0.9 : 0.7
@@ -1399,11 +1396,7 @@ Email: ${this.businessEmail}
 
         // Model has finished (no more tool calls)
         // Extract the final text response
-        const textBlocks = response.content.filter(
-          (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
-        )
-
-        const reply = textBlocks.map(block => block.text).join('\n')
+        const reply = replyText(response)
 
         // Determine confidence based on stop reason and tool usage
         let confidence = response.stop_reason === 'end_turn' ? 0.9 : 0.7

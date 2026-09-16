@@ -56,7 +56,11 @@ const invalidKey = () =>
     new Headers(),
   )
 
-const reply = (text: string) => ({ content: [{ type: 'text', text }], stop_reason: 'end_turn' })
+// Sonnet 5 shape: adaptive thinking is on by default, so a thinking block comes first.
+const reply = (text: string) => ({
+  content: [{ type: 'thinking', thinking: '', signature: 'sig' }, { type: 'text', text }],
+  stop_reason: 'end_turn',
+})
 
 const TEXT = 'Two days in Cairo, pyramids on day one, museum on day two.'
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import { createMessageWithRetry, getUserFriendlyError } from '@/lib/ai/anthropic-client'
+import { createMessageWithRetry, getUserFriendlyError, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 
 const ACCEPTED_TYPES: Record<string, 'pdf' | 'image'> = {
@@ -109,10 +109,7 @@ export async function POST(request: NextRequest) {
       messages: [{ role: 'user', content: contentBlocks }],
     })
 
-    const responseText = message.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map(block => block.text)
-      .join('')
+    const responseText = replyText(message)
 
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
