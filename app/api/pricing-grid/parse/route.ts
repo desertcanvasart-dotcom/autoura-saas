@@ -9,21 +9,13 @@ import { loadVocabularyForTenant } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { packageRules } from '@/lib/ai/package-prompt-rules'
-import Anthropic from '@anthropic-ai/sdk'
+import { createMessageWithRetry, getUserFriendlyError } from '@/lib/ai/anthropic-client'
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
 
 // Lazy-initialized clients
-let _anthropic: Anthropic | null = null
-function getAnthropic() {
-  if (!_anthropic) {
-    _anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
-  }
-  return _anthropic
-}
-
 let _supabaseAdmin: ReturnType<typeof createSupabaseAdmin> | null = null
 function getSupabaseAdmin() {
   if (!_supabaseAdmin) {
@@ -256,6 +248,58 @@ function buildRateMap(rates: Record<string, any[]>): Map<string, { rate: number;
 }
 
 // ============================================
+// AI call — a failed CALL is not a failed PARSE
+// ============================================
+// The route used to wrap the call and JSON.parse in one catch, so a rejected API
+// key (401), an exhausted credit balance or an outage all fell through to the
+// generative fallback, failed identically there, and reached the operator as
+// "Could not parse or generate itinerary from the provided text" — blaming their
+// text for a platform fault. Now a service failure THROWS (the caller answers
+// with getUserFriendlyError, which names it), and only a reply that is not
+// usable JSON comes back as null.
+const PARSE_MODEL = 'claude-sonnet-4-20250514'
+
+class AiServiceError extends Error {
+  constructor(readonly original: unknown) {
+    super('AI service call failed')
+  }
+}
+
+async function askForJson(system: string, userContent: string): Promise<unknown> {
+  let response
+  try {
+    response = await createMessageWithRetry({
+      model: PARSE_MODEL,
+      max_tokens: 8192,
+      system,
+      messages: [{ role: 'user', content: userContent }],
+    })
+  } catch (error) {
+    throw new AiServiceError(error)
+  }
+
+  const content = response.content[0]
+  if (!content || content.type !== 'text') return null
+  if (response.stop_reason === 'max_tokens') {
+    console.error('Pricing grid parse: AI reply hit max_tokens — JSON is truncated')
+  }
+  const jsonText = content.text.trim()
+    .replace(/^```(?:json)?\s*\n?/i, '')
+    .replace(/\n?```\s*$/i, '')
+  try {
+    return JSON.parse(jsonText)
+  } catch (parseError) {
+    console.error('Pricing grid parse: AI reply was not valid JSON:', (parseError as Error).message)
+    return null
+  }
+}
+
+function aiServiceFailure(error: AiServiceError) {
+  const { message, status } = getUserFriendlyError(error.original)
+  return NextResponse.json({ success: false, error: message }, { status })
+}
+
+// ============================================
 // POST handler
 // ============================================
 export async function POST(request: NextRequest) {
@@ -299,7 +343,6 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Stage 1: AI structured parse
-    const anthropic = getAnthropic()
 
     const systemPrompt = `You are an Egypt travel itinerary parser for a tour operator pricing system.
 
@@ -392,31 +435,15 @@ Match the origin_city and destination_city of each transport entry to the day's 
     let aiResult: any = null
     let generationMode: 'parsed' | 'generated' = 'parsed'
 
-    try {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 8192,
-        messages: [{ role: 'user', content: `Parse this travel inquiry/itinerary into a priced day-by-day grid:\n\n${text}` }],
-        system: systemPrompt,
-      })
-
-      const content = response.content[0]
-      if (content.type === 'text') {
-        // Try to parse JSON from response
-        let jsonText = content.text.trim()
-        // Remove markdown code blocks if present
-        jsonText = jsonText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
-        aiResult = JSON.parse(jsonText)
-      }
-    } catch (parseError: any) {
-      console.error('AI parse error (Stage 1):', parseError.message)
-    }
+    aiResult = await askForJson(
+      systemPrompt,
+      `Parse this travel inquiry/itinerary into a priced day-by-day grid:\n\n${text}`,
+    )
 
     // 3. Stage 2: Generative fallback if 0 days
     if (!aiResult || !aiResult.days || aiResult.days.length === 0) {
       generationMode = 'generated'
-      try {
-        const genPrompt = `You are an Egypt travel expert. The user sent a vague inquiry. Generate a suggested ${pax}-person itinerary.
+      const genPrompt = `You are an Egypt travel expert. The user sent a vague inquiry. Generate a suggested ${pax}-person itinerary.
 ${packageRules(pkg)}
 
 ${EGYPT_GLOSSARY}
@@ -427,21 +454,8 @@ ${rateCatalog}
 Return the same JSON format as before with suggested days, matching real rate IDs from the catalog.
 Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
 
-        const genResponse = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 8192,
-          messages: [{ role: 'user', content: `Generate a suggested itinerary for this inquiry:\n\n${text}` }],
-          system: genPrompt,
-        })
-
-        const genContent = genResponse.content[0]
-        if (genContent.type === 'text') {
-          let jsonText = genContent.text.trim()
-          jsonText = jsonText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
-          aiResult = JSON.parse(jsonText)
-        }
-      } catch (genError: any) {
-        console.error('AI generative fallback error:', genError.message)
+      aiResult = await askForJson(genPrompt, `Generate a suggested itinerary for this inquiry:\n\n${text}`)
+      if (!aiResult) {
         return NextResponse.json({
           success: false,
           error: 'Could not parse or generate itinerary from the provided text',
@@ -530,6 +544,7 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
     })
 
   } catch (error: any) {
+    if (error instanceof AiServiceError) return aiServiceFailure(error)
     console.error('Pricing grid parse error:', error)
     return NextResponse.json(
       { success: false, error: error.message || 'Parse failed' },
@@ -618,8 +633,6 @@ export function buildSlotsFromAI(
 // Structure-only parse (no rate matching)
 // ============================================
 async function handleStructureParse(text: string, pax: number) {
-  const anthropic = getAnthropic()
-
   const systemPrompt = `You are an Egypt travel itinerary parser. Extract a structured day-by-day itinerary from the input text WITHOUT matching any rates or prices.
 
 ${EGYPT_GLOSSARY}
@@ -701,45 +714,22 @@ Common patterns (list ALL that apply):
 - tourName should be descriptive (e.g. "Cairo & Luxor Classic") based on itinerary content
 - If the text is vague, generate a reasonable suggested itinerary for ${pax} travelers`
 
-  let aiResult: any = null
-
-  // Retry up to 3 times for transient errors (429/529)
-  const MAX_RETRIES = 3
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 8192,
-        messages: [{ role: 'user', content: `Parse this travel inquiry into a structured day-by-day itinerary (no pricing):\n\n${text}` }],
-        system: systemPrompt,
-      })
-
-      const content = response.content[0]
-      if (content.type === 'text') {
-        let jsonText = content.text.trim()
-        jsonText = jsonText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
-        aiResult = JSON.parse(jsonText)
-      }
-      break // Success, exit retry loop
-    } catch (parseError: any) {
-      const status = parseError?.status || parseError?.error?.status || 0
-      const isRetryable = status === 429 || status === 529
-      console.error(`Structure parse error (attempt ${attempt}/${MAX_RETRIES}):`, parseError.message)
-
-      if (isRetryable && attempt < MAX_RETRIES) {
-        const delay = attempt * 2000 // 2s, 4s backoff
-        await new Promise(resolve => setTimeout(resolve, delay))
-        continue
-      }
-
-      const userMessage = isRetryable
-        ? 'AI service is temporarily overloaded. Please try again in a moment.'
-        : 'Could not parse itinerary structure from the provided text'
-      return NextResponse.json({
-        success: false,
-        error: userMessage,
-      }, { status: 422 })
-    }
+  let aiResult: any
+  try {
+    // createMessageWithRetry already retries 429/529/500/503.
+    aiResult = await askForJson(
+      systemPrompt,
+      `Parse this travel inquiry into a structured day-by-day itinerary (no pricing):\n\n${text}`,
+    )
+  } catch (error) {
+    if (error instanceof AiServiceError) return aiServiceFailure(error)
+    throw error
+  }
+  if (!aiResult) {
+    return NextResponse.json({
+      success: false,
+      error: 'Could not parse itinerary structure from the provided text',
+    }, { status: 422 })
   }
 
   if (!aiResult || !aiResult.days || aiResult.days.length === 0) {
