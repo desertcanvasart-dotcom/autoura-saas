@@ -2,8 +2,7 @@
 // PROMPT BUILDER: STRUCTURED + CREATIVE GENERATORS
 // ============================================
 
-import Anthropic from '@anthropic-ai/sdk'
-import { createMessageWithRetry } from '@/lib/ai/anthropic-client'
+import { createMessageWithRetry, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { egyptPromptContext, type DestinationPromptContext } from './destination-context'
 import type { ServiceTier, ExtractedDay, PackageType } from './parsing-utils'
@@ -87,10 +86,7 @@ ${seg.rawContent}
     ]
   })
 
-  const responseText = message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map(block => block.text)
-    .join('')
+  const responseText = replyText(message)
 
   // Parse JSON
   const jsonMatch = responseText.match(/\{[\s\S]*\}/)
@@ -175,10 +171,7 @@ export async function generateCreativeItinerary(
     ]
   })
 
-  const responseText = message.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map(block => block.text)
-    .join('')
+  const responseText = replyText(message)
 
   const jsonMatch = responseText.match(/\{[\s\S]*\}/)
   if (!jsonMatch) {

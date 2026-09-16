@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import Anthropic from '@anthropic-ai/sdk'
-import { getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 
 // ============================================================================
 // One Anthropic client, and a failed CALL is never reported as a failed PARSE.
@@ -62,6 +62,34 @@ describe('one model name', () => {
   it('no model id is written as a string literal outside lib/ai/models.ts', () => {
     const offenders = files.filter(f => f !== 'lib/ai/models.ts' && /['"`]claude-[a-z0-9.-]+['"`]/.test(read(f)))
     expect(offenders).toEqual([])
+  })
+})
+
+describe('reading a reply', () => {
+  // Sonnet 5 thinks by default: the first block is `thinking`, the answer after.
+  // Reading content[0] saw no text on every call (2026-09-16).
+  it('nothing reads only the first content block of a reply', () => {
+    const offenders = files.filter(f => f !== CLIENT && /\bcontent\[0\]/.test(read(f)) && /anthropic-client|@anthropic-ai\/sdk/.test(read(f)))
+    expect(offenders).toEqual([])
+  })
+
+  it('replyText joins the text after a thinking block', () => {
+    const message = {
+      content: [
+        { type: 'thinking', thinking: '', signature: 'sig' },
+        { type: 'text', text: '{"days":', citations: null },
+        { type: 'text', text: '[]}', citations: null },
+      ],
+      stop_reason: 'end_turn',
+    } as unknown as Anthropic.Message
+    expect(replyText(message)).toBe('{"days":[]}')
+  })
+
+  it('an empty reply is logged with its stop reason', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const message = { content: [{ type: 'thinking', thinking: '', signature: 's' }], stop_reason: 'max_tokens' } as unknown as Anthropic.Message
+    expect(replyText(message)).toBe('')
+    expect(spy).toHaveBeenCalledWith(expect.stringMatching(/stop_reason=max_tokens/))
   })
 })
 

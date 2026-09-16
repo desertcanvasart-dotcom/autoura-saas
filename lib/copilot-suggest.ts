@@ -8,7 +8,7 @@
 // ============================================
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from './ai/anthropic-client'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from './ai/anthropic-client'
 import { whatsappModel } from './ai/models'
 import { retrieveKnowledge, formatRetrievalContext, type RetrievedItem } from './copilot-retrieval'
 
@@ -187,9 +187,8 @@ export async function generateDraftReplies(args: SuggestArgs): Promise<SuggestRe
       system: systemPrompt,
       messages: [{ role: 'user', content: userPromptParts.join('\n') }],
     })
-    const first = resp.content[0]
-    if (first?.type !== 'text') throw new Error('Non-text response')
-    let jsonText = first.text.trim()
+    let jsonText = replyText(resp).trim()
+    if (!jsonText) throw new Error('Non-text response')
     jsonText = jsonText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
     const parsed = JSON.parse(jsonText)
     if (!parsed || !Array.isArray(parsed.drafts) || parsed.drafts.length === 0) throw new Error('No drafts in response')

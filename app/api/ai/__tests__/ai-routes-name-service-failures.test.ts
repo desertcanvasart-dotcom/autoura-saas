@@ -27,7 +27,11 @@ vi.mock('@/lib/embeddings', () => ({
 const invalidKey = () =>
   new Anthropic.AuthenticationError(401, undefined, 'API key is invalid.', new Headers())
 
-const reply = (text: string) => ({ content: [{ type: 'text', text }], stop_reason: 'end_turn' })
+// Sonnet 5 shape: adaptive thinking is on by default, so a thinking block comes first.
+const reply = (text: string) => ({
+  content: [{ type: 'thinking', thinking: '', signature: 'sig' }, { type: 'text', text }],
+  stop_reason: 'end_turn',
+})
 
 const req = (body: Record<string, unknown>) =>
   new Request('http://x', { method: 'POST', body: JSON.stringify(body) })
@@ -79,6 +83,13 @@ describe('POST /api/ai/parse-file', async () => {
     const { json } = await call(POST, { file: pdf, filename: 'trip.pdf', mimeType: 'application/pdf' })
     expect(json.success).toBe(false)
     expect(json.error).toMatch(/authentication failed/i)
+  })
+
+  it('a PDF reply that starts with thinking still returns the extracted text', async () => {
+    create.mockResolvedValue(reply('Day 1: Giza Pyramids\nDay 2: Egyptian Museum'))
+    const { json } = await call(POST, { file: pdf, filename: 'trip.pdf', mimeType: 'application/pdf' })
+    expect(json.success).toBe(true)
+    expect(json.text).toMatch(/^Day 1: Giza/)
   })
 
   it('a legacy .doc is refused with what to do, and never sent to the AI as an image', async () => {

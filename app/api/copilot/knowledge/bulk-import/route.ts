@@ -7,7 +7,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createMessageWithRetry, getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
+import { createMessageWithRetry, getUserFriendlyError, isAiServiceError, replyText } from '@/lib/ai/anthropic-client'
 import { whatsappModel } from '@/lib/ai/models'
 import { requireAuth } from '@/lib/supabase-server'
 import { chunkText, embedBatch, EMBEDDING_MODEL, toPgVector } from '@/lib/embeddings'
@@ -60,9 +60,8 @@ Limit to at most 40 entries per call.`
     messages: [{ role: 'user', content: `Structure the following text into knowledge entries:\n\n${text}` }],
   })
 
-  const first = resp.content[0]
-  if (first?.type !== 'text') throw new Error('Non-text response')
-  let jsonText = first.text.trim()
+  let jsonText = replyText(resp).trim()
+  if (!jsonText) throw new Error('Non-text response')
   jsonText = jsonText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '')
   const parsed = JSON.parse(jsonText)
   if (!parsed || !Array.isArray(parsed.entries)) throw new Error('Bad extraction shape')
