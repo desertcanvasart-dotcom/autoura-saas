@@ -37,6 +37,8 @@ export interface ClientDay {
   description: string | null
   city: string | null
   overnightCity: string | null
+  /** The hotel or ship for the night — name only. */
+  overnightProperty: string | null
   attractions: string[]
   lunchIncluded: boolean
   dinnerIncluded: boolean
@@ -101,12 +103,19 @@ export function toClientItinerary(
         description: str(d.description),
         city: str(d.city),
         overnightCity: str(d.overnight_city),
+        // The hotel or ship for the night — the NAME only, resolved from the
+        // day's accommodation line before it reaches this projection. No
+        // rate, supplier id or cost may follow it out (see the header).
+        overnightProperty: str(d.overnight_property),
         attractions: Array.isArray(d.attractions)
           ? d.attractions.filter((a): a is string => typeof a === 'string')
           : [],
         lunchIncluded: d.lunch_included === true,
         dinnerIncluded: d.dinner_included === true,
         hotelIncluded: d.hotel_included === true,
+        // Legacy column: nothing has ever written itinerary_days.hotel_name,
+        // so this was always null. Kept for the shape; overnightProperty is
+        // the one that is filled.
         hotelName: str(d.hotel_name),
         isArrival: d.is_arrival === true,
         isDeparture: d.is_departure === true,

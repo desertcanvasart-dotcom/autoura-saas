@@ -4,6 +4,7 @@
 // ============================================
 
 import { jsPDF } from 'jspdf'
+import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { formatDateOnly } from '@/lib/date-utils'
 import { identityFooterLine, brandColorRgb, tint, type CompanyIdentity } from './company-identity'
 import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
@@ -16,6 +17,8 @@ interface Service {
   id: string
   service_type: string
   service_name: string
+  /** The hotel or ship for an accommodation/cruise line. */
+  supplier_name?: string | null
   quantity: number
   rate_eur?: number
   rate_non_eur?: number
@@ -344,7 +347,8 @@ export function generateItineraryPDF(
         `Day ${day.day_number || '?'}`,
         formatShortDate(day.date),
         cleanDayTitle(day.title, day.day_number) || day.city || '',
-        day.overnight_city || ''
+        // The hotel or ship, not just the city (lib/itineraries/overnight-property).
+        overnightLabel(overnightProperty(day.services as never), day.overnight_city) || ''
       ])
 
       yPos = drawTable(doc, yPos, ['Day', 'Date', 'Activities', 'Overnight'], daysData, [20, 25, 90, 45], margin, brand, brandTintLight)
