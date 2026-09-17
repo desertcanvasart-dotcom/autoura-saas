@@ -114,5 +114,33 @@ describe('migration replay from scratch', () => {
       "SELECT count(*)::int AS n FROM suppliers WHERE name = 'Replay Probe Supplier'"
     )
     expect((probe.rows[0] as { n: number }).n).toBe(1)
+
+    // Migration 361: a SECURITY DEFINER function runs past RLS, so one that
+    // takes a caller-supplied id must not be executable by the browser roles.
+    // Production proved anon could call ten of them (cross-tenant reads and
+    // writes). New ones fail here unless revoked, or listed below with the
+    // reason the function is safe to expose (it derives the tenant itself).
+    const SAFE_FOR_BROWSER_ROLES: Record<string, string> = {
+      user_has_role: 'checks auth.uid() against get_user_tenant_id(); argument is a role name, not an id',
+      reset_tenant_vocabulary: 'scopes to get_user_tenant_id(); argument is a vocabulary kind',
+    }
+    const exposed = await db.query(`
+      SELECT DISTINCT p.proname,
+             has_function_privilege('anon', p.oid, 'EXECUTE') AS anon,
+             has_function_privilege('authenticated', p.oid, 'EXECUTE') AS authd
+        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public' AND p.prosecdef
+         AND pg_get_function_result(p.oid) <> 'trigger'
+         AND pg_get_function_identity_arguments(p.oid) <> ''
+    `)
+    const leaks = (exposed.rows as Array<{ proname: string; anon: boolean; authd: boolean }>)
+      .filter(r => (r.anon || r.authd) && !SAFE_FOR_BROWSER_ROLES[r.proname])
+      .map(r => `${r.proname} (anon=${r.anon}, authenticated=${r.authd})`)
+    expect(
+      leaks,
+      'SECURITY DEFINER functions with arguments that anon/authenticated can EXECUTE — ' +
+        'REVOKE them (see migration 361) or justify them in SAFE_FOR_BROWSER_ROLES:\n  ' +
+        leaks.join('\n  ')
+    ).toEqual([])
   }, 120_000)
 })

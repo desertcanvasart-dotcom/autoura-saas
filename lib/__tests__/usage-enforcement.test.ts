@@ -187,7 +187,7 @@ describe('incrementVolumeUsage — writer and reader must agree on the window', 
     const calls: Array<{ fn: string; args: Record<string, unknown> }> = []
     const supabase = makeSupabase({ onRpc: (fn, args) => calls.push({ fn, args }) })
 
-    incrementVolumeUsage(supabase, TENANT, 'ai_generations', PERIOD)
+    incrementVolumeUsage(TENANT, 'ai_generations', PERIOD, supabase)
 
     expect(calls).toHaveLength(1)
     expect(calls[0].fn).toBe('increment_usage')
@@ -206,7 +206,7 @@ describe('incrementVolumeUsage — writer and reader must agree on the window', 
     const calls: Array<{ args: Record<string, unknown> }> = []
     const supabase = makeSupabase({ onRpc: (_fn, args) => calls.push({ args }) })
 
-    incrementVolumeUsage(supabase, TENANT, 'itineraries', PERIOD)
+    incrementVolumeUsage(TENANT, 'itineraries', PERIOD, supabase)
 
     const expected = windowKeys(computeUsageWindow(PERIOD, 'annual'))
     expect(calls[0].args.p_metric).toBe('itineraries')
@@ -218,7 +218,7 @@ describe('incrementVolumeUsage — writer and reader must agree on the window', 
     // ever reached — the bug migration 238 exists to prevent.
     const calls: Array<{ args: Record<string, unknown> }> = []
     const supabase = makeSupabase({ onRpc: (_fn, args) => calls.push({ args }) })
-    incrementVolumeUsage(supabase, TENANT, 'itineraries', PERIOD)
+    incrementVolumeUsage(TENANT, 'itineraries', PERIOD, supabase)
 
     const readerWindow = computeUsageWindow(PERIOD, 'annual')
     expect(calls[0].args.p_period_start).toBe(windowKeys(readerWindow).period_start)
@@ -227,7 +227,7 @@ describe('incrementVolumeUsage — writer and reader must agree on the window', 
   it('does nothing without an anchor rather than guessing a window', async () => {
     const calls: unknown[] = []
     const supabase = makeSupabase({ onRpc: () => calls.push(1) })
-    incrementVolumeUsage(supabase, TENANT, 'itineraries', null)
+    incrementVolumeUsage(TENANT, 'itineraries', null, supabase)
     expect(calls).toHaveLength(0)
   })
 

@@ -155,7 +155,6 @@ export async function PATCH(request: NextRequest) {
       tenant_id,
       user.id,
       'tenant.settings_updated',
-      supabase,
       {
         resourceType: 'tenant',
         resourceId: tenant_id,

@@ -11,6 +11,7 @@
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase-server'
 
 // ============================================================
 // TYPES
@@ -56,12 +57,18 @@ export interface MemoryInjectionResult {
 // ============================================================
 
 export async function getMemoriesForPrompt(params: {
-  supabase: any
   tenant_id: string
   client_id?: string | null
   min_confidence?: number
+  /** Tests only. Production always reads on the service-role client. */
+  client?: any
 }): Promise<MemoryInjectionResult> {
-  const { supabase, tenant_id, client_id, min_confidence = 0.3 } = params
+  const { tenant_id, client_id, min_confidence = 0.3 } = params
+  // Service role only: get_tenant_agent_memories is SECURITY DEFINER and takes
+  // the tenant id as an argument, so migration 361 revoked it from anon and
+  // authenticated (it read any agency's AI notes on its clients). `tenant_id`
+  // must come from requireAuth().
+  const supabase = params.client ?? createAdminClient()
 
   const empty: MemoryInjectionResult = {
     memories: [],

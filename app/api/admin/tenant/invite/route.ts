@@ -127,7 +127,6 @@ export async function POST(request: NextRequest) {
       tenant_id,
       user.id,
       'team.member_invited',
-      supabase,
       {
         resourceType: 'tenant_invitation',
         resourceId: invitation.id,

@@ -147,7 +147,6 @@ export async function POST(request: NextRequest) {
       tenant_id,
       user.id,
       'billing.checkout_started',
-      supabase,
       {
         details: {
           plan_slug,

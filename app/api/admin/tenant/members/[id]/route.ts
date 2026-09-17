@@ -107,7 +107,6 @@ export async function PATCH(
       tenant_id,
       user.id,
       'team.member_role_changed',
-      supabase,
       {
         resourceType: 'tenant_member',
         resourceId: id,
@@ -232,7 +231,6 @@ export async function DELETE(
       tenant_id,
       user.id,
       'team.member_removed',
-      supabase,
       {
         resourceType: 'tenant_member',
         resourceId: id,
