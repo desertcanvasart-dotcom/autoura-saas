@@ -55,6 +55,13 @@ interface CalculatedService {
   is_optional: boolean
   day_number: number | null
   pricing_note?: string
+  /** No usable rate: listed in its day at 0 so the gap is visible where the
+   *  day is read. Adds nothing to any total (lib/pricing/breakdown-order). */
+  unpriced?: boolean
+  /** Already paid for inside another line. */
+  included?: boolean
+  /** Why the line is unpriced or included. */
+  issue?: string
   // Optional services only: chosen for this quote, and what the customer pays.
   is_selected?: boolean
   selling_price?: number
@@ -501,7 +508,10 @@ export async function POST(request: NextRequest) {
         line_total: s.lineTotal,
         is_optional: s.isOptional,
         day_number: s.dayNumber,
-        pricing_note: s.notes
+        pricing_note: s.notes,
+        unpriced: s.unpriced,
+        included: s.included,
+        issue: s.issue,
       }))
 
       const convertedOptional: CalculatedService[] = autoPriceResult.optionalServices.map((s: any) => ({

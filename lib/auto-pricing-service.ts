@@ -38,6 +38,7 @@ import {
   groupSleeperTrains, trainForNamedRow,
 } from '@/lib/pricing/ticket-legs'
 import type { RateSource, PricingHole } from './pricing-types'
+import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { pickCandidate, ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
 import { presetTierFor, tierMultiplier, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
@@ -236,6 +237,15 @@ export interface PricedService {
   isPerPax: boolean  // true = scales with pax, false = fixed cost
   isOptional: boolean  // true = optional add-on service
   notes?: string
+  /** No usable rate: the line is listed in its day at 0 so the operator can
+   *  see WHAT is missing and WHERE, instead of reading a separate list of
+   *  holes and matching it back to the programme by hand. Totals are
+   *  unaffected — an unpriced line adds nothing. */
+  unpriced?: boolean
+  /** Already paid for inside another line (breakfast in the hotel rate). */
+  included?: boolean
+  /** The operator-facing reason for an unpriced or included line. */
+  issue?: string
 }
 
 // Complete pricing result
@@ -893,6 +903,92 @@ function inferAccommodationType(day: any, _allDays?: any[]): AccommodationType {
   // what that day says, and the rest is a hotel. Same rule as the sibling app
   // (travel-ops-pro #446).
   return 'hotel'
+}
+
+// ============================================
+// Gaps, listed where they happen
+// ============================================
+// Turns the holes into the lines that say, on the day, what could not be
+// priced. A hole that already has a line (a fuzzy rate still produced one)
+// does not get a second.
+
+const HOLE_LINE_LABEL: Record<string, { name: string; serviceType: string; perPax: boolean }> = {
+  hotel: { name: 'Hotel night', serviceType: 'accommodation', perPax: true },
+  cruise: { name: 'Cruise night', serviceType: 'cruise', perPax: true },
+  guide: { name: 'Guide', serviceType: 'guide', perPax: false },
+  meal: { name: 'Meal', serviceType: 'meal', perPax: true },
+  entrance: { name: 'Entrance fee', serviceType: 'entrance', perPax: true },
+  transport: { name: 'Transport', serviceType: 'transportation', perPax: false },
+  airport_service: { name: 'Airport service', serviceType: 'airport_service', perPax: false },
+  hotel_service: { name: 'Hotel service', serviceType: 'hotel_service', perPax: false },
+  tipping: { name: 'Tips', serviceType: 'tips', perPax: true },
+  activity: { name: 'Activity', serviceType: 'activity', perPax: true },
+}
+
+export function unpricedLinesForHoles(
+  holes: PricingHole[],
+  days: ItineraryDay[],
+  existing: PricedService[]
+): PricedService[] {
+  const lines: PricedService[] = []
+  const priced = new Set(existing.map(s => `${s.dayNumber}|${s.serviceType}`))
+
+  const dayNumbersFor = (hole: PricingHole): number[] => {
+    if (typeof hole.dayNumber === 'number' && hole.dayNumber > 0) return [hole.dayNumber]
+    // A hotel hole is recorded per CITY (one lookup serves every night there),
+    // and a cruise hole for the sailing as a whole. List the nights it covers.
+    if (hole.kind === 'hotel' && hole.city) {
+      return days.filter(d => d.accommodation_type === 'hotel' && d.city === hole.city).map(d => d.day)
+    }
+    if (hole.kind === 'cruise') {
+      const aboard = days.filter(d => d.accommodation_type === 'cruise').map(d => d.day)
+      return aboard.length ? [aboard[0]] : []
+    }
+    // The rest are recorded once for the whole trip (one guide-rate lookup
+    // serves every guided day). List them on the days that ASKED for the
+    // service — that is where the operator is looking for them.
+    const asked = (want: (d: ItineraryDay) => boolean) => days.filter(want).map(d => d.day)
+    switch (hole.kind) {
+      case 'guide':
+        return asked(d => d.services?.guide_required === true)
+      case 'meal':
+        return asked(d => d.meals.lunch === 'external' || d.meals.dinner === 'external')
+      case 'airport_service':
+        return asked(d => d.services?.airport_arrival === true || d.services?.airport_departure === true)
+      case 'hotel_service':
+        return asked(d => d.services?.hotel_checkin === true || d.services?.hotel_checkout === true)
+      case 'tipping':
+        return days.length ? [days[0].day] : []
+      default:
+        return []
+    }
+  }
+
+  for (const hole of holes) {
+    const label = HOLE_LINE_LABEL[hole.kind]
+    if (!label) continue
+    for (const dayNumber of dayNumbersFor(hole)) {
+      if (priced.has(`${dayNumber}|${label.serviceType}`)) continue
+      const id = `day${dayNumber}-${hole.kind}-no-rate`
+      if (lines.some(l => l.id === id)) continue
+      lines.push({
+        id,
+        dayNumber,
+        serviceType: label.serviceType,
+        serviceName: `${label.name} — no rate`,
+        quantity: 1,
+        quantityMode: 'fixed',
+        unitCost: 0,
+        lineTotal: 0,
+        rateSource: 'none',
+        isPerPax: label.perPax,
+        isOptional: false,
+        unpriced: true,
+        issue: hole.message,
+      })
+    }
+  }
+  return lines
 }
 
 // ============================================
@@ -2070,6 +2166,7 @@ export async function calculateDayBasedPricing(
     seenHoleKeys.add(key)
     holes.push(h)
   }
+
 
   // ============================================
   // STEP 1: Fetch template and parse itinerary
@@ -3348,15 +3445,27 @@ export async function calculateDayBasedPricing(
   })
 
   // ============================================
-  // STEP 11: Return result
+  // STEP 11: Every gap is listed where it happens, and the day reads in order
   // ============================================
+  // A hole used to live only in a separate list the operator had to match back
+  // to the programme by hand. Each one that stands for a service on a day is
+  // also listed IN THAT DAY at 0, marked unpriced, with the reason on the
+  // line. Totals are untouched: an unpriced line adds nothing.
+  //
+  // Derived from the holes rather than written at each of the 25 places that
+  // record one, so a hole added later is listed too and the two can never
+  // disagree about what is missing.
+  for (const line of unpricedLinesForHoles(holes, itinerary, services)) services.push(line)
 
-
-
-
-
-
-
+  // One ordering rule, shared with the calculator page
+  // (lib/pricing/breakdown-order.ts): day by day, each day in the order it
+  // runs. The old sort put every fixed cost ahead of every per-person one, so
+  // a day read as a shuffled list.
+  const orderedServices = sortByItineraryFlow(services, s => ({
+    id: s.id,
+    category: s.serviceType,
+    dayNumber: s.dayNumber,
+  }))
 
   return {
     success: true,
@@ -3368,7 +3477,7 @@ export async function calculateDayBasedPricing(
     cruiseNights,
     singleSupplement: Math.round(singleSupplement * 100) / 100,
     tripleReduction: Math.round(tripleReduction * 100) / 100,
-    services,
+    services: orderedServices,
     paxPricing,
     complete: holes.length === 0,
     holes,
