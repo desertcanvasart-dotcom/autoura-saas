@@ -1,55 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { requireAuth } from '@/lib/supabase-server'
 
-async function createClient() {
-  const cookieStore = await cookies()
-
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
-}
+// Tenant and role come from requireAuth(): its own .single() lookups on
+// tenant_members errored for anyone in two companies, and the GET one had no
+// status filter at all.
 
 // GET - Fetch exchange rates (system-level + tenant overrides)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
+    const auth = await requireAuth()
+    if (auth.error !== null) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
-
-    // Get tenant_id from tenant_members
-    const { data: memberData } = await supabase
-      .from('tenant_members')
-      .select('tenant_id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!memberData?.tenant_id) {
-      return NextResponse.json(
-        { success: false, error: 'Tenant not found' },
-        { status: 404 }
-      )
-    }
+    const { supabase } = auth
+    const memberData = { tenant_id: auth.tenant_id }
 
     // Fetch system-level rates (tenant_id IS NULL)
     const { data: systemRates, error: systemError } = await supabase
@@ -127,31 +91,13 @@ export async function GET(request: NextRequest) {
 // PUT - Update or create exchange rates
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const auth = await requireAuth()
+    if (auth.error !== null) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
+    }
+    const { supabase } = auth
     const body = await request.json()
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Get tenant_id and check if user is admin
-    const { data: memberData } = await supabase
-      .from('tenant_members')
-      .select('tenant_id, role')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!memberData?.tenant_id) {
-      return NextResponse.json(
-        { success: false, error: 'Tenant not found' },
-        { status: 404 }
-      )
-    }
+    const memberData = { tenant_id: auth.tenant_id, role: auth.role }
 
     if (!['owner', 'admin'].includes(memberData.role)) {
       return NextResponse.json(

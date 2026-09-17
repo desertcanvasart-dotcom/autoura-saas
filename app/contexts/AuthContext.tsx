@@ -183,6 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', data.user.id)
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
+        .order('tenant_id', { ascending: true })
         .limit(1)
         .maybeSingle()
 

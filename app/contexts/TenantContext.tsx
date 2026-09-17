@@ -145,6 +145,7 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
         .eq('user_id', user.id)
         .eq('status', 'active')
         .order('joined_at', { ascending: true })
+        .order('tenant_id', { ascending: true })
         .limit(1)
         .maybeSingle()
 

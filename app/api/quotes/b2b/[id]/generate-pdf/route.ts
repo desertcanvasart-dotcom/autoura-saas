@@ -55,31 +55,18 @@ export async function POST(
     const { id: quoteId } = await params;
 
     // Authenticate and get user
-    const { supabase, user } = await requireAuth();
+    const { supabase, user, tenant_id } = await requireAuth();
 
-    if (!supabase || !user) {
+    if (!supabase || !user || !tenant_id) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
         { status: 401 }
       );
     }
 
-    // Get user's tenant
-    const { data: membership } = await supabase
-      .from('tenant_members')
-      .select('tenant_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single();
-
-    if (!membership) {
-      return NextResponse.json(
-        { success: false, error: 'User does not belong to any tenant' },
-        { status: 403 }
-      );
-    }
-
-    const tenantId = membership.tenant_id;
+    // The tenant requireAuth() resolved (one membership rule, and the
+    // impersonated tenant for a super admin) — never a second lookup.
+    const tenantId = tenant_id;
 
     // Fetch the quote with related data
     const { data: quote, error: quoteError } = await supabase
@@ -185,31 +172,18 @@ export async function GET(
     const { id: quoteId } = await params;
 
     // Authenticate and get user
-    const { supabase, user } = await requireAuth();
+    const { supabase, user, tenant_id } = await requireAuth();
 
-    if (!supabase || !user) {
+    if (!supabase || !user || !tenant_id) {
       return NextResponse.json(
         { success: false, error: 'Authentication failed' },
         { status: 401 }
       );
     }
 
-    // Get user's tenant
-    const { data: membership } = await supabase
-      .from('tenant_members')
-      .select('tenant_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .single();
-
-    if (!membership) {
-      return NextResponse.json(
-        { success: false, error: 'User does not belong to any tenant' },
-        { status: 403 }
-      );
-    }
-
-    const tenantId = membership.tenant_id;
+    // The tenant requireAuth() resolved (one membership rule, and the
+    // impersonated tenant for a super admin) — never a second lookup.
+    const tenantId = tenant_id;
 
     // Fetch the quote with related data
     const { data: quote, error: quoteError } = await supabase
