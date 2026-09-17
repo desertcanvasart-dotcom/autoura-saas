@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileSpreadsheet, TrendingUp, AlertCircle, UserPlus, Save, X, CheckCircle2, Building2, User, Mail, Phone, FileText, XCircle } from 'lucide-react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
+import { isBookableLine, sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 
 // ============================================
 // B2B TOUR PRICE CALCULATOR PAGE
@@ -39,6 +40,13 @@ interface PricingResult {
     unit_cost: number
     line_total: number
     pricing_note?: string
+    day_number?: number | null
+    /** No usable rate: listed in its day at 0, red, with the reason. */
+    unpriced?: boolean
+    /** Already paid for inside another line. */
+    included?: boolean
+    /** Why the line is unpriced or included. */
+    issue?: string
     // Present on catalogue-extra lines (rate_source 'extras_catalogue').
     extra?: { unit: 'per_person' | 'per_booking'; pinned: boolean; sell_total: number | null; margin_total: number; cost_known: boolean }
   }>
@@ -109,6 +117,18 @@ export default function TourPriceCalculator() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<PricingResult | null>(null)
+
+  // The breakdown reads like the day runs — the same rule the engine sorts by
+  // (lib/pricing/breakdown-order.ts), so extras folded in after pricing land in
+  // their place too.
+  const orderedServices = useMemo(
+    () => sortByItineraryFlow(result?.services ?? [], s => ({
+      id: s.service_id,
+      category: s.service_category,
+      dayNumber: s.day_number ?? null,
+    })),
+    [result]
+  )
   const [rateSheet, setRateSheet] = useState<RateSheetRow[]>([])
   const [generatingSheet, setGeneratingSheet] = useState(false)
 
@@ -326,7 +346,11 @@ export default function TourPriceCalculator() {
           // The CHOSEN optional services travel with the quote as real services,
           // so their money and their lines stay together downstream.
           services_snapshot: [
-            ...result.services,
+            // A no-rate line IS a service to book, so it travels with the
+            // quote; a line that only makes the day read whole (a meal already
+            // inside the hotel rate) does not, or it converts into a zero-cost
+            // booking nobody can act on.
+            ...result.services.filter(isBookableLine),
             ...(result.optional_services || []).filter(s => s.is_selected),
           ],
           total_cost: result.total_cost,
@@ -784,10 +808,18 @@ export default function TourPriceCalculator() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {result.services.map((service, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
+                    {orderedServices.map((service, idx) => (
+                      <tr key={idx} className={service.unpriced ? 'bg-red-50' : 'hover:bg-gray-50'}>
                         <td className="px-4 py-2">
-                          {service.service_name}
+                          <span className={service.unpriced ? 'text-red-700 font-medium' : undefined}>
+                            {service.service_name}
+                          </span>
+                          {/* A service with no rate is listed in its day at 0
+                              with the reason, instead of only in the banner
+                              above — the operator reads the day, not a list. */}
+                          {service.unpriced && service.issue && (
+                            <p className="text-xs text-red-600">{service.issue}</p>
+                          )}
                           {service.extra && service.pricing_note && (
                             <p className={`text-xs ${service.extra.cost_known === false ? 'text-red-600' : 'text-gray-500'}`}>
                               {service.pricing_note}
@@ -802,9 +834,13 @@ export default function TourPriceCalculator() {
                               ? 'bg-gray-100'
                               : service.rate_source === 'manual'
                               ? 'bg-yellow-100 text-yellow-700'
+                              : service.unpriced
+                              ? 'bg-red-100 text-red-700'
                               : 'bg-green-100 text-green-700'
                           }`}>
-                            {service.extra
+                            {service.unpriced
+                              ? 'no rate'
+                              : service.extra
                               ? `${service.rate_source === 'variation_option' ? 'Option' : 'Extra'}${service.extra.pinned ? ' · set price' : ''}`
                               : (service.rate_type || service.rate_source)}
                           </span>

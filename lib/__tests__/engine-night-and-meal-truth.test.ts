@@ -71,7 +71,15 @@ describe('a blank nightly rate in the covering period', () => {
     const hole = result.holes.find(h => h.kind === 'hotel')
     expect(hole?.message).toContain('Winter')
     expect(hole?.message).toContain('no nightly rate')
-    expect(result.services.some(s => s.serviceType === 'accommodation')).toBe(false)
+    // The night is LISTED in its day at 0 and marked unpriced (the gap is
+    // where the operator reads the day), never priced.
+    const nights = result.services.filter(s => s.serviceType === 'accommodation')
+    expect(nights.length).toBeGreaterThan(0)
+    for (const night of nights) {
+      expect(night.unpriced).toBe(true)
+      expect(night.lineTotal).toBe(0)
+      expect(night.issue).toContain('Winter')
+    }
   })
 })
 
