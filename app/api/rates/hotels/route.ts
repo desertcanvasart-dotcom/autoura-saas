@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/supabase-server'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { validateRatePayload } from '@/lib/rate-validation'
 import type { TablesInsert } from '@/types/database.types'
-import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
+import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
 
 export async function GET(request: NextRequest) {
   try {
@@ -95,6 +95,14 @@ export async function POST(request: NextRequest) {
     //   - 013_accommodation_rates_rls.sql (applies trigger to this table)
     // The trigger automatically sets tenant_id from the authenticated user's session
     // RLS policies enforce that users can only insert rates for their own tenant
+    // Six periods per rate, enforced here as well as in the editor and the
+    // CSV: a seventh saved through the API could never be shown or corrected.
+    if ('seasons' in body) {
+      const capError = ratePeriodCapError(body.seasons)
+      if (capError) {
+        return NextResponse.json({ success: false, error: capError }, { status: 400 })
+      }
+    }
     const parsedSeasons = 'seasons' in body ? sanitizeSeasons(body.seasons, 'accommodation') : undefined
     const seasonsPatch: Record<string, unknown> = parsedSeasons === undefined
       ? {}

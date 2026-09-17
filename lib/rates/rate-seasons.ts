@@ -94,6 +94,35 @@ export function sanitizeSeasons(input: unknown, entity: RateSeasonEntity): RateS
   return seasons
 }
 
+/** How many real (fully dated) periods a save payload is asking to store.
+ *  Half-filled editor rows do not count — sanitizeSeasons drops those rather
+ *  than failing the save. */
+export function countProposedSeasons(input: unknown): number {
+  if (!Array.isArray(input)) return 0
+  let n = 0
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue
+    const s = raw as Record<string, unknown>
+    const from = typeof s.from === 'string' ? s.from.trim() : ''
+    const to = typeof s.to === 'string' ? s.to.trim() : ''
+    if (ISO_DATE.test(from) && ISO_DATE.test(to)) n++
+  }
+  return n
+}
+
+/** The cap, enforced at every WRITE. The editor and the CSV both stop at six,
+ *  but the save routes did not — anything posting straight to the API (or a UI
+ *  that drifts) stored a seventh period that the editor could then never show
+ *  and the operator could never correct. Reads stay tolerant on purpose: a row
+ *  that somehow holds more must still price, not fall back to the legacy
+ *  columns. Returns the error message, or null when the payload is fine. */
+export function ratePeriodCapError(input: unknown): string | null {
+  const n = countProposedSeasons(input)
+  return n > MAX_RATE_PERIODS
+    ? `A rate holds at most ${MAX_RATE_PERIODS} periods — this one has ${n}. Remove ${n - MAX_RATE_PERIODS} before saving.`
+    : null
+}
+
 /** Read a seasons value off a rate row. Tolerates the JSONB arriving as a
  *  string, which some Supabase client paths do for jsonb columns. */
 export function parseSeasons(value: unknown, entity: RateSeasonEntity): RateSeason[] | null {

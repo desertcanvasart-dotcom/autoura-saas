@@ -3,7 +3,7 @@ import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { clearPreferredSiblings } from '@/lib/rates/preferred'
 import { requireAuth } from '@/lib/supabase-server'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
-import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
+import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
 
 export async function GET(
   request: NextRequest,
@@ -73,6 +73,14 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
+    // Six periods per rate, enforced here as well as in the editor and the
+    // CSV: a seventh saved through the API could never be shown or corrected.
+    if ('seasons' in body) {
+      const capError = ratePeriodCapError(body.seasons)
+      if (capError) {
+        return NextResponse.json({ success: false, error: capError }, { status: 400 })
+      }
+    }
     const parsedSeasons = 'seasons' in body ? sanitizeSeasons(body.seasons, 'cruise') : undefined
     const seasonsPatch: Record<string, unknown> = parsedSeasons === undefined
       ? {}
