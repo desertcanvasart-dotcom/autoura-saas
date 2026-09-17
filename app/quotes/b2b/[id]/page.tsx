@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/app/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -12,6 +12,7 @@ import {
   MapPin, Users, CheckCircle, XCircle, Eye, Globe, MessageCircle, BookOpen
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { quoteCompleteness } from '@/lib/pricing/quote-completeness'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface B2BQuote {
@@ -41,6 +42,7 @@ interface B2BQuote {
   internal_notes: string | null
   terms_and_conditions: string | null
   pdf_url: string | null
+  services_snapshot?: unknown
   created_at: string | null
   b2b_partners: {
     id: string
@@ -74,6 +76,10 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
   const router = useRouter()
   const dialog = useConfirmDialog()
   const [quote, setQuote] = useState<B2BQuote | null>(null)
+
+  // What this quote could not price, read from its own saved lines
+  // (lib/pricing/quote-completeness.ts) — no separate flag to drift.
+  const completeness = useMemo(() => quoteCompleteness(quote?.services_snapshot), [quote])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pdfGenerating, setPdfGenerating] = useState(false)
@@ -155,10 +161,29 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
   const handleDownloadPDF = async () => {
     if (!quote) return
 
+    // A quote with services the engine could not price is refused by the
+    // route. Ask here rather than showing that refusal as an error: the
+    // operator may know the missing pieces and mean to send it anyway.
+    let allowIncomplete = false
+    if (!completeness.complete) {
+      allowIncomplete = window.confirm(
+        `${completeness.gaps.length} service(s) in this quote have no price:\n\n` +
+          completeness.gaps
+            .slice(0, 5)
+            .map(g => `• ${g.day ? `Day ${g.day}: ` : ''}${g.name} — ${g.issue}`)
+            .join('\n') +
+          (completeness.gaps.length > 5 ? `\n• …and ${completeness.gaps.length - 5} more` : '') +
+          '\n\nGenerate the PDF anyway?'
+      )
+      if (!allowIncomplete) return
+    }
+
     try {
       setPdfGenerating(true)
 
-      const response = await fetch(`/api/quotes/b2b/${quote.id}/generate-pdf`)
+      const response = await fetch(
+        `/api/quotes/b2b/${quote.id}/generate-pdf${allowIncomplete ? '?allow_incomplete=true' : ''}`
+      )
 
       if (!response.ok) {
         // The route returns real reasons (e.g. 'Quote not found') — show
@@ -437,6 +462,31 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* What this quote could not price. The PDF and the booking refuse it
+            until an operator says otherwise, so it is said plainly here. */}
+        {!completeness.complete && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+              <div>
+                <h3 className="text-sm font-semibold text-red-800">
+                  {completeness.gaps.length} service{completeness.gaps.length === 1 ? '' : 's'} in this quote {completeness.gaps.length === 1 ? 'has' : 'have'} no price
+                </h3>
+                <ul className="mt-2 space-y-1 text-sm text-red-700">
+                  {completeness.gaps.slice(0, 8).map((gap, i) => (
+                    <li key={i}>
+                      {gap.day ? <span className="font-medium">Day {gap.day}: </span> : null}
+                      {gap.name} — {gap.issue}
+                    </li>
+                  ))}
+                  {completeness.gaps.length > 8 && (
+                    <li>…and {completeness.gaps.length - 8} more</li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Partner Information */}
         {quote.b2b_partners && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
