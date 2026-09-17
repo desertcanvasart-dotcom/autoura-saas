@@ -409,7 +409,11 @@ export default function AutouraHomepage() {
           .from('tenant_members')
           .select('tenant_id')
           .eq('user_id', session.user.id)
-          .single()
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .order('tenant_id', { ascending: true })
+          .limit(1)
+          .maybeSingle()
         if (memberData?.tenant_id) {
           const { data: featuresData } = await supabase
             .from('tenant_features')
