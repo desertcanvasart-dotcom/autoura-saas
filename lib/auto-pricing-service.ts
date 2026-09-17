@@ -834,7 +834,13 @@ function inferCityFromTitle(title: string): string {
     return 'Abu Simbel'
   }
 
-  return 'Cairo'  // Default
+  // Unknown. It used to return 'Cairo', so a day the wording did not place —
+  // "Leisure day", "Free morning", a city not in this list, or a title in
+  // another language — was priced with CAIRO's hotel, transport and airport
+  // rates and nothing said so. Callers treat '' as "no city on this day" and
+  // record a hole. The cure is for the day to CARRY its city: the live
+  // templates store none, so every city here is read out of a title.
+  return ''
 }
 
 /**
@@ -2217,7 +2223,22 @@ export async function calculateDayBasedPricing(
 
   // Fetch per-city hotel rates concurrently (deduped cities), then apply in
   // deterministic order so results/holes match the previous serial version.
-  const hotelCities = [...new Set(hotelDays.map(d => d.city))]
+  // A day with no city cannot be given a hotel: there is nothing to look up.
+  // One hole naming the days, and no lookup with an empty city (which would
+  // otherwise match whatever the query's ilike returned first).
+  const daysWithoutCity = hotelDays.filter(d => !d.city || !d.city.trim())
+  if (daysWithoutCity.length > 0) {
+    const dayList = daysWithoutCity.map(d => d.day).join(', ')
+    addHole({
+      kind: 'hotel',
+      reason: 'missing',
+      tier,
+      lookupAttempted: `hotel rate for day(s) ${dayList} (no city)`,
+      message: `Day ${dayList} names no city, so no hotel can be priced for ${daysWithoutCity.length === 1 ? 'that night' : 'those nights'}. Set the city on the day.`,
+    })
+  }
+
+  const hotelCities = [...new Set(hotelDays.map(d => d.city).filter(c => c && c.trim()))]
   const hotelRatesMap = new Map<string, NonNullable<Awaited<ReturnType<typeof getHotelRates>>>>()
   const hotelResults = await Promise.all(
     hotelCities.map(city => getHotelRates(catalogScope, city, tier, travelDate))
