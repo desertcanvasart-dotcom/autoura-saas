@@ -30,6 +30,13 @@ const EXEMPT: Record<string, string> = {
 
 const MIGRATIONS_DIR = path.join(__dirname, '..', '..', 'supabase', 'migrations')
 
+/** The id of a probe client, for the migration-362 trigger checks below. */
+async function clientId(db: PGlite, name: string): Promise<string> {
+  const r = await db.query(`SELECT id FROM clients WHERE full_name = '${name}'`)
+  return (r.rows[0] as { id: string }).id
+}
+
+
 const SUPABASE_STUBS = `
 CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
 CREATE SCHEMA auth;
@@ -114,6 +121,47 @@ describe('migration replay from scratch', () => {
       "SELECT count(*)::int AS n FROM suppliers WHERE name = 'Replay Probe Supplier'"
     )
     expect((probe.rows[0] as { n: number }).n).toBe(1)
+
+    // Migration 362: a lead becomes a Customer when the booking becomes real.
+    // The trigger used to be AFTER INSERT ONLY, so a booking whose client was
+    // attached later (every B2B booking did) left the client a lead for ever,
+    // and a booking INSERTED as cancelled promoted them anyway.
+    await db.exec(`
+      INSERT INTO clients (tenant_id, full_name, email, status)
+      SELECT t.id, 'Lead A', 'a@example.com', 'lead' FROM tenants t WHERE t.company_name = 'Replay Probe Co';
+      INSERT INTO clients (tenant_id, full_name, email, status)
+      SELECT t.id, 'Lead B', 'b@example.com', 'lead' FROM tenants t WHERE t.company_name = 'Replay Probe Co';
+      INSERT INTO clients (tenant_id, full_name, email, status)
+      SELECT t.id, 'Lead C', 'c@example.com', 'lead' FROM tenants t WHERE t.company_name = 'Replay Probe Co';
+    `)
+    const statusOf = async (name: string) => {
+      const r = await db.query(`SELECT status FROM clients WHERE full_name = '${name}'`)
+      return (r.rows[0] as { status: string }).status
+    }
+    const booking = (ref: string, withClient: boolean) => `
+      INSERT INTO bookings (tenant_id, booking_number, trip_name, start_date, end_date,
+                            total_days, num_travelers, total_amount, balance_due, status${withClient ? ', client_id' : ''})
+      SELECT t.id, '${ref}', 'Trip', DATE '2027-01-01', DATE '2027-01-05', 5, 2, 1000, 1000, `
+
+    // (a) a live booking promotes on insert, as it always did
+    await db.exec(booking('BK-A', true) + `'pending_deposit', '${await clientId(db, 'Lead A')}'::uuid FROM tenants t WHERE t.company_name = 'Replay Probe Co'`)
+    expect(await statusOf('Lead A')).toBe('active')
+
+    // (b) a booking inserted with NO client, whose client is attached later
+    await db.exec(booking('BK-B', false) + `'pending_deposit' FROM tenants t WHERE t.company_name = 'Replay Probe Co'`)
+    expect(await statusOf('Lead B')).toBe('lead')
+    await db.exec(`UPDATE bookings SET client_id = '${await clientId(db, 'Lead B')}' WHERE booking_number = 'BK-B'`)
+    expect(await statusOf('Lead B'), 'client attached after the insert must still promote').toBe('active')
+
+    // (c) a booking inserted CANCELLED must not promote; confirming it later does
+    await db.exec(booking('BK-C', true) + `'cancelled', '${await clientId(db, 'Lead C')}'::uuid FROM tenants t WHERE t.company_name = 'Replay Probe Co'`)
+    expect(await statusOf('Lead C'), 'a cancelled booking is not custom').toBe('lead')
+    await db.exec(`UPDATE bookings SET status = 'confirmed' WHERE booking_number = 'BK-C'`)
+    expect(await statusOf('Lead C')).toBe('active')
+
+    // (d) cancelling afterwards never demotes a Customer
+    await db.exec(`UPDATE bookings SET status = 'cancelled' WHERE booking_number = 'BK-C'`)
+    expect(await statusOf('Lead C')).toBe('active')
 
     // Migration 361: a SECURITY DEFINER function runs past RLS, so one that
     // takes a caller-supplied id must not be executable by the browser roles.

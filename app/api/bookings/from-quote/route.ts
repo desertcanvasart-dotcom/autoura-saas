@@ -272,7 +272,10 @@ export async function POST(request: NextRequest) {
       itinerary_id: itinerary_id ?? null,
       quote_id,
       quote_type,
-      client_id: b2cQuote?.client_id ?? null,
+      // B2B too: this read b2cQuote only, so every B2B booking carried no
+      // client and the trip's client stayed a Lead for ever. A B2B quote has
+      // no client of its own, but the itinerary it was built from does.
+      client_id: b2cQuote?.client_id ?? itinerary?.client_id ?? null,
       partner_id: b2bQuote?.partner_id ?? null,
       booking_number,
       booking_date: new Date().toISOString().split('T')[0],

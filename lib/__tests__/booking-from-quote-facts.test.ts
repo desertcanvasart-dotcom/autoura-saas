@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import {
   b2bNumTravelers,
   b2bTotalAmount,
@@ -162,5 +164,27 @@ describe('b2cNumTravelers', () => {
     const res = b2cNumTravelers({ selling_price: 100, num_travelers: 0 })
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toMatch(/how many travellers/)
+  })
+})
+
+// ============================================
+// The booking must carry its client
+// ============================================
+// client_id read b2cQuote only, so EVERY B2B booking was written with none.
+// The Lead → Customer trigger (migration 352/362) keys on the booking's
+// client_id, so those clients stayed a Lead for ever. A B2B quote has no
+// client column of its own; the itinerary it was built from does.
+describe('/api/bookings/from-quote client_id', () => {
+  const source = readFileSync(
+    path.join(__dirname, '..', '..', 'app', 'api', 'bookings', 'from-quote', 'route.ts'),
+    'utf8'
+  )
+
+  it('falls back to the itinerary the quote was built from', () => {
+    expect(source).toMatch(/client_id:\s*b2cQuote\?\.client_id \?\? itinerary\?\.client_id \?\? null/)
+  })
+
+  it('still never invents one', () => {
+    expect(source).not.toMatch(/client_id:\s*b2cQuote\?\.client_id \?\? ['"]/)
   })
 })
