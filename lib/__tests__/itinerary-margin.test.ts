@@ -1,4 +1,10 @@
 import { describe, it, expect } from 'vitest'
+import {
+  resolveItineraryMargin,
+  itineraryClientTotal,
+  effectiveItineraryTotal,
+} from '@/lib/itinerary-client-total'
+import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
 // ============================================================================
 // The itinerary page hardcoded `const margin = 25` while the SAME FILE already
@@ -6,32 +12,14 @@ import { describe, it, expect } from 'vitest'
 // fed the header, the client email and invoice generation — so an itinerary
 // configured at 40% was quoted and invoiced at 25%.
 //
-// The rules live in the component, so these pin the arithmetic the component
-// performs, including the two traps: a nullable column, and 0 being a real
-// margin rather than a missing one.
+// The rules now live in lib/itinerary-client-total.ts, shared by the page and
+// the email route. These pin the arithmetic, including the two traps: a
+// nullable column, and 0 being a real margin rather than a missing one.
 // ============================================================================
 
-/** Exactly what the page computes (app/itineraries/[id]/page.tsx). */
-function resolveMargin(marginPercent: unknown): number {
-  // Order matters: Number(null) === 0 and Number.isFinite(0) === true, so a
-  // missing margin would resolve to 0% and sell the trip at cost.
-  if (marginPercent === null || marginPercent === undefined || marginPercent === '') return 25
-  const raw = Number(marginPercent)
-  return Number.isFinite(raw) ? raw : 25
-}
-
-function clientTotal(
-  services: { total_cost: number; client_price?: number | null }[],
-  marginPercent: unknown
-): number {
-  const margin = resolveMargin(marginPercent)
-  let total = 0
-  for (const s of services) {
-    const supplier = Number(s.total_cost) || 0
-    total += s.client_price != null ? Number(s.client_price) : supplier * (1 + margin / 100)
-  }
-  return Math.round(total * 100) / 100
-}
+// The real functions — the page and the email route both use them.
+const resolveMargin = resolveItineraryMargin
+const clientTotal = itineraryClientTotal
 
 describe('resolveMargin', () => {
   it('uses the itinerary’s configured margin', () => {
@@ -89,5 +77,28 @@ describe('per-service client_price still wins over the margin', () => {
 
   it('rounds to cents', () => {
     expect(clientTotal([{ total_cost: 33.33 }], 37.5)).toBe(45.83)
+  })
+})
+
+describe('effectiveItineraryTotal', () => {
+  it('uses the services when they price above zero', () => {
+    expect(effectiveItineraryTotal({ total_cost: 999, margin_percent: 40 }, [{ total_cost: 100 }])).toBe(140)
+  })
+
+  it('falls back to the stored total when there are no priced services', () => {
+    expect(effectiveItineraryTotal({ total_cost: 999, margin_percent: 40 }, [])).toBe(999)
+    expect(effectiveItineraryTotal({ total_cost: '999', margin_percent: 40 }, [{ total_cost: 0 }])).toBe(999)
+  })
+
+  it('is 0 when nothing is priced, which the send gate refuses', () => {
+    expect(effectiveItineraryTotal({ total_cost: null, margin_percent: null }, [])).toBe(0)
+    expect(checkAmountDeliverable(0).ok).toBe(false)
+  })
+})
+
+describe('why the total must be a number, not toFixed()', () => {
+  it('the deliverable gate refuses a numeric string — the "Send email" 422', () => {
+    expect(checkAmountDeliverable('1900.00' as unknown as number).ok).toBe(false)
+    expect(checkAmountDeliverable(1900).ok).toBe(true)
   })
 })

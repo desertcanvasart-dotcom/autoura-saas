@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
+import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
 
 export async function POST(request: Request) {
   try {
@@ -25,16 +26,7 @@ export async function POST(request: Request) {
       .eq('id', auth.tenant_id!)
       .maybeSingle()
 
-    const {
-      itineraryId,
-      clientName,
-      clientEmail,
-      itineraryCode,
-      tripName,
-      totalCost,
-      currency,
-      pdfBase64
-    } = await request.json()
+    const { itineraryId, clientName, clientEmail, pdfBase64 } = await request.json()
 
     if (!clientEmail) {
       return NextResponse.json(
@@ -42,6 +34,56 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+    if (!itineraryId) {
+      return NextResponse.json(
+        { success: false, error: 'itineraryId is required' },
+        { status: 400 }
+      )
+    }
+
+    // The price, currency, code and trip name come from the DATABASE, never the
+    // request. The page used to send totalCost as a string (toFixed(2)), which
+    // the gate below rejects — every itinerary email failed with 422 — and a
+    // browser-supplied total could put any figure in front of a client.
+    const { data: itinerary } = await auth.supabase!
+      .from('itineraries')
+      .select('id, itinerary_code, trip_name, client_name, currency, total_cost, margin_percent')
+      .eq('id', itineraryId)
+      .eq('tenant_id', auth.tenant_id!)
+      .maybeSingle()
+
+    if (!itinerary) {
+      return NextResponse.json(
+        { success: false, error: 'Itinerary not found' },
+        { status: 404 }
+      )
+    }
+
+    const { data: days, error: daysError } = await auth.supabase!
+      .from('itinerary_days')
+      .select('id')
+      .eq('itinerary_id', itinerary.id)
+    const dayIds = (days || []).map(d => d.id)
+    const { data: services, error: servicesError } = dayIds.length
+      ? await auth.supabase!
+          .from('itinerary_services')
+          .select('total_cost, client_price')
+          .in('itinerary_day_id', dayIds)
+      : { data: [], error: null }
+
+    // A failed read must not become a smaller total (silent-empty is the enemy).
+    if (daysError || servicesError) {
+      return NextResponse.json(
+        { success: false, error: 'Could not read the itinerary services' },
+        { status: 500 }
+      )
+    }
+
+    const totalCost = effectiveItineraryTotal(itinerary, services || [])
+    const currency = itinerary.currency ?? ''
+    const itineraryCode = itinerary.itinerary_code
+    const tripName = itinerary.trip_name ?? ''
+    const recipientName = clientName || itinerary.client_name || ''
 
     // Itinerary email with PDF — output gate (harness Layer 2): never email a
     // non-deliverable price.
@@ -55,10 +97,10 @@ export async function POST(request: Request) {
 
     // Generate email HTML
     const emailHtml = generateEmailTemplate(
-      clientName,
+      recipientName,
       itineraryCode,
       tripName,
-      totalCost,
+      totalCost.toFixed(2),
       currency,
       {
         company: tenant?.company_name || '',
@@ -77,7 +119,7 @@ export async function POST(request: Request) {
       subject: `Your Egypt Tour Itinerary - ${tripName} (${itineraryCode})`,
       html: emailHtml,
       attachments: pdfBase64 ? [{
-        filename: `${itineraryCode}_${clientName.replace(/\s+/g, '_')}.pdf`,
+        filename: `${itineraryCode}_${recipientName.replace(/\s+/g, '_')}.pdf`,
         content: pdfBase64,
         encoding: 'base64'
       }] : []
