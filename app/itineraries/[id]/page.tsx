@@ -21,6 +21,7 @@ import ItineraryExpenses from '@/app/components/ItineraryExpenses'
 import TripTimeline from '@/app/components/TripTimeline'
 import TravellerChat from '@/app/components/TravellerChat'
 import { showToast } from '@/app/contexts/ToastContext'
+import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 
 interface Itinerary {
   id: string
@@ -1159,7 +1160,16 @@ export default function ViewItineraryPage() {
                   ) : (
                     <div className="text-center py-6 text-gray-500"><p className="text-sm">No services added yet</p></div>
                   )}
-                  {day.overnight_city && <div className="mt-3 pt-3 border-t border-gray-200"><p className="text-xs text-gray-600">🌙 Overnight in <span className="font-medium">{day.overnight_city}</span></p></div>}
+                  {/* The hotel or ship, not just the city: the property is on the
+                      day's accommodation line (lib/itineraries/overnight-property). */}
+                  {(() => {
+                    const stay = overnightLabel(overnightProperty(day.services as never), day.overnight_city)
+                    return stay ? (
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-xs text-gray-600">🌙 Overnight in <span className="font-medium">{stay}</span></p>
+                      </div>
+                    ) : null
+                  })()}
                 </div>
               )}
             </div>

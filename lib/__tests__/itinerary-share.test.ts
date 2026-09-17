@@ -297,3 +297,34 @@ describe('cleanClientText — free text from a token-holder', () => {
     expect(cleanClientText(undefined, 100)).toBeNull()
   })
 })
+
+// ============================================
+// The night's property crosses the boundary — the NAME only
+// ============================================
+describe('overnightProperty on the share projection', () => {
+  it('carries the name the page resolved', () => {
+    const out = toClientItinerary({}, [{ day_number: 1, overnight_city: 'Cairo', overnight_property: 'Mena House' }])
+    expect(out.days[0].overnightProperty).toBe('Mena House')
+    expect(out.days[0].overnightCity).toBe('Cairo')
+  })
+
+  it('is null when the day names no property', () => {
+    const out = toClientItinerary({}, [{ day_number: 1, overnight_city: 'Cairo' }])
+    expect(out.days[0].overnightProperty).toBeNull()
+  })
+
+  it('never carries anything else off the service line', () => {
+    const out = toClientItinerary({}, [{
+      day_number: 1,
+      overnight_property: 'Mena House',
+      supplier_id: 'sup-1',
+      total_cost: 1200,
+      rate_eur: 300,
+    }])
+    const day = out.days[0] as Record<string, unknown>
+    expect(day.overnightProperty).toBe('Mena House')
+    for (const leaked of ['supplier_id', 'total_cost', 'rate_eur', 'supplierId', 'totalCost']) {
+      expect(day[leaked], leaked).toBeUndefined()
+    }
+  })
+})

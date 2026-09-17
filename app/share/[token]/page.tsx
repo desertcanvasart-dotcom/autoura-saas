@@ -11,6 +11,7 @@ import {
   type ClientTripEvent,
   type ClientTripMessage,
 } from '@/lib/itinerary-share'
+import { overnightProperty } from '@/lib/itineraries/overnight-property'
 import ReportProblem from './ReportProblem'
 import TripChat from './TripChat'
 import { getCurrencySymbol } from '@/lib/currency'
@@ -61,11 +62,19 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
   if (!share || share.revoked_at) return null
 
   const [
-    { data: itinerary }, { data: days }, { data: tenant }, { data: resources },
+    { data: itinerary }, { data: days }, { data: stayLines }, { data: tenant }, { data: resources },
     { data: eventRows }, { data: messageRows },
   ] = await Promise.all([
     supabase.from('itineraries').select('*').eq('id', share.itinerary_id).maybeSingle(),
     supabase.from('itinerary_days').select('*').eq('itinerary_id', share.itinerary_id),
+    // The night's hotel or ship. EXPLICIT columns: these rows also carry
+    // costs and supplier ids, which must never reach this page's process.
+    // Only the resolved NAME is put on the day below.
+    supabase
+      .from('itinerary_services')
+      .select('itinerary_day_id, service_type, service_name, supplier_name')
+      .eq('itinerary_id', share.itinerary_id)
+      .in('service_type', ['accommodation', 'hotel', 'cruise']),
     supabase
       .from('tenants')
       .select('company_name, logo_url, primary_color, contact_email, company_phone, company_website')
@@ -137,7 +146,16 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
   const brandHex = /^#[0-9a-fA-F]{6}$/.test(tenant?.primary_color || '') ? tenant!.primary_color! : '#647C47'
 
   return {
-    itinerary: toClientItinerary(itinerary, days ?? []),
+    // The property name is resolved HERE, from lines that stay in this
+    // function: only the name is handed to the projection.
+    itinerary: toClientItinerary(
+      itinerary,
+      (days ?? []).map(d => ({
+        ...d,
+        overnight_property:
+          overnightProperty((stayLines ?? []).filter(l => l.itinerary_day_id === d.id))?.name ?? null,
+      }))
+    ),
     messages: toClientTripMessages((messageRows ?? []) as Array<Record<string, unknown>>),
     events: toClientTripEvents(
       (eventRows ?? []) as Array<Record<string, unknown>>,
@@ -254,6 +272,19 @@ export default async function SharedItineraryPage({ params }: { params: Promise<
               <div className="px-5 pb-4 pt-3 sm:pl-[68px]">
                 {day.description && (
                   <p className="text-sm text-gray-700 whitespace-pre-line">{day.description}</p>
+                )}
+
+                {/* Where the night is spent: the hotel or ship by name, which
+                    the page could never show before (nothing filled the old
+                    hotel_name column). */}
+                {(day.overnightProperty || day.overnightCity) && (
+                  <p className="mt-3 text-sm text-gray-700">
+                    <span className="text-gray-500">Overnight:</span>{' '}
+                    <span className="font-medium">{day.overnightProperty || day.overnightCity}</span>
+                    {day.overnightProperty && day.overnightCity ? (
+                      <span className="text-gray-500">, {day.overnightCity}</span>
+                    ) : null}
+                  </p>
                 )}
 
                 {day.attractions.length > 0 && (
