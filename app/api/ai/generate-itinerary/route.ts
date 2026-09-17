@@ -613,7 +613,6 @@ export async function POST(request: NextRequest) {
 
     // ── Fetch + inject agent memory ──────────────────────────
     const memoryResult = await getMemoriesForPrompt({
-      supabase,
       tenant_id,
       client_id: client_id || null,
     })
@@ -809,8 +808,8 @@ export async function POST(request: NextRequest) {
 
         void (async () => {
           const anchor = await loadUsageAnchor(supabase, tenant_id)
-          incrementVolumeUsage(supabase, tenant_id, 'ai_generations', anchor)
-          incrementVolumeUsage(supabase, tenant_id, 'itineraries', anchor)
+          incrementVolumeUsage(tenant_id, 'ai_generations', anchor)
+          incrementVolumeUsage(tenant_id, 'itineraries', anchor)
         })()
         // ─────────────────────────────────────────────────────
 
@@ -1316,8 +1315,8 @@ export async function POST(request: NextRequest) {
 
     void (async () => {
       const anchor = await loadUsageAnchor(supabase, tenant_id)
-      incrementVolumeUsage(supabase, tenant_id, 'ai_generations', anchor)
-      incrementVolumeUsage(supabase, tenant_id, 'itineraries', anchor)
+      incrementVolumeUsage(tenant_id, 'ai_generations', anchor)
+      incrementVolumeUsage(tenant_id, 'itineraries', anchor)
     })()
     // ─────────────────────────────────────────────────────
 

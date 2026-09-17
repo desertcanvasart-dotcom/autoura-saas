@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
     // Count it only now that it exists — incrementing earlier would burn
     // allowance on failed creates. Fire-and-forget: a lost increment
     // under-counts, a thrown one would fail a create that already succeeded.
-    incrementVolumeUsage(supabase, tenant_id!, 'itineraries', await loadUsageAnchor(supabase, tenant_id!))
+    incrementVolumeUsage(tenant_id!, 'itineraries', await loadUsageAnchor(supabase, tenant_id!))
 
     return NextResponse.json({
       success: true,

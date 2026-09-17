@@ -20,6 +20,7 @@
 // fire-and-forget so a telemetry failure cannot fail a successful create.
 
 import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase-server'
 import {
   checkStructuralLimit,
   checkVolumeLimit,
@@ -190,10 +191,10 @@ export async function gateVolume(
  * succeeded.
  */
 export function incrementVolumeUsage(
-  supabase: Client,
   tenantId: string,
   metric: VolumeMetric,
-  anchor: Date | string | null
+  anchor: Date | string | null,
+  client?: Client
 ): void {
   try {
     const resolved = resolveUsageAnchor({
@@ -204,7 +205,11 @@ export function incrementVolumeUsage(
     const window = computeUsageWindow(resolved, INCREMENT_WINDOW[metric])
     const keys = windowKeys(window)
 
-    const result = supabase.rpc('increment_usage', {
+    // Service role only: increment_usage is SECURITY DEFINER and takes the
+    // tenant id as an argument, so migration 361 revoked it from anon and
+    // authenticated (anyone could inflate another tenant's usage until its
+    // limits blocked it). `tenantId` must come from requireAuth().
+    const result = (client ?? createAdminClient()).rpc('increment_usage', {
       p_tenant_id: tenantId,
       p_metric: INCREMENT_METRIC[metric],
       p_amount: 1,

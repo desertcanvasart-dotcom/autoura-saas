@@ -126,7 +126,7 @@ export async function POST(
       return NextResponse.json({ success: false, error: headerError.message }, { status: 500 })
     }
 
-    await logActivity(tenant_id, user?.id ?? '', 'fx_reprice', supabase, {
+    await logActivity(tenant_id, user?.id ?? '', 'fx_reprice', {
       resourceType: 'itinerary',
       resourceId: id,
       details: {

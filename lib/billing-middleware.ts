@@ -1,3 +1,5 @@
+import { createAdminClient } from '@/lib/supabase-server'
+
 /**
  * Billing Middleware
  * Handles usage tracking and limit enforcement for metered features
@@ -22,23 +24,30 @@
  */
 
 /**
- * Log activity for audit trail
+ * Log activity for audit trail.
+ *
+ * Always on the service-role client: log_activity is SECURITY DEFINER and
+ * takes the tenant id as an argument, so migration 361 revoked it from anon
+ * and authenticated (the signed-in client could write audit rows into any
+ * tenant). `tenantId` must come from requireAuth(), never from a request body.
+ * `client` exists for tests only.
  */
 export async function logActivity(
   tenantId: string,
   userId: string,
   actionType: string,
-  supabase: any,
   options?: {
     resourceType?: string
     resourceId?: string
     details?: any
     ipAddress?: string
     userAgent?: string
-  }
+  },
+  client?: { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ error: unknown }> }
 ): Promise<void> {
   try {
-    const { error } = await supabase.rpc('log_activity', {
+    const admin = client ?? createAdminClient()
+    const { error } = await (admin as any).rpc('log_activity', {
       p_tenant_id: tenantId,
       p_user_id: userId,
       p_action_type: actionType,
