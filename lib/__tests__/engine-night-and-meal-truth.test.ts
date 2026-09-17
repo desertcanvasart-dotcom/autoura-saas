@@ -133,3 +133,79 @@ describe('the day they leave the ship', () => {
     expect(parseItinerary([{ day: 1, title: 'Disembark', accommodation_type: 'cruise', city: 'Aswan' }])[0].accommodation_type).toBe('cruise')
   })
 })
+
+// ============================================================================
+// 4. One day saying "cruise" used to make the WHOLE programme cruise nights.
+//    Checked against the shape of the live "Egypt End to End" tour: 12 days,
+//    none of them stating a night type, one of them boarding a ship.
+// ============================================================================
+describe('a programme with a cruise in the middle of it', () => {
+  // Titles and the traps in the real descriptions, from the live template.
+  const EGYPT_END_TO_END = [
+    { day: 1, title: 'Arrival in Cairo' },
+    { day: 2, title: 'Memphis, Saqqara & Old Cairo' },
+    { day: 3, title: 'Egyptian Museum & the Giza Pyramids' },
+    { day: 4, title: 'Fly to Aswan & Abu Simbel', description: 'Early-morning flight to Aswan, travel south to Abu Simbel, then return to Aswan for a felucca sail.' },
+    { day: 5, title: 'Aswan Sightseeing & Board the Cruise' },
+    { day: 6, title: 'Sail to Kom Ombo' },
+    { day: 7, title: 'Edfu Temple & Sail to Luxor' },
+    { day: 8, title: "Luxor's West & East Banks", description: 'Disembark after breakfast.' },
+    { day: 9, title: 'Leisure in Hurghada' },
+    { day: 10, title: 'Leisure in Hurghada' },
+    { day: 11, title: 'Fly to Cairo & Khan El Khalili' },
+    { day: 12, title: 'Departure', description: 'After breakfast, transfer to Cairo International Airport for departure flight. Source states hand-picked hotels and cruise boats across three comfort tiers.' },
+  ]
+
+  const nights = () => parseItinerary(EGYPT_END_TO_END).map(d => d.accommodation_type)
+
+  it('sells only the nights that are actually aboard', () => {
+    expect(nights()).toEqual([
+      'hotel', 'hotel', 'hotel', 'hotel',   // Cairo, Cairo, Cairo, Aswan
+      'cruise', 'cruise', 'cruise',         // board, sail, sail
+      'hotel',                              // disembark, Luxor
+      'hotel', 'hotel',                     // Hurghada, on the Red Sea
+      'hotel',                              // back in Cairo
+      'none',                               // departure
+    ])
+  })
+
+  it('does not put the beach nights on the ship', () => {
+    expect(nights()[8]).toBe('hotel')
+    expect(nights()[9]).toBe('hotel')
+  })
+
+  it('does not put the nights before boarding on the ship', () => {
+    expect(nights().slice(0, 4)).toEqual(['hotel', 'hotel', 'hotel', 'hotel'])
+  })
+
+  it('judges a day on its own words, not on the other days', () => {
+    const alone = parseItinerary([{ day: 1, title: 'Leisure in Hurghada' }])[0].accommodation_type
+    const amongCruiseDays = nights()[8]
+    expect(amongCruiseDays).toBe(alone)
+  })
+})
+
+describe('the two traps in the real descriptions', () => {
+  const night = (day: Record<string, unknown>) => parseItinerary([day])[0].accommodation_type
+
+  it('an afternoon felucca sail is not a night aboard', () => {
+    expect(night({ day: 4, title: 'Fly to Aswan & Abu Simbel', description: 'Return to Aswan for a felucca sail.' })).toBe('hotel')
+  })
+
+  it('marketing copy naming cruise boats does not put anyone on one', () => {
+    expect(night({
+      day: 12, title: 'Departure',
+      description: 'Transfer to the airport. Source states hand-picked hotels and cruise boats across three comfort tiers.',
+    })).toBe('none')
+    expect(night({
+      day: 2, title: 'Memphis & Saqqara',
+      description: 'Our hand-picked hotels and cruise boats across three comfort tiers.',
+    })).toBe('hotel')
+  })
+
+  it('but a description that really says they sleep aboard is believed', () => {
+    expect(night({ day: 6, title: 'Kom Ombo', description: 'Overnight on board.' })).toBe('cruise')
+    expect(night({ day: 6, title: 'Kom Ombo', description: 'Overnight aboard the MS Farah.' })).toBe('cruise')
+    expect(night({ day: 6, title: 'Edfu', description: 'Dinner and overnight on the ship.' })).toBe('cruise')
+  })
+})

@@ -840,7 +840,7 @@ function inferCityFromTitle(title: string): string {
 /**
  * Infer accommodation type from day data and context
  */
-function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
+function inferAccommodationType(day: any, _allDays?: any[]): AccommodationType {
   if (day.accommodation_type) {
     return day.accommodation_type
   }
@@ -855,11 +855,19 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
   // priced. Checked first, and the ship words are matched as whole words so
   // "disembarkation" cannot come back in through 'embark'.
   const LEAVES_THE_SHIP = /\b(disembark\w*|end of (the )?cruise|leave the ship|check out of the ship)\b/
-  const leavesTheShip = LEAVES_THE_SHIP.test(combined)
+  if (LEAVES_THE_SHIP.test(combined)) {
+    return 'hotel'
+  }
 
-  // Check for cruise indicators
+  // The TITLE is where a day says what it is. Descriptions are not: on the
+  // live "Egypt End to End" tour the description of day 4 ends with "a felucca
+  // sail" (an afternoon boat ride) and the DEPARTURE day's description carries
+  // the marketing line "hand-picked hotels and cruise boats across three
+  // comfort tiers" — both were read as nights aboard. Only an explicit
+  // overnight phrase in the description counts.
   const SHIP_WORDS = /\b(cruise|cruiser|cruising|sail|sails|sailing|aboard|on board|embark|embarkation|embarking)\b/
-  if (!leavesTheShip && SHIP_WORDS.test(combined)) {
+  const OVERNIGHT_ABOARD = /\b((overnight|night|nights|sleep|stay|staying)\s+(on\s?board|aboard|on the (cruise|ship|boat))|overnight on the nile cruise)\b/
+  if (SHIP_WORDS.test(title) || OVERNIGHT_ABOARD.test(description)) {
     return 'cruise'
   }
 
@@ -869,20 +877,15 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
     return 'none'
   }
 
-  // Default based on tour theme (check all days for cruise mentions)
-  const hasCruiseDays = allDays.some((d: any) => 
-    ((d.title || '') + ' ' + (d.description || '')).toLowerCase().includes('cruise')
-  )
-
-  if (hasCruiseDays) {
-    const isDeparture = title.includes('departure')
-    if (isDeparture) return 'none'
-    // A day that says they leave the ship sleeps ashore, whatever the rest of
-    // the programme says.
-    if (leavesTheShip) return 'hotel'
-    return 'cruise'
-  }
-
+  // A night that is not aboard is a night in a hotel. There used to be a rule
+  // here that read every OTHER day: if any day in the programme mentioned a
+  // cruise, every day that was not a departure became a night aboard. On the
+  // live 12-day "Egypt End to End" programme that made 11 of 12 nights cruise
+  // nights — three in Cairo before anyone boarded and two on the beach in
+  // Hurghada — so no Cairo or Hurghada hotel was ever looked up and the ship
+  // was charged for eight nights nobody spent on it. Each day is judged on
+  // what that day says, and the rest is a hotel. Same rule as the sibling app
+  // (travel-ops-pro #446).
   return 'hotel'
 }
 
