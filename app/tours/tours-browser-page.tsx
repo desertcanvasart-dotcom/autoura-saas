@@ -22,8 +22,8 @@ interface TourTemplate {
   available_tiers: string[]
   min_pax: number
   max_pax: number
-  starting_from: number
-  starting_from_tier: string
+  starting_from: number | null
+  starting_from_tier: string | null
   currency: string
   uses_day_builder: boolean
   pricing_mode: string
@@ -330,12 +330,17 @@ export default function ToursBrowsePage() {
               <div className="flex items-end justify-between pt-3 border-t border-gray-100">
                 <div>
                   <p className="text-[10px] text-gray-400 uppercase tracking-wide">Starting from</p>
+                  {/* No price is said plainly. It used to read as a euro sign
+                      followed by N/A, and before that the card showed a
+                      made-up duration x 150 estimate. */}
                   <p className="text-xl font-semibold text-[#647C47]">
-                    €{tour.starting_from ? tour.starting_from.toLocaleString() : 'N/A'}
+                    {tour.starting_from ? `€${tour.starting_from.toLocaleString()}` : 'Price on request'}
                   </p>
-                  <p className="text-[10px] text-gray-400">
-                    per person • {tour.starting_from_tier || 'standard'}
-                  </p>
+                  {tour.starting_from && (
+                    <p className="text-[10px] text-gray-400">
+                      per person • {tour.starting_from_tier || 'standard'}
+                    </p>
+                  )}
                 </div>
                 <Link
                   href={`/tours/${tour.default_variation_code ?? tour.id}`}
