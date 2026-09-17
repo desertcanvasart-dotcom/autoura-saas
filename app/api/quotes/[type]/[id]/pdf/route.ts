@@ -4,6 +4,7 @@ import { createElement } from 'react'
 import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 
 /**
  * GET /api/quotes/[type]/[id]/pdf
@@ -92,6 +93,24 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: 'Quote not found' },
         { status: 404 }
+      )
+    }
+
+    // A quote that could not be fully priced does not become a PDF by
+    // accident. The quote's own lines say what is missing (every service the
+    // engine could not price is kept at 0 with the reason on it), so the
+    // refusal can name them. `allow_incomplete=true` is the explicit override
+    // for an operator who means it.
+    const { searchParams: gateParams } = new URL(request.url)
+    const completeness = quoteCompleteness(quote.services_snapshot)
+    if (!completeness.complete && !allowsIncomplete(gateParams.get('allow_incomplete'))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote has ${completeness.gaps.length} service(s) with no price: ${describeGaps(completeness.gaps)}. Add the rates, or send it anyway with allow_incomplete=true.`,
+          gaps: completeness.gaps,
+        },
+        { status: 422 }
       )
     }
 

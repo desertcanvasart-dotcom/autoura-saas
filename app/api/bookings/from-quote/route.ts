@@ -3,6 +3,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { b2bNumTravelers, b2bTotalAmount, b2cNumTravelers, b2cTotalAmount, calculatorTripFacts } from '@/lib/bookings/from-quote-facts'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import type { Tables, TablesInsert } from '@/types/database.types'
+import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,6 +89,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Quote not found' },
         { status: 404 }
+      )
+    }
+
+    // A quote the engine could not fully price does not become a BOOKING by
+    // accident either: the missing services are exactly the ones nobody has a
+    // cost for, and the booking freezes the price. Explicit override only.
+    const completeness = quoteCompleteness((quote as { services_snapshot?: unknown }).services_snapshot)
+    if (!completeness.complete && !allowsIncomplete(body?.allow_incomplete)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote has ${completeness.gaps.length} service(s) with no price: ${describeGaps(completeness.gaps)}. Add the rates before booking, or confirm booking it as it is.`,
+          gaps: completeness.gaps,
+        },
+        { status: 422 }
       )
     }
 

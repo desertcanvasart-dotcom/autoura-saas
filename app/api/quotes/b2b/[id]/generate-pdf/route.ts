@@ -4,6 +4,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF';
 import React from 'react';
 import type { Tables } from '@/types/database.types';
+import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness';
 
 type B2BQuoteWithRelations = Tables<'b2b_quotes'> & {
   b2b_partners: Pick<
@@ -98,6 +99,20 @@ export async function POST(
       return NextResponse.json(
         { success: false, error: 'Quote not found' },
         { status: 404 }
+      );
+    }
+
+    // Not a PDF by accident: a quote the engine could not fully price is
+    // refused, naming what is missing, unless the caller says allow_incomplete.
+    const completeness = quoteCompleteness((quote as { services_snapshot?: unknown }).services_snapshot);
+    if (!completeness.complete && !allowsIncomplete(new URL(request.url).searchParams.get('allow_incomplete'))) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `This quote has ${completeness.gaps.length} service(s) with no price: ${describeGaps(completeness.gaps)}. Add the rates, or send it anyway with allow_incomplete=true.`,
+          gaps: completeness.gaps,
+        },
+        { status: 422 }
       );
     }
 
