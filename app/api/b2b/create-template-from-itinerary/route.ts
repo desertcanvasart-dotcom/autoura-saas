@@ -39,9 +39,19 @@ export async function POST(request: NextRequest) {
     // 4. Build template itinerary JSONB
     const templateItinerary = days.map((day, index) => {
       const daySvcs = servicesByDay[day.id] || []
-      const meals: string[] = ['breakfast']
-      if (daySvcs.some((s: any) => s.service_type === 'meal' && s.service_name?.toLowerCase().includes('lunch'))) meals.push('lunch')
-      if (daySvcs.some((s: any) => s.service_type === 'meal' && s.service_name?.toLowerCase().includes('dinner'))) meals.push('dinner')
+      // The object form, and each meal STATED. The list form
+      // (['breakfast','lunch']) read as "included in the hotel" everywhere
+      // downstream, so a restaurant lunch or dinner carried over from the
+      // Quote Builder was never charged. A meal service on the day means the
+      // travellers eat out: 'external', which the engine prices from
+      // Rates → Meals.
+      const hasMeal = (name: string) =>
+        daySvcs.some((s: any) => s.service_type === 'meal' && s.service_name?.toLowerCase().includes(name))
+      const meals = {
+        breakfast: 'included',
+        lunch: hasMeal('lunch') ? 'external' : 'none',
+        dinner: hasMeal('dinner') ? 'external' : 'none',
+      }
 
       const isCruiseDay = daySvcs.some((s: any) => s.service_type === 'cruise') || day.is_cruise_day
       const hasGuide = daySvcs.some((s: any) => s.service_type === 'guide')

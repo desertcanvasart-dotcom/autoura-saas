@@ -622,11 +622,18 @@ export function parseItinerary(itineraryData: any, opts?: {
 
     if (day.meals) {
       if (Array.isArray(day.meals)) {
-        // Old format: ["Breakfast", "Lunch", "Dinner"]
-        const mealArray = day.meals.map((m: string) => m.toLowerCase())
+        // Old format: ["Breakfast", "Lunch", "Dinner"] — a LIST of the meals
+        // the day has. Every one was read as 'included' (already paid for in
+        // the hotel), so a restaurant lunch or dinner was never charged and no
+        // hole was recorded: the meal was given away. The only writer of this
+        // shape (app/api/b2b/create-template-from-itinerary) listed lunch or
+        // dinner exactly when the itinerary had a MEAL SERVICE that day, which
+        // is a restaurant meal = 'external' (priced by the engine). Breakfast
+        // is the hotel's, as it always was.
+        const mealArray = day.meals.map((m: string) => String(m).toLowerCase())
         meals.breakfast = mealArray.includes('breakfast') ? 'included' : 'none'
-        meals.lunch = mealArray.includes('lunch') ? 'included' : 'none'
-        meals.dinner = mealArray.includes('dinner') ? 'included' : 'none'
+        meals.lunch = mealArray.includes('lunch') ? 'external' : 'none'
+        meals.dinner = mealArray.includes('dinner') ? 'external' : 'none'
       } else {
         // New format: { breakfast: 'included', lunch: 'external', dinner: 'none' }
         meals = {
@@ -842,10 +849,17 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
   const description = (day.description || '').toLowerCase()
   const combined = title + ' ' + description
 
+  // The day they GET OFF the ship is not a night aboard. `includes('embark')`
+  // matched "disembark", so "Disembark in Aswan, transfer to your hotel" was
+  // billed as a cruise night and the hotel night it really is was never
+  // priced. Checked first, and the ship words are matched as whole words so
+  // "disembarkation" cannot come back in through 'embark'.
+  const LEAVES_THE_SHIP = /\b(disembark\w*|end of (the )?cruise|leave the ship|check out of the ship)\b/
+  const leavesTheShip = LEAVES_THE_SHIP.test(combined)
+
   // Check for cruise indicators
-  if (combined.includes('cruise') || combined.includes('cruiser') || 
-      combined.includes('sail') || combined.includes('aboard') ||
-      combined.includes('on board') || combined.includes('embark')) {
+  const SHIP_WORDS = /\b(cruise|cruiser|cruising|sail|sails|sailing|aboard|on board|embark|embarkation|embarking)\b/
+  if (!leavesTheShip && SHIP_WORDS.test(combined)) {
     return 'cruise'
   }
 
@@ -861,9 +875,11 @@ function inferAccommodationType(day: any, allDays: any[]): AccommodationType {
   )
 
   if (hasCruiseDays) {
-    const isArrival = title.includes('arrival')
     const isDeparture = title.includes('departure')
     if (isDeparture) return 'none'
+    // A day that says they leave the ship sleeps ashore, whatever the rest of
+    // the programme says.
+    if (leavesTheShip) return 'hotel'
     return 'cruise'
   }
 
@@ -941,6 +957,8 @@ export async function getCruiseRates(
    *  date — a pricing hole naming the uncovered night, never a base-column
    *  fallback (the base columns mirror the FIRST period's rate). */
   periodGap?: { propertyName: string; date: string }
+  /** The period that covers the date exists but its nightly rate is blank. */
+  periodBlank?: { propertyName: string; date: string; periodName: string }
   /** Several ships fit and none (or more than one) is preferred — a hole
    *  naming the candidates; the engine refuses to pick one (see
    *  lib/pricing/candidate-selection.ts). */
@@ -1033,6 +1051,24 @@ export async function getCruiseRates(
         season: 'low',
         source: 'missing',
         periodGap: { propertyName: cruise.ship_name || 'this cruise', date: cruisePeriod.travelDate },
+      }
+    }
+    if (cruisePeriod.kind === 'period' && !(cruisePeriod.rates.ppd_eur > 0)) {
+      // Blank nightly rate in the covering period — see the hotel path above.
+      return {
+        shipName: cruise.ship_name,
+        cruiseId: cruise.id,
+        ppdNight: 0,
+        singleSuppNight: 0,
+        tripleRedNight: 0,
+        durationNights,
+        season: 'low',
+        source: 'missing',
+        periodBlank: {
+          propertyName: cruise.ship_name || 'this cruise',
+          date: cruisePeriod.season.from,
+          periodName: cruisePeriod.season.name,
+        },
       }
     }
     if (cruisePeriod.kind === 'period') {
@@ -1152,6 +1188,8 @@ export async function getHotelRates(
    *  date — a pricing hole naming the uncovered night, never a base-column
    *  fallback (the base columns mirror the FIRST period's rate). */
   periodGap?: { propertyName: string; date: string }
+  /** The period that covers the date exists but its nightly rate is blank. */
+  periodBlank?: { propertyName: string; date: string; periodName: string }
   /** Several hotels fit and none (or more than one) is preferred — a hole
    *  naming the candidates; the engine refuses to pick one (see
    *  lib/pricing/candidate-selection.ts). */
@@ -1181,6 +1219,25 @@ export async function getHotelRates(
       }
     }
     if (period.kind === 'period') {
+      // A period whose nightly rate is blank stores 0 (the sanitizer's
+      // convention). Returning it as a real rate priced the night at 0 and
+      // recorded nothing — the client was quoted a free hotel. A hole says so.
+      if (!(period.rates.ppd_eur > 0)) {
+        return {
+          hotelName: hotel.property_name || hotel.name,
+          hotelId: hotel.id,
+          ppdNight: 0,
+          singleSuppNight: 0,
+          tripleRedNight: 0,
+          season: 'low' as const,
+          source: 'missing' as RateSource,
+          periodBlank: {
+            propertyName: hotel.property_name || hotel.name || 'this hotel',
+            date: period.season.from,
+            periodName: period.season.name,
+          },
+        }
+      }
       return {
         hotelName: hotel.property_name || hotel.name,
         hotelId: hotel.id,
@@ -2123,6 +2180,14 @@ export async function calculateDayBasedPricing(
         lookupAttempted: `cruise rate (${tier})`,
         message: ambiguityMessage(`${tier} cruises${firstCruiseDay?.city ? ` from ${firstCruiseDay.city}` : ''}`, cr.ambiguous, 'Rates → Cruises'),
       })
+    } else if (cr?.periodBlank) {
+      addHole({
+        kind: 'cruise',
+        reason: 'missing',
+        tier,
+        lookupAttempted: `cruise nightly rate in period "${cr.periodBlank.periodName}" (${tier})`,
+        message: `${cr.periodBlank.propertyName}'s "${cr.periodBlank.periodName}" period has no nightly rate. Fill it in Rates → Cruises, or use a period that has one.`,
+      })
     } else if (cr?.periodGap) {
       // The cruise EXISTS and has contract periods — the travel date falls in
       // a gap between them. One hole naming the uncovered date; never the
@@ -2166,6 +2231,15 @@ export async function calculateDayBasedPricing(
         city,
         lookupAttempted: `hotel rate (${city}, ${tier})`,
         message: ambiguityMessage(`${tier} hotels in ${city}`, rates.ambiguous, 'Rates → Hotels'),
+      })
+    } else if (rates?.periodBlank) {
+      addHole({
+        kind: 'hotel',
+        reason: 'missing',
+        tier,
+        city,
+        lookupAttempted: `hotel nightly rate in period "${rates.periodBlank.periodName}" (${city}, ${tier})`,
+        message: `${rates.periodBlank.propertyName}'s "${rates.periodBlank.periodName}" period has no nightly rate. Fill it in Rates → Hotels, or use a period that has one.`,
       })
     } else if (rates?.periodGap) {
       // The hotel EXISTS and has contract periods — the travel date falls in
