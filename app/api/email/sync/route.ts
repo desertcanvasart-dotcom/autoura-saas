@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
+import { repairOfficeDirections } from '@/lib/email/repair-direction'
 
 /** Either client writes the same rows; the sweep's is the service role. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,9 +29,19 @@ function extractDisplayName(from: string | null | undefined): string | null {
   return null
 }
 
-function getDirection(from: string | null | undefined, userEmail: string): 'inbound' | 'outbound' {
-  if (!from || !userEmail) return 'inbound'
-  return extractEmailAddress(from) === userEmail.toLowerCase() ? 'outbound' : 'inbound'
+/**
+ * Ours or the customer's?
+ *
+ * This compared the From against the connected mailbox EXACTLY, so a reply a
+ * colleague sent from hello@ on the same domain read as the customer writing:
+ * the conversation stayed "waiting on us" for an answer that had already gone,
+ * and the colleague's address could become the conversation's customer
+ * address. The office is now a rule, not one string
+ * (lib/email/office-addresses.ts).
+ */
+function getDirection(from: string | null | undefined, office: OfficeRule): 'inbound' | 'outbound' {
+  if (!from) return 'inbound'
+  return isOfficeAddress(office, from) ? 'outbound' : 'inbound'
 }
 
 // GET - Sync status
@@ -118,6 +130,25 @@ export async function POST(request: NextRequest) {
     const gmail = getGmailClient(accessToken, refreshToken)
     const userEmail = tokenRecord.email || ''
 
+    // Every address that counts as the OFFICE writing: the connected mailbox,
+    // its domain (unless that is a public provider), and whatever Settings →
+    // Email lists (migration 367).
+    const { data: officeTenant } = await createAdminClient()
+      .from('tenants')
+      .select('office_email_addresses')
+      .eq('id', tenant_id)
+      .maybeSingle()
+    const office = officeRule(
+      [userEmail],
+      ((officeTenant as { office_email_addresses?: string[] } | null)?.office_email_addresses ?? [])
+    )
+
+    // Mail stored on the wrong side before the office rule existed: a
+    // colleague's reply filed as the customer writing. Repaired every sync,
+    // because since migration 366 such a row shows as "Waiting on us" for an
+    // answer that already went.
+    const repaired = await repairOfficeDirections(db as never, tenant_id, office)
+
     // Update sync state
     await db.from('email_sync_state').upsert({ user_id: userId, sync_status: 'running', updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
 
@@ -148,7 +179,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const result = { success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0, history_id: null as string | null, auto_linked: 0 }
+    const result = { success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0, history_id: null as string | null, auto_linked: 0, direction_repaired: repaired.repaired }
 
     // Track conversation ids that received at least one new inbound message
     // during this sync — used to fire opt-in pre-generation after the loop.
@@ -185,7 +216,7 @@ export async function POST(request: NextRequest) {
 
         const firstFrom = getH(firstHeaders, 'From')
         const firstTo = getH(firstHeaders, 'To')
-        const firstDir = getDirection(firstFrom, userEmail)
+        const firstDir = getDirection(firstFrom, office)
         const customerHeader = firstDir === 'inbound' ? firstFrom : firstTo
         const contactEmail = extractEmailAddress(customerHeader)
         const contactName = extractDisplayName(customerHeader)
@@ -242,7 +273,7 @@ export async function POST(request: NextRequest) {
           const msgDate = new Date(parseInt(message.internalDate || '0')).toISOString()
           const fromRaw = getMH('From')
           const toRaw = getMH('To')
-          const msgDir = getDirection(fromRaw, userEmail)
+          const msgDir = getDirection(fromRaw, office)
 
           let bodyHtml = '', bodyText = ''
           const extractBody = (p: any) => {

@@ -39,11 +39,45 @@ function EmailSettingsContent() {
   const [gmailConnected, setGmailConnected] = useState(false)
   const [connectedEmail, setConnectedEmail] = useState<string | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+  const loadOfficeAddresses = async () => {
+    try {
+      const res = await fetch('/api/admin/tenant/settings')
+      const data = await res.json()
+      if (data.success) setOfficeAddresses((data.settings?.office_email_addresses ?? []).join('\n'))
+    } catch {}
+  }
+
+  const saveOfficeAddresses = async () => {
+    setSavingOffice(true)
+    try {
+      const entries = officeAddresses.split('\n').map(v => v.trim()).filter(Boolean)
+      const res = await fetch('/api/admin/tenant/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ office_email_addresses: entries }),
+      })
+      const data = await res.json()
+      setMessage(
+        data.success
+          ? { type: 'success', text: 'Saved. Mail from these addresses now counts as ours.' }
+          : { type: 'error', text: data.error || 'Could not save the addresses' }
+      )
+    } catch (e) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : 'Could not save the addresses' })
+    } finally {
+      setSavingOffice(false)
+    }
+  }
   
   // Signatures are managed at /settings/email-signatures — this page used to
   // carry a second UI over the same email_signatures table (older editor, no
   // HTML mode). One signature manager only.
   const [activeTab, setActiveTab] = useState<'connection' | 'templates'>('connection')
+  // Addresses that count as the office writing, beyond the connected mailbox
+  // and its own domain. One per line, or a whole domain.
+  const [officeAddresses, setOfficeAddresses] = useState('')
+  const [savingOffice, setSavingOffice] = useState(false)
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null)
@@ -65,6 +99,7 @@ function EmailSettingsContent() {
     if (user) {
       checkGmailConnection()
       fetchTemplates()
+      loadOfficeAddresses()
     }
   }, [user])
 
@@ -290,6 +325,37 @@ function EmailSettingsContent() {
                       )}
                     </button>
                   )}
+                </div>
+              </div>
+
+              {/* The office's other addresses (migration 367) */}
+              <div className="bg-white rounded-lg border border-gray-200 p-4 mt-4">
+                <h3 className="text-sm font-semibold text-gray-900">Our other email addresses</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Replies sent from the connected mailbox, or from any address on its domain, are
+                  already recognised as ours. Add anything else your office answers from — a
+                  colleague&rsquo;s address on another domain, or a partner office. One per line; a
+                  whole domain works too.
+                </p>
+                <textarea
+                  value={officeAddresses}
+                  onChange={(e) => setOfficeAddresses(e.target.value)}
+                  rows={4}
+                  placeholder={'hello@another-domain.com\npartner-office.com'}
+                  className="mt-2 w-full text-sm border border-gray-300 rounded-lg px-3 py-2 font-mono"
+                />
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    onClick={saveOfficeAddresses}
+                    disabled={savingOffice}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {savingOffice ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    Save addresses
+                  </button>
+                  <span className="text-xs text-gray-500">
+                    Used to tell our reply from a customer&rsquo;s message.
+                  </span>
                 </div>
               </div>
             </div>
