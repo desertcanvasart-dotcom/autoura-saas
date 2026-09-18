@@ -1,7 +1,7 @@
 {
   "totals": {
-    "errors": 1522,
-    "warnings": 555
+    "errors": 1520,
+    "warnings": 554
   },
   "rules": {
     "(no rule — parse or config error)": {
@@ -13,7 +13,7 @@
       "warnings": 12
     },
     "@typescript-eslint/no-explicit-any": {
-      "errors": 1395,
+      "errors": 1393,
       "warnings": 0
     },
     "@typescript-eslint/no-require-imports": {
@@ -30,7 +30,7 @@
     },
     "@typescript-eslint/no-unused-vars": {
       "errors": 0,
-      "warnings": 450
+      "warnings": 449
     },
     "import/no-anonymous-default-export": {
       "errors": 0,

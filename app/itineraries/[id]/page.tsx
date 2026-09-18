@@ -22,6 +22,7 @@ import TripTimeline from '@/app/components/TripTimeline'
 import TravellerChat from '@/app/components/TravellerChat'
 import { showToast } from '@/app/contexts/ToastContext'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
+import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 
 interface Itinerary {
   id: string
@@ -103,38 +104,20 @@ export default function ViewItineraryPage() {
   // `Number.isFinite` rather than `|| 25`: margin_percent is nullable, but 0 is
   // a legitimate value (an at-cost trip), and `0 || 25` would quietly resell it
   // at 25%.
-  const marginPercent = useMemo(() => {
-    // null/undefined/'' must be caught BEFORE Number(), because Number(null)
-    // is 0 and Number.isFinite(0) is true — which would resolve a missing
-    // margin to 0% and sell the trip AT COST. Caught by the unit test.
-    const v = itinerary?.margin_percent
-    if (v === null || v === undefined || (v as unknown) === '') return 25
-    const raw = Number(v)
-    return Number.isFinite(raw) ? raw : 25
-  }, [itinerary])
+  const marginPercent = useMemo(() => resolveItineraryMargin(itinerary?.margin_percent), [itinerary])
 
   // The stored itinerary.total_cost is a denormalized cache that can be 0/stale
   // (an itinerary priced via its services without the header being re-synced —
   // which is why the header read EUR 0.00 while Profit & Loss showed a price).
-  // The services are the source of truth, so derive the client total from them,
-  // mirroring the Profit & Loss card, and use that whenever services exist.
-  const computedClientTotal = useMemo(() => {
-    let total = 0
-    for (const day of days) {
-      for (const s of (day.services || [])) {
-        const supplier = Number(s.total_cost) || 0
-        const clientPrice = (s as any).client_price != null
-          ? Number((s as any).client_price)
-          : supplier * (1 + marginPercent / 100)
-        total += clientPrice
-      }
-    }
-    return Math.round(total * 100) / 100
-  }, [days, marginPercent])
-
-  const effectiveTotalCost = computedClientTotal > 0
-    ? computedClientTotal
-    : (Number(itinerary?.total_cost) || 0)
+  // The services are the source of truth. Same function the email route uses
+  // server-side (lib/itinerary-client-total.ts).
+  const effectiveTotalCost = useMemo(
+    () => effectiveItineraryTotal(
+      { total_cost: itinerary?.total_cost ?? null, margin_percent: itinerary?.margin_percent },
+      days.flatMap(day => (day.services || []) as PricedService[])
+    ),
+    [days, itinerary]
+  )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedDays, setExpandedDays] = useState<Set<number>>(new Set([1]))
@@ -586,8 +569,6 @@ export default function ViewItineraryPage() {
           clientEmail: itinerary.client_email,
           itineraryCode: itinerary.itinerary_code,
           tripName: itinerary.trip_name,
-          totalCost: effectiveTotalCost.toFixed(2),
-          currency: itinerary.currency,
           pdfBase64: pdfBase64.split(',')[1]
         })
       })
