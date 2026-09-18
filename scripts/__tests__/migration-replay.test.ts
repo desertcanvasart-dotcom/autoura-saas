@@ -163,6 +163,30 @@ describe('migration replay from scratch', () => {
     await db.exec(`UPDATE bookings SET status = 'cancelled' WHERE booking_number = 'BK-C'`)
     expect(await statusOf('Lead C')).toBe('active')
 
+    // Migration 363: a seeded tour type carries the days it covers, so the
+    // form stops rewriting an agency's own type from the duration.
+    await db.exec(`
+      INSERT INTO tenant_vocabularies (tenant_id, kind, key, label, rank)
+      SELECT t.id, 'tour_type', 'package', 'Package', 9 FROM tenants t WHERE t.company_name = 'Replay Probe Co'
+    `)
+    const ranges = await db.query(`
+      SELECT v.key, v.meta FROM tenant_vocabularies v
+        JOIN tenants t ON t.id = v.tenant_id
+       WHERE t.company_name = 'Replay Probe Co' AND v.kind = 'tour_type'
+       ORDER BY v.key
+    `)
+    const byKey = Object.fromEntries(
+      (ranges.rows as Array<{ key: string; meta: Record<string, unknown> }>).map(r => [r.key, r.meta ?? {}])
+    )
+    expect(byKey.day_tour, 'a day tour covers exactly one day').toMatchObject({ min_days: 1, max_days: 1 })
+    expect(byKey.stopover).toMatchObject({ min_days: 1, max_days: 1 })
+    expect(byKey.multi_day).toMatchObject({ min_days: 2 })
+    expect(byKey.multi_day.max_days, 'multi-day is open-ended').toBeUndefined()
+    expect(
+      byKey.package,
+      "an agency's own type keeps an unknown range, so nothing overwrites it"
+    ).toEqual({})
+
     // Migration 361: a SECURITY DEFINER function runs past RLS, so one that
     // takes a caller-supplied id must not be executable by the browser roles.
     // Production proved anon could call ten of them (cross-tenant reads and

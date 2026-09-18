@@ -46,18 +46,26 @@ describe('the tour form asks the vocabulary, not a constant', () => {
 describe('behaviour stays keyed even though the words are free', () => {
   const form = codeOnly(read(FORM))
 
-  it('single-day detection still runs off the built-in keys', () => {
-    // day_tour and stopover are what make a tour measured in HOURS. An agency
-    // renaming them must not change that; an agency ADDING one gets multi-day.
-    expect(form).toContain("SINGLE_DAY_TOUR_TYPES = ['day_tour', 'stopover']")
+  it('single-day detection reads the days a type covers, not a hardcoded list', () => {
+    // It was `SINGLE_DAY_TOUR_TYPES = ['day_tour', 'stopover']`, so Sawa Tours'
+    // own "OverDay Trip" — a day trip — was held to 2 days and a night, and
+    // any 2+ day edit rewrote a "Package" tour into a Multi-Day Tour. The
+    // range now lives on the vocabulary entry (migration 363).
+    expect(form).not.toContain("SINGLE_DAY_TOUR_TYPES = ['day_tour', 'stopover']")
+    expect(form).toContain("isSingleDayType(i)")
+    expect(form).toContain('suggestTourType(')
+    expect(form).toContain('durationForType(')
   })
 
   it('the settings description warns what a new entry will do', () => {
     // The 351 rule: if a key carries behaviour, the screen has to say so.
     const d = VOCABULARY_KIND_INFO.tour_type.description
-    expect(d).toMatch(/day_tour/)
+    expect(d).toMatch(/day tour/i)
     expect(d).toMatch(/hours/i)
     expect(d).toMatch(/multi-day/i)
+    // And what an agency's OWN entry does, which is now the opposite of what
+    // this text used to promise.
+    expect(d).toMatch(/sets its own duration/i)
   })
 
   it('all four kinds are grouped under Tours', () => {
