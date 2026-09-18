@@ -79,6 +79,8 @@ export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   // A transfer to somewhere else in town that is not sightseeing: the sound &
   // light show, the market, an evening out (operator, 2026-09-18).
   { name: 'city_transfer', label: 'Local Transfer', kind: 'bool' },
+  // Four hours, eight, or twelve — priced as different transport routes.
+  { name: 'sightseeing_length', label: 'Sightseeing Length', allowed: ['half_day', 'day_tour', 'long_day_tour'] },
   { name: 'description', label: 'Description' },
 ]
 
@@ -128,6 +130,7 @@ export function serializeDaysCsv(
         hotel_checkout: !!services.hotel_checkout,
         guide_required: !!services.guide_required,
         city_transfer: !!d.city_transfer,
+        sightseeing_length: d.sightseeing_length ?? '',
         description: d.description ?? '',
       }
       rows.push(
@@ -333,6 +336,7 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
     // 'none' it would remove the bed.
     ...(rec.accommodation_type ? { accommodation_type: rec.accommodation_type } : {}),
     ...(rec.city_transfer ? { city_transfer: true } : {}),
+    ...(rec.sightseeing_length ? { sightseeing_length: rec.sightseeing_length } : {}),
     meals: {
       breakfast: rec.breakfast ?? 'none',
       lunch: rec.lunch ?? 'none',
