@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 141
+ * Tables: 142
  */
 
 export type Json =
@@ -4186,6 +4186,45 @@ export interface Database {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_send_claims: {
+        Row: {
+          request_key: string
+          tenant_id: string
+          user_id: string | null
+          thread_id: string | null
+          body_hash: string | null
+          status: string
+          gmail_message_id: string | null
+          gmail_thread_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          request_key: string
+          tenant_id: string
+          user_id?: string | null
+          thread_id?: string | null
+          body_hash?: string | null
+          status?: string
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          request_key?: string
+          tenant_id?: string
+          user_id?: string | null
+          thread_id?: string | null
+          body_hash?: string | null
+          status?: string
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       email_signatures: {
         Row: {
@@ -10511,6 +10550,9 @@ export interface Database {
           tags: string[] | null
           created_at: string | null
           updated_at: string | null
+          last_inbound_at: string | null
+          last_outbound_at: string | null
+          awaiting_reply_since: string | null
         }
         Insert: {
           id?: string
@@ -10532,6 +10574,9 @@ export interface Database {
           tags?: string[] | null
           created_at?: string | null
           updated_at?: string | null
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          awaiting_reply_since?: string | null
         }
         Update: {
           id?: string
@@ -10553,6 +10598,9 @@ export interface Database {
           tags?: string[] | null
           created_at?: string | null
           updated_at?: string | null
+          last_inbound_at?: string | null
+          last_outbound_at?: string | null
+          awaiting_reply_since?: string | null
         }
         Relationships: [
           {

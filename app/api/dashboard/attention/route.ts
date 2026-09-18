@@ -72,11 +72,9 @@ export async function GET() {
       .not('awaiting_reply_since', 'is', null)
       .order('awaiting_reply_since', { ascending: true })
       .limit(50)
-    // The cast goes away with `npm run types:generate` once migration 366 is
-    // applied: the generated types come from the live schema. A database
-    // without the column contributes nothing rather than sinking the list.
+    // A read that fails contributes nothing rather than sinking the list.
     const awaitingItems = buildAwaitingReplyItems(
-      (awaitingRows.error ? [] : (awaitingRows.data ?? [])) as unknown as AwaitingConversation[]
+      (awaitingRows.error ? [] : (awaitingRows.data ?? [])) as AwaitingConversation[]
     )
 
     if (bookingIds.length === 0) {
