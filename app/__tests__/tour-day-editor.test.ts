@@ -84,3 +84,19 @@ describe('choosing the hotel for a night', () => {
     expect(SOURCE).toMatch(/shows a gap rather than quietly using a different one/)
   })
 })
+
+describe('a cruise night chooses a SHIP', () => {
+  it('asks the ships catalogue, not the hotels in a city', () => {
+    expect(SOURCE).toMatch(/dayNight === 'cruise'\s*\n?\s*\? `\/api\/rates\/cruises/)
+    expect(SOURCE).toContain('r.ship_name')
+  })
+
+  it('re-reads when the night type changes, not only the city', () => {
+    expect(SOURCE).toMatch(/\}, \[dayCity, dayNight, tiers\]\)/)
+  })
+
+  it('says ship, not hotel, everywhere the operator reads it', () => {
+    expect(SOURCE).toContain("'Ship for this night'")
+    expect(SOURCE).toContain('🚢 Named ship')
+  })
+})
