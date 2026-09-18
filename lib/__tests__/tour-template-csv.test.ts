@@ -398,3 +398,60 @@ describe('a column this importer does not read is named, not swallowed', () => {
     expect(r.ignoredHeaders).toEqual([])
   })
 })
+
+// ============================================
+// The fields the live tours actually carry
+// ============================================
+// duration_hours was filled on 12 of the 26 live templates, and
+// age_suitability, gallery_urls and destinations_covered on all 26 — and the
+// sheet carried none of them, so export → delete → re-import lost them. A
+// round trip has to give the tour back as it was.
+describe('the fields the sheet used to drop', () => {
+  const tour = {
+    template_code: 'CAI-DAY',
+    template_name: 'Giza day tour',
+    tour_type: 'day_tour',
+    duration_days: 1,
+    duration_hours: 8,
+    accommodation_nights: 0,
+    age_suitability: 'All ages',
+    gallery_urls: ['https://example.test/1.jpg', 'https://example.test/2.jpg'],
+    destinations_covered: ['Giza', 'Cairo'],
+    pricing_mode: 'auto',
+    uses_day_builder: true,
+    default_transportation_service: 'private_car',
+    transportation_city: 'Cairo',
+  }
+
+  it('they ride the sheet', () => {
+    const csv = serializeTemplatesCsv([tour])
+    const header = csv.split('\n')[0]
+    for (const label of ['Duration Hours', 'Age Suitability', 'Gallery URLs', 'Destinations', 'Pricing Mode']) {
+      expect(header, label).toContain(label)
+    }
+  })
+
+  it('and come back unchanged', () => {
+    const { records, refused } = parseTemplatesCsv(serializeTemplatesCsv([tour]), papa)
+    expect(refused).toEqual([])
+    const back = records[0] as Record<string, unknown>
+    expect(back.duration_hours).toBe(8)
+    expect(back.accommodation_nights).toBe(0)
+    expect(back.age_suitability).toBe('All ages')
+    expect(back.gallery_urls).toEqual(tour.gallery_urls)
+    expect(back.destinations_covered).toEqual(['Giza', 'Cairo'])
+    expect(back.pricing_mode).toBe('auto')
+    expect(back.uses_day_builder).toBe(true)
+    expect(back.transportation_city).toBe('Cairo')
+  })
+
+  it('an empty cell stays empty rather than becoming a 0-hour tour', () => {
+    const { records } = parseTemplatesCsv(
+      serializeTemplatesCsv([{ ...tour, duration_hours: null, gallery_urls: null }]),
+      papa
+    )
+    const back = records[0] as Record<string, unknown>
+    expect(back.duration_hours ?? null).toBeNull()
+    expect(back.gallery_urls ?? null).not.toBe(0)
+  })
+})
