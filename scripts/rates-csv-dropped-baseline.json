@@ -1,0 +1,132 @@
+{
+  "accommodation_rates": [
+    "base_rate_eur",
+    "base_rate_non_eur",
+    "double_rate_eur",
+    "double_rate_non_eur",
+    "high_season_double_eur",
+    "high_season_double_non_eur",
+    "high_season_ppd_eur",
+    "high_season_ppd_non_eur",
+    "high_season_rate_eur",
+    "high_season_rate_non_eur",
+    "high_season_single_eur",
+    "high_season_single_non_eur",
+    "high_season_single_supplement_eur",
+    "high_season_single_supplement_non_eur",
+    "high_season_triple_eur",
+    "high_season_triple_non_eur",
+    "high_season_triple_reduction_eur",
+    "high_season_triple_reduction_non_eur",
+    "hotel_id",
+    "hotel_name",
+    "low_season_rate_eur",
+    "low_season_rate_non_eur",
+    "peak_season_double_eur",
+    "peak_season_double_non_eur",
+    "peak_season_ppd_eur",
+    "peak_season_ppd_non_eur",
+    "peak_season_single_eur",
+    "peak_season_single_non_eur",
+    "peak_season_single_supplement_eur",
+    "peak_season_single_supplement_non_eur",
+    "peak_season_triple_eur",
+    "peak_season_triple_non_eur",
+    "peak_season_triple_reduction_eur",
+    "peak_season_triple_reduction_non_eur",
+    "ppd_eur",
+    "ppd_non_eur",
+    "rate_high_season_dbl",
+    "rate_high_season_sgl",
+    "rate_low_season_dbl",
+    "rate_low_season_sgl",
+    "rate_peak_season_dbl",
+    "rate_peak_season_sgl",
+    "room_type",
+    "season",
+    "seasons",
+    "single_rate_eur",
+    "single_rate_non_eur",
+    "single_supplement_eur",
+    "single_supplement_non_eur",
+    "star_rating",
+    "supplements",
+    "triple_rate_eur",
+    "triple_rate_non_eur",
+    "triple_reduction_eur",
+    "triple_reduction_non_eur"
+  ],
+  "transportation_rates": [
+    "capacity",
+    "rate_per_day"
+  ],
+  "guide_rates": [
+    "full_day_rate",
+    "half_day_rate"
+  ],
+  "meal_rates": [
+    "dietary_options"
+  ],
+  "entrance_fees": [
+    "egyptian_rate",
+    "is_sellable_extra"
+  ],
+  "flight_rates": [
+    "carry_on_kg",
+    "route_name"
+  ],
+  "activity_rates": [
+    "addon_note",
+    "is_addon",
+    "tiers"
+  ],
+  "airport_staff_rates": [
+    "airport_name",
+    "supplier_name"
+  ],
+  "hotel_staff_rates": [
+    "destination",
+    "supplier_name"
+  ],
+  "nile_cruises": [
+    "cabin_type",
+    "high_season_ppd_eur",
+    "high_season_ppd_non_eur",
+    "high_season_single_supplement_eur",
+    "high_season_single_supplement_non_eur",
+    "high_season_triple_reduction_eur",
+    "high_season_triple_reduction_non_eur",
+    "peak_season_ppd_eur",
+    "peak_season_ppd_non_eur",
+    "peak_season_single_supplement_eur",
+    "peak_season_single_supplement_non_eur",
+    "peak_season_triple_reduction_eur",
+    "peak_season_triple_reduction_non_eur",
+    "ppd_eur",
+    "ppd_non_eur",
+    "rate_double_eur",
+    "rate_double_eur_high",
+    "rate_double_eur_low",
+    "rate_double_eur_peak",
+    "rate_high_season",
+    "rate_low_season",
+    "rate_peak_season",
+    "rate_single_eur",
+    "rate_triple_eur",
+    "season",
+    "season_end",
+    "season_start",
+    "seasons",
+    "single_supplement_eur",
+    "single_supplement_non_eur",
+    "supplements",
+    "supplier_name",
+    "triple_reduction_eur",
+    "triple_reduction_non_eur"
+  ],
+  "sleeping_train_rates": [
+    "departure_days",
+    "rate_oneway_non_eur",
+    "rate_roundtrip_non_eur"
+  ]
+}
