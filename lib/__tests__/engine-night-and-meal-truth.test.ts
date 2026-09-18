@@ -114,9 +114,14 @@ describe('the old list format for meals', () => {
 //    billed as a night aboard.
 // ============================================================================
 describe('the day they leave the ship', () => {
+  /** The night of a day INSIDE a programme. A one-day itinerary is a day
+   *  tour, which has no night — so a trailing day keeps this about the words. */
   const nightOf = (title: string, description = '', allDays: unknown[] = []) =>
-    parseItinerary([...(allDays as never[]), { day: 9, title, description, city: 'Aswan' }])
-      .slice(-1)[0].accommodation_type
+    parseItinerary([
+      ...(allDays as never[]),
+      { day: 9, title, description, city: 'Aswan' },
+      { day: 10, title: 'Onward', city: 'Aswan' },
+    ])[(allDays as never[]).length].accommodation_type
 
   it('is not a cruise night', () => {
     expect(nightOf('Disembark in Aswan, transfer to your hotel')).toBe('hotel')
@@ -138,7 +143,12 @@ describe('the day they leave the ship', () => {
   })
 
   it('an explicit accommodation_type always wins over the words', () => {
-    expect(parseItinerary([{ day: 1, title: 'Disembark', accommodation_type: 'cruise', city: 'Aswan' }])[0].accommodation_type).toBe('cruise')
+    expect(
+      parseItinerary([
+        { day: 1, title: 'Disembark', accommodation_type: 'cruise', city: 'Aswan' },
+        { day: 2, title: 'Onward', city: 'Aswan' },
+      ])[0].accommodation_type
+    ).toBe('cruise')
   })
 })
 
@@ -187,14 +197,18 @@ describe('a programme with a cruise in the middle of it', () => {
   })
 
   it('judges a day on its own words, not on the other days', () => {
-    const alone = parseItinerary([{ day: 1, title: 'Leisure in Hurghada' }])[0].accommodation_type
+    const alone = parseItinerary([
+      { day: 1, title: 'Leisure in Hurghada' },
+      { day: 2, title: 'Onward' },
+    ])[0].accommodation_type
     const amongCruiseDays = nights()[8]
     expect(amongCruiseDays).toBe(alone)
   })
 })
 
 describe('the two traps in the real descriptions', () => {
-  const night = (day: Record<string, unknown>) => parseItinerary([day])[0].accommodation_type
+  const night = (day: Record<string, unknown>) =>
+    parseItinerary([day, { day: 99, title: 'Onward' }])[0].accommodation_type
 
   it('an afternoon felucca sail is not a night aboard', () => {
     expect(night({ day: 4, title: 'Fly to Aswan & Abu Simbel', description: 'Return to Aswan for a felucca sail.' })).toBe('hotel')
@@ -215,5 +229,37 @@ describe('the two traps in the real descriptions', () => {
     expect(night({ day: 6, title: 'Kom Ombo', description: 'Overnight on board.' })).toBe('cruise')
     expect(night({ day: 6, title: 'Kom Ombo', description: 'Overnight aboard the MS Farah.' })).toBe('cruise')
     expect(night({ day: 6, title: 'Edfu', description: 'Dinner and overnight on the ship.' })).toBe('cruise')
+  })
+})
+
+// ============================================
+// 5. A one-day tour has no night
+// ============================================
+// Found in the live data on 2026-09-18: 12 single-day tours across Sawa Tours
+// and Travel2Egypt store no night type, and the words in their titles say
+// nothing about sleeping — so every one of them was priced with a HOTEL night
+// nobody sleeps.
+describe('a one-day tour', () => {
+  const oneDay = (title: string) => parseItinerary([{ day: 1, title }])[0]
+
+  it('has no night, whatever its title says', () => {
+    for (const title of [
+      'Giza Pyramids, Sphinx & the Grand Egyptian Museum',
+      'Luxor in Depth — East & West Bank Full Day',
+      'Cairo to Alexandria — the Mediterranean Day Tour',
+      'Aswan to Abu Simbel — Temples of Ramses II & Nefertari',
+    ]) {
+      expect(oneDay(title).accommodation_type, title).toBe('none')
+    }
+  })
+
+  it('still obeys a night it DOES state — a one-day trip can include a cabin', () => {
+    expect(parseItinerary([{ day: 1, title: 'Overnight felucca', accommodation_type: 'cruise' }])[0].accommodation_type)
+      .toBe('cruise')
+  })
+
+  it('does not change a programme of two days or more', () => {
+    const days = parseItinerary([{ day: 1, title: 'Arrival in Cairo' }, { day: 2, title: 'Departure' }])
+    expect(days[0].accommodation_type).toBe('hotel')
   })
 })
