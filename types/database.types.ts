@@ -6,7 +6,7 @@
  *
  * Source: live production schema via PostgREST OpenAPI
  * (see scripts/generate-db-types.mjs for why not `supabase gen types`).
- * Tables: 142
+ * Tables: 143
  */
 
 export type Json =
@@ -4059,6 +4059,33 @@ export interface Database {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_lead_dismissals: {
+        Row: {
+          id: string
+          tenant_id: string
+          sender_email: string
+          dismissed_by: string | null
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          sender_email: string
+          dismissed_by?: string | null
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          sender_email?: string
+          dismissed_by?: string | null
+          reason?: string | null
+          created_at?: string
+        }
+        Relationships: []
       }
       email_messages: {
         Row: {
@@ -9218,6 +9245,7 @@ export interface Database {
           rates_currency: string | null
           deposit_percent: number | null
           deposit_due_days: number | null
+          office_email_addresses: string[]
         }
         Insert: {
           id?: string
@@ -9249,6 +9277,7 @@ export interface Database {
           rates_currency?: string | null
           deposit_percent?: number | null
           deposit_due_days?: number | null
+          office_email_addresses: string[]
         }
         Update: {
           id?: string
@@ -9280,6 +9309,7 @@ export interface Database {
           rates_currency?: string | null
           deposit_percent?: number | null
           deposit_due_days?: number | null
+          office_email_addresses?: string[]
         }
         Relationships: []
       }
