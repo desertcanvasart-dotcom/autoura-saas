@@ -328,3 +328,67 @@ describe('cron-reminders', { timeout: 30_000 }, () => {
     expect(hits).toEqual([])
   })
 })
+
+// ============================================================================
+// cron-gmail-sync — mail arrives whether or not anybody is looking
+//
+// The endpoint answers 200 with a summary that can describe a bad run: some
+// mailboxes synced, others refused. Railway records the run from the EXIT
+// CODE, so trusting the status would hide exactly the degradation this job
+// exists to end — a mailbox whose token expired quietly syncing nothing.
+// ============================================================================
+
+const GMAIL_SYNC = path.join(ROOT, 'scripts/cron-gmail-sync.mjs')
+
+describe('cron-gmail-sync', { timeout: 30_000 }, () => {
+  it('exits 0 on a clean run, and asks with a Bearer secret', async () => {
+    const stub = await stubByPath({
+      '/api/cron/gmail-sync': {
+        body: JSON.stringify({ success: true, mailboxes: 3, synced: 3, failed: 0, messages: 7, results: [] }),
+      },
+    })
+    const res = await run(GMAIL_SYNC, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
+    expect(res.code).toBe(0)
+    expect(res.stdout).toContain('3/3 mailboxes synced')
+    expect(res.stdout).toContain('7 new message(s)')
+    expect(stub.auth[0]).toBe('Bearer s3cret')
+  })
+
+  it('exits 1 when ANY mailbox failed, and names it', async () => {
+    const stub = await stubByPath({
+      '/api/cron/gmail-sync': {
+        body: JSON.stringify({
+          success: false,
+          mailboxes: 2,
+          synced: 1,
+          failed: 1,
+          messages: 2,
+          results: [{ user_id: 'u1', ok: true, messages: 2 }, { user_id: 'u2', ok: false, error: 'Gmail not connected' }],
+        }),
+      },
+    })
+    const res = await run(GMAIL_SYNC, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
+    expect(res.code, 'a failed mailbox must not look like a healthy run').toBe(1)
+    expect(res.stderr).toContain('u2')
+    expect(res.stderr).toContain('Gmail not connected')
+  })
+
+  it('exits 1 on an HTTP failure', async () => {
+    const stub = await stubByPath({
+      '/api/cron/gmail-sync': { status: 401, body: JSON.stringify({ error: 'Unauthorized' }) },
+    })
+    const res = await run(GMAIL_SYNC, { CRON_TARGET_URL: stub.url, CRON_SECRET: 'wrong' })
+    expect(res.code).toBe(1)
+    expect(res.stderr).toContain('401')
+  })
+
+  it('refuses to run without a target or a secret, rather than failing silently', async () => {
+    const noTarget = await run(GMAIL_SYNC, { CRON_SECRET: 's3cret' })
+    expect(noTarget.code).toBe(1)
+    expect(noTarget.stderr).toContain('CRON_TARGET_URL')
+
+    const noSecret = await run(GMAIL_SYNC, { CRON_TARGET_URL: 'http://127.0.0.1:1' })
+    expect(noSecret.code).toBe(1)
+    expect(noSecret.stderr).toContain('CRON_SECRET')
+  })
+})
