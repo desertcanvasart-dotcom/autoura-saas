@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
+import { allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 import { requireAuth } from '@/lib/supabase-server'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { generateShareToken } from '@/lib/itinerary-share'
@@ -23,6 +25,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
   }
   const { supabase, tenant_id, user } = auth
+  // The share route is called with no body from the page; an override, when an
+  // operator confirms one, arrives as { allow_incomplete: true }.
+  const body = await request.json().catch(() => ({} as Record<string, unknown>))
 
   const { data: itinerary, error } = await supabase!
     .from('itineraries')
@@ -42,6 +47,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       { status: 422 }
     )
   }
+  // Every service must have a price before a client can open this link. A
+  // service with no rate and no cost is a gap; filling it in on the itinerary
+  // clears it. Fails CLOSED — a database error refuses rather than reading as
+  // complete (lib/pricing/itinerary-completeness.ts).
+  const itineraryLines = await loadItineraryCompleteness(supabase!, id, tenant_id)
+  if (!itineraryLines.ok) {
+    return NextResponse.json({ success: false, error: itineraryLines.error }, { status: itineraryLines.status })
+  }
+  if (!itineraryLines.completeness.complete && !allowsIncomplete(body?.allow_incomplete)) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or share it anyway with allow_incomplete=true.`,
+        gaps: itineraryLines.completeness.gaps,
+      },
+      { status: 422 }
+    )
+  }
+
   const priceCheck = checkAmountDeliverable(itinerary.total_cost, { currency: itinerary.currency })
   if (!priceCheck.ok) {
     return NextResponse.json(

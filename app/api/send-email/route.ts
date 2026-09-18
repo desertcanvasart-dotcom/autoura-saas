@@ -5,6 +5,8 @@ import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 import { effectiveItineraryTotal } from '@/lib/itinerary-client-total'
+import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
+import { allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 
 export async function POST(request: Request) {
   try {
@@ -26,7 +28,7 @@ export async function POST(request: Request) {
       .eq('id', auth.tenant_id!)
       .maybeSingle()
 
-    const { itineraryId, clientName, clientEmail, pdfBase64 } = await request.json()
+    const { itineraryId, clientName, clientEmail, pdfBase64, allow_incomplete } = await request.json()
 
     if (!clientEmail) {
       return NextResponse.json(
@@ -84,6 +86,28 @@ export async function POST(request: Request) {
     const itineraryCode = itinerary.itinerary_code
     const tripName = itinerary.trip_name ?? ''
     const recipientName = clientName || itinerary.client_name || ''
+
+    // Every service must have a price before this reaches a client. A service
+    // with no rate and no cost is a gap: filling it in on the itinerary clears
+    // it. Fails CLOSED — a database error refuses rather than reading as
+    // complete (lib/pricing/itinerary-completeness.ts).
+    const itineraryLines = await loadItineraryCompleteness(auth.supabase!, itineraryId, auth.tenant_id)
+    if (!itineraryLines.ok) {
+      return NextResponse.json(
+        { success: false, error: itineraryLines.error },
+        { status: itineraryLines.status }
+      )
+    }
+    if (!itineraryLines.completeness.complete && !allowsIncomplete(allow_incomplete)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway with allow_incomplete=true.`,
+          gaps: itineraryLines.completeness.gaps,
+        },
+        { status: 422 }
+      )
+    }
 
     // Itinerary email with PDF — output gate (harness Layer 2): never email a
     // non-deliverable price.
