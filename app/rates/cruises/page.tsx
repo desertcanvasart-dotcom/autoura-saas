@@ -13,7 +13,8 @@ import { TierBadge, TierPicker, VocabSelect, VocabLabel } from '@/components/voc
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
-import { seasonsForRow, type RateSeason } from '@/lib/rates/rate-seasons'
+import { seasonsForRow, displayPpd, type RateSeason } from '@/lib/rates/rate-seasons'
+import { RatePeriodLines } from '@/components/rates/RatePeriodLines'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
@@ -1341,7 +1342,22 @@ export default function CruisesPage() {
                       <TierBadge tier={cruise.tier} />
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-blue-600">
-                      {fmtRate(cruise.ppd_eur || cruise.rate_double_eur || 0, cruise, 2)}
+                      {/* The period that covers today, then every period on its
+                          own line. This cell used to read the base columns,
+                          which the periods editor leaves NULL — so a ship
+                          priced by periods showed 0 — and a period with a
+                          blank rate was invisible. */}
+                      {(() => {
+                        const ppd = displayPpd(cruise, 'cruise')
+                        return ppd.current == null ? '—' : fmtRate(ppd.current, cruise, 2)
+                      })()}
+                      <div className="mt-1 text-left font-normal">
+                        <RatePeriodLines
+                          row={cruise}
+                          entity="cruise"
+                          formatRate={(v) => fmtRate(v, cruise, 2)}
+                        />
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
                       {cruise.single_supplement_eur ? `+${fmtRate(cruise.single_supplement_eur, cruise, 2)}` : '-'}
