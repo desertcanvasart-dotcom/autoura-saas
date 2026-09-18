@@ -62,7 +62,8 @@ const transportRow = (service_type: string, city: string, rate: number) => ({
   city,
   destination_city: null,
   origin_city: null,
-  duration: 'one_way',
+  // NULL, as every production row has: the service type carries the length.
+  duration: null,
   area: null,
   vehicle_type: 'Sedan',
   base_rate_eur: rate,
@@ -109,5 +110,16 @@ describe('the rates those days reach', () => {
   it('does not charge one on a day that asks for neither', async () => {
     const result = await priceWith([transportRow('city_transfer', 'Cairo', 40)], {})
     expect(result.services.some(s => s.id.endsWith('-city-transfer'))).toBe(false)
+  })
+})
+
+describe('against rows shaped like production\'s', () => {
+  it('prices a row whose duration is NULL — which is all 2,040 of them', async () => {
+    const result = await priceWith([transportRow('city_transfer', 'Cairo', 40)], { city_transfer: true })
+    const line = result.services.find(s => s.id.endsWith('-city-transfer'))
+    // Asking for a duration would match this row only APPROXIMATELY, which
+    // becomes a gap — a rate that exists, reported as missing.
+    expect(line?.unitCost).toBe(40)
+    expect(result.holes.some(h => h.message.includes('local transfer'))).toBe(false)
   })
 })
