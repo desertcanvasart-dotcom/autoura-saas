@@ -100,3 +100,32 @@ describe('a cruise night chooses a SHIP', () => {
     expect(SOURCE).toContain('🚢 Named ship')
   })
 })
+
+describe('the edit can actually be found', () => {
+  // Reported 2026-09-18 from the live app: "all programs imported through CSV
+  // is not editable, especially the section of the tour days itself". The Edit
+  // and Remove controls existed — as bare icons with `opacity-0
+  // group-hover:opacity-100`, so they were invisible until the pointer
+  // happened to rest on the day, and on a touch screen there is no hover at
+  // all. A control nobody can see is a control that is not there.
+  const DAY_LIST = SOURCE.slice(SOURCE.indexOf('{/* Added Days List */}'))
+
+  it('shows the day controls without waiting for a hover', () => {
+    expect(DAY_LIST).not.toMatch(/opacity-0\s+group-hover:opacity-100/)
+  })
+
+  it('names them, rather than leaving an icon to be guessed at', () => {
+    expect(DAY_LIST).toMatch(/onClick=\{\(\) => editDay\(index\)\}[\s\S]{0,400}?>\s*[\s\S]{0,200}?Edit\s*<\/button>/)
+    expect(DAY_LIST).toMatch(/onClick=\{\(\) => removeDay\(index\)\}[\s\S]{0,400}?>\s*[\s\S]{0,200}?Remove\s*<\/button>/)
+  })
+
+  it('tells the operator the days can be changed', () => {
+    expect(SOURCE).toMatch(/every day below can be changed/)
+  })
+
+  it('brings the form to the operator — a 12-day programme is taller than the modal', () => {
+    expect(SOURCE).toContain('const dayFormRef = useRef<HTMLDivElement>(null)')
+    expect(SOURCE).toMatch(/dayFormRef\.current\?\.scrollIntoView/)
+    expect(SOURCE).toContain('ref={dayFormRef}')
+  })
+})
