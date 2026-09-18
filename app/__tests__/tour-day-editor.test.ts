@@ -129,3 +129,19 @@ describe('the edit can actually be found', () => {
     expect(SOURCE).toContain('ref={dayFormRef}')
   })
 })
+
+describe('how long the sightseeing runs', () => {
+  it('offers the agency\'s three lengths, in their hours', () => {
+    expect(SOURCE).toContain('Half day (4 hours)')
+    expect(SOURCE).toContain('Full day (8 hours)')
+    expect(SOURCE).toContain('Long day (12 hours)')
+  })
+
+  it('writes it only when chosen, so a day that does not say prices as before', () => {
+    expect(SOURCE).toMatch(/\.\.\.\(dayLength \? \{ sightseeing_length: dayLength \} : \{\}\)/)
+  })
+
+  it('says what it is for', () => {
+    expect(SOURCE).toMatch(/transport for the day is priced from the matching route/)
+  })
+})

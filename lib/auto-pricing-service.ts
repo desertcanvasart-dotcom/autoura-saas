@@ -179,6 +179,12 @@ export interface ItineraryDay {
    *  explicit services object REPLACES the defaults, so a flag in there would
    *  silently drop the airport and hotel ones. */
   city_transfer?: boolean
+  /** How long the sightseeing runs, which is how the transport is priced:
+   *  half day is 4 hours, a day tour 8, a long day tour 12 (operator,
+   *  2026-09-18). The LENGTH is the service type, not the `duration` column —
+   *  that column is NULL on all 2,040 production rows. Absent = a day tour,
+   *  exactly as before. */
+  sightseeing_length?: 'half_day' | 'day_tour' | 'long_day_tour'
   services: {
     airport_arrival: boolean
     airport_departure: boolean
@@ -632,7 +638,9 @@ export function determineTransportNeeds(
     const duration = detectDurationFromAttractions(day.attractions)
 
     return {
-      serviceType: 'day_tour',
+      // Four hours, eight, or twelve: the agency prices those as different
+      // routes, so the length is the service type.
+      serviceType: day.sightseeing_length ?? 'day_tour',
       duration,
       area,
       useSpecialVehicle,
@@ -762,6 +770,10 @@ export function parseItinerary(itineraryData: any, opts?: {
       transport_type,
       transport_rate_id,
       city_transfer: day.city_transfer === true,
+      sightseeing_length:
+        day.sightseeing_length === 'half_day' || day.sightseeing_length === 'long_day_tour'
+          ? day.sightseeing_length
+          : undefined,
       property_by_tier: day.property_by_tier && typeof day.property_by_tier === 'object'
         ? (day.property_by_tier as Record<string, string>)
         : undefined,
@@ -2159,6 +2171,8 @@ export interface ExtraTransfer {
   label: string
   /** Part of the line id, so two extras on a day cannot collide. */
   slug: string
+  /** Other keys that mean the same thing, tried in order. */
+  alsoTry?: TransportServiceType[]
 }
 
 export function extraTransfersFor(day: ItineraryDay): ExtraTransfer[] {
@@ -2169,7 +2183,16 @@ export function extraTransfersFor(day: ItineraryDay): ExtraTransfer[] {
     extras.push({ serviceType: 'outside_dinner', label: 'Dinner transfer', slug: 'dinner-transfer' })
   }
   if (day.city_transfer) {
-    extras.push({ serviceType: 'city_transfer', label: 'Local transfer', slug: 'city-transfer' })
+    // "City Transfer" and "Transfer Within City" are the same thing, and the
+    // operator is populating Transfer Within City (2026-09-18). Both are
+    // asked for, in that order, so today's 398 City Transfer rows keep
+    // working while the new ones land.
+    extras.push({
+      serviceType: 'transfer_within_city',
+      label: 'Local transfer',
+      slug: 'city-transfer',
+      alsoTry: ['city_transfer'],
+    })
   }
   return extras
 }
@@ -2220,11 +2243,23 @@ export function findTransportRate(
     return { rate: cache.get(noAreaKey)!, source: 'db' }
   }
 
-  // Priority 3: Match without duration — APPROXIMATE (different trip length).
-  const noDurationKey = [serviceType, cityLower, '', '', vehicleKey(vehicleType)].join('|')
-  if (cache.has(noDurationKey)) {
-    return { rate: cache.get(noDurationKey)!, source: 'fuzzy' }
+  // Priority 3: the row carries no duration — which is EVERY row on
+  // production: `transportation_rates.duration` is NULL on all 2,040 of them,
+  // because the length of a journey is the service type (Half Day is four
+  // hours, a day tour eight, a Long Day Tour twelve — operator, 2026-09-18).
+  // A row that simply does not use the column is an exact answer for the
+  // service type asked for, not an approximate one; treating it as
+  // approximate turned every real day-tour rate into a gap.
+  for (const key of [
+    [serviceType, cityLower, '', area || '', vehicleKey(vehicleType)].join('|'),
+    [serviceType, cityLower, '', '', vehicleKey(vehicleType)].join('|'),
+  ]) {
+    if (cache.has(key)) return { rate: cache.get(key)!, source: 'db' }
   }
+
+  // (The old "match without duration, approximately" rule is the exact match
+  // above now. A row that DOES carry a different duration is still only ever
+  // reached by the nearby-city rule below, as an approximate answer.)
 
   // Priority 5: Nearby-city substitution (e.g. Luxor for Edfu) — APPROXIMATE.
   const fallbackCities = ['luxor', 'aswan', 'cairo']
@@ -3537,18 +3572,22 @@ export async function calculateDayBasedPricing(
   // local transfer the operator ticked. Priced per day, at the day's city.
   for (const day of itinerary) {
     for (const extra of extraTransfersFor(day)) {
-      const match = findTransportRate(transportCache, {
-        // No duration: `transportation_rates.duration` is NULL on all 2,040
-        // production rows — the length of a journey is carried by the service
-        // type itself (Half Day, Long Day Tour, Multi-Day). Asking for
-        // 'one_way' here would miss every real row on the exact key and match
-        // it as APPROXIMATE instead, turning a rate that exists into a gap.
-        serviceType: extra.serviceType,
-        city: day.city,
-        duration: '' as never,
-        area: null,
-        vehicleType: baseVehicleType,
-      })
+      // No duration: `transportation_rates.duration` is NULL on all 2,040
+      // production rows — the length of a journey is carried by the service
+      // type itself (Half Day, Long Day Tour, Multi-Day). Asking for
+      // 'one_way' here would miss every real row on the exact key and match it
+      // as APPROXIMATE instead, turning a rate that exists into a gap.
+      let match = null as ReturnType<typeof findTransportRate>
+      for (const serviceType of [extra.serviceType, ...(extra.alsoTry ?? [])]) {
+        match = findTransportRate(transportCache, {
+          serviceType,
+          city: day.city,
+          duration: '' as never,
+          area: null,
+          vehicleType: baseVehicleType,
+        })
+        if (match && match.source === 'db') break
+      }
       if (match && match.source === 'db') {
         baseTransportCost += match.rate.base_rate_eur
         services.push({
