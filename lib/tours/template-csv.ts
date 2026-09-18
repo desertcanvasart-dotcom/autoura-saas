@@ -16,6 +16,9 @@
 // is how a field can quietly stop round-tripping (see the supplier CSV work,
 // #399–#402); as a key it travels like the rest.
 
+import { SAMPLE_TOUR_DAYS } from './itinerary-csv'
+import { summarizeMeals } from './day-meals'
+
 export interface TemplateCsvColumn {
   name: string
   label: string
@@ -105,9 +108,10 @@ export function sampleTemplateCsv(): string {
     main_attractions: ['Giza Plateau', 'Egyptian Museum'],
     inclusions: ['Licensed Egyptologist guide', 'Air-conditioned transport', 'Lunch'],
     exclusions: ['Entrance tickets', 'Gratuities'],
-    meals_included: ['Day 1: Lunch'],
+    // Derived from the days sample so the two sheets describe one tour.
+    meals_included: summarizeMeals(SAMPLE_TOUR_DAYS),
     short_description: 'A classic full-day tour of Cairo’s headline sights.',
-    long_description: 'Pyramids of Giza, the Sphinx, and the Egyptian Museum, with lunch.',
+    long_description: 'Pyramids of Giza, the Sphinx, and the Egyptian Museum, with lunch at a local restaurant.',
     image_url: 'https://example.com/giza.jpg',
     pickup_required: true,
     is_featured: false,
