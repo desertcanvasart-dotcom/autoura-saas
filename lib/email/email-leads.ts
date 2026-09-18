@@ -24,9 +24,12 @@
 import { createMessageWithRetry, replyText } from '@/lib/ai/anthropic-client'
 import { CLAUDE_MODEL } from '@/lib/ai/models'
 import { isOfficeAddress, bareAddress, type OfficeRule } from './office-addresses'
+import { isAutomatedSender } from './automated-senders'
 
-/** Addresses no human reads, so nobody is asking us for a trip from them. */
-const NEVER_A_LEAD = /^(no[-_.]?reply|do[-_.]?not[-_.]?reply|postmaster|mailer[-_.]?daemon|bounce|notifications?|alerts?|billing|invoices?|support|newsletter|news|marketing|info@(?:facebook|google|linkedin|twitter|x)\.com)/i
+/** Support desks and the big platforms' info@ — not automated exactly, but
+ *  nobody there is asking us for a trip either. The no-reply family lives in
+ *  lib/email/automated-senders.ts, shared with the waiting-on-us list. */
+const NEVER_A_LEAD = /^(support|info@(?:facebook|google|linkedin|twitter|x)\.com)/i
 
 export interface LeadCandidate {
   fromEmail: string
@@ -51,6 +54,7 @@ export function worthJudging(
   if (isOfficeAddress(context.office, from)) return false
   if (context.knownClientEmails.has(from)) return false
   if (context.dismissedEmails.has(from)) return false
+  if (isAutomatedSender(from)) return false
   const local = from.split('@')[0]
   if (NEVER_A_LEAD.test(local) || NEVER_A_LEAD.test(from)) return false
   return true

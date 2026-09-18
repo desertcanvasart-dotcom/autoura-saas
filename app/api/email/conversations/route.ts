@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { waitingSince } from '@/lib/email/automated-senders'
 
 export async function GET(request: NextRequest) {
   try {
@@ -64,13 +65,19 @@ export async function GET(request: NextRequest) {
       unread_count: c.unread_messages || 0,
       status: c.status,
       is_starred: c.is_starred,
-      awaiting_reply_since: c.awaiting_reply_since ?? null,
+      // A robot is not waiting for an answer (lib/email/automated-senders).
+      awaiting_reply_since: waitingSince(c.contact_email, c.awaiting_reply_since),
       client: c.client
         ? { ...c.client, full_name: `${c.client.first_name || ''} ${c.client.last_name || ''}`.trim() }
         : null,
     }))
 
-    return NextResponse.json({ conversations, success: true })
+    // ...so the "waiting on us" filter shows only the people actually waiting.
+    const visible = searchParams.get('awaiting') === 'true'
+      ? conversations.filter(c => c.awaiting_reply_since)
+      : conversations
+
+    return NextResponse.json({ conversations: visible, success: true })
   } catch (error: any) {
     return NextResponse.json({ error: error.message, success: false }, { status: 500 })
   }

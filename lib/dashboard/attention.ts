@@ -15,6 +15,8 @@
 // testable without a database: these are judgements about someone's trip, and
 // "surfaced too late" is indistinguishable from "not surfaced at all".
 
+import { waitingSince } from '@/lib/email/automated-senders'
+
 export const HORIZON_DAYS = 45
 /** Chasing a customer payment takes days, so a balance deadline surfaces
  *  earlier than a departure does. */
@@ -264,8 +266,11 @@ export function buildAwaitingReplyItems(
 ): AttentionItem[] {
   const items: AttentionItem[] = []
   for (const c of conversations) {
-    if (!c.awaiting_reply_since) continue
-    const since = new Date(c.awaiting_reply_since)
+    // A no-reply address is not waiting for us. Live check 2026-09-18: the
+    // five oldest "waiting" conversations were all robots.
+    const waiting = waitingSince(c.contact_email, c.awaiting_reply_since)
+    if (!waiting) continue
+    const since = new Date(waiting)
     if (Number.isNaN(since.getTime())) continue
     const hours = (now.getTime() - since.getTime()) / 3_600_000
     if (hours < AWAITING_REPLY_HOURS) continue
@@ -278,7 +283,7 @@ export function buildAwaitingReplyItems(
       tripName: null,
       clientName: c.contact_name || c.contact_email || 'A customer',
       startDate: null,
-      detail: { waitingSince: c.awaiting_reply_since, hours: Math.floor(hours) },
+      detail: { waitingSince: waiting, hours: Math.floor(hours) },
       href: `/conversations?conversation=${c.id}`,
     })
   }
