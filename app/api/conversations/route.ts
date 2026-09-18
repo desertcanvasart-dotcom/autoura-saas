@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { waitingSince } from '@/lib/email/automated-senders'
 
 export async function GET(request: NextRequest) {
   try {
@@ -109,14 +110,27 @@ export async function GET(request: NextRequest) {
       throw error
     }
 
+    // The database stamps awaiting_reply_since on ANY inbound message, robots
+    // included. One place decides whether a human is waiting, so the badge and
+    // the filter agree (lib/email/automated-senders).
+    const rows = (data || []).map((c: any) => ({
+      ...c,
+      awaiting_reply_since: waitingSince(c.contact_email, c.awaiting_reply_since),
+    }))
+    const awaitingOnly = searchParams.get('awaiting') === 'true'
+    const visible = awaitingOnly ? rows.filter(c => c.awaiting_reply_since) : rows
+    // The robots dropped here were counted by the database. The waiting queue
+    // is far smaller than one page, so subtracting this page's is exact.
+    const total = Math.max(0, (count || 0) - (rows.length - visible.length))
+
     return NextResponse.json({
       success: true,
-      data: data || [],
+      data: visible,
       pagination: {
         page,
         limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit)
+        total,
+        totalPages: Math.ceil(total / limit)
       }
     })
   } catch (error: any) {

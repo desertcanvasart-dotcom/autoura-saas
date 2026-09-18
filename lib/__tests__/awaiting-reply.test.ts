@@ -55,3 +55,25 @@ describe('buildAwaitingReplyItems', () => {
     expect(items.map(i => i.bookingId)).toEqual(['b', 'a'])
   })
 })
+
+describe('buildAwaitingReplyItems and robots', () => {
+  // The database stamps awaiting_reply_since on any inbound message; it cannot
+  // tell a customer from a Twilio notification. Live 2026-09-18: five of the
+  // twelve "waiting" conversations were no-reply addresses, and they were the
+  // oldest, so they sat at the top of the dashboard.
+  it('does not raise a no-reply address', () => {
+    expect(buildAwaitingReplyItems([conv({ contact_email: 'donotreply@twilio.com' })], NOW)).toEqual([])
+    expect(buildAwaitingReplyItems([conv({ contact_email: 'ads-noreply@google.com' })], NOW)).toEqual([])
+  })
+
+  it('still raises the customer sitting behind them', () => {
+    const items = buildAwaitingReplyItems(
+      [
+        conv({ id: 'robot', contact_email: 'noreply@twilio.com', awaiting_reply_since: hoursAgo(900) }),
+        conv({ id: 'human', contact_email: 'ada@example.test', awaiting_reply_since: hoursAgo(30) }),
+      ],
+      NOW
+    )
+    expect(items.map(i => i.bookingId)).toEqual(['human'])
+  })
+})
