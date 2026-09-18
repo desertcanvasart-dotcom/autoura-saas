@@ -367,7 +367,7 @@ export const VOCABULARY_KIND_INFO: Record<VocabularyKind, VocabularyKindInfo> = 
     kind: 'tour_type',
     group: 'Tours',
     title: 'Tour types',
-    description: 'The shapes of tour you sell. Two keys change behaviour: day_tour and stopover are measured in HOURS and held to a single day, while anything else is measured in days and nights. Rename freely; an entry you add behaves like a multi-day tour.',
+    description: 'The shapes of tour you sell. Day Tour and Stopover are measured in HOURS and held to a single day; Multi-Day covers two days or more. Rename freely. An entry you add sets its own duration — the form will never change its type or its length for you.',
     usedIn: 'Tour Manager, tour templates, CSV import/export',
     minItems: 1,
     example: 'Day Tour / Multi-Day Tour / Stopover — or "Excursion" and "Grand Tour"',

@@ -41,6 +41,7 @@ import {
 import DayBuilder from './DayBuilder'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useTierConfigs, useVocabulary } from '@/components/vocabulary'
+import { suggestTourType, durationForType, isSingleDayType } from '@/lib/tours/tour-type'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 // ============================================
@@ -160,11 +161,12 @@ const EGYPTIAN_CITIES = [
 // agency's own now — Settings → Your vocabulary (migration 358). The KEYS
 // below are still the app's: day_tour and stopover are what make a tour
 // measured in hours instead of days, so that logic stays keyed, not worded.
-const SINGLE_DAY_TOUR_TYPES = ['day_tour', 'stopover'] as const
-
-// Single-day tour types are measured in HOURS, not days/nights.
-const isSingleDayTourType = (tourType: string) =>
-  (SINGLE_DAY_TOUR_TYPES as readonly string[]).includes(tourType)
+// Which types are measured in HOURS is the agency's own answer now: a type
+// whose vocabulary entry says it covers at most one day (migration 363). The
+// hardcoded list this replaced treated Sawa Tours' "OverDay Trip" — a day
+// trip — as multi-day, and held it to 2 days and a night.
+const isSingleDayTourType = (tourType: string | null | undefined, singleDayKeys: ReadonlySet<string>) =>
+  !!tourType && singleDayKeys.has(tourType)
 
 // Human-readable duration: hours for a single-day tour that has them, else the
 // classic "days/nights" shorthand.
@@ -173,8 +175,8 @@ const formatTourDuration = (t: {
   duration_days?: number | null
   duration_nights?: number | null
   duration_hours?: number | null
-}): string => {
-  if (t.duration_hours && isSingleDayTourType(t.tour_type || '')) {
+}, singleDayKeys: ReadonlySet<string>): string => {
+  if (t.duration_hours && isSingleDayTourType(t.tour_type, singleDayKeys)) {
     return `${t.duration_hours}h`
   }
   const days = t.duration_days || 0
@@ -872,13 +874,21 @@ interface DayBuilderModalProps {
 }
 
 function DayBuilderModal({ template, onClose, onSave }: DayBuilderModalProps) {
+  // Its own read of the agency's tour types: which ones are measured in hours
+  // is their answer, not a constant (migration 363).
+  const { items: tourTypeItems } = useVocabulary('tour_type')
+  const singleDayKeys = useMemo(
+    () => new Set(tourTypeItems.filter(i => isSingleDayType(i)).map(i => i.key)),
+    [tourTypeItems]
+  )
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div className="px-4 py-3 border-b flex items-center justify-between bg-white">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Day Builder</h2>
-            <p className="text-xs text-gray-500 mt-0.5">{template.template_name} • {formatTourDuration(template)}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{template.template_name} • {formatTourDuration(template, singleDayKeys)}</p>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
             <X className="w-5 h-5 text-gray-500" />
@@ -912,6 +922,11 @@ export default function TourManagerContent() {
   // be tour_categories — a table nothing seeded and no screen could add to, so
   // the dropdown was empty for everyone (retired in 359).
   const { items: tourTypeItems, labelFor: tourTypeLabel } = useVocabulary('tour_type')
+  // The types this agency measures in hours, from their own ranges.
+  const singleDayKeys = useMemo(
+    () => new Set(tourTypeItems.filter(i => isSingleDayType(i)).map(i => i.key)),
+    [tourTypeItems]
+  )
   const { items: physicalLevelItems } = useVocabulary('tour_physical_level')
   const { items: bestForItems } = useVocabulary('tour_best_for')
   const { items: themeItems } = useVocabulary('tour_theme')
@@ -1085,29 +1100,27 @@ export default function TourManagerContent() {
         [name]: parsedValue
       }
       
-      // Auto-suggest tour_type based on duration_days
+      // Suggest a tour type from the duration — from the agency's OWN types and
+      // the days each covers (Settings → Your vocabulary, migration 363), never
+      // from hardcoded keys. This used to set multi_day on any 2+ day tour,
+      // which wiped an agency's own type: a Package tour became a Multi-Day
+      // Tour the moment someone edited its duration. A type with no range set
+      // is the operator's decision and is left alone (lib/tours/tour-type.ts).
       if (name === 'duration_days' && typeof parsedValue === 'number') {
-        if (parsedValue === 1) {
-          // Keep current type if it's day_tour or stopover, otherwise suggest day_tour
-          if (prev.tour_type !== 'day_tour' && prev.tour_type !== 'stopover') {
-            updated.tour_type = 'day_tour'
-          }
-        } else if (parsedValue >= 2) {
-          updated.tour_type = 'multi_day'
-        }
+        const suggested = suggestTourType(parsedValue, prev.tour_type, tourTypeItems)
+        if (suggested) updated.tour_type = suggested
       }
 
-      // Keep duration coherent when the tour TYPE is switched. Single-day types
-      // are measured in hours (1 day / 0 nights); multi-day needs at least 2.
+      // Keep the duration coherent when the TYPE is switched, again from its
+      // own range: a type measured in hours holds the tour to its one day.
       if (name === 'tour_type' && typeof parsedValue === 'string') {
-        if (isSingleDayTourType(parsedValue)) {
-          updated.duration_days = 1
-          updated.duration_nights = 0
-          if (!updated.duration_hours) updated.duration_hours = 8
-        } else if (prev.duration_days < 2) {
-          updated.duration_days = 2
-          updated.duration_nights = 1
+        const item = tourTypeItems.find(i => i.key === parsedValue)
+        const duration = durationForType(item, prev.duration_days)
+        if (duration) {
+          updated.duration_days = duration.duration_days
+          updated.duration_nights = duration.duration_nights
         }
+        if (isSingleDayType(item) && !updated.duration_hours) updated.duration_hours = 8
       }
 
       return updated
@@ -1483,7 +1496,7 @@ export default function TourManagerContent() {
     // (operator, 1 Sep — confirmed in the data). The guard drops the second
     // call synchronously and disables the button while the first is in flight.
     await guard(async () => {
-    const singleDay = isSingleDayTourType(formData.tour_type)
+    const singleDay = isSingleDayTourType(formData.tour_type, singleDayKeys)
     const dataToSubmit = {
       ...formData,
       template_code: formData.template_code || generateTemplateCode(),
@@ -1879,7 +1892,7 @@ export default function TourManagerContent() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className="text-sm text-gray-900">
-                            {formatTourDuration(template)}
+                            {formatTourDuration(template, singleDayKeys)}
                           </span>
                         </td>
                         <td className="px-4 py-3">
@@ -2064,7 +2077,7 @@ export default function TourManagerContent() {
                   <div className="space-y-2 text-sm mb-4">
                     <div className="flex items-center gap-2 text-gray-600">
                       <Calendar className="w-4 h-4" />
-                      <span>{isSingleDayTourType(template.tour_type) && template.duration_hours
+                      <span>{isSingleDayTourType(template.tour_type, singleDayKeys) && template.duration_hours
                         ? `${template.duration_hours} hours`
                         : `${template.duration_days} day${template.duration_days > 1 ? 's' : ''}`}</span>
                       <span className="px-2 py-0.5 bg-gray-100 rounded text-xs">
@@ -2172,7 +2185,7 @@ export default function TourManagerContent() {
                     <span className="text-xs text-gray-500 font-mono">{template.template_code}</span>
                   </div>
                   <div className="hidden md:block">
-                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{formatTourDuration(template)}</span>
+                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{formatTourDuration(template, singleDayKeys)}</span>
                   </div>
                   <div className="hidden md:flex items-center gap-1">
                     {(template.variations?.length || 0) > 0 ? (
@@ -2323,7 +2336,7 @@ export default function TourManagerContent() {
                         ))}
                       </select>
                     </div>
-                    {isSingleDayTourType(formData.tour_type) ? (
+                    {isSingleDayTourType(formData.tour_type, singleDayKeys) ? (
                       // A one-day tour is measured in HOURS, not days/nights.
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Duration (Hours) *</label>
