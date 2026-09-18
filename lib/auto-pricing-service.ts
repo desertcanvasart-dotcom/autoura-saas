@@ -3538,9 +3538,14 @@ export async function calculateDayBasedPricing(
   for (const day of itinerary) {
     for (const extra of extraTransfersFor(day)) {
       const match = findTransportRate(transportCache, {
+        // No duration: `transportation_rates.duration` is NULL on all 2,040
+        // production rows — the length of a journey is carried by the service
+        // type itself (Half Day, Long Day Tour, Multi-Day). Asking for
+        // 'one_way' here would miss every real row on the exact key and match
+        // it as APPROXIMATE instead, turning a rate that exists into a gap.
         serviceType: extra.serviceType,
         city: day.city,
-        duration: 'one_way',
+        duration: '' as never,
         area: null,
         vehicleType: baseVehicleType,
       })
