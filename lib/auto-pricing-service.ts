@@ -761,7 +761,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       // (B-item 2); the sleeper night joins the rooming list instead.
       accommodation_type: transport_type === 'sleeping_train'
         ? 'none'
-        : (day.accommodation_type || inferAccommodationType(day, itineraryData)),
+        : (day.accommodation_type || inferAccommodationType(day, itineraryData, itineraryData.length === 1)),
       meals,
       attractions,
       attraction_ids,
@@ -910,10 +910,17 @@ function inferCityFromTitle(title: string): string {
 /**
  * Infer accommodation type from day data and context
  */
-function inferAccommodationType(day: any, _allDays?: any[]): AccommodationType {
+function inferAccommodationType(day: any, _allDays?: any[], isSingleDay = false): AccommodationType {
   if (day.accommodation_type) {
     return day.accommodation_type
   }
+
+  // A one-day programme has no night. This returned 'hotel' for every day
+  // tour that did not say otherwise, so on production 12 of Sawa Tours' and
+  // Travel2Egypt's single-day tours — "Giza Pyramids, Sphinx & the Grand
+  // Egyptian Museum", "Luxor in Depth", "Cairo to Alexandria" — were priced
+  // with a hotel night nobody sleeps.
+  if (isSingleDay) return 'none'
 
   const title = (day.title || '').toLowerCase()
   const description = (day.description || '').toLowerCase()
