@@ -423,3 +423,50 @@ export function displayPpd(
   const base = usable(r.ppd_eur) ?? (usable(r.double_rate_eur) ? (usable(r.double_rate_eur) as number) / 2 : null)
   return { current: base, top: null, periodName: null, periodCount: 0 }
 }
+
+// ── Every period, on its own line (A-item: the list showed one) ───────────
+// The hotel list showed today's period and the peak as two numbers, and the
+// cruise list showed the raw base columns — so an operator checking a contract
+// against what was stored could not see the periods at all, and a period with
+// a blank rate (stored as 0, the sanitizer's convention) looked like any
+// other. One line per period, with the blank ones marked.
+
+export interface RatePeriodLine {
+  name: string
+  from: string
+  to: string
+  /** Per-person-in-double for each passport, null when the cell is blank. */
+  eur: number | null
+  nonEur: number | null
+  /** The nightly rate is missing: the engine records a hole for these nights. */
+  blank: boolean
+  /** Does today fall inside this period? */
+  current: boolean
+}
+
+export function ratePeriodLines(
+  row: object,
+  entity: RateSeasonEntity,
+  todayIso?: string
+): RatePeriodLine[] {
+  const usable = (v: unknown): number | null => {
+    const n = Number(v)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  const list = seasonsForRow(row, entity)
+  if (list.length === 0) return []
+  const today = todayIso ?? new Date().toISOString().slice(0, 10)
+  const chosen = seasonForTravelDate(list, today)
+  return list.map(s => {
+    const eur = usable(s.rates.ppd_eur)
+    return {
+      name: s.name,
+      from: s.from,
+      to: s.to,
+      eur,
+      nonEur: usable(s.rates.ppd_non_eur),
+      blank: eur === null,
+      current: chosen ? chosen.from === s.from && chosen.to === s.to : false,
+    }
+  })
+}

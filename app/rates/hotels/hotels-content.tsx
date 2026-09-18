@@ -18,6 +18,7 @@ import { useDestinationCities } from '@/hooks/useDestinationCities'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
 import { displayPpd } from '@/lib/rates/rate-seasons'
+import { RatePeriodLines } from '@/components/rates/RatePeriodLines'
 import { seasonsForRow, type RateSeason } from '@/lib/rates/rate-seasons'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
@@ -1509,19 +1510,25 @@ export default function HotelsContent() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
-                      <div className="text-center">
-                        <p className="text-xs text-blue-600 font-medium">PP Dbl</p>
-                        <p className="text-sm font-bold text-gray-700">{ppdCell(rate, 'current')}</p>
+                    <div className="pt-3 border-t border-gray-100 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="text-center">
+                          <p className="text-xs text-blue-600 font-medium">PP Dbl now</p>
+                          <p className="text-sm font-bold text-gray-700">{ppdCell(rate, 'current')}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-red-600 font-medium">Peak</p>
+                          <p className="text-sm font-bold text-gray-700">{ppdCell(rate, 'top')}</p>
+                        </div>
                       </div>
-                      <div className="text-center">
-                        <p className="text-xs text-red-600 font-medium">Peak</p>
-                        <p className="text-sm font-bold text-gray-700">{ppdCell(rate, 'top')}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-gray-500 font-medium">Periods</p>
-                        <p className="text-sm font-bold text-gray-700">{displayPpd(rate, 'accommodation').periodCount || '—'}</p>
-                      </div>
+                      {/* Each period on its own line: the list used to show a
+                          count, so a period with a blank rate — which the
+                          engine refuses to price — was invisible here. */}
+                      <RatePeriodLines
+                        row={rate}
+                        entity="accommodation"
+                        formatRate={(v) => fmtRate(v, rate, 0)}
+                      />
                     </div>
                   </div>
 
