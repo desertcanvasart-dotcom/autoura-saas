@@ -426,14 +426,18 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       await Promise.all(
         tiers.map(async t => {
           try {
-            const res = await fetch(
-              `/api/rates/hotels?city=${encodeURIComponent(city)}&tier=${encodeURIComponent(t.key)}&active_only=true`
-            )
+            // A cruise night is chosen from the SHIPS, a hotel night from the
+            // hotels in that city. Same idea, different catalogue.
+            const url =
+              dayNight === 'cruise'
+                ? `/api/rates/cruises?tier=${encodeURIComponent(t.key)}&active_only=true`
+                : `/api/rates/hotels?city=${encodeURIComponent(city)}&tier=${encodeURIComponent(t.key)}&active_only=true`
+            const res = await fetch(url)
             const data = await res.json()
-            const rows = (data?.data ?? data?.rates ?? []) as Array<Record<string, unknown>>
+            const rows = (data?.data ?? data?.rates ?? data?.cruises ?? []) as Array<Record<string, unknown>>
             next[t.key] = rows.map(r => ({
               id: String(r.id),
-              name: String(r.property_name ?? r.name ?? 'Unnamed'),
+              name: String(r.property_name ?? r.ship_name ?? r.name ?? 'Unnamed'),
             }))
           } catch {
             next[t.key] = []
@@ -443,7 +447,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       if (!cancelled) setCityHotels(next)
     })()
     return () => { cancelled = true }
-  }, [dayCity, tiers])
+  }, [dayCity, dayNight, tiers])
 
   const setMeal = (slot: MealSlot, status: DayMealStatus | '') => {
     setDayMealsError(null)
@@ -655,7 +659,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
         {dayNight !== 'none' && dayCity.trim() && tiers.length > 0 && (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              Hotel for this night <span className="text-gray-400 font-normal">(optional, per tier)</span>
+              {dayNight === 'cruise' ? 'Ship for this night' : 'Hotel for this night'}{' '}
+              <span className="text-gray-400 font-normal">(optional, per tier)</span>
             </label>
             <div className="space-y-2">
               {tiers.map(tier => {
@@ -670,7 +675,11 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                       }
                       className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
                     >
-                      <option value="">Automatic — whatever this tier has in {dayCity.trim()}</option>
+                      <option value="">
+                        {dayNight === 'cruise'
+                          ? `Automatic — whatever this tier sails`
+                          : `Automatic — whatever this tier has in ${dayCity.trim()}`}
+                      </option>
                       {options.map(o => (
                         <option key={o.id} value={o.id}>{o.name}</option>
                       ))}
@@ -864,7 +873,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                 )}
                 {day.property_by_tier && Object.values(day.property_by_tier).some(Boolean) && (
                   <p className="text-xs text-indigo-700 mt-0.5">
-                    🏨 Named hotel for {Object.values(day.property_by_tier).filter(Boolean).length} tier
+                    {day.accommodation_type === 'cruise' ? '🚢 Named ship' : '🏨 Named hotel'} for{' '}
+                    {Object.values(day.property_by_tier).filter(Boolean).length} tier
                     {Object.values(day.property_by_tier).filter(Boolean).length === 1 ? '' : 's'}
                   </p>
                 )}

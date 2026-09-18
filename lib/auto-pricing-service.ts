@@ -2373,7 +2373,13 @@ export async function calculateDayBasedPricing(
   let cruiseRates: NonNullable<Awaited<ReturnType<typeof getCruiseRates>>> | null = null
   if (cruiseNights > 0) {
     const firstCruiseDay = cruiseDays[0]
-    const cr = await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate)
+    // A cruise night may NAME its ship for this tier, exactly as a hotel night
+    // names its hotel. One sailing, so the first cruise day that says which
+    // ship decides it. Absent, the engine picks as it always has.
+    const chosenShip = cruiseDays.map(d => d.property_by_tier?.[tier]).find(Boolean) ?? null
+    const cr = await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate, {
+      rateId: chosenShip,
+    })
     if (cr && cr.source === 'db') {
       cruiseRates = cr
     } else if (cr?.ambiguous) {

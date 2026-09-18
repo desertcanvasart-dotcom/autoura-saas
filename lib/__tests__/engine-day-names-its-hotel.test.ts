@@ -81,3 +81,53 @@ describe('a day that names its hotel', () => {
     expect(night?.unitCost).toBe(100)
   })
 })
+
+describe('a cruise night that names its ship', () => {
+  const ship = (id: string, name: string, ppd: number, extra: Record<string, unknown> = {}) => ({
+    // Shaped like the rows the other engine tests use: an unpinned lookup
+    // narrows by the embark city as well as the tier.
+    id, ship_name: name, tier: 'standard', is_active: true, embark_city: 'Cairo', duration_nights: 2,
+    ppd_eur: ppd, single_supplement_eur: 0, triple_reduction_eur: 0, ...extra,
+  })
+
+  /** The fixture trip with its nights aboard, and a ship named per tier. */
+  async function priceCruise(ships: Array<Record<string, unknown>>, chosen?: Record<string, string>) {
+    const tables = fullRateTables()
+    tables.nile_cruises = ships
+    const template = JSON.parse(JSON.stringify(cairoTemplateRow))
+    for (const d of template.itinerary) {
+      if (d.accommodation_type === 'hotel') {
+        d.accommodation_type = 'cruise'
+        if (chosen) d.property_by_tier = chosen
+      }
+    }
+    tables.tour_templates = [template]
+    setMockTables(tables)
+    return calculateDayBasedPricing({
+      templateId: TEMPLATE_ID, tenantId: 'test-tenant', tier: 'standard',
+      isEurPassport: true, language: 'English', marginPercent: 25,
+    })
+  }
+
+  it('is priced from THAT ship', async () => {
+    const result = await priceCruise([ship('c1', 'Sun Boat', 150), ship('c2', 'Al Farida', 320)], { standard: 'c2' })
+    const night = result.services.find(s => s.serviceType === 'cruise' && !s.unpriced)
+    expect(night?.serviceName).toContain('Al Farida')
+    expect(night?.unitCost).toBe(320)
+  })
+
+  it('a named ship that was switched off is a gap, not the other ship', async () => {
+    const result = await priceCruise(
+      [ship('c1', 'Sun Boat', 150), ship('c2', 'Al Farida', 320, { is_active: false })],
+      { standard: 'c2' }
+    )
+    expect(result.complete).toBe(false)
+    expect(result.services.some(s => s.serviceType === 'cruise' && s.unitCost === 150)).toBe(false)
+  })
+
+  it('without a choice it picks as it always has', async () => {
+    const result = await priceCruise([ship('c1', 'Sun Boat', 150)])
+    const night = result.services.find(s => s.serviceType === 'cruise' && !s.unpriced)
+    expect(night?.unitCost).toBe(150)
+  })
+})
