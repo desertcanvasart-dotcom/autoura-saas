@@ -6,6 +6,8 @@
 // ============================================
 
 import { useEffect, useState } from 'react'
+import { DayBandBlock, groupByDay } from '@/components/pricing/DayBand'
+import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { todayLocal } from '@/lib/today'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -610,15 +612,32 @@ export default function TourDetailPage() {
                 {showBreakdown && pricing.services.length > 0 && (
                   <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                     <h4 className="text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wide">Services Included</h4>
-                    <div className="space-y-2">
-                      {pricing.services.map((service, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-gray-600">
-                            <span>{getCategoryIcon(service.service_category)}</span>
-                            <span className="truncate max-w-[180px]">{service.service_name}</span>
-                          </span>
-                          <span className="text-gray-900 font-medium">€{service.line_total.toFixed(0)}</span>
-                        </div>
+                    {/* Each day its own band, in the order the day runs — the
+                        same rule the engine and the calculator use. */}
+                    <div className="space-y-3">
+                      {groupByDay(
+                        sortByItineraryFlow(pricing.services, s => ({
+                          id: (s as { service_id?: string }).service_id ?? '',
+                          category: s.service_category,
+                          dayNumber: (s as { day_number?: number | null }).day_number ?? null,
+                        })),
+                        s => (s as { day_number?: number | null }).day_number ?? null
+                      ).map(group => (
+                        <DayBandBlock key={group.day ?? 'whole-trip'} day={group.day}>
+                          {group.lines.map((service, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-sm">
+                              <span className="flex items-center gap-2 text-gray-600">
+                                <span>{getCategoryIcon(service.service_category)}</span>
+                                <span className="truncate max-w-[180px]">{service.service_name}</span>
+                              </span>
+                              {(service as { unpriced?: boolean }).unpriced ? (
+                                <span className="text-red-600 font-medium">No rate</span>
+                              ) : (
+                                <span className="text-gray-900 font-medium">€{service.line_total.toFixed(0)}</span>
+                              )}
+                            </div>
+                          ))}
+                        </DayBandBlock>
                       ))}
                     </div>
                     <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between text-sm font-medium">
