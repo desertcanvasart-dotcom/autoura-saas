@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { bareAddress } from '@/lib/email/office-addresses'
@@ -27,10 +26,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'A sender email address is required' }, { status: 400 })
   }
 
-  // The table arrives with migration 368; the cast goes away with the
-  // `npm run types:generate` that follows it, since the generated types come
-  // from the live schema.
-  const { error } = await (auth.supabase! as unknown as { from: (t: string) => any })
+  const { error } = await auth.supabase!
     .from('email_lead_dismissals')
     .upsert(
       {
