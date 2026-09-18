@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
         unread_messages,
         status,
         is_starred,
+        awaiting_reply_since,
         client:clients(id, first_name, last_name, email)
       `)
       .eq('tenant_id', tenant_id)
@@ -42,6 +43,10 @@ export async function GET(request: NextRequest) {
       .limit(100)
 
     if (clientId) query = query.eq('client_id', clientId)
+    // Only the conversations waiting on US (migration 366). Not the same as
+    // unread: a message someone opened and did not answer is exactly the one
+    // that goes missing.
+    if (searchParams.get('awaiting') === 'true') query = query.not('awaiting_reply_since', 'is', null)
     if (search) query = query.or(`contact_email.ilike.%${search}%,contact_name.ilike.%${search}%`)
 
     const { data, error } = await query
@@ -59,6 +64,7 @@ export async function GET(request: NextRequest) {
       unread_count: c.unread_messages || 0,
       status: c.status,
       is_starred: c.is_starred,
+      awaiting_reply_since: c.awaiting_reply_since ?? null,
       client: c.client
         ? { ...c.client, full_name: `${c.client.first_name || ''} ${c.client.last_name || ''}`.trim() }
         : null,

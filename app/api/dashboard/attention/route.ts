@@ -16,6 +16,8 @@ import {
   type AttentionBooking,
   type AttentionPassenger,
   type AttentionChangeRequest,
+  buildAwaitingReplyItems,
+  type AwaitingConversation,
   AttentionExtraRequest,
 } from '@/lib/dashboard/attention'
 
@@ -62,8 +64,26 @@ export async function GET() {
     const itineraryIds = [...new Set(rows.map(b => b.itinerary_id).filter((v): v is string => !!v))]
     const clientIds = [...new Set(rows.map(b => b.client_id).filter((v): v is string => !!v))]
 
+    // Customers waiting on us — read whether or not there are bookings, since
+    // someone who wrote in is waiting either way (migration 366).
+    const awaitingRows = await supabase
+      .from('unified_conversations')
+      .select('id, contact_name, contact_email, awaiting_reply_since')
+      .not('awaiting_reply_since', 'is', null)
+      .order('awaiting_reply_since', { ascending: true })
+      .limit(50)
+    // The cast goes away with `npm run types:generate` once migration 366 is
+    // applied: the generated types come from the live schema. A database
+    // without the column contributes nothing rather than sinking the list.
+    const awaitingItems = buildAwaitingReplyItems(
+      (awaitingRows.error ? [] : (awaitingRows.data ?? [])) as unknown as AwaitingConversation[]
+    )
+
     if (bookingIds.length === 0) {
-      return NextResponse.json({ success: true, data: { items: [], scannedBookings: 0 } })
+      return NextResponse.json({
+        success: true,
+        data: { items: awaitingItems, scannedBookings: 0 },
+      })
     }
 
     // Portal extras waiting on the office (migration 321). The ids came from
@@ -117,7 +137,13 @@ export async function GET() {
       today,
     })
 
-    return NextResponse.json({ success: true, data: result })
+    return NextResponse.json({
+
+      success: true,
+
+      data: { ...result, items: [...awaitingItems, ...result.items] },
+
+    })
   } catch (error) {
     console.error('Error building attention list:', error)
     return NextResponse.json({ success: false, error: 'Failed to build the attention list' }, { status: 500 })

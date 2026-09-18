@@ -5,6 +5,8 @@ import { RefreshCw, Loader2, Mail, Archive, User } from 'lucide-react'
 import ChannelBadge from './ChannelBadge'
 
 interface Conversation {
+  /** Set while a customer is waiting on us (migration 366). */
+  awaiting_reply_since?: string | null
   id: string
   thread_id: string
   client_email: string
@@ -29,16 +31,19 @@ export default function UnifiedConversationList({ onSelectConversation, selected
   const [search, setSearch] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [filter, setFilter] = useState<'active' | 'archived'>('active')
+  // "Waiting on us": a customer wrote and nobody has answered since.
+  const [awaitingOnly, setAwaitingOnly] = useState(false)
 
   const fetchConversations = useCallback(async () => {
     try {
       const params = new URLSearchParams({ status: filter })
       if (search) params.set('search', search)
+      if (awaitingOnly) params.set('awaiting', 'true')
       const res = await fetch(`/api/email/conversations?${params}`)
       const data = await res.json()
       if (data.success) setConversations(data.conversations || [])
     } catch {} finally { setLoading(false) }
-  }, [filter, search])
+  }, [filter, search, awaitingOnly])
 
   useEffect(() => {
     setLoading(true)
@@ -75,6 +80,15 @@ export default function UnifiedConversationList({ onSelectConversation, selected
       <div className="px-4 py-3 border-b border-gray-200">
         <div className="flex items-center justify-between mb-2">
           <h2 className="font-semibold text-gray-800">Email Conversations</h2>
+          <button
+            onClick={() => setAwaitingOnly(v => !v)}
+            className={`text-[11px] px-2 py-1 rounded-lg font-medium mr-auto ml-2 ${
+              awaitingOnly ? 'bg-amber-100 text-amber-800' : 'text-gray-500 hover:bg-gray-100'
+            }`}
+            title="Conversations a customer is waiting on"
+          >
+            Waiting on us
+          </button>
           <button onClick={handleSync} disabled={syncing} className="p-1.5 text-gray-400 hover:text-[#647C47] rounded-lg hover:bg-gray-100">
             {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           </button>
@@ -117,6 +131,13 @@ export default function UnifiedConversationList({ onSelectConversation, selected
                     </span>
                     {conv.unread_count > 0 && (
                       <span className="bg-[#647C47] text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0">{conv.unread_count}</span>
+                    )}
+                    {/* Waiting on us, and for how long — dated from the
+                        customer's FIRST unanswered message. */}
+                    {conv.awaiting_reply_since && (
+                      <span className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium">
+                        Waiting {timeAgo(conv.awaiting_reply_since)}
+                      </span>
                     )}
                   </div>
                   <p className="text-xs font-medium text-gray-700 truncate">{conv.subject || '(no subject)'}</p>
