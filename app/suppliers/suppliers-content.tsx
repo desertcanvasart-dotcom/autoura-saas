@@ -3,6 +3,7 @@
 import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
 import ReconcileCodes from '@/components/suppliers/ReconcileCodes'
+import ToolbarMenu from '@/components/ToolbarMenu'
 
 import { useState, useEffect, useRef } from 'react'
 import { showToast } from '@/app/contexts/ToastContext'
@@ -820,24 +821,6 @@ export default function SuppliersContent() {
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportFile(f) }}
               />
-              <button
-                onClick={handleSampleCsv}
-                title="Download the import format with one example row — fill it with your data and import"
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                <FileText className="w-4 h-4" /> Sample CSV
-              </button>
-              <button
-                onClick={() => importInputRef.current?.click()}
-                title="Import suppliers from a CSV (the Export format round-trips)"
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                <Upload className="w-4 h-4" /> Import
-              </button>
-              <button onClick={handleExport} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
-                <Download className="w-4 h-4" /> Export
-              </button>
-              <div className="w-px h-6 bg-gray-200" />
               <input
                 ref={propertiesInputRef}
                 type="file"
@@ -845,20 +828,56 @@ export default function SuppliersContent() {
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportProperties(f) }}
               />
-              <button
-                onClick={handleExportProperties}
-                title="Download every property (ships, hotels, trains) as one row each — edit in a spreadsheet and import it back"
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                <Ship className="w-4 h-4" /> Properties CSV
-              </button>
-              <button
-                onClick={() => propertiesInputRef.current?.click()}
-                title="Import an edited properties sheet — rows update by Property ID, or by supplier + kind + name"
-                className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-              >
-                <Upload className="w-4 h-4" /> Import Properties
-              </button>
+              {/* Five grey CSV buttons became one menu. Two sheets, because a
+                  supplier and one of its ships are different rows — that is
+                  the data model — but each item can now say what it does and
+                  what it matches rows on. */}
+              <ToolbarMenu
+                label="Import / Export"
+                icon={<FileText className="w-4 h-4" />}
+                groups={[
+                  {
+                    label: 'Suppliers — one row per supplier',
+                    items: [
+                      {
+                        label: 'Sample sheet',
+                        description: 'The columns, with one example row showing the allowed values.',
+                        icon: <FileText className="w-4 h-4" />,
+                        onSelect: handleSampleCsv,
+                      },
+                      {
+                        label: 'Export suppliers',
+                        description: 'Everything listed here, in the format the import reads back.',
+                        icon: <Download className="w-4 h-4" />,
+                        onSelect: handleExport,
+                      },
+                      {
+                        label: 'Import suppliers',
+                        description: 'Adds new suppliers and updates existing ones by code.',
+                        icon: <Upload className="w-4 h-4" />,
+                        onSelect: () => importInputRef.current?.click(),
+                      },
+                    ],
+                  },
+                  {
+                    label: 'Properties — one row per ship, hotel or train',
+                    items: [
+                      {
+                        label: 'Export properties',
+                        description: 'Every property its supplier owns, one row each — edit in a spreadsheet and bring it back.',
+                        icon: <Ship className="w-4 h-4" />,
+                        onSelect: handleExportProperties,
+                      },
+                      {
+                        label: 'Import properties',
+                        description: 'Rows match on Property ID, or on supplier + kind + name when the ID is blank.',
+                        icon: <Upload className="w-4 h-4" />,
+                        onSelect: () => propertiesInputRef.current?.click(),
+                      },
+                    ],
+                  },
+                ]}
+              />
               <ReconcileCodes onApplied={fetchSuppliers} />
               <button onClick={handleAdd} className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700">
                 <Plus className="w-4 h-4" /> Add Supplier
