@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { claimSend, finishSend, threadConflict, replyBodyHash } from '@/lib/email/send-guard'
+import { replyHeaders, threadingLines, type ThreadingHeaders } from '@/lib/email/threading'
 import { refreshAccessToken } from '@/lib/gmail'
 import { google } from 'googleapis'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -171,13 +172,18 @@ export async function POST(request: NextRequest) {
 
     const gmail = google.gmail({ version: 'v1', auth: getOAuth2Client() })
 
+    // What the customer's mail client threads on. Gmail's threadId keeps the
+    // conversation together for US; In-Reply-To and References keep it
+    // together for THEM.
+    const threading = threadId ? await replyHeaders(gmail, String(threadId)) : {}
+
     // Build email with or without attachments
     let rawEmail: string
 
     if (attachments && attachments.length > 0) {
-      rawEmail = buildEmailWithAttachments(to, subject, body, attachments)
+      rawEmail = buildEmailWithAttachments(to, subject, body, attachments, threading)
     } else {
-      rawEmail = buildSimpleEmail(to, subject, body)
+      rawEmail = buildSimpleEmail(to, subject, body, threading)
     }
 
     // Send email
@@ -330,10 +336,11 @@ function stripHeader(value: string): string {
   return String(value ?? '').replace(/[\r\n]+/g, ' ').trim()
 }
 
-function buildSimpleEmail(to: string, subject: string, body: string): string {
+function buildSimpleEmail(to: string, subject: string, body: string, threading: ThreadingHeaders = {}): string {
   const emailLines = [
     `To: ${stripHeader(to)}`,
     `Subject: ${stripHeader(subject)}`,
+    ...threadingLines(threading),
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
     '',
@@ -351,13 +358,15 @@ function buildEmailWithAttachments(
   to: string, 
   subject: string, 
   body: string, 
-  attachments: Attachment[]
+  attachments: Attachment[],
+  threading: ThreadingHeaders = {}
 ): string {
   const boundary = `boundary_${Date.now()}`
   
   const emailParts = [
     `To: ${stripHeader(to)}`,
     `Subject: ${stripHeader(subject)}`,
+    ...threadingLines(threading),
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',

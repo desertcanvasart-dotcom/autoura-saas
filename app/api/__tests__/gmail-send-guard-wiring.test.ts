@@ -67,3 +67,19 @@ describe('the reply composer', () => {
     expect(composer).toContain('return send(true)')
   })
 })
+
+describe('threading', () => {
+  it('reads the thread’s headers before building the message', () => {
+    expect(route).toContain('replyHeaders(gmail, String(threadId))')
+    expect(route.indexOf('replyHeaders(')).toBeLessThan(route.indexOf('buildSimpleEmail(to'))
+  })
+
+  it('passes them to both builders — a reply with an attachment threads too', () => {
+    expect(route).toContain('buildEmailWithAttachments(to, subject, body, attachments, threading)')
+    expect(route).toContain('buildSimpleEmail(to, subject, body, threading)')
+  })
+
+  it('asks for them only when there is a thread to answer', () => {
+    expect(route).toMatch(/threadId \? await replyHeaders\(/)
+  })
+})
