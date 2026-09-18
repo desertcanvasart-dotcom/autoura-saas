@@ -127,6 +127,8 @@ interface ItineraryDay {
   transport_rate_id?: string
   /** The hotel for this night, chosen per tier — the engine pins to it. */
   property_by_tier?: Record<string, string>
+  /** A non-sightseeing transfer in town: sound & light, the market, dinner. */
+  city_transfer?: boolean
 }
 
 /** A ticket row the Travel picker can name (B-item 2). */
@@ -402,6 +404,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   const [dayCity, setDayCity] = useState('')
   /** The hotel chosen for this night, per tier. Empty = the engine picks. */
   const [dayProperties, setDayProperties] = useState<Record<string, string>>({})
+  /** A transfer to somewhere else in town that is not sightseeing. */
+  const [dayCityTransfer, setDayCityTransfer] = useState(false)
   /** What is on file for this day's city, per tier, for the pickers. */
   const [cityHotels, setCityHotels] = useState<Record<string, Array<{ id: string; name: string }>>>({})
   const [dayNight, setDayNight] = useState<'' | 'hotel' | 'cruise' | 'none'>('')
@@ -463,6 +467,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayCity('')
     setDayNight('')
     setDayProperties({})
+    setDayCityTransfer(false)
     setEditingDayIndex(null)
   }
 
@@ -481,6 +486,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayTransportRateId(day.transport_rate_id || '')
     setDayCity(day.city || '')
     setDayProperties((day.property_by_tier as Record<string, string>) || {})
+    setDayCityTransfer(day.city_transfer === true)
     setDayNight((day.accommodation_type as typeof dayNight) || '')
     setDayMealsError(null)
   }
@@ -519,6 +525,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       // engine was reading from its words.
       ...(dayCity.trim() ? { city: dayCity.trim() } : {}),
       ...(dayNight ? { accommodation_type: dayNight } : {}),
+      ...(dayCityTransfer ? { city_transfer: true } : {}),
       // Only the tiers that actually named one. An empty map is the same as
       // saying nothing: the engine picks, as it always has.
       ...(Object.values(dayProperties).some(Boolean)
@@ -621,6 +628,25 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
             </p>
           </div>
         </div>
+
+        {/* A day tour is the sightseeing. This is getting somewhere else in
+            town — the sound & light show, the market in Luxor or Aswan, an
+            evening out. Different rates, and a day can need both. */}
+        <label className="flex items-start gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={dayCityTransfer}
+            onChange={(e) => setDayCityTransfer(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            Local transfer this day
+            <span className="block text-[11px] text-gray-500">
+              Somewhere else in town that is not sightseeing — the sound &amp; light show, the
+              market, an evening out. Dinner at a restaurant already adds its own transfer.
+            </span>
+          </span>
+        </label>
 
         {/* Which hotel, per tier. The same programme at two tiers is two
             different hotels, so the choice cannot be one value. Left on
@@ -833,6 +859,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                     ? 'No night'
                     : <span className="italic">night not stated — read from the title</span>}
                 </p>
+                {day.city_transfer && (
+                  <p className="text-xs text-purple-700 mt-0.5">🚐 Local transfer</p>
+                )}
                 {day.property_by_tier && Object.values(day.property_by_tier).some(Boolean) && (
                   <p className="text-xs text-indigo-700 mt-0.5">
                     🏨 Named hotel for {Object.values(day.property_by_tier).filter(Boolean).length} tier

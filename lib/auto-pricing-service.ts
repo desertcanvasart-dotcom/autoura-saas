@@ -170,6 +170,13 @@ export interface ItineraryDay {
    *  whatever else happens to be in that city. Absent = the engine picks, as
    *  it always has. */
   property_by_tier?: Record<string, string>
+  /** A transfer to somewhere else in town that is NOT sightseeing: the sound &
+   *  light show, the market in Luxor or Aswan, an evening out. A day tour is
+   *  the sightseeing; this is the getting there and back (operator,
+   *  2026-09-18). It sits on the DAY rather than in `services` because an
+   *  explicit services object REPLACES the defaults, so a flag in there would
+   *  silently drop the airport and hotel ones. */
+  city_transfer?: boolean
   services: {
     airport_arrival: boolean
     airport_departure: boolean
@@ -760,6 +767,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       attraction_ids,
       transport_type,
       transport_rate_id,
+      city_transfer: day.city_transfer === true,
       property_by_tier: day.property_by_tier && typeof day.property_by_tier === 'object'
         ? (day.property_by_tier as Record<string, string>)
         : undefined,
@@ -2117,6 +2125,40 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
   return cache
 }
 
+// ============================================
+// The transfers a day needs BESIDES its sightseeing
+// ============================================
+// A day tour is the sightseeing. A city transfer is getting somewhere else in
+// town — dinner out, the sound & light show, the market in Luxor or Aswan.
+// They are different rates and a day can need both, but the engine only ever
+// asked for ONE thing per day, so 398 City Transfer rows and 30 Outside Dinner
+// Transfer rows on production were unreachable.
+//
+// Derived from what the day STATES, never from its wording: dinner at a
+// restaurant means a transfer to it, and the local transfer is a box the
+// operator ticks on the day.
+
+export interface ExtraTransfer {
+  serviceType: TransportServiceType
+  /** What the line says on the quote. */
+  label: string
+  /** Part of the line id, so two extras on a day cannot collide. */
+  slug: string
+}
+
+export function extraTransfersFor(day: ItineraryDay): ExtraTransfer[] {
+  const extras: ExtraTransfer[] = []
+  // Eating out is a stated meal status ('external'), so the transfer to the
+  // restaurant is stated too — no guessing from the title.
+  if (day.meals?.dinner === 'external') {
+    extras.push({ serviceType: 'outside_dinner', label: 'Dinner transfer', slug: 'dinner-transfer' })
+  }
+  if (day.city_transfer) {
+    extras.push({ serviceType: 'city_transfer', label: 'Local transfer', slug: 'city-transfer' })
+  }
+  return extras
+}
+
 /**
  * Smart transport rate lookup with fallbacks
  */
@@ -3463,6 +3505,48 @@ export async function calculateDayBasedPricing(
         lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
         message: `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
       })
+    }
+  }
+
+  // The transfers a day needs BESIDES its sightseeing: dinner out, and the
+  // local transfer the operator ticked. Priced per day, at the day's city.
+  for (const day of itinerary) {
+    for (const extra of extraTransfersFor(day)) {
+      const match = findTransportRate(transportCache, {
+        serviceType: extra.serviceType,
+        city: day.city,
+        duration: 'one_way',
+        area: null,
+        vehicleType: baseVehicleType,
+      })
+      if (match && match.source === 'db') {
+        baseTransportCost += match.rate.base_rate_eur
+        services.push({
+          id: `day${day.day}-${extra.slug}`,
+          dayNumber: day.day,
+          serviceType: 'transportation',
+          serviceName: match.rate.route_name || `${extra.label} - ${day.city}`,
+          quantity: 1,
+          quantityMode: 'fixed',
+          unitCost: match.rate.base_rate_eur,
+          lineTotal: match.rate.base_rate_eur,
+          rateSource: 'transportation_rates',
+          isPerPax: false,
+          isOptional: false,
+          notes: `${extra.serviceType} | one_way`,
+        })
+      } else {
+        addHole({
+          kind: 'transport',
+          reason: match ? 'fuzzy' : 'missing',
+          tier,
+          dayNumber: day.day,
+          city: day.city,
+          vehicleType: baseVehicleType,
+          lookupAttempted: `${extra.serviceType}/one_way ${baseVehicleType} in ${day.city}`,
+          message: `No ${extra.label.toLowerCase()} rate for ${baseVehicleType} in ${day.city || 'this day'}. Add it in Rates → Transportation.`,
+        })
+      }
     }
   }
 

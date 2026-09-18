@@ -76,6 +76,9 @@ export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   { name: 'hotel_checkin', label: 'Hotel Check-in', kind: 'bool' },
   { name: 'hotel_checkout', label: 'Hotel Check-out', kind: 'bool' },
   { name: 'guide_required', label: 'Guide', kind: 'bool' },
+  // A transfer to somewhere else in town that is not sightseeing: the sound &
+  // light show, the market, an evening out (operator, 2026-09-18).
+  { name: 'city_transfer', label: 'Local Transfer', kind: 'bool' },
   { name: 'description', label: 'Description' },
 ]
 
@@ -124,6 +127,7 @@ export function serializeDaysCsv(
         hotel_checkin: !!services.hotel_checkin,
         hotel_checkout: !!services.hotel_checkout,
         guide_required: !!services.guide_required,
+        city_transfer: !!d.city_transfer,
         description: d.description ?? '',
       }
       rows.push(
@@ -328,6 +332,7 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
     // night". Left unset, the engine infers it as it always has; written as
     // 'none' it would remove the bed.
     ...(rec.accommodation_type ? { accommodation_type: rec.accommodation_type } : {}),
+    ...(rec.city_transfer ? { city_transfer: true } : {}),
     meals: {
       breakfast: rec.breakfast ?? 'none',
       lunch: rec.lunch ?? 'none',
