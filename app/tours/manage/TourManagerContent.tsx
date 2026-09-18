@@ -125,6 +125,8 @@ interface ItineraryDay {
   /** The EXACT ticket row when several serve the route ("Auto" = resolve
    *  by route at pricing time; ambiguity becomes a named hole). */
   transport_rate_id?: string
+  /** The hotel for this night, chosen per tier — the engine pins to it. */
+  property_by_tier?: Record<string, string>
 }
 
 /** A ticket row the Travel picker can name (B-item 2). */
@@ -373,9 +375,12 @@ interface ItineraryEditorProps {
   attractionOptions: Attraction[]
   /** Ticket catalogues for the Travel picker (B-item 2). */
   ticketOptions: Record<'flight' | 'train' | 'sleeping_train', TicketOption[]>
+  /** The tiers this template is sold at: a night is chosen PER TIER, because
+   *  the same programme at two tiers is two different hotels. */
+  tiers: Array<{ key: string; label: string }>
 }
 
-function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions }: ItineraryEditorProps) {
+function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions, tiers }: ItineraryEditorProps) {
   const [dayTitle, setDayTitle] = useState('')
   const [dayDescription, setDayDescription] = useState('')
   // Tri-state per meal. The checkboxes could only say included-or-nothing,
@@ -395,9 +400,46 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   // the title before: an unplaced day priced as Cairo, and one mention of a
   // cruise made every night a cruise night.
   const [dayCity, setDayCity] = useState('')
+  /** The hotel chosen for this night, per tier. Empty = the engine picks. */
+  const [dayProperties, setDayProperties] = useState<Record<string, string>>({})
+  /** What is on file for this day's city, per tier, for the pickers. */
+  const [cityHotels, setCityHotels] = useState<Record<string, Array<{ id: string; name: string }>>>({})
   const [dayNight, setDayNight] = useState<'' | 'hotel' | 'cruise' | 'none'>('')
   /** The day being edited, or null when the form is adding a new one. */
   const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null)
+
+  // What this city has on file, per tier. Loaded only when a city is named:
+  // the picker is an offer to be exact, not a requirement.
+  useEffect(() => {
+    const city = dayCity.trim()
+    if (!city || tiers.length === 0) {
+      setCityHotels({})
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      const next: Record<string, Array<{ id: string; name: string }>> = {}
+      await Promise.all(
+        tiers.map(async t => {
+          try {
+            const res = await fetch(
+              `/api/rates/hotels?city=${encodeURIComponent(city)}&tier=${encodeURIComponent(t.key)}&active_only=true`
+            )
+            const data = await res.json()
+            const rows = (data?.data ?? data?.rates ?? []) as Array<Record<string, unknown>>
+            next[t.key] = rows.map(r => ({
+              id: String(r.id),
+              name: String(r.property_name ?? r.name ?? 'Unnamed'),
+            }))
+          } catch {
+            next[t.key] = []
+          }
+        })
+      )
+      if (!cancelled) setCityHotels(next)
+    })()
+    return () => { cancelled = true }
+  }, [dayCity, tiers])
 
   const setMeal = (slot: MealSlot, status: DayMealStatus | '') => {
     setDayMealsError(null)
@@ -420,6 +462,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayTransportRateId('')
     setDayCity('')
     setDayNight('')
+    setDayProperties({})
     setEditingDayIndex(null)
   }
 
@@ -437,6 +480,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayTransportType((day.transport_type as typeof dayTransportType) || '')
     setDayTransportRateId(day.transport_rate_id || '')
     setDayCity(day.city || '')
+    setDayProperties((day.property_by_tier as Record<string, string>) || {})
     setDayNight((day.accommodation_type as typeof dayNight) || '')
     setDayMealsError(null)
   }
@@ -475,6 +519,15 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       // engine was reading from its words.
       ...(dayCity.trim() ? { city: dayCity.trim() } : {}),
       ...(dayNight ? { accommodation_type: dayNight } : {}),
+      // Only the tiers that actually named one. An empty map is the same as
+      // saying nothing: the engine picks, as it always has.
+      ...(Object.values(dayProperties).some(Boolean)
+        ? {
+            property_by_tier: Object.fromEntries(
+              Object.entries(dayProperties).filter(([, id]) => Boolean(id))
+            ),
+          }
+        : {}),
     }
 
     if (editingDayIndex === null) {
@@ -568,6 +621,47 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
             </p>
           </div>
         </div>
+
+        {/* Which hotel, per tier. The same programme at two tiers is two
+            different hotels, so the choice cannot be one value. Left on
+            Automatic, pricing picks as it always has — and refuses when the
+            city holds several it cannot choose between. */}
+        {dayNight !== 'none' && dayCity.trim() && tiers.length > 0 && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Hotel for this night <span className="text-gray-400 font-normal">(optional, per tier)</span>
+            </label>
+            <div className="space-y-2">
+              {tiers.map(tier => {
+                const options = cityHotels[tier.key] ?? []
+                return (
+                  <div key={tier.key} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-24 shrink-0">{tier.label}</span>
+                    <select
+                      value={dayProperties[tier.key] ?? ''}
+                      onChange={(e) =>
+                        setDayProperties(prev => ({ ...prev, [tier.key]: e.target.value }))
+                      }
+                      className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white"
+                    >
+                      <option value="">Automatic — whatever this tier has in {dayCity.trim()}</option>
+                      {options.map(o => (
+                        <option key={o.id} value={o.id}>{o.name}</option>
+                      ))}
+                    </select>
+                    {options.length === 0 && (
+                      <span className="text-[11px] text-amber-700 shrink-0">none on file</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1">
+              A named hotel is priced exactly. If it is later switched off or deleted, the quote
+              shows a gap rather than quietly using a different one.
+            </p>
+          </div>
+        )}
 
         {/* Title */}
         <div>
@@ -739,6 +833,12 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                     ? 'No night'
                     : <span className="italic">night not stated — read from the title</span>}
                 </p>
+                {day.property_by_tier && Object.values(day.property_by_tier).some(Boolean) && (
+                  <p className="text-xs text-indigo-700 mt-0.5">
+                    🏨 Named hotel for {Object.values(day.property_by_tier).filter(Boolean).length} tier
+                    {Object.values(day.property_by_tier).filter(Boolean).length === 1 ? '' : 's'}
+                  </p>
+                )}
                 {day.attraction_ids && day.attraction_ids.length > 0 && (
                   <p className="text-xs text-green-700 mt-0.5">
                     Attractions (priced by pick): {(day.attractions || []).join(', ')}
@@ -1048,6 +1148,9 @@ export default function TourManagerContent() {
     () => new Set(tourTypeItems.filter(i => isSingleDayType(i)).map(i => i.key)),
     [tourTypeItems]
   )
+  // The agency's tiers, for choosing a night's hotel per tier: the same
+  // programme at two tiers is two different hotels.
+  const { entries: templateTierEntries } = useTierConfigs()
   const { items: physicalLevelItems } = useVocabulary('tour_physical_level')
   const { items: bestForItems } = useVocabulary('tour_best_for')
   const { items: themeItems } = useVocabulary('tour_theme')
@@ -2672,6 +2775,7 @@ export default function TourManagerContent() {
                       onChange={handleItineraryChange}
                       attractionOptions={attractions}
                       ticketOptions={ticketOptions}
+                      tiers={templateTierEntries.map(t => ({ key: t.key, label: t.label }))}
                     />
                   </div>
 

@@ -59,3 +59,28 @@ describe('the day says where it is and where the night is', () => {
     expect(SOURCE).toContain('night not stated — read from the title')
   })
 })
+
+describe('choosing the hotel for a night', () => {
+  it('offers a choice per TIER — the same programme at two tiers is two hotels', () => {
+    expect(SOURCE).toContain('Hotel for this night')
+    expect(SOURCE).toMatch(/tiers\.map\(tier => \{/)
+    expect(SOURCE).toContain('setDayProperties')
+  })
+
+  it('defaults to Automatic, so nothing is chosen for the operator', () => {
+    expect(SOURCE).toMatch(/Automatic — whatever this tier has in/)
+  })
+
+  it('writes only the tiers that named one', () => {
+    expect(SOURCE).toMatch(/Object\.values\(dayProperties\)\.some\(Boolean\)/)
+    expect(SOURCE).toMatch(/\.filter\(\(\[, id\]\) => Boolean\(id\)\)/)
+  })
+
+  it('offers it only where a night is actually spent', () => {
+    expect(SOURCE).toMatch(/dayNight !== 'none' && dayCity\.trim\(\) && tiers\.length > 0/)
+  })
+
+  it('says what a named hotel means when it later disappears', () => {
+    expect(SOURCE).toMatch(/shows a gap rather than quietly using a different one/)
+  })
+})

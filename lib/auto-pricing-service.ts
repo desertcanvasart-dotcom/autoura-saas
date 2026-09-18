@@ -163,6 +163,13 @@ export interface ItineraryDay {
   transport_type?: 'flight' | 'train' | 'sleeping_train'
   /** The EXACT ticket row when several serve the route; named rows win. */
   transport_rate_id?: string
+  /** The property this night is spent at, chosen per tier: the same programme
+   *  is sold at several tiers and each has its own hotel. The value is the
+   *  rate row's id, which the engine PINS to — a chosen property that is
+   *  switched off or deleted becomes a hole, never a silent substitution by
+   *  whatever else happens to be in that city. Absent = the engine picks, as
+   *  it always has. */
+  property_by_tier?: Record<string, string>
   services: {
     airport_arrival: boolean
     airport_departure: boolean
@@ -753,6 +760,9 @@ export function parseItinerary(itineraryData: any, opts?: {
       attraction_ids,
       transport_type,
       transport_rate_id,
+      property_by_tier: day.property_by_tier && typeof day.property_by_tier === 'object'
+        ? (day.property_by_tier as Record<string, string>)
+        : undefined,
       services,
       // Parse transport overrides if present
       transport: day.transport || undefined
@@ -2383,9 +2393,21 @@ export async function calculateDayBasedPricing(
   }
 
   const hotelCities = [...new Set(hotelDays.map(d => d.city).filter(c => c && c.trim()))]
+  // A day may NAME the hotel for this tier (property_by_tier). The engine
+  // pins to it rather than picking: a chosen hotel that is switched off or
+  // deleted becomes a hole, never a silent substitution by whatever else is
+  // in that city. One choice per city per tier, taken from the first day
+  // there that makes one.
+  const chosenByCity = new Map<string, string>()
+  for (const day of hotelDays) {
+    const chosen = day.property_by_tier?.[tier]
+    if (chosen && day.city && !chosenByCity.has(day.city)) chosenByCity.set(day.city, chosen)
+  }
   const hotelRatesMap = new Map<string, NonNullable<Awaited<ReturnType<typeof getHotelRates>>>>()
   const hotelResults = await Promise.all(
-    hotelCities.map(city => getHotelRates(catalogScope, city, tier, travelDate))
+    hotelCities.map(city =>
+      getHotelRates(catalogScope, city, tier, travelDate, { rateId: chosenByCity.get(city) ?? null })
+    )
   )
   hotelCities.forEach((city, i) => {
     const rates = hotelResults[i]
