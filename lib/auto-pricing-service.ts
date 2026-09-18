@@ -487,9 +487,13 @@ export function getVehicleTypeByPax(totalPax: number, city?: string, bands?: Veh
 }
 
 /**
- * Get airport code from city name
+ * Get airport code from city name, or null when the city has no airport on
+ * file. It used to return 'CAI' for anything it did not recognise, so a
+ * "Marsa Alam" or misspelled arrival day was priced at CAIRO's meet & greet
+ * rate, with rateSource 'airport_staff_rates' and no hole — a wrong price a
+ * client could be sent. Callers record a hole instead.
  */
-export function getAirportCode(city: string): string {
+export function getAirportCode(city: string): string | null {
   const cityMap: Record<string, string> = {
     'cairo': 'CAI',
     'luxor': 'LXR',
@@ -500,7 +504,7 @@ export function getAirportCode(city: string): string {
     'alexandria': 'ALY',
     'abu simbel': 'ABS'
   }
-  return cityMap[city.toLowerCase()] || 'CAI'
+  return cityMap[(city || '').toLowerCase().trim()] ?? null
 }
 
 /**
@@ -2941,7 +2945,20 @@ export async function calculateDayBasedPricing(
     // ----- AIRPORT SERVICES (fixed per service) -----
     if (day.services.airport_arrival) {
       const airportCode = getAirportCode(day.city)
-      const rate = await getAirportServiceRate(catalogScope, airportCode, 'arrival', airportLevel)
+      const rate = airportCode
+        ? await getAirportServiceRate(catalogScope, airportCode, 'arrival', airportLevel)
+        : null
+      if (!airportCode) {
+        addHole({
+          kind: 'airport_service',
+          reason: 'missing',
+          tier,
+          dayNumber: day.day,
+          city: day.city,
+          lookupAttempted: `airport arrival meet & greet (${day.city || 'no city'})`,
+          message: `No airport is on file for "${day.city || 'this day'}", so the meet & greet cannot be priced. Name a city with an airport, or remove the service.`,
+        })
+      }
       if (rate != null) {
         fixedCosts += rate
         services.push({
@@ -2957,7 +2974,7 @@ export async function calculateDayBasedPricing(
           isPerPax: false,
           isOptional: false
         })
-      } else {
+      } else if (airportCode) {
         addHole({
           kind: 'airport_service',
           reason: 'missing',
@@ -2972,7 +2989,20 @@ export async function calculateDayBasedPricing(
 
     if (day.services.airport_departure) {
       const airportCode = getAirportCode(day.city)
-      const rate = await getAirportServiceRate(catalogScope, airportCode, 'departure', airportLevel)
+      const rate = airportCode
+        ? await getAirportServiceRate(catalogScope, airportCode, 'departure', airportLevel)
+        : null
+      if (!airportCode) {
+        addHole({
+          kind: 'airport_service',
+          reason: 'missing',
+          tier,
+          dayNumber: day.day,
+          city: day.city,
+          lookupAttempted: `airport departure departure assist (${day.city || 'no city'})`,
+          message: `No airport is on file for "${day.city || 'this day'}", so the departure assist cannot be priced. Name a city with an airport, or remove the service.`,
+        })
+      }
       if (rate != null) {
         fixedCosts += rate
         services.push({
@@ -2988,7 +3018,7 @@ export async function calculateDayBasedPricing(
           isPerPax: false,
           isOptional: false
         })
-      } else {
+      } else if (airportCode) {
         addHole({
           kind: 'airport_service',
           reason: 'missing',

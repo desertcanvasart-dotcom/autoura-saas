@@ -119,8 +119,8 @@ export async function GET(request: NextRequest) {
         }
 
         // Get auto-calculated price range
-        let startingFromPrice = null
-        let startingFromTier = null
+        let startingFromPrice: number | null = null
+        let startingFromTier: string | null = null
 
         // If template uses day builder, use auto-pricing
         if (template.uses_day_builder || template.pricing_mode === 'auto') {
@@ -146,12 +146,12 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Final fallback: calculate quick estimate
-        if (startingFromPrice === null) {
-          // Quick estimate: €100/day base + €50/day for activities
-          startingFromPrice = template.duration_days * 150
-          startingFromTier = 'standard'
-        }
+        // No invented estimate. This used to fall back to
+        // `duration_days * 150` labelled "standard", so a tour with no rates
+        // behind it showed a made-up per-person price on the card — and the
+        // filter below then hid the tours that had NO price, which meant the
+        // fabricated one was the only thing anybody ever saw. A tour with no
+        // price is listed without one.
 
         return {
           id: template.id,
@@ -193,11 +193,13 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    // Filter out templates with €Infinity or invalid pricing
-    const validTemplates = templatesWithPricing.filter(t => 
-      t.starting_from !== null && 
-      isFinite(t.starting_from) && 
-      t.starting_from > 0
+    // Drop a nonsense number (Infinity/NaN from a broken rate) by blanking the
+    // price — never by hiding the tour, which is what sent every card to the
+    // fabricated estimate above.
+    const validTemplates = templatesWithPricing.map(t =>
+      t.starting_from !== null && Number.isFinite(t.starting_from) && t.starting_from > 0
+        ? t
+        : { ...t, starting_from: null, starting_from_tier: null }
     )
 
     return NextResponse.json({

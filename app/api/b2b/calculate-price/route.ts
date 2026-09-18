@@ -13,6 +13,7 @@ import {
 import { parseOptionalSelection, isOptionalSelected } from '@/lib/b2b/optional-selection'
 import { composeQuoteTotals, optionalContribution, type OptionalContribution } from '@/lib/b2b/optional-pricing'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
+import { selectVehicleFromPackage } from '@/lib/pricing/package-vehicle'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getCurrencySymbol } from '@/lib/currency'
 
@@ -193,20 +194,6 @@ async function getTransportPackage(packageType: string, originCity: string, dest
   return normalized ?? null
 }
 
-// Select vehicle from transport package based on group size
-function selectVehicleFromPackage(pkg: any, numPax: number): { rate: number; vehicle: string } {
-  if (numPax <= pkg.sedan_capacity && pkg.sedan_rate) {
-    return { rate: pkg.sedan_rate, vehicle: 'Sedan' }
-  } else if (numPax <= pkg.minivan_capacity && pkg.minivan_rate) {
-    return { rate: pkg.minivan_rate, vehicle: 'Minivan' }
-  } else if (numPax <= pkg.van_capacity && pkg.van_rate) {
-    return { rate: pkg.van_rate, vehicle: 'Van' }
-  } else if (numPax <= pkg.minibus_capacity && pkg.minibus_rate) {
-    return { rate: pkg.minibus_rate, vehicle: 'Minibus' }
-  } else {
-    return { rate: pkg.bus_rate || pkg.minibus_rate, vehicle: 'Bus' }
-  }
-}
 
 // Select appropriate vehicle from vehicles table based on pax count and tier
 async function selectVehicleFromB2CTable(numPax: number, tier: string = 'standard', tenantId?: string): Promise<{ rate: number; vehicle: string; id: string } | null> {
@@ -651,8 +638,8 @@ export async function POST(request: NextRequest) {
       if (rateSource === 'manual' && service.service_category === 'transportation') {
         if (service.service_name?.toLowerCase().includes('sightseeing')) {
           const pkg = await getTransportPackage('cruise_sightseeing', 'Luxor', 'Aswan', tenantId)
-          if (pkg) {
-            const vehicle = selectVehicleFromPackage(pkg, num_pax)
+          const vehicle = pkg ? selectVehicleFromPackage(pkg, num_pax) : null
+          if (pkg && vehicle) {
             unitCost = vehicle.rate
             lineTotal = vehicle.rate
             effectiveQuantityMode = 'fixed'
@@ -664,8 +651,8 @@ export async function POST(request: NextRequest) {
         else if (service.service_name?.toLowerCase().includes('transfer') || 
                  service.service_name?.toLowerCase().includes('airport')) {
           const pkg = await getTransportPackage('cruise_transfer', 'Luxor', 'Aswan', tenantId)
-          if (pkg) {
-            const vehicle = selectVehicleFromPackage(pkg, num_pax)
+          const vehicle = pkg ? selectVehicleFromPackage(pkg, num_pax) : null
+          if (pkg && vehicle) {
             unitCost = vehicle.rate
             lineTotal = vehicle.rate
             effectiveQuantityMode = 'fixed'
@@ -850,8 +837,10 @@ export async function POST(request: NextRequest) {
         lineTotal = unitCost * quantity
       }
 
-      // Harness: a non-optional service with no real rate is a HOLE, not a guess.
-      if (!service.is_optional && unitCost === 0) {
+      // Harness: a non-optional service with no real rate is a HOLE, not a
+      // guess. `unitCost > 0` rather than `=== 0`: a null or NaN unit cost
+      // (an empty rate column) skipped this check and shipped a free line.
+      if (!service.is_optional && !(Number(unitCost) > 0)) {
         holes.push({
           kind: service.service_category,
           message: `No rate found for "${service.service_name}" (${service.service_category || 'service'}).`,
