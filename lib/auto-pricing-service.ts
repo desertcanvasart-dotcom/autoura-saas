@@ -90,13 +90,41 @@ export type MealKind = 'breakfast' | 'lunch' | 'dinner'
 export const MEAL_KINDS: readonly MealKind[] = ['breakfast', 'lunch', 'dinner']
 
 // Transport service types (normalized)
-export type TransportServiceType = 
+// The keys the RATES actually carry, which are the keys of the
+// transport_service_type vocabulary. Three of the old names existed nowhere in
+// the data — 'intercity_transfer' (the rows are intercity_dropoff /
+// intercity_day_trip / intercity_overnight, 939 of them), 'dinner_transfer'
+// (outside_dinner) and 'sound_light_transfer' (sound_light) — and the lookup
+// keys embed the service type, including the approximate fallbacks. So every
+// road transfer BETWEEN CITIES priced at nothing and became a hole, on every
+// programme, and dinner and sound & light transfers did the same.
+//
+// The trip shape the sibling app added a column for (one_way /
+// same_day_return / overnight_return) is already here, in these keys:
+// drop-off, day trip, overnight.
+export type TransportServiceType =
   | 'airport_transfer'
   | 'city_transfer'
+  | 'transfer_within_city'
   | 'day_tour'
-  | 'dinner_transfer'
-  | 'intercity_transfer'
-  | 'sound_light_transfer'
+  | 'half_day'
+  | 'long_day_tour'
+  | 'multi_day'
+  | 'outside_dinner'
+  | 'sound_light'
+  | 'intercity_dropoff'
+  | 'intercity_day_trip'
+  | 'intercity_overnight'
+
+/** The intercity family: a road journey between two cities, by trip shape. */
+export const INTERCITY_SERVICE_TYPES: readonly TransportServiceType[] = [
+  'intercity_dropoff',
+  'intercity_day_trip',
+  'intercity_overnight',
+]
+
+const isIntercity = (t: string): boolean =>
+  (INTERCITY_SERVICE_TYPES as readonly string[]).includes(t)
 
 export type TransportDuration = 'full_day' | 'half_day' | 'one_way'
 
@@ -572,7 +600,11 @@ export function determineTransportNeeds(
       day.accommodation_type !== 'cruise' &&
       previousDay.accommodation_type !== 'cruise') {
     return {
-      serviceType: 'intercity_transfer',
+      // Moving to another city and sleeping there is a one-way journey: the
+      // agency's "Intercity Drop-off". A same-day return would be an
+      // Intercity Day Trip and an overnight return an Intercity Overnight —
+      // neither of which a day that CHANGES city is.
+      serviceType: 'intercity_dropoff',
       duration: 'one_way',
       area: null,
       useSpecialVehicle: false
@@ -2051,15 +2083,18 @@ export async function buildTransportCache(scope: CatalogScope): Promise<Map<stri
       cache.set(keyNoArea, rate)
     }
 
-    // For intercity, also cache by origin-destination
-    if (rate.service_type === 'intercity_transfer' && rate.origin_city && rate.destination_city) {
-      const intercityKey = [
-        'intercity_transfer',
-        (rate.origin_city || '').toLowerCase(),
-        (rate.destination_city || '').toLowerCase(),
-        vehicleKey(rate.vehicle_type)
-      ].join('|')
-      cache.set(intercityKey, rate)
+    // An intercity rate IS its route, so it is cached by one. The departure is
+    // `city` — the rate form calls that field "Departure City" — and
+    // origin_city wins when a CSV import filled it in (it is NULL on every row
+    // on production today). Without this an intercity rate could only be found
+    // by a single city, which matches the wrong direction just as readily.
+    if (isIntercity(rate.service_type || '')) {
+      const from = (rate.origin_city || rate.city || '').toLowerCase()
+      const to = (rate.destination_city || '').toLowerCase()
+      if (from && to) {
+        const routeKey = [rate.service_type, from, to, vehicleKey(rate.vehicle_type)].join('|')
+        if (!cache.has(routeKey)) cache.set(routeKey, rate)
+      }
     }
     }
   }
@@ -2086,6 +2121,22 @@ export function findTransportRate(
   const { serviceType, city, duration, area, vehicleType, originCity, destinationCity } = params
   const cityLower = city.toLowerCase()
 
+  // A ROAD TRANSFER BETWEEN CITIES IS ITS ROUTE, NOT A CITY. The rate form
+  // stores the departure in `city` and the engine looks a day up by the day's
+  // ARRIVAL city, so the single-city keys below would match a Luxor → Aswan
+  // rate to an Aswan → Luxor day and call it definite. An intercity transfer
+  // matches on departure → destination only; anything else is a miss, which
+  // becomes a hole the operator can see.
+  if (isIntercity(serviceType)) {
+    const from = (originCity || '').toLowerCase()
+    const to = (destinationCity || city || '').toLowerCase()
+    if (from && to) {
+      const routeKey = [serviceType, from, to, vehicleKey(vehicleType)].join('|')
+      if (cache.has(routeKey)) return { rate: cache.get(routeKey)!, source: 'db' }
+    }
+    return null
+  }
+
   // Priority 1: Exact match (service_type + city + duration + area + vehicle) — definite.
   const exactKey = [serviceType, cityLower, duration, area || '', vehicleKey(vehicleType)].join('|')
   if (cache.has(exactKey)) {
@@ -2096,14 +2147,6 @@ export function findTransportRate(
   const noAreaKey = [serviceType, cityLower, duration, '', vehicleKey(vehicleType)].join('|')
   if (cache.has(noAreaKey)) {
     return { rate: cache.get(noAreaKey)!, source: 'db' }
-  }
-
-  // Priority 4: Intercity route match (origin→destination) — definite for transfers.
-  if (serviceType === 'intercity_transfer' && originCity && destinationCity) {
-    const intercityKey = ['intercity_transfer', originCity.toLowerCase(), destinationCity.toLowerCase(), vehicleKey(vehicleType)].join('|')
-    if (cache.has(intercityKey)) {
-      return { rate: cache.get(intercityKey)!, source: 'db' }
-    }
   }
 
   // Priority 3: Match without duration — APPROXIMATE (different trip length).
