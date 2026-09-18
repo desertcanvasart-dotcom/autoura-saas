@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 
 import React, { useEffect, useMemo, useState, useRef } from 'react'
 import Link from 'next/link'
+import ToolbarMenu from '@/components/ToolbarMenu'
 import { sampleTemplateCsv } from '@/lib/tours/template-csv'
 import { sampleDaysCsv } from '@/lib/tours/itinerary-csv'
 import { readDayMeals, summarizeMeals, mealStatusLabel, MEAL_SLOTS, type DayMeals, type DayMealStatus, type MealSlot } from '@/lib/tours/day-meals'
@@ -1578,6 +1579,36 @@ export default function TourManagerContent() {
   const handleImportDays = async (file: File) => {
     try {
       const text = await file.text()
+
+      // This REPLACES the whole itinerary of every tour the file names, so it
+      // says what it is about to do first — counted by the server from the
+      // real file, not guessed. The endpoint has always had the dry run; the
+      // button just never used it.
+      const dry = await fetch('/api/tours/bulk/import-days', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csvData: text, dryRun: true }),
+      }).then(r => r.json()).catch(() => null)
+
+      if (dry && dry.success) {
+        const skipped = dry.refusedRows
+          ? `\n\n${dry.refusedRows} row(s) will be skipped — ${dry.refused?.[0]?.reason ?? 'see the result message'}.`
+          : ''
+        const ok = await dialog.confirm({
+          title: 'Replace these itineraries?',
+          message:
+            `${dry.templates} tour(s) named in this file will lose their current days and take the ${dry.days} day(s) in the sheet. ` +
+            `Tours the file does not name are untouched.${skipped}`,
+          confirmText: `Replace ${dry.templates} itinerary(ies)`,
+          cancelText: 'Cancel',
+          variant: 'danger',
+        })
+        if (!ok) {
+          if (daysFileRef.current) daysFileRef.current.value = ''
+          return
+        }
+      }
+
       const res = await fetch('/api/tours/bulk/import-days', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1969,14 +2000,6 @@ export default function TourManagerContent() {
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportFile(f) }}
               />
-              <button onClick={handleSampleCsv} title="Download a sample CSV with the columns and one example row. Replace the Code column with your own tour code — any row still starting EXAMPLE- is skipped on import." className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
-                <FileText className="w-4 h-4" />
-                Sample CSV
-              </button>
-              <button onClick={handleExportTemplates} title="Download all templates as a CSV (portable metadata: code, name, type, duration, cities, status)" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
-                <Download className="w-4 h-4" />
-                Export
-              </button>
               <input
                 ref={daysFileRef}
                 type="file"
@@ -1984,22 +2007,64 @@ export default function TourManagerContent() {
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleImportDays(f) }}
               />
-              <button onClick={handleSampleDaysCsv} title="Download a sample days sheet — one row per itinerary day, keyed by Template Code. This is what Auto-Pricing reads." className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
-                <FileText className="w-4 h-4" />
-                Sample Days
-              </button>
-              <button onClick={handleExportDays} title="Download every tour's day-by-day itinerary as a CSV (one row per day)" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
-                <Download className="w-4 h-4" />
-                Export Days
-              </button>
-              <button onClick={() => daysFileRef.current?.click()} title="Import a days sheet — REPLACES the whole itinerary of each tour it names; tours it does not name are untouched" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
-                <Upload className="w-4 h-4" />
-                Import Days
-              </button>
-                            <button onClick={() => bulkFileRef.current?.click()} title="Import templates from a CSV (upserts by code; itinerary and variations are untouched)" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
-                <Upload className="w-4 h-4" />
-                Import
-              </button>
+              {/* Six grey lookalikes became one menu. Two sheets, because a
+                  tour and a day are different rows — that part is the data
+                  model, not clutter — but each item now has room to say what
+                  it does, and the one that REPLACES itineraries reads like it.
+              */}
+              <ToolbarMenu
+                label="Import / Export"
+                icon={<FileText className="w-4 h-4" />}
+                groups={[
+                  {
+                    label: 'Tours — one row per tour',
+                    items: [
+                      {
+                        label: 'Sample sheet',
+                        description: 'The columns, with one example row showing the allowed values.',
+                        icon: <FileText className="w-4 h-4" />,
+                        onSelect: handleSampleCsv,
+                      },
+                      {
+                        label: 'Export tours',
+                        description: 'Code, name, type, duration, cities, status. Re-imports as it stands.',
+                        icon: <Download className="w-4 h-4" />,
+                        onSelect: handleExportTemplates,
+                      },
+                      {
+                        label: 'Import tours',
+                        description: 'Adds new tours and updates existing ones by code. Days and variations are left alone.',
+                        icon: <Upload className="w-4 h-4" />,
+                        onSelect: () => bulkFileRef.current?.click(),
+                      },
+                    ],
+                  },
+                  {
+                    label: 'Days — one row per day (what pricing reads)',
+                    items: [
+                      {
+                        label: 'Sample days sheet',
+                        description: 'One row per itinerary day, keyed by tour code.',
+                        icon: <FileText className="w-4 h-4" />,
+                        onSelect: handleSampleDaysCsv,
+                      },
+                      {
+                        label: 'Export days',
+                        description: "Every tour's day-by-day programme, one row per day.",
+                        icon: <Download className="w-4 h-4" />,
+                        onSelect: handleExportDays,
+                      },
+                      {
+                        label: 'Import days — replaces itineraries',
+                        description: 'Every tour named in the file loses its current days and takes the ones in the sheet. You see what it will do before it happens.',
+                        icon: <Upload className="w-4 h-4" />,
+                        danger: true,
+                        onSelect: () => daysFileRef.current?.click(),
+                      },
+                    ],
+                  },
+                ]}
+              />
               <Link href="/tours" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium">
                 <Eye className="w-4 h-4" />
                 Browse Tours
