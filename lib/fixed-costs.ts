@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
+import { ttlMemo } from '@/lib/ttl-memo'
 
 // Lazy-initialized service-role client — the pricing engine reads fixed costs
 // server-side. Lazy init mirrors auto-pricing-service's getSupabaseAdmin()
@@ -26,8 +27,11 @@ export interface FixedDailyCosts {
   waterPerPersonPerDay: number
 }
 
-let cachedCosts: { data: FixedDailyCosts; fetchedAt: number } | null = null
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+// Holds the in-flight read, not only the answer: the pricing engine prices its
+// tiers concurrently, and four callers arriving together used to make four
+// identical requests (lib/ttl-memo.ts).
+const costsMemo = ttlMemo<FixedDailyCosts>(CACHE_TTL)
 
 /**
  * Fetch fixed daily costs (water bottles) from the database.
@@ -38,24 +42,27 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
  * use getTippingRate() from lib/auto-pricing-service.ts for tips.
  */
 export async function getFixedDailyCosts(): Promise<FixedDailyCosts> {
-  // Return cached if still fresh
-  if (cachedCosts && Date.now() - cachedCosts.fetchedAt < CACHE_TTL) {
-    return cachedCosts.data
-  }
-
   try {
+    return await costsMemo('all', loadFixedDailyCosts)
+  } catch (err: any) {
+    // The fallback is NOT remembered: a database that was briefly unreachable
+    // must not pin every quote to the built-in default for the next five
+    // minutes. ttlMemo drops a failed read, so the next caller tries again.
+    console.warn('[FixedCosts] Falling back to defaults:', err?.message)
+    return { waterPerPersonPerDay: DEFAULTS['Water Bottle'] }
+  }
+}
+
+/** Throws rather than falling back, so a failure is never cached. */
+async function loadFixedDailyCosts(): Promise<FixedDailyCosts> {
+  {
     const { data: rawData, error } = await getSupabaseAdmin()
       .from('fixed_daily_costs')
       .select('*')
       .eq('is_active', true)
     const data = await normalizeRateRows(getSupabaseAdmin(), 'fixed_daily_costs', rawData)
 
-    if (error) {
-      console.warn('[FixedCosts] DB query failed, using defaults:', error.message)
-      return {
-        waterPerPersonPerDay: DEFAULTS['Water Bottle'],
-      }
-    }
+    if (error) throw new Error(`fixed_daily_costs query failed: ${error.message}`)
 
     const findRate = (type: string) => {
       const record = ((data as any[]) || []).find((r: any) => r.cost_type === type)
@@ -66,17 +73,11 @@ export async function getFixedDailyCosts(): Promise<FixedDailyCosts> {
       waterPerPersonPerDay: findRate('Water Bottle'),
     }
 
-    cachedCosts = { data: costs, fetchedAt: Date.now() }
     return costs
-  } catch (err: any) {
-    console.warn('[FixedCosts] Exception fetching costs, using defaults:', err.message)
-    return {
-      waterPerPersonPerDay: DEFAULTS['Water Bottle'],
-    }
   }
 }
 
 /** Clear the cache (e.g. after updating rates via the admin API) */
 export function clearFixedCostsCache() {
-  cachedCosts = null
+  costsMemo.clear()
 }

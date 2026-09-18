@@ -33,6 +33,8 @@ import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/s
 import { resolveTravelDateRates } from '@/lib/rates/rate-seasons'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import { loadAttractionAliasIndex, resolveAttractionAlias } from '@/lib/pricing/attraction-aliases'
+import { memoRead, withQueryMemo } from '@/lib/pricing/query-memo'
+import { ttlMemo } from '@/lib/ttl-memo'
 import {
   collectTicketLegs, rowServesRoute, selectTicketRow,
   groupSleeperTrains, trainForNamedRow,
@@ -409,39 +411,31 @@ const SPECIAL_VEHICLE_CITIES: Record<string, VehicleType> = {
 const vehicleKey = (v: unknown) => slugifyKey(String(v ?? ''))
 
 // The tenant's tier ladder and vehicle bands (Settings → Your vocabulary),
-// memoised for a minute — a pricing run asks for them several times.
+// memoised for a minute — a pricing run asks for them several times, and the
+// tiers now ask together, so the memo holds the in-flight read rather than
+// only the answer (lib/ttl-memo.ts).
 const VOCAB_TTL_MS = 60_000
-const ladderMemo = new Map<string, { at: number; value: string[] }>()
-const vehicleMemo = new Map<string, { at: number; value: VehicleBand[] }>()
-const labelMemo = new Map<string, { at: number; value: Map<string, string> }>()
+const ladderMemo = ttlMemo<string[]>(VOCAB_TTL_MS)
+const vehicleMemo = ttlMemo<VehicleBand[]>(VOCAB_TTL_MS)
+const labelMemo = ttlMemo<Map<string, string>>(VOCAB_TTL_MS)
 type VocabClient = Parameters<typeof tierLadderForTenant>[0]
 
 async function tenantTierLadder(tenantId: string): Promise<string[]> {
-  const hit = ladderMemo.get(tenantId)
-  if (hit && Date.now() - hit.at < VOCAB_TTL_MS) return hit.value
-  const value = await tierLadderForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId)
-  ladderMemo.set(tenantId, { at: Date.now(), value })
-  return value
+  return ladderMemo(tenantId, () =>
+    tierLadderForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId))
 }
 
 async function tenantVehicleBands(tenantId: string): Promise<VehicleBand[]> {
-  const hit = vehicleMemo.get(tenantId)
-  if (hit && Date.now() - hit.at < VOCAB_TTL_MS) return hit.value
-  const value = await vehicleBandsForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId)
-  vehicleMemo.set(tenantId, { at: Date.now(), value })
-  return value
+  return vehicleMemo(tenantId, () =>
+    vehicleBandsForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId))
 }
 
 /** The agency's word for a stored key of `kind`, for service names and
  *  hole messages ("Train ENR First Class", not "Train ENR first_class").
  *  A key the vocabulary does not know reads as itself. */
 async function tenantVocabularyLabels(tenantId: string, kind: VocabularyKind): Promise<Map<string, string>> {
-  const memoKey = `${tenantId}:${kind}`
-  const hit = labelMemo.get(memoKey)
-  if (hit && Date.now() - hit.at < VOCAB_TTL_MS) return hit.value
-  const labels = await vocabularyLabelsForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId, kind)
-  labelMemo.set(memoKey, { at: Date.now(), value: labels })
-  return labels
+  return labelMemo(`${tenantId}:${kind}`, () =>
+    vocabularyLabelsForTenant(getSupabaseAdmin() as unknown as VocabClient, tenantId, kind))
 }
 
 async function tenantVocabularyLabeller(tenantId: string, kind: VocabularyKind): Promise<(key: string | null | undefined) => string> {
@@ -1529,6 +1523,9 @@ export async function getEntranceFeeById(
   id: string,
   isEurPassport: boolean
 ): Promise<{ id: string; name: string; rate: number; source: RateSource } | null> {
+  // Keyed on everything that changes the answer: the catalogue scope, the
+  // fee, and the passport (which picks the column).
+  return memoRead(`fee-id|${scope.tenantId}|${id}|${isEurPassport}`, async () => {
   try {
     let { data: fees } = await getSupabaseAdmin()
       .from('entrance_fees')
@@ -1551,6 +1548,7 @@ export async function getEntranceFeeById(
     console.error('Error fetching entrance fee by id:', err)
     return null
   }
+  })
 }
 
 /**
@@ -1561,6 +1559,10 @@ export async function getEntranceFee(
   attractionName: string,
   isEurPassport: boolean
 ): Promise<{ id: string; name: string; rate: number; source: RateSource } | null> {
+  // A fee does not change with the tier, but every tier asks for it — and the
+  // fuzzy path can cost several requests on its own. Keyed on everything that
+  // changes the answer.
+  return memoRead(`fee-name|${scope.tenantId}|${attractionName.toLowerCase()}|${isEurPassport}`, async () => {
   try {
     let { data: fees, error } = await getSupabaseAdmin()
       .from('entrance_fees')
@@ -1629,6 +1631,7 @@ export async function getEntranceFee(
     console.error('Error fetching entrance fee:', err)
     return null
   }
+  })
 }
 
 /**
@@ -2072,6 +2075,11 @@ export async function getTippingRate(
  * Key format: "service_type|city|duration|area|vehicle_type"
  */
 export async function buildTransportCache(scope: CatalogScope): Promise<Map<string, TransportRate>> {
+  // Every tier reads the same transport rows. Once per calculation.
+  return memoRead(`transport|${scope.tenantId}`, () => buildTransportCacheUncached(scope))
+}
+
+async function buildTransportCacheUncached(scope: CatalogScope): Promise<Map<string, TransportRate>> {
   const { data: rawAllRates } = await getSupabaseAdmin()
     .from('transportation_rates')
     .select('*')
@@ -2278,18 +2286,22 @@ export async function calculateDayBasedPricing(
   // STEP 1: Fetch template and parse itinerary
   // ============================================
 
-  const { data: template, error: templateError } = await getSupabaseAdmin()
-    .from('tour_templates')
-    .select(`
-      id,
-      template_name,
-      template_code,
-      duration_days,
-      tour_type,
-      itinerary
-    `)
-    .eq('id', templateId)
-    .single()
+  // The programme does not change between tiers; read it once per calculation.
+  const { data: template, error: templateError } = await memoRead(
+    `template|${templateId}`,
+    async () => getSupabaseAdmin()
+      .from('tour_templates')
+      .select(`
+        id,
+        template_name,
+        template_code,
+        duration_days,
+        tour_type,
+        itinerary
+      `)
+      .eq('id', templateId)
+      .single()
+  )
 
   if (templateError || !template) {
     console.error('❌ Template not found:', templateId)
@@ -4040,21 +4052,27 @@ export async function calculateMultiTierPricing(
   isEurPassport: boolean,
   options?: Partial<PricingParams>
 ): Promise<Map<ServiceTier, PricingResult>> {
-  const results = new Map<ServiceTier, PricingResult>()
-
-  for (const tier of tiers) {
-    const result = await calculateAutoPricing({
-      templateId,
-      tenantId,
-      tier,
-      numPax,
-      isEurPassport,
-      ...options
-    })
-    results.set(tier, result)
-  }
-
-  return results
+  // One memo scope around every tier, so the reads that do not depend on tier
+  // — the programme, the transport rows, an entrance fee — happen once for the
+  // whole set rather than once per tier. The tiers themselves are independent,
+  // so they run together instead of queueing: measured on live data, the four
+  // tiers of one tour card were 48 round trips and 6.8s.
+  return withQueryMemo(async () => {
+    const computed = await Promise.all(
+      tiers.map(async tier => [
+        tier,
+        await calculateAutoPricing({
+          templateId,
+          tenantId,
+          tier,
+          numPax,
+          isEurPassport,
+          ...options
+        }),
+      ] as const)
+    )
+    return new Map<ServiceTier, PricingResult>(computed)
+  })
 }
 
 /**
