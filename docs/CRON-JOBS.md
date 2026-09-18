@@ -374,3 +374,29 @@ DONE 2026-08-24: the apply landed, all four services carry stored start
 commands, the dashboard Config File fields were cleared, and the four
 `railway*.toml` files were deleted from the repo. `.railway/railway.ts` is the
 single source of truth for the topology.
+
+## Gmail sync — every 10 minutes
+
+| | |
+|---|---|
+| Service | `cron:gmail-sync` |
+| Start command | `npm run cron:gmail-sync` |
+| Schedule | `*/10 * * * *` |
+| Endpoint | `GET /api/cron/gmail-sync`, `Authorization: Bearer $CRON_SECRET` |
+| Env | `CRON_TARGET_URL`, `CRON_SECRET` |
+
+Email used to arrive only when somebody opened the inbox and pressed sync, so a
+customer who wrote on Friday evening sat unseen until Monday. This pulls **every
+connected mailbox** — not only the ones whose owner is logged in.
+
+Each mailbox is synced through the ordinary sync route
+(`POST /api/email/sync`) with the `x-cron-secret` header, so there is one sync
+implementation rather than a scheduled copy that drifts from the one people use
+by hand. A mailbox that fails is recorded and the sweep carries on; a mailbox
+that hangs is abandoned after 60 seconds.
+
+**The exit code is not the HTTP status.** The endpoint answers 200 with a
+summary that can describe a bad run (some mailboxes synced, others refused), so
+the runner exits 1 if ANY mailbox failed and names it on stderr. Exiting 0 on
+any 200 would make a mailbox with an expired token look like a healthy night —
+the quiet degradation this job exists to end.

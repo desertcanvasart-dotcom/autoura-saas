@@ -108,7 +108,24 @@ export default defineRailway(() => {
     },
   });
 
+  // Mail must arrive whether or not anybody has the inbox open: a customer who
+  // writes on Friday evening is seen before Monday. Its own start command, or
+  // it inherits the web service's and boots a Next server that never exits
+  // (docs/CRON-JOBS.md).
+  const cronGmailSync = service("cron:gmail-sync", {
+    source: autouraSaas,
+    build: "",
+    start: "npm run cron:gmail-sync",
+    replicas: { "asia-southeast1-eqsg3a": 1 },
+    deploy: { cronSchedule: "*/10 * * * *", restartPolicyType: "NEVER" },
+    networking: { privateNetworkEndpoint: "gmail-sync-cron" },
+    env: {
+      CRON_TARGET_URL: preserve(),
+      CRON_SECRET: preserve(),
+    },
+  });
+
   return project("Autoura multi-tenant", {
-    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates],
+    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync],
   });
 });

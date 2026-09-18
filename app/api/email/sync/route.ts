@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+
+/** Either client writes the same rows; the sweep's is the service role. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseLike = { from(table: string): any }
 import { after } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { autoLinkEmails, type SyncedEmailRef } from '@/lib/email-auto-link'
@@ -50,24 +54,51 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   let userId: string | undefined
   try {
-    const authResult = await requireAuth()
-    if (authResult.error !== null) return NextResponse.json({ error: authResult.error, success: false }, { status: authResult.status })
-    const { supabase, tenant_id } = authResult
-    if (!supabase || !tenant_id) return NextResponse.json({ error: 'Auth failed', success: false }, { status: 401 })
-
     const body = await request.json()
     const { user_id, full_sync = false, max_results = 100, days_back = 30 } = body
-    userId = user_id || authResult.user?.id
-    if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
 
-    // `user_id` arrives in the request body. Until now RLS was the only thing
-    // stopping one user syncing another's mailbox: the authenticated client
-    // could not see a foreign gmail_tokens row, so the request fell through to
-    // "Gmail not connected". The token read below uses the admin client, which
-    // has no such backstop, so the ownership rule is stated here instead of
-    // being an accident of the policy.
-    if (userId !== authResult.user?.id) {
-      return NextResponse.json({ error: 'Cannot sync another user\u2019s mailbox', success: false }, { status: 403 })
+    // Two ways in. A person, with a session — or the scheduled sweep, with the
+    // server-to-server secret, because mail must arrive whether or not anybody
+    // has the page open. Fails closed: with CRON_SECRET unset the header path
+    // is always rejected, exactly as in /api/gmail/send.
+    const cronSecret = process.env.CRON_SECRET
+    const isTrustedServerCall = Boolean(cronSecret && request.headers.get('x-cron-secret') === cronSecret)
+
+    let db: SupabaseLike
+    let tenant_id: string | null = null
+
+    if (isTrustedServerCall) {
+      userId = user_id
+      if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
+      // The tenant comes from the mailbox's own row, never from the request.
+      const { data: owner } = await createAdminClient()
+        .from('gmail_tokens')
+        .select('tenant_id')
+        .eq('user_id', userId)
+        .maybeSingle()
+      tenant_id = owner?.tenant_id ?? null
+      if (!tenant_id) return NextResponse.json({ error: 'Mailbox is not linked to a company', success: false }, { status: 404 })
+      // No session, so no RLS client: the sweep spans every tenant and writes
+      // with the service role, scoped by the tenant_id resolved above.
+      db = createAdminClient() as unknown as SupabaseLike
+    } else {
+      const authResult = await requireAuth()
+      if (authResult.error !== null) return NextResponse.json({ error: authResult.error, success: false }, { status: authResult.status })
+      if (!authResult.supabase || !authResult.tenant_id) return NextResponse.json({ error: 'Auth failed', success: false }, { status: 401 })
+      db = authResult.supabase as unknown as SupabaseLike
+      tenant_id = authResult.tenant_id
+      userId = user_id || authResult.user?.id
+      if (!userId) return NextResponse.json({ error: 'User ID required', success: false }, { status: 400 })
+
+      // `user_id` arrives in the request body. Until now RLS was the only thing
+      // stopping one user syncing another's mailbox: the authenticated client
+      // could not see a foreign gmail_tokens row, so the request fell through to
+      // "Gmail not connected". The token read below uses the admin client, which
+      // has no such backstop, so the ownership rule is stated here instead of
+      // being an accident of the policy.
+      if (userId !== authResult.user?.id) {
+        return NextResponse.json({ error: 'Cannot sync another user\u2019s mailbox', success: false }, { status: 403 })
+      }
     }
 
     // Gmail tokens are read with the admin client so that access_token and
@@ -88,7 +119,7 @@ export async function POST(request: NextRequest) {
     const userEmail = tokenRecord.email || ''
 
     // Update sync state
-    await supabase.from('email_sync_state').upsert({ user_id: userId, sync_status: 'running', updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    await db.from('email_sync_state').upsert({ user_id: userId, sync_status: 'running', updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
 
     // Build query
     let query = ''
@@ -163,7 +194,7 @@ export async function POST(request: NextRequest) {
 
         // Upsert unified_conversations keyed by (tenant_id, contact_email)
         let unifiedId: string
-        const { data: existingUnified } = await supabase
+        const { data: existingUnified } = await db
           .from('unified_conversations')
           .select('id, total_messages')
           .eq('tenant_id', tenant_id)
@@ -171,7 +202,7 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         if (existingUnified) {
-          await supabase
+          await db
             .from('unified_conversations')
             .update({
               contact_name: contactName || undefined,
@@ -184,7 +215,7 @@ export async function POST(request: NextRequest) {
           unifiedId = existingUnified.id
           result.conversations_updated++
         } else {
-          const { data: newUnified, error: unifiedErr } = await supabase
+          const { data: newUnified, error: unifiedErr } = await db
             .from('unified_conversations')
             .insert({
               tenant_id,
@@ -231,7 +262,7 @@ export async function POST(request: NextRequest) {
           }
           if (message.payload) extractAtt(message.payload)
 
-          const { data: existingMsg } = await supabase
+          const { data: existingMsg } = await db
             .from('email_messages')
             .select('id')
             .eq('tenant_id', tenant_id)
@@ -247,7 +278,7 @@ export async function POST(request: NextRequest) {
           const cc = getMH('Cc')
           const ccEmails = cc ? cc.split(',').map((e: string) => extractEmailAddress(e)).filter(Boolean) : null
 
-          const { error: insErr } = await supabase.from('email_messages').insert({
+          const { error: insErr } = await db.from('email_messages').insert({
             tenant_id,
             unified_conversation_id: unifiedId,
             gmail_message_id: message.id,
@@ -284,19 +315,19 @@ export async function POST(request: NextRequest) {
         }
 
         // Recalculate total/unread counts for the unified conversation from source of truth
-        const { count: totalCount } = await supabase
+        const { count: totalCount } = await db
           .from('email_messages')
           .select('id', { count: 'exact', head: true })
           .eq('unified_conversation_id', unifiedId)
 
-        const { count: unreadCount } = await supabase
+        const { count: unreadCount } = await db
           .from('email_messages')
           .select('id', { count: 'exact', head: true })
           .eq('unified_conversation_id', unifiedId)
           .eq('direction', 'inbound')
           .eq('is_read', false)
 
-        await supabase
+        await db
           .from('unified_conversations')
           .update({
             total_messages: totalCount || 0,
@@ -326,7 +357,7 @@ export async function POST(request: NextRequest) {
     // ============================================
     if (conversationsWithNewInbound.size > 0) {
       try {
-        const { data: features } = await supabase
+        const { data: features } = await db
           .from('tenant_features')
           .select('copilot_pregenerate_enabled')
           .eq('tenant_id', tenant_id)
@@ -340,7 +371,7 @@ export async function POST(request: NextRequest) {
             for (const cid of capped) {
               try {
                 await generateDraftReplies({
-                  supabase: supabase as any,
+                  supabase: db as any,
                   tenantId: tenant_id,
                   channel: 'email',
                   unifiedConversationId: cid,
@@ -360,17 +391,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Update sync state
-    await supabase.from('email_sync_state').upsert({ user_id: userId, sync_status: 'idle', last_full_sync_at: full_sync ? new Date().toISOString() : undefined, last_incremental_sync_at: new Date().toISOString(), emails_synced: result.messages_created, error_message: null, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    await db.from('email_sync_state').upsert({ user_id: userId, sync_status: 'idle', last_full_sync_at: full_sync ? new Date().toISOString() : undefined, last_incremental_sync_at: new Date().toISOString(), emails_synced: result.messages_created, error_message: null, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
 
     return NextResponse.json(result)
   } catch (error: any) {
     console.error('[Email Sync] Error:', error.message)
     if (userId) {
+      // The failure is recorded with the service role: the scheduled sweep has
+      // no session to write it with, and a failed sync that records nothing is
+      // the silence this whole job exists to end.
       try {
-        const authResult = await requireAuth()
-        if (authResult.supabase) {
-          await authResult.supabase.from('email_sync_state').upsert({ user_id: userId, sync_status: 'failed', error_message: error.message, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-        }
+        await createAdminClient()
+          .from('email_sync_state')
+          .upsert(
+            { user_id: userId, sync_status: 'failed', error_message: error.message, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id' }
+          )
       } catch {}
     }
     return NextResponse.json({ error: error.message, success: false }, { status: 500 })

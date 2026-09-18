@@ -22,6 +22,7 @@ export type JobName =
   | 'reminders'
   | 'task-reminders'
   | 'purge-traveller-documents'
+  | 'gmail-sync'
 
 export { STALE_AFTER_HOURS }
 
