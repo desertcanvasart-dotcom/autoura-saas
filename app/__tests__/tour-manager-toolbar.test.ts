@@ -73,10 +73,13 @@ describe('importing a days sheet', () => {
 describe('the menu itself', () => {
   const MENU = read('components', 'ToolbarMenu.tsx')
 
-  it('closes the way a menu is expected to', () => {
-    expect(MENU).toContain("document.addEventListener('mousedown', onDown)")
+  it('closes the way a menu is expected to, through the house hook', () => {
+    // Not a hand-rolled listener and never an invisible backdrop: a backdrop
+    // closes the popover AND eats the click that did it, which is the bug
+    // lib/use-dismiss-on-outside.ts was written to end.
+    expect(MENU).toContain('useDismissOnOutside(open, root, () => setOpen(false))')
+    expect(MENU).not.toMatch(/fixed inset-0/)
     expect(MENU).toMatch(/e\.key === 'Escape'/)
-    expect(MENU).toMatch(/removeEventListener\('mousedown', onDown\)/)
     expect(MENU).toMatch(/removeEventListener\('keydown', onKey\)/)
   })
 

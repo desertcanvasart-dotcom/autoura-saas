@@ -14,6 +14,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { useDismissOnOutside } from '@/lib/use-dismiss-on-outside'
 
 export interface ToolbarMenuItem {
   label: string
@@ -42,18 +43,16 @@ export default function ToolbarMenu({
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
 
+  // The house hook, not a hand-rolled listener and never an invisible
+  // backdrop: a backdrop closes the popover AND swallows the click that did
+  // it, which is the bug lib/use-dismiss-on-outside.ts exists to prevent.
+  useDismissOnOutside(open, root, () => setOpen(false))
+
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (root.current && !root.current.contains(e.target as Node)) setOpen(false)
-    }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
   return (
