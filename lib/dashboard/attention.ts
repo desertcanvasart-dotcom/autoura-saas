@@ -21,7 +21,7 @@ export const HORIZON_DAYS = 45
 export const BALANCE_SOON_DAYS = 14
 export const URGENT_DAYS = 7
 
-export type AttentionType = 'balance_due' | 'details_missing' | 'no_guide' | 'change_request' | 'extra_request'
+export type AttentionType = 'balance_due' | 'details_missing' | 'no_guide' | 'change_request' | 'extra_request' | 'awaiting_reply'
 export type Severity = 'urgent' | 'soon'
 
 export interface AttentionItem {
@@ -237,4 +237,50 @@ export function buildAttentionItems(input: AttentionInput): {
   })
 
   return { items, scannedBookings: rows.length }
+}
+
+// ============================================
+// A customer waiting on us for a day
+// ============================================
+// Separate from the booking signals above: a person who wrote in is waiting
+// whether or not they have a booking, so this is built from conversations and
+// merged in by the route. The dashboard's existing "Needs a reply" reads
+// UNREAD flags, so a message someone opened and did not answer disappears
+// from it — which is the one most worth chasing.
+
+export interface AwaitingConversation {
+  id: string
+  contact_name?: string | null
+  contact_email?: string | null
+  awaiting_reply_since?: string | null
+}
+
+/** Hours without an answer before a customer reaches the dashboard. */
+export const AWAITING_REPLY_HOURS = 24
+
+export function buildAwaitingReplyItems(
+  conversations: readonly AwaitingConversation[],
+  now: Date = new Date()
+): AttentionItem[] {
+  const items: AttentionItem[] = []
+  for (const c of conversations) {
+    if (!c.awaiting_reply_since) continue
+    const since = new Date(c.awaiting_reply_since)
+    if (Number.isNaN(since.getTime())) continue
+    const hours = (now.getTime() - since.getTime()) / 3_600_000
+    if (hours < AWAITING_REPLY_HOURS) continue
+    items.push({
+      type: 'awaiting_reply',
+      // Two days without an answer is a different problem from one.
+      severity: hours >= AWAITING_REPLY_HOURS * 2 ? 'urgent' : 'soon',
+      bookingId: c.id,
+      bookingNumber: null,
+      tripName: null,
+      clientName: c.contact_name || c.contact_email || 'A customer',
+      startDate: null,
+      detail: { waitingSince: c.awaiting_reply_since, hours: Math.floor(hours) },
+      href: `/conversations?conversation=${c.id}`,
+    })
+  }
+  return items.sort((a, z) => Number(z.detail.hours ?? 0) - Number(a.detail.hours ?? 0))
 }

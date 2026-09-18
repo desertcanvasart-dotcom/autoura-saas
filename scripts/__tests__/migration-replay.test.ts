@@ -163,6 +163,46 @@ describe('migration replay from scratch', () => {
     await db.exec(`UPDATE bookings SET status = 'cancelled' WHERE booking_number = 'BK-C'`)
     expect(await statusOf('Lead C')).toBe('active')
 
+    // Migration 366: which conversations are waiting on US. The rule that
+    // matters is that the wait is dated from the customer's FIRST unanswered
+    // message, not their newest one.
+    await db.exec(`
+      INSERT INTO unified_conversations (tenant_id, contact_name, contact_email)
+      SELECT t.id, 'Waiting Traveller', 'waiting@example.test' FROM tenants t WHERE t.company_name = 'Replay Probe Co';
+    `)
+    const convId = (await db.query(
+      "SELECT id FROM unified_conversations WHERE contact_name = 'Waiting Traveller'"
+    )).rows[0] as { id: string }
+    let probeMsg = 0
+    const email = (dir: string, at: string, subject: string) => `
+      INSERT INTO email_messages (tenant_id, unified_conversation_id, gmail_message_id, direction, from_email, to_email, subject, sent_at, is_read)
+      SELECT t.id, '${convId.id}', 'probe-${++probeMsg}', '${dir}', 'a@x.test', 'b@x.test', '${subject}', TIMESTAMPTZ '${at}', true
+      FROM tenants t WHERE t.company_name = 'Replay Probe Co';
+    `
+    const awaiting = async () => {
+      const r = await db.query(
+        `SELECT last_inbound_at, last_outbound_at, awaiting_reply_since FROM unified_conversations WHERE id = '${convId.id}'`
+      )
+      return r.rows[0] as { last_inbound_at: Date | null; last_outbound_at: Date | null; awaiting_reply_since: Date | null }
+    }
+
+    await db.exec(email('inbound', '2027-05-01 09:00+00', 'Can you quote Egypt?'))
+    expect((await awaiting()).awaiting_reply_since?.toISOString()).toBe('2027-05-01T09:00:00.000Z')
+
+    await db.exec(email('inbound', '2027-05-02 09:00+00', 'Still interested'))
+    expect(
+      (await awaiting()).awaiting_reply_since?.toISOString(),
+      'the wait dates from the FIRST unanswered message'
+    ).toBe('2027-05-01T09:00:00.000Z')
+
+    await db.exec(email('outbound', '2027-05-03 09:00+00', 'Here is your quote'))
+    const answered = await awaiting()
+    expect(answered.awaiting_reply_since, 'answered: nothing is waiting').toBeNull()
+    expect(answered.last_outbound_at?.toISOString()).toBe('2027-05-03T09:00:00.000Z')
+
+    await db.exec(email('inbound', '2027-05-04 09:00+00', 'One more question'))
+    expect((await awaiting()).awaiting_reply_since?.toISOString()).toBe('2027-05-04T09:00:00.000Z')
+
     // Migration 363: a seeded tour type carries the days it covers, so the
     // form stops rewriting an agency's own type from the duration.
     await db.exec(`

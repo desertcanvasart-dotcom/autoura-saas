@@ -33,6 +33,13 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status)
     }
 
+    // Only the conversations waiting on US: a customer wrote and nobody has
+    // answered since (migration 366). This is not "unread" — a message someone
+    // opened and did not answer is exactly the one that goes missing.
+    if (searchParams.get('awaiting') === 'true') {
+      query = query.not('awaiting_reply_since', 'is', null)
+    }
+
     // Search by name, email, or phone
     if (search) {
       query = query.or(`contact_name.ilike.%${search}%,contact_email.ilike.%${search}%,contact_phone.ilike.%${search}%`)
