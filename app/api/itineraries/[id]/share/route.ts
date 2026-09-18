@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { toApprovedGaps } from '@/lib/itineraries/share-approval'
 import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
 import { allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 import { requireAuth } from '@/lib/supabase-server'
@@ -74,6 +75,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
   }
 
+  // What this approval covers, recorded on the link (migration 364). The
+  // public page re-checks on every view: a service that loses its cost AFTER
+  // the link goes out withholds the price until an operator looks again.
+  const approval = itineraryLines.completeness.complete
+    ? null
+    : {
+        incomplete_approved_gaps: toApprovedGaps(itineraryLines.completeness.gaps),
+        incomplete_approved_at: new Date().toISOString(),
+        incomplete_approved_by: user!.id,
+      }
+
   // Existing active link wins — one URL per itinerary.
   const { data: existing } = await supabase!
     .from('itinerary_shares')
@@ -83,6 +95,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .maybeSingle()
 
   let token = existing?.token
+  // Sharing again after approving different gaps updates the record on the
+  // existing link, so what the traveller may see always matches the last
+  // approval — not the first one ever given.
+  if (token && approval) {
+    // The cast goes away with `npm run types:generate` once migration 364 is
+    // applied: the generated types come from the live schema.
+    await supabase!
+      .from('itinerary_shares')
+      .update(approval as never)
+      .eq('itinerary_id', id)
+      .is('revoked_at', null)
+  }
   if (!token) {
     token = generateShareToken()
     const { error: insErr } = await supabase!.from('itinerary_shares').insert({
@@ -90,6 +114,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       itinerary_id: id,
       token,
       created_by: user!.id,
+      // Same as above: typed once migration 364 reaches the live schema.
+      ...((approval ?? {}) as Record<string, unknown>),
     })
     if (insErr) {
       // 23505 = someone shared concurrently; return theirs rather than

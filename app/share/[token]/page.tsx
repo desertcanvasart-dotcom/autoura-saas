@@ -12,6 +12,8 @@ import {
   type ClientTripMessage,
 } from '@/lib/itinerary-share'
 import { overnightProperty } from '@/lib/itineraries/overnight-property'
+import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
+import { sharePriceDecision } from '@/lib/itineraries/share-approval'
 import ReportProblem from './ReportProblem'
 import TripChat from './TripChat'
 import { getCurrencySymbol } from '@/lib/currency'
@@ -56,7 +58,7 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
 
   const { data: share } = await supabase
     .from('itinerary_shares')
-    .select('id, itinerary_id, tenant_id, revoked_at, view_count')
+    .select('id, itinerary_id, tenant_id, revoked_at, view_count, incomplete_approved_gaps')
     .eq('token', token)
     .maybeSingle()
   if (!share || share.revoked_at) return null
@@ -143,13 +145,29 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     .eq('id', share.id)
     .then(() => {}, () => {})
 
+  // The price is re-checked on EVERY view, not only when the link was made
+  // (migration 364). A service that lost its cost after the link went out —
+  // or one added since — withholds the total until an operator approves it
+  // again. The itinerary itself still shows. Fails closed: if the services
+  // cannot be read, the price is withheld.
+  const lines = await loadItineraryCompleteness(supabase, share.itinerary_id, share.tenant_id)
+  const priceDecision = sharePriceDecision({
+    status: (itinerary as { status?: string | null }).status,
+    totalCost: (itinerary as { total_cost?: unknown }).total_cost,
+    currency: (itinerary as { currency?: string | null }).currency,
+    completeness: lines.ok ? lines.completeness : null,
+    approvedGaps: (share as { incomplete_approved_gaps?: unknown }).incomplete_approved_gaps,
+  })
+
   const brandHex = /^#[0-9a-fA-F]{6}$/.test(tenant?.primary_color || '') ? tenant!.primary_color! : '#647C47'
 
   return {
     // The property name is resolved HERE, from lines that stay in this
     // function: only the name is handed to the projection.
     itinerary: toClientItinerary(
-      itinerary,
+      // A withheld price does not reach the projection at all, so it cannot
+      // be rendered by accident.
+      priceDecision.show ? itinerary : { ...itinerary, total_cost: null },
       (days ?? []).map(d => ({
         ...d,
         overnight_property:

@@ -52,3 +52,36 @@ describe('supplier documents stay ungated, on purpose', () => {
     expect(src).not.toContain('loadItineraryCompleteness(')
   })
 })
+
+// ============================================
+// The share link records what was approved, and the page re-checks
+// ============================================
+describe('the share link and its public page', () => {
+  const route = readFileSync(path.join(ROOT, 'app/api/itineraries/[id]/share/route.ts'), 'utf8')
+  const page = readFileSync(path.join(ROOT, 'app/share/[token]/page.tsx'), 'utf8')
+
+  it('records the approved gaps, when, and by whom', () => {
+    expect(route).toContain('toApprovedGaps(itineraryLines.completeness.gaps)')
+    expect(route).toContain('incomplete_approved_at')
+    expect(route).toContain('incomplete_approved_by')
+  })
+
+  it('updates the record when an existing link is shared again', () => {
+    expect(route).toMatch(/if \(token && approval\)/)
+  })
+
+  it('records nothing when the itinerary is complete', () => {
+    expect(route).toContain('itineraryLines.completeness.complete')
+    expect(route).toContain('? null')
+  })
+
+  it('the public page decides on EVERY view, not only at creation', () => {
+    expect(page).toContain('loadItineraryCompleteness(')
+    expect(page).toContain('sharePriceDecision(')
+    expect(page).toContain('incomplete_approved_gaps')
+  })
+
+  it('a withheld price never reaches the traveller-facing projection', () => {
+    expect(page).toMatch(/priceDecision\.show \? itinerary : \{ \.\.\.itinerary, total_cost: null \}/)
+  })
+})
