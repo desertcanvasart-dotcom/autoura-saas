@@ -105,6 +105,13 @@ interface ItineraryDay {
   day: number
   title: string
   description: string
+  /** Where the day IS. Stored, not read out of the title: an unplaced day
+   *  used to be priced as Cairo, and now records a gap instead. */
+  city?: string
+  /** Where the night is spent. Stored, not guessed from the words: one day
+   *  saying "cruise" used to make every night in the programme a cruise
+   *  night (11 of 12 on a live 12-day tour). */
+  accommodation_type?: 'hotel' | 'cruise' | 'none'
   meals: DayMeals
   /** Names, for display and for the engine's text fallback. */
   attractions?: string[]
@@ -384,6 +391,13 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   // Travel mode + optional exact row (B-item 2). '' = road, as before.
   const [dayTransportType, setDayTransportType] = useState<'' | 'flight' | 'train' | 'sleeping_train'>('')
   const [dayTransportRateId, setDayTransportRateId] = useState('')
+  // Where the day is, and where the night is spent. Both were guessed from
+  // the title before: an unplaced day priced as Cairo, and one mention of a
+  // cruise made every night a cruise night.
+  const [dayCity, setDayCity] = useState('')
+  const [dayNight, setDayNight] = useState<'' | 'hotel' | 'cruise' | 'none'>('')
+  /** The day being edited, or null when the form is adding a new one. */
+  const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null)
 
   const setMeal = (slot: MealSlot, status: DayMealStatus | '') => {
     setDayMealsError(null)
@@ -397,6 +411,36 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayAttractions(prev => [...prev, { id: attr.id, name: attr.attraction_name }])
   }
 
+  const resetDayForm = () => {
+    setDayTitle('')
+    setDayDescription('')
+    setDayMeals({ breakfast: '', lunch: '', dinner: '' })
+    setDayAttractions([])
+    setDayTransportType('')
+    setDayTransportRateId('')
+    setDayCity('')
+    setDayNight('')
+    setEditingDayIndex(null)
+  }
+
+  /** Load a day back into the form to change it. Until now a day could only
+   *  be added or removed, so correcting a typo meant rebuilding it. */
+  const editDay = (index: number) => {
+    const day = itinerary[index]
+    if (!day) return
+    const meals = readDayMeals(day.meals)
+    setEditingDayIndex(index)
+    setDayTitle(day.title || '')
+    setDayDescription(day.description || '')
+    setDayMeals({ breakfast: meals.breakfast, lunch: meals.lunch, dinner: meals.dinner } as typeof dayMeals)
+    setDayAttractions((day.attraction_ids || []).map((id, i) => ({ id, name: (day.attractions || [])[i] || id })))
+    setDayTransportType((day.transport_type as typeof dayTransportType) || '')
+    setDayTransportRateId(day.transport_rate_id || '')
+    setDayCity(day.city || '')
+    setDayNight((day.accommodation_type as typeof dayNight) || '')
+    setDayMealsError(null)
+  }
+
   const addDay = () => {
     const unstated = MEAL_SLOTS.filter(k => dayMeals[k] === '')
     if (unstated.length) {
@@ -406,7 +450,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     if (!dayTitle.trim()) return
     
     const newDay: ItineraryDay = {
-      day: itinerary.length + 1,
+      day: editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day,
       title: dayTitle.trim(),
       description: dayDescription.trim(),
       // Written in the object shape, not the legacy array: it is what the
@@ -425,18 +469,21 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
             transport_type: dayTransportType,
             ...(dayTransportRateId ? { transport_rate_id: dayTransportRateId } : {}),
           }
-        : {})
+        : {}),
+      // Written only when stated. An empty city or night leaves the day
+      // exactly as it was, so nothing here silently overwrites a day the
+      // engine was reading from its words.
+      ...(dayCity.trim() ? { city: dayCity.trim() } : {}),
+      ...(dayNight ? { accommodation_type: dayNight } : {}),
     }
-    
-    onChange([...itinerary, newDay])
-    
-    // Reset form
-    setDayTitle('')
-    setDayDescription('')
-    setDayMeals({ breakfast: '', lunch: '', dinner: '' })
-    setDayAttractions([])
-    setDayTransportType('')
-    setDayTransportRateId('')
+
+    if (editingDayIndex === null) {
+      onChange([...itinerary, newDay])
+    } else {
+      onChange(itinerary.map((d, i) => (i === editingDayIndex ? newDay : d)))
+    }
+
+    resetDayForm()
   }
 
   const removeDay = (index: number) => {
@@ -460,13 +507,66 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
         <span className="ml-2 text-gray-400 font-normal">({itinerary.length} day{itinerary.length !== 1 ? 's' : ''} added)</span>
       </label>
 
-      {/* Add Day Form */}
-      <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
+      {/* Add / edit a day */}
+      <div className={`border rounded-lg p-4 space-y-3 ${editingDayIndex === null ? 'border-gray-200 bg-gray-50' : 'border-amber-300 bg-amber-50'}`}>
         <div className="flex items-center gap-2 mb-2">
-          <span className="flex items-center justify-center w-7 h-7 bg-green-100 text-green-700 rounded-full text-sm font-bold">
-            {itinerary.length + 1}
+          <span className={`flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold ${
+            editingDayIndex === null ? 'bg-green-100 text-green-700' : 'bg-amber-200 text-amber-800'
+          }`}>
+            {editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex]?.day}
           </span>
-          <span className="text-sm font-medium text-gray-600">Day {itinerary.length + 1}</span>
+          <span className="text-sm font-medium text-gray-600">
+            {editingDayIndex === null
+              ? `Day ${itinerary.length + 1}`
+              : `Editing day ${itinerary[editingDayIndex]?.day}`}
+          </span>
+          {editingDayIndex !== null && (
+            <button
+              type="button"
+              onClick={resetDayForm}
+              className="ml-auto text-xs text-gray-500 hover:text-gray-800 underline"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+
+        {/* Where the day is, and where the night is spent. Both used to be
+            read out of the title: an unplaced day was priced as Cairo, and a
+            single mention of a cruise made every night a cruise night. */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+            <input
+              list="tour-day-cities"
+              value={dayCity}
+              onChange={(e) => setDayCity(e.target.value)}
+              placeholder="Where this day is"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
+            />
+            <datalist id="tour-day-cities">
+              {EGYPTIAN_CITIES.map(c => <option key={c} value={c} />)}
+            </datalist>
+            <p className="text-[11px] text-gray-500 mt-1">
+              Left blank, pricing reads the title — and a day it cannot place is a gap, not Cairo.
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Night</label>
+            <select
+              value={dayNight}
+              onChange={(e) => setDayNight(e.target.value as typeof dayNight)}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
+            >
+              <option value="">Not stated — read from the title</option>
+              <option value="hotel">Hotel</option>
+              <option value="cruise">On board</option>
+              <option value="none">No night (departure, or a day tour)</option>
+            </select>
+            <p className="text-[11px] text-gray-500 mt-1">
+              Say it here and the words in the title stop deciding it.
+            </p>
+          </div>
         </div>
 
         {/* Title */}
@@ -608,7 +708,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
           disabled={!dayTitle.trim()}
           className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          + Add Day {itinerary.length + 1}
+          {editingDayIndex === null ? `+ Add Day ${itinerary.length + 1}` : 'Save this day'}
         </button>
       </div>
 
@@ -628,6 +728,17 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                 {day.description && (
                   <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{day.description}</p>
                 )}
+                <p className="text-xs text-gray-500 mt-0.5">
+                  📍 {day.city || <span className="italic">city not stated — read from the title</span>}
+                  {' · 🌙 '}
+                  {day.accommodation_type === 'cruise'
+                    ? 'On board'
+                    : day.accommodation_type === 'hotel'
+                    ? 'Hotel'
+                    : day.accommodation_type === 'none'
+                    ? 'No night'
+                    : <span className="italic">night not stated — read from the title</span>}
+                </p>
                 {day.attraction_ids && day.attraction_ids.length > 0 && (
                   <p className="text-xs text-green-700 mt-0.5">
                     Attractions (priced by pick): {(day.attractions || []).join(', ')}
@@ -652,14 +763,24 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                   )
                 })()}
               </div>
-              <button
-                type="button"
-                onClick={() => removeDay(index)}
-                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Remove day"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => editDay(index)}
+                  className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Edit day"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeDay(index)}
+                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Remove day"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

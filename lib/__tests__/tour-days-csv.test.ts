@@ -166,7 +166,16 @@ describe('toItineraryDay fills what the engine reads', () => {
     const d = toItineraryDay({ day: 1 })
     expect(d.meals).toEqual({ breakfast: 'none', lunch: 'none', dinner: 'none' })
     expect(d.services).toMatchObject({ guide_required: false, hotel_checkin: false })
-    expect(d.accommodation_type).toBe('none')
     expect(d.attractions).toEqual([])
+  })
+
+  it('leaves an unstated NIGHT unstated — "no night" is a different claim', () => {
+    // It used to store 'none' for a blank cell, which says the day has no bed
+    // and silently removes the hotel from pricing. Unset means the day does
+    // not say, and the engine infers it as it always has.
+    expect(toItineraryDay({ day: 1 }).accommodation_type).toBeUndefined()
+    expect(toItineraryDay({ day: 1, accommodation_type: '' }).accommodation_type).toBeUndefined()
+    expect(toItineraryDay({ day: 1, accommodation_type: 'none' }).accommodation_type).toBe('none')
+    expect(toItineraryDay({ day: 1, accommodation_type: 'cruise' }).accommodation_type).toBe('cruise')
   })
 })

@@ -45,6 +45,8 @@
 
 export type DayCsvKind = 'text' | 'int' | 'bool' | 'list'
 
+import { readDayMeals } from '@/lib/tours/day-meals'
+
 export interface DayCsvColumn {
   name: string
   label: string
@@ -96,14 +98,20 @@ export function serializeDaysCsv(
     const days = Array.isArray(t.itinerary) ? t.itinerary : []
     days.forEach((raw: unknown, i: number) => {
       const d = (raw ?? {}) as Record<string, unknown>
-      const meals = (d.meals ?? {}) as Record<string, unknown>
+      // Both meal shapes, one reader: a legacy ARRAY of meals used to export
+      // as three "none" cells, so a re-import turned a day of real meals into
+      // a day of nothing (lib/tours/day-meals.ts).
+      const meals = readDayMeals(d.meals as never) as unknown as Record<string, unknown>
       const services = (d.services ?? {}) as Record<string, unknown>
       const flat: Record<string, unknown> = {
         template_code: t.template_code,
         day: d.day ?? i + 1,
         title: d.title ?? '',
         city: d.city ?? '',
-        accommodation_type: d.accommodation_type ?? 'none',
+        // An UNSTATED night exports blank, not 'none'. Writing 'none' made a
+        // re-import say "this day has no bed", which silently removed the
+        // hotel from pricing — the opposite of what the blank meant.
+        accommodation_type: d.accommodation_type ?? '',
         breakfast: meals.breakfast ?? 'none',
         lunch: meals.lunch ?? 'none',
         dinner: meals.dinner ?? 'none',
@@ -251,6 +259,10 @@ export function parseDaysCsv(
     for (const col of DAY_CSV_COLUMNS) {
       if (!col.allowed || rec[col.name] == null) continue
       const v = String(rec[col.name]).trim().toLowerCase()
+      // A BLANK is not a wrong value: for the night it means the day does not
+      // say, which the engine then infers as it always has. Only meals refuse
+      // a blank, and they refuse it below, with their own reason.
+      if (v === '') continue
       if (!col.allowed.includes(v)) {
         refused.push({
           row: rowNum,
@@ -312,7 +324,10 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
     title: rec.title ?? '',
     description: rec.description ?? '',
     city: rec.city ?? '',
-    accommodation_type: rec.accommodation_type ?? 'none',
+    // Blank means the day does not say, which is not the same as saying "no
+    // night". Left unset, the engine infers it as it always has; written as
+    // 'none' it would remove the bed.
+    ...(rec.accommodation_type ? { accommodation_type: rec.accommodation_type } : {}),
     meals: {
       breakfast: rec.breakfast ?? 'none',
       lunch: rec.lunch ?? 'none',
