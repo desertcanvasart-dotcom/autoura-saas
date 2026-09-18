@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
         timezone: tenantData.timezone,
         date_format: tenantData.date_format,
         currency: tenantData.currency,
+        office_email_addresses: (tenantData as { office_email_addresses?: string[] }).office_email_addresses ?? [],
         settings: tenantData.settings
       }
     })
@@ -107,7 +108,10 @@ export async function PATCH(request: NextRequest) {
       'timezone',
       'date_format',
       'currency',
-      'settings'
+      'settings',
+      // Addresses (or whole domains) that count as the office writing, beyond
+      // the connected mailbox and its own domain (migration 367).
+      'office_email_addresses',
     ]
 
     for (const field of allowedFields) {
