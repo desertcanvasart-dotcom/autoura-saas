@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { Fragment, useState, useEffect, useMemo } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -8,6 +8,7 @@ import { ArrowLeft, Calculator, Download, Users, Calendar, Globe, Loader2, FileS
 import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { isBookableLine, sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
+import { DayBandRow, groupByDay } from '@/components/pricing/DayBand'
 
 // ============================================
 // B2B TOUR PRICE CALCULATOR PAGE
@@ -808,7 +809,13 @@ export default function TourPriceCalculator() {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {orderedServices.map((service, idx) => (
+                    {groupByDay(orderedServices, s => s.day_number).map(group => (
+                      <Fragment key={group.day ?? 'whole-trip'}>
+                        {/* Where each day starts. The table was a flat list, so
+                            checking a quote against the programme meant
+                            counting rows. */}
+                        <DayBandRow day={group.day} columns={6} />
+                        {group.lines.map((service, idx) => (
                       <tr key={idx} className={service.unpriced ? 'bg-red-50' : 'hover:bg-gray-50'}>
                         <td className="px-4 py-2">
                           <span className={service.unpriced ? 'text-red-700 font-medium' : undefined}>
@@ -850,6 +857,8 @@ export default function TourPriceCalculator() {
                         <td className="px-4 py-2 text-right">€{service.unit_cost.toFixed(2)}</td>
                         <td className="px-4 py-2 text-right font-medium">€{service.line_total.toFixed(2)}</td>
                       </tr>
+                        ))}
+                      </Fragment>
                     ))}
                   </tbody>
                   <tfoot className="bg-gray-50 font-medium">

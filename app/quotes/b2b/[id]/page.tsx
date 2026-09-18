@@ -13,6 +13,19 @@ import {
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { quoteCompleteness } from '@/lib/pricing/quote-completeness'
+import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
+import { DayBandBlock, groupByDay } from '@/components/pricing/DayBand'
+
+/** A line as the calculator saved it into services_snapshot. */
+type SavedQuoteLine = {
+  service_id?: string
+  service_name?: string
+  service_category?: string
+  day_number?: number | null
+  line_total?: number | string | null
+  unpriced?: boolean
+  issue?: string
+}
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface B2BQuote {
@@ -80,6 +93,16 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
   // What this quote could not price, read from its own saved lines
   // (lib/pricing/quote-completeness.ts) — no separate flag to drift.
   const completeness = useMemo(() => quoteCompleteness(quote?.services_snapshot), [quote])
+
+  // The quote's own saved lines, in the order the day runs.
+  const savedLines = useMemo(() => {
+    const raw = Array.isArray(quote?.services_snapshot) ? (quote?.services_snapshot as SavedQuoteLine[]) : []
+    return sortByItineraryFlow(raw, l => ({
+      id: String(l.service_id ?? ''),
+      category: String(l.service_category ?? ''),
+      dayNumber: l.day_number ?? null,
+    }))
+  }, [quote])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pdfGenerating, setPdfGenerating] = useState(false)
@@ -578,6 +601,42 @@ export default function B2BQuoteDetailPage({ params }: { params: { id: string } 
           currency={quote.currency}
           tourLeaderIncluded={quote.tour_leader_included}
         />
+
+        {/* What the quote actually holds, line by line. The page showed
+            category TOTALS and never the saved lines, so the services a
+            partner is quoted for could not be checked against the programme
+            at all. Ordered and banded by day like every other breakdown. */}
+        {savedLines.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              Services in this quote
+            </h2>
+            <div className="space-y-3">
+              {groupByDay(savedLines, l => l.day_number).map(group => (
+                <DayBandBlock key={group.day ?? 'whole-trip'} day={group.day}>
+                  {group.lines.map((line, idx) => (
+                    <div key={idx} className="flex items-start justify-between gap-3 text-sm">
+                      <span className={line.unpriced ? 'text-red-700' : 'text-gray-700'}>
+                        {line.service_name}
+                        {line.unpriced && line.issue && (
+                          <span className="block text-xs text-red-600">{line.issue}</span>
+                        )}
+                      </span>
+                      {line.unpriced ? (
+                        <span className="shrink-0 text-xs font-medium text-red-700">No rate</span>
+                      ) : (
+                        <span className="shrink-0 font-medium text-gray-900">
+                          {quote.currency} {Number(line.line_total ?? 0).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </DayBandBlock>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Cost Breakdown */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
