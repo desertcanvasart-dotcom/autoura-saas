@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
 import { repairOfficeDirections } from '@/lib/email/repair-direction'
+import { createLeadsFromNewConversations, type NewConversation } from '@/lib/email/create-leads'
 
 /** Either client writes the same rows; the sweep's is the service role. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -179,13 +180,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const result = { success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0, history_id: null as string | null, auto_linked: 0, direction_repaired: repaired.repaired }
+    const result = { success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0, history_id: null as string | null, auto_linked: 0, direction_repaired: repaired.repaired, leads_created: 0 }
 
     // Track conversation ids that received at least one new inbound message
     // during this sync — used to fire opt-in pre-generation after the loop.
     const conversationsWithNewInbound = new Set<string>()
     // Every message stored this pass, for the auto-link step after the loop.
     const syncedForLinking: SyncedEmailRef[] = []
+    // Conversations that did not exist before this sync, for lead detection.
+    const newConversations: NewConversation[] = []
 
     // Group by thread
     const threadMessages = new Map<string, any[]>()
@@ -263,6 +266,15 @@ export async function POST(request: NextRequest) {
             .single()
           if (unifiedErr || !newUnified) continue
           unifiedId = newUnified.id
+          // Judged for a travel request after the loop: a conversation is
+          // judged ONCE, when it first appears.
+          newConversations.push({
+            unifiedId,
+            fromEmail: contactEmail,
+            fromName: contactName,
+            subject: getH(firstHeaders, 'Subject'),
+            body: sorted[0]?.snippet || '',
+          })
           result.conversations_created++
         }
 
@@ -382,6 +394,23 @@ export async function POST(request: NextRequest) {
       console.error('[Email Sync] auto-link failed:', linkErr instanceof Error ? linkErr.message : linkErr)
     }
     result.auto_linked = autoLinked
+
+    // ============================================
+    // A travel request becomes a Lead
+    // ============================================
+    // After auto-link, so a sender already on record is linked and never
+    // judged. A failure here must not fail the sync — the mail is stored, and
+    // a missing lead is a nuisance where an invented one is work to undo.
+    try {
+      result.leads_created = await createLeadsFromNewConversations({
+        db: createAdminClient() as never,
+        tenantId: tenant_id,
+        office,
+        conversations: newConversations,
+      })
+    } catch (leadErr: unknown) {
+      console.error('[Email Sync] lead detection failed:', leadErr instanceof Error ? leadErr.message : leadErr)
+    }
 
     // ============================================
     // Draft-only pre-generation for new inbound emails (opt-in per tenant)
