@@ -65,8 +65,14 @@ describe('an arrival in a city with no airport', () => {
     expect(hole?.message).toContain('Marsa Alam')
     expect(hole?.message).toContain('No airport is on file')
 
+    // Since the gaps-in-their-day work, a gap is also LISTED on its day at 0
+    // and marked unpriced. What must never happen is a PRICED airport line.
     const airportLines = result.services.filter(s => s.serviceType === 'airport_service')
-    expect(airportLines).toEqual([])
+    for (const line of airportLines) {
+      expect(line.unpriced).toBe(true)
+      expect(line.lineTotal).toBe(0)
+    }
+    expect(airportLines.some(l => l.lineTotal > 0)).toBe(false)
   })
 
   it('records ONE hole, not two', async () => {
@@ -82,7 +88,10 @@ describe('an arrival in a city with no airport', () => {
     expect(cairoLine?.unitCost).toBe(15)
     expect(cairo.holes.some(h => h.kind === 'airport_service')).toBe(false)
 
-    expect(marsa.services.some(s => s.serviceType === 'airport_service')).toBe(false)
+    // Marsa Alam gets no PRICE — only an unpriced line saying so.
+    const marsaAirport = marsa.services.filter(s => s.serviceType === 'airport_service')
+    expect(marsaAirport.every(l => l.unpriced === true && l.lineTotal === 0)).toBe(true)
+    expect(marsaAirport.some(l => l.rateSource === 'airport_staff_rates')).toBe(false)
   })
 
   it('a known city with no rate on file still reports the missing rate', async () => {
