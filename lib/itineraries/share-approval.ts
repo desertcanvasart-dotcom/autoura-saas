@@ -15,7 +15,10 @@
 import type { QuoteGap, QuoteCompleteness } from '@/lib/pricing/quote-completeness'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
 
-export interface ApprovedGap {
+// A type alias, not an interface, so it carries the implicit index signature
+// that makes it assignable to the generated `Json` column type. With an
+// interface the share route needed a cast to store it.
+export type ApprovedGap = {
   day: number | null
   name: string
 }

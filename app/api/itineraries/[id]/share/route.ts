@@ -99,11 +99,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // existing link, so what the traveller may see always matches the last
   // approval — not the first one ever given.
   if (token && approval) {
-    // The cast goes away with `npm run types:generate` once migration 364 is
-    // applied: the generated types come from the live schema.
     await supabase!
       .from('itinerary_shares')
-      .update(approval as never)
+      .update(approval)
       .eq('itinerary_id', id)
       .is('revoked_at', null)
   }
@@ -114,8 +112,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       itinerary_id: id,
       token,
       created_by: user!.id,
-      // Same as above: typed once migration 364 reaches the live schema.
-      ...((approval ?? {}) as Record<string, unknown>),
+      ...(approval ?? {}),
     })
     if (insErr) {
       // 23505 = someone shared concurrently; return theirs rather than
