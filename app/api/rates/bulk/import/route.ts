@@ -8,6 +8,7 @@ import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { resolveRecordKeys, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
+import { linkRowsBySupplierName, supplierNameGapMessage } from '@/lib/rates/link-supplier-by-name'
 
 export async function POST(request: NextRequest) {
   try {
@@ -258,6 +259,38 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // supplier_name is what a HUMAN writes. The sample sheet offers the column,
+    // the export fills it and the form's dropdown stores a real link — but the
+    // import only ever resolved supplier_code and supplier_id, so a sheet
+    // filled in by hand landed with the company's NAME and no link to it.
+    // The rule itself is in lib/rates/link-supplier-by-name.ts, with the live
+    // evidence that found it.
+    let supplierNamesLinked = 0
+    const supplierNameGaps: Array<{ row: string; operation: string; message: string }> = []
+    {
+      const needsLink = rowsToUpsert.some(
+        r => !r.supplier_id && String(r.supplier_name ?? '').trim()
+      )
+      if (needsLink) {
+        const { data: all } = await (supabase
+          .from('suppliers') as unknown as {
+            select(c: string): { eq(c: string, v: string): PromiseLike<{ data: Array<{ id: string; name: string | null }> | null }> }
+          })
+          .select('id, name')
+          .eq('tenant_id', tenant_id)
+
+        const result = linkRowsBySupplierName(rowsToUpsert, all ?? [])
+        supplierNamesLinked = result.linked
+        for (const gap of result.gaps) {
+          supplierNameGaps.push({
+            row: uniqueKey.map(c => `${c}=${String((gap.row as Record<string, unknown>)[c] ?? '')}`).join(', '),
+            operation: 'imported unlinked',
+            message: supplierNameGapMessage(gap),
+          })
+        }
+      }
+    }
+
     // WHICH ship / hotel / train this rate prices. The rate FORMS resolve this
     // on every save; the bulk import never did, so export → delete → re-import
     // came back with every property link NULL — visibly so on trains, whose
@@ -364,7 +397,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, propertyLinksUnresolved, supplierCodeErrors: supplierCodeErrors.length, errors: importErrors })
+    // A company name that matched nothing is REPORTED, not a failure: the rate
+    // itself imported cleanly and the missing link is something to fix in
+    // Suppliers, not a reason to tell the operator the import broke.
+    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, supplierNamesLinked, supplierNameGaps: supplierNameGaps.length, propertyLinksUnresolved, supplierCodeErrors: supplierCodeErrors.length, errors: [...importErrors, ...supplierNameGaps] })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
