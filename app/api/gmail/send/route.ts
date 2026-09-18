@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { claimSend, finishSend, threadConflict, replyBodyHash } from '@/lib/email/send-guard'
 import { refreshAccessToken } from '@/lib/gmail'
 import { google } from 'googleapis'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
@@ -54,6 +55,13 @@ export async function POST(request: NextRequest) {
       userId, to, subject, body, body_text: bodyTextParam, threadId, attachments,
       conversation_id: conversationId,
       draft_id: draftId,
+      // The guard's inputs (migration 365). request_key is one key per reply,
+      // repeated on retry; seen_up_to is the newest message the composer was
+      // showing. Absent from a server-to-server caller, which sends nothing a
+      // person could double-click.
+      request_key: requestKey,
+      seen_up_to: seenUpTo,
+      allow_duplicate: allowDuplicate,
     } = await request.json()
 
     if (!userId || !to || !subject || !body) {
@@ -100,6 +108,61 @@ export async function POST(request: NextRequest) {
         .eq('user_id', userId)
     }
 
+    // ============================================
+    // Never the same reply twice — BEFORE Gmail is called
+    // ============================================
+    // Sending was unguarded: a double click, a retry, a second tab or two
+    // colleagues answering the same customer each sent a real email. The only
+    // duplicate check ran after Gmail had already accepted the message.
+    const bodyHash = replyBodyHash(body)
+    let claimed = false
+    if (requestKey && user) {
+      const claim = await claimSend(supabase, String(requestKey), {
+        userId: user.id,
+        threadId: threadId ? String(threadId) : null,
+        bodyHash,
+      })
+      if (!claim.ok) {
+        // This exact attempt is already in flight or already sent. Answer with
+        // it rather than sending a second email.
+        return NextResponse.json(
+          {
+            success: claim.status === 'sent',
+            alreadySent: claim.status === 'sent',
+            messageId: claim.gmailMessageId,
+            threadId: claim.gmailThreadId,
+            error: claim.status === 'sent' ? undefined : 'This reply is already being sent.',
+          },
+          { status: claim.status === 'sent' ? 200 : 409 }
+        )
+      }
+      claimed = true
+    }
+
+    if (threadId && !allowDuplicate) {
+      const conflict = await threadConflict(supabase, {
+        threadId: String(threadId),
+        requestKey: requestKey ? String(requestKey) : null,
+        seenUpTo: seenUpTo === undefined ? undefined : (seenUpTo as string | null),
+        bodyHash,
+      })
+      if (conflict) {
+        if (claimed && requestKey) await finishSend(supabase, String(requestKey), { ok: false })
+        return NextResponse.json(
+          {
+            success: false,
+            conflict: conflict.code,
+            error:
+              conflict.code === 'ALREADY_REPLIED'
+                ? `${conflict.repliedBy || 'Someone'} already replied to this conversation at ${conflict.repliedAt}. Send anyway?`
+                : `The same reply was sent to this conversation at ${conflict.sentAt}. Send anyway?`,
+            ...conflict,
+          },
+          { status: 409 }
+        )
+      }
+    }
+
     // Set credentials
     getOAuth2Client().setCredentials({
       access_token,
@@ -118,13 +181,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Send email
-    const response = await gmail.users.messages.send({
-      userId: 'me',
-      requestBody: {
-        raw: rawEmail,
-        threadId,
-      },
-    })
+    let response
+    try {
+      response = await gmail.users.messages.send({
+        userId: 'me',
+        requestBody: {
+          raw: rawEmail,
+          threadId,
+        },
+      })
+    } catch (sendError) {
+      // A failed attempt releases its key, so the operator can try again.
+      if (claimed && requestKey) await finishSend(supabase, String(requestKey), { ok: false })
+      throw sendError
+    }
+
+    if (claimed && requestKey) {
+      await finishSend(supabase, String(requestKey), {
+        ok: true,
+        gmailMessageId: response.data.id ?? null,
+        gmailThreadId: response.data.threadId ?? threadId ?? null,
+      })
+    }
 
     // ============================================
     // Persist outbound into email_messages + index + mark draft sent

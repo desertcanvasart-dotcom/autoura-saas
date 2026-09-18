@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Sparkles, Loader2, RefreshCw, X, Check, Send, Paperclip, PenLine } from 'lucide-react'
 import RichReplyEditor, { plainTextToHtml, htmlToPlainText } from './RichReplyEditor'
 
@@ -10,6 +10,8 @@ interface Conversation {
   client_email: string
   client_name?: string
   subject: string
+  /** The newest message this composer was showing — what the reply answers. */
+  last_message_at?: string | null
   client?: { full_name?: string; email?: string }
 }
 
@@ -223,13 +225,21 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
     setAttachments((prev) => prev.filter((_, i) => i !== idx))
   }
 
-  const send = async () => {
+  const sendKeyRef = useRef<string | null>(null)
+
+  const send = async (allowDuplicate = false) => {
     const to = conversation.client_email
     const plain = htmlToPlainText(bodyHtml).trim()
     if (!to || !plain || !subject.trim() || sending) return
     setSending(true)
     setSendError(null)
     try {
+      // One key per reply, repeated on retry: the route claims it before it
+      // calls Gmail, so a double click, a retry or a second tab cannot send
+      // the customer a second email. A NEW key is only made once a reply has
+      // actually gone (below).
+      if (!sendKeyRef.current) sendKeyRef.current = crypto.randomUUID()
+
       const res = await fetch('/api/gmail/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -243,13 +253,30 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
           conversation_id: conversation.id,
           draft_id: acceptedDraftId,
           attachments: attachments.length ? attachments : undefined,
+          request_key: sendKeyRef.current,
+          // What this composer was showing when the reply was written: a reply
+          // sent to the thread after it means somebody else answered first.
+          seen_up_to: conversation.last_message_at ?? null,
+          allow_duplicate: allowDuplicate || undefined,
         }),
       })
       const data = await res.json()
+      if (res.status === 409 && data.conflict) {
+        // Somebody answered first, or this is the same text again. The person
+        // sending decides — nothing is sent until they say so.
+        if (window.confirm(`${data.error}`)) {
+          setSending(false)
+          return send(true)
+        }
+        setSendError(data.error || 'Not sent')
+        return
+      }
       if (!res.ok || !data.success) {
         setSendError(data.error || 'Send failed')
         return
       }
+      // Sent: the next reply is a new attempt.
+      sendKeyRef.current = null
       setBodyHtml('')
       setAttachments([])
       setAcceptedDraftId(null)
@@ -404,7 +431,7 @@ export default function EmailReplyComposer({ conversation, userId, onSent }: Pro
             )}
           </div>
           <button
-            onClick={send}
+            onClick={() => send()}
             disabled={!canSend}
             className="flex items-center gap-1.5 bg-[#647C47] text-white text-sm px-4 py-1.5 rounded-lg hover:bg-[#566b3c] disabled:opacity-50"
           >
