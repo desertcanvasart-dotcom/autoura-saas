@@ -475,11 +475,16 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setEditingDayIndex(null)
   }
 
+  /** The add/edit form. A twelve-day programme is taller than the modal, so
+   *  editing day 9 used to change a form the operator could not see. */
+  const dayFormRef = useRef<HTMLDivElement>(null)
+
   /** Load a day back into the form to change it. Until now a day could only
    *  be added or removed, so correcting a typo meant rebuilding it. */
   const editDay = (index: number) => {
     const day = itinerary[index]
     if (!day) return
+    dayFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     const meals = readDayMeals(day.meals)
     setEditingDayIndex(index)
     setDayTitle(day.title || '')
@@ -569,10 +574,18 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       <label className="block text-xs font-medium text-gray-600">
         Day-by-Day Itinerary
         <span className="ml-2 text-gray-400 font-normal">({itinerary.length} day{itinerary.length !== 1 ? 's' : ''} added)</span>
+        {itinerary.length > 0 && (
+          <span className="ml-2 text-gray-400 font-normal">
+            — every day below can be changed: press Edit on it.
+          </span>
+        )}
       </label>
 
       {/* Add / edit a day */}
-      <div className={`border rounded-lg p-4 space-y-3 ${editingDayIndex === null ? 'border-gray-200 bg-gray-50' : 'border-amber-300 bg-amber-50'}`}>
+      <div
+        ref={dayFormRef}
+        className={`border rounded-lg p-4 space-y-3 ${editingDayIndex === null ? 'border-gray-200 bg-gray-50' : 'border-amber-300 bg-amber-50'}`}
+      >
         <div className="flex items-center gap-2 mb-2">
           <span className={`flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold ${
             editingDayIndex === null ? 'bg-green-100 text-green-700' : 'bg-amber-200 text-amber-800'
@@ -902,22 +915,28 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                   )
                 })()}
               </div>
-              <div className="flex items-center gap-1">
+              {/* Named and always visible. These were icons that appeared on
+                  hover, so an imported programme read as something that could
+                  not be changed at all — and on a touch screen there is no
+                  hover, which made it true. */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => editDay(index)}
-                  className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Edit day"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50"
+                  title={`Edit day ${day.day}`}
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-3.5 h-3.5" />
+                  Edit
                 </button>
                 <button
                   type="button"
                   onClick={() => removeDay(index)}
-                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remove day"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-50"
+                  title={`Remove day ${day.day}`}
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" />
+                  Remove
                 </button>
               </div>
             </div>
