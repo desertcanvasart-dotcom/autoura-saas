@@ -3,6 +3,8 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { loadItineraryCompleteness } from '@/lib/pricing/itinerary-completeness'
+import { allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
@@ -55,6 +57,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Itinerary not found' },
         { status: 404 }
+      )
+    }
+
+    // Every service must have a price before this reaches a client. A service
+    // with no rate and no cost is a gap: filling it in on the itinerary clears
+    // it. Fails CLOSED — a database error refuses rather than reading as
+    // complete (lib/pricing/itinerary-completeness.ts).
+    const itineraryLines = await loadItineraryCompleteness(supabase, itineraryId, authResult.tenant_id)
+    if (!itineraryLines.ok) {
+      return NextResponse.json(
+        { success: false, error: itineraryLines.error },
+        { status: itineraryLines.status }
+      )
+    }
+    if (!itineraryLines.completeness.complete && !allowsIncomplete(body?.allow_incomplete)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `${itineraryLines.completeness.gaps.length} service(s) have no price: ${describeGaps(itineraryLines.completeness.gaps)}. Add the costs on the itinerary, or send it anyway with allow_incomplete=true.`,
+          gaps: itineraryLines.completeness.gaps,
+        },
+        { status: 422 }
       )
     }
 
