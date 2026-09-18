@@ -33,7 +33,9 @@ import {
 } from 'lucide-react'
 
 interface TourDetail {
-  variation_id: string
+  // Null until a pricing variation (tier + private/shared) exists for this
+  // tour. The programme itself lives on the template and is always shown.
+  variation_id: string | null
   template_name: string
   template_code: string
   category_name: string
@@ -43,12 +45,12 @@ interface TourDetail {
   short_description: string
   long_description: string
   highlights: string[]
-  variation_name: string
-  variation_code: string
-  tier: string
-  group_type: string
-  min_pax: number
-  max_pax: number
+  variation_name: string | null
+  variation_code: string | null
+  tier: string | null
+  group_type: string | null
+  min_pax: number | null
+  max_pax: number | null
   inclusions: string[]
   exclusions: string[]
   optional_extras: string[]
@@ -268,8 +270,8 @@ export default function TourDetailPage() {
     )
   }
 
-  const tierStyle = getTierStyle(tour.tier)
-  const groupStyle = getGroupTypeStyle(tour.group_type)
+  const tierStyle = getTierStyle(tour.tier ?? '')
+  const groupStyle = getGroupTypeStyle(tour.group_type ?? '')
 
   return (
     <div className="p-6">
@@ -288,12 +290,16 @@ export default function TourDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${tierStyle.bg} ${tierStyle.text}`}>
-            {tierStyle.icon} {tour.tier.charAt(0).toUpperCase() + tour.tier.slice(1)}
-          </span>
-          <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${groupStyle.bg} ${groupStyle.text}`}>
-            {groupStyle.icon} {groupStyle.label}
-          </span>
+          {tour.tier && (
+            <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${tierStyle.bg} ${tierStyle.text}`}>
+              {tierStyle.icon} {tour.tier.charAt(0).toUpperCase() + tour.tier.slice(1)}
+            </span>
+          )}
+          {tour.group_type && (
+            <span className={`px-3 py-1.5 rounded-lg text-xs font-medium border ${groupStyle.bg} ${groupStyle.text}`}>
+              {groupStyle.icon} {groupStyle.label}
+            </span>
+          )}
         </div>
       </div>
 
@@ -315,7 +321,11 @@ export default function TourDetailPage() {
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
           </div>
           <p className="text-xs text-gray-500 mb-1">Group Size</p>
-          <p className="text-lg font-semibold text-gray-900">{tour.min_pax}-{tour.max_pax} pax</p>
+          <p className="text-lg font-semibold text-gray-900">
+            {tour.min_pax != null && tour.max_pax != null
+              ? `${tour.min_pax}-${tour.max_pax} pax`
+              : <span className="text-sm font-normal text-gray-400">not set</span>}
+          </p>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -511,6 +521,29 @@ export default function TourDetailPage() {
 
         {/* Sidebar - Dynamic Pricing Calculator */}
         <div className="space-y-6 sticky top-6">
+          {/* Pricing is a VARIATION's job — a tier and private/shared decide
+              what the tour costs. A programme with none is still a tour: it
+              shows its days and says what is missing, instead of refusing to
+              open (which is what it did for 43 of 44 tours on 2026-09-18). */}
+          {!tour.variation_id ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+              <h3 className="text-sm font-semibold text-amber-900 mb-2 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                No price yet
+              </h3>
+              <p className="text-sm text-amber-800">
+                This programme has no pricing variation, so there is nothing to price
+                against — a variation is a tier (standard, deluxe…) and whether the
+                tour runs private or shared.
+              </p>
+              <Link
+                href="/tours/manage"
+                className="inline-block mt-3 px-3 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700"
+              >
+                Add one in Tour Manager
+              </Link>
+            </div>
+          ) : (
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <Calculator className="h-5 w-5 text-[#647C47]" />
@@ -527,7 +560,9 @@ export default function TourDetailPage() {
                 onChange={(e) => setSelectedPax(Number(e.target.value))}
                 className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47] outline-none bg-white"
               >
-                {Array.from({ length: tour.max_pax }, (_, i) => i + 1).map(num => (
+                {/* The variation's ceiling when it states one; otherwise a
+                    plain picker range, which claims nothing about the tour. */}
+                {Array.from({ length: tour.max_pax ?? 20 }, (_, i) => i + 1).map(num => (
                   <option key={num} value={num}>
                     {num} {num === 1 ? 'person' : 'people'}
                   </option>
@@ -677,13 +712,15 @@ export default function TourDetailPage() {
             </p>
           </div>
 
+          )}
+
           {/* Tour Info */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Tour Information</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Code</span>
-                <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{tour.variation_code}</span>
+                <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">{tour.variation_code || tour.template_code}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Category</span>
@@ -699,7 +736,7 @@ export default function TourDetailPage() {
               <div className="flex justify-between">
                 <span className="text-gray-500">Type</span>
                 <span className="text-gray-900">
-                  {tour.group_type === 'private' ? '🔒 Private' : '👥 Shared'}
+                  {tour.group_type === 'private' ? '🔒 Private' : tour.group_type === 'shared' ? '👥 Shared' : '—'}
                 </span>
               </div>
               <div className="flex justify-between">
