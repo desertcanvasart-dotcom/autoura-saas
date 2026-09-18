@@ -227,6 +227,89 @@ describe('migration replay from scratch', () => {
       "an agency's own type keeps an unknown range, so nothing overwrites it"
     ).toEqual({})
 
+    // Migration 369: naming a supplier this workspace knows IS linking to it.
+    // The Hotels page listed eleven hotels with their companies above a card
+    // reading "Linked to Company 0" — the rows carried the NAME and no link,
+    // so the company filter found none of them. An import is only one door,
+    // so the rule lives here, where every door passes.
+    await db.exec(`
+      INSERT INTO suppliers (tenant_id, name, company_name, type, status)
+      SELECT t.id, 'Aracan Hotels & Resorts', 'Aracan Hotels & Resorts', 'hotel', 'active'
+      FROM tenants t WHERE t.company_name = 'Replay Probe Co';
+      INSERT INTO suppliers (tenant_id, name, company_name, type, status)
+      SELECT t.id, 'Twin Name Co', 'Twin Name Co', 'hotel', 'active'
+      FROM tenants t WHERE t.company_name = 'Replay Probe Co';
+      INSERT INTO suppliers (tenant_id, name, company_name, type, status)
+      SELECT t.id, 'Twin Name Co', 'Twin Name Co', 'hotel', 'active'
+      FROM tenants t WHERE t.company_name = 'Replay Probe Co';
+    `)
+    const rateLink = async (code: string) => {
+      const r = await db.query(
+        `SELECT supplier_id, supplier_name FROM accommodation_rates WHERE service_code = '${code}'`
+      )
+      return r.rows[0] as { supplier_id: string | null; supplier_name: string | null }
+    }
+    const rate = (code: string, cols: string, values: string) => `
+      INSERT INTO accommodation_rates (tenant_id, service_code, hotel_name, city, ${cols})
+      SELECT t.id, '${code}', 'Probe Hotel', 'Luxor', ${values}
+      FROM tenants t WHERE t.company_name = 'Replay Probe Co'`
+
+    // (a) a name this workspace knows becomes a link — whatever the spacing
+    await db.exec(rate('PROBE-LINK', 'supplier_name', `'  aracan hotels & resorts '`))
+    const linked = await rateLink('PROBE-LINK')
+    const aracan = await db.query(
+      `SELECT id FROM suppliers WHERE name = 'Aracan Hotels & Resorts'`
+    )
+    expect(linked.supplier_id).toBe((aracan.rows[0] as { id: string }).id)
+
+    // (b) a name nobody here carries stays unlinked — never invented
+    await db.exec(rate('PROBE-UNKNOWN', 'supplier_name', `'Accor'`))
+    expect((await rateLink('PROBE-UNKNOWN')).supplier_id).toBeNull()
+    expect((await rateLink('PROBE-UNKNOWN')).supplier_name).toBe('Accor')
+
+    // (c) two suppliers share the name: only a human can choose
+    await db.exec(rate('PROBE-AMBIGUOUS', 'supplier_name', `'Twin Name Co'`))
+    expect((await rateLink('PROBE-AMBIGUOUS')).supplier_id).toBeNull()
+
+    // (d) a stated link is never overruled by a name pointing elsewhere
+    const twin = await db.query(`SELECT id FROM suppliers WHERE name = 'Twin Name Co' LIMIT 1`)
+    const twinId = (twin.rows[0] as { id: string }).id
+    await db.exec(rate('PROBE-STATED', 'supplier_id, supplier_name', `'${twinId}'::uuid, 'Aracan Hotels & Resorts'`))
+    expect((await rateLink('PROBE-STATED')).supplier_id).toBe(twinId)
+
+    // (e) a link with no name is given the supplier's own name
+    await db.exec(rate('PROBE-NAMELESS', 'supplier_id', `'${twinId}'::uuid`))
+    expect((await rateLink('PROBE-NAMELESS')).supplier_name).toBe('Twin Name Co')
+
+    // (f) naming a known supplier on an UPDATE links it too
+    await db.exec(rate('PROBE-UPDATE', 'supplier_name', `'Accor'`))
+    await db.exec(
+      `UPDATE accommodation_rates SET supplier_name = 'Aracan Hotels & Resorts' WHERE service_code = 'PROBE-UPDATE'`
+    )
+    expect((await rateLink('PROBE-UPDATE')).supplier_id).toBe((aracan.rows[0] as { id: string }).id)
+
+    // (g) the rule reaches every table that can name a supplier, not just rates
+    const triggered = await db.query(`
+      SELECT c.relname FROM pg_trigger g
+        JOIN pg_class c ON c.oid = g.tgrelid
+       WHERE g.tgname = 'link_supplier_by_name' AND NOT g.tgisinternal
+       ORDER BY c.relname
+    `)
+    expect((triggered.rows as Array<{ relname: string }>).map(r => r.relname)).toEqual([
+      'accommodation_rates',
+      'activity_rates',
+      'airport_staff_rates',
+      'booking_supplier_status',
+      'expenses',
+      'flight_rates',
+      'hotel_staff_rates',
+      'itinerary_services',
+      'meal_rates',
+      'nile_cruises',
+      'supplier_documents',
+      'supplier_invoices',
+    ])
+
     // Migration 361: a SECURITY DEFINER function runs past RLS, so one that
     // takes a caller-supplied id must not be executable by the browser roles.
     // Production proved anon could call ten of them (cross-tenant reads and
