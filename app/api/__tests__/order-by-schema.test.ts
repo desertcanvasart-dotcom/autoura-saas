@@ -31,13 +31,6 @@ const EXEMPT: Array<{ file: string; table: string; column: string; reason: strin
     reason:
       "the .order belongs to the `query` variable built from unified_conversations (which HAS last_message_at, mig 125); an intervening .from('trip_messages') id-lookup steals the window",
   },
-  {
-    file: 'app/api/dashboard/attention/route.ts',
-    table: 'unified_conversations',
-    column: 'awaiting_reply_since',
-    reason:
-      'migration 366 adds it; the generated types follow the LIVE schema, so this entry comes out with the types:generate run after 366 is applied',
-  },
 ]
 
 function rowColumns(table: string): Set<string> | null {
