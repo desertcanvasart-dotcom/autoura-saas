@@ -1247,8 +1247,37 @@ export default function TourManagerContent() {
     a.click()
   }
 
+  // Fetched, not navigated to: window.location.href on a route that answers
+  // JSON on failure replaced the page with raw JSON (or, with a download
+  // header, did nothing at all and left the operator staring at the screen).
+  // A failure is reported in place, with the reason the route gives.
+  const downloadCsv = async (url: string, filename: string, what: string) => {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `${what} export failed (${res.status})`)
+      }
+      const blob = await res.blob()
+      const href = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = href
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(href)
+    } catch (e) {
+      showToast('error', e instanceof Error ? e.message : `${what} export failed`)
+    }
+  }
+
   const handleExportDays = () => {
-    window.location.href = '/api/tours/bulk/export-days'
+    void downloadCsv(
+      '/api/tours/bulk/export-days',
+      `tour-days-${new Date().toISOString().split('T')[0]}.csv`,
+      'Day'
+    )
   }
 
   const handleImportDays = async (file: File) => {
@@ -1262,16 +1291,19 @@ export default function TourManagerContent() {
       const json = await res.json()
       const firstReason = Array.isArray(json.refused) && json.refused.length
         ? ` — ${json.refused[0].reason}` : ''
+      const landed = (json.updated || 0)
+      const counts =
+        `${json.days || 0} day(s) across ${json.updated || 0} tour(s)` +
+        (json.refusedRows ? `, ${json.refusedRows} skipped${firstReason}` : '')
       if (json.success) {
-        showToast(
-          json.refusedRows ? 'info' : 'success',
-          `Itineraries updated: ${json.days} day(s) across ${json.updated} tour(s)` +
-          (json.refusedRows ? `, ${json.refusedRows} skipped${firstReason}` : '')
-        )
-        fetchTemplates()
+        showToast(json.refusedRows ? 'info' : 'success', `Itineraries updated: ${counts}`)
       } else {
-        showToast('error', json.error || 'Day import failed')
+        showToast(
+          'error',
+          (json.error || 'Day import failed') + (landed ? ` — ${counts} before it stopped` : '')
+        )
       }
+      if (landed > 0 || json.success) fetchTemplates()
     } catch (e) {
       showToast('error', e instanceof Error ? e.message : 'Day import failed')
     } finally {
@@ -1281,7 +1313,11 @@ export default function TourManagerContent() {
 
   // Flat CSV of the portable template metadata (this tenant). Server builds it.
   const handleExportTemplates = () => {
-    window.location.href = '/api/tours/bulk/export'
+    void downloadCsv(
+      '/api/tours/bulk/export',
+      `tour-templates-${new Date().toISOString().split('T')[0]}.csv`,
+      'Template'
+    )
   }
 
   // Import that CSV: upserts by template_code (portable fields only, never the
@@ -1307,17 +1343,25 @@ export default function TourManagerContent() {
       const ignored = Array.isArray(json.ignoredHeaders) && json.ignoredHeaders.length
         ? ` — columns not imported: ${json.ignoredHeaders.join(', ')}`
         : ''
+      // What LANDED is said even when some rows failed: the route imports row
+      // by row, so a partial failure still created and updated tours. Showing
+      // only the error hid that, and skipping the refresh left the screen
+      // claiming those tours did not exist.
+      const landed = (json.created || 0) + (json.updated || 0)
+      const counts =
+        `${json.created || 0} created, ${json.updated || 0} updated` +
+        (json.refusedRows ? `, ${json.refusedRows} skipped${firstReason}` : '') +
+        ignored
       if (json.success) {
-        showToast(
-          json.refusedRows || ignored ? 'info' : 'success',
-          `Imported: ${json.created} created, ${json.updated} updated` +
-          (json.refusedRows ? `, ${json.refusedRows} skipped${firstReason}` : '') +
-          ignored
-        )
-        fetchTemplates()
+        showToast(json.refusedRows || ignored ? 'info' : 'success', `Imported: ${counts}`)
       } else {
-        showToast('error', (json.error || 'Import failed') + (json.error ? '' : firstReason))
+        showToast(
+          'error',
+          (json.error || 'Import failed') + (json.error ? '' : firstReason) +
+          (landed ? ` — ${counts} before it stopped` : '')
+        )
       }
+      if (landed > 0 || json.success) fetchTemplates()
     } catch (e: any) {
       showToast('error', e?.message || 'Import failed')
     } finally {
