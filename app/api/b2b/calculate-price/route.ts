@@ -299,7 +299,12 @@ async function getEntranceFee(
 ): Promise<{ rate: number; name: string; id: string } | null> {
   const scope = await getCatalogScope(getSupabaseAdmin(), tenantId ?? '')
   const fee = await canonicalGetEntranceFee(scope, attractionName, isEurPassport)
-  if (!fee) return null
+  // ONLY a definite match is a price. This wrapper used to drop `source`, so a
+  // KEYWORD match was priced as if it were exact: "Citadel of Saladin" falls
+  // back to the word "citadel", and whether that is Salah Eldin or Qaitbay was
+  // up to the database. The template engine has always refused these; the
+  // calculator now does too, and the line stays unpriced like any other gap.
+  if (!fee || fee.source !== 'db') return null
   return { rate: fee.rate, name: fee.name, id: fee.id }
 }
 

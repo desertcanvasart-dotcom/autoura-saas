@@ -49,6 +49,7 @@ import type { VocabularyKind } from '@/lib/vocabulary'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
+import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
 import { priceAcrossPax } from '@/lib/pricing/pax-range'
@@ -1587,11 +1588,15 @@ export async function getEntranceFeeById(
 /**
  * Get entrance fee for an attraction
  */
+/** Every fee a wording could mean. A sheet is ~120 rows, so this is "all of
+ *  them" in practice while still never dragging a whole table across. */
+const FEE_CANDIDATE_LIMIT = 50
+
 export async function getEntranceFee(
   scope: CatalogScope,
   attractionName: string,
   isEurPassport: boolean
-): Promise<{ id: string; name: string; rate: number; source: RateSource } | null> {
+): Promise<{ id: string; name: string; rate: number; source: RateSource; ambiguous?: Ambiguity } | null> {
   // A fee does not change with the tier, but every tier asks for it — and the
   // fuzzy path can cost several requests on its own. Keyed on everything that
   // changes the answer.
@@ -1603,10 +1608,23 @@ export async function getEntranceFee(
       .or(catalogOrExpr(scope))
       .eq('is_active', true)
       .ilike('attraction_name', `%${attractionName}%`)
-      .limit(1)
+      // Every fee that CONTAINS the wording, not the first one: this was
+      // `.limit(1)` with no ordering, so "Egyptian Museum" could come back as
+      // The Grand Egyptian Museum (1,640 EGP, not 600) and be called definite.
+      // lib/pricing/entrance-fee-match.ts has the rule and the live evidence.
+      .order('attraction_name', { ascending: true })
+      .limit(FEE_CANDIDATE_LIMIT)
 
     // A full-name match is definite; a keyword fallback is approximate.
     let matchSource: RateSource = 'db'
+
+    const choice = chooseEntranceFee((fees ?? []) as Array<{ attraction_name?: string | null }>, attractionName)
+    if (!error && choice.kind === 'ambiguous') {
+      // Not a price. `source: 'fuzzy'` so that a caller which only knows the
+      // old contract (`source === 'db'` means usable) still refuses it.
+      return { id: '', name: attractionName, rate: 0, source: 'fuzzy', ambiguous: choice.ambiguity }
+    }
+    fees = (!error && choice.kind === 'one' ? [choice.row] : []) as typeof fees
 
     if (error || !fees || fees.length === 0) {
       matchSource = 'fuzzy'
@@ -3423,6 +3441,7 @@ export async function calculateDayBasedPricing(
         message: `Day ${day.day}'s picked attraction is no longer in Rates → Attractions (or has no price). Re-pick it on the day editor.`,
       })
     } else {
+      const ambiguousFee = (fee as { ambiguous?: Ambiguity } | null)?.ambiguous
       addHole({
         kind: 'entrance',
         reason: fee ? 'fuzzy' : 'missing',
@@ -3430,7 +3449,10 @@ export async function calculateDayBasedPricing(
         dayNumber: day.day,
         attraction,
         lookupAttempted: `entrance fee "${attraction}"`,
-        message: `No exact entrance fee for "${attraction}". Add it in Rates → Attractions.`,
+        // Only the worded lookup can be ambiguous; a picked id is one row.
+        message: ambiguousFee
+          ? ambiguousFeeMessage(attraction as string, ambiguousFee)
+          : `No exact entrance fee for "${attraction}". Add it in Rates → Attractions.`,
       })
     }
   })
