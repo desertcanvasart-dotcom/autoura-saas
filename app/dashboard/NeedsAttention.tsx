@@ -10,30 +10,52 @@
 // Loads on its own so a slow or failing scan degrades to a quiet panel rather
 // than holding up the numbers above it.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ComponentType } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, CheckCircle2, Wallet, IdCard, UserRound, MessageSquare } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Wallet, IdCard, UserRound, MessageSquare, PackagePlus, MailWarning } from 'lucide-react'
+// The item and its kinds are the API's own. This panel used to keep a copy of
+// the list, typed out by hand — and the copy stopped at four while the API
+// went on to six ('extra_request' in #300, 'awaiting_reply' in #449). An item
+// of a kind with no icon here rendered `undefined` as a component, which is
+// React error #130, and took the WHOLE DASHBOARD down with it: reported from
+// production on 2026-09-20, the first account with a customer waiting more
+// than a day for a reply.
+import type { AttentionItem, AttentionType } from '@/lib/dashboard/attention'
 
-interface AttentionItem {
-  type: 'balance_due' | 'details_missing' | 'no_guide' | 'change_request'
-  severity: 'urgent' | 'soon'
-  bookingId: string
-  bookingNumber: string | null
-  tripName: string | null
-  clientName: string | null
-  startDate: string | null
-  detail: Record<string, unknown>
-  href: string
-}
+type IconType = ComponentType<{ className?: string }>
 
-const ICONS = {
+// Record<AttentionType, …>, not `as const`: a kind added to the API without an
+// icon is now a type error, not a crashed page.
+const ICONS: Record<AttentionType, IconType> = {
   balance_due: Wallet,
   details_missing: IdCard,
   no_guide: UserRound,
   change_request: MessageSquare,
-} as const
+  extra_request: PackagePlus,
+  awaiting_reply: MailWarning,
+}
 
-function describe(item: AttentionItem): string {
+/** The icon for an item. The fallback is for the one case the types cannot
+ *  cover: a browser tab still running yesterday's code against today's API.
+ *  A list of reminders must never be able to take the page down. */
+export function iconFor(type: string): IconType {
+  return (ICONS as Record<string, IconType | undefined>)[type] ?? AlertTriangle
+}
+
+function waitedFor(hours: unknown): string {
+  const h = Number(hours)
+  if (!Number.isFinite(h) || h < 24) return 'more than a day'
+  const days = Math.floor(h / 24)
+  return days === 1 ? '1 day' : `${days} days`
+}
+
+/** What the first line says. A conversation is not a booking. */
+export function headline(item: AttentionItem): string {
+  if (item.type === 'awaiting_reply') return item.clientName || 'A customer'
+  return item.tripName || item.bookingNumber || 'Booking'
+}
+
+export function describe(item: AttentionItem): string {
   const d = item.detail
   switch (item.type) {
     case 'balance_due':
@@ -48,6 +70,13 @@ function describe(item: AttentionItem): string {
       return d.requestedCount
         ? `Asked to add ${d.requestedCount} traveller${d.requestedCount === 1 ? '' : 's'}`
         : 'Change request waiting'
+    case 'extra_request':
+      return d.title ? `Extra requested: ${d.title}` : 'An extra was requested and is waiting on the office'
+    case 'awaiting_reply':
+      return `Waiting ${waitedFor(d.hours)} for our reply`
+    default:
+      // Reached only by a kind this build has never heard of — see iconFor.
+      return 'Needs a look'
   }
 }
 
@@ -105,15 +134,15 @@ export default function NeedsAttention() {
       ) : (
         <ul className="divide-y divide-gray-100">
           {items.map((item, i) => {
-            const Icon = ICONS[item.type]
+            const Icon = iconFor(item.type)
             return (
               <li key={`${item.bookingId}-${item.type}-${i}`}>
                 <Link href={item.href} className="flex items-start gap-3 py-2.5 px-1 hover:bg-gray-50 rounded transition-colors">
                   <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${item.severity === 'urgent' ? 'text-red-600' : 'text-amber-500'}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-gray-900 truncate">
-                      {item.tripName || item.bookingNumber || 'Booking'}
-                      {item.clientName && <span className="text-gray-500"> · {item.clientName}</span>}
+                      {headline(item)}
+                      {item.clientName && item.type !== 'awaiting_reply' && <span className="text-gray-500"> · {item.clientName}</span>}
                     </p>
                     <p className="text-xs text-gray-500">
                       {describe(item)}
