@@ -13,6 +13,8 @@
 //   - a name no alias knows passes through unchanged, so the engine's
 //     historical map and ilike fallback still get their turn.
 
+import { memoRead } from './query-memo'
+
 export interface AttractionAliasRow {
   alias: string
   canonical: string
@@ -64,6 +66,8 @@ export async function loadAttractionAliasIndex(
   db: object,
   tenantId: string
 ): Promise<Map<string, string>> {
+  // The same table, unchanged by tier — read once per calculation.
+  return memoRead(`aliases|${tenantId}`, async () => {
   try {
     const { data, error } = await (db as AliasDb)
       .from('attraction_aliases')
@@ -75,4 +79,5 @@ export async function loadAttractionAliasIndex(
   } catch {
     return new Map()
   }
+  })
 }
