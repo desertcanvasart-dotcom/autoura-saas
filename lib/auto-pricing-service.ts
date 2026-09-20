@@ -185,6 +185,11 @@ export interface ItineraryDay {
    *  that column is NULL on all 2,040 production rows. Absent = a day tour,
    *  exactly as before. */
   sightseeing_length?: 'half_day' | 'day_tour' | 'long_day_tour'
+  /** The day STORES nothing the engine prices from — no city, no services, no
+   *  attractions, no night — and its title gave the engine nothing to ask for
+   *  either. Such a day is prose: it costs nothing to "price", so it used to
+   *  count as fully priced. See the hole in calculateDayBasedPricing. */
+  unstated?: boolean
   services: {
     airport_arrival: boolean
     airport_departure: boolean
@@ -754,10 +759,21 @@ export function parseItinerary(itineraryData: any, opts?: {
         ? day.transport_rate_id
         : undefined
 
+    // Nothing stored AND nothing the wording could be read for. Meals do not
+    // count: a lunch is not what a day of a tour costs.
+    const storesNothing =
+      !day.city && !day.services && !day.accommodation_type && !transport_type &&
+      day.city_transfer !== true && attraction_ids.length === 0 &&
+      !(Array.isArray(day.attractions) && day.attractions.length > 0)
+    // The airport and hotel defaults above come from the day's POSITION in the
+    // tour, not from anything it says, so they do not make it a stated day.
+    const asksForNothing = attractions.length === 0 && !hasAttractions
+
     return {
       day: day.day || index + 1,
       title: day.title || `Day ${index + 1}`,
       description: day.description || '',
+      unstated: storesNothing && asksForNothing,
       city: day.city || inferCityFromTitle(day.title || ''),
       // A sleeping-train night has no hotel bed — the ticket IS the bed
       // (B-item 2); the sleeper night joins the rooming list instead.
@@ -2398,6 +2414,30 @@ export async function calculateDayBasedPricing(
         'day builder.',
     })
     warnings.push('No itinerary data found - using defaults')
+  }
+
+  // A DAY THAT SAYS NOTHING IS NOT A DAY THAT COSTS NOTHING. Found on live
+  // data, 2026-09-20: 27 of Sawa Tours' 48 days are a title and a description
+  // and nothing else — no city, no sightseeing, no night. The engine had
+  // nothing to look up, so it recorded no gap, and nine full-day tours came
+  // out COMPLETE at 12.50 per person: the price of the lunch. Only a flag on
+  // the template was keeping that figure off the tours page. A price is
+  // deliverable when every component traces to a rate; a day with no
+  // components has not been priced, it has been skipped.
+  for (const day of itinerary) {
+    if (!day.unstated) continue
+    addHole({
+      kind: 'template',
+      reason: 'missing',
+      tier,
+      dayNumber: day.day,
+      lookupAttempted: `what day ${day.day} includes (city, sightseeing, night)`,
+      message:
+        `Day ${day.day} ("${day.title}") is only a description: it does not say ` +
+        `where it is, what is visited or where the night is, so nothing on it can ` +
+        `be priced. Open the tour in Tour Manager, press Edit on the day and fill in ` +
+        `its city and what it includes.`,
+    })
   }
 
 
