@@ -16,6 +16,7 @@
 //      at 0; the route refuses to create the quote while any exist.
 
 import { ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
+import { ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 import { mealHoleMessage, type MealKind, type MealRatesResult } from '@/lib/auto-pricing-service'
 import { applyActivityTiers, type ActivityTier } from '@/lib/rates/activity-tiers'
 
@@ -50,7 +51,9 @@ export interface QuoteLookups {
   cruise(city: string, rateId: string | null): Promise<PropertyRate | null>
   meals(): Promise<MealRatesResult | null>
   guide(): Promise<{ dailyRate: number; source: 'db' | 'fuzzy' | 'missing'; ambiguous?: Ambiguity } | null>
-  entrance(serviceName: string): Promise<{ rate: number } | null>
+  /** `source` and `ambiguous` are the engine's: only `source === 'db'` is a
+   *  price. A lookup that reports neither is trusted as definite. */
+  entrance(serviceName: string): Promise<{ rate: number; source?: string; ambiguous?: Ambiguity } | null>
   tieredActivity(serviceName: string): Promise<{ tiers: ActivityTier[] } | null>
 }
 
@@ -220,14 +223,21 @@ export async function repriceItineraryServices(
           priced = true
         } else {
           const fee = await lookups.entrance(name)
-          if (fee) {
+          // A keyword or ambiguous match is not a price — it used to be taken
+          // as one here, because only `fee` was checked and not its source.
+          if (fee && !fee.ambiguous && (fee.source === undefined || fee.source === 'db')) {
             unitCost = fee.rate
             lineTotal = fee.rate * ctx.numPax
             quantityMode = 'per_pax'
             rateSource = 'entrance_fees'
             priced = true
           } else {
-            holes.push({ kind: 'entrance', dayNumber: dayNumber ?? undefined, service: name, message: `No entrance fee on file for "${name}". Add it in Rates → Attractions.` })
+            holes.push({
+              kind: 'entrance', dayNumber: dayNumber ?? undefined, service: name,
+              message: fee?.ambiguous
+                ? ambiguousFeeMessage(name, fee.ambiguous)
+                : `No entrance fee on file for "${name}". Add it in Rates → Attractions.`,
+            })
           }
         }
       } else {
