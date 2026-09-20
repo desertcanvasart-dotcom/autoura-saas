@@ -1,3 +1,4 @@
+import { tenantForUser, type MembershipRow } from '@/lib/email/scheduled-sync'
 import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
 import { repairOfficeDirections } from '@/lib/email/repair-direction'
@@ -89,7 +90,14 @@ export async function POST(request: NextRequest) {
         .select('tenant_id')
         .eq('user_id', userId)
         .maybeSingle()
-      tenant_id = owner?.tenant_id ?? null
+      // …or, when that row carries none (the sign-in never wrote one: all four
+      // production mailboxes had NULL on 2026-09-20), from the owner's own
+      // membership — still never from the request.
+      const { data: memberships } = await createAdminClient()
+        .from('tenant_members')
+        .select('user_id, tenant_id, joined_at')
+        .eq('user_id', userId)
+      tenant_id = tenantForUser(userId, owner?.tenant_id ?? null, (memberships ?? []) as MembershipRow[])
       if (!tenant_id) return NextResponse.json({ error: 'Mailbox is not linked to a company', success: false }, { status: 404 })
       // No session, so no RLS client: the sweep spans every tenant and writes
       // with the service role, scoped by the tenant_id resolved above.
