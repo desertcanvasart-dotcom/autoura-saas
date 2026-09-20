@@ -43,6 +43,7 @@ import DayBuilder from './DayBuilder'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useTierConfigs, useVocabulary } from '@/components/vocabulary'
 import { suggestTourType, durationForType, isSingleDayType } from '@/lib/tours/tour-type'
+import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 // ============================================
@@ -515,6 +516,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       return
     }
     if (!dayTitle.trim()) return
+    // A day is in ONE city — every rate for it is looked up by that city. The
+    // field below already says why; saving a list would only hide it again.
+    if (namesSeveralPlaces(dayCity)) return
     
     const newDay: ItineraryDay = {
       day: editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day,
@@ -633,9 +637,15 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
             <datalist id="tour-day-cities">
               {EGYPTIAN_CITIES.map(c => <option key={c} value={c} />)}
             </datalist>
-            <p className="text-[11px] text-gray-500 mt-1">
-              Left blank, pricing reads the title — and a day it cannot place is a gap, not Cairo.
-            </p>
+            {namesSeveralPlaces(dayCity) ? (
+              <p className="text-[11px] text-red-600 mt-1" role="alert">
+                {severalPlacesReason(dayCity)}. Choose one to save this day.
+              </p>
+            ) : (
+              <p className="text-[11px] text-gray-500 mt-1">
+                Left blank, pricing reads the title — and a day it cannot place is a gap, not Cairo.
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Night</label>
@@ -900,6 +910,11 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                 )}
                 <p className="text-xs text-gray-500 mt-0.5">
                   📍 {day.city || <span className="italic">city not stated — read from the title</span>}
+                  {namesSeveralPlaces(day.city) && (
+                    <span className="ml-1 font-medium text-red-600">
+                      — more than one place, so this day cannot be priced. Press Edit and choose one.
+                    </span>
+                  )}
                   {' · 🌙 '}
                   {day.accommodation_type === 'cruise'
                     ? 'On board'
