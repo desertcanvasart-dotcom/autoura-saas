@@ -130,6 +130,9 @@ interface ItineraryDay {
   property_by_tier?: Record<string, string>
   /** A non-sightseeing transfer in town: sound & light, the market, dinner. */
   city_transfer?: boolean
+  /** Four hours, eight, or twelve — the agency prices those as different
+   *  transport routes. */
+  sightseeing_length?: 'half_day' | 'day_tour' | 'long_day_tour'
 }
 
 /** A ticket row the Travel picker can name (B-item 2). */
@@ -407,6 +410,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   const [dayProperties, setDayProperties] = useState<Record<string, string>>({})
   /** A transfer to somewhere else in town that is not sightseeing. */
   const [dayCityTransfer, setDayCityTransfer] = useState(false)
+  /** How long the sightseeing runs: four hours, eight, or twelve. */
+  const [dayLength, setDayLength] = useState<'' | 'half_day' | 'day_tour' | 'long_day_tour'>('')
   /** What is on file for this day's city, per tier, for the pickers. */
   const [cityHotels, setCityHotels] = useState<Record<string, Array<{ id: string; name: string }>>>({})
   const [dayNight, setDayNight] = useState<'' | 'hotel' | 'cruise' | 'none'>('')
@@ -473,6 +478,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayNight('')
     setDayProperties({})
     setDayCityTransfer(false)
+    setDayLength('')
     setEditingDayIndex(null)
   }
 
@@ -497,6 +503,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayCity(day.city || '')
     setDayProperties((day.property_by_tier as Record<string, string>) || {})
     setDayCityTransfer(day.city_transfer === true)
+    setDayLength((day.sightseeing_length as typeof dayLength) || '')
     setDayNight((day.accommodation_type as typeof dayNight) || '')
     setDayMealsError(null)
   }
@@ -536,6 +543,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       ...(dayCity.trim() ? { city: dayCity.trim() } : {}),
       ...(dayNight ? { accommodation_type: dayNight } : {}),
       ...(dayCityTransfer ? { city_transfer: true } : {}),
+      ...(dayLength ? { sightseeing_length: dayLength } : {}),
       // Only the tiers that actually named one. An empty map is the same as
       // saying nothing: the engine picks, as it always has.
       ...(Object.values(dayProperties).some(Boolean)
@@ -645,6 +653,25 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
               Say it here and the words in the title stop deciding it.
             </p>
           </div>
+        </div>
+
+        {/* Four hours, eight, or twelve: the agency prices those as different
+            transport routes, so the length is a choice on the day. */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Sightseeing length</label>
+          <select
+            value={dayLength}
+            onChange={(e) => setDayLength(e.target.value as typeof dayLength)}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white"
+          >
+            <option value="">Full day (8 hours) — the default</option>
+            <option value="half_day">Half day (4 hours)</option>
+            <option value="day_tour">Full day (8 hours)</option>
+            <option value="long_day_tour">Long day (12 hours)</option>
+          </select>
+          <p className="text-[11px] text-gray-500 mt-1">
+            The transport for the day is priced from the matching route.
+          </p>
         </div>
 
         {/* A day tour is the sightseeing. This is getting somewhere else in
@@ -882,6 +909,11 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                     ? 'No night'
                     : <span className="italic">night not stated — read from the title</span>}
                 </p>
+                {day.sightseeing_length && day.sightseeing_length !== 'day_tour' && (
+                  <p className="text-xs text-teal-700 mt-0.5">
+                    ⏱️ {day.sightseeing_length === 'half_day' ? 'Half day (4 hours)' : 'Long day (12 hours)'}
+                  </p>
+                )}
                 {day.city_transfer && (
                   <p className="text-xs text-purple-700 mt-0.5">🚐 Local transfer</p>
                 )}

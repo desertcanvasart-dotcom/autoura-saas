@@ -41,14 +41,18 @@ describe('what a day asks for besides its sightseeing', () => {
   })
 
   it('a local transfer when the operator ticks it — the market, sound & light', () => {
-    expect(extraTransfersFor(day({ city_transfer: true })).map(e => e.serviceType)).toEqual(['city_transfer'])
+    // "City Transfer" and "Transfer Within City" are the same thing, and the
+    // operator is populating the latter; the older key is still tried.
+    const [extra] = extraTransfersFor(day({ city_transfer: true }))
+    expect(extra.serviceType).toBe('transfer_within_city')
+    expect(extra.alsoTry).toEqual(['city_transfer'])
   })
 
   it('both, because a day can need both', () => {
     const extras = extraTransfersFor(
       day({ city_transfer: true, meals: { breakfast: 'included', lunch: 'none', dinner: 'external' } })
     )
-    expect(extras.map(e => e.serviceType)).toEqual(['outside_dinner', 'city_transfer'])
+    expect(extras.map(e => e.serviceType)).toEqual(['outside_dinner', 'transfer_within_city'])
   })
 
   it('never asks because of a WORD in the title', () => {
@@ -62,7 +66,8 @@ const transportRow = (service_type: string, city: string, rate: number) => ({
   city,
   destination_city: null,
   origin_city: null,
-  duration: 'one_way',
+  // NULL, as every production row has: the service type carries the length.
+  duration: null,
   area: null,
   vehicle_type: 'Sedan',
   base_rate_eur: rate,
@@ -109,5 +114,52 @@ describe('the rates those days reach', () => {
   it('does not charge one on a day that asks for neither', async () => {
     const result = await priceWith([transportRow('city_transfer', 'Cairo', 40)], {})
     expect(result.services.some(s => s.id.endsWith('-city-transfer'))).toBe(false)
+  })
+})
+
+describe('against rows shaped like production\'s', () => {
+  it('prices a row whose duration is NULL — which is all 2,040 of them', async () => {
+    const result = await priceWith([transportRow('city_transfer', 'Cairo', 40)], { city_transfer: true })
+    const line = result.services.find(s => s.id.endsWith('-city-transfer'))
+    // Asking for a duration would match this row only APPROXIMATELY, which
+    // becomes a gap — a rate that exists, reported as missing.
+    expect(line?.unitCost).toBe(40)
+    expect(result.holes.some(h => h.message.includes('local transfer'))).toBe(false)
+  })
+})
+
+describe('the length of a day\'s sightseeing is its route', () => {
+  // Half day is four hours, a day tour eight, a long day tour twelve
+  // (operator, 2026-09-18), and the agency prices those as different routes.
+  it('asks for the route the day says it is', async () => {
+    for (const [length, rate] of [['half_day', 60], ['long_day_tour', 200]] as const) {
+      const result = await priceWith([transportRow(length, 'Cairo', rate)], { sightseeing_length: length })
+      const line = result.services.find(s => s.id.endsWith('-transport'))
+      expect(line?.unitCost, length).toBe(rate)
+    }
+  })
+
+  it('is a full day tour when the day does not say, exactly as before', async () => {
+    const result = await priceWith([transportRow('day_tour', 'Cairo', 120)], {})
+    expect(result.services.find(s => s.id.endsWith('-transport'))?.unitCost).toBe(120)
+  })
+
+  it('does not fall back to the day-tour rate for a half day', async () => {
+    const result = await priceWith([transportRow('day_tour', 'Cairo', 120)], { sightseeing_length: 'half_day' })
+    expect(result.services.some(s => s.id.endsWith('-transport') && s.unitCost === 120)).toBe(false)
+    expect(result.complete).toBe(false)
+  })
+
+  it('finds an older City Transfer row while Transfer Within City is being filled in', async () => {
+    const result = await priceWith([transportRow('city_transfer', 'Cairo', 40)], { city_transfer: true })
+    expect(result.services.find(s => s.id.endsWith('-city-transfer'))?.unitCost).toBe(40)
+  })
+
+  it('prefers Transfer Within City when both exist', async () => {
+    const result = await priceWith(
+      [transportRow('city_transfer', 'Cairo', 40), transportRow('transfer_within_city', 'Cairo', 55)],
+      { city_transfer: true }
+    )
+    expect(result.services.find(s => s.id.endsWith('-city-transfer'))?.unitCost).toBe(55)
   })
 })
