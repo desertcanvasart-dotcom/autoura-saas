@@ -1,3 +1,4 @@
+import { tenantForUser, type MembershipRow } from '@/lib/email/scheduled-sync'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { getTokensFromCode, getUserEmail } from '@/lib/gmail'
@@ -55,11 +56,23 @@ export async function GET(request: NextRequest) {
     // Calculate token expiry
     const expiryDate = new Date(Date.now() + (tokens.expiry_date || 3600 * 1000))
 
+    // Which company this mailbox is filed under. The row used to be written
+    // without one — every production mailbox had tenant_id NULL — and the
+    // scheduled sweep skips a mailbox it cannot place. Same rule as the sweep.
+    const { data: memberships } = await getSupabase()
+      .from('tenant_members')
+      .select('user_id, tenant_id, joined_at')
+      .eq('user_id', userId)
+    const tenantId = tenantForUser(userId, null, (memberships ?? []) as MembershipRow[])
+
     // Upsert token record
     const { error: dbError } = await (getSupabase() as any)
       .from('gmail_tokens')
       .upsert({
         user_id: userId,
+        // Left out rather than nulled when unknown, so a reconnect can never
+        // erase a company that was already recorded.
+        ...(tenantId ? { tenant_id: tenantId } : {}),
         email,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
