@@ -48,6 +48,7 @@ import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant }
 import type { VocabularyKind } from '@/lib/vocabulary'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
+import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
 import { priceAcrossPax } from '@/lib/pricing/pax-range'
@@ -995,7 +996,7 @@ function inferAccommodationType(day: any, _allDays?: any[], isSingleDay = false)
 // priced. A hole that already has a line (a fuzzy rate still produced one)
 // does not get a second.
 
-const HOLE_LINE_LABEL: Record<string, { name: string; serviceType: string; perPax: boolean }> = {
+const HOLE_LINE_LABEL: Record<string, { name: string; serviceType: string; perPax: boolean; line?: string }> = {
   hotel: { name: 'Hotel night', serviceType: 'accommodation', perPax: true },
   cruise: { name: 'Cruise night', serviceType: 'cruise', perPax: true },
   guide: { name: 'Guide', serviceType: 'guide', perPax: false },
@@ -1006,6 +1007,9 @@ const HOLE_LINE_LABEL: Record<string, { name: string; serviceType: string; perPa
   hotel_service: { name: 'Hotel service', serviceType: 'hotel_service', perPax: false },
   tipping: { name: 'Tips', serviceType: 'tips', perPax: true },
   activity: { name: 'Activity', serviceType: 'activity', perPax: true },
+  // The day itself is the problem, not a rate: it is only a description, or
+  // its city is a list. Only the ones that name a day get a line.
+  template: { name: 'This day', serviceType: 'other', perPax: false, line: 'This day cannot be priced as written' },
 }
 
 export function unpricedLinesForHoles(
@@ -1051,14 +1055,15 @@ export function unpricedLinesForHoles(
     const label = HOLE_LINE_LABEL[hole.kind]
     if (!label) continue
     for (const dayNumber of dayNumbersFor(hole)) {
-      if (priced.has(`${dayNumber}|${label.serviceType}`)) continue
+      // A priced 'other' line on the day does not answer for the day itself.
+      if (!label.line && priced.has(`${dayNumber}|${label.serviceType}`)) continue
       const id = `day${dayNumber}-${hole.kind}-no-rate`
       if (lines.some(l => l.id === id)) continue
       lines.push({
         id,
         dayNumber,
         serviceType: label.serviceType,
-        serviceName: `${label.name} — no rate`,
+        serviceName: label.line ?? `${label.name} — no rate`,
         quantity: 1,
         quantityMode: 'fixed',
         unitCost: 0,
@@ -2325,7 +2330,22 @@ export async function calculateDayBasedPricing(
   // Harness Layer 1: collect rate-data gaps instead of fabricating defaults.
   const holes: PricingHole[] = []
   const seenHoleKeys = new Set<string>()
+  // Days whose city is a list ("Cairo; Luxor") — filled in once the programme
+  // is parsed. See lib/tours/day-city.ts.
+  const severalPlaceDays = new Set<number>()
   const addHole = (h: PricingHole) => {
+    // A list-city day gets ONE gap that says what is wrong with it. Every
+    // lookup made with the list as a city name then misses as well, and
+    // reporting those sends the operator to add a sedan rate "in Cairo;
+    // Luxor". So does the road transfer the NEXT day appears to need, which
+    // exists only because "Cairo; Luxor" is not the same string as "Luxor".
+    if (h.kind !== 'template') {
+      if (namesSeveralPlaces(h.city)) return
+      if (
+        h.kind === 'transport' && typeof h.dayNumber === 'number' &&
+        severalPlaceDays.has(h.dayNumber - 1) && isIntercity(h.lookupAttempted.split('/')[0])
+      ) return
+    }
     const key = `${h.kind}|${h.dayNumber ?? ''}|${h.lookupAttempted}`
     if (seenHoleKeys.has(key)) return
     seenHoleKeys.add(key)
@@ -2424,6 +2444,26 @@ export async function calculateDayBasedPricing(
   // the template was keeping that figure off the tours page. A price is
   // deliverable when every component traces to a rate; a day with no
   // components has not been priced, it has been skipped.
+  // A DAY IS IN ONE CITY. 21 of 144 live days store a list there; every rate
+  // is keyed by the day's city, so none of them could be found. The list is
+  // not split and read by position — lib/tours/day-city.ts has the three live
+  // rows that break every such rule. One gap, on the day, saying what to do.
+  for (const day of itinerary) {
+    if (!namesSeveralPlaces(day.city)) continue
+    severalPlaceDays.add(day.day)
+    addHole({
+      kind: 'template',
+      reason: 'missing',
+      tier,
+      dayNumber: day.day,
+      city: day.city,
+      lookupAttempted: `the one city day ${day.day} is priced in`,
+      message:
+        `Day ${day.day}: ${severalPlacesReason(day.city)}. Open the tour in Tour ` +
+        `Manager, press Edit on the day and choose one.`,
+    })
+  }
+
   for (const day of itinerary) {
     if (!day.unstated) continue
     addHole({

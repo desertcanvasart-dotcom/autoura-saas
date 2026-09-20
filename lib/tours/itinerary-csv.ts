@@ -46,6 +46,7 @@
 export type DayCsvKind = 'text' | 'int' | 'bool' | 'list'
 
 import { readDayMeals } from '@/lib/tours/day-meals'
+import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 
 export interface DayCsvColumn {
   name: string
@@ -277,6 +278,14 @@ export function parseDaysCsv(
         return
       }
       rec[col.name] = v
+    }
+
+    // A day is in ONE city. "Cairo; Luxor" is how 21 live days arrived, and
+    // not one rate could be found for them — see lib/tours/day-city.ts for why
+    // the list is refused rather than read by position.
+    if (namesSeveralPlaces(rec.city)) {
+      refused.push({ row: rowNum, reason: `"${code}" day ${day}: ${severalPlacesReason(rec.city)}` })
+      return
     }
 
     // THE RULE: every meal on every day is stated — hotel (included),
