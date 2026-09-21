@@ -752,7 +752,7 @@ export interface Database {
       attraction_aliases: {
         Row: {
           id: string
-          tenant_id: string | null
+          tenant_id: string
           alias: string
           canonical: string
           is_active: boolean
@@ -761,7 +761,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          tenant_id?: string | null
+          tenant_id: string
           alias: string
           canonical: string
           is_active?: boolean
@@ -770,7 +770,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          tenant_id?: string | null
+          tenant_id?: string
           alias?: string
           canonical?: string
           is_active?: boolean
@@ -2095,6 +2095,7 @@ export interface Database {
           assigned_to: string | null
           base_total_cost: number | null
           extras_total: number | null
+          status_override: Json | null
         }
         Insert: {
           id?: string
@@ -2137,6 +2138,7 @@ export interface Database {
           assigned_to?: string | null
           base_total_cost?: number | null
           extras_total?: number | null
+          status_override?: Json | null
         }
         Update: {
           id?: string
@@ -2179,6 +2181,7 @@ export interface Database {
           assigned_to?: string | null
           base_total_cost?: number | null
           extras_total?: number | null
+          status_override?: Json | null
         }
         Relationships: [
           {
@@ -11393,6 +11396,14 @@ export interface Database {
     // every select('*') result to {}.
     Views: { [_ in never]: never }
     Functions: {
+      attraction_alias_resolves: {
+        Args: {
+          p_canonical?: string
+          p_tenant?: string
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Returns: any
+      }
       convert_amount: {
         Args: {
           p_amount?: number
