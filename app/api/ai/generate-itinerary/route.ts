@@ -1159,10 +1159,11 @@ export async function POST(request: NextRequest) {
         if (holedHotelCities.has(where)) continue
         holedHotelCities.add(where)
         addHole({
-          kind: 'hotel', tier, reason: rates && !rates.ambiguous && !rates.periodBlank && !rates.periodGap ? 'fuzzy' : 'missing',
+          kind: 'hotel', tier, reason: rates && !rates.ambiguous && !rates.periodBlank && !rates.periodGap && !rates.noPrice ? 'fuzzy' : 'missing',
           lookupAttempted: `hotel rate (${where}, ${tier})`,
           message: !night.city ? `Day ${night.day} has a hotel night and names no city, so no hotel can be priced for it.`
             : rates?.ambiguous ? ambiguityMessage(`${tier} hotels in ${night.city}`, rates.ambiguous, 'Rates → Hotels')
+            : rates?.noPrice ? `${rates.noPrice.propertyName} is on your hotel sheet with no price. Enter its rate in Rates → Hotels.`
             : rates?.periodBlank ? `${rates.periodBlank.propertyName}'s "${rates.periodBlank.periodName}" period has no nightly rate. Fill it in Rates → Hotels.`
             : rates?.periodGap ? `${rates.periodGap.propertyName} has rate periods, but none covers ${rates.periodGap.date}. Add a period for that date in Rates → Hotels.`
             : `No exact ${tier} hotel rate for ${night.city}. Add it in Rates → Hotels.`,
