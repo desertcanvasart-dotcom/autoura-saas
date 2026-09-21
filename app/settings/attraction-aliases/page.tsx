@@ -15,7 +15,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AlertCircle, ArrowRight, Check, CheckCircle2, Loader2, Pencil, Plus, Signpost, Trash2, X } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
-import { COMBO_SEPARATOR, canonicalParts, type AliasHealth, type FeeName, type UnresolvedWording } from '@/lib/pricing/alias-admin'
+// alias-shared, NOT alias-admin: that one reaches server-only code and breaks the build.
+import { COMBO_SEPARATOR, canonicalParts, type AliasHealth, type FeeName, type UnresolvedWording } from '@/lib/pricing/alias-shared'
 import { ALIAS_WRITE_DENIED } from '@/lib/pricing/alias-admin-access'
 
 interface AliasRow {

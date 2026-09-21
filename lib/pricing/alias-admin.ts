@@ -20,20 +20,14 @@
 import { chooseEntranceFee } from './entrance-fee-match'
 import { buildAliasIndex, resolveAttractionAlias, type AttractionAliasRow } from './attraction-aliases'
 
-export const COMBO_SEPARATOR = ' + '
-export const MAX_ALIAS_LENGTH = 120
+import { COMBO_SEPARATOR, MAX_ALIAS_LENGTH, canonicalParts, type AliasHealth, type FeeName, type UnresolvedWording } from './alias-shared'
 
-export interface FeeName { attraction_name: string; city?: string | null }
-
-export type AliasHealth =
-  | { ok: true; fees: string[] }
-  | { ok: false; problem: string }
+// The browser-safe pieces live in ./alias-shared (see the note there); they
+// are re-exported so server code has one place to import from.
+export { COMBO_SEPARATOR, MAX_ALIAS_LENGTH, canonicalParts }
+export type { AliasHealth, FeeName, UnresolvedWording }
 
 const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ')
-
-export function canonicalParts(canonical: string): string[] {
-  return canonical.split(COMBO_SEPARATOR).map(p => p.trim()).filter(Boolean)
-}
 
 /** Does every part of this canonical land on exactly one fee of the sheet? */
 export function aliasHealth(canonical: string, fees: readonly FeeName[]): AliasHealth {
@@ -103,16 +97,6 @@ export function validateAlias(
 
 export interface TourDay { attractions?: unknown; attraction_ids?: unknown }
 export interface TourForScan { template_name?: string | null; itinerary?: unknown }
-
-export interface UnresolvedWording {
-  wording: string
-  /** What the engine actually looks up, when an alias already rewrites it. */
-  lookedUpAs: string
-  days: number
-  tours: string[]
-  reason: 'no_fee' | 'several_fees'
-  candidates: string[]
-}
 
 /**
  * Every attraction wording in the agency's tours that does not reach exactly

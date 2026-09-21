@@ -146,3 +146,28 @@ describe('canonicalParts', () => {
     expect(canonicalParts(' Giza Plateau +  + Saqqara ')).toEqual(['Giza Plateau', 'Saqqara'])
   })
 })
+
+// ============================================================================
+// The Settings screen is a CLIENT component, and the production build refused
+// it the first time: it imported two helpers from alias-admin, which reaches
+// the engine's alias loader → the query memo → node:async_hooks, and a browser
+// bundle cannot hold that. `tsc` and the unit tests were all green. Only
+// `next build` noticed — and this repo's CI does not build.
+// ============================================================================
+describe('the screen only loads what a browser can hold', () => {
+  const read = async (p: string) => (await import('node:fs')).readFileSync((await import('node:path')).join(process.cwd(), p), 'utf8')
+  const imports = (src: string) => [...src.matchAll(/^import\s[^'"]*['"]([^'"]+)['"]/gm)].map(m => m[1])
+
+  it('alias-shared imports nothing at all', async () => {
+    expect(imports(await read('lib/pricing/alias-shared.ts'))).toEqual([])
+  })
+
+  it('alias-admin-access imports nothing at all', async () => {
+    expect(imports(await read('lib/pricing/alias-admin-access.ts'))).toEqual([])
+  })
+
+  it('the page takes its alias helpers from those two, never from the server-side module', async () => {
+    const fromPricing = imports(await read('app/settings/attraction-aliases/page.tsx')).filter(i => i.startsWith('@/lib/pricing/'))
+    expect(fromPricing.sort()).toEqual(['@/lib/pricing/alias-admin-access', '@/lib/pricing/alias-shared'])
+  })
+})
