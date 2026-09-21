@@ -2257,26 +2257,41 @@ export function extraTransfersFor(day: ItineraryDay): ExtraTransfer[] {
   return extras
 }
 
+/** What a transport lookup outside the engine found. */
+export interface DayTransportRate { rate: number; rateId: string; vehicleType: string; serviceType: string }
+
 /**
- * The agency's REAL one-way airport transfer in a city, for a group of this
- * size — the rate the tour engine charges an arrival or departure day. For
- * callers outside the engine (the AI itinerary generator) that used to make a
- * transfer price up. null = no exact rate: a gap, never a substitute — the
+ * The agency's REAL rate for one transport need — the row the tour engine
+ * would charge: the service type, the city (or the road FROM → TO), and a
+ * vehicle that seats the group. For callers outside the engine (the AI
+ * itinerary generator). null = no exact rate: a gap, never a substitute — the
  * nearby-city fallback in findTransportRate is refused here ('fuzzy').
  */
+export async function getTransportRateFor(
+  scope: CatalogScope,
+  need: { serviceType: TransportServiceType; city: string | null | undefined; duration?: TransportDuration; originCity?: string | null; specialVehicleType?: VehicleType },
+  totalPax: number
+): Promise<DayTransportRate | null> {
+  const where = String(need.city ?? '').trim()
+  if (!where) return null
+  const [cache, bands] = await Promise.all([buildTransportCache(scope), tenantVehicleBands(scope.tenantId)])
+  const vehicleType = need.specialVehicleType ?? getVehicleTypeByPax(totalPax, undefined, bands)
+  const match = findTransportRate(cache, {
+    serviceType: need.serviceType, city: where, duration: need.duration ?? ('' as TransportDuration), area: null, vehicleType,
+    originCity: need.originCity ?? undefined, destinationCity: where,
+  })
+  if (!match || match.source !== 'db') return null
+  const rate = Number(match.rate.base_rate_eur)
+  return rate > 0 ? { rate, rateId: match.rate.id, vehicleType, serviceType: need.serviceType } : null
+}
+
+/** The one-way airport transfer in a city, for a group of this size. */
 export async function getAirportTransferRate(
   scope: CatalogScope,
   city: string | null | undefined,
   totalPax: number
 ): Promise<{ rate: number; rateId: string; vehicleType: string } | null> {
-  const where = String(city ?? '').trim()
-  if (!where) return null
-  const [cache, bands] = await Promise.all([buildTransportCache(scope), tenantVehicleBands(scope.tenantId)])
-  const vehicleType = getVehicleTypeByPax(totalPax, undefined, bands)
-  const match = findTransportRate(cache, { serviceType: 'airport_transfer', city: where, duration: 'one_way', area: null, vehicleType })
-  if (!match || match.source !== 'db') return null
-  const rate = Number(match.rate.base_rate_eur)
-  return rate > 0 ? { rate, rateId: match.rate.id, vehicleType } : null
+  return getTransportRateFor(scope, { serviceType: 'airport_transfer', city, duration: 'one_way' }, totalPax)
 }
 
 /**
