@@ -670,6 +670,10 @@ export const TABLE_VOCABULARY_COLUMNS: Record<string, Record<string, VocabularyK
   hotel_staff_rates: { service_type: 'hotel_service_type' },
   entrance_fees: { category: 'attraction_category' },
   activity_rates: { duration: 'activity_duration' },
+  // `cabin_type` is a sleeping-train cabin everywhere else (above); on a
+  // cruise it is the ship's cabin category. Without this the importer would
+  // check "Deluxe" against the sleeper cabins and refuse it.
+  nile_cruises: { cabin_type: 'cruise_cabin' },
 }
 
 /** The vocabulary columns of one import table. */

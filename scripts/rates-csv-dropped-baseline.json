@@ -89,7 +89,6 @@
     "supplier_name"
   ],
   "nile_cruises": [
-    "cabin_type",
     "high_season_ppd_eur",
     "high_season_ppd_non_eur",
     "high_season_single_supplement_eur",
