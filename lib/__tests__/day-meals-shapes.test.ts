@@ -74,6 +74,9 @@ describe('the editor no longer assumes an array', () => {
   it('writes the object shape for new days', () => {
     // So a day added by hand and a day imported from the sheet are stored the
     // same way, and the engine sees one format going forward.
-    expect(src).toContain('meals: { ...dayMeals } as DayMeals')
+    // The save moved into lib/tours/day-edit.ts; the form still hands it the
+    // object shape, and that is what gets stored.
+    expect(src).toContain('meals: { ...dayMeals },')
+    expect(src).toMatch(/applyDayForm\(existing, \{/)
   })
 })

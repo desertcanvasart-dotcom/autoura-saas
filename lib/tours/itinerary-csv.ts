@@ -47,6 +47,7 @@ export type DayCsvKind = 'text' | 'int' | 'bool' | 'list'
 
 import { readDayMeals } from '@/lib/tours/day-meals'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
+import { sightseeingStatement, SIGHTSEEING_NOT_STATED } from '@/lib/tours/day-sightseeing'
 
 export interface DayCsvColumn {
   name: string
@@ -77,6 +78,12 @@ export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   { name: 'hotel_checkin', label: 'Hotel Check-in', kind: 'bool' },
   { name: 'hotel_checkout', label: 'Hotel Check-out', kind: 'bool' },
   { name: 'guide_required', label: 'Guide', kind: 'bool' },
+  // A day must SAY whether it has sightseeing (lib/tours/day-sightseeing.ts).
+  // Attractions or Guide = true say yes; 'none' here says no. Every bool above
+  // exports as "false" and a blank imports as false, so without this column a
+  // round trip turned a day nobody had described into a day that "says" it has
+  // no guide — and the gap the engine records for it quietly disappeared.
+  { name: 'sightseeing', label: 'Sightseeing', allowed: ['none'] },
   // A transfer to somewhere else in town that is not sightseeing: the sound &
   // light show, the market, an evening out (operator, 2026-09-18).
   { name: 'city_transfer', label: 'Local Transfer', kind: 'bool' },
@@ -130,6 +137,11 @@ export function serializeDaysCsv(
         hotel_checkin: !!services.hotel_checkin,
         hotel_checkout: !!services.hotel_checkout,
         guide_required: !!services.guide_required,
+        // 'none' for a day that SAYS so — the editor's tick, or a services
+        // block written without a guide (an arrival, a departure). Blank for a
+        // day with attractions or a guide (they say it themselves), and blank
+        // for a day that says nothing: a re-import must not invent the answer.
+        sightseeing: sightseeingStatement(d) === 'none' ? 'none' : '',
         city_transfer: !!d.city_transfer,
         sightseeing_length: d.sightseeing_length ?? '',
         description: d.description ?? '',
@@ -228,6 +240,8 @@ export function parseDaysCsv(
     }
   }
 
+  // A sheet made before the Sightseeing column existed cannot be held to it.
+  const hasSightseeingColumn = headers.some(h => HEADER_MAP[slug(h)] === 'sightseeing')
   const ignoredHeaders = headers.filter(h => !HEADER_MAP[slug(h)])
   const refused: Array<{ row: number; reason: string }> = []
   let exampleRows = 0
@@ -288,6 +302,25 @@ export function parseDaysCsv(
       return
     }
 
+    // A day says whether it has sightseeing — the meals rule, applied to the
+    // other thing a day's price hangs on. Only for a sheet that HAS the column:
+    // an older file imports exactly as it did.
+    const namesAttractions = Array.isArray(rec.attractions) && rec.attractions.length > 0
+    if (rec.sightseeing === 'none' && (namesAttractions || rec.guide_required === true)) {
+      refused.push({
+        row: rowNum,
+        reason: `"${code}" day ${day}: Sightseeing says "none" but the day ${namesAttractions ? 'lists attractions' : 'asks for a guide'} — it cannot be both`,
+      })
+      return
+    }
+    if (hasSightseeingColumn && !namesAttractions && rec.guide_required !== true && rec.sightseeing !== 'none') {
+      refused.push({
+        row: rowNum,
+        reason: `"${code}" day ${day} ${SIGHTSEEING_NOT_STATED}. List its Attractions, set Guide to true, or put "none" in Sightseeing`,
+      })
+      return
+    }
+
     // THE RULE: every meal on every day is stated — hotel (included),
     // restaurant (external), or none. A blank is not 'none'; it is an
     // itinerary that has not said, and a cost line cannot be left unsaid.
@@ -345,6 +378,7 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
     ...(rec.accommodation_type ? { accommodation_type: rec.accommodation_type } : {}),
     ...(rec.city_transfer ? { city_transfer: true } : {}),
     ...(rec.sightseeing_length ? { sightseeing_length: rec.sightseeing_length } : {}),
+    ...(rec.sightseeing === 'none' ? { sightseeing: 'none' } : {}),
     meals: {
       breakfast: rec.breakfast ?? 'none',
       lunch: rec.lunch ?? 'none',

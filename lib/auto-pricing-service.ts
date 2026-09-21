@@ -49,6 +49,7 @@ import type { VocabularyKind } from '@/lib/vocabulary'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
+import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
@@ -192,6 +193,10 @@ export interface ItineraryDay {
    *  either. Such a day is prose: it costs nothing to "price", so it used to
    *  count as fully priced. See the hole in calculateDayBasedPricing. */
   unstated?: boolean
+  /** The day says NOTHING about sightseeing — no attractions, no services
+   *  block, no "no guided sightseeing". lib/tours/day-sightseeing.ts. */
+  sightseeingUnstated?: boolean
+  dayTourWithoutAttractions?: boolean
   services: {
     airport_arrival: boolean
     airport_departure: boolean
@@ -676,6 +681,14 @@ export function parseItinerary(itineraryData: any, opts?: {
    *  EXPLICIT day.services always win — same precedence as the grid.
    *  Omitted = full-package, the engine's historical assumption. */
   packageType?: string
+  /** A DAY TOUR (operator, 2026-09-21): "Overnight at a certain city is used
+   *  only in packages, but day tours do not require overnight or stays to be
+   *  priced. However, days which include guiding, entrance fees,
+   *  transportation, meals and tipping should be calculated correctly, not
+   *  ignored." So on a day tour every day IS a sightseeing day — guide,
+   *  vehicle and tips are asked for whether or not anybody named an
+   *  attraction — and there is never a night, whatever the day says. */
+  dayTour?: boolean
 }): ItineraryDay[] {
   if (!itineraryData || !Array.isArray(itineraryData)) {
     return []
@@ -716,8 +729,15 @@ export function parseItinerary(itineraryData: any, opts?: {
     // Handle services - default based on day position
     const isFirstDay = index === 0
     const isLastDay = index === itineraryData.length - 1
-    const hasAttractions = (day.attractions && day.attractions.length > 0) ||
-                          (day.title && /temple|pyramid|museum|valley|tomb/i.test(day.title))
+    // What the day SAYS about sightseeing, read from what is stored — before
+    // any wording is consulted. "No guided sightseeing" is a decision, so a
+    // word in the title ("…Valley…") must not earn the day a guide anyway.
+    const statement = sightseeingStatement(day)
+    const saysNoSightseeing = day.sightseeing === 'none'
+    const isDayTour = opts?.dayTour === true
+    const hasAttractions = !saysNoSightseeing && (
+      (day.attractions && day.attractions.length > 0) ||
+      (day.title && /temple|pyramid|museum|valley|tomb/i.test(day.title)))
 
     // The defaults describe a FULL PACKAGE, so they are gated on what the
     // product actually includes. Two latent bugs lived here: a SINGLE-day
@@ -730,7 +750,13 @@ export function parseItinerary(itineraryData: any, opts?: {
     )?.includes ?? PACKAGE_TYPE_CONFIGS.find(p => p.slug === 'full-package')!.includes
     const isSingleDay = itineraryData.length === 1
 
-    const services = day.services || {
+    // On a day tour the guide is not something a day has to ask for: it is
+    // what a day tour is. This beats a services block that says `false`, which
+    // on production is a blank cell in a days sheet (every bool imports as
+    // false), not a decision — 9 of Travel2Egypt's day tours carry one. Only
+    // the editor's explicit "No guided sightseeing" switches it off.
+    const dayTourGuide = isDayTour && !saysNoSightseeing
+    const baseServices = day.services || {
       airport_arrival: pkgIncludes.airportTransfers && isFirstDay,
       airport_departure: pkgIncludes.airportTransfers && isLastDay,
       // A single-day trip has no overnight, so there is no hotel to check
@@ -739,10 +765,13 @@ export function parseItinerary(itineraryData: any, opts?: {
       hotel_checkout: pkgIncludes.accommodation && !isSingleDay && isLastDay,
       guide_required: hasAttractions
     }
+    const services = dayTourGuide && !baseServices.guide_required
+      ? { ...baseServices, guide_required: true }
+      : baseServices
 
     // Extract attractions from title if not provided
     let attractions = day.attractions || []
-    if (attractions.length === 0 && day.title) {
+    if (attractions.length === 0 && day.title && !saysNoSightseeing) {
       attractions = extractAttractionsFromTitle(day.title)
     }
 
@@ -775,11 +804,22 @@ export function parseItinerary(itineraryData: any, opts?: {
       day: day.day || index + 1,
       title: day.title || `Day ${index + 1}`,
       description: day.description || '',
-      unstated: storesNothing && asksForNothing,
+      // Not on a day tour: there the guide, vehicle and tips ARE priced, so
+      // "nothing on it can be priced" would be untrue — the specific gaps
+      // (no attractions named, no city to find a vehicle in) say what is missing.
+      unstated: storesNothing && asksForNothing && !isDayTour,
+      // A day tour's day never has to SAY it has sightseeing — it is one.
+      sightseeingUnstated: statement === 'unstated' && !isDayTour,
+      /** A day-tour day that names no attraction: the guide, the vehicle and
+       *  the tips are priced, but its entrance fees cannot be. */
+      dayTourWithoutAttractions: isDayTour && !saysNoSightseeing && attractions.length === 0 && attraction_ids.length === 0,
       city: day.city || inferCityFromTitle(day.title || ''),
       // A sleeping-train night has no hotel bed — the ticket IS the bed
       // (B-item 2); the sleeper night joins the rooming list instead.
-      accommodation_type: transport_type === 'sleeping_train'
+      // A day tour has no overnight, whatever the day says: three live
+      // Travel2Egypt day tours store "hotel" on their one day and were being
+      // asked for a hotel night (operator, 2026-09-21).
+      accommodation_type: transport_type === 'sleeping_train' || isDayTour
         ? 'none'
         : (day.accommodation_type || inferAccommodationType(day, itineraryData, itineraryData.length === 1)),
       meals,
@@ -2422,12 +2462,14 @@ export async function calculateDayBasedPricing(
   // definition a day trip — no accommodation, no airport transfers sold —
   // yet it priced full-package shaped. An explicit packageType from the
   // caller still wins.
-  const SINGLE_DAY_TOUR_TYPES = ['day_tour', 'half_day', 'stopover']
   const effectivePackageType =
     (params as { packageType?: string }).packageType ??
     (SINGLE_DAY_TOUR_TYPES.includes(t.tour_type ?? '') ? 'day-trips' : undefined)
 
-  const itinerary = parseItinerary(t.itinerary, { packageType: effectivePackageType })
+  // A day tour by its type, or by being one day long: a one-day programme
+  // cannot have an overnight either (#461).
+  const isDayTour = isDayTourProgramme(t.tour_type, Array.isArray(t.itinerary) ? t.itinerary.length : 0)
+  const itinerary = parseItinerary(t.itinerary, { packageType: effectivePackageType, dayTour: isDayTour })
   const totalDays = itinerary.length || t.duration_days || 1
 
   if (itinerary.length === 0) {
@@ -2511,6 +2553,44 @@ export async function calculateDayBasedPricing(
   // the whole price is the meals, and a lunch is not the price of a tour. So
   // the test is on the programme, not the day: one empty departure day in a
   // twelve-day package is left alone.
+  // A DAY TOUR THAT NAMES NO ATTRACTION. Its guide, vehicle and tips are asked
+  // for regardless (see parseItinerary) — but entrance fees are priced per
+  // attraction, and nobody can price a ticket to a place that was not named.
+  // One gap, for the one thing that is actually missing.
+  for (const day of itinerary) {
+    if (!day.dayTourWithoutAttractions) continue
+    addHole({
+      kind: 'entrance',
+      reason: 'missing',
+      tier,
+      dayNumber: day.day,
+      lookupAttempted: `the attractions day ${day.day} visits`,
+      message:
+        `Day ${day.day} ("${day.title}") ${DAY_TOUR_NO_ATTRACTIONS}. Open the tour in Tour Manager, ` +
+        `press Edit on the day and pick the attractions it visits.`,
+    })
+  }
+
+  // A DAY MUST SAY WHETHER IT HAS SIGHTSEEING. Everything a sightseeing day
+  // costs — entrance fees, guide, vehicle, tips — follows from its attractions,
+  // so a day that names none and says nothing was priced as a free day without
+  // anyone having decided that. On production 28 of Sawa Tours' 48 days and 3
+  // of Travel2Egypt's 40 were in that state (lib/tours/day-sightseeing.ts). The
+  // operator's rule for meals, applied here: a blank is not "none".
+  for (const day of itinerary) {
+    if (!day.sightseeingUnstated || day.unstated) continue // `unstated` said more, above
+    addHole({
+      kind: 'template',
+      reason: 'missing',
+      tier,
+      dayNumber: day.day,
+      lookupAttempted: `whether day ${day.day} includes sightseeing`,
+      message:
+        `Day ${day.day} ("${day.title}") ${SIGHTSEEING_NOT_STATED}. Open the tour in ` +
+        `Tour Manager, press Edit on the day, and ${SIGHTSEEING_HOW_TO_STATE}.`,
+    })
+  }
+
   const asksBeyondMeals = (d: ItineraryDay): boolean =>
     d.accommodation_type !== 'none' ||
     d.attractions.length > 0 ||
@@ -2521,7 +2601,7 @@ export async function calculateDayBasedPricing(
     Boolean(d.transport_type) || d.city_transfer === true || Boolean(d.transport)
   if (itinerary.length > 0 && !itinerary.some(asksBeyondMeals)) {
     for (const day of itinerary) {
-      if (day.unstated) continue // already said, above
+      if (day.unstated || day.sightseeingUnstated) continue // already said, above
       addHole({
         kind: 'template',
         reason: 'missing',

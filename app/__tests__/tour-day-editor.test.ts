@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { applyDayForm, type DayForm } from '@/lib/tours/day-edit'
+
+// The save used to be written inline in the component, and these tests read
+// its source. It now lives in lib/tours/day-edit.ts, so they call it instead —
+// which also proves what the source scans only implied.
+const blankForm = (over: Partial<DayForm> = {}): DayForm => ({
+  title: 'A day', description: '', meals: { breakfast: 'none', lunch: 'none', dinner: 'none' }, picked: [],
+  transportType: '', transportRateId: '', city: '', night: '', cityTransfer: false, length: '',
+  propertiesByTier: {}, noSightseeing: false, ...over,
+})
 
 // ============================================
 // A day can be edited, and says where it is
@@ -45,8 +55,12 @@ describe('the day says where it is and where the night is', () => {
   })
 
   it('writes them onto the day only when stated', () => {
-    expect(SOURCE).toMatch(/\.\.\.\(dayCity\.trim\(\) \? \{ city: dayCity\.trim\(\) \} : \{\}\)/)
-    expect(SOURCE).toMatch(/\.\.\.\(dayNight \? \{ accommodation_type: dayNight \} : \{\}\)/)
+    const unstated = applyDayForm(null, blankForm(), 1)
+    expect(unstated).not.toHaveProperty('city')
+    expect(unstated).not.toHaveProperty('accommodation_type')
+    const stated = applyDayForm(null, blankForm({ city: ' Luxor ', night: 'hotel' }), 1)
+    expect(stated).toMatchObject({ city: 'Luxor', accommodation_type: 'hotel' })
+    expect(SOURCE).toMatch(/applyDayForm\(existing, \{/)
   })
 
   it('says plainly what a blank means, rather than leaving it a mystery', () => {
@@ -72,8 +86,8 @@ describe('choosing the hotel for a night', () => {
   })
 
   it('writes only the tiers that named one', () => {
-    expect(SOURCE).toMatch(/Object\.values\(dayProperties\)\.some\(Boolean\)/)
-    expect(SOURCE).toMatch(/\.filter\(\(\[, id\]\) => Boolean\(id\)\)/)
+    expect(applyDayForm(null, blankForm({ propertiesByTier: { standard: 'h1', luxury: '' } }), 1).property_by_tier).toEqual({ standard: 'h1' })
+    expect(applyDayForm(null, blankForm({ propertiesByTier: { standard: '' } }), 1)).not.toHaveProperty('property_by_tier')
   })
 
   it('offers it only where a night is actually spent', () => {
@@ -138,7 +152,8 @@ describe('how long the sightseeing runs', () => {
   })
 
   it('writes it only when chosen, so a day that does not say prices as before', () => {
-    expect(SOURCE).toMatch(/\.\.\.\(dayLength \? \{ sightseeing_length: dayLength \} : \{\}\)/)
+    expect(applyDayForm(null, blankForm(), 1)).not.toHaveProperty('sightseeing_length')
+    expect(applyDayForm(null, blankForm({ length: 'half_day' }), 1).sightseeing_length).toBe('half_day')
   })
 
   it('says what it is for', () => {
