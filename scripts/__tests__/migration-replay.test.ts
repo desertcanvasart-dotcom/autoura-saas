@@ -493,11 +493,64 @@ describe('migration replay from scratch', () => {
     for (const name of ['idx_commissions_tenant_id', 'idx_invoices_date']) {
       expect(indexNames.has(name), `${name} — the second name for an index that is already there`).toBe(false)
     }
-    // NOT adopted: numbers unique across ALL agencies. Per agency is the rule
-    // (migration 360 fixed the same thing for tour codes).
+    // NOT adopted by 374, and removed from production by 375: numbers unique
+    // across ALL agencies. Per agency is the rule (360 did this for tour codes).
     for (const name of ['invoices_invoice_number_key', 'expenses_expense_number_key', 'supplier_invoices_internal_reference_key']) {
       expect(indexNames.has(name), `${name} would stop a second agency issuing its first document`).toBe(false)
     }
+
+    // ---- Migration 375: a document number is unique PER AGENCY ----
+    // A fresh build never had the three global constraints, so 375 is a no-op
+    // here. To test what it does on production, production's state is MADE:
+    // the global constraints are added by hand, the defect is shown, then 375
+    // runs. Two agencies, each issuing its own first document of the year.
+    const m375 = readFileSync(path.join(MIGRATIONS_DIR, '375_document_numbers_unique_per_agency.sql'), 'utf8')
+    await db.exec("INSERT INTO tenants (company_name, contact_email) VALUES ('Numbering Probe A', 'a@numbering.test'), ('Numbering Probe B', 'b@numbering.test')")
+    const firstDocs = (who: 'A' | 'B') => {
+      const tenant = `(SELECT id FROM tenants WHERE company_name = 'Numbering Probe ${who}')`
+      return [
+        `INSERT INTO invoices (tenant_id, invoice_number, client_name, line_items, total_amount, balance_due, issue_date)
+           VALUES (${tenant}, 'INV-2027-001', 'Probe', '[]'::jsonb, 100, 100, DATE '2027-01-05')`,
+        `INSERT INTO expenses (tenant_id, expense_number, category, amount, expense_date)
+           VALUES (${tenant}, 'EXP-2027-001', 'other', 10, DATE '2027-01-05')`,
+        `INSERT INTO supplier_invoices (tenant_id, supplier_invoice_number, supplier_name, invoice_date, amount, internal_reference)
+           VALUES (${tenant}, 'S-1', 'Probe Supplier', DATE '2027-01-05', 10, 'SI-2027-001')`,
+      ]
+    }
+    const GLOBALS: Array<[string, string, string]> = [
+      ['invoices', 'invoices_invoice_number_key', 'invoice_number'],
+      ['expenses', 'expenses_expense_number_key', 'expense_number'],
+      ['supplier_invoices', 'supplier_invoices_internal_reference_key', 'internal_reference'],
+    ]
+    const asOnProduction = async () => {
+      for (const [table, name, column] of GLOBALS) await db.exec(`ALTER TABLE ${table} ADD CONSTRAINT ${name} UNIQUE (${column})`)
+    }
+    const hasConstraint = async (name: string) =>
+      ((await db.query('SELECT 1 FROM pg_constraint WHERE conname = $1', [name])).rows.length) > 0
+
+    await asOnProduction()
+    for (const sql of firstDocs('A')) await db.exec(sql)
+    for (const sql of firstDocs('B')) {
+      await expect(db.exec(sql), 'the defect: agency B is refused the number agency A holds').rejects.toThrow(/duplicate key/)
+    }
+
+    await db.exec(m375)
+    for (const [, name] of GLOBALS) expect(await hasConstraint(name), `${name} is gone`).toBe(false)
+    for (const sql of firstDocs('B')) await db.exec(sql) // every agency has its own 001
+    for (const sql of firstDocs('A')) {
+      await expect(db.exec(sql), 'ONE agency still cannot hold a number twice — the retry in document-numbering.ts depends on it').rejects.toThrow(/duplicate key/)
+    }
+    await db.exec(m375) // and again: nothing left to do, nothing breaks
+
+    // It REFUSES rather than leave a number with no uniqueness at all.
+    await db.exec('DELETE FROM expenses; ALTER TABLE expenses DROP CONSTRAINT expenses_tenant_id_expense_number_key')
+    await db.exec('ALTER TABLE expenses ADD CONSTRAINT expenses_expense_number_key UNIQUE (expense_number)')
+    await expect(db.exec(m375)).rejects.toThrow(/refusing to drop expenses_expense_number_key/)
+    await db.exec('ROLLBACK').catch(() => undefined)
+    expect(await hasConstraint('expenses_expense_number_key'), 'the refusal dropped nothing').toBe(true)
+    // Put the fresh build back as it was, for the checks below.
+    await db.exec(`ALTER TABLE expenses DROP CONSTRAINT expenses_expense_number_key;
+                   ALTER TABLE expenses ADD CONSTRAINT expenses_tenant_id_expense_number_key UNIQUE (tenant_id, expense_number)`)
 
     // "A no-op on production" is the same claim as "a no-op the second time":
     // in both cases everything is already where 374 puts it.
