@@ -20,7 +20,7 @@ const STAR = /\.select\(\s*['"`]\*['"`]/g
 // nile_cruises itself (three stars) and delegated to the canonical engine
 // lookup. Lower this — never raise it — as star-selects are replaced with
 // explicit column lists.
-const BASELINE = 271
+const BASELINE = 269
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {

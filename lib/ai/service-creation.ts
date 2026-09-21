@@ -12,7 +12,11 @@ export async function createLandItineraryServices(
     withMargin: (cost: number) => number; tier: ServiceTier; finalLanguage: string;
     includeLunch: boolean; includeDinner: boolean; includeAccommodationFinal: boolean;
     guidePerDay: number; selectedGuide: any;
-    selectedHotel: any; hotelRate: number; hotelName_final: string; roomsNeeded: number;
+    /** day number → that NIGHT's hotel, from the agency's Rates → Hotels: the
+     *  night's own city, tier and date (hotelNightsForGeneratedDays says which
+     *  nights). Per person in a double; an odd traveller pays the single
+     *  supplement. The route refuses to price when a night has no rate. */
+    hotelByDay: Record<number, { ppd: number; singleSupplement: number; hotelName: string; rateId: string }>;
     airportServiceRates: { arrival: number; departure: number }; hotelServiceRate: number; lunchRate: number; dinnerRate: number;
     /** The agency's active tipping rows, in the run's currency — priced by the
      *  SAME rules as the tour engine (lib/pricing/tipping.ts). */
@@ -31,7 +35,7 @@ export async function createLandItineraryServices(
     withMargin, tier, finalLanguage,
     includeLunch, includeDinner, includeAccommodationFinal,
     guidePerDay, selectedGuide,
-    selectedHotel, hotelRate, hotelName_final, roomsNeeded,
+    hotelByDay,
     airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
     tippingRows, allEntranceFees, transportByDay,
   } = params
@@ -364,20 +368,27 @@ export async function createLandItineraryServices(
       totalClientPrice += withMargin(waterCost)
     }
 
-    // Hotel (only if included and not last day and not cruise day)
-    if (includesHotelForDay && hotelRate > 0) {
-      const hotelCost = hotelRate * roomsNeeded
+    // Hotel (only if included and not last day and not cruise day) — THIS
+    // night's hotel, in THIS night's city, at the rate for THIS date. It was
+    // one hotel for the whole trip, looked up in the itinerary's first city
+    // (a Luxor night was priced at the Cairo hotel), from a contacts table no
+    // agency has data in, as rooms at a flat double rate.
+    const night = hotelByDay[dayNumber]
+    if (includesHotelForDay && night && night.ppd > 0) {
+      // Per person sharing a double; the odd traveller has a room alone.
+      const single = totalPax % 2 === 1 ? night.singleSupplement : 0
+      const hotelCost = Math.round((night.ppd * totalPax + single) * 100) / 100
       services.push({
         service_type: 'accommodation',
-        service_code: selectedHotel?.id || 'HOTEL',
-        service_name: `${hotelName_final} (${roomsNeeded} room${roomsNeeded > 1 ? 's' : ''})`,
-        supplier_name: hotelName_final,
-        quantity: roomsNeeded,
-        rate_eur: hotelRate,
-        rate_non_eur: hotelRate,
+        service_code: night.rateId || 'HOTEL',
+        service_name: night.hotelName,
+        supplier_name: night.hotelName,
+        quantity: totalPax,
+        rate_eur: night.ppd,
+        rate_non_eur: night.ppd,
         total_cost: hotelCost,
         client_price: withMargin(hotelCost),
-        notes: `Overnight at ${hotelName_final}`
+        notes: `Overnight at ${night.hotelName} — per person in a double${single > 0 ? `, plus one single supplement (${single})` : ''}`
       })
       totalSupplierCost += hotelCost
       totalClientPrice += withMargin(hotelCost)
@@ -457,4 +468,28 @@ export function tipOccasionsForGeneratedDay(
     hotelServices: !departureTransferOnly && dayData.needs_hotel_service && !isFreeDay ? 1 : 0,
     night: departureTransferOnly ? null : isCruiseDay ? (isLastDay ? null : 'cruise') : hotelNight ? 'hotel' : null,
   }
+}
+
+/** The nights a generated itinerary sleeps in a hotel, and where — read with
+ *  the same conditions the loop above uses to write the accommodation line. */
+export function hotelNightsForGeneratedDays(
+  days: ReadonlyArray<{ day_number?: number; city?: string | null; overnight_city?: string | null; is_cruise_day?: boolean; accommodation_type?: string | null; includes_hotel?: boolean }> | null | undefined,
+  p: { durationDays: number; effectiveCity: string; includeAccommodationFinal: boolean }
+): Array<{ day: number; city: string }> {
+  if (!p.includeAccommodationFinal) return []
+  return (days ?? []).flatMap(d => {
+    const day = d.day_number || 1
+    const onShip = d.is_cruise_day || d.accommodation_type === 'cruise'
+    if (day === p.durationDays || onShip || d.includes_hotel === false) return []
+    return [{ day, city: String(d.overnight_city || d.city || p.effectiveCity || '').trim() }]
+  })
+}
+
+/** The days a generated itinerary needs a guide on — the loop's own condition. */
+export function guidedDaysOfGeneratedItinerary(
+  days: ReadonlyArray<{ day_number?: number; guide_required?: boolean; is_transfer_only?: boolean; is_free_day?: boolean; is_sailing_day?: boolean }> | null | undefined
+): number[] {
+  return (days ?? [])
+    .filter(d => d.guide_required !== false && !d.is_transfer_only && !(d.is_free_day || d.is_sailing_day))
+    .map(d => d.day_number || 1)
 }

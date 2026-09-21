@@ -18,8 +18,8 @@ const params = (tippingRows: unknown[], over: Record<string, unknown> = {}) => (
   tenantId: 'test-tenant', days: DAYS, itineraryId: 'itin-1', startDateObj: new Date('2026-11-01T00:00:00Z'), durationDays: 3,
   effectiveCity: 'Cairo', totalPax: 4, isEuroPassport: true, skipPricing: false, withMargin, tier: 'luxury' as const,
   finalLanguage: 'English', includeLunch: true, includeDinner: false, includeAccommodationFinal: true,
-  guidePerDay: 60, selectedGuide: { id: 'g' }, selectedHotel: { id: 'h' },
-  hotelRate: 120, hotelName_final: 'Nile Ritz', roomsNeeded: 2, airportServiceRates: { arrival: 30, departure: 30 },
+  guidePerDay: 60, selectedGuide: { id: 'g' }, hotelByDay: { 1: { ppd: 60, singleSupplement: 25, hotelName: 'Nile Ritz', rateId: 'h' }, 2: { ppd: 60, singleSupplement: 25, hotelName: 'Nile Ritz', rateId: 'h' } },
+  airportServiceRates: { arrival: 30, departure: 30 },
   hotelServiceRate: 15, lunchRate: 18, dinnerRate: 25, allEntranceFees: [], transportByDay: { 1: { rate: 22, label: 'Airport Transfer', vehicleType: 'Sedan', rateId: 't1' }, 2: { rate: 60, label: 'Day Tour Transportation', vehicleType: 'Sedan', rateId: 't2' }, 3: { rate: 35, label: 'Airport Transfer', vehicleType: 'Sedan', rateId: 't3' } }, tippingRows, ...over,
 }) as never
 
