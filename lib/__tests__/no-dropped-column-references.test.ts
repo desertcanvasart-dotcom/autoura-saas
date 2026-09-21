@@ -12,6 +12,9 @@ import { describe, it, expect } from 'vitest'
 /** column → the migration that drops it. */
 const DROPPED: Record<string, string> = {
   uses_day_builder: '371_drop_uses_day_builder.sql',
+  // Its twin. NOT `pricing_model`, which is a live column on b2b partners —
+  // the match below is on the whole word.
+  pricing_mode: '372_drop_pricing_mode.sql',
 }
 
 const ROOTS = ['app', 'lib', 'components', 'hooks', 'scripts']
