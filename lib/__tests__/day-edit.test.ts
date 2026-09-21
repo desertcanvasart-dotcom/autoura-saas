@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { applyDayForm, wordedAttractions, type DayForm } from '@/lib/tours/day-edit'
-import { sightseeingStatement, sightseeingIsStated } from '@/lib/tours/day-sightseeing'
+import { sightseeingStatement, sightseeingIsStated, isDayTourProgramme, dayTourNamesNoAttractions } from '@/lib/tours/day-sightseeing'
 
 // One of the 21: Travel2Egypt T2E-NC-08J day 3, as production stores it.
 const LIVE_DAY = {
@@ -190,5 +190,61 @@ describe('the editor uses it', () => {
       const src = readFileSync(join(process.cwd(), f), 'utf8')
       expect([...src.matchAll(/^import\s/gm)], f).toHaveLength(0)
     }
+  })
+})
+
+// The operator's rule, 2026-09-21: "Overnight at a certain city is used only in
+// packages, but day tours do not require overnight or stays to be priced.
+// However, days which include guiding, entrance fees, transportation, meals and
+// tipping should be calculated correctly, not ignored."
+describe('what counts as a day tour — one test, shared by the engine and the editor', () => {
+  it.each([
+    ['day_tour', 1, true], ['half_day', 1, true], ['stopover', 1, true],
+    ['day_tour', 3, true],          // its type says so, however many days were typed in
+    [null, 1, true],                // one day long: it cannot have an overnight either
+    ['multi_day', 1, true],
+    ['multi_day', 2, false], [null, 5, false], ['package', 8, false], [undefined, 0, false],
+  ])('type %s with %i day(s) → %s', (type, days, expected) => {
+    expect(isDayTourProgramme(type as never, days as number)).toBe(expected)
+  })
+})
+
+describe('on a day tour, the one thing a day can still fail to say', () => {
+  it('is the names of what it visits', () => {
+    expect(dayTourNamesNoAttractions({ title: 'Aswan', city: 'Aswan' })).toBe(true)
+    expect(dayTourNamesNoAttractions({ services: { guide_required: true } })).toBe(true)
+  })
+  it('is answered by naming or picking them', () => {
+    expect(dayTourNamesNoAttractions({ attractions: ['Philae Temple'] })).toBe(false)
+    expect(dayTourNamesNoAttractions({ attraction_ids: ['f1'] })).toBe(false)
+  })
+  it('is not asked of a day that says it has no sightseeing', () => {
+    expect(dayTourNamesNoAttractions({ sightseeing: 'none' })).toBe(false)
+  })
+})
+
+describe('the editor asks a day tour the right question', () => {
+  const SOURCE = readFileSync(join(process.cwd(), 'app/tours/manage/TourManagerContent.tsx'), 'utf8')
+
+  it('is told the tour\'s type, and applies the engine\'s own test', () => {
+    expect(SOURCE).toContain('tourType={formData.tour_type}')
+    expect(SOURCE).toMatch(/const isDayTour = isDayTourProgramme\(tourType, Math\.max\(itinerary\.length, 1\)\)/)
+  })
+
+  it('says what is always priced, instead of offering "No guided sightseeing"', () => {
+    expect(SOURCE).toMatch(/This is a day tour: its guide, vehicle and tips are always priced, and it has no night\./)
+    expect(SOURCE).toMatch(/\$\{isDayTour \? 'hidden' : 'flex'\}/)
+  })
+
+  it('flags a day with no attractions for what is actually missing — not the package warning', () => {
+    const list = SOURCE.slice(SOURCE.indexOf('{/* Added Days List */}'))
+    expect(list).toMatch(/isDayTour && dayTourNamesNoAttractions\(/)
+    expect(list).toMatch(/!isDayTour && sightseeingStatement\(/)
+  })
+
+  it('the engine uses the same test and the same words', () => {
+    const engine = readFileSync(join(process.cwd(), 'lib/auto-pricing-service.ts'), 'utf8')
+    expect(engine).toMatch(/const isDayTour = isDayTourProgramme\(t\.tour_type,/)
+    expect(engine).toContain('${DAY_TOUR_NO_ATTRACTIONS}')
   })
 })

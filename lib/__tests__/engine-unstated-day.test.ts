@@ -1,4 +1,22 @@
-// A day that says nothing is not a day that costs nothing.
+// What a day has to SAY before it can be priced — and what a day tour does not.
+//
+// Three reports from production, in three days, all the same fault from a
+// different side: the engine prices what a day asks for, and a day that asks
+// for nothing costs nothing.
+//
+//   20 Sep — nine Sawa day tours COMPLETE at 12.50 per person: the lunch.
+//   21 Sep — "Aswan Highlights — Unfinished Obelisk, High Dam & Philae" in the
+//            B2B calculator at 12.50, Save as Quote enabled, after the operator
+//            had given the day a city as the first gap told them to.
+//   21 Sep — the operator's rule, which settles it for day tours:
+//            "Overnight at a certain city is used only in packages, but day
+//             tours do not require overnight or stays to be priced. However,
+//             days which include guiding, entrance fees, transportation, meals
+//             and tipping should be calculated correctly, not ignored."
+//
+// So: a DAY TOUR is sightseeing by definition — guide, vehicle and tips are
+// asked for whether or not anybody named an attraction, and there is never a
+// night. A PACKAGE day has to say what it is, because there a free day is real.
 //
 // Found on live data, 2026-09-20. 27 of Sawa Tours' 48 template days were a
 // title and a description and nothing else — no city, no sightseeing, no
@@ -50,213 +68,194 @@ async function price(itinerary: Array<Record<string, unknown>>, tourType?: strin
   } as never)
 }
 
-describe('a day that is only a description', () => {
-  it('is a gap, so a tour made of one is not a price', async () => {
-    const result = await price([PROSE_DAY])
+const NO_SERVICES = { airport_arrival: false, airport_departure: false, hotel_checkin: false, hotel_checkout: false, guide_required: false }
+/** A day of a package that prices and says everything it needs to. */
+const STATED = { day: 9, title: 'Philae', city: 'Cairo', accommodation_type: 'hotel', attractions: ['Egyptian Museum'], meals: { breakfast: 'included', lunch: 'none', dinner: 'none' } }
+/** `days` as a package: a stated day is appended so the programme is never one day long. */
+const inPackage = (...days: Array<Record<string, unknown>>) => price([...days, { ...STATED, day: days.length + 1 }])
+
+type Result = Awaited<ReturnType<typeof price>>
+const templateHoles = (r: Result, day?: number) => r.holes.filter(h => h.kind === 'template' && (day === undefined || h.dayNumber === day))
+/** Everything the engine ASKED for on a day — priced or not. */
+const askedFor = (r: Result, day: number) => new Set([
+  ...r.services.filter(s => s.dayNumber === day).map(s => s.serviceType),
+  ...r.holes.filter(h => h.dayNumber === day || h.dayNumber === undefined).map(h => h.kind),
+])
+
+// ============================================================================
+// PACKAGES — a day has to say what it is
+// ============================================================================
+describe('in a package, a day that is only a description', () => {
+  it('is a gap that names the day and the way out', async () => {
+    const result = await inPackage(PROSE_DAY)
     expect(result.complete).toBe(false)
-    const hole = result.holes.find(h => h.kind === 'template')
-    expect(hole?.dayNumber).toBe(1)
-    expect(hole?.message).toMatch(/only a description/)
-    expect(hole?.message).toMatch(/Tour Manager/)
+    const [hole] = templateHoles(result, 1)
+    expect(hole.message).toMatch(/only a description/)
+    expect(hole.message).toMatch(/Tour Manager/)
   })
 
   it('names each such day, not the tour as a whole', async () => {
-    const result = await price([PROSE_DAY, { ...PROSE_DAY, day: 2 }])
-    expect(result.holes.filter(h => h.kind === 'template').map(h => h.dayNumber)).toEqual([1, 2])
+    const result = await inPackage(PROSE_DAY, { ...PROSE_DAY, day: 2 })
+    expect(templateHoles(result).map(h => h.dayNumber)).toEqual([1, 2])
+  })
+
+  it('says it once per day — not again as "sightseeing not stated"', async () => {
+    expect(templateHoles(await inPackage(PROSE_DAY), 1)).toHaveLength(1)
   })
 })
 
-describe('a day that says something is left alone', () => {
-  const templateHoles = async (day: Record<string, unknown>) =>
-    (await price([day])).holes.filter(h => h.kind === 'template')
+describe('in a package, a day must say whether it has sightseeing', () => {
+  // A hotel night in Cairo and nothing else: not "only a description", not a
+  // meals-only tour — simply priced as a free day, which nobody had decided.
+  const SILENT = { day: 1, title: 'Cairo', city: 'Cairo', accommodation_type: 'hotel', meals: { breakfast: 'included', lunch: 'none', dinner: 'none' } }
+  const notStated = (r: Result, day = 1) => templateHoles(r, day).filter(h => /does not say whether it includes sightseeing/.test(h.message))
 
-  it('a city is enough IN A TOUR THAT HAS SOMETHING ELSE TO PRICE — a free day is a real day', async () => {
-    // Day 1 has a hotel night, so the tour is more than its meals; day 2 is a
-    // day at leisure and is left alone. (On its own this day is NOT enough —
-    // see "a tour that asks for nothing but meals", below. It used to be, and
-    // that is how a one-day tour reached the calculator priced at its lunch.)
-    const result = await price([
-      { ...PROSE_DAY, city: 'Cairo', accommodation_type: 'hotel', sightseeing: 'none' },
-      { ...PROSE_DAY, day: 2, city: 'Cairo', sightseeing: 'none' },
-    ])
-    expect(result.holes.filter(h => h.kind === 'template')).toEqual([])
+  it('a day that names no attraction and says nothing is a gap, with both ways out', async () => {
+    const [hole] = notStated(await inPackage(SILENT))
+    expect(hole.message).toMatch(/pick the attractions it visits, or tick "No guided sightseeing on this day"/)
   })
 
-  it('a stated services object is not "only a description" — it is judged by the rule below instead', async () => {
-    const holes = await templateHoles({
-      ...PROSE_DAY,
-      services: { airport_arrival: false, airport_departure: false, hotel_checkin: false, hotel_checkout: false, guide_required: false },
-    })
-    expect(holes.some(h => /only a description/.test(h.message))).toBe(false)
+  it.each([
+    ['names an attraction', { attractions: ['Egyptian Museum'] }],
+    ['picked a fee', { attraction_ids: ['fee-1'], attractions: ['Egyptian Museum'] }],
+    ['says "no guided sightseeing" — a free day is a real day, once it SAYS so', { sightseeing: 'none' }],
+    ['carries a services block — an arrival day written on purpose', { services: { ...NO_SERVICES, airport_arrival: true, hotel_checkin: true } }],
+    ['says a guide is required', { services: { ...NO_SERVICES, guide_required: true } }],
+  ])('is satisfied by a day that %s', async (_label, patch) => {
+    expect(notStated(await inPackage({ ...SILENT, ...patch }))).toEqual([])
   })
 
-  it('a title the engine can read a visit from is not "only a description" — but it is not a STATEMENT either', async () => {
-    // The old title fallback still earns the day a guide; whether to keep
-    // reading titles is the operator's open question. What changed is that a
-    // word in a title no longer counts as the day having said anything: it is
-    // asked to say so (see "a day must say whether it has sightseeing").
-    const holes = await templateHoles({ ...PROSE_DAY, title: 'Giza Pyramids and the Egyptian Museum' })
-    expect(holes.some(h => /only a description/.test(h.message))).toBe(false)
-    expect(holes.some(h => /does not say whether it includes sightseeing/.test(h.message))).toBe(true)
+  it('a word in the TITLE is not a statement', async () => {
+    expect(notStated(await inPackage({ ...SILENT, title: 'Valley of the Kings and the Temple of Hatshepsut' }))).toHaveLength(1)
   })
-})
 
-// ============================================================================
-// Reported from production, 2026-09-21. Sawa Tours' "Aswan Highlights —
-// Unfinished Obelisk, High Dam & Philae" in the B2B calculator: 12.50 per
-// person, ONE line in the breakdown (Lunch), no gap, Save as Quote enabled.
-//
-// The guard above had told the operator to fill in the day. They gave it a city
-// and "no night" — and a day with just a city was let through on purpose, as a
-// possible free day. It is one, when the rest of the tour has something to
-// price. When nothing in the programme asks for a sight, a guide, a night, a
-// transfer or a journey, the whole price is the meals.
-// ============================================================================
-describe('a tour that asks for nothing but meals', () => {
-  // The live day as the operator left it after editing — plus the one thing
-  // that day did not have: a statement about sightseeing. WITHOUT it the day is
-  // caught earlier, by "a day must say whether it has sightseeing" (below);
-  // WITH "none" it is this rule's case — a tour of free days and lunches.
-  const ASWAN = {
-    sightseeing: 'none',
-    day: 1,
-    city: 'Aswan',
-    title: "A Day Through Aswan's Granite and Water",
-    description: '08:00 AM — Gather in Aswan… the northern granite quarries… the High Dam… Philae…',
-    meals: { breakfast: 'none', lunch: 'external', dinner: 'none' },
-    accommodation_type: 'none',
-  }
-
-  it('is not a price — the production case', async () => {
-    const result = await price([ASWAN], 'day_tour')
-    expect(result.complete).toBe(false)
-    const hole = result.holes.find(h => h.kind === 'template')
-    expect(hole?.dayNumber).toBe(1)
-    expect(hole?.message).toContain('(Aswan)')
-    expect(hole?.message).toMatch(/no sights, no guide, no transport, no night/)
-    expect(hole?.message).toMatch(/pick the attractions it visits/)
+  it('"no guided sightseeing" is a decision — a word in the title does not earn the day a guide anyway', async () => {
+    const result = await inPackage({ ...SILENT, title: 'At leisure in the Valley', sightseeing: 'none' })
+    expect(askedFor(result, 1).has('entrance')).toBe(false)
+    expect(result.services.some(s => s.dayNumber === 1 && s.serviceType === 'guide')).toBe(false)
   })
 
   it('is listed IN its day, so the calculator shows it and a saved quote carries it', async () => {
-    const result = await price([ASWAN], 'day_tour')
+    const result = await inPackage(SILENT)
     const line = result.services.find(s => s.dayNumber === 1 && s.unpriced && /cannot be priced as written/.test(s.serviceName))
-    expect(line?.issue).toMatch(/a meal is not the price of a tour/)
+    expect(line?.issue).toMatch(/does not say whether it includes sightseeing/)
   })
+})
 
-  it('stops being one the moment the day says what it visits', async () => {
-    const result = await price([{ ...ASWAN, attractions: ['Philae Temple'] }], 'day_tour')
-    expect(result.holes.filter(h => h.kind === 'template')).toEqual([])
-    // …and the sights bring the rest with them: something beyond lunch is asked for.
-    const asked = new Set([...result.services.map(s => s.serviceType), ...result.holes.map(h => h.kind)])
-    expect([...asked].some(k => k !== 'meal')).toBe(true)
-  })
+describe('a programme that asks for nothing but meals', () => {
+  // Sightseeing only, as sold — no airport, no hotel to fall back on — and
+  // every day says "none". A tour of free days and lunches is not a product.
+  const FREE = { day: 1, city: 'Aswan', title: 'At leisure', sightseeing: 'none', accommodation_type: 'none', meals: { breakfast: 'none', lunch: 'external', dinner: 'none' } }
 
-  it('"explicitly nothing" is still nothing — a desert safari with no vehicle priced at 0', async () => {
-    // Sawa's Whale Valley day: a city, services all switched off, no sights, a
-    // lunch that is included. It came out COMPLETE at 0.00.
-    const result = await price([{
-      ...ASWAN, city: 'Fayoum', attractions: [],
-      meals: { breakfast: 'none', lunch: 'included', dinner: 'none' },
-      services: { airport_arrival: false, airport_departure: false, hotel_checkin: false, hotel_checkout: false, guide_required: false },
-    }], 'day_tour')
+  it('names every day', async () => {
+    const result = await price([FREE, { ...FREE, day: 2 }], undefined, 'tours-only')
     expect(result.complete).toBe(false)
-    expect(result.holes.some(h => h.kind === 'template')).toBe(true)
-  })
-
-  it('names every day when a whole multi-day programme is like that', async () => {
-    // Sightseeing only, as sold: no airport, no hotel to fall back on.
-    const result = await price([ASWAN, { ...ASWAN, day: 2 }], undefined, 'tours-only')
-    expect(result.holes.filter(h => h.kind === 'template').map(h => h.dayNumber)).toEqual([1, 2])
+    expect(templateHoles(result).map(h => h.dayNumber)).toEqual([1, 2])
+    expect(templateHoles(result)[0].message).toMatch(/a meal is not the price of a tour/)
   })
 
   it('leaves one empty day alone in a tour that has something to price', async () => {
-    // A departure day with nothing on it, after a night in a hotel.
-    const result = await price([{ ...ASWAN, accommodation_type: 'hotel' }, { ...ASWAN, day: 2 }])
-    expect(result.holes.filter(h => h.kind === 'template')).toEqual([])
+    expect(templateHoles(await price([{ ...FREE, accommodation_type: 'hotel' }, { ...FREE, day: 2 }], undefined, 'tours-only'))).toEqual([])
   })
 
   it('a FULL package is not meals-only: its first and last days are given an airport transfer', async () => {
     // Position-based defaults are real priced content, so this rule stays out
     // of the way; whether those defaults are right is a different question.
-    const result = await price([ASWAN, { ...ASWAN, day: 2 }])
-    expect(result.holes.filter(h => h.kind === 'template')).toEqual([])
-  })
-
-  it('does not say it twice for a day that is only a description', async () => {
-    const result = await price([PROSE_DAY], 'day_tour')
-    expect(result.holes.filter(h => h.kind === 'template')).toHaveLength(1)
+    expect(templateHoles(await price([FREE, { ...FREE, day: 2 }]))).toEqual([])
   })
 })
 
 // ============================================================================
-// A DAY MUST SAY WHETHER IT HAS SIGHTSEEING.
-//
-// Everything a sightseeing day costs — entrance fees, guide, vehicle, tips —
-// follows from its attractions. A day that named none and said nothing was
-// priced as a free day without anyone deciding that. On production, 28 of Sawa
-// Tours' 48 days and 3 of Travel2Egypt's 40. The operator's rule for meals,
-// applied here: a blank is not "none".
+// DAY TOURS — the operator's rule, 2026-09-21
 // ============================================================================
-describe('a day must say whether it has sightseeing', () => {
-  // Exactly what production stores for "Aswan Highlights" day 1.
+describe('a day tour is priced as what it is', () => {
+  // Exactly what production stores for Sawa's "Aswan Highlights" day 1, after
+  // the operator edited it: a city, "no night", a lunch. No attractions, no
+  // services block. It was priced at the lunch.
   const AS_STORED = {
-    day: 1, city: 'Aswan', title: "A Day Through Aswan's Granite and Water",
-    description: '08:00 AM — Gather in Aswan…',
+    day: 1, city: 'Cairo', title: "A Day Through Aswan's Granite and Water",
+    description: '08:00 AM — Gather… the granite quarries… the High Dam… Philae…',
     meals: { breakfast: 'none', lunch: 'external', dinner: 'none' },
     accommodation_type: 'none',
   }
-  const sightseeingHoles = (r: Awaited<ReturnType<typeof price>>) =>
-    r.holes.filter(h => /does not say whether it includes sightseeing/.test(h.message))
 
-  it('a day that names no attraction and says nothing is a gap — the production day', async () => {
+  it('asks for the guide, the vehicle and the tips — nobody had to say "guide required"', async () => {
+    const asked = askedFor(await price([AS_STORED], 'day_tour'), 1)
+    for (const kind of ['guide', 'transport', 'tipping', 'meal']) {
+      expect([...asked].some(k => k === kind || (kind === 'transport' && k === 'transportation') || (kind === 'tipping' && k === 'tips')), kind).toBe(true)
+    }
+  })
+
+  it('is no longer the price of its lunch', async () => {
+    const result = await price([AS_STORED], 'day_tour')
+    const priced = result.services.filter(s => !s.unpriced).map(s => s.serviceType)
+    expect(priced).toContain('guide')
+    expect(priced.filter(t => t !== 'meal').length).toBeGreaterThan(0)
+  })
+
+  it('has ONE thing missing, and says which: the attractions, for the entrance fees', async () => {
     const result = await price([AS_STORED], 'day_tour')
     expect(result.complete).toBe(false)
-    const [hole] = sightseeingHoles(result)
-    expect(hole.dayNumber).toBe(1)
-    expect(hole.message).toMatch(/pick the attractions it visits, or tick "No guided sightseeing on this day"/)
-    // One reason per day, the most specific: not ALSO the meals-only one.
-    expect(result.holes.filter(h => h.kind === 'template')).toHaveLength(1)
+    const hole = result.holes.find(h => h.kind === 'entrance' && /names no attractions/.test(h.message))
+    expect(hole?.dayNumber).toBe(1)
+    expect(hole?.message).toMatch(/the guide, the vehicle and the tips are/)
+    expect(hole?.message).toMatch(/pick the attractions it visits/)
+    // Not the package rules: a day tour never has to SAY it has sightseeing.
+    expect(templateHoles(result)).toEqual([])
   })
 
-  it('it matters most INSIDE a package, where nothing else would have noticed', async () => {
-    // Day 2 has a hotel night, so the tour is not "meals only" and the day is
-    // not "only a description". It was simply priced as a free day.
-    const result = await price([
-      { ...AS_STORED, accommodation_type: 'hotel', attractions: ['Philae Temple'] },
-      { ...AS_STORED, day: 2, accommodation_type: 'hotel', title: 'Luxor' },
-    ])
-    expect(sightseeingHoles(result).map(h => h.dayNumber)).toEqual([2])
+  it('stops asking once the day names what it visits', async () => {
+    const result = await price([{ ...AS_STORED, attractions: ['Egyptian Museum'] }], 'day_tour')
+    expect(result.holes.filter(h => /names no attractions/.test(h.message))).toEqual([])
+    expect(result.services.some(s => s.serviceType === 'entrance' && !s.unpriced)).toBe(true)
   })
 
-  it.each([
-    ['names an attraction', { attractions: ['Philae Temple'] }],
-    ['picked a fee', { attraction_ids: ['fee-1'], attractions: ['Philae Temple'] }],
-    ['says "no guided sightseeing"', { sightseeing: 'none' }],
-    ['carries a services block — an arrival day written on purpose', { services: { airport_arrival: true, airport_departure: false, hotel_checkin: true, hotel_checkout: false, guide_required: false } }],
-    ['says a guide is required', { services: { airport_arrival: false, airport_departure: false, hotel_checkin: false, hotel_checkout: false, guide_required: true } }],
-  ])('is satisfied by a day that %s', async (_label, patch) => {
-    expect(sightseeingHoles(await price([{ ...AS_STORED, ...patch }], 'day_tour'))).toEqual([])
+  it('never has a night, whatever the day says — three live day tours stored "hotel"', async () => {
+    const result = await price([{ ...AS_STORED, accommodation_type: 'hotel', attractions: ['Egyptian Museum'] }], 'day_tour')
+    expect(result.services.some(s => s.serviceType === 'accommodation' || s.serviceType === 'cruise')).toBe(false)
+    expect(result.holes.some(h => h.kind === 'hotel' || h.kind === 'cruise')).toBe(false)
   })
 
-  it('a word in the TITLE is not a statement', async () => {
-    const result = await price([{ ...AS_STORED, title: 'Valley of the Kings and the Temple of Hatshepsut' }], 'day_tour')
-    expect(sightseeingHoles(result)).toHaveLength(1)
+  it('a services block that says guide = false is a BLANK CELL, not a decision — the guide is still asked for', async () => {
+    // Every bool on a days sheet imports as false; nine live Travel2Egypt day
+    // tours carry guide_required:false beside their attractions.
+    const result = await price([{ ...AS_STORED, services: NO_SERVICES }], 'day_tour')
+    expect(result.services.some(s => s.serviceType === 'guide') || result.holes.some(h => h.kind === 'guide')).toBe(true)
   })
 
-  it('"no guided sightseeing" is a decision — a word in the title does not earn the day a guide anyway', async () => {
-    const result = await price([
-      { ...AS_STORED, accommodation_type: 'hotel', attractions: ['Philae Temple'] },
-      { ...AS_STORED, day: 2, accommodation_type: 'hotel', title: 'At leisure in the Valley', sightseeing: 'none' },
-    ])
-    const day2 = result.services.filter(s => s.dayNumber === 2).map(s => s.serviceType)
-    expect(day2).not.toContain('guide')
-    expect(day2).not.toContain('entrance')
-    expect(result.holes.filter(h => h.dayNumber === 2 && (h.kind === 'guide' || h.kind === 'entrance'))).toEqual([])
+  it('a one-day programme is a day tour even if nobody set its type', async () => {
+    const result = await price([{ ...AS_STORED, accommodation_type: 'hotel' }], undefined, 'tours-only')
+    expect(result.services.some(s => s.serviceType === 'guide') || result.holes.some(h => h.kind === 'guide')).toBe(true)
+    expect(result.services.some(s => s.serviceType === 'accommodation')).toBe(false)
   })
 
-  it('is listed IN its day, so the calculator shows it and a saved quote carries it', async () => {
-    const result = await price([AS_STORED], 'day_tour')
-    const line = result.services.find(s => s.dayNumber === 1 && s.unpriced && /cannot be priced as written/.test(s.serviceName))
-    expect(line?.issue).toMatch(/does not say whether it includes sightseeing/)
+  it('a day that is only a description is still a day tour: specific gaps, not "nothing can be priced"', async () => {
+    const result = await price([PROSE_DAY], 'day_tour')
+    expect(result.complete).toBe(false)
+    expect(templateHoles(result)).toEqual([])
+    expect(result.holes.some(h => /names no attractions/.test(h.message))).toBe(true)
+  })
+
+  it('the editor\'s explicit "No guided sightseeing" is respected — and a day tour of nothing is then not a price', async () => {
+    const result = await price([{ ...AS_STORED, sightseeing: 'none' }], 'day_tour')
+    expect(result.services.some(s => s.serviceType === 'guide')).toBe(false)
+    expect(result.complete).toBe(false)
+    expect(templateHoles(result)[0].message).toMatch(/a meal is not the price of a tour/)
+  })
+
+  it('"explicitly nothing" is no longer complete at 0.00 — Sawa\'s desert safari', async () => {
+    // Whale Valley: a city, a services block with everything off, no sights, an
+    // included lunch. It came out COMPLETE at 0.00 with no vehicle on it.
+    const result = await price([{ ...AS_STORED, attractions: [], services: NO_SERVICES, meals: { breakfast: 'none', lunch: 'included', dinner: 'none' } }], 'day_tour')
+    expect(result.complete).toBe(false)
+    expect(askedFor(result, 1).size).toBeGreaterThan(0)
+  })
+})
+
+describe('packages are unchanged by the day-tour rule', () => {
+  it('a package day keeps its night, and is not given a guide it did not ask for', async () => {
+    const result = await inPackage({ day: 1, title: 'Arrival', city: 'Cairo', accommodation_type: 'hotel', sightseeing: 'none', meals: { breakfast: 'none', lunch: 'none', dinner: 'none' } })
+    expect(result.services.some(s => s.dayNumber === 1 && s.serviceType === 'guide')).toBe(false)
+    expect(result.services.some(s => s.serviceType === 'accommodation') || result.holes.some(h => h.kind === 'hotel')).toBe(true)
   })
 })

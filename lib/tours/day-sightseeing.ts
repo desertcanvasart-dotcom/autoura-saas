@@ -62,3 +62,32 @@ export const SIGHTSEEING_NOT_STATED =
 
 export const SIGHTSEEING_HOW_TO_STATE =
   'pick the attractions it visits, or tick "No guided sightseeing on this day"'
+
+// ---- day tours ----
+// The operator's rule (2026-09-21): "Overnight at a certain city is used only
+// in packages, but day tours do not require overnight or stays to be priced.
+// However, days which include guiding, entrance fees, transportation, meals
+// and tipping should be calculated correctly, not ignored."
+//
+// So on a day tour a day never has to SAY it has sightseeing — it is one: the
+// guide, the vehicle and the tips are asked for regardless, there is never a
+// night, and the only thing a day can still be missing is the NAMES of what it
+// visits, for the entrance fees.
+
+/** Tour types that are one day by definition. */
+export const SINGLE_DAY_TOUR_TYPES: readonly string[] = ['day_tour', 'half_day', 'stopover']
+
+/** A day tour by its type — or by being one day long, which cannot have an
+ *  overnight either. */
+export function isDayTourProgramme(tourType: string | null | undefined, dayCount: number): boolean {
+  return SINGLE_DAY_TOUR_TYPES.includes(tourType ?? '') || dayCount === 1
+}
+
+/** On a day tour, the one thing a day can still fail to say. */
+export function dayTourNamesNoAttractions(day: DayLike | null | undefined): boolean {
+  if (!day || day.sightseeing === 'none') return false
+  return sightseeingStatement({ attractions: day.attractions, attraction_ids: day.attraction_ids }) !== 'attractions'
+}
+
+export const DAY_TOUR_NO_ATTRACTIONS =
+  'names no attractions, so its entrance fees cannot be priced — the guide, the vehicle and the tips are'

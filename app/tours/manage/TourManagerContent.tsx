@@ -45,7 +45,7 @@ import { useTierConfigs, useVocabulary } from '@/components/vocabulary'
 import { suggestTourType, durationForType, isSingleDayType } from '@/lib/tours/tour-type'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { applyDayForm, wordedAttractions } from '@/lib/tours/day-edit'
-import { sightseeingStatement, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE } from '@/lib/tours/day-sightseeing'
+import { sightseeingStatement, isDayTourProgramme, dayTourNamesNoAttractions, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 // ============================================
@@ -389,9 +389,15 @@ interface ItineraryEditorProps {
   /** The tiers this template is sold at: a night is chosen PER TIER, because
    *  the same programme at two tiers is two different hotels. */
   tiers: Array<{ key: string; label: string }>
+  /** The tour's type. A day tour is priced as sightseeing whatever its days
+   *  say, and has no night — so the editor asks different questions of it. */
+  tourType?: string | null
 }
 
-function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions, tiers }: ItineraryEditorProps) {
+function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions, tiers, tourType }: ItineraryEditorProps) {
+  // The same test the engine applies. `+ 1` while adding: a first day being
+  // written into an empty programme is about to be a one-day tour.
+  const isDayTour = isDayTourProgramme(tourType, Math.max(itinerary.length, 1))
   const [dayTitle, setDayTitle] = useState('')
   const [dayDescription, setDayDescription] = useState('')
   // Tri-state per meal. The checkboxes could only say included-or-nothing,
@@ -834,7 +840,13 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
               sightseeing day costs — entrance fees, guide, vehicle, tips —
               follows from its attractions, so a day that names none and says
               nothing was priced as a free day without anyone deciding that. */}
-          <label className={`flex items-start gap-2 text-sm mt-2 ${dayAttractions.length > 0 ? 'text-gray-400' : 'text-gray-700'}`}>
+          {isDayTour && (
+            <p className="text-[11px] text-gray-500 mt-2">
+              This is a day tour: its guide, vehicle and tips are always priced, and it has no night.
+              Pick the attractions above so their entrance fees are priced too.
+            </p>
+          )}
+          <label className={`${isDayTour ? 'hidden' : 'flex'} items-start gap-2 text-sm mt-2 ${dayAttractions.length > 0 ? 'text-gray-400' : 'text-gray-700'}`}>
             <input
               type="checkbox"
               checked={dayNoSightseeing && dayAttractions.length === 0}
@@ -929,7 +941,12 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                 )}
                 <p className="text-xs text-gray-500 mt-0.5">
                   📍 {day.city || <span className="italic">city not stated — read from the title</span>}
-                  {sightseeingStatement(day as unknown as Record<string, unknown>) === 'unstated' && (
+                  {isDayTour && dayTourNamesNoAttractions(day as unknown as Record<string, unknown>) && (
+                    <span className="block font-medium text-red-600">
+                      This day {DAY_TOUR_NO_ATTRACTIONS}. Press Edit and pick them.
+                    </span>
+                  )}
+                  {!isDayTour && sightseeingStatement(day as unknown as Record<string, unknown>) === 'unstated' && (
                     <span className="block font-medium text-red-600">
                       This day {SIGHTSEEING_NOT_STATED}. Press Edit and {SIGHTSEEING_HOW_TO_STATE}.
                     </span>
@@ -2970,6 +2987,7 @@ export default function TourManagerContent() {
                       attractionOptions={attractions}
                       ticketOptions={ticketOptions}
                       tiers={templateTierEntries.map(t => ({ key: t.key, label: t.label }))}
+                      tourType={formData.tour_type}
                     />
                   </div>
 
