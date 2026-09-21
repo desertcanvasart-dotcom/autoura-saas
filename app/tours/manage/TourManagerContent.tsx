@@ -2315,9 +2315,6 @@ export default function TourManagerContent() {
                               <p className="text-xs text-gray-500 font-mono">{template.template_code}</p>
                             </div>
                             {template.is_featured && <Star className="w-4 h-4 text-amber-500 fill-amber-500" />}
-                            {template.uses_day_builder && (
-                              <span className="px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded text-[10px] font-medium">Auto</span>
-                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">
@@ -2912,16 +2909,10 @@ export default function TourManagerContent() {
                       />
                       <span className="text-xs text-gray-700">Active</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="uses_day_builder"
-                        checked={formData.uses_day_builder}
-                        onChange={handleCheckboxChange}
-                        className="w-4 h-4 text-purple-600 border-gray-300 rounded"
-                      />
-                      <span className="text-xs text-gray-700">⚡ Auto-Pricing (Day Builder)</span>
-                    </label>
+                    {/* There was an "Auto-Pricing (Day Builder)" tick here. It set
+                        `uses_day_builder`, which the tours page used to require before
+                        pricing a tour at all — and which every imported tour had OFF.
+                        A tour is priced from its days; there is nothing to switch on. */}
                   </div>
                 </div>
               )}
