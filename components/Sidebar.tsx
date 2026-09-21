@@ -57,6 +57,7 @@ import {
   CalendarRange,
   Globe,
   BookA,
+  Signpost,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -273,6 +274,8 @@ const navigation: NavSection[] = [
       { label: 'Settings', href: '/settings', icon: Settings, roles: ['admin'] },
       { label: 'Organization', href: '/settings/tenant', icon: Building, roles: ['admin'] },
       { label: 'Your Vocabulary', href: '/settings/vocabulary', icon: BookA, roles: ['admin'] },
+      // Which fee a tour's wording means. The agency's own since migration 370.
+      { label: 'Attraction Names', href: '/settings/attraction-aliases', icon: Signpost, roles: ['admin'] },
       { label: 'Destinations', href: '/settings/destinations', icon: Globe, roles: ['admin'] },
       // The demand calendar: the dates you charge more on, and by how much
       // (lib/pricing/season-uplift.ts). Managers price, so they keep this.
