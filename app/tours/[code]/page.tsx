@@ -703,10 +703,6 @@ export default function TourDetailPage() {
               </div>
             )}
 
-            <button className="w-full bg-[#647C47] text-white py-3 rounded-lg hover:bg-[#4a5c35] transition-colors font-medium text-sm">
-              Request This Tour
-            </button>
-            
             <p className="text-xs text-gray-400 text-center mt-3">
               Prices calculated dynamically based on current rates
             </p>
