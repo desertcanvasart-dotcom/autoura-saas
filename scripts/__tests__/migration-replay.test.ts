@@ -499,6 +499,45 @@ describe('migration replay from scratch', () => {
       expect(indexNames.has(name), `${name} would stop a second agency issuing its first document`).toBe(false)
     }
 
+    // ---- Migration 377: one of each index ----
+    // Production has fourteen booking indexes twice (by hand, then again as
+    // *_v2 from migration 100). A fresh build only ever had the _v2 set, so
+    // production's state is MADE here before 377 runs.
+    const m377 = readFileSync(path.join(MIGRATIONS_DIR, '377_one_of_each_index.sql'), 'utf8')
+    const indexExists = async (name: string) =>
+      ((await db.query("SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = $1", [name])).rows.length) > 0
+    const SPARES: Array<[string, string]> = [
+      ['idx_bookings_tenant', 'bookings (tenant_id)'], ['idx_bookings_status', 'bookings (status)'],
+      ['idx_bookings_dates', 'bookings (start_date, end_date)'], ['idx_bookings_client', 'bookings (client_id)'],
+      ['idx_bookings_partner', 'bookings (partner_id)'], ['idx_bookings_itinerary', 'bookings (itinerary_id)'],
+      ['idx_bookings_booking_date', 'bookings (booking_date DESC)'],
+      ['idx_passengers_booking', 'booking_passengers (booking_id)'], ['idx_passengers_tenant', 'booking_passengers (tenant_id)'],
+      ['idx_passengers_lead', 'booking_passengers (is_lead_passenger) WHERE is_lead_passenger = true'],
+      ['idx_booking_payments_booking', 'booking_payments (booking_id)'], ['idx_booking_payments_tenant', 'booking_payments (tenant_id)'],
+      ['idx_booking_payments_status', 'booking_payments (status)'], ['idx_booking_payments_date', 'booking_payments (payment_date DESC)'],
+    ]
+    // The fresh build has already run 377 once (in the replay above): the five
+    // indexes no query uses are gone, the _v2 set is untouched.
+    for (const name of ['idx_usage_current', 'idx_content_library_created_by', 'idx_writing_rules_category', 'idx_itineraries_cost_mode', 'idx_itinerary_services_code']) {
+      expect(await indexExists(name), `${name} — nothing queries by it`).toBe(false)
+    }
+    expect(await indexExists('idx_usage_tenant_period_end'), 'the index idx_usage_current duplicated stays').toBe(true)
+
+    for (const [name, on] of SPARES) await db.exec(`CREATE INDEX ${name} ON ${on}`)
+    // One spare is NOT a copy: same name as production's, different columns.
+    // And one has lost its twin. Neither may go.
+    await db.exec('DROP INDEX idx_bookings_status; CREATE INDEX idx_bookings_status ON bookings (status, tenant_id)')
+    await db.exec('DROP INDEX idx_passengers_tenant_v2')
+    await db.exec(m377)
+    for (const [name] of SPARES) {
+      const kept = name === 'idx_bookings_status' || name === 'idx_passengers_tenant'
+      expect(await indexExists(name), kept ? `${name} is not a spare copy — it stays` : `${name} is the second copy — it goes`).toBe(kept)
+      if (name !== 'idx_passengers_tenant') expect(await indexExists(`${name}_v2`), `${name}_v2 is the one a migration builds — it stays`).toBe(true)
+    }
+    // Back to a fresh build's state, then once more: nothing left to do.
+    await db.exec('DROP INDEX idx_bookings_status; ALTER INDEX idx_passengers_tenant RENAME TO idx_passengers_tenant_v2')
+    await db.exec(m377)
+
     // ---- Migration 376: the two stray columns go — unless they hold something ----
     // A fresh build never had them, so production's state is MADE here.
     const m376 = readFileSync(path.join(MIGRATIONS_DIR, '376_drop_stray_columns.sql'), 'utf8')
