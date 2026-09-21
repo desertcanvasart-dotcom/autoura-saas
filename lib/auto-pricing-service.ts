@@ -2494,8 +2494,47 @@ export async function calculateDayBasedPricing(
         `Day ${day.day} ("${day.title}") is only a description: it does not say ` +
         `where it is, what is visited or where the night is, so nothing on it can ` +
         `be priced. Open the tour in Tour Manager, press Edit on the day and fill in ` +
-        `its city and what it includes.`,
+        `its city and the attractions it visits.`,
     })
+  }
+
+  // A TOUR THAT ASKS FOR NOTHING BUT MEALS IS NOT PRICED EITHER. Reported from
+  // production, 2026-09-21: Sawa Tours' "Aswan Highlights — Unfinished Obelisk,
+  // High Dam & Philae" in the B2B calculator at 12.50 per person, one line in
+  // the breakdown (Lunch), no gap, and Save as Quote enabled. The guard above
+  // had told the operator to fill in the day; they gave it a city (Aswan) and
+  // "no night" — and that guard deliberately lets a day with just a city
+  // through, because in a multi-day package a free day is a real day.
+  //
+  // It is, when the REST of the tour has something to price. When no day of
+  // the programme asks for a sight, a guide, a night, a transfer or a journey,
+  // the whole price is the meals, and a lunch is not the price of a tour. So
+  // the test is on the programme, not the day: one empty departure day in a
+  // twelve-day package is left alone.
+  const asksBeyondMeals = (d: ItineraryDay): boolean =>
+    d.accommodation_type !== 'none' ||
+    d.attractions.length > 0 ||
+    (d.attraction_ids?.length ?? 0) > 0 ||
+    d.services.guide_required ||
+    d.services.airport_arrival || d.services.airport_departure ||
+    d.services.hotel_checkin || d.services.hotel_checkout ||
+    Boolean(d.transport_type) || d.city_transfer === true || Boolean(d.transport)
+  if (itinerary.length > 0 && !itinerary.some(asksBeyondMeals)) {
+    for (const day of itinerary) {
+      if (day.unstated) continue // already said, above
+      addHole({
+        kind: 'template',
+        reason: 'missing',
+        tier,
+        dayNumber: day.day,
+        lookupAttempted: `what day ${day.day} visits or includes`,
+        message:
+          `Day ${day.day} ("${day.title}") says where it is${day.city ? ` (${day.city})` : ''} but not what ` +
+          `happens on it: no sights, no guide, no transport, no night. Only its meals could be priced, ` +
+          `and a meal is not the price of a tour. Open the tour in Tour Manager, press Edit on the day ` +
+          `and pick the attractions it visits — the guide, the vehicle and the tips follow from them.`,
+      })
+    }
   }
 
 
