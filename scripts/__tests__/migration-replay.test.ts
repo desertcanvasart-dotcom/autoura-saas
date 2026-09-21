@@ -499,6 +499,15 @@ describe('migration replay from scratch', () => {
       expect(indexNames.has(name), `${name} would stop a second agency issuing its first document`).toBe(false)
     }
 
+    // ---- Migration 378: a cruise's length has no default ----
+    // 106 gave the column DEFAULT '[4]': a cruise saved without a length became
+    // a four-night one, and the length is what turns a per-trip price into a
+    // nightly one. A fresh build must not bring that back.
+    const cruiseLengthDefault = await db.query(`
+      SELECT column_default FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'nile_cruises' AND column_name = 'duration_nights'`)
+    expect((cruiseLengthDefault.rows[0] as { column_default: string | null }).column_default, 'no invented cruise length').toBeNull()
+
     // ---- Migration 377: one of each index ----
     // Production has fourteen booking indexes twice (by hand, then again as
     // *_v2 from migration 100). A fresh build only ever had the _v2 set, so

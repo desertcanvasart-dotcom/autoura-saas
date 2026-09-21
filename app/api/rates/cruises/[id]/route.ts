@@ -4,6 +4,7 @@ import { clearPreferredSiblings } from '@/lib/rates/preferred'
 import { requireAuth } from '@/lib/supabase-server'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
+import { cruiseLengthsToStore } from '@/lib/rates/cruise-ppd'
 
 export async function GET(
   request: NextRequest,
@@ -108,7 +109,10 @@ export async function PUT(
       route_name: body.route_name,
       embark_city: body.embark_city || 'Luxor',
       disembark_city: body.disembark_city || 'Aswan',
-      duration_nights: body.duration_nights || [4],
+      // What was sent, or left as it is. This wrote `[4]` when the body had no
+      // length — an edit from anywhere but the form turned any ship into a
+      // four-night one.
+      duration_nights: cruiseLengthsToStore(body.duration_nights),
       cabin_type: body.cabin_type || 'standard',
 
       // Tier and preferences

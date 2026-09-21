@@ -1,6 +1,6 @@
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { seasonsFromAccommodationColumns, seasonsFromCruiseColumns } from '@/lib/rates/rate-seasons'
-import { cruiseNightsOf } from '@/lib/rates/cruise-ppd'
+import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 /**
  * Bulk Rate Import/Export Service
  * Provides CSV import/export for all rate tables with validation and upsert.
@@ -784,7 +784,11 @@ const CRUISE_SEASON_PREFIX: Array<[string, string]> = [
 ]
 
 function cruiseImportDerive(record: Record<string, unknown>): void {
-  const nights = cruiseNightsOf(record as { duration_nights?: number | string | null })
+  // A per-trip price becomes a per-night one only when the row says how many
+  // nights the trip is. Otherwise nothing is derived: the ship then has no
+  // nightly price, which pricing reports — it is not divided by an assumed 4.
+  const nights = cruiseNightsStated(record.duration_nights)
+  if (!nights) return
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
   const hole = (v: unknown) => !(typeof v === 'number' && Number.isFinite(v) && v !== 0)
   for (const [csvSeason, enginePrefix] of CRUISE_SEASON_PREFIX) {
@@ -815,9 +819,9 @@ function cruiseExportDerive(row: Record<string, unknown>, column: string): unkno
   const [, csvSeason, occupancy, p] = m
   const enginePrefix = CRUISE_SEASON_PREFIX.find(([cs]) => cs === csvSeason)![1]
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
-  const nights = cruiseNightsOf(row as { duration_nights?: number | string | null })
+  const nights = cruiseNightsStated(row.duration_nights)
   const ppd = num(row[`${enginePrefix}ppd_${p}`])
-  if (ppd <= 0) return undefined
+  if (ppd <= 0 || !nights) return undefined
   if (occupancy === 'double') return ppd * nights
   if (occupancy === 'single') return (ppd + num(row[`${enginePrefix}single_supplement_${p}`])) * nights
   return (ppd - num(row[`${enginePrefix}triple_reduction_${p}`])) * nights

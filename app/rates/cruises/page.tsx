@@ -666,7 +666,8 @@ export default function CruisesPage() {
     route_name: '',
     embark_city: 'Luxor',
     disembark_city: 'Aswan',
-    duration_nights: [4],
+    // None preselected: a new cruise used to start as a four-night one.
+    duration_nights: [],
     cabin_type: 'standard',
     // PPD Model - Low Season
     ppd_eur: 0,
@@ -955,6 +956,10 @@ export default function CruisesPage() {
   const { submitting, guard } = useSubmitGuard()
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    if (formData.duration_nights.length === 0) {
+      showToast('error', 'Choose how many nights this cruise is (Duration).')
+      return
+    }
     guard(async () => {
       // Calculate legacy rates from PPD for backward compatibility
       const singleEur = formData.ppd_eur + formData.single_supplement_eur
