@@ -7,7 +7,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 // Hotel picker option that reveals the free-text input for a new hotel.
 const NEW_PROPERTY = '__new__'
 
-import { useEffect, useState, useRef, type ReactNode } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign } from 'lucide-react'
@@ -22,7 +22,6 @@ import { RatePeriodLines } from '@/components/rates/RatePeriodLines'
 import { seasonsForRow, type RateSeason } from '@/lib/rates/rate-seasons'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
-
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 25, 50, 100]
 
@@ -307,32 +306,6 @@ function Pagination({
 // ============================================
 // MAIN COMPONENT
 // ============================================
-
-// The default (fallback) rate, shown as a collapsible so it reads as
-// subordinate to the contract periods above. Collapsed once the rate has
-// periods (they do the pricing); expanded when there are none. Mounts with the
-// edit modal, so defaultOpen reflects the rate being edited.
-function CollapsibleDefaultRate({
-  defaultOpen,
-  summary,
-  children,
-}: {
-  defaultOpen: boolean
-  summary: ReactNode
-  children: ReactNode
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <details
-      open={open}
-      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
-      className="border border-blue-200 rounded-lg bg-blue-50/40"
-    >
-      <summary className="p-4 cursor-pointer select-none">{summary}</summary>
-      <div className="px-4 pb-4">{children}</div>
-    </details>
-  )
-}
 
 export default function HotelsContent() {
   // City vocabulary from the destination catalog (Egypt fallback pre-migration).
@@ -799,6 +772,12 @@ export default function HotelsContent() {
   const { submitting, guard } = useSubmitGuard()
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // A rate IS its dated periods (migration 379): there is no default price
+    // for the dates in between, so a rate with no period prices nothing.
+    if (periods.length === 0) {
+      showToast('error', 'Add at least one rate period — the dates this hotel rate covers, and its price.')
+      return
+    }
     guard(async () => {
       // Calculate legacy room rates from PPD for backward compatibility
       const lowRates = calculateRoomRates(formData.ppd_eur, formData.single_supplement_eur, formData.triple_reduction_eur)
@@ -848,8 +827,6 @@ export default function HotelsContent() {
 
         const method = editingRate ? 'PUT' : 'POST'
 
-
-
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
@@ -857,7 +834,6 @@ export default function HotelsContent() {
         })
 
         const data = await response.json()
-
 
         if (!response.ok || !data.success) {
           const errorMsg = data.error || data.hint || `HTTP error ${response.status}`
@@ -1874,93 +1850,11 @@ export default function HotelsContent() {
                   />
                 </div>
 
-                <CollapsibleDefaultRate
-                  defaultOpen={periods.length === 0}
-                  summary={
-                    <div>
-                      <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                        Default rate
-                        <span className="text-xs font-normal text-gray-500">(PPD Model)</span>
-                      </h3>
-                      <p className="text-xs text-gray-500 mt-1 italic">The fallback price — used only for travel dates no contract period above covers. Enter amounts in the rate&rsquo;s own currency.</p>
-                    </div>
-                  }
-                >
-
-                  {/* EU Passport Holders - PPD Model */}
-                  <p className="text-xs font-medium text-gray-600 mb-2">EU Passport Holders</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD *</label>
-                      <input type="number" name="ppd_eur" value={formData.ppd_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-blue-400 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent bg-white font-medium" placeholder="Per Person Double" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp</label>
-                      <input type="number" name="single_supplement_eur" value={formData.single_supplement_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red</label>
-                      <input type="number" name="triple_reduction_eur" value={formData.triple_reduction_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite</label>
-                      <input type="number" name="suite_rate_eur" value={formData.suite_rate_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                  </div>
-
-                  {/* Calculated Room Rates - EU */}
-                  {formData.ppd_eur > 0 && (
-                    <div className="mb-4 p-2 bg-blue-100 rounded-lg">
-                      <p className="text-xs text-blue-700 font-medium mb-1">Calculated Room Rates (EU Passport):</p>
-                      <div className="flex gap-4 text-xs text-blue-800">
-                        <span>Single: <strong>{rateSymbol}{(formData.ppd_eur + formData.single_supplement_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>{rateSymbol}{(formData.ppd_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>{rateSymbol}{((formData.ppd_eur - formData.triple_reduction_eur) * 3).toFixed(2)}</strong></span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Non-EU Passport Holders - PPD Model */}
-                  <p className="text-xs font-medium text-gray-600 mb-2">Non-EU Passport Holders</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">PPD</label>
-                      <input type="number" name="ppd_non_eur" value={formData.ppd_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Single Supp</label>
-                      <input type="number" name="single_supplement_non_eur" value={formData.single_supplement_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Triple Red</label>
-                      <input type="number" name="triple_reduction_non_eur" value={formData.triple_reduction_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Suite</label>
-                      <input type="number" name="suite_rate_non_eur" value={formData.suite_rate_non_eur} onChange={handleChange} step="0.01" min="0"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent" placeholder="0" />
-                    </div>
-                  </div>
-
-                  {/* Calculated Room Rates - Non-EU */}
-                  {formData.ppd_non_eur > 0 && (
-                    <div className="mt-3 p-2 bg-blue-100 rounded-lg">
-                      <p className="text-xs text-blue-700 font-medium mb-1">Calculated Room Rates (Non-EU Passport):</p>
-                      <div className="flex gap-4 text-xs text-blue-800">
-                        <span>Single: <strong>{rateSymbol}{(formData.ppd_non_eur + formData.single_supplement_non_eur).toFixed(2)}</strong></span>
-                        <span>Double: <strong>{rateSymbol}{(formData.ppd_non_eur * 2).toFixed(2)}</strong></span>
-                        <span>Triple: <strong>{rateSymbol}{((formData.ppd_non_eur - formData.triple_reduction_non_eur) * 3).toFixed(2)}</strong></span>
-                      </div>
-                    </div>
-                  )}
-                </CollapsibleDefaultRate>
+                {/* A rate IS its dated periods (migration 379). There used to be a
+                    "Default rate" section here, described as the price for dates no
+                    period covers — which the engine has refused to do since #431: an
+                    uncovered night is a gap. The first period is mirrored onto the
+                    base columns on save, for readers that have no travel date. */}
               </div>
 
               {/* SECTION 7: Supplements */}

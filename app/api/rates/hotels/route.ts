@@ -122,7 +122,6 @@ export async function POST(request: NextRequest) {
       // Dated rate periods (C3.2). Only named when the client sent them, so a
       // database without migration 305 never sees the column; the first period
       // is mirrored onto the base columns for date-less readers.
-      ...seasonsPatch,
       ...rateCurrencyWriteField(body),
       // Basic info
       tenant_id,
@@ -201,7 +200,11 @@ export async function POST(request: NextRequest) {
 
       // Other
       notes: body.notes || null,
-      is_active: body.is_active !== false
+      is_active: body.is_active !== false,
+      // LAST, so it wins: a rate IS its dated periods, and the first period is
+      // mirrored onto the base columns for readers that have no travel date. It
+      // used to sit at the top, where the form's own base fields overwrote it.
+      ...seasonsPatch,
     }
 
     const { data, error } = await supabase

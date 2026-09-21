@@ -15,7 +15,7 @@ import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurre
 import RatePeriodsEditor from '@/app/components/RatePeriodsEditor'
 import { seasonsForRow, displayPpd, type RateSeason } from '@/lib/rates/rate-seasons'
 import { RatePeriodLines } from '@/components/rates/RatePeriodLines'
-import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
+import { useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
 // ============================================
@@ -373,256 +373,6 @@ function Pagination({
 // PPD SEASONAL RATE SECTION COMPONENT
 // ============================================
 
-function PPDSeasonalRateSection({
-  title,
-  seasonNumber,
-  startDate,
-  endDate,
-  startDate2,
-  endDate2,
-  onStartDateChange,
-  onEndDateChange,
-  onStartDate2Change,
-  onEndDate2Change,
-  rates,
-  onRateChange,
-  showSecondPeriod = false,
-  subtitle,
-  hideDates = false,
-  collapsible = false,
-  defaultOpen = true,
-  borderColor = 'border-gray-200',
-  bgColor = 'bg-white',
-  // The symbol the amounts are actually in — the cruise's own currency, or
-  // the tenant's (C3.4b). Passed in rather than read here so the section
-  // stays a pure presentational block.
-  rateSymbol = '€'
-}: {
-  title: string
-  seasonNumber?: number
-  startDate: string
-  endDate: string
-  startDate2?: string
-  endDate2?: string
-  onStartDateChange: (value: string) => void
-  onEndDateChange: (value: string) => void
-  onStartDate2Change?: (value: string) => void
-  onEndDate2Change?: (value: string) => void
-  rates: {
-    ppd_eur: number
-    ppd_non_eur: number
-    single_supplement_eur: number
-    single_supplement_non_eur: number
-    triple_reduction_eur: number
-    triple_reduction_non_eur: number
-  }
-  onRateChange: (field: string, value: number) => void
-  showSecondPeriod?: boolean
-  subtitle?: string
-  hideDates?: boolean
-  collapsible?: boolean
-  defaultOpen?: boolean
-  borderColor?: string
-  bgColor?: string
-  rateSymbol?: string
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  const header = (
-    <div>
-      <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-        {seasonNumber != null && (
-          <span className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">
-            {seasonNumber}
-          </span>
-        )}
-        {title}
-      </h4>
-      {subtitle && <p className="text-xs text-gray-500 mt-1 italic">{subtitle}</p>}
-    </div>
-  )
-
-  const body = (
-    <>
-      {/* Date Range */}
-      {!hideDates && (
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div>
-          <label className="block text-xs font-medium text-red-600 mb-1">From</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => onStartDateChange(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-green-600 mb-1">To</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => onEndDateChange(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-          />
-        </div>
-      </div>
-
-      )}
-
-      {/* Second Period for Peak Season */}
-      {showSecondPeriod && (
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div>
-            <label className="block text-xs font-medium text-orange-600 mb-1">Period 2 From (optional)</label>
-            <input
-              type="date"
-              value={startDate2 || ''}
-              onChange={(e) => onStartDate2Change?.(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-orange-600 mb-1">Period 2 To (optional)</label>
-            <input
-              type="date"
-              value={endDate2 || ''}
-              onChange={(e) => onEndDate2Change?.(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-600"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* PPD Explanation */}
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-xs text-blue-800">
-          <strong>PPD Model:</strong> Enter Per Person Double rate (base rate per person sharing a cabin).
-          Single = PPD + Supplement | Triple = PPD - Reduction
-        </p>
-      </div>
-
-      {/* EUR Passport Rates */}
-      <div className="mb-3">
-        <label className="block text-xs font-medium text-gray-500 mb-2">EUR Passport Holders</label>
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <label className="block text-xs text-blue-600 font-medium mb-1">PPD *</label>
-            <input
-              type="number"
-              value={rates.ppd_eur}
-              onChange={(e) => onRateChange('ppd_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-blue-50 font-medium"
-              min="0"
-              step="0.01"
-              placeholder="Per Person Double"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp</label>
-            <input
-              type="number"
-              value={rates.single_supplement_eur}
-              onChange={(e) => onRateChange('single_supplement_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-green-300 rounded-lg"
-              min="0"
-              step="0.01"
-              placeholder="+ for single"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red</label>
-            <input
-              type="number"
-              value={rates.triple_reduction_eur}
-              onChange={(e) => onRateChange('triple_reduction_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg"
-              min="0"
-              step="0.01"
-              placeholder="- for triple"
-            />
-          </div>
-        </div>
-        {/* Calculated rates display */}
-        {rates.ppd_eur > 0 && (
-          <div className="mt-2 text-xs text-gray-500 flex gap-4">
-            <span>Single: {rateSymbol}{(rates.ppd_eur + rates.single_supplement_eur).toFixed(2)}</span>
-            <span>Double: {rateSymbol}{(rates.ppd_eur * 2).toFixed(2)}</span>
-            <span>Triple: {rateSymbol}{((rates.ppd_eur - rates.triple_reduction_eur) * 3).toFixed(2)}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Non-EUR Passport Rates */}
-      <div>
-        <label className="block text-xs font-medium text-gray-500 mb-2">Non-EUR Passport Holders</label>
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <label className="block text-xs text-blue-600 font-medium mb-1">PPD *</label>
-            <input
-              type="number"
-              value={rates.ppd_non_eur}
-              onChange={(e) => onRateChange('ppd_non_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-blue-300 rounded-lg bg-blue-50 font-medium"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-green-600 font-medium mb-1">Single Supp</label>
-            <input
-              type="number"
-              value={rates.single_supplement_non_eur}
-              onChange={(e) => onRateChange('single_supplement_non_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-green-300 rounded-lg"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-purple-600 font-medium mb-1">Triple Red</label>
-            <input
-              type="number"
-              value={rates.triple_reduction_non_eur}
-              onChange={(e) => onRateChange('triple_reduction_non_eur', parseFloat(e.target.value) || 0)}
-              className="w-full px-2 py-1.5 text-sm border border-purple-300 rounded-lg"
-              min="0"
-              step="0.01"
-            />
-          </div>
-        </div>
-        {/* Calculated rates display */}
-        {rates.ppd_non_eur > 0 && (
-          <div className="mt-2 text-xs text-gray-500 flex gap-4">
-            <span>Single: {rateSymbol}{(rates.ppd_non_eur + rates.single_supplement_non_eur).toFixed(2)}</span>
-            <span>Double: {rateSymbol}{(rates.ppd_non_eur * 2).toFixed(2)}</span>
-            <span>Triple: {rateSymbol}{((rates.ppd_non_eur - rates.triple_reduction_non_eur) * 3).toFixed(2)}</span>
-          </div>
-        )}
-      </div>
-    </>
-  )
-
-  if (collapsible) {
-    return (
-      <details
-        open={open}
-        onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
-        className={`border ${borderColor} rounded-lg ${bgColor}`}
-      >
-        <summary className="p-4 cursor-pointer select-none">{header}</summary>
-        <div className="px-4 pb-4">{body}</div>
-      </details>
-    )
-  }
-
-  return (
-    <div className={`border ${borderColor} rounded-lg p-4 ${bgColor}`}>
-      {header}
-      <div className="mt-3">{body}</div>
-    </div>
-  )
-}
-
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -645,7 +395,6 @@ export default function CruisesPage() {
   // Which currency this rate's amounts are entered in ('' = EUR default)
   const [rateCurrency, setRateCurrency] = useState('')
   // Labels must name the currency the amounts are actually in (C3.4b).
-  const { symbol: rateSymbol } = useRateCurrency(rateCurrency)
   // Dated contract periods (C3.2). While any exist they price the cruise and
   // the fixed season blocks below are only a fallback.
   const [periods, setPeriods] = useState<RateSeason[]>([])
@@ -721,7 +470,6 @@ export default function CruisesPage() {
     setToasts(prev => [...prev, { id, type, message }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
   }
-
 
   // The preferred star: the engine's default among several ships in the
   // same tier (one per scope, migration 354).
@@ -956,6 +704,12 @@ export default function CruisesPage() {
   const { submitting, guard } = useSubmitGuard()
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // A rate IS its dated periods (migration 379): there is no default price
+    // for the dates in between, so a rate with no period prices nothing.
+    if (periods.length === 0) {
+      showToast('error', 'Add at least one rate period — the dates this cruise rate covers, and its price.')
+      return
+    }
     if (formData.duration_nights.length === 0) {
       showToast('error', 'Choose how many nights this cruise is (Duration).')
       return
@@ -1590,31 +1344,9 @@ export default function CruisesPage() {
                 currencyLabel={rateCurrency || 'EUR'}
               />
 
-              {/* Default rate — the fallback used when no contract period covers the date.
-                  Collapsed once the rate has periods; expanded when periods do the pricing. */}
-              <PPDSeasonalRateSection
-                rateSymbol={rateSymbol}
-                title="Default rate"
-                subtitle="The fallback price — used only for travel dates no contract period above covers. Add periods above for dated pricing. Amounts are in the rate's own currency."
-                hideDates
-                collapsible
-                defaultOpen={periods.length === 0}
-                startDate={formData.low_season_start}
-                endDate={formData.low_season_end}
-                onStartDateChange={(value) => setFormData({ ...formData, low_season_start: value })}
-                onEndDateChange={(value) => setFormData({ ...formData, low_season_end: value })}
-                rates={{
-                  ppd_eur: formData.ppd_eur,
-                  ppd_non_eur: formData.ppd_non_eur,
-                  single_supplement_eur: formData.single_supplement_eur,
-                  single_supplement_non_eur: formData.single_supplement_non_eur,
-                  triple_reduction_eur: formData.triple_reduction_eur,
-                  triple_reduction_non_eur: formData.triple_reduction_non_eur
-                }}
-                onRateChange={(field, value) => setFormData({ ...formData, [field]: value })}
-                borderColor="border-green-200"
-                bgColor="bg-green-50/30"
-              />
+              {/* A rate IS its dated periods (migration 379) — see the hotel editor.
+                  The "Default rate" section that sat here promised a fallback the
+                  engine refuses: a night no period covers is a gap. */}
 
               {/* Section 9: Rate Card Validity */}
               <div className="border border-gray-200 rounded-lg p-4">
