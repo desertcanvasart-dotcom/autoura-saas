@@ -406,7 +406,7 @@ export async function POST(request: NextRequest) {
       .from('tour_variations')
       .select(`
         id, variation_name, variation_code, tier, group_type, min_pax, max_pax,
-        tour_templates (id, template_name, template_code, duration_days, pricing_mode)
+        tour_templates (id, template_name, template_code, duration_days)
       `)
       .eq('id', variation_id)
       .eq('tenant_id', tenantId)

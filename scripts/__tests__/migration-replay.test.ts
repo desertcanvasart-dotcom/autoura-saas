@@ -388,6 +388,11 @@ describe('migration replay from scratch', () => {
       SELECT count(*)::int AS n FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'tour_templates' AND column_name = 'uses_day_builder'`)
     expect((dayBuilder.rows[0] as { n: number }).n, 'the dead flag is dropped').toBe(0)
+    // Migration 372: and its twin, pricing_mode — NULL on every live tour.
+    const pricingMode = await db.query(`
+      SELECT count(*)::int AS n FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'tour_templates' AND column_name = 'pricing_mode'`)
+    expect((pricingMode.rows[0] as { n: number }).n, 'the other dead flag is dropped').toBe(0)
     // …and a tour can still be created without it.
     await db.exec(`
       INSERT INTO tour_templates (tenant_id, template_code, template_name, tour_type, duration_days)

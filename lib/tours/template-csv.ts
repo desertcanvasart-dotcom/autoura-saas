@@ -55,11 +55,12 @@ export const TEMPLATE_CSV_COLUMNS: TemplateCsvColumn[] = [
   { name: 'long_description', label: 'Long Description' },
   { name: 'image_url', label: 'Image URL' },
   { name: 'gallery_urls', label: 'Gallery URLs', kind: 'list' },
-  { name: 'pricing_mode', label: 'Pricing Mode' },
-  // There was a "Uses Day Builder" column here. It was the flag the tours page
-  // used to require before pricing a tour at all (#484 removed the gate;
-  // migration 371 removes the column). A sheet exported before then still has
-  // the header: it is reported under "ignored headers" and written nowhere.
+  // There were two columns here, "Pricing Mode" and "Uses Day Builder": the
+  // pair of flags the tours page used to consult before pricing a tour at all
+  // (`uses_day_builder || pricing_mode === 'auto'`). #484 removed the gate — a
+  // tour is priced from its days — and migrations 371 and 372 remove the
+  // columns. A sheet exported before then still has the headers: they are
+  // reported under "ignored headers" and written nowhere.
   { name: 'default_transportation_service', label: 'Default Transport Service' },
   { name: 'transportation_city', label: 'Transport City' },
   { name: 'pickup_required', label: 'Pickup Required', kind: 'bool' },

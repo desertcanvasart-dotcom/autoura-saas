@@ -417,7 +417,6 @@ describe('the fields the sheet used to drop', () => {
     age_suitability: 'All ages',
     gallery_urls: ['https://example.test/1.jpg', 'https://example.test/2.jpg'],
     destinations_covered: ['Giza', 'Cairo'],
-    pricing_mode: 'auto',
     default_transportation_service: 'private_car',
     transportation_city: 'Cairo',
   }
@@ -425,7 +424,9 @@ describe('the fields the sheet used to drop', () => {
   it('they ride the sheet', () => {
     const csv = serializeTemplatesCsv([tour])
     const header = csv.split('\n')[0]
-    for (const label of ['Duration Hours', 'Age Suitability', 'Gallery URLs', 'Destinations', 'Pricing Mode']) {
+    // ('Pricing Mode' used to be in this list. It was a dead flag, NULL on every
+    // live tour, and migration 372 drops it — see the end of this file.)
+    for (const label of ['Duration Hours', 'Age Suitability', 'Gallery URLs', 'Destinations']) {
       expect(header, label).toContain(label)
     }
   })
@@ -439,7 +440,6 @@ describe('the fields the sheet used to drop', () => {
     expect(back.age_suitability).toBe('All ages')
     expect(back.gallery_urls).toEqual(tour.gallery_urls)
     expect(back.destinations_covered).toEqual(['Giza', 'Cairo'])
-    expect(back.pricing_mode).toBe('auto')
     expect(back.transportation_city).toBe('Cairo')
   })
 
@@ -455,7 +455,7 @@ describe('the fields the sheet used to drop', () => {
 })
 
 // ============================================================================
-// "Uses Day Builder" is gone (migration 371).
+// "Uses Day Builder" and "Pricing Mode" are gone (migrations 371 and 372).
 //
 // It was the flag the tours page used to require before pricing a tour at all;
 // #484 removed the gate, and nothing has read the column since. Every sheet
@@ -463,7 +463,7 @@ describe('the fields the sheet used to drop', () => {
 // writing it would fail the whole insert. So the sheet stops knowing about it:
 // an old file imports exactly as before, with the header reported as ignored.
 // ============================================================================
-describe('a sheet exported before "Uses Day Builder" went', () => {
+describe('a sheet exported before "Uses Day Builder" and "Pricing Mode" went', () => {
   const OLD_SHEET = 'Code,Name,Type,Duration Days,Pricing Mode,Uses Day Builder\nOLD-1,An old export,day_tour,1,auto,true\n'
 
   it('still imports', () => {
@@ -476,12 +476,15 @@ describe('a sheet exported before "Uses Day Builder" went', () => {
   it('says the header was ignored, and writes it nowhere', () => {
     const { records, ignoredHeaders } = parseTemplatesCsv(OLD_SHEET, papa)
     expect(ignoredHeaders).toContain('Uses Day Builder')
+    expect(ignoredHeaders).toContain('Pricing Mode')
     expect(records[0]).not.toHaveProperty('uses_day_builder')
+    expect(records[0]).not.toHaveProperty('pricing_mode')
   })
 
   it('is no longer on the sheet, the export or the sample', () => {
     expect(TEMPLATE_CSV_COLUMNS.map(c => c.name)).not.toContain('uses_day_builder')
-    expect(serializeTemplatesCsv([{ template_code: 'X', template_name: 'Y' } as never]).split('\n')[0]).not.toMatch(/Uses Day Builder/)
-    expect(sampleTemplateCsv().split('\n')[0]).not.toMatch(/Uses Day Builder/)
+    expect(TEMPLATE_CSV_COLUMNS.map(c => c.name)).not.toContain('pricing_mode')
+    expect(serializeTemplatesCsv([{ template_code: 'X', template_name: 'Y' } as never]).split('\n')[0]).not.toMatch(/Uses Day Builder|Pricing Mode/)
+    expect(sampleTemplateCsv().split('\n')[0]).not.toMatch(/Uses Day Builder|Pricing Mode/)
   })
 })
