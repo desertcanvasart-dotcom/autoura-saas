@@ -17,6 +17,11 @@ const DROPPED: Record<string, string> = {
   pricing_mode: '372_drop_pricing_mode.sql',
   // Never this app's: the sibling's migration, pasted into this database.
   status_override: '373_drop_bookings_status_override.sql',
+  // The sibling's again. (376 also drops content_library.content_type, which
+  // cannot be listed: `content_type` is an everyday word — uploads, e-mail
+  // attachments — and this match is by name alone. The generated types cover
+  // it: naming it on content_library no longer compiles.)
+  cabin_allocation: '376_drop_stray_columns.sql',
 }
 
 const ROOTS = ['app', 'lib', 'components', 'hooks', 'scripts']
