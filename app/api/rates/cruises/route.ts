@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/supabase-server'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { validateRatePayload } from '@/lib/rate-validation'
 import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
+import { cruiseLengthsToStore } from '@/lib/rates/cruise-ppd'
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,6 +117,9 @@ export async function POST(request: NextRequest) {
       ...seasonsPatch,
       ...rateCurrencyWriteField(body),
       ...body,
+      // The lengths sent, or NULL — never the column default, which used to make
+      // a cruise saved without a length a four-night one (migration 378).
+      duration_nights: cruiseLengthsToStore(body.duration_nights) ?? null,
       supplier_id: body.supplier_id || null,
       // Omitted when null so a database that has not run the migration yet
       // (an install mid-upgrade) still saves the rate.

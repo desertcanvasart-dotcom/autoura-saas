@@ -67,6 +67,12 @@ export async function getCruiseRate(params: {
     if (rate.periodGap) {
       return noRate(`${rate.periodGap.propertyName} has rate periods, but none covers ${rate.periodGap.date}. Add one in Rates → Cruises.`)
     }
+    if (rate.noDuration) {
+      return noRate(`${rate.noDuration.propertyName} is priced per trip and does not say how many nights that trip is. Set one Duration on it in Rates → Cruises, or enter its per-person-per-night rate.`)
+    }
+    if (rate.noPrice) {
+      return noRate(`${rate.noPrice.propertyName} is on your cruise sheet with no price. Enter its rate in Rates → Cruises.`)
+    }
     if (rate.source !== 'db' || !(rate.ppdNight > 0)) {
       return noRate(`No usable ${tier} cruise rate. Check the per-person rate in Rates → Cruises.`)
     }

@@ -30,12 +30,42 @@ export interface CruisePpdRow {
   rate_low_double_eur?: number | string | null
   rate_double_non_eur?: number | string | null
   rate_low_double_non_eur?: number | string | null
-  duration_nights?: number | string | null
+  duration_nights?: unknown
 }
 
-/** Nights used for the legacy trip→night derivation (engine default: 4). */
-export function cruiseNightsOf(row: CruisePpdRow): number {
-  return Math.max(1, Math.floor(num(row.duration_nights)) || 4)
+/**
+ * How many nights the cruise is — when it SAYS, and only then.
+ *
+ * `nile_cruises.duration_nights` is a JSON LIST of the lengths a ship sails
+ * (the rate form is a multi-select), and a plain number on rows that came from
+ * a sheet. Both are read here. The length is needed for exactly one thing:
+ * turning a price entered PER TRIP into a price per night.
+ *
+ *   - a number above 0, or a list holding exactly one      → that many nights
+ *   - a list of SEVERAL lengths ([3, 4, 7])                → null: a per-trip
+ *     price cannot say which of those trips it is the price of
+ *   - nothing, 0, or anything else                         → null
+ *
+ * It used to be `|| 4` in five places — and one of them read the list as "not
+ * a number", so a 7-night ship was divided by 4 on import and export. A ship
+ * priced per trip that does not say how long the trip is has no nightly price;
+ * the engine records that as a gap (getCruiseRates → noDuration).
+ */
+export function cruiseNightsStated(value: unknown): number | null {
+  const one = Array.isArray(value) ? (value.length === 1 ? value[0] : null) : value
+  const n = typeof one === 'string' && one.trim() !== '' ? Number(one) : one
+  return typeof n === 'number' && Number.isFinite(n) && n >= 1 ? Math.floor(n) : null
+}
+
+/** The lengths to STORE from a request body: the positive whole numbers it
+ *  sent, as a list. undefined when it sent none — callers then leave the
+ *  column alone (an update) or store NULL (a create); never an invented [4]. */
+export function cruiseLengthsToStore(value: unknown): number[] | undefined {
+  const list = (Array.isArray(value) ? value : value == null || value === '' ? [] : [value])
+    .map(v => (typeof v === 'string' && v.trim() !== '' ? Number(v) : v))
+    .filter((n): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 1)
+    .map(n => Math.floor(n))
+  return list.length > 0 ? [...new Set(list)].sort((a, b) => a - b) : undefined
 }
 
 /** Per-person-per-night EUR-column figure. 0 = genuinely unpriced. */
@@ -43,7 +73,8 @@ export function cruisePpdNightEur(row: CruisePpdRow): number {
   const ppd = num(row.ppd_eur)
   if (ppd > 0) return ppd
   const trip = num(row.rate_double_eur) || num(row.rate_low_double_eur)
-  return trip > 0 ? trip / cruiseNightsOf(row) : 0
+  const nights = cruiseNightsStated(row.duration_nights)
+  return trip > 0 && nights ? trip / nights : 0
 }
 
 /** Non-EUR variant; falls back to the EUR figure when unset (the tables'
@@ -52,6 +83,7 @@ export function cruisePpdNightNonEur(row: CruisePpdRow): number {
   const ppd = num(row.ppd_non_eur)
   if (ppd > 0) return ppd
   const trip = num(row.rate_double_non_eur) || num(row.rate_low_double_non_eur)
-  if (trip > 0) return trip / cruiseNightsOf(row)
+  const nights = cruiseNightsStated(row.duration_nights)
+  if (trip > 0 && nights) return trip / nights
   return cruisePpdNightEur(row)
 }

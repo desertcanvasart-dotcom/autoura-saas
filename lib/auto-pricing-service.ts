@@ -51,6 +51,7 @@ import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
+import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
@@ -1124,6 +1125,9 @@ export async function getCruiseRates(
   /** The row has NO price at all — no period, and nothing in the base or the
    *  room-rate columns. A gap naming it; never an exact match at 0. */
   noPrice?: { propertyName: string }
+  /** The ship is priced PER TRIP and does not say how many nights the trip is
+   *  (no length, or several) — so it has no nightly price. */
+  noDuration?: { propertyName: string }
   /** Several ships fit and none (or more than one) is preferred — a hole
    *  naming the candidates; the engine refuses to pick one (see
    *  lib/pricing/candidate-selection.ts). */
@@ -1185,7 +1189,10 @@ export async function getCruiseRates(
       if (pick.kind === 'none') return null
       cruise = pick.row
     }
-    const durationNights = cruise.duration_nights || 4
+    // The trip's length — when the ship SAYS (lib/rates/cruise-ppd). It was
+    // `|| 4`. Needed only to turn a per-TRIP price into a nightly one, below.
+    const statedNights = cruiseNightsStated(cruise.duration_nights)
+    const durationNights = statedNights ?? 0
 
     // Use new PPD fields if available, otherwise derive from legacy fields
     let ppdNight: number
@@ -1269,6 +1276,23 @@ export async function getCruiseRates(
       // old code divided rate_double_eur by 2 as if it were a cabin rate,
       // which HALVED every legacy cruise price.
       const ppdTrip = cruise.rate_double_eur
+      // A price per trip and no single trip length: there IS no nightly price.
+      // Dividing by an assumed four nights made one up.
+      if (Number(ppdTrip) > 0 && !statedNights) {
+        return {
+          shipName: cruise.ship_name,
+          cruiseId: cruise.id,
+          supplierId: cruise.supplier_id ?? null,
+          cabinType: cruise.cabin_type ?? null,
+          ppdNight: 0,
+          singleSuppNight: 0,
+          tripleRedNight: 0,
+          durationNights: 0,
+          season,
+          source: 'missing',
+          noDuration: { propertyName: cruise.ship_name || 'this cruise' },
+        }
+      }
       ppdNight = ppdTrip / durationNights
       const singleSuppTrip = (cruise.rate_single_eur || cruise.rate_double_eur) - ppdTrip
       singleSuppNight = Math.max(0, singleSuppTrip / durationNights)
@@ -2729,6 +2753,15 @@ export async function calculateDayBasedPricing(
         city: firstCruiseDay?.city,
         lookupAttempted: `cruise rate (${tier})`,
         message: ambiguityMessage(`${tier} cruises${firstCruiseDay?.city ? ` from ${firstCruiseDay.city}` : ''}`, cr.ambiguous, 'Rates → Cruises'),
+      })
+    } else if (cr?.noDuration) {
+      addHole({
+        kind: 'cruise',
+        reason: 'missing',
+        tier,
+        city: firstCruiseDay?.city,
+        lookupAttempted: `nights of ${cr.noDuration.propertyName} (${tier})`,
+        message: `${cr.noDuration.propertyName} is priced per trip and does not say how many nights that trip is, so a night aboard cannot be priced. Set one Duration on it in Rates → Cruises, or enter its per-person-per-night rate.`,
       })
     } else if (cr?.noPrice) {
       addHole({

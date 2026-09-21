@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cruisePpdNightEur, cruisePpdNightNonEur, cruiseNightsOf } from '@/lib/rates/cruise-ppd'
+import { cruisePpdNightEur, cruisePpdNightNonEur, cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 
 // ============================================
 // Cruise pricing basis: per person, PER NIGHT (locked 2026-09-05)
@@ -29,9 +29,12 @@ describe('cruisePpdNightEur', () => {
     expect(cruisePpdNightEur({})).toBe(0)
   })
 
-  it('missing duration uses the engine default of 4 nights', () => {
-    expect(cruiseNightsOf({})).toBe(4)
-    expect(cruisePpdNightEur({ rate_double_eur: 800 })).toBe(200)
+  // This pinned the guess: a per-trip price with no length was divided by an
+  // assumed four nights. It is now unpriced — a gap the engine names.
+  it('a per-trip price with no stated length is unpriced, not a quarter of it', () => {
+    expect(cruiseNightsStated(undefined)).toBeNull()
+    expect(cruisePpdNightEur({ rate_double_eur: 800 })).toBe(0)
+    expect(cruisePpdNightEur({ rate_double_eur: 800, duration_nights: 4 })).toBe(200)
   })
 })
 
