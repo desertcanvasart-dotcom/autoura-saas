@@ -63,7 +63,9 @@ export interface DayCsvColumn {
 }
 
 const MEALS = ['included', 'external', 'none'] as const
-const ACCOMMODATION = ['hotel', 'cruise', 'none'] as const
+// 'in_the_air' = the overnight flight out: nothing is sold on the day
+// (lib/pricing/flight-leg.ts isInTransit). It is a night, so it lives here.
+const ACCOMMODATION = ['hotel', 'cruise', 'none', 'in_the_air'] as const
 const TRANSPORT = ['road', 'flight', 'train', 'sleeping_train'] as const
 const YES_NO = ['yes', 'no'] as const
 
@@ -138,7 +140,7 @@ export function serializeDaysCsv(
         // An UNSTATED night exports blank, not 'none'. Writing 'none' made a
         // re-import say "this day has no bed", which silently removed the
         // hotel from pricing — the opposite of what the blank meant.
-        accommodation_type: d.accommodation_type ?? '',
+        accommodation_type: d.in_transit === true ? 'in_the_air' : (d.accommodation_type ?? ''),
         breakfast: meals.breakfast ?? 'none',
         lunch: meals.lunch ?? 'none',
         dinner: meals.dinner ?? 'none',
@@ -343,7 +345,8 @@ export function parseDaysCsv(
       })
       return
     }
-    if (hasSightseeingColumn && !namesAttractions && rec.guide_required !== true && rec.sightseeing !== 'none') {
+    // (A day in the air has said everything: nothing on it is sold.)
+    if (hasSightseeingColumn && rec.accommodation_type !== 'in_the_air' && !namesAttractions && rec.guide_required !== true && rec.sightseeing !== 'none') {
       refused.push({
         row: rowNum,
         reason: `"${code}" day ${day} ${SIGHTSEEING_NOT_STATED}. List its Attractions, set Guide to true, or put "none" in Sightseeing`,
@@ -405,7 +408,10 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
     // Blank means the day does not say, which is not the same as saying "no
     // night". Left unset, the engine infers it as it always has; written as
     // 'none' it would remove the bed.
-    ...(rec.accommodation_type ? { accommodation_type: rec.accommodation_type } : {}),
+    // 'in_the_air' is a flag on the DAY, stored as the editor stores it.
+    ...(rec.accommodation_type === 'in_the_air'
+      ? { accommodation_type: 'none', in_transit: true, overnight_kind: 'flight' }
+      : rec.accommodation_type ? { accommodation_type: rec.accommodation_type } : {}),
     ...(rec.city_transfer ? { city_transfer: true } : {}),
     ...(rec.sightseeing_length ? { sightseeing_length: rec.sightseeing_length } : {}),
     ...(rec.sightseeing === 'none' ? { sightseeing: 'none' } : {}),

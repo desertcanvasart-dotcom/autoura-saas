@@ -1,4 +1,4 @@
-import { legRoute } from './flight-leg'
+import { legRoute, groundedNeighbour, isInTransit } from './flight-leg'
 
 // ============================================
 // Ticket legs — flights, day trains, sleeping trains (B-item 2)
@@ -63,8 +63,9 @@ export function collectTicketLegs(days: TicketLegDay[]): TicketLeg[] {
   const legs: TicketLeg[] = []
   for (let i = 0; i < days.length; i++) {
     const day = days[i]
-    if (!day.transport_type) continue
-    const { from, to } = legRoute(day.transport_type, day, days[i - 1], days[i + 1])
+    // Nothing is sold on a day in the air — and it is not where a leg starts.
+    if (!day.transport_type || isInTransit(day)) continue
+    const { from, to } = legRoute(day.transport_type, day, groundedNeighbour(days, i, -1), groundedNeighbour(days, i, 1))
     if (!from || !to) continue
     if (normalizeStationCity(from) === normalizeStationCity(to)) continue
     legs.push({ mode: day.transport_type, from, to, dayNumber: day.day, namedRateId: day.transport_rate_id })

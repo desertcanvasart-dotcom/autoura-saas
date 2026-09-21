@@ -74,6 +74,8 @@ interface Service {
   rate_non_eur: number
   total_cost: number
   notes: string
+  /** Whether the night's hotel or ship is still in Rates (days API; staff only). */
+  property_rate_status?: 'on_file' | 'switched_off' | 'not_on_file' | null
 }
 
 interface DayWithServices extends ItineraryDay {
@@ -1144,10 +1146,21 @@ export default function ViewItineraryPage() {
                   {/* The hotel or ship, not just the city: the property is on the
                       day's accommodation line (lib/itineraries/overnight-property). */}
                   {(() => {
-                    const stay = overnightLabel(overnightProperty(day.services as never), day.overnight_city)
+                    const property = overnightProperty(day.services as never)
+                    const stay = overnightLabel(property, day.overnight_city)
+                    // The night line that named it says whether it is still in Rates.
+                    const status = day.services.find(s => s.property_rate_status)?.property_rate_status
+                    const stale = property && (status === 'not_on_file' || status === 'switched_off')
                     return stay ? (
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <p className="text-xs text-gray-600">🌙 Overnight in <span className="font-medium">{stay}</span></p>
+                        {stale && (
+                          <p className="mt-1 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1" data-testid="overnight-stale">
+                            ⚠ {status === 'switched_off'
+                              ? `${property!.name} is switched off in your rates — this night can no longer be re-priced or booked from it. Switch it back on in Rates, or choose another.`
+                              : `${property!.name} is no longer in your rates — it was removed after this itinerary was priced. Check the night before confirming it.`}
+                          </p>
+                        )}
                       </div>
                     ) : null
                   })()}
