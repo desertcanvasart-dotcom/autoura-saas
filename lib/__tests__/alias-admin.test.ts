@@ -151,8 +151,10 @@ describe('canonicalParts', () => {
 // The Settings screen is a CLIENT component, and the production build refused
 // it the first time: it imported two helpers from alias-admin, which reaches
 // the engine's alias loader → the query memo → node:async_hooks, and a browser
-// bundle cannot hold that. `tsc` and the unit tests were all green. Only
-// `next build` noticed — and this repo's CI does not build.
+// bundle cannot hold that. `tsc` and the unit tests were all green; only
+// `next build` noticed. CI does run a production build on every PR, so it
+// would have gone red there — this test just says so a few minutes sooner,
+// and says WHY, which a Turbopack chunking error does not.
 // ============================================================================
 describe('the screen only loads what a browser can hold', () => {
   const read = async (p: string) => (await import('node:fs')).readFileSync((await import('node:path')).join(process.cwd(), p), 'utf8')

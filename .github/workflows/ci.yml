@@ -29,7 +29,12 @@ concurrency:
 
 jobs:
   test:
-    name: Tests + type-check
+    # The name lists what the job ACTUALLY runs. It used to read "Tests +
+    # type-check" while also doing a production build, an E2E smoke and a
+    # bundle budget — and on 2026-09-21 that name alone convinced a reviewer
+    # that this repository's CI did not build, and a PR description said so.
+    # A check nobody knows about is half a check.
+    name: Tests, type-check, production build + E2E smoke
     # NOTE: do NOT add `if: github.event.changes.base != null` here to skip the
     # title/body edits that `edited` also fires for. It looks like a free
     # saving and it is not: a skipped job still publishes a check run under
