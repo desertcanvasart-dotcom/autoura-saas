@@ -179,3 +179,80 @@ describe('toItineraryDay fills what the engine reads', () => {
     expect(toItineraryDay({ day: 1, accommodation_type: 'cruise' }).accommodation_type).toBe('cruise')
   })
 })
+
+// ============================================================================
+// A day must SAY whether it has sightseeing (lib/tours/day-sightseeing.ts).
+//
+// Every bool on this sheet exports as "false" and a blank imports as false, so
+// a round trip used to turn a day nobody had described into a day that "says"
+// it has no guide — and the gap the engine records for it quietly went away.
+// The Sightseeing column carries the statement instead of inventing it.
+// ============================================================================
+describe('the sightseeing statement rides the sheet', () => {
+  const base = { meals: { breakfast: 'none', lunch: 'none', dinner: 'none' } }
+  const tour = (...days: Array<Record<string, unknown>>) => [{ template_code: 'SAW-010', itinerary: days.map((d, i) => ({ day: i + 1, title: `Day ${i + 1}`, ...base, ...d })) }]
+  const cell = (csv: string, row: number, label: string) => {
+    const p = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true })
+    return p.data[row][label]
+  }
+
+  it('has the column', () => {
+    expect(DAY_CSV_COLUMNS.map(c => c.name)).toContain('sightseeing')
+  })
+
+  it('exports "none" for a day that says so — the editor\'s tick, or an arrival day\'s services block', () => {
+    const csv = serializeDaysCsv(tour(
+      { sightseeing: 'none' },
+      { services: { airport_arrival: true, airport_departure: false, hotel_checkin: true, hotel_checkout: false, guide_required: false } },
+    ))
+    expect(cell(csv, 0, 'Sightseeing')).toBe('none')
+    expect(cell(csv, 1, 'Sightseeing')).toBe('none')
+  })
+
+  it('exports a blank for a day whose attractions or guide already say it', () => {
+    const csv = serializeDaysCsv(tour({ attractions: ['Philae Temple'] }, { services: { guide_required: true } }))
+    expect(cell(csv, 0, 'Sightseeing')).toBe('')
+    expect(cell(csv, 1, 'Sightseeing')).toBe('')
+  })
+
+  it('exports a blank for a day that says NOTHING — and does not invent the answer', () => {
+    expect(cell(serializeDaysCsv(tour({ city: 'Aswan' })), 0, 'Sightseeing')).toBe('')
+  })
+
+  it('"none" survives the round trip', () => {
+    const { byTemplate, refused } = parseDaysCsv(serializeDaysCsv(tour({ sightseeing: 'none', city: 'Luxor' })), papa)
+    expect(refused).toEqual([])
+    expect(byTemplate.get('SAW-010')?.[0].sightseeing).toBe('none')
+  })
+
+  it('a day that says nothing is REFUSED on the way back in, by day, with the three ways out', () => {
+    const { byTemplate, refused } = parseDaysCsv(serializeDaysCsv(tour({ city: 'Aswan' })), papa)
+    expect(byTemplate.has('SAW-010')).toBe(false)
+    expect(refused[0].reason).toContain('"SAW-010" day 1')
+    expect(refused[0].reason).toMatch(/does not say whether it includes sightseeing/)
+    expect(refused[0].reason).toMatch(/List its Attractions, set Guide to true, or put "none" in Sightseeing/)
+  })
+
+  it('"none" on a day that lists attractions, or asks for a guide, is refused — it cannot be both', () => {
+    const header = DAY_CSV_COLUMNS.map(c => c.label).join(',')
+    const row = (over: Record<string, string>) => DAY_CSV_COLUMNS.map(c => `"${({ template_code: 'SAW-010', day: '1', title: 'Day 1', breakfast: 'none', lunch: 'none', dinner: 'none', sightseeing: 'none', ...over } as Record<string, string>)[c.name] ?? ''}"`).join(',')
+    const both = parseDaysCsv(`${header}\n${row({ attractions: 'Philae Temple' })}\n`, papa)
+    expect(both.refused[0].reason).toMatch(/lists attractions — it cannot be both/)
+    const guided = parseDaysCsv(`${header}\n${row({ guide_required: 'true' })}\n`, papa)
+    expect(guided.refused[0].reason).toMatch(/asks for a guide — it cannot be both/)
+  })
+
+  it('a sheet made BEFORE the column existed imports exactly as it did', () => {
+    const old = DAY_CSV_COLUMNS.filter(c => c.name !== 'sightseeing')
+    const header = old.map(c => c.label).join(',')
+    const row = old.map(c => `"${({ template_code: 'SAW-010', day: '1', title: 'Arrival', breakfast: 'none', lunch: 'none', dinner: 'none' } as Record<string, string>)[c.name] ?? ''}"`).join(',')
+    const { byTemplate, refused } = parseDaysCsv(`${header}\n${row}\n`, papa)
+    expect(refused).toEqual([])
+    expect(byTemplate.get('SAW-010')).toHaveLength(1)
+  })
+
+  it('the sample sheet passes its own rule', () => {
+    const { refused } = parseDaysCsv(sampleDaysCsv().replace(/EXAMPLE-REPLACE-THIS-CODE/g, 'REAL-001'), papa)
+    expect(refused).toEqual([])
+  })
+})

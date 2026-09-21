@@ -49,6 +49,7 @@ import type { VocabularyKind } from '@/lib/vocabulary'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
+import { sightseeingStatement, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE } from '@/lib/tours/day-sightseeing'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
@@ -192,6 +193,9 @@ export interface ItineraryDay {
    *  either. Such a day is prose: it costs nothing to "price", so it used to
    *  count as fully priced. See the hole in calculateDayBasedPricing. */
   unstated?: boolean
+  /** The day says NOTHING about sightseeing — no attractions, no services
+   *  block, no "no guided sightseeing". lib/tours/day-sightseeing.ts. */
+  sightseeingUnstated?: boolean
   services: {
     airport_arrival: boolean
     airport_departure: boolean
@@ -716,8 +720,14 @@ export function parseItinerary(itineraryData: any, opts?: {
     // Handle services - default based on day position
     const isFirstDay = index === 0
     const isLastDay = index === itineraryData.length - 1
-    const hasAttractions = (day.attractions && day.attractions.length > 0) ||
-                          (day.title && /temple|pyramid|museum|valley|tomb/i.test(day.title))
+    // What the day SAYS about sightseeing, read from what is stored — before
+    // any wording is consulted. "No guided sightseeing" is a decision, so a
+    // word in the title ("…Valley…") must not earn the day a guide anyway.
+    const statement = sightseeingStatement(day)
+    const saysNoSightseeing = day.sightseeing === 'none'
+    const hasAttractions = !saysNoSightseeing && (
+      (day.attractions && day.attractions.length > 0) ||
+      (day.title && /temple|pyramid|museum|valley|tomb/i.test(day.title)))
 
     // The defaults describe a FULL PACKAGE, so they are gated on what the
     // product actually includes. Two latent bugs lived here: a SINGLE-day
@@ -742,7 +752,7 @@ export function parseItinerary(itineraryData: any, opts?: {
 
     // Extract attractions from title if not provided
     let attractions = day.attractions || []
-    if (attractions.length === 0 && day.title) {
+    if (attractions.length === 0 && day.title && !saysNoSightseeing) {
       attractions = extractAttractionsFromTitle(day.title)
     }
 
@@ -776,6 +786,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       title: day.title || `Day ${index + 1}`,
       description: day.description || '',
       unstated: storesNothing && asksForNothing,
+      sightseeingUnstated: statement === 'unstated',
       city: day.city || inferCityFromTitle(day.title || ''),
       // A sleeping-train night has no hotel bed — the ticket IS the bed
       // (B-item 2); the sleeper night joins the rooming list instead.
@@ -2511,6 +2522,26 @@ export async function calculateDayBasedPricing(
   // the whole price is the meals, and a lunch is not the price of a tour. So
   // the test is on the programme, not the day: one empty departure day in a
   // twelve-day package is left alone.
+  // A DAY MUST SAY WHETHER IT HAS SIGHTSEEING. Everything a sightseeing day
+  // costs — entrance fees, guide, vehicle, tips — follows from its attractions,
+  // so a day that names none and says nothing was priced as a free day without
+  // anyone having decided that. On production 28 of Sawa Tours' 48 days and 3
+  // of Travel2Egypt's 40 were in that state (lib/tours/day-sightseeing.ts). The
+  // operator's rule for meals, applied here: a blank is not "none".
+  for (const day of itinerary) {
+    if (!day.sightseeingUnstated || day.unstated) continue // `unstated` said more, above
+    addHole({
+      kind: 'template',
+      reason: 'missing',
+      tier,
+      dayNumber: day.day,
+      lookupAttempted: `whether day ${day.day} includes sightseeing`,
+      message:
+        `Day ${day.day} ("${day.title}") ${SIGHTSEEING_NOT_STATED}. Open the tour in ` +
+        `Tour Manager, press Edit on the day, and ${SIGHTSEEING_HOW_TO_STATE}.`,
+    })
+  }
+
   const asksBeyondMeals = (d: ItineraryDay): boolean =>
     d.accommodation_type !== 'none' ||
     d.attractions.length > 0 ||
@@ -2521,7 +2552,7 @@ export async function calculateDayBasedPricing(
     Boolean(d.transport_type) || d.city_transfer === true || Boolean(d.transport)
   if (itinerary.length > 0 && !itinerary.some(asksBeyondMeals)) {
     for (const day of itinerary) {
-      if (day.unstated) continue // already said, above
+      if (day.unstated || day.sightseeingUnstated) continue // already said, above
       addHole({
         kind: 'template',
         reason: 'missing',

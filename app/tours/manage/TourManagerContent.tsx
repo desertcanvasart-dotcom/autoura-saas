@@ -44,6 +44,8 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { useTierConfigs, useVocabulary } from '@/components/vocabulary'
 import { suggestTourType, durationForType, isSingleDayType } from '@/lib/tours/tour-type'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
+import { applyDayForm, wordedAttractions } from '@/lib/tours/day-edit'
+import { sightseeingStatement, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE } from '@/lib/tours/day-sightseeing'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
 // ============================================
@@ -104,6 +106,8 @@ interface TourTemplate {
 
 // NEW: Itinerary Day interface
 interface ItineraryDay {
+  /** "No guided sightseeing on this day" — lib/tours/day-sightseeing.ts. */
+  sightseeing?: 'none'
   day: number
   title: string
   description: string
@@ -411,6 +415,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   const [dayProperties, setDayProperties] = useState<Record<string, string>>({})
   /** A transfer to somewhere else in town that is not sightseeing. */
   const [dayCityTransfer, setDayCityTransfer] = useState(false)
+  const [dayNoSightseeing, setDayNoSightseeing] = useState(false)
   /** How long the sightseeing runs: four hours, eight, or twelve. */
   const [dayLength, setDayLength] = useState<'' | 'half_day' | 'day_tour' | 'long_day_tour'>('')
   /** What is on file for this day's city, per tier, for the pickers. */
@@ -479,6 +484,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayNight('')
     setDayProperties({})
     setDayCityTransfer(false)
+    setDayNoSightseeing(false)
     setDayLength('')
     setEditingDayIndex(null)
   }
@@ -504,6 +510,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayCity(day.city || '')
     setDayProperties((day.property_by_tier as Record<string, string>) || {})
     setDayCityTransfer(day.city_transfer === true)
+    setDayNoSightseeing(day.sightseeing === 'none')
     setDayLength((day.sightseeing_length as typeof dayLength) || '')
     setDayNight((day.accommodation_type as typeof dayNight) || '')
     setDayMealsError(null)
@@ -520,44 +527,28 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     // field below already says why; saving a list would only hide it again.
     if (namesSeveralPlaces(dayCity)) return
     
-    const newDay: ItineraryDay = {
-      day: editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day,
-      title: dayTitle.trim(),
-      description: dayDescription.trim(),
-      // Written in the object shape, not the legacy array: it is what the
-      // pricing engine calls the new format, what the days CSV round-trips,
-      // and the only one that can say 'external'. Existing array days keep
-      // working — readDayMeals() handles both.
-      meals: { ...dayMeals } as DayMeals,
-      ...(dayAttractions.length > 0
-        ? {
-            attractions: dayAttractions.map(a => a.name),
-            attraction_ids: dayAttractions.map(a => a.id),
-          }
-        : {}),
-      ...(dayTransportType
-        ? {
-            transport_type: dayTransportType,
-            ...(dayTransportRateId ? { transport_rate_id: dayTransportRateId } : {}),
-          }
-        : {}),
-      // Written only when stated. An empty city or night leaves the day
-      // exactly as it was, so nothing here silently overwrites a day the
-      // engine was reading from its words.
-      ...(dayCity.trim() ? { city: dayCity.trim() } : {}),
-      ...(dayNight ? { accommodation_type: dayNight } : {}),
-      ...(dayCityTransfer ? { city_transfer: true } : {}),
-      ...(dayLength ? { sightseeing_length: dayLength } : {}),
-      // Only the tiers that actually named one. An empty map is the same as
-      // saying nothing: the engine picks, as it always has.
-      ...(Object.values(dayProperties).some(Boolean)
-        ? {
-            property_by_tier: Object.fromEntries(
-              Object.entries(dayProperties).filter(([, id]) => Boolean(id))
-            ),
-          }
-        : {}),
-    }
+    // Built ON the day being edited, not in place of it: the form shows only
+    // part of a day, and everything it does not show — the services block,
+    // worded attractions, a city left blank here — used to be deleted on Save
+    // (lib/tours/day-edit.ts).
+    const existing = editingDayIndex === null ? null : (itinerary[editingDayIndex] as unknown as Record<string, unknown>)
+    const newDay = applyDayForm(existing, {
+      title: dayTitle,
+      description: dayDescription,
+      // The object shape, not the legacy array: it is what the pricing engine
+      // calls the new format, what the days CSV round-trips, and the only one
+      // that can say 'external'.
+      meals: { ...dayMeals },
+      picked: dayAttractions,
+      transportType: dayTransportType,
+      transportRateId: dayTransportRateId,
+      city: dayCity,
+      night: dayNight,
+      cityTransfer: dayCityTransfer,
+      length: dayLength,
+      propertiesByTier: dayProperties,
+      noSightseeing: dayNoSightseeing,
+    }, editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day) as unknown as ItineraryDay
 
     if (editingDayIndex === null) {
       onChange([...itinerary, newDay])
@@ -831,6 +822,34 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
               ))}
             </div>
           )}
+          {/* Attractions that arrived as WORDS (a days sheet, the AI builder).
+              The picker cannot show them, so say they are there — and kept. */}
+          {dayAttractions.length === 0 && editingDayIndex !== null && wordedAttractions(itinerary[editingDayIndex] as unknown as Record<string, unknown>).length > 0 && (
+            <p className="text-[11px] text-gray-500 mt-1.5">
+              This day already names, in words: <span className="text-gray-700">{wordedAttractions(itinerary[editingDayIndex] as unknown as Record<string, unknown>).join(', ')}</span>.
+              They are kept as they are, and priced by name. Pick from the list only to replace them with exact fees.
+            </p>
+          )}
+          {/* A day must SAY whether it has sightseeing: everything a
+              sightseeing day costs — entrance fees, guide, vehicle, tips —
+              follows from its attractions, so a day that names none and says
+              nothing was priced as a free day without anyone deciding that. */}
+          <label className={`flex items-start gap-2 text-sm mt-2 ${dayAttractions.length > 0 ? 'text-gray-400' : 'text-gray-700'}`}>
+            <input
+              type="checkbox"
+              checked={dayNoSightseeing && dayAttractions.length === 0}
+              disabled={dayAttractions.length > 0}
+              onChange={(e) => setDayNoSightseeing(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              No guided sightseeing on this day
+              <span className="block text-[11px] text-gray-500">
+                An arrival or departure day, a day at leisure, a day of travel. Without this tick or an attraction,
+                pricing cannot tell a free day from a day nobody finished describing — and records a gap.
+              </span>
+            </span>
+          </label>
         </div>
 
         {/* Travel picker (B-item 2): how this day travels. Road is the
@@ -910,6 +929,11 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                 )}
                 <p className="text-xs text-gray-500 mt-0.5">
                   📍 {day.city || <span className="italic">city not stated — read from the title</span>}
+                  {sightseeingStatement(day as unknown as Record<string, unknown>) === 'unstated' && (
+                    <span className="block font-medium text-red-600">
+                      This day {SIGHTSEEING_NOT_STATED}. Press Edit and {SIGHTSEEING_HOW_TO_STATE}.
+                    </span>
+                  )}
                   {namesSeveralPlaces(day.city) && (
                     <span className="ml-1 font-medium text-red-600">
                       — more than one place, so this day cannot be priced. Press Edit and choose one.
