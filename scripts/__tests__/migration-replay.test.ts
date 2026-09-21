@@ -446,10 +446,10 @@ describe('migration replay from scratch', () => {
 
     // Tables only the exempt migrations (205, 261) can build.
     const ONLY_ON_SUPABASE = ['copilot_knowledge', 'support_conversations', 'support_messages']
-    // On production, in the types, and deliberately NOT adopted: strays with no
-    // migration and no code (see 374's footer). Remove an entry when its
-    // column is dropped — the list may only shrink.
-    const STRAYS_ON_PRODUCTION = ['content_library.content_type', 'itineraries.cabin_allocation']
+    // Columns on production with no migration and no code. 374 left two here;
+    // 376 dropped them. EMPTY is the rule: a new entry means someone added a
+    // column by hand — write its migration (or drop it) instead of listing it.
+    const STRAYS_ON_PRODUCTION: string[] = []
 
     expect(
       [...typed.keys()].filter(t => !built.has(t)).sort(),
@@ -498,6 +498,22 @@ describe('migration replay from scratch', () => {
     for (const name of ['invoices_invoice_number_key', 'expenses_expense_number_key', 'supplier_invoices_internal_reference_key']) {
       expect(indexNames.has(name), `${name} would stop a second agency issuing its first document`).toBe(false)
     }
+
+    // ---- Migration 376: the two stray columns go — unless they hold something ----
+    // A fresh build never had them, so production's state is MADE here.
+    const m376 = readFileSync(path.join(MIGRATIONS_DIR, '376_drop_stray_columns.sql'), 'utf8')
+    const hasColumn = async (table: string, column: string) =>
+      ((await db.query('SELECT 1 FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 AND column_name = $3', ['public', table, column])).rows.length) > 0
+    await db.exec('ALTER TABLE itineraries ADD COLUMN cabin_allocation JSONB; ALTER TABLE content_library ADD COLUMN content_type VARCHAR(50)')
+    await db.exec("INSERT INTO content_library (tenant_id, name, content_type) SELECT id, 'Stray probe', 'article' FROM tenants WHERE company_name = 'Replay Probe Co'")
+    await expect(db.exec(m376), 'a value turned up since it was checked').rejects.toThrow(/content_library\.content_type holds 1 value/)
+    await db.exec('ROLLBACK').catch(() => undefined)
+    expect(await hasColumn('itineraries', 'cabin_allocation'), 'a refusal drops NOTHING — not even the column that was empty').toBe(true)
+    await db.exec("DELETE FROM content_library WHERE name = 'Stray probe'")
+    await db.exec(m376)
+    expect(await hasColumn('itineraries', 'cabin_allocation')).toBe(false)
+    expect(await hasColumn('content_library', 'content_type')).toBe(false)
+    await db.exec(m376) // nothing left to do
 
     // ---- Migration 375: a document number is unique PER AGENCY ----
     // A fresh build never had the three global constraints, so 375 is a no-op

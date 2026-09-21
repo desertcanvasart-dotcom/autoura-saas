@@ -3325,7 +3325,6 @@ export interface Database {
           duration_days: number | null
           start_city: string | null
           end_city: string | null
-          content_type: string | null
           language: string | null
           title: string | null
         }
@@ -3352,7 +3351,6 @@ export interface Database {
           duration_days?: number | null
           start_city?: string | null
           end_city?: string | null
-          content_type?: string | null
           language?: string | null
           title?: string | null
         }
@@ -3379,7 +3377,6 @@ export interface Database {
           duration_days?: number | null
           start_city?: string | null
           end_city?: string | null
-          content_type?: string | null
           language?: string | null
           title?: string | null
         }
@@ -5760,7 +5757,6 @@ export interface Database {
           generation_mode: string | null
           cost_mode: string | null
           total_revenue: number | null
-          cabin_allocation: Json | null
           nationality: string | null
           language: string | null
           is_euro_passport: boolean | null
@@ -5834,7 +5830,6 @@ export interface Database {
           generation_mode?: string | null
           cost_mode?: string | null
           total_revenue?: number | null
-          cabin_allocation?: Json | null
           nationality?: string | null
           language?: string | null
           is_euro_passport?: boolean | null
@@ -5908,7 +5903,6 @@ export interface Database {
           generation_mode?: string | null
           cost_mode?: string | null
           total_revenue?: number | null
-          cabin_allocation?: Json | null
           nationality?: string | null
           language?: string | null
           is_euro_passport?: boolean | null
