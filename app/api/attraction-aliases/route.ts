@@ -27,7 +27,7 @@ export async function GET() {
     const [aliasRes, feeRes, tourRes] = await Promise.all([
       supabase.from('attraction_aliases').select(ALIAS_COLS).eq('tenant_id', tenant_id).order('alias'),
       supabase.from('entrance_fees').select('attraction_name, city').eq('tenant_id', tenant_id).eq('is_active', true).order('attraction_name'),
-      supabase.from('tour_templates').select('template_name, itinerary').eq('tenant_id', tenant_id).eq('is_active', true),
+      supabase.from('tour_templates').select('template_name, itinerary, main_attractions').eq('tenant_id', tenant_id).eq('is_active', true),
     ])
     if (aliasRes.error) throw aliasRes.error
     if (feeRes.error) throw feeRes.error

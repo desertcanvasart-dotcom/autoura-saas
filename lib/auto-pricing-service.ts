@@ -50,6 +50,7 @@ import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
+import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
@@ -689,6 +690,9 @@ export function parseItinerary(itineraryData: any, opts?: {
    *  vehicle and tips are asked for whether or not anybody named an
    *  attraction — and there is never a night, whatever the day says. */
   dayTour?: boolean
+  /** The attractions picked on the TOUR ("Main Attractions"). Only a one-day
+   *  tour's day takes them, and only when it names none of its own. */
+  tourAttractions?: unknown
 }): ItineraryDay[] {
   if (!itineraryData || !Array.isArray(itineraryData)) {
     return []
@@ -779,10 +783,10 @@ export function parseItinerary(itineraryData: any, opts?: {
       ? { ...baseServices, guide_required: true }
       : baseServices
 
-    // The attractions the day names — and no others (see above).
-    const attractions: string[] = Array.isArray(day.attractions)
-      ? day.attractions.filter((a: unknown): a is string => typeof a === 'string' && a.trim() !== '')
-      : []
+    // The attractions the day names — and no others (see above). One
+    // exception that is not a guess: a ONE-day tour whose day names none is
+    // priced for the attractions picked on the TOUR (lib/tours/day-attractions).
+    const attractions: string[] = wordedAttractionsForDay(day, itineraryData.length, opts?.tourAttractions)
 
     // Explicit entrance-fee ids from the day editor (A-item 13).
     const attraction_ids: string[] = Array.isArray(day.attraction_ids)
@@ -2349,6 +2353,7 @@ export async function calculateDayBasedPricing(
         template_code,
         duration_days,
         tour_type,
+        main_attractions,
         itinerary
       `)
       .eq('id', templateId)
@@ -2392,7 +2397,7 @@ export async function calculateDayBasedPricing(
   // A day tour by its type, or by being one day long: a one-day programme
   // cannot have an overnight either (#461).
   const isDayTour = isDayTourProgramme(t.tour_type, Array.isArray(t.itinerary) ? t.itinerary.length : 0)
-  const itinerary = parseItinerary(t.itinerary, { packageType: effectivePackageType, dayTour: isDayTour })
+  const itinerary = parseItinerary(t.itinerary, { packageType: effectivePackageType, dayTour: isDayTour, tourAttractions: t.main_attractions })
   const totalDays = itinerary.length || t.duration_days || 1
 
   if (itinerary.length === 0) {
