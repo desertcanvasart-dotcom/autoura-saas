@@ -310,6 +310,76 @@ describe('migration replay from scratch', () => {
       'supplier_invoices',
     ])
 
+    // Migration 370: an attraction alias belongs to the agency whose fee it
+    // names. Production had 27 GLOBAL aliases; nine pointed at a name on
+    // nobody's sheet and rewrote right wording into a miss, and a global row
+    // is one agency's wording imposed on every other.
+    const noGlobals = await db.query(`SELECT count(*)::int AS n FROM attraction_aliases WHERE tenant_id IS NULL`)
+    expect((noGlobals.rows[0] as { n: number }).n, 'no global alias survives').toBe(0)
+
+    const aliasTenant = await db.query(`
+      SELECT is_nullable FROM information_schema.columns
+       WHERE table_name = 'attraction_aliases' AND column_name = 'tenant_id'`)
+    expect((aliasTenant.rows[0] as { is_nullable: string }).is_nullable, 'a global alias cannot come back').toBe('NO')
+    await expect(
+      db.exec(`INSERT INTO attraction_aliases (tenant_id, alias, canonical) VALUES (NULL, 'sneaks back', 'Nothing')`),
+      'the column refuses a row with no agency'
+    ).rejects.toThrow()
+
+    const globalRead = await db.query(`SELECT count(*)::int AS n FROM pg_policies WHERE tablename = 'attraction_aliases' AND policyname = 'attraction_aliases_global_read'`)
+    expect((globalRead.rows[0] as { n: number }).n, 'nobody reads a shared alias any more').toBe(0)
+
+    // The rule that decided who was handed what: does a canonical land on
+    // exactly ONE fee of this agency's sheet? The engine's own rule — a fee
+    // whose name IS it, else the only one that contains it.
+    await db.exec(`
+      INSERT INTO entrance_fees (tenant_id, attraction_name, city, eur_rate, non_eur_rate, is_active)
+      SELECT t.id, f.name, 'Probe', 10, 10, true
+        FROM tenants t, (VALUES
+          ('Valley Of Kings'), ('Egyptian Museum'), ('The Grand Egyptian Museum (GEM)'),
+          ('Abu Simbel Temple'), ('Abu Simbel Sound & Light'), ('Giza Plateau')
+        ) AS f(name)
+       WHERE t.company_name = 'Replay Probe Co';
+    `)
+    const resolves = async (canonical: string) => {
+      const r = await db.query(
+        `SELECT public.attraction_alias_resolves(t.id, $1) AS ok FROM tenants t WHERE t.company_name = 'Replay Probe Co'`,
+        [canonical]
+      )
+      return (r.rows[0] as { ok: boolean }).ok
+    }
+    expect(await resolves('Valley Of Kings'), 'a name on the sheet').toBe(true)
+    expect(await resolves('valley of kings '), 'whatever the case or padding').toBe(true)
+    expect(await resolves('Valley of the Kings'), 'the old global canonical is on NO sheet').toBe(false)
+    expect(await resolves('Egyptian Museum'), 'an exact name wins over one that merely contains it').toBe(true)
+    expect(await resolves('Abu Simbel'), 'two fees contain it and none IS it — not an alias, a coin toss').toBe(false)
+    expect(await resolves('Giza Plateau + Egyptian Museum'), 'a combo lands when every part does').toBe(true)
+    expect(await resolves('Giza Plateau + Sphinx Area'), '…and not when one part is on no sheet').toBe(false)
+    expect(await resolves(''), 'nothing is not a fee').toBe(false)
+
+    // The statement that hands out the spellings, run against a sheet that
+    // HAS fees (when the migration itself replays there is no agency yet, so
+    // it copies nothing). Taken from the file, so it is the real one.
+    const sql370 = readFileSync(path.join(MIGRATIONS_DIR, '370_attraction_aliases_per_tenant.sql'), 'utf8')
+    const spellings = sql370.match(/INSERT INTO attraction_aliases \(tenant_id, alias, canonical\)\nSELECT t\.id, a\.alias, a\.canonical[\s\S]*?DO NOTHING;/)
+    expect(spellings, 'the spellings statement is in the migration').not.toBeNull()
+    await db.exec(`INSERT INTO tenants (company_name, contact_email) VALUES ('Empty Sheet Co', 'empty@example.com')`)
+    await db.exec(spellings![0])
+    const handed = async (company: string) => {
+      const r = await db.query(
+        `SELECT a.alias, a.canonical FROM attraction_aliases a JOIN tenants t ON t.id = a.tenant_id
+          WHERE t.company_name = $1 ORDER BY a.alias`, [company])
+      return Object.fromEntries((r.rows as Array<{ alias: string; canonical: string }>).map(x => [x.alias, x.canonical]))
+    }
+    const probeAliases = await handed('Replay Probe Co')
+    expect(probeAliases['Valley of the Kings'], 'the spelling its sheet can honour').toBe('Valley Of Kings')
+    expect(probeAliases['Abu Simbel'], 'pinned to the temple, not left to chance').toBe('Abu Simbel Temple')
+    expect(probeAliases['Citadel'], 'no citadel fee on this sheet, so no alias into thin air').toBeUndefined()
+    expect(await handed('Empty Sheet Co'), 'an agency with an empty sheet is handed nothing').toEqual({})
+    const before = Object.keys(probeAliases).length
+    await db.exec(spellings![0])
+    expect(Object.keys(await handed('Replay Probe Co')).length, 'running it twice adds nothing').toBe(before)
+
     // Migration 361: a SECURITY DEFINER function runs past RLS, so one that
     // takes a caller-supplied id must not be executable by the browser roles.
     // Production proved anon could call ten of them (cross-tenant reads and

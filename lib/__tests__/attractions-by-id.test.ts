@@ -88,10 +88,24 @@ describe('attraction_ids win and silence wording', () => {
 })
 
 describe('wording resolves through the alias table', () => {
-  it('an alias row maps day wording to the canonical fee — including combos', async () => {
+  it('a global row, or another agency\'s, is not this agency\'s alias', async () => {
     const tables = withDay2({ attractions: ['Giza plateau'] })
     tables.attraction_aliases = [
       { alias: 'giza plateau', canonical: 'Pyramids of Giza + Egyptian Museum', tenant_id: null, is_active: true },
+      { alias: 'giza plateau', canonical: 'Pyramids of Giza + Egyptian Museum', tenant_id: 'some-other-agency', is_active: true },
+    ]
+    setMockTables(tables)
+    const r = await calculateDayBasedPricing(BASE_PARAMS)
+    // The wording is looked up as written, so neither fee is reached through
+    // somebody else's alias.
+    expect(entranceLines(r).map(l => l.serviceName)).not.toContain('Egyptian Museum')
+  })
+
+  it('an alias row maps day wording to the canonical fee — including combos', async () => {
+    const tables = withDay2({ attractions: ['Giza plateau'] })
+    tables.attraction_aliases = [
+      // The agency's OWN row. Aliases are per-tenant since migration 370.
+      { alias: 'giza plateau', canonical: 'Pyramids of Giza + Egyptian Museum', tenant_id: BASE_PARAMS.tenantId, is_active: true },
     ]
     setMockTables(tables)
     const r = await calculateDayBasedPricing(BASE_PARAMS)

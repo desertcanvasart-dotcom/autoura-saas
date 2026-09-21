@@ -1,17 +1,22 @@
 // ============================================
 // Attraction alias resolution (A-item 13)
 // ============================================
-// Free-text day wording ("the citadel", "Giza plateau") resolves to
-// canonical entrance-fee names through the attraction_aliases table
-// (migration 323) BEFORE the catalogue lookup. The rules:
+// Free-text day wording ("the citadel", "Giza plateau") resolves to the
+// name on the agency's OWN entrance-fee sheet through the attraction_aliases
+// table BEFORE the fee lookup. The rules:
 //
 //   - matching is a case-insensitive EXACT match on the alias — substring
 //     guessing is the defect this mechanism replaces;
-//   - a tenant's own alias beats a global one with the same spelling;
+//   - AN ALIAS BELONGS TO ONE AGENCY. It points at a name on that agency's
+//     fee sheet, so it means nothing to anybody else. There used to be global
+//     rows every agency read (migration 323); nine of the 27 pointed at names
+//     on nobody's sheet and turned right wording into a miss, and a global row
+//     is one agency's wording imposed on the rest. Migration 370 handed each
+//     agency the ones that worked for it and made the column NOT NULL;
 //   - a canonical may join several fees with ' + ' (a combo ticket): one
 //     worded attraction becomes several priced lines;
-//   - a name no alias knows passes through unchanged, so the engine's
-//     historical map and ilike fallback still get their turn.
+//   - a name no alias knows passes through unchanged, so the fee lookup
+//     still gets its turn.
 
 import { memoRead } from './query-memo'
 
@@ -21,12 +26,15 @@ export interface AttractionAliasRow {
   tenant_id?: string | null
 }
 
-/** alias(lowercased) → canonical, tenant rows winning over global. */
+/** alias(lowercased) → canonical. A row with no tenant is not an alias any
+ *  more, and is ignored even if one is handed in. (Migration 370 must be
+ *  applied BEFORE this code deploys: it is what hands each agency the global
+ *  rows that worked for it. The old code reads tenant rows perfectly well, so
+ *  that order has no gap; the other order loses them until it runs.) */
 export function buildAliasIndex(rows: AttractionAliasRow[]): Map<string, string> {
   const index = new Map<string, string>()
-  // Global rows first, tenant rows after — later set() wins.
-  const ordered = [...rows].sort((a, b) => Number(Boolean(a.tenant_id)) - Number(Boolean(b.tenant_id)))
-  for (const row of ordered) {
+  for (const row of rows) {
+    if (!row.tenant_id) continue
     const key = row.alias.trim().toLowerCase()
     const canonical = row.canonical.trim()
     if (key && canonical) index.set(key, canonical)
@@ -51,14 +59,14 @@ interface AliasDb {
   from(table: string): {
     select(cols: string): {
       eq(col: string, v: boolean): {
-        or(expr: string): PromiseLike<{ data: AttractionAliasRow[] | null; error: unknown }>
+        eq(col: string, v: string): PromiseLike<{ data: AttractionAliasRow[] | null; error: unknown }>
       }
     }
   }
 }
 
 /**
- * Load the alias index for a tenant (tenant rows + global catalogue rows).
+ * Load the alias index for a tenant — its own rows, and nobody else's.
  * Failures degrade to an empty index — the engine's historical fallbacks
  * still apply, so a missing table never breaks pricing.
  */
@@ -73,7 +81,7 @@ export async function loadAttractionAliasIndex(
       .from('attraction_aliases')
       .select('alias, canonical, tenant_id')
       .eq('is_active', true)
-      .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+      .eq('tenant_id', tenantId)
     if (error || !data) return new Map()
     return buildAliasIndex(data)
   } catch {
