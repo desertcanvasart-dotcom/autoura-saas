@@ -198,7 +198,9 @@ describe('a day tour is priced as what it is', () => {
     expect(result.complete).toBe(false)
     const hole = result.holes.find(h => h.kind === 'entrance' && /names no attractions/.test(h.message))
     expect(hole?.dayNumber).toBe(1)
-    expect(hole?.message).toMatch(/the guide, the vehicle and the tips are/)
+    expect(hole?.message).toMatch(/The guide, the vehicle and the tips do not depend on them/)
+    // It used to say they "are" priced — directly above "Tips — no rate".
+    expect(hole?.message).not.toMatch(/the tips are(?! worked)/)
     expect(hole?.message).toMatch(/pick the attractions it visits/)
     // Not the package rules: a day tour never has to SAY it has sightseeing.
     expect(templateHoles(result)).toEqual([])

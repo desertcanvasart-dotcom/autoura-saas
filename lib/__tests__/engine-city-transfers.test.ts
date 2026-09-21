@@ -124,7 +124,11 @@ describe('against rows shaped like production\'s', () => {
     // Asking for a duration would match this row only APPROXIMATELY, which
     // becomes a gap — a rate that exists, reported as missing.
     expect(line?.unitCost).toBe(40)
-    expect(result.holes.some(h => h.message.includes('local transfer'))).toBe(false)
+    // No gap for the vehicle that HAS a rate. (The larger vehicles are asked
+    // for too, now that the transfer is part of the price at every group size
+    // — exactly as the day's own vehicle is — and this fixture has only a
+    // sedan, so those are reported, correctly, as missing.)
+    expect(result.holes.some(h => h.message.includes('local transfer') && /sedan/i.test(h.message))).toBe(false)
   })
 })
 

@@ -232,7 +232,7 @@ describe('the editor asks a day tour the right question', () => {
   })
 
   it('says what is always priced, instead of offering "No guided sightseeing"', () => {
-    expect(SOURCE).toMatch(/This is a day tour: its guide, vehicle and tips are always priced, and it has no night\./)
+    expect(SOURCE).toMatch(/This is a day tour: its guide, vehicle and tips are always included in the price, and it has no night\./)
     expect(SOURCE).toMatch(/\$\{isDayTour \? 'hidden' : 'flex'\}/)
   })
 

@@ -1,3 +1,4 @@
+import { scaleForGroup } from '@/lib/pricing/line-for-group'
 import { NextRequest, NextResponse } from 'next/server'
 import { calculateAutoPricing, ServiceTier } from '@/lib/auto-pricing-service'
 import { getEntranceFee as canonicalGetEntranceFee } from '@/lib/pricing/rate-resolution'
@@ -488,6 +489,21 @@ export async function POST(request: NextRequest) {
       const travelDate = new Date(travel_date)
       const season = getSeason(travelDate)
 
+      // THE ROWS MUST ADD UP TO THE SUBTOTAL. The engine emits a per-person
+      // line ONCE — quantity 1, lineTotal = the per-person amount — and scales
+      // it by the group when it totals. Passed through as-is, the calculator
+      // showed "Lunch · per_pax · Qty 1 · 10.00" under a subtotal that had
+      // charged it for every passenger: reported from production 2026-09-21,
+      // rows summing to 112.47 above a subtotal of 124.48 for two people. The
+      // app's other two pricing paths (the variation-services path below, and
+      // quote-from-itinerary) already send a per-person line as quantity =
+      // passengers and total = unit × passengers; this one now does too, so a
+      // saved quote's lines also add up to its total.
+      const perPaxQuantity = (s: { isPerPax?: boolean; quantity?: number }): number =>
+        scaleForGroup(s, num_pax).quantity
+      const perPaxTotal = (s: { isPerPax?: boolean; lineTotal?: number }): number =>
+        scaleForGroup(s, num_pax).lineTotal
+
       const convertedServices: CalculatedService[] = autoPriceResult.services.map((s: any) => ({
         service_id: s.id,
         service_name: s.serviceName,
@@ -495,9 +511,9 @@ export async function POST(request: NextRequest) {
         rate_type: s.serviceType,
         rate_source: s.rateSource,
         quantity_mode: s.quantityMode,
-        quantity: s.quantity,
+        quantity: perPaxQuantity(s),
         unit_cost: s.unitCost,
-        line_total: s.lineTotal,
+        line_total: perPaxTotal(s),
         is_optional: s.isOptional,
         day_number: s.dayNumber,
         pricing_note: s.notes,
