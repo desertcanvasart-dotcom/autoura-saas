@@ -9885,7 +9885,6 @@ export interface Database {
           inclusions: string[] | null
           exclusions: string[] | null
           primary_destination_id: string | null
-          pricing_mode: string | null
           cached_starting_price: number | null
           cached_starting_tier: string | null
           cached_price_updated_at: string | null
@@ -9926,7 +9925,6 @@ export interface Database {
           inclusions?: string[] | null
           exclusions?: string[] | null
           primary_destination_id?: string | null
-          pricing_mode?: string | null
           cached_starting_price?: number | null
           cached_starting_tier?: string | null
           cached_price_updated_at?: string | null
@@ -9967,7 +9965,6 @@ export interface Database {
           inclusions?: string[] | null
           exclusions?: string[] | null
           primary_destination_id?: string | null
-          pricing_mode?: string | null
           cached_starting_price?: number | null
           cached_starting_tier?: string | null
           cached_price_updated_at?: string | null
