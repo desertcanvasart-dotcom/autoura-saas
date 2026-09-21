@@ -418,7 +418,6 @@ describe('the fields the sheet used to drop', () => {
     gallery_urls: ['https://example.test/1.jpg', 'https://example.test/2.jpg'],
     destinations_covered: ['Giza', 'Cairo'],
     pricing_mode: 'auto',
-    uses_day_builder: true,
     default_transportation_service: 'private_car',
     transportation_city: 'Cairo',
   }
@@ -441,7 +440,6 @@ describe('the fields the sheet used to drop', () => {
     expect(back.gallery_urls).toEqual(tour.gallery_urls)
     expect(back.destinations_covered).toEqual(['Giza', 'Cairo'])
     expect(back.pricing_mode).toBe('auto')
-    expect(back.uses_day_builder).toBe(true)
     expect(back.transportation_city).toBe('Cairo')
   })
 
@@ -453,5 +451,37 @@ describe('the fields the sheet used to drop', () => {
     const back = records[0] as Record<string, unknown>
     expect(back.duration_hours ?? null).toBeNull()
     expect(back.gallery_urls ?? null).not.toBe(0)
+  })
+})
+
+// ============================================================================
+// "Uses Day Builder" is gone (migration 371).
+//
+// It was the flag the tours page used to require before pricing a tour at all;
+// #484 removed the gate, and nothing has read the column since. Every sheet
+// exported before this still HAS the header — and after the column is dropped,
+// writing it would fail the whole insert. So the sheet stops knowing about it:
+// an old file imports exactly as before, with the header reported as ignored.
+// ============================================================================
+describe('a sheet exported before "Uses Day Builder" went', () => {
+  const OLD_SHEET = 'Code,Name,Type,Duration Days,Pricing Mode,Uses Day Builder\nOLD-1,An old export,day_tour,1,auto,true\n'
+
+  it('still imports', () => {
+    const { records, refused } = parseTemplatesCsv(OLD_SHEET, papa)
+    expect(refused).toEqual([])
+    expect(records).toHaveLength(1)
+    expect(records[0].template_code).toBe('OLD-1')
+  })
+
+  it('says the header was ignored, and writes it nowhere', () => {
+    const { records, ignoredHeaders } = parseTemplatesCsv(OLD_SHEET, papa)
+    expect(ignoredHeaders).toContain('Uses Day Builder')
+    expect(records[0]).not.toHaveProperty('uses_day_builder')
+  })
+
+  it('is no longer on the sheet, the export or the sample', () => {
+    expect(TEMPLATE_CSV_COLUMNS.map(c => c.name)).not.toContain('uses_day_builder')
+    expect(serializeTemplatesCsv([{ template_code: 'X', template_name: 'Y' } as never]).split('\n')[0]).not.toMatch(/Uses Day Builder/)
+    expect(sampleTemplateCsv().split('\n')[0]).not.toMatch(/Uses Day Builder/)
   })
 })
