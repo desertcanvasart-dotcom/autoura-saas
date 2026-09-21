@@ -395,6 +395,15 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('embark_city', 'Embark City', 'text', true),
       col('disembark_city', 'Disembark City', 'text', true),
       col('duration_nights', 'Duration (Nights)', 'number', true),
+      // The cabin a rate is for. The Add form has always asked, the list
+      // filters by it and the cruise code is built from it — but the sheet
+      // never carried it. So an export dropped it, and a cruise imported as
+      // new took the column's default: checked on production 2026-09-20, all
+      // 132 cruises are 'standard' or blank, in every agency. Optional, and a
+      // blank cell writes nothing — an existing cruise keeps the cabin it has,
+      // and older files without the column still import exactly as before.
+      // The agency's own words (Settings → Cruise cabin types).
+      col('cabin_type', 'Cabin Type', 'text', false),
       // Low season
       col('low_season_start', 'Low Season Start', 'date', false),
       col('low_season_end', 'Low Season End', 'date', false),
