@@ -48,6 +48,10 @@ export type DayCsvKind = 'text' | 'int' | 'bool' | 'list'
 import { readDayMeals } from '@/lib/tours/day-meals'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { sightseeingStatement, SIGHTSEEING_NOT_STATED } from '@/lib/tours/day-sightseeing'
+import { sanitizeLegPlace, sanitizeLegAssist } from '@/lib/pricing/flight-leg'
+
+/** A stated yes/no, or blank for "not stated". */
+const yesNo = (v: boolean | undefined): string => (v === true ? 'yes' : v === false ? 'no' : '')
 
 export interface DayCsvColumn {
   name: string
@@ -61,6 +65,7 @@ export interface DayCsvColumn {
 const MEALS = ['included', 'external', 'none'] as const
 const ACCOMMODATION = ['hotel', 'cruise', 'none'] as const
 const TRANSPORT = ['road', 'flight', 'train', 'sleeping_train'] as const
+const YES_NO = ['yes', 'no'] as const
 
 export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   { name: 'template_code', label: 'Template Code', required: true },
@@ -73,6 +78,15 @@ export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   { name: 'dinner', label: 'Dinner', allowed: MEALS },
   { name: 'attractions', label: 'Attractions', kind: 'list' },
   { name: 'transport_type', label: 'Transport', allowed: TRANSPORT },
+  // A ticket leg's OWN route, when it is not "yesterday's city → today's" — a
+  // connection on the arrival day (lib/pricing/flight-leg.ts). Blank = the
+  // usual route. Assistance is yes / no; blank = the day's default (on for an
+  // arrival-day connection, off on any other flight day) — so it is a word,
+  // not a true/false cell, which cannot say "not stated".
+  { name: 'leg_from', label: 'Leg From' },
+  { name: 'leg_to', label: 'Leg To' },
+  { name: 'leg_assist_from', label: 'Assist At Departure', allowed: YES_NO },
+  { name: 'leg_assist_to', label: 'Assist At Arrival', allowed: YES_NO },
   { name: 'airport_arrival', label: 'Airport Arrival', kind: 'bool' },
   { name: 'airport_departure', label: 'Airport Departure', kind: 'bool' },
   { name: 'hotel_checkin', label: 'Hotel Check-in', kind: 'bool' },
@@ -132,6 +146,10 @@ export function serializeDaysCsv(
         // Absent transport_type has always meant road; write it so the sheet
         // says what the day does rather than leaving the reader to know that.
         transport_type: d.transport_type ?? 'road',
+        leg_from: sanitizeLegPlace(d.leg_from) ?? '',
+        leg_to: sanitizeLegPlace(d.leg_to) ?? '',
+        leg_assist_from: yesNo(sanitizeLegAssist(d.leg_assist)?.from),
+        leg_assist_to: yesNo(sanitizeLegAssist(d.leg_assist)?.to),
         airport_arrival: !!services.airport_arrival,
         airport_departure: !!services.airport_departure,
         hotel_checkin: !!services.hotel_checkin,
@@ -302,6 +320,18 @@ export function parseDaysCsv(
       return
     }
 
+    // A leg belongs to a day that travels by ticket; airport assistance to one
+    // that FLIES. Said on a road day it would be stored and never priced.
+    const mode = rec.transport_type && rec.transport_type !== 'road' ? String(rec.transport_type) : ''
+    if ((rec.leg_from || rec.leg_to) && !mode) {
+      refused.push({ row: rowNum, reason: `"${code}" day ${day}: Leg From / Leg To name a ticket's route, but Transport is road — set Transport to flight, train or sleeping_train, or clear them` })
+      return
+    }
+    if ((rec.leg_assist_from || rec.leg_assist_to) && mode !== 'flight') {
+      refused.push({ row: rowNum, reason: `"${code}" day ${day}: Assist At Departure / Arrival is airport assistance, and the day does not fly — set Transport to flight, or clear them` })
+      return
+    }
+
     // A day says whether it has sightseeing — the meals rule, applied to the
     // other thing a day's price hangs on. Only for a sheet that HAS the column:
     // an older file imports exactly as it did.
@@ -397,6 +427,14 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
   // day editor writes, rather than introducing a value it never sets.
   if (rec.transport_type && rec.transport_type !== 'road') {
     day.transport_type = rec.transport_type
+    const from = sanitizeLegPlace(rec.leg_from), to = sanitizeLegPlace(rec.leg_to)
+    if (from) day.leg_from = from
+    if (to) day.leg_to = to
+    const assist = sanitizeLegAssist({
+      ...(rec.leg_assist_from ? { from: rec.leg_assist_from === 'yes' } : {}),
+      ...(rec.leg_assist_to ? { to: rec.leg_assist_to === 'yes' } : {}),
+    })
+    if (assist && rec.transport_type === 'flight') day.leg_assist = assist
   }
   return day
 }

@@ -37,6 +37,12 @@ export interface DayForm {
   propertiesByTier: Record<string, string>
   /** "No guided sightseeing on this day". */
   noSightseeing: boolean
+  /** A ticket leg's own route; '' = the usual one (yesterday's city → today's). */
+  legFrom?: string
+  legTo?: string
+  /** Airport assistance at each end of a flight — only the ends the operator
+   *  actually SET; an end left alone keeps the day's default. */
+  legAssist?: { from?: boolean; to?: boolean }
 }
 
 type Day = Record<string, unknown>
@@ -70,8 +76,19 @@ export function applyDayForm(existing: Day | null, form: DayForm, dayNumber: num
     day.transport_type = form.transportType
     if (form.transportRateId) day.transport_rate_id = form.transportRateId
     else drop(day, 'transport_rate_id')
+    // The leg's own route, and a flight's airport assistance. They belong to
+    // the ticket: a day that goes back to road, or stops flying, loses them.
+    const from = (form.legFrom ?? '').trim().replace(/\s+/g, ' ').slice(0, 80)
+    const to = (form.legTo ?? '').trim().replace(/\s+/g, ' ').slice(0, 80)
+    if (from) day.leg_from = from; else drop(day, 'leg_from')
+    if (to) day.leg_to = to; else drop(day, 'leg_to')
+    const assist: { from?: boolean; to?: boolean } = {}
+    if (typeof form.legAssist?.from === 'boolean') assist.from = form.legAssist.from
+    if (typeof form.legAssist?.to === 'boolean') assist.to = form.legAssist.to
+    if (form.transportType === 'flight' && Object.keys(assist).length > 0) day.leg_assist = assist
+    else drop(day, 'leg_assist')
   } else {
-    drop(day, 'transport_type', 'transport_rate_id')
+    drop(day, 'transport_type', 'transport_rate_id', 'leg_from', 'leg_to', 'leg_assist')
   }
 
   // Blank means "leave it", which is now true as well as written.
