@@ -15,13 +15,32 @@
 //
 // Files apply in name order; each carries its own BEGIN/COMMIT; the first
 // failure stops the run and is NOT recorded, so a rerun retries it.
+//
+// EVERY mode says where it is pointed — host, port and database, never the
+// credentials — and what it found there. And it REFUSES the sibling product's
+// database (travel-ops-pro: `organizations`, no `tenants`) in every mode,
+// including --dry-run, before touching anything: both apps call their tracker
+// `schema_migrations`, so this runner would otherwise read all of this repo's
+// files as pending there and start from 001. It also refuses --baseline on an
+// empty database. --status and --dry-run are read-only; they do not create the
+// tracker. See identifyDatabase / checkTarget in migrate-core.mjs.
 
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { computePending, loadApplied, runPending } from './migrate-core.mjs'
+import { computePending, identifyDatabase, loadApplied, runPending } from './migrate-core.mjs'
 
 const MIGRATIONS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'supabase', 'migrations')
+
+/** Where this is pointed — host, port and database, never the credentials. */
+function redactUrl(url) {
+  try {
+    const u = new URL(url)
+    return `${u.hostname}${u.port ? `:${u.port}` : ''}${u.pathname}`
+  } catch {
+    return '(unparseable DATABASE_URL)'
+  }
+}
 
 async function main() {
   const args = new Set(process.argv.slice(2))
@@ -39,7 +58,21 @@ async function main() {
     const fileNames = readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort()
 
     if (args.has('--status')) {
-      const applied = await loadApplied(client)
+      // Read-only: asking "what state is this in?" must not create the tracker.
+      const id = await identifyDatabase(client)
+      console.log(`${redactUrl(url)} — ${id.detail}`)
+      if (id.verdict === 'sibling') {
+        console.error('\nThis is NOT autoura-saas\'s database. Its schema_migrations table belongs to travel-ops-pro,')
+        console.error('so "pending" here would mean nothing. Check DATABASE_URL.')
+        process.exitCode = 1
+        return
+      }
+      const applied = await loadApplied(client, { create: false })
+      if (applied === null) {
+        console.log('No schema_migrations table — nothing has ever been recorded here.')
+        console.log(`${fileNames.length} migration file(s) in the repo, none recorded.`)
+        return
+      }
       const pending = computePending(fileNames, applied)
       console.log(`${applied.length} recorded, ${pending.length} pending`)
       for (const p of pending) console.log(`  pending  ${p}`)
@@ -56,6 +89,15 @@ async function main() {
       baseline: args.has('--baseline'),
       log: line => console.log(line),
     })
+
+    // Say where this went, every time — the one line that would have caught
+    // both wrong-database incidents before anything ran.
+    console.log(`Target: ${redactUrl(url)} — ${result.identity.detail}`)
+    if (result.refused) {
+      console.error(`\n${result.refused}`)
+      process.exitCode = 1
+      return
+    }
 
     if (args.has('--dry-run')) {
       console.log(`${result.pending.length} pending`)
