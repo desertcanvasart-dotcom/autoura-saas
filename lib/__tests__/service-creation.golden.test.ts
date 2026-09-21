@@ -36,9 +36,7 @@ function baseParams(over: Partial<Parameters<typeof createLandItineraryServices>
     includeLunch: true,
     includeDinner: false,
     includeAccommodationFinal: true,
-    vehiclePerDay: 80,
     guidePerDay: 60,
-    selectedVehicle: { id: 'veh-1', vehicle_type: 'Minivan', company_name: 'Cairo Cars' },
     selectedGuide: { id: 'guide-1', name: 'Ahmed' },
     selectedHotel: { id: 'hotel-1' },
     hotelRate: 120,
@@ -53,9 +51,13 @@ function baseParams(over: Partial<Parameters<typeof createLandItineraryServices>
     // What `dailyTips: 12` used to mean: one Per Day row of 12 on guided days.
     tippingRows: [{ role_type: 'driver', context: 'day_tour', rate_unit: 'per_day', rate_eur: 12 }],
     allEntranceFees: ALL_ENTRANCE_FEES,
-    // Day 3 is the departure transfer. 40 is what `vehiclePerDay * 0.5` used to
-    // make up; it now has to be GIVEN — the agency's airport transfer rate.
-    transferRateByDay: { 3: 40 },
+    // What the fleet vehicle used to be charged: 80 a day, and "half" of it
+    // (40) for the departure transfer. Now GIVEN, per day, from the rate sheet.
+    transportByDay: {
+      1: { rate: 80, label: 'Minivan Transportation', vehicleType: 'Minivan', rateId: 'veh-1' },
+      2: { rate: 80, label: 'Minivan Transportation', vehicleType: 'Minivan', rateId: 'veh-1' },
+      3: { rate: 40, label: 'Airport Transfer', vehicleType: 'Minivan', rateId: 'veh-1' },
+    },
     ...over,
   }
 }

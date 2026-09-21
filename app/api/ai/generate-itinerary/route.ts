@@ -37,8 +37,9 @@ import { loadDestinationPromptContext } from '@/lib/ai/destination-context'
 import { getTenantRunCurrency, DEFAULT_RUN_CURRENCY } from '@/lib/rates/run-currency'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { createCruiseItineraryServices } from '@/lib/ai/cruise-service-creation'
-import { createLandItineraryServices, transferOnlyDays } from '@/lib/ai/service-creation'
-import { getAirportTransferRate } from '@/lib/auto-pricing-service'
+import { createLandItineraryServices } from '@/lib/ai/service-creation'
+import { transportNeedsForGeneratedDays } from '@/lib/ai/day-transport'
+import { getTransportRateFor, type TransportServiceType, type TransportDuration } from '@/lib/auto-pricing-service'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors)
 let _supabaseAdmin: ReturnType<typeof createAdminClient> | null = null
@@ -896,33 +897,10 @@ export async function POST(request: NextRequest) {
     const inRunCurrency = <T extends Record<string, unknown>>(table: string, rows: T[] | null | undefined) =>
       normalizeRateRows(supabase, table, rows, tenantRunCurrency)
 
-    const { data: vehicles, error: vehiclesError } = await supabase.from('vehicles').select('*').eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false })
-    requireRates(rateHoles, {
-      kind: 'transport', tier, table: 'vehicles', error: vehiclesError, rows: vehicles,
-      lookupAttempted: `vehicles where is_active and tier = '${tier}'`,
-      message: `No active ${tier} vehicles are set up. Add them in Rates → Vehicles, with a daily rate and passenger capacity.`,
-    })
-    // The column is `passenger_capacity` — a single seat count. `capacity_min`
-    // and `capacity_max` were read here and do not exist, so the comparison was
-    // `totalPax >= undefined` (false) on every row and selection always fell
-    // through to the LAST vehicle in the list, whatever that happened to be.
-    // app/api/b2b/calculate-price reads the real columns; this now matches it.
-    //
-    // Smallest vehicle that actually seats the party, so a group of 2 is not
-    // priced in a coach. `is_preferred` already ordered the query, so a
-    // preferred vehicle wins among equal capacities.
-    const seating = (vehicles ?? [])
-      .filter((v: any) => toNumber(v.passenger_capacity, 0) >= totalPax)
-      .sort((a: any, b: any) => toNumber(a.passenger_capacity, 0) - toNumber(b.passenger_capacity, 0))
-    const selectedVehicle = seating[0] as any
-
-    if (vehicles?.length && !selectedVehicle) {
-      addHole({
-        kind: 'transport', tier, reason: 'missing',
-        lookupAttempted: `vehicles seating ${totalPax} pax at tier '${tier}'`,
-        message: `No ${tier} vehicle seats ${totalPax} passengers. Add one in Rates → Vehicles with a large enough passenger capacity.`,
-      })
-    }
+    // TRANSPORT is priced further down, once the days exist — from the agency's
+    // Rates → Transportation, by the tour engine's own rule (lib/ai/day-transport).
+    // It used to come from the FLEET table (`vehicles.daily_rate`): no agency
+    // has a fleet vehicle on file, so this lookup withheld every price.
 
     const { data: raw_guides, error: guidesError } = await supabase.from('guides').select('*').eq('is_active', true).eq('tier', tier).contains('languages', [finalLanguage]).limit(5)
     const guides = await inRunCurrency('guides', raw_guides as Record<string, unknown>[])
@@ -1073,16 +1051,8 @@ export async function POST(request: NextRequest) {
       .eq('is_active', true)
     const tippingRows = ((await inRunCurrency('tipping_rates', raw_tippingRates as Record<string, unknown>[])) ?? []) as TippingRow[]
 
-    // `daily_rate`, not `daily_rate_eur` — the latter does not exist on either
-    // table, so both of these were silently 0 and every quote said transport
-    // and guiding were free.
-    const vehiclePerDay = selectedVehicle
-      ? (requireUsableRate(rateHoles, selectedVehicle.daily_rate, {
-          kind: 'transport', tier, table: 'vehicles',
-          lookupAttempted: `daily_rate for vehicle '${selectedVehicle.vehicle_type ?? selectedVehicle.name ?? selectedVehicle.id}'`,
-          message: `The selected ${tier} vehicle has no daily rate. Add one in Rates → Vehicles.`,
-        }) ?? 0)
-      : 0
+    // `daily_rate`, not `daily_rate_eur` — the latter does not exist, so this
+    // was silently 0 and every quote said guiding was free.
     const guidePerDay = selectedGuide
       ? (requireUsableRate(rateHoles, selectedGuide.daily_rate, {
           kind: 'guide', tier, table: 'guides',
@@ -1171,24 +1141,28 @@ export async function POST(request: NextRequest) {
       itineraryData.days = applyDayRules(itineraryData.days, effectivePackageType)
     }
 
-    // A TRANSFER-ONLY DAY IS PRICED FROM THE AGENCY'S AIRPORT TRANSFER RATE.
-    // It was `vehiclePerDay * 0.5` — half the day rate of a fleet vehicle, on
-    // nobody's rate sheet. Which days are transfer-only is only known now (the
-    // day rules above decide), so the gate is re-checked here: a day with no
-    // exact rate is a gap, and a gap withholds the price like any other.
-    const transferRateByDay: Record<number, number> = {}
+    // EACH DAY'S TRANSPORT, FROM THE AGENCY'S RATE SHEET. What a day needs —
+    // an airport transfer, a road move to another city, a day tour — is only
+    // known now (the day rules above decide), so the gate is re-checked here:
+    // a needed rate that is not there is a gap, and a gap withholds the price.
+    const transportByDay: Record<number, { rate: number; label: string; vehicleType: string; rateId: string }> = {}
     if (!skip_pricing) {
-      for (const t of transferOnlyDays(itineraryData?.days, effectiveCity)) {
-        const found = await getAirportTransferRate({ tenantId: tenant_id }, t.city, totalPax)
-        if (found) { transferRateByDay[t.day] = found.rate; continue }
+      for (const need of transportNeedsForGeneratedDays(itineraryData?.days, effectiveCity)) {
+        const found = await getTransportRateFor({ tenantId: tenant_id }, {
+          serviceType: need.serviceType as TransportServiceType, city: need.city, duration: need.duration as TransportDuration,
+          originCity: need.originCity, specialVehicleType: need.specialVehicleType,
+        }, totalPax)
+        // To the cent: a rate converted into the run's currency arrives unrounded.
+        if (found) { transportByDay[need.day] = { rate: Math.round(found.rate * 100) / 100, label: need.label, vehicleType: found.vehicleType, rateId: found.rateId }; continue }
+        const where = need.originCity ? `${need.originCity} → ${need.city}` : need.city
         addHole({
           kind: 'transport', tier, reason: 'missing',
-          lookupAttempted: `airport_transfer in '${t.city || 'no city'}' for ${totalPax} traveller(s)`,
-          message: `Day ${t.day} is an airport transfer${t.city ? ` in ${t.city}` : ''} and there is no Airport Transfer rate for a group of ${totalPax} there. Add it in Rates → Transportation.`,
+          lookupAttempted: `${need.serviceType} ${where} for ${totalPax} traveller(s)`,
+          message: `Day ${need.day} needs ${need.label} (${where}) and there is no such rate for a group of ${totalPax}. Add it in Rates → Transportation.`,
         })
       }
       if (!pricingBlocked && holes.length > 0) {
-        console.warn('[generate-itinerary] pricing withheld — no airport transfer rate:', holes.map(h => h.lookupAttempted).join(' | '))
+        console.warn('[generate-itinerary] pricing withheld — transport rate gap(s):', holes.map(h => h.lookupAttempted).join(' | '))
       }
       pricingBlocked = holes.length > 0
       effectiveSkipPricing = skip_pricing || pricingBlocked
@@ -1245,10 +1219,10 @@ export async function POST(request: NextRequest) {
       durationDays: duration_days, effectiveCity, totalPax, isEuroPassport,
       skipPricing: effectiveSkipPricing, withMargin, tier, finalLanguage,
       includeLunch: include_lunch, includeDinner: include_dinner, includeAccommodationFinal,
-      vehiclePerDay, guidePerDay, selectedVehicle, selectedGuide,
+      guidePerDay, selectedGuide,
       selectedHotel, hotelRate, hotelName_final, roomsNeeded,
       airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
-      tippingRows, allEntranceFees, transferRateByDay,
+      tippingRows, allEntranceFees, transportByDay,
     })
 
     // Update totals — only when every rate behind them is real.
