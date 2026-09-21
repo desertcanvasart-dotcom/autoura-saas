@@ -1121,6 +1121,9 @@ export async function getCruiseRates(
   periodGap?: { propertyName: string; date: string }
   /** The period that covers the date exists but its nightly rate is blank. */
   periodBlank?: { propertyName: string; date: string; periodName: string }
+  /** The row has NO price at all — no period, and nothing in the base or the
+   *  room-rate columns. A gap naming it; never an exact match at 0. */
+  noPrice?: { propertyName: string }
   /** Several ships fit and none (or more than one) is preferred — a hole
    *  naming the candidates; the engine refuses to pick one (see
    *  lib/pricing/candidate-selection.ts). */
@@ -1274,14 +1277,33 @@ export async function getCruiseRates(
 
 
 
+    // The same for a ship (see getHotelRates): a cruise with nothing in any
+    // price column is a gap naming it, never an exact match at 0. `> 0` also
+    // refuses NaN — the legacy branch divides a NULL trip rate by the nights.
+    if (!(Number(ppdNight) > 0)) {
+      return {
+        shipName: cruise.ship_name,
+        cruiseId: cruise.id,
+        supplierId: cruise.supplier_id ?? null,
+        cabinType: cruise.cabin_type ?? null,
+        ppdNight: 0,
+        singleSuppNight: 0,
+        tripleRedNight: 0,
+        durationNights,
+        season,
+        source: 'missing',
+        noPrice: { propertyName: cruise.ship_name || 'this cruise' },
+      }
+    }
+
     return {
       shipName: cruise.ship_name,
       cruiseId: cruise.id,
       supplierId: cruise.supplier_id ?? null,
       cabinType: cruise.cabin_type ?? null,
       ppdNight,
-      singleSuppNight,
-      tripleRedNight: Math.max(0, tripleRedNight),
+      singleSuppNight: Number(singleSuppNight) > 0 ? singleSuppNight : 0,
+      tripleRedNight: Number(tripleRedNight) > 0 ? tripleRedNight : 0,
       guideBedNight,
       durationNights,
       season,
@@ -1352,6 +1374,9 @@ export async function getHotelRates(
   periodGap?: { propertyName: string; date: string }
   /** The period that covers the date exists but its nightly rate is blank. */
   periodBlank?: { propertyName: string; date: string; periodName: string }
+  /** The row has NO price at all — no period, and nothing in the base or the
+   *  room-rate columns. A gap naming it; never an exact match at 0. */
+  noPrice?: { propertyName: string }
   /** Several hotels fit and none (or more than one) is preferred — a hole
    *  naming the candidates; the engine refuses to pick one (see
    *  lib/pricing/candidate-selection.ts). */
@@ -1431,6 +1456,30 @@ export async function getHotelRates(
     const tripleRed = (season === 'peak' ? hotel.peak_season_triple_reduction_eur
       : season === 'high' ? hotel.high_season_triple_reduction_eur
       : null) ?? baseRed
+
+    // NO PRICE IS NOT A PRICE OF ZERO. A hotel entered with its name, city and
+    // tier and nothing in any price column arrived here as `ppd = 0` and went
+    // out as an EXACT match — the night was priced at nothing and no gap was
+    // recorded. Live, 2026-09-22: Sillage Egypte's "The Nile & the Red Sea",
+    // luxury, day 3 — Old Cataract, Aswan, free. The period path above has
+    // refused a blank since #431; the columns path never did.
+    // Only for the hotel that WOULD have been priced. A wrong-tier stand-in
+    // ('fuzzy') is already a gap, and the right thing to say there is that the
+    // tier has no hotel — not that some other tier's hotel lacks a price.
+    if (source === 'db' && !(Number(ppd) > 0)) {
+      const name = hotel.property_name || hotel.name
+      return {
+        hotelName: name,
+        hotelId: hotel.id,
+        ppdNight: 0,
+        singleSuppNight: 0,
+        tripleRedNight: 0,
+        guideBedNight: null,
+        season,
+        source: 'missing' as RateSource,
+        noPrice: { propertyName: name || 'this hotel' },
+      }
+    }
 
     return {
       hotelName: hotel.property_name || hotel.name,
@@ -2681,6 +2730,15 @@ export async function calculateDayBasedPricing(
         lookupAttempted: `cruise rate (${tier})`,
         message: ambiguityMessage(`${tier} cruises${firstCruiseDay?.city ? ` from ${firstCruiseDay.city}` : ''}`, cr.ambiguous, 'Rates → Cruises'),
       })
+    } else if (cr?.noPrice) {
+      addHole({
+        kind: 'cruise',
+        reason: 'missing',
+        tier,
+        city: firstCruiseDay?.city,
+        lookupAttempted: `price of ${cr.noPrice.propertyName} (${tier})`,
+        message: `${cr.noPrice.propertyName} is on your cruise sheet with no price. Enter its rate in Rates → Cruises.`,
+      })
     } else if (cr?.periodBlank) {
       addHole({
         kind: 'cruise',
@@ -2759,6 +2817,15 @@ export async function calculateDayBasedPricing(
         city,
         lookupAttempted: `hotel rate (${city}, ${tier})`,
         message: ambiguityMessage(`${tier} hotels in ${city}`, rates.ambiguous, 'Rates → Hotels'),
+      })
+    } else if (rates?.noPrice) {
+      addHole({
+        kind: 'hotel',
+        reason: 'missing',
+        tier,
+        city,
+        lookupAttempted: `price of ${rates.noPrice.propertyName} (${city}, ${tier})`,
+        message: `${rates.noPrice.propertyName} is on your hotel sheet with no price. Enter its rate in Rates → Hotels.`,
       })
     } else if (rates?.periodBlank) {
       addHole({
