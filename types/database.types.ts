@@ -2095,7 +2095,6 @@ export interface Database {
           assigned_to: string | null
           base_total_cost: number | null
           extras_total: number | null
-          status_override: Json | null
         }
         Insert: {
           id?: string
@@ -2138,7 +2137,6 @@ export interface Database {
           assigned_to?: string | null
           base_total_cost?: number | null
           extras_total?: number | null
-          status_override?: Json | null
         }
         Update: {
           id?: string
@@ -2181,7 +2179,6 @@ export interface Database {
           assigned_to?: string | null
           base_total_cost?: number | null
           extras_total?: number | null
-          status_override?: Json | null
         }
         Relationships: [
           {
