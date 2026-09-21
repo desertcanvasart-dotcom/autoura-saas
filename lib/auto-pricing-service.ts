@@ -43,7 +43,7 @@ import type { RateSource, PricingHole } from './pricing-types'
 import { sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { getCatalogScope, catalogOrExpr, type CatalogScope } from '@/lib/catalog-scope'
 import { pickCandidate, ambiguityMessage, type Ambiguity } from '@/lib/pricing/candidate-selection'
-import { presetTierFor, tierMultiplier, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
+import { presetTierFor, defaultTierKey, vehicleForPax, slugifyKey, type VehicleBand } from '@/lib/vocabulary'
 import { tierLadderForTenant, vehicleBandsForTenant, vocabularyLabelsForTenant } from '@/lib/vocabulary-server'
 import type { VocabularyKind } from '@/lib/vocabulary'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
@@ -51,6 +51,7 @@ import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
+import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
@@ -2025,7 +2026,7 @@ export interface TippingRateResolver {
  */
 export async function getTippingRates(
   scope: CatalogScope,
-  tier: ServiceTier
+  _tier?: ServiceTier
 ): Promise<TippingRateResolver | null> {
   try {
     const { data: rawTippingRates } = await getSupabaseAdmin()
@@ -2039,9 +2040,8 @@ export async function getTippingRates(
       return null
     }
 
-    // By position on the tenant's ladder: lowest tier 0.8 … highest 1.5.
-    const multiplier = tierMultiplier(await tenantTierLadder(scope.tenantId), tier)
-
+    // No tier scaling (operator, 2026-09-21). This used to multiply by
+    // 0.8 … 1.5 by tier and round: a 500 driver tip was charged as 400 to 750.
     const perDay = (rates as any[]).filter(r => r.rate_unit === 'per_day')
     const groups = new Map<string, any[]>()
     for (const r of perDay) {
@@ -2061,13 +2061,67 @@ export async function getTippingRates(
             rows.find(r => !r.city)
           if (match) dailyTotal += match.rate_eur || 0
         }
-        // 0 means there were rows but none applied here — a hole, not free.
-        return Math.round(dailyTotal * multiplier) || null
+        // 0 means there were rows but none applied here.
+        return dailyTotal || null
       },
     }
   } catch (err) {
     return null
   }
+}
+
+/** "Driver tip — Day Tour", in the agency's own keys made readable. */
+function tipLineName(tip: TipLine): string {
+  const words = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  const role = tip.role ? `${words(tip.role)} tip` : 'Tip'
+  return tip.context ? `${role} — ${words(tip.context)}` : role
+}
+
+/**
+ * The agency's active tipping rows, in the run's currency — what
+ * lib/pricing/tipping.ts prices from. Every unit and every context, not just
+ * the per-day ones. [] when there are none (never a gap — see tipping.ts).
+ */
+export async function loadTippingRows(scope: CatalogScope): Promise<TippingRow[]> {
+  try {
+    const { data } = await getSupabaseAdmin()
+      .from('tipping_rates')
+      .select('id, tenant_id, role_type, context, rate_unit, rate_eur, rate_currency, city')
+      .or(catalogOrExpr(scope))
+      .eq('is_active', true)
+    const rows = await normalizeRateRows(getSupabaseAdmin(), 'tipping_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    return (rows ?? []) as TippingRow[]
+  } catch {
+    return []
+  }
+}
+
+/** What happens on each day that a tip can be for (lib/pricing/tipping.ts). */
+export function tipOccasionsFor(itinerary: ItineraryDay[]): DayOccasions[] {
+  return itinerary.map((day, i) => {
+    const previousDay = i > 0 ? itinerary[i - 1] : null
+    const nextDay = i < itinerary.length - 1 ? itinerary[i + 1] : null
+    const hasSightseeing = day.services.guide_required || day.attractions.length > 0 || (day.attraction_ids?.length ?? 0) > 0
+    // The transfers the day is CHARGED: the airport runs, a road move to
+    // another city (not one made by ticket), and the stated local ones.
+    const needs = day.city ? determineTransportNeeds(day, previousDay, nextDay) : null
+    const intercityByRoad = !!needs && String(needs.serviceType).startsWith('intercity') && !day.transport_type
+    const transfers =
+      (day.services.airport_arrival ? 1 : 0) +
+      (day.services.airport_departure ? 1 : 0) +
+      (intercityByRoad && !day.services.airport_arrival && !day.services.airport_departure ? 1 : 0) +
+      extraTransfersFor(day).length
+    return {
+      day: day.day,
+      city: day.city,
+      sightseeing: hasSightseeing ? (day.sightseeing_length === 'half_day' ? 'half' : 'full') : null,
+      restaurantMeals: MEAL_KINDS.filter(kind => day.meals[kind] === 'external').length,
+      transfers,
+      airportServices: (day.services.airport_arrival ? 1 : 0) + (day.services.airport_departure ? 1 : 0),
+      hotelServices: (day.services.hotel_checkin ? 1 : 0) + (day.services.hotel_checkout ? 1 : 0),
+      night: day.accommodation_type === 'hotel' || day.accommodation_type === 'cruise' ? day.accommodation_type : null,
+    }
+  })
 }
 
 /**
@@ -2705,7 +2759,7 @@ export async function calculateDayBasedPricing(
   // These four are independent — fetch concurrently. Water cost is
   // admin-configurable via Rates → Fixed Costs (fixed_daily_costs); falls back
   // to €2 (the previous hardcoded value) if the table is empty.
-  const [guideRate, guideMeetRate, mealRates, tippingRates, fixedDailyCosts] = await Promise.all([
+  const [guideRate, guideMeetRate, mealRates, tippingRows, fixedDailyCosts] = await Promise.all([
     getGuideRate(catalogScope, language, tier, { grade: guideGrade }),
     // The throughout guide's cheaper fee for meet/goodbye/transit days.
     // Only fetched when asked for — and it must be a REAL row: pricing a
@@ -2714,7 +2768,7 @@ export async function calculateDayBasedPricing(
       ? getGuideRate(catalogScope, language, tier, { grade: guideGrade, duration: 'meet_greet' })
       : Promise.resolve(null),
     getMealRates(catalogScope, tier),
-    getTippingRates(catalogScope, tier),
+    loadTippingRows(catalogScope),
     getFixedDailyCosts(),
   ])
   const waterCostPerPax = fixedDailyCosts.waterPerPersonPerDay
@@ -3095,6 +3149,31 @@ export async function calculateDayBasedPricing(
   fixedCosts += guideBedCosts + ticketGuideSeatCost
   services.push(...guideBedLines, ...ticketGuideLines)
 
+  // ----- TIPPING — every row whose occasion happens (lib/pricing/tipping.ts) -----
+  // Never a gap: the tipping sheet is the agency's policy, and a tour is not
+  // incomplete for the tips an agency chose not to have (operator, 2026-09-21).
+  const tips = tipLinesForTour(tippingRows, tipOccasionsFor(itinerary))
+  const tipSums = tipTotals(tips.lines)
+  fixedCosts += tipSums.group
+  const tipsPerPax = tipSums.perPerson
+  tips.lines.forEach((tip, n) => {
+    const total = tip.amount * tip.quantity
+    services.push({
+      id: `day${tip.day}-tip-${n}`,
+      dayNumber: tip.day,
+      serviceType: 'tips',
+      serviceName: tipLineName(tip),
+      quantity: tip.perPerson ? 1 : tip.quantity,
+      quantityMode: tip.perPerson ? 'per_pax' : 'fixed',
+      unitCost: tip.perPerson ? total : tip.amount,
+      lineTotal: total,
+      rateSource: 'tipping_rates',
+      isPerPax: tip.perPerson,
+      isOptional: false,
+      ...(tip.quantity > 1 ? { notes: `${tip.amount} × ${tip.quantity}` } : {}),
+    })
+  })
+
   for (let i = 0; i < itinerary.length; i++) {
     const day = itinerary[i]
     const previousDay = i > 0 ? itinerary[i - 1] : null
@@ -3169,37 +3248,6 @@ export async function calculateDayBasedPricing(
           message: guideRate?.ambiguous
             ? ambiguityMessage(`${tier} ${language}-speaking guides`, guideRate.ambiguous, 'CRM → Guides')
             : `No exact ${tier} ${language}-speaking ${gradeLabel.toLowerCase()}guide rate. Add it in Rates → Guides.`,
-        })
-      }
-    }
-
-    // ----- TIPPING (fixed per day, when guide present) -----
-    if (hasSightseeing) {
-      // Tips vary by place: this day's city picks the rate, falling back to
-      // the country-wide row when the city has none of its own.
-      const tippingRate = tippingRates?.forCity(day.city) ?? null
-      if (tippingRate != null) {
-        fixedCosts += tippingRate
-        services.push({
-          id: `day${day.day}-tips`,
-          dayNumber: day.day,
-          serviceType: 'tips',
-          serviceName: 'Daily Tips',
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: tippingRate,
-          lineTotal: tippingRate,
-          rateSource: 'tipping_rates',
-          isPerPax: false,
-          isOptional: false
-        })
-      } else {
-        addHole({
-          kind: 'tipping',
-          reason: 'missing',
-          tier,
-          lookupAttempted: `tipping rate (${tier})`,
-          message: `No per-day tipping rate. Add it in Rates → Tipping.`,
         })
       }
     }
@@ -3597,7 +3645,7 @@ export async function calculateDayBasedPricing(
     })
   }
 
-  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax
+  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + tipsPerPax
 
 
 
