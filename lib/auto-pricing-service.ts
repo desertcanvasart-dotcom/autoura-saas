@@ -735,9 +735,19 @@ export function parseItinerary(itineraryData: any, opts?: {
     const statement = sightseeingStatement(day)
     const saysNoSightseeing = day.sightseeing === 'none'
     const isDayTour = opts?.dayTour === true
-    const hasAttractions = !saysNoSightseeing && (
-      (day.attractions && day.attractions.length > 0) ||
-      (day.title && /temple|pyramid|museum|valley|tomb/i.test(day.title)))
+    // Only what the day STORES. Until 2026-09-21 a word in the title —
+    // "temple", "pyramid", "museum", "valley", "tomb" — earned the day a guide,
+    // and the title was then searched for twenty sight names to charge entrance
+    // fees for (below). A title is marketing wording, not a list of tickets:
+    // "Birth of the Pyramid" bought a Giza ticket on a Saqqara day, any title
+    // containing the letters "gem" bought the Grand Egyptian Museum, and two
+    // live Sawa day tours that name NO attraction escaped the "names no
+    // attractions" gap because their titles happened to say Abu Simbel and
+    // Kom Ombo. Same doctrine as the cruise night and the city: refuse to guess.
+    const namesAttractions =
+      (Array.isArray(day.attractions) && day.attractions.some((a: unknown) => typeof a === 'string' && a.trim() !== '')) ||
+      (Array.isArray(day.attraction_ids) && day.attraction_ids.some((v: unknown) => typeof v === 'string' && v.length > 0))
+    const hasAttractions = !saysNoSightseeing && namesAttractions
 
     // The defaults describe a FULL PACKAGE, so they are gated on what the
     // product actually includes. Two latent bugs lived here: a SINGLE-day
@@ -769,11 +779,10 @@ export function parseItinerary(itineraryData: any, opts?: {
       ? { ...baseServices, guide_required: true }
       : baseServices
 
-    // Extract attractions from title if not provided
-    let attractions = day.attractions || []
-    if (attractions.length === 0 && day.title && !saysNoSightseeing) {
-      attractions = extractAttractionsFromTitle(day.title)
-    }
+    // The attractions the day names — and no others (see above).
+    const attractions: string[] = Array.isArray(day.attractions)
+      ? day.attractions.filter((a: unknown): a is string => typeof a === 'string' && a.trim() !== '')
+      : []
 
     // Explicit entrance-fee ids from the day editor (A-item 13).
     const attraction_ids: string[] = Array.isArray(day.attraction_ids)
@@ -840,92 +849,6 @@ export function parseItinerary(itineraryData: any, opts?: {
       transport: day.transport || undefined
     }
   })
-}
-
-/**
- * Extract attraction names from day title
- */
-function extractAttractionsFromTitle(title: string): string[] {
-  const attractions: string[] = []
-  const patterns = [
-    /karnak/i,
-    /luxor temple/i,
-    /valley of (the )?kings/i,
-    /hatshepsut/i,
-    /colossi of memnon/i,
-    /edfu/i,
-    /kom[- ]?ombo/i,
-    /philae/i,
-    /high dam/i,
-    /aswan dam/i,
-    /unfinished obelisk/i,
-    /pyramid/i,
-    /sphinx/i,
-    /egyptian museum/i,
-    /cairo museum/i,
-    /grand egyptian museum/i,
-    /gem/i,
-    /citadel/i,
-    /khan el[- ]?khalili/i,
-    /abu simbel/i
-  ]
-
-  for (const pattern of patterns) {
-    if (pattern.test(title)) {
-      const match = title.match(pattern)
-      if (match) {
-        attractions.push(normalizeAttractionName(match[0]))
-      }
-    }
-  }
-
-  return attractions
-}
-
-/**
- * Normalize attraction names for database lookup
- */
-function normalizeAttractionName(name: string): string {
-  const normalized = name.toLowerCase()
-    .replace(/^the /, '')
-    .replace(/temple$/i, 'Temple')
-    .trim()
-
-  const nameMap: Record<string, string> = {
-    'karnak': 'Karnak Temple',
-    'luxor temple': 'Luxor Temple',
-    'valley of kings': 'Valley of the Kings',
-    'valley of the kings': 'Valley of the Kings',
-    'hatshepsut': 'Hatshepsut Temple',
-    'colossi of memnon': 'Colossi of Memnon',
-    'edfu': 'Edfu Temple',
-    'kom ombo': 'Kom Ombo Temple',
-    'kom-ombo': 'Kom Ombo Temple',
-    'komombo': 'Kom Ombo Temple',
-    'philae': 'Philae Temple',
-    'high dam': 'Aswan High Dam',
-    'aswan dam': 'Aswan High Dam',
-    'unfinished obelisk': 'Unfinished Obelisk',
-    'pyramid': 'Pyramids of Giza',
-    'pyramids': 'Pyramids of Giza',
-    // Canonical outputs MUST be substrings of entrance_fees.attraction_name
-    // (the lookup is ilike '%name%'). 'Great Sphinx' and 'Saladin Citadel'
-    // matched nothing — the catalog rows are 'Sphinx Area' and
-    // 'Citadel of Saladin' — so both attractions always priced as holes.
-    'sphinx': 'Sphinx Area',
-    'great sphinx': 'Sphinx Area',
-    'egyptian museum': 'Egyptian Museum',
-    'cairo museum': 'Egyptian Museum',
-    'grand egyptian museum': 'Grand Egyptian Museum',
-    'gem': 'Grand Egyptian Museum',
-    'citadel': 'Citadel of Saladin',
-    'saladin citadel': 'Citadel of Saladin',
-    'khan el khalili': 'Khan El Khalili',
-    'khan el-khalili': 'Khan El Khalili',
-    'abu simbel': 'Abu Simbel'
-  }
-
-  return nameMap[normalized] || name
 }
 
 /**
