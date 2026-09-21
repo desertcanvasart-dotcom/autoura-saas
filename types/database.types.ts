@@ -9864,7 +9864,6 @@ export interface Database {
           highlights: string[] | null
           main_attractions: string[] | null
           is_active: boolean | null
-          uses_day_builder: boolean | null
           created_at: string | null
           updated_at: string | null
           tour_type: string | null
@@ -9906,7 +9905,6 @@ export interface Database {
           highlights?: string[] | null
           main_attractions?: string[] | null
           is_active?: boolean | null
-          uses_day_builder?: boolean | null
           created_at?: string | null
           updated_at?: string | null
           tour_type?: string | null
@@ -9948,7 +9946,6 @@ export interface Database {
           highlights?: string[] | null
           main_attractions?: string[] | null
           is_active?: boolean | null
-          uses_day_builder?: boolean | null
           created_at?: string | null
           updated_at?: string | null
           tour_type?: string | null
