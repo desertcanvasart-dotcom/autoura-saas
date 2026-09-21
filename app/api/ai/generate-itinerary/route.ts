@@ -29,7 +29,8 @@ import {
 } from '@/lib/ai/content-library'
 import { getUserPreferences } from '@/lib/ai/user-preferences'
 import { loadVocabulary } from '@/lib/vocabulary-server'
-import { presetTierFor, tierMultiplier } from '@/lib/vocabulary'
+import { presetTierFor } from '@/lib/vocabulary'
+import type { TippingRow } from '@/lib/pricing/tipping'
 import { generateFromStructuredInput, generateCreativeItinerary } from '@/lib/ai/prompt-builder'
 import { getUserFriendlyError, isAiServiceError } from '@/lib/ai/anthropic-client'
 import { loadDestinationPromptContext } from '@/lib/ai/destination-context'
@@ -1061,16 +1062,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: raw_tippingRates, error: tippingRatesError } = await supabase.from('tipping_rates').select('*').eq('is_active', true)
-    const tippingRates = await inRunCurrency('tipping_rates', raw_tippingRates as Record<string, unknown>[])
-    requireRates(rateHoles, {
-      kind: 'tipping', tier, table: 'tipping_rates', error: tippingRatesError, rows: tippingRates,
-      lookupAttempted: 'tipping_rates where is_active',
-      message: 'No active tipping rates are set up. Add them in Rates → Tipping.',
-    })
-    let dailyTips = tippingRates?.reduce((sum: number, t: any) => t.rate_unit === 'per_day' ? sum + toNumber(t.rate_eur, 0) : sum, 0) || 0
-    // By position on the agency's ladder: lowest tier 0.8 … highest 1.5.
-    dailyTips = Math.round(dailyTips * tierMultiplier(tierLadder, tier))
+    // Tipping — the agency's rows, priced by the SAME rules as the tour engine
+    // (lib/pricing/tipping.ts): every unit and context, no tier scaling, and
+    // never a gap. This used to take the Per Day rows only, scale them 0.8–1.5
+    // by tier, round — and refuse to price the itinerary when there were none.
+    const { data: raw_tippingRates } = await supabase
+      .from('tipping_rates')
+      .select('id, tenant_id, role_type, context, rate_unit, rate_eur, rate_currency, city')
+      .eq('is_active', true)
+    const tippingRows = ((await inRunCurrency('tipping_rates', raw_tippingRates as Record<string, unknown>[])) ?? []) as TippingRow[]
 
     // `daily_rate`, not `daily_rate_eur` — the latter does not exist on either
     // table, so both of these were silently 0 and every quote said transport
@@ -1224,7 +1224,7 @@ export async function POST(request: NextRequest) {
       vehiclePerDay, guidePerDay, selectedVehicle, selectedGuide,
       selectedHotel, hotelRate, hotelName_final, roomsNeeded,
       airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
-      dailyTips, allEntranceFees,
+      tippingRows, allEntranceFees,
     })
 
     // Update totals — only when every rate behind them is real.

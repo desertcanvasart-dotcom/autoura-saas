@@ -1,6 +1,7 @@
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { ServiceTier } from './parsing-utils'
 import { getCruiseRate } from './cruise-pricing'
+import { tipLinesForTour, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 
 export async function createLandItineraryServices(
   supabase: any,
@@ -13,7 +14,9 @@ export async function createLandItineraryServices(
     vehiclePerDay: number; guidePerDay: number; selectedVehicle: any; selectedGuide: any;
     selectedHotel: any; hotelRate: number; hotelName_final: string; roomsNeeded: number;
     airportServiceRates: { arrival: number; departure: number }; hotelServiceRate: number; lunchRate: number; dinnerRate: number;
-    dailyTips: number; allEntranceFees: any[] | null | undefined;
+    /** The agency's active tipping rows, in the run's currency — priced by the
+     *  SAME rules as the tour engine (lib/pricing/tipping.ts). */
+    tippingRows: TippingRow[]; allEntranceFees: any[] | null | undefined;
   }
 ): Promise<{ totalSupplierCost: number; totalClientPrice: number }> {
   const {
@@ -25,12 +28,42 @@ export async function createLandItineraryServices(
     vehiclePerDay, guidePerDay, selectedVehicle, selectedGuide,
     selectedHotel, hotelRate, hotelName_final, roomsNeeded,
     airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
-    dailyTips, allEntranceFees,
+    tippingRows, allEntranceFees,
   } = params
 
   // Create days and services
   let totalSupplierCost = 0
   let totalClientPrice = 0
+
+  // ----- TIPS: every row whose occasion happens (lib/pricing/tipping.ts) -----
+  // This used to add ONE number — the sum of the Per Day rows, scaled by tier
+  // and rounded — to every guided day. Now the generator and the tour engine
+  // read one rule: each tipping row is charged when its context happens on
+  // the day, counted by its unit; no tier scaling; never a gap.
+  // A sailing needs the whole trip in view, so the days are read up front.
+  const tipsByDay = new Map<number, TipLine[]>()
+  if (!skipPricing) {
+    for (const tip of tipLinesForTour(tippingRows ?? [], (days || []).map(d => tipOccasionsForGeneratedDay(d, params))).lines) {
+      tipsByDay.set(tip.day, [...(tipsByDay.get(tip.day) ?? []), tip])
+    }
+  }
+  const tipServices = (dayNumber: number) => (tipsByDay.get(dayNumber) ?? []).map(tip => {
+    const each = tip.amount * tip.quantity
+    const total = tip.perPerson ? each * totalPax : each
+    totalSupplierCost += total
+    totalClientPrice += withMargin(total)
+    return {
+      service_type: 'tips',
+      service_code: 'TIPS',
+      service_name: tipName(tip),
+      quantity: tip.perPerson ? totalPax : tip.quantity,
+      rate_eur: tip.perPerson ? each : tip.amount,
+      rate_non_eur: tip.perPerson ? each : tip.amount,
+      total_cost: total,
+      client_price: withMargin(total),
+      notes: tip.perPerson ? 'Per traveller' : tip.quantity > 1 ? `${tip.quantity} × ${tip.amount}` : 'For the group',
+    }
+  })
 
   for (const dayData of days || []) {
     const dayNumber = dayData.day_number || 1
@@ -112,6 +145,9 @@ export async function createLandItineraryServices(
       })
       totalSupplierCost += transferCost
       totalClientPrice += withMargin(transferCost)
+      for (const svc of tipServices(dayNumber)) {
+        await supabase.from('itinerary_services').insert({ itinerary_day_id: day.id, ...svc })
+      }
       continue
     }
 
@@ -204,20 +240,6 @@ export async function createLandItineraryServices(
       totalSupplierCost += guidePerDay
       totalClientPrice += withMargin(guidePerDay)
 
-     // Tips (only when guide is present)
-     services.push({
-      service_type: 'tips',
-      service_code: 'TIPS',
-      service_name: 'Daily Tips',
-      quantity: 1,
-      rate_eur: dailyTips,
-      rate_non_eur: dailyTips,
-      total_cost: dailyTips,
-      client_price: withMargin(dailyTips),
-      notes: 'Driver and guide tips'
-    })
-    totalSupplierCost += dailyTips
-    totalClientPrice += withMargin(dailyTips)
     }
 
     // Entrance fees (ONLY for INSIDE attractions, not OUTSIDE photo stops)
@@ -366,6 +388,9 @@ export async function createLandItineraryServices(
       totalClientPrice += withMargin(nightCost)
     }
 
+    // Tips for whatever this day turned out to include.
+    services.push(...tipServices(dayNumber))
+
     // Insert all services
     for (const svc of services) {
       await supabase.from('itinerary_services').insert({
@@ -376,4 +401,45 @@ export async function createLandItineraryServices(
   }
 
   return { totalSupplierCost, totalClientPrice }
+}
+
+/** "Driver tip — Day Tour". */
+function tipName(tip: TipLine): string {
+  const words = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  const role = tip.role ? `${words(tip.role)} tip` : 'Tip'
+  return tip.context ? `${role} — ${words(tip.context)}` : role
+}
+
+/**
+ * What a GENERATED day includes that a tip can be for — read with the same
+ * conditions the loop above uses to create each service, so a tip is charged
+ * exactly when the thing it is for is.
+ */
+export function tipOccasionsForGeneratedDay(
+  dayData: any,
+  p: { durationDays: number; effectiveCity: string; includeLunch: boolean; includeDinner: boolean; includeAccommodationFinal: boolean }
+): DayOccasions {
+  const dayNumber = dayData.day_number || 1
+  const isLastDay = dayNumber === p.durationDays
+  const isTransferOnly = dayData.is_transfer_only || false
+  const isSailingDay = dayData.is_sailing_day || false
+  const isFreeDay = dayData.is_free_day || isSailingDay || false
+  const isCruiseDay = dayData.is_cruise_day || dayData.accommodation_type === 'cruise'
+  const departureTransferOnly = !!dayData.is_departure && isTransferOnly
+  const dayNeedsGuide = dayData.guide_required !== false && !isTransferOnly && !isFreeDay
+  const lunch = isFreeDay ? false : (dayData.includes_lunch ?? p.includeLunch)
+  const dinner = dayData.includes_dinner ?? p.includeDinner
+  const hotelNight = !isLastDay && p.includeAccommodationFinal && !isCruiseDay && (dayData.includes_hotel !== false)
+  return {
+    day: dayNumber,
+    city: dayData.city || p.effectiveCity,
+    // The generator has no half-day: a guided day is a day tour.
+    sightseeing: dayNeedsGuide && !departureTransferOnly ? 'full' : null,
+    // A departure transfer-only day creates its transfer and nothing else.
+    restaurantMeals: departureTransferOnly ? 0 : (lunch ? 1 : 0) + (dinner ? 1 : 0),
+    transfers: isTransferOnly ? 1 : 0,
+    airportServices: !departureTransferOnly && (dayData.needs_airport_service || dayData.is_arrival || dayData.is_departure || dayData.flight_info) ? 1 : 0,
+    hotelServices: !departureTransferOnly && dayData.needs_hotel_service && !isFreeDay ? 1 : 0,
+    night: departureTransferOnly ? null : isCruiseDay ? (isLastDay ? null : 'cruise') : hotelNight ? 'hotel' : null,
+  }
 }

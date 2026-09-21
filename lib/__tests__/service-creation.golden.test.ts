@@ -50,7 +50,8 @@ function baseParams(over: Partial<Parameters<typeof createLandItineraryServices>
     hotelServiceRate: 15,
     lunchRate: 18,
     dinnerRate: 25,
-    dailyTips: 12,
+    // What `dailyTips: 12` used to mean: one Per Day row of 12 on guided days.
+    tippingRows: [{ role_type: 'driver', context: 'day_tour', rate_unit: 'per_day', rate_eur: 12 }],
     allEntranceFees: ALL_ENTRANCE_FEES,
     ...over,
   }
@@ -179,14 +180,6 @@ describe('createLandItineraryServices — characterization', () => {
           "total_cost": 60,
         },
         {
-          "client_price": 15,
-          "day": "itinerary_days-8",
-          "quantity": 1,
-          "service_code": "TIPS",
-          "service_type": "tips",
-          "total_cost": 12,
-        },
-        {
           "client_price": 87.5,
           "day": "itinerary_days-8",
           "quantity": 2,
@@ -217,6 +210,14 @@ describe('createLandItineraryServices — characterization', () => {
           "service_code": "hotel-1",
           "service_type": "accommodation",
           "total_cost": 120,
+        },
+        {
+          "client_price": 15,
+          "day": "itinerary_days-8",
+          "quantity": 1,
+          "service_code": "TIPS",
+          "service_type": "tips",
+          "total_cost": 12,
         },
         {
           "client_price": 50,
