@@ -25,8 +25,8 @@ interface TourTemplate {
   starting_from: number | null
   starting_from_tier: string | null
   currency: string
-  uses_day_builder: boolean
-  pricing_mode: string
+  /** Days in the programme. Every tour with days is priced; 0 = nothing to price from. */
+  day_count: number
 }
 
 export default function ToursBrowsePage() {
@@ -170,9 +170,12 @@ export default function ToursBrowsePage() {
             <span className="text-lg">📋</span>
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
           </div>
-          <p className="text-xs text-gray-500 mb-1">With Auto-Pricing</p>
+          {/* This tile used to count a flag (uses_day_builder). Every tour with
+              days is priced now, so the number worth a tile is how many HAVE a price. */}
+          <p className="text-xs text-gray-500 mb-1">With a price</p>
           <p className="text-2xl font-semibold text-gray-900">
-            {tours.filter(t => t.uses_day_builder || t.pricing_mode === 'auto').length}
+            {tours.filter(t => t.starting_from != null).length}
+            <span className="text-sm font-normal text-gray-400"> of {tours.length}</span>
           </p>
         </div>
         {/* Optional-metadata tiles appear once the data exists — headline
@@ -311,10 +314,12 @@ export default function ToursBrowsePage() {
                     <span className="text-gray-500 text-xs">{tour.theme_name}</span>
                   </div>
                 )}
-                {tour.uses_day_builder && (
+                {/* Every tour with days is priced, so a badge saying so would be on
+                    every card. The exception is what is worth saying. */}
+                {tour.day_count === 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-400">⚡</span>
-                    <span className="text-[#647C47] text-xs font-medium">Auto-Pricing</span>
+                    <span className="text-gray-400">📋</span>
+                    <span className="text-amber-700 text-xs font-medium">No day-by-day programme yet — add its days in Tour Manager to price it</span>
                   </div>
                 )}
               </div>

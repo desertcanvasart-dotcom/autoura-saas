@@ -53,8 +53,7 @@ export async function GET(request: NextRequest) {
         short_description,
         is_featured,
         image_url,
-        uses_day_builder,
-        pricing_mode,
+        itinerary,
         tour_theme,
         tour_variations (
           id,
@@ -122,8 +121,17 @@ export async function GET(request: NextRequest) {
         let startingFromPrice: number | null = null
         let startingFromTier: string | null = null
 
-        // If template uses day builder, use auto-pricing
-        if (template.uses_day_builder || template.pricing_mode === 'auto') {
+        // EVERY TOUR WITH DAYS IS PRICED. This used to ask a flag first —
+        // `uses_day_builder`, a column that defaults to false and that a CSV
+        // import leaves false — so 26 of 47 live tours (all of Sawa Tours',
+        // Sillage's and the Sandbox's) were never sent to the engine at all,
+        // whatever their days said. 25 of those 26 had a full day-by-day
+        // programme. The flag was also, by accident, the only thing keeping a
+        // lunch-only "price" off this page; #471, #481 and #482 closed that,
+        // so the accident is no longer needed and the gate goes (operator,
+        // 2026-09-21). What decides is what the engine prices FROM: the days.
+        const dayCount = Array.isArray(template.itinerary) ? template.itinerary.length : 0
+        if (dayCount > 0) {
           const priceRange = await getTemplatePriceRange(template.id, template.tenant_id)
           if (priceRange) {
             startingFromPrice = priceRange.minPrice
@@ -187,8 +195,8 @@ export async function GET(request: NextRequest) {
           currency: 'EUR',
           
           // Flags
-          uses_day_builder: template.uses_day_builder,
-          pricing_mode: template.pricing_mode || 'manual'
+          // How many days the programme has. 0 = nothing to price from yet.
+          day_count: dayCount,
         }
       })
     )
