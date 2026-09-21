@@ -56,7 +56,10 @@ export const TEMPLATE_CSV_COLUMNS: TemplateCsvColumn[] = [
   { name: 'image_url', label: 'Image URL' },
   { name: 'gallery_urls', label: 'Gallery URLs', kind: 'list' },
   { name: 'pricing_mode', label: 'Pricing Mode' },
-  { name: 'uses_day_builder', label: 'Uses Day Builder', kind: 'bool' },
+  // There was a "Uses Day Builder" column here. It was the flag the tours page
+  // used to require before pricing a tour at all (#484 removed the gate;
+  // migration 371 removes the column). A sheet exported before then still has
+  // the header: it is reported under "ignored headers" and written nowhere.
   { name: 'default_transportation_service', label: 'Default Transport Service' },
   { name: 'transportation_city', label: 'Transport City' },
   { name: 'pickup_required', label: 'Pickup Required', kind: 'bool' },

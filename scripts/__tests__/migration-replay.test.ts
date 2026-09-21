@@ -380,6 +380,21 @@ describe('migration replay from scratch', () => {
     await db.exec(spellings![0])
     expect(Object.keys(await handed('Replay Probe Co')).length, 'running it twice adds nothing').toBe(before)
 
+    // Migration 371: tour_templates.uses_day_builder is gone. It was the flag
+    // the tours page required before pricing a tour at all; nothing has read
+    // it since #484, and a column that means nothing but LOOKS like a pricing
+    // switch is a trap.
+    const dayBuilder = await db.query(`
+      SELECT count(*)::int AS n FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'tour_templates' AND column_name = 'uses_day_builder'`)
+    expect((dayBuilder.rows[0] as { n: number }).n, 'the dead flag is dropped').toBe(0)
+    // …and a tour can still be created without it.
+    await db.exec(`
+      INSERT INTO tour_templates (tenant_id, template_code, template_name, tour_type, duration_days)
+      SELECT t.id, 'PROBE-371', 'After the flag', 'day_tour', 1 FROM tenants t WHERE t.company_name = 'Replay Probe Co'`)
+    const made = await db.query(`SELECT count(*)::int AS n FROM tour_templates WHERE template_code = 'PROBE-371'`)
+    expect((made.rows[0] as { n: number }).n).toBe(1)
+
     // Migration 361: a SECURITY DEFINER function runs past RLS, so one that
     // takes a caller-supplied id must not be executable by the browser roles.
     // Production proved anon could call ten of them (cross-tenant reads and

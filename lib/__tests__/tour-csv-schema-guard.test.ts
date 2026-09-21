@@ -31,6 +31,11 @@ const NOT_IN_THE_SHEET: Record<string, string> = {
   cached_starting_tier: 'derived, as above',
   cached_price_updated_at: 'derived, as above',
   popularity_score: 'behavioural, earned on the install that serves the tour',
+  // TEMPORARY. The column is dead and migration 371 drops it; the generated
+  // types still list it until they are regenerated AFTER that migration is
+  // applied. The stale-entry check below will then fail on this line, which is
+  // the reminder to delete it.
+  uses_day_builder: 'dead flag, dropped by migration 371 — remove this line when the types are regenerated',
 }
 
 function tourTemplateColumns(): string[] {

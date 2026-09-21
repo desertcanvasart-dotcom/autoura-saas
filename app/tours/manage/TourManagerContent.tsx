@@ -93,7 +93,6 @@ interface TourTemplate {
   is_featured: boolean
   is_active: boolean
   created_at: string
-  uses_day_builder?: boolean
   pricing_mode?: string
   variations?: TourVariation[]
   itinerary?: ItineraryDay[]
@@ -1362,7 +1361,6 @@ export default function TourManagerContent() {
     image_url: '',
     is_featured: false,
     is_active: true,
-    uses_day_builder: true,
     pricing_mode: 'auto',
     default_transportation_service: 'day_tour',
     transportation_city: 'Cairo',
@@ -1806,7 +1804,6 @@ export default function TourManagerContent() {
       image_url: '',
       is_featured: false,
       is_active: true,
-      uses_day_builder: true,
       pricing_mode: 'auto',
       default_transportation_service: 'day_tour',
       transportation_city: 'Cairo',
@@ -1850,7 +1847,6 @@ export default function TourManagerContent() {
       image_url: template.image_url || '',
       is_featured: template.is_featured,
       is_active: template.is_active,
-      uses_day_builder: template.uses_day_builder ?? true,
       pricing_mode: template.pricing_mode || 'auto',
       default_transportation_service: 'day_tour',
       transportation_city: 'Cairo',
