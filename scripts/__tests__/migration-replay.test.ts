@@ -419,6 +419,96 @@ describe('migration replay from scratch', () => {
     const made = await db.query(`SELECT count(*)::int AS n FROM tour_templates WHERE template_code = 'PROBE-371'`)
     expect((made.rows[0] as { n: number }).n).toBe(1)
 
+    // ---- Migration 374: a fresh build has what PRODUCTION has ----
+    // types/database.types.ts is generated from production, and the code is
+    // typed against it. Until 374, 23 columns in it were built by no migration
+    // (added by hand in the SQL editor) — so a database built from this folder
+    // was one the app could not run on, and nothing said so. This compares the
+    // two, column by column, and is where the NEXT hand-made column fails.
+    const typesSrc = readFileSync(path.join(MIGRATIONS_DIR, '..', '..', 'types', 'database.types.ts'), 'utf8')
+    const typed = new Map<string, Set<string>>()
+    const tableRe = /^ {6}([a-z_0-9]+): \{\n {8}Row: \{\n([\s\S]*?)\n {8}\}/gm
+    for (let m = tableRe.exec(typesSrc); m !== null; m = tableRe.exec(typesSrc)) {
+      typed.set(m[1], new Set(m[2].split('\n').flatMap(l => l.match(/^ {10}([a-z_0-9]+)\??:/)?.[1] ?? [])))
+    }
+    expect(typed.size, 'the generated types were parsed').toBeGreaterThan(130)
+
+    const builtCols = await db.query(`
+      SELECT c.table_name AS t, c.column_name AS col
+        FROM information_schema.columns c
+        JOIN information_schema.tables tb ON tb.table_schema = c.table_schema AND tb.table_name = c.table_name
+       WHERE c.table_schema = 'public' AND tb.table_type IN ('BASE TABLE', 'VIEW')`) // the generator lists views as tables
+    const built = new Map<string, Set<string>>()
+    for (const r of builtCols.rows as Array<{ t: string; col: string }>) {
+      if (!built.has(r.t)) built.set(r.t, new Set())
+      built.get(r.t)!.add(r.col)
+    }
+
+    // Tables only the exempt migrations (205, 261) can build.
+    const ONLY_ON_SUPABASE = ['copilot_knowledge', 'support_conversations', 'support_messages']
+    // On production, in the types, and deliberately NOT adopted: strays with no
+    // migration and no code (see 374's footer). Remove an entry when its
+    // column is dropped — the list may only shrink.
+    const STRAYS_ON_PRODUCTION = ['content_library.content_type', 'itineraries.cabin_allocation']
+
+    expect(
+      [...typed.keys()].filter(t => !built.has(t)).sort(),
+      'tables production has that no migration here builds'
+    ).toEqual(ONLY_ON_SUPABASE)
+    expect(
+      [...built.keys()].filter(t => !typed.has(t)).sort(),
+      'tables a fresh build has that production (the types) does not — regenerate the types, or the migration is unapplied'
+    ).toEqual([])
+
+    const missingFromBuild: string[] = []
+    const missingFromProduction: string[] = []
+    for (const [table, cols] of typed) {
+      const mine = built.get(table)
+      if (!mine) continue
+      for (const c of cols) if (!mine.has(c)) missingFromBuild.push(`${table}.${c}`)
+      for (const c of mine) if (!cols.has(c)) missingFromProduction.push(`${table}.${c}`)
+    }
+    expect(
+      missingFromBuild.sort(),
+      'columns production has that NO migration creates — someone added them by hand. Write the migration (ADD COLUMN IF NOT EXISTS).'
+    ).toEqual(STRAYS_ON_PRODUCTION)
+    expect(
+      missingFromProduction.sort(),
+      'columns a fresh build has that production does not — an unapplied migration, or types that need regenerating'
+    ).toEqual([])
+
+    // What 374 aligned besides columns.
+    const zeroDefaults = await db.query(`
+      SELECT count(*)::int AS n FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'accommodation_rates'
+         AND column_name ~ '(ppd|single_supplement|triple_reduction)_(non_)?eur$' AND column_default IS NOT NULL`)
+    expect((zeroDefaults.rows[0] as { n: number }).n, 'a hotel rate saved without a price must be NULL (a hole), never 0 (a free hotel)').toBe(0)
+
+    const indexNames = new Set(((await db.query(
+      "SELECT indexname FROM pg_indexes WHERE schemaname = 'public'"
+    )).rows as Array<{ indexname: string }>).map(r => r.indexname))
+    for (const name of ['idx_commissions_tenant', 'idx_commissions_type', 'idx_tour_quotes_tenant', 'idx_content_library_route', 'idx_itinerary_days_cruise_day']) {
+      expect(indexNames.has(name), `${name} — production's index, under production's name`).toBe(true)
+    }
+    for (const name of ['idx_commissions_tenant_id', 'idx_invoices_date']) {
+      expect(indexNames.has(name), `${name} — the second name for an index that is already there`).toBe(false)
+    }
+    // NOT adopted: numbers unique across ALL agencies. Per agency is the rule
+    // (migration 360 fixed the same thing for tour codes).
+    for (const name of ['invoices_invoice_number_key', 'expenses_expense_number_key', 'supplier_invoices_internal_reference_key']) {
+      expect(indexNames.has(name), `${name} would stop a second agency issuing its first document`).toBe(false)
+    }
+
+    // "A no-op on production" is the same claim as "a no-op the second time":
+    // in both cases everything is already where 374 puts it.
+    const fingerprint = async () => JSON.stringify((await db.query(`
+      SELECT c.table_name, c.column_name, c.udt_name, c.is_nullable, c.column_default
+        FROM information_schema.columns c WHERE c.table_schema = 'public' ORDER BY 1, 2`)).rows) +
+      JSON.stringify((await db.query("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'public' ORDER BY 1")).rows)
+    const before374Again = await fingerprint()
+    await db.exec(readFileSync(path.join(MIGRATIONS_DIR, '374_adopt_live_schema.sql'), 'utf8'))
+    expect(await fingerprint(), '374 changes nothing where its work is already done').toBe(before374Again)
+
     // Migration 361: a SECURITY DEFINER function runs past RLS, so one that
     // takes a caller-supplied id must not be executable by the browser roles.
     // Production proved anon could call ten of them (cross-tenant reads and
