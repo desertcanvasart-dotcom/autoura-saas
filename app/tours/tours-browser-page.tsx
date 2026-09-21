@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { loadPricesInBatches, type PriceState, type StartingFrom } from '@/lib/tours/price-loader'
 
 // Updated interface to match the new API response structure
 interface TourTemplate {
@@ -22,8 +23,8 @@ interface TourTemplate {
   available_tiers: string[]
   min_pax: number
   max_pax: number
-  starting_from: number | null
-  starting_from_tier: string | null
+  /** tier → variation code, so a card can link to the variation its price describes. */
+  variation_code_by_tier?: Record<string, string>
   currency: string
   /** Days in the programme. Every tour with days is priced; 0 = nothing to price from. */
   day_count: number
@@ -31,34 +32,70 @@ interface TourTemplate {
 
 export default function ToursBrowsePage() {
   const [tours, setTours] = useState<TourTemplate[]>([])
+  // THE LIST FIRST, THE PRICES AFTER. The page used to wait for the pricing
+  // engine before showing anything — 5–8 seconds on production data. The list
+  // is cheap; each price arrives on its own and fills its card in.
+  const [prices, setPrices] = useState<Record<string, PriceState>>({})
+  const pricing = useRef<AbortController | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filterTier, setFilterTier] = useState<string>('all')
   const [filterCategory, setFilterCategory] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
-  useEffect(() => {
-    fetchTours()
+  const fetchPriceBatch = useCallback(async (ids: string[], signal?: AbortSignal): Promise<Record<string, StartingFrom>> => {
+    const res = await fetch(`/api/tours/browse/prices?ids=${ids.join(',')}`, { signal })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok || !json?.success) throw new Error(json?.error || 'prices failed')
+    return json.data.prices as Record<string, StartingFrom>
   }, [])
 
-  const fetchTours = async () => {
+  const fetchTours = useCallback(async () => {
+    // A reload must not be answered by the previous load's prices.
+    pricing.current?.abort()
+    const controller = new AbortController()
+    pricing.current = controller
     try {
-      const response = await fetch('/api/tours/browse')
-      const data = await response.json()
-
-      if (data.success) {
-        // API now returns { data: { templates: [...], pagination: {...} } }
-        setTours(data.data?.templates || [])
-      } else {
-        setError(data.error || 'Failed to load tours')
+      // The whole list. This page has no pager, and used to send no limit —
+      // so it only ever showed the first 12 tours an agency had.
+      const all: TourTemplate[] = []
+      for (let page = 1; page <= 20; page++) {
+        const response = await fetch(`/api/tours/browse?limit=200&page=${page}`, { signal: controller.signal })
+        const data = await response.json()
+        if (!data.success) { setError(data.error || 'Failed to load tours'); return }
+        all.push(...(data.data?.templates || []))
+        if (page >= (data.data?.pagination?.total_pages ?? 1)) break
       }
+      setTours(all)
+      setLoading(false)
+
+      // A tour with no days and no variations has nothing to price from; every
+      // other card says "pricing…" until its own answer arrives.
+      const toPrice = all.filter(t => t.day_count > 0 || t.variations_count > 0).map(t => t.id)
+      setPrices(Object.fromEntries(all.map(t => [t.id, toPrice.includes(t.id)
+        ? { status: 'pending' } as PriceState
+        : { status: 'done', starting_from: null, starting_from_tier: null } as PriceState])))
+      await loadPricesInBatches(toPrice, fetchPriceBatch, update => setPrices(prev => ({ ...prev, ...update })), { signal: controller.signal })
     } catch (err) {
+      if (controller.signal.aborted) return
       setError('Error loading tours')
       console.error(err)
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
-  }
+  }, [fetchPriceBatch])
+
+  useEffect(() => {
+    fetchTours()
+    return () => pricing.current?.abort()
+  }, [fetchTours])
+
+  const priceOf = (id: string): PriceState => prices[id] ?? { status: 'pending' }
+  const priced = useMemo(
+    () => tours.map(t => prices[t.id]).filter((p): p is Extract<PriceState, { status: 'done' }> => p?.status === 'done' && p.starting_from != null),
+    [tours, prices]
+  )
+  const stillPricing = tours.filter(t => (prices[t.id]?.status ?? 'pending') === 'pending').length
 
   const filteredTours = tours.filter(tour => {
     // Filter by tier - check if the tour has the selected tier available
@@ -174,9 +211,10 @@ export default function ToursBrowsePage() {
               days is priced now, so the number worth a tile is how many HAVE a price. */}
           <p className="text-xs text-gray-500 mb-1">With a price</p>
           <p className="text-2xl font-semibold text-gray-900">
-            {tours.filter(t => t.starting_from != null).length}
+            {priced.length}
             <span className="text-sm font-normal text-gray-400"> of {tours.length}</span>
           </p>
+          {stillPricing > 0 && <p className="text-[11px] text-gray-400 mt-0.5">pricing {stillPricing} more…</p>}
         </div>
         {/* Optional-metadata tiles appear once the data exists — headline
             "Categories 0" / "Starting From —" above a populated list reads
@@ -193,7 +231,7 @@ export default function ToursBrowsePage() {
             <p className="text-2xl font-semibold text-gray-900">{uniqueCategories.length}</p>
           </div>
         )}
-        {tours.some(t => t.starting_from) && (
+        {priced.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">💰</span>
@@ -201,7 +239,7 @@ export default function ToursBrowsePage() {
             </div>
             <p className="text-xs text-gray-500 mb-1">Starting From</p>
             <p className="text-2xl font-semibold text-gray-900">
-              €{Math.min(...tours.filter(t => t.starting_from).map(t => t.starting_from as number)).toLocaleString()}
+              €{Math.min(...priced.map(p => p.starting_from as number)).toLocaleString()}
             </p>
           </div>
         )}
@@ -338,17 +376,39 @@ export default function ToursBrowsePage() {
                   {/* No price is said plainly. It used to read as a euro sign
                       followed by N/A, and before that the card showed a
                       made-up duration x 150 estimate. */}
-                  <p className="text-xl font-semibold text-[#647C47]">
-                    {tour.starting_from ? `€${tour.starting_from.toLocaleString()}` : 'Price on request'}
-                  </p>
-                  {tour.starting_from && (
-                    <p className="text-[10px] text-gray-400">
-                      per person • {tour.starting_from_tier || 'standard'}
-                    </p>
-                  )}
+                  {(() => {
+                    const price = priceOf(tour.id)
+                    // Three different things, said three different ways: still
+                    // working it out, could not ask, and asked — no price.
+                    if (price.status === 'pending') return (
+                      <p className="text-sm text-gray-400 flex items-center gap-2" aria-live="polite">
+                        <span className="inline-block w-16 h-5 rounded bg-gray-100 animate-pulse" /> pricing…
+                      </p>
+                    )
+                    if (price.status === 'failed') return (
+                      <p className="text-xs text-amber-700">Price could not be loaded — <button type="button" onClick={fetchTours} className="underline">try again</button></p>
+                    )
+                    return (
+                      <>
+                        <p className="text-xl font-semibold text-[#647C47]">
+                          {price.starting_from ? `€${price.starting_from.toLocaleString()}` : 'Price on request'}
+                        </p>
+                        {price.starting_from && (
+                          <p className="text-[10px] text-gray-400">
+                            per person{price.starting_from_tier ? ` • ${price.starting_from_tier}` : ''}
+                          </p>
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
                 <Link
-                  href={`/tours/${tour.default_variation_code ?? tour.id}`}
+                  href={`/tours/${(() => {
+                    // The variation the PRICE describes, once it is known.
+                    const p = priceOf(tour.id)
+                    const tier = p.status === 'done' ? p.starting_from_tier : null
+                    return (tier && tour.variation_code_by_tier?.[tier]) || tour.default_variation_code || tour.id
+                  })()}`}
                   className="bg-[#647C47] text-white px-4 py-2 rounded-lg hover:bg-[#4a5c35] transition-colors text-xs font-medium"
                 >
                   View Details

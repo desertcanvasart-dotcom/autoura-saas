@@ -1,15 +1,21 @@
 // ============================================
-// B2B TOURS BROWSE API - UPDATED
-// File: app/api/tours/browse/route.ts
-//
-// Now uses auto-pricing for "Starting From" price
-// instead of requiring manual variation_pricing
+// /api/tours/browse — the LIST of tours. It does not price them.
 // ============================================
+// This route used to run the pricing engine for every tour on the page before
+// it answered — ~30 database round trips a tour (#467) — so the tours page
+// showed nothing for 5–8 seconds on production data. The list is now the list;
+// the page asks /api/tours/browse/prices for the "starting from" figures
+// afterwards and fills each card in as its answer arrives.
+//
+// It matters more since #484: every tour with days is priced, not only the
+// ones with a flag set, so there are more prices to wait for.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
-import { getTemplatePriceRange } from '@/lib/auto-pricing-service'
+import { dayCountOf } from '@/lib/tours/starting-from'
 import { loadVocabulary } from '@/lib/vocabulary-server'
+
+const MAX_LIMIT = 200
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +41,10 @@ export async function GET(request: NextRequest) {
 
     // Pagination
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '12')
+    // The tours page has no pager and used to send no `limit` — so it only ever
+    // listed the FIRST 12 tours, and 7 of Sawa Tours' 19 and 9 of Travel2Egypt's
+    // 21 never appeared on it. Listing is cheap now; the ceiling is for safety.
+    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '12') || 12, 1), MAX_LIMIT)
     const offset = (page - 1) * limit
 
     // Build query for templates (RLS filters to tenant's templates only)
@@ -107,59 +116,15 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Calculate pricing for each template
-    const templatesWithPricing = await Promise.all(
-      (templates || []).map(async (template) => {
+    const listed = (templates || []).map((template) => {
         // Filter variations by tier if specified
         let variations = template.tour_variations?.filter((v: any) => v.is_active) || []
-        
+
         if (tier) {
           variations = variations.filter((v: any) => v.tier === tier)
         }
 
-        // Get auto-calculated price range
-        let startingFromPrice: number | null = null
-        let startingFromTier: string | null = null
-
-        // EVERY TOUR WITH DAYS IS PRICED. This used to ask a flag first —
-        // `uses_day_builder`, a column that defaults to false and that a CSV
-        // import leaves false — so 26 of 47 live tours (all of Sawa Tours',
-        // Sillage's and the Sandbox's) were never sent to the engine at all,
-        // whatever their days said. 25 of those 26 had a full day-by-day
-        // programme. The flag was also, by accident, the only thing keeping a
-        // lunch-only "price" off this page; #471, #481 and #482 closed that,
-        // so the accident is no longer needed and the gate goes (operator,
-        // 2026-09-21). What decides is what the engine prices FROM: the days.
-        const dayCount = Array.isArray(template.itinerary) ? template.itinerary.length : 0
-        if (dayCount > 0) {
-          const priceRange = await getTemplatePriceRange(template.id, template.tenant_id)
-          if (priceRange) {
-            startingFromPrice = priceRange.minPrice
-            startingFromTier = priceRange.tier
-          }
-        }
-
-        // Fallback: check for manual variation pricing
-        if (startingFromPrice === null && variations.length > 0) {
-          // Try to get from variation_pricing table (legacy) - RLS filters automatically
-          const { data: pricing } = await supabase
-            .from('variation_pricing')
-            .select('price_per_person')
-            .in('variation_id', variations.map((v: any) => v.id))
-            .order('price_per_person', { ascending: true })
-            .limit(1)
-
-          if (pricing?.length) {
-            startingFromPrice = pricing[0].price_per_person
-          }
-        }
-
-        // No invented estimate. This used to fall back to
-        // `duration_days * 150` labelled "standard", so a tour with no rates
-        // behind it showed a made-up per-person price on the card — and the
-        // filter below then hid the tours that had NO price, which meant the
-        // fabricated one was the only thing anybody ever saw. A tour with no
-        // price is listed without one.
+        const dayCount = dayCountOf(template)
 
         return {
           id: template.id,
@@ -179,9 +144,15 @@ export async function GET(request: NextRequest) {
           // (looks up by variation_code), so hand the card the code of the
           // variation its "starting from" tier describes. Linking the
           // template UUID here was the bug that dead-ended every click.
-          default_variation_code:
-            (variations.find((v: { tier?: string }) => v.tier === startingFromTier) ?? variations[0])
-              ?.variation_code ?? null,
+          default_variation_code: variations[0]?.variation_code ?? null,
+          // …and once the price arrives the card can link to the variation its
+          // "starting from" TIER describes, which is what this used to pick
+          // when the price was computed here.
+          variation_code_by_tier: Object.fromEntries(
+            (variations as Array<{ tier?: string | null; variation_code?: string | null }>)
+              .filter(v => v.tier && v.variation_code)
+              .map(v => [v.tier as string, v.variation_code as string])
+          ),
 
           // Variations summary
           variations_count: variations.length,
@@ -189,31 +160,19 @@ export async function GET(request: NextRequest) {
           min_pax: Math.min(...variations.map((v: any) => v.min_pax || 1)),
           max_pax: Math.max(...variations.map((v: any) => v.max_pax || 15)),
           
-          // Pricing
-          starting_from: startingFromPrice,
-          starting_from_tier: startingFromTier,
+          // No price here: see /api/tours/browse/prices.
           currency: 'EUR',
-          
+
           // Flags
           // How many days the programme has. 0 = nothing to price from yet.
           day_count: dayCount,
         }
       })
-    )
-
-    // Drop a nonsense number (Infinity/NaN from a broken rate) by blanking the
-    // price — never by hiding the tour, which is what sent every card to the
-    // fabricated estimate above.
-    const validTemplates = templatesWithPricing.map(t =>
-      t.starting_from !== null && Number.isFinite(t.starting_from) && t.starting_from > 0
-        ? t
-        : { ...t, starting_from: null, starting_from_tier: null }
-    )
 
     return NextResponse.json({
       success: true,
       data: {
-        templates: validTemplates,
+        templates: listed,
         pagination: {
           page,
           limit,
