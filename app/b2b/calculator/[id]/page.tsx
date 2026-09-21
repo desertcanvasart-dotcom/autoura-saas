@@ -737,10 +737,10 @@ export default function TourPriceCalculator() {
                   </div>
                 </div>
 
-                {result.tour_leader_included && result.num_paying_pax && (
+                {result.tour_leader_included && (result.num_paying_pax ?? 0) > 0 && (
                   <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
                     <strong>Group:</strong> {result.num_pax} total ({result.num_paying_pax} paying guests + 1 tour leader)
-                    {result.tour_leader_cost && (
+                    {typeof result.tour_leader_cost === 'number' && result.tour_leader_cost > 0 && (
                       <span className="ml-2">• <strong>TL Cost:</strong> €{result.tour_leader_cost.toFixed(2)}</span>
                     )}
                   </div>
@@ -766,7 +766,8 @@ export default function TourPriceCalculator() {
                 </div>
 
                 {/* Single Supplement Display */}
-                {result.single_supplement && result.single_supplement > 0 && (
+                {/* `> 0` alone: `0 && …` renders a bare "0" under the totals. */}
+                {typeof result.single_supplement === 'number' && result.single_supplement > 0 && (
                   <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-amber-800">
@@ -866,7 +867,7 @@ export default function TourPriceCalculator() {
                       <td colSpan={5} className="px-4 py-2 text-right">Subtotal:</td>
                       <td className="px-4 py-2 text-right">€{result.subtotal_cost.toFixed(2)}</td>
                     </tr>
-                    {result.tour_leader_included && result.tour_leader_cost && (
+                    {result.tour_leader_included && typeof result.tour_leader_cost === 'number' && result.tour_leader_cost > 0 && (
                       <tr>
                         <td colSpan={5} className="px-4 py-2 text-right text-blue-600">Tour Leader Cost:</td>
                         <td className="px-4 py-2 text-right text-blue-600">€{result.tour_leader_cost.toFixed(2)}</td>
