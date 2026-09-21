@@ -13,6 +13,7 @@ import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurre
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
+import { whyTipRowIsNotPriced, howTipIsCounted } from '@/lib/pricing/tipping'
 
 // ============================================
 // CONSTANTS
@@ -619,6 +620,13 @@ export default function TippingPage() {
                       <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs font-medium">
                         <VocabLabel kind="tipping_unit" value={rate.rate_unit} />
                       </span>
+                      {/* A row pricing can never charge says so here, rather
+                          than sitting in the list looking like it counts. */}
+                      {rate.is_active !== false && whyTipRowIsNotPriced(rate) && (
+                        <div className="mt-1 text-[11px] leading-tight text-amber-700" title={whyTipRowIsNotPriced(rate) ?? undefined}>
+                          Not priced — hover for why
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
                       {fmtRate(Number(rate.rate_eur), rate, 2)}
@@ -732,6 +740,12 @@ export default function TippingPage() {
                   ))}
                 </select>
               </div>
+              {/* How THIS combination is counted — the same rule pricing uses
+                  (lib/pricing/tipping.ts), so the form cannot promise what
+                  the engine does not do. */}
+              <p className={`text-xs rounded-lg px-3 py-2 ${whyTipRowIsNotPriced({ ...formData, rate_eur: Number(formData.rate_eur) || 1 }) ? 'bg-amber-50 text-amber-800' : 'bg-green-50 text-green-800'}`}>
+                {whyTipRowIsNotPriced({ ...formData, rate_eur: Number(formData.rate_eur) || 1 }) ?? howTipIsCounted(formData)}
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Rate Unit *</label>
