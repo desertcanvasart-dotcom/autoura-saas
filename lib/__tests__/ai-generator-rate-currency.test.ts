@@ -28,7 +28,7 @@ function moneyTablesRead(src: string): string[] {
 describe('the AI generator converts every rate it reads into the run currency', () => {
   it('reads the money tables it is expected to', () => {
     expect(moneyTablesRead(ROUTE)).toEqual([
-      'airport_staff_rates', 'entrance_fees', 'guides', 'hotel_staff_rates', 'meal_rates', 'tipping_rates',
+      'airport_staff_rates', 'entrance_fees', 'hotel_staff_rates', 'meal_rates', 'tipping_rates',
     ])
   })
 
@@ -60,12 +60,20 @@ describe('the AI generator converts every rate it reads into the run currency', 
       ['tipping_rates', 'rate_eur'],
       ['airport_staff_rates', 'rate_eur'],
       ['hotel_staff_rates', 'rate_eur'],
-      ['guides', 'daily_rate'],
       ['entrance_fees', 'eur_rate'],
       ['entrance_fees', 'non_eur_rate'],
     ]
     for (const [table, column] of priced) {
       expect(RATE_MONETARY_COLUMNS[table], table).toContain(column)
+    }
+  })
+
+  // Guides, hotels and transport are not fetched by this route at all any more:
+  // they come through the tour engine's lookups (getGuideRate, getHotelRates,
+  // getTransportRateFor), which convert into the run currency themselves.
+  it('the guide roster, hotel contacts and fleet tables are not read', () => {
+    for (const t of ['guides', 'hotel_contacts', 'vehicles']) {
+      expect(ROUTE.replace(/\/\/.*$/gm, ''), t).not.toContain(`from('${t}')`)
     }
   })
 

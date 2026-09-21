@@ -123,8 +123,8 @@ const run = async (transportByDay: Record<number, { rate: number; label: string;
     tenantId: 'test-tenant', days: DAYS, itineraryId: 'itin-1', startDateObj: new Date('2026-11-01T00:00:00Z'), durationDays: 4,
     effectiveCity: 'Cairo', totalPax: 2, isEuroPassport: true, skipPricing: false, withMargin, tier: 'standard',
     finalLanguage: 'English', includeLunch: false, includeDinner: false, includeAccommodationFinal: false,
-    guidePerDay: 60, selectedGuide: { id: 'g' }, selectedHotel: null,
-    hotelRate: 0, hotelName_final: '', roomsNeeded: 1, airportServiceRates: { arrival: 30, departure: 30 },
+    guidePerDay: 60, selectedGuide: { id: 'g' }, hotelByDay: {},
+    airportServiceRates: { arrival: 30, departure: 30 },
     hotelServiceRate: 15, lunchRate: 0, dinnerRate: 0, allEntranceFees: [], tippingRows: [], transportByDay,
   } as never)
   const dayOf = new Map((sb.store.itinerary_days as Row[]).map(d => [d.id, d.day_number]))

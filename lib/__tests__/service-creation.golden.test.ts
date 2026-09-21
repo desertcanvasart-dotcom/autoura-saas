@@ -38,10 +38,6 @@ function baseParams(over: Partial<Parameters<typeof createLandItineraryServices>
     includeAccommodationFinal: true,
     guidePerDay: 60,
     selectedGuide: { id: 'guide-1', name: 'Ahmed' },
-    selectedHotel: { id: 'hotel-1' },
-    hotelRate: 120,
-    hotelName_final: 'Nile Ritz',
-    roomsNeeded: 1,
     // Both directions equal, so this still pins the pre-Phase-2 behaviour:
     // the rate used to be one flat number for every airport touch.
     airportServiceRates: { arrival: 30, departure: 30 },
@@ -51,6 +47,11 @@ function baseParams(over: Partial<Parameters<typeof createLandItineraryServices>
     // What `dailyTips: 12` used to mean: one Per Day row of 12 on guided days.
     tippingRows: [{ role_type: 'driver', context: 'day_tour', rate_unit: 'per_day', rate_eur: 12 }],
     allEntranceFees: ALL_ENTRANCE_FEES,
+    // What one double room at 120 used to be: 60 per person sharing, two people.
+    hotelByDay: {
+      1: { ppd: 60, singleSupplement: 25, hotelName: 'Nile Ritz', rateId: 'hotel-1' },
+      2: { ppd: 60, singleSupplement: 25, hotelName: 'Nile Ritz', rateId: 'hotel-1' },
+    },
     // What the fleet vehicle used to be charged: 80 a day, and "half" of it
     // (40) for the departure transfer. Now GIVEN, per day, from the rate sheet.
     transportByDay: {
@@ -163,7 +164,7 @@ describe('createLandItineraryServices — characterization', () => {
         {
           "client_price": 150,
           "day": "itinerary_days-1",
-          "quantity": 1,
+          "quantity": 2,
           "service_code": "hotel-1",
           "service_type": "accommodation",
           "total_cost": 120,
@@ -211,7 +212,7 @@ describe('createLandItineraryServices — characterization', () => {
         {
           "client_price": 150,
           "day": "itinerary_days-8",
-          "quantity": 1,
+          "quantity": 2,
           "service_code": "hotel-1",
           "service_type": "accommodation",
           "total_cost": 120,

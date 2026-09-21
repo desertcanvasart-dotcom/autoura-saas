@@ -18,7 +18,7 @@ import {
 } from '@/lib/ai/staff-rate-resolution'
 import type { ServiceTier, InputMode, ExtractedDay } from '@/lib/ai/parsing-utils'
 import {
-  isValidDate, toNumber, normalizeTier, calculateExpectedDays,
+  isValidDate, normalizeTier, calculateExpectedDays,
 } from '@/lib/ai/parsing-utils'
 import { detectCruiseRequest, determinePackageType } from '@/lib/ai/cruise-detection'
 import type { CruiseDetectionResult } from '@/lib/ai/cruise-detection'
@@ -37,9 +37,10 @@ import { loadDestinationPromptContext } from '@/lib/ai/destination-context'
 import { getTenantRunCurrency, DEFAULT_RUN_CURRENCY } from '@/lib/rates/run-currency'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { createCruiseItineraryServices } from '@/lib/ai/cruise-service-creation'
-import { createLandItineraryServices } from '@/lib/ai/service-creation'
+import { createLandItineraryServices, hotelNightsForGeneratedDays, guidedDaysOfGeneratedItinerary } from '@/lib/ai/service-creation'
 import { transportNeedsForGeneratedDays } from '@/lib/ai/day-transport'
-import { getTransportRateFor, type TransportServiceType, type TransportDuration } from '@/lib/auto-pricing-service'
+import { getTransportRateFor, getGuideRate, getHotelRates, type TransportServiceType, type TransportDuration } from '@/lib/auto-pricing-service'
+import { ambiguityMessage } from '@/lib/pricing/candidate-selection'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors)
 let _supabaseAdmin: ReturnType<typeof createAdminClient> | null = null
@@ -458,7 +459,6 @@ export async function POST(request: NextRequest) {
       special_requests = [],
       budget_level = 'standard',
       tier: raw_tier = null,
-      hotel_name,
       city: requested_city = null,
       client_id = null,
       nationality = null,
@@ -892,8 +892,8 @@ export async function POST(request: NextRequest) {
     // exchange rate comes back with its amounts NULLED (never-guess), which
     // the requireUsableRate checks below already report as a gap.
     //
-    // `vehicles` and `hotel_contacts` are deliberately absent: neither carries
-    // rate_currency, so their amounts are single-currency by design.
+    // (Transport, guides and hotels are not read here at all any more: they
+    // come through the tour engine's lookups, which convert for themselves.)
     const inRunCurrency = <T extends Record<string, unknown>>(table: string, rows: T[] | null | undefined) =>
       normalizeRateRows(supabase, table, rows, tenantRunCurrency)
 
@@ -902,14 +902,11 @@ export async function POST(request: NextRequest) {
     // It used to come from the FLEET table (`vehicles.daily_rate`): no agency
     // has a fleet vehicle on file, so this lookup withheld every price.
 
-    const { data: raw_guides, error: guidesError } = await supabase.from('guides').select('*').eq('is_active', true).eq('tier', tier).contains('languages', [finalLanguage]).limit(5)
-    const guides = await inRunCurrency('guides', raw_guides as Record<string, unknown>[])
-    requireRates(rateHoles, {
-      kind: 'guide', tier, table: 'guides', error: guidesError, rows: guides,
-      lookupAttempted: `guides where is_active, tier = '${tier}', speaks '${finalLanguage}'`,
-      message: `No active ${tier} guide speaking ${finalLanguage} is set up. Add one in Rates → Guides with a daily rate.`,
-    })
-    const selectedGuide = guides?.[0] as any
+    // The GUIDE and the HOTELS are priced further down, once the days exist —
+    // from Rates → Guides and Rates → Hotels, by the tour engine's own lookups.
+    // They came from a guide ROSTER (`guides.daily_rate`) and a hotel CONTACTS
+    // list (`hotel_contacts.rate_double_eur`): no agency has a row in either,
+    // so both lookups withheld every price.
 
     const { data: raw_allEntranceFees, error: entranceFeesError } = await supabase.from('entrance_fees').select('*').eq('is_active', true)
     const allEntranceFees = await inRunCurrency('entrance_fees', raw_allEntranceFees as Record<string, unknown>[])
@@ -1014,33 +1011,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    let hotelRate = 0
-    let hotelName_final = hotel_name || 'Standard Hotel'
-    let selectedHotel = null
-
-    if (includeAccommodationFinal) {
-      const { data: hotels, error: hotelsError } = await supabase.from('hotel_contacts').select('*').ilike('city', effectiveCity).eq('is_active', true).eq('tier', tier).order('is_preferred', { ascending: false }).limit(5)
-      const haveHotels = requireRates(rateHoles, {
-        kind: 'hotel', tier, table: 'hotel_contacts', error: hotelsError, rows: hotels,
-        lookupAttempted: `hotel_contacts in '${effectiveCity}' where is_active and tier = '${tier}'`,
-        message: `No active ${tier} hotel is set up for ${effectiveCity}. Add one in Rates → Hotels with a double-room rate.`,
-      })
-      if (haveHotels) {
-        selectedHotel = hotels![0] as any
-        hotelRate = toNumber(selectedHotel.rate_double_eur, 0)
-        hotelName_final = selectedHotel.name
-        // A hotel row with no rate prices accommodation at zero, which reads as
-        // "included" on a quote. That is a gap, not a free room.
-        if (hotelRate <= 0) {
-          addHole({
-            kind: 'hotel', tier, reason: 'missing',
-            lookupAttempted: `rate_double_eur for '${selectedHotel.name}'`,
-            message: `${selectedHotel.name} has no double-room rate. Add one in Rates → Hotels.`,
-          })
-        }
-      }
-    }
-
     // Tipping — the agency's rows, priced by the SAME rules as the tour engine
     // (lib/pricing/tipping.ts): every unit and context, no tier scaling, and
     // never a gap. This used to take the Per Day rows only, scale them 0.8–1.5
@@ -1050,17 +1020,6 @@ export async function POST(request: NextRequest) {
       .select('id, tenant_id, role_type, context, rate_unit, rate_eur, rate_currency, city')
       .eq('is_active', true)
     const tippingRows = ((await inRunCurrency('tipping_rates', raw_tippingRates as Record<string, unknown>[])) ?? []) as TippingRow[]
-
-    // `daily_rate`, not `daily_rate_eur` — the latter does not exist, so this
-    // was silently 0 and every quote said guiding was free.
-    const guidePerDay = selectedGuide
-      ? (requireUsableRate(rateHoles, selectedGuide.daily_rate, {
-          kind: 'guide', tier, table: 'guides',
-          lookupAttempted: `daily_rate for guide '${selectedGuide.full_name ?? selectedGuide.name ?? selectedGuide.id}'`,
-          message: `The selected ${tier} guide has no daily rate. Add one in Rates → Guides.`,
-        }) ?? 0)
-      : 0
-    const roomsNeeded = Math.ceil(totalPax / 2)
 
     // ============================================
     // THE GATE: an itinerary with any rate gap is NOT priced.
@@ -1146,6 +1105,9 @@ export async function POST(request: NextRequest) {
     // known now (the day rules above decide), so the gate is re-checked here:
     // a needed rate that is not there is a gap, and a gap withholds the price.
     const transportByDay: Record<number, { rate: number; label: string; vehicleType: string; rateId: string }> = {}
+    const hotelByDay: Record<number, { ppd: number; singleSupplement: number; hotelName: string; rateId: string }> = {}
+    let guidePerDay = 0
+    let selectedGuide: { id: string; name: string } | null = null
     if (!skip_pricing) {
       for (const need of transportNeedsForGeneratedDays(itineraryData?.days, effectiveCity)) {
         const found = await getTransportRateFor({ tenantId: tenant_id }, {
@@ -1161,8 +1123,54 @@ export async function POST(request: NextRequest) {
           message: `Day ${need.day} needs ${need.label} (${where}) and there is no such rate for a group of ${totalPax}. Add it in Rates → Transportation.`,
         })
       }
+
+      // THE GUIDE — Rates → Guides, for the language and tier asked for. Only
+      // when some day is actually guided: a beach-and-transfers trip needs none.
+      if (guidedDaysOfGeneratedItinerary(itineraryData?.days).length > 0) {
+        const found = await getGuideRate({ tenantId: tenant_id }, finalLanguage, tier)
+        if (found && found.source === 'db' && found.dailyRate > 0) {
+          guidePerDay = Math.round(found.dailyRate * 100) / 100
+          selectedGuide = { id: found.id, name: found.name }
+        } else {
+          addHole({
+            kind: 'guide', tier, reason: found && !found.ambiguous ? 'fuzzy' : 'missing',
+            lookupAttempted: `${finalLanguage} guide (${tier})`,
+            message: found?.ambiguous
+              ? ambiguityMessage(`${tier} ${finalLanguage}-speaking guides`, found.ambiguous, 'Rates → Guides')
+              : `No exact ${tier} ${finalLanguage}-speaking guide rate. Add it in Rates → Guides.`,
+          })
+        }
+      }
+
+      // THE HOTELS — Rates → Hotels, night by night: the night's own city, the
+      // tier, and the night's own date. One gap per city, as the engine reports.
+      const holedHotelCities = new Set<string>()
+      for (const night of hotelNightsForGeneratedDays(itineraryData?.days, { durationDays: itineraryData?.total_days || duration_days, effectiveCity, includeAccommodationFinal })) {
+        const date = new Date(startDateObj); date.setDate(startDateObj.getDate() + night.day - 1)
+        const rates = night.city ? await getHotelRates({ tenantId: tenant_id }, night.city, tier, date.toISOString().split('T')[0]) : null
+        if (rates && rates.source === 'db' && rates.ppdNight > 0) {
+          hotelByDay[night.day] = {
+            ppd: Math.round(rates.ppdNight * 100) / 100, singleSupplement: Math.round(rates.singleSuppNight * 100) / 100,
+            hotelName: rates.hotelName, rateId: rates.hotelId ?? '',
+          }
+          continue
+        }
+        const where = night.city || 'no city'
+        if (holedHotelCities.has(where)) continue
+        holedHotelCities.add(where)
+        addHole({
+          kind: 'hotel', tier, reason: rates && !rates.ambiguous && !rates.periodBlank && !rates.periodGap ? 'fuzzy' : 'missing',
+          lookupAttempted: `hotel rate (${where}, ${tier})`,
+          message: !night.city ? `Day ${night.day} has a hotel night and names no city, so no hotel can be priced for it.`
+            : rates?.ambiguous ? ambiguityMessage(`${tier} hotels in ${night.city}`, rates.ambiguous, 'Rates → Hotels')
+            : rates?.periodBlank ? `${rates.periodBlank.propertyName}'s "${rates.periodBlank.periodName}" period has no nightly rate. Fill it in Rates → Hotels.`
+            : rates?.periodGap ? `${rates.periodGap.propertyName} has rate periods, but none covers ${rates.periodGap.date}. Add a period for that date in Rates → Hotels.`
+            : `No exact ${tier} hotel rate for ${night.city}. Add it in Rates → Hotels.`,
+        })
+      }
+
       if (!pricingBlocked && holes.length > 0) {
-        console.warn('[generate-itinerary] pricing withheld — transport rate gap(s):', holes.map(h => h.lookupAttempted).join(' | '))
+        console.warn('[generate-itinerary] pricing withheld — rate gap(s) found once the days were known:', holes.map(h => h.lookupAttempted).join(' | '))
       }
       pricingBlocked = holes.length > 0
       effectiveSkipPricing = skip_pricing || pricingBlocked
@@ -1220,7 +1228,7 @@ export async function POST(request: NextRequest) {
       skipPricing: effectiveSkipPricing, withMargin, tier, finalLanguage,
       includeLunch: include_lunch, includeDinner: include_dinner, includeAccommodationFinal,
       guidePerDay, selectedGuide,
-      selectedHotel, hotelRate, hotelName_final, roomsNeeded,
+      hotelByDay,
       airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
       tippingRows, allEntranceFees, transportByDay,
     })
