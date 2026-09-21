@@ -811,7 +811,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       // A day tour's day never has to SAY it has sightseeing — it is one.
       sightseeingUnstated: statement === 'unstated' && !isDayTour,
       /** A day-tour day that names no attraction: the guide, the vehicle and
-       *  the tips are priced, but its entrance fees cannot be. */
+       *  the tips are asked for, but its entrance fees cannot be. */
       dayTourWithoutAttractions: isDayTour && !saysNoSightseeing && attractions.length === 0 && attraction_ids.length === 0,
       city: day.city || inferCityFromTitle(day.title || ''),
       // A sleeping-train night has no hotel bed — the ticket IS the bed
@@ -3730,11 +3730,41 @@ export async function calculateDayBasedPricing(
   }
 
   // ============================================
-  // STEP 9: Add transport services (for 2 pax baseline)
+  // STEP 9: The transport LINES — for the group being priced
   // ============================================
+  // These lines are what the breakdown shows; the money comes from
+  // transportAtPax() in step 10. They used to be sized for TWO passengers
+  // whatever the group, so at four the calculator showed the sedan (66.98)
+  // above a subtotal that had charged the minivan: reported from production
+  // 2026-09-21, the rows of 37 of 45 live tours did not add up at four
+  // passengers. Same seats, same city rule as transportAtPax, so the row IS
+  // the vehicle that was charged. No group asked for (the rate sheet, the
+  // tours page) keeps the two-passenger lines it always had.
+  const shownSeats = (requestedPax ?? 2) + (throughoutGuide ? 1 : 0)
+  const vehicleFor = (seats: number, city: string | undefined): VehicleType =>
+    getVehicleTypeByPax(seats, city, vehicleBands)
 
-  const baseVehicleType = getVehicleTypeByPax(2, undefined, vehicleBands)
-  let baseTransportCost = 0
+  /** The rate for one of a day's extra transfers (dinner out, a local
+   *  transfer), for a vehicle. One lookup, used by the lines AND the total. */
+  const findExtraTransfer = (day: ItineraryDay, extra: ExtraTransfer, vehicleType: VehicleType) => {
+    // No duration: `transportation_rates.duration` is NULL on all 2,040
+    // production rows — the length of a journey is carried by the service
+    // type itself (Half Day, Long Day Tour, Multi-Day). Asking for
+    // 'one_way' here would miss every real row on the exact key and match it
+    // as APPROXIMATE instead, turning a rate that exists into a gap.
+    let match = null as ReturnType<typeof findTransportRate>
+    for (const serviceType of [extra.serviceType, ...(extra.alsoTry ?? [])]) {
+      match = findTransportRate(transportCache, {
+        serviceType,
+        city: day.city,
+        duration: '' as never,
+        area: null,
+        vehicleType,
+      })
+      if (match && match.source === 'db') break
+    }
+    return match
+  }
 
   for (const info of transportInfoByDay) {
     if (!info.requiresTransport) continue
@@ -3742,7 +3772,7 @@ export async function calculateDayBasedPricing(
     const { needs } = info
 
     // Determine vehicle type
-    let vehicleType: VehicleType = baseVehicleType
+    let vehicleType: VehicleType = vehicleFor(shownSeats, info.city)
     if (needs.useSpecialVehicle && needs.specialVehicleType) {
       vehicleType = needs.specialVehicleType
     }
@@ -3759,7 +3789,6 @@ export async function calculateDayBasedPricing(
     })
 
     if (match && match.source === 'db') {
-      baseTransportCost += match.rate.base_rate_eur
       services.push({
         id: `day${info.day}-transport`,
         dayNumber: info.day,
@@ -3793,24 +3822,9 @@ export async function calculateDayBasedPricing(
   // local transfer the operator ticked. Priced per day, at the day's city.
   for (const day of itinerary) {
     for (const extra of extraTransfersFor(day)) {
-      // No duration: `transportation_rates.duration` is NULL on all 2,040
-      // production rows — the length of a journey is carried by the service
-      // type itself (Half Day, Long Day Tour, Multi-Day). Asking for
-      // 'one_way' here would miss every real row on the exact key and match it
-      // as APPROXIMATE instead, turning a rate that exists into a gap.
-      let match = null as ReturnType<typeof findTransportRate>
-      for (const serviceType of [extra.serviceType, ...(extra.alsoTry ?? [])]) {
-        match = findTransportRate(transportCache, {
-          serviceType,
-          city: day.city,
-          duration: '' as never,
-          area: null,
-          vehicleType: baseVehicleType,
-        })
-        if (match && match.source === 'db') break
-      }
+      const extraVehicle = vehicleFor(shownSeats, day.city)
+      const match = findExtraTransfer(day, extra, extraVehicle)
       if (match && match.source === 'db') {
-        baseTransportCost += match.rate.base_rate_eur
         services.push({
           id: `day${day.day}-${extra.slug}`,
           dayNumber: day.day,
@@ -3832,9 +3846,9 @@ export async function calculateDayBasedPricing(
           tier,
           dayNumber: day.day,
           city: day.city,
-          vehicleType: baseVehicleType,
-          lookupAttempted: `${extra.serviceType}/one_way ${baseVehicleType} in ${day.city}`,
-          message: `No ${extra.label.toLowerCase()} rate for ${baseVehicleType} in ${day.city || 'this day'}. Add it in Rates → Transportation.`,
+          vehicleType: extraVehicle,
+          lookupAttempted: `${extra.serviceType}/one_way ${extraVehicle} in ${day.city}`,
+          message: `No ${extra.label.toLowerCase()} rate for ${extraVehicle} in ${day.city || 'this day'}. Add it in Rates → Transportation.`,
         })
       }
     }
@@ -3893,6 +3907,31 @@ export async function calculateDayBasedPricing(
           lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
           message: `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
         })
+      }
+    }
+    // THE EXTRA TRANSFERS ARE PART OF THE PRICE. Dinner out and the local
+    // transfer (#459) were pushed onto the breakdown as lines and added to a
+    // running total that nothing ever read — so a quote SHOWED "Dinner
+    // transfer 25.00" and charged nothing for it. Latent on production only
+    // because no such rate matched yet; the operator is about to add them.
+    for (const day of itinerary) {
+      for (const extra of extraTransfersFor(day)) {
+        const vehicleType = vehicleFor(pax, day.city)
+        const match = findExtraTransfer(day, extra, vehicleType)
+        if (match && match.source === 'db') {
+          transportCost += match.rate.base_rate_eur
+        } else {
+          addHole({
+            kind: 'transport',
+            reason: match ? 'fuzzy' : 'missing',
+            tier,
+            dayNumber: day.day,
+            city: day.city,
+            vehicleType,
+            lookupAttempted: `${extra.serviceType}/one_way ${vehicleType} in ${day.city}`,
+            message: `No ${extra.label.toLowerCase()} rate for ${vehicleType} in ${day.city || 'this day'}. Add it in Rates → Transportation.`,
+          })
+        }
       }
     }
     return transportCost

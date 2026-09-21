@@ -842,7 +842,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
               nothing was priced as a free day without anyone deciding that. */}
           {isDayTour && (
             <p className="text-[11px] text-gray-500 mt-2">
-              This is a day tour: its guide, vehicle and tips are always priced, and it has no night.
+              This is a day tour: its guide, vehicle and tips are always included in the price, and it has no night.
               Pick the attractions above so their entrance fees are priced too.
             </p>
           )}

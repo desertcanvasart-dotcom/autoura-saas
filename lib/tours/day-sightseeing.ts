@@ -89,5 +89,8 @@ export function dayTourNamesNoAttractions(day: DayLike | null | undefined): bool
   return sightseeingStatement({ attractions: day.attractions, attraction_ids: day.attraction_ids }) !== 'attractions'
 }
 
+// "…the guide, the vehicle and the tips are [priced]" is what this used to
+// say — directly above a row reading "Tips — no rate". They are ASKED FOR;
+// whether each has a rate is that row's business, not this message's.
 export const DAY_TOUR_NO_ATTRACTIONS =
-  'names no attractions, so its entrance fees cannot be priced — the guide, the vehicle and the tips are'
+  'names no attractions, so its entrance fees cannot be priced. The guide, the vehicle and the tips do not depend on them and are worked out separately'
