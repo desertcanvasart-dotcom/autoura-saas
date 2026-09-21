@@ -21,10 +21,14 @@
  *   Year-scoped, tolerates row deletions, and survives 4-digit counters
  *   (a lexicographic DESC put '999' above '1000').
  *
- * The matching DB migration (20260626_unique_document_numbers.sql) adds
- * UNIQUE constraints on each column. Callers should wrap the INSERT in
- * `insertWithUniqueRetry` so a 23505 collision regenerates the number and
- * retries instead of crashing the request.
+ * Each number is UNIQUE PER AGENCY — (tenant_id, number), migrations 006 and
+ * 258. Callers should wrap the INSERT in `insertWithUniqueRetry` so a 23505
+ * collision regenerates the number and retries instead of crashing the
+ * request. (The sibling's migration made them unique across the whole
+ * database, and that reached this one by hand: the second agency's first
+ * invoice then collided with the first's, and the retry — which cannot see
+ * the other agency's rows — regenerated the same number until it gave up.
+ * Migration 375 removed those.)
  *
  * Ported from sibling app lib/document-numbering.ts.
  */
@@ -32,7 +36,9 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 
 interface NextDocumentNumberOpts {
-  /** A SupabaseClient that can read the target table (service-role admin). */
+  /** The CALLER's client, so RLS scopes the scan to their agency — that is
+   *  what makes the numbering per-agency. A service-role client would scan
+   *  every agency's rows and number them as one. */
   supabase: SupabaseClient
   /** Prefix, e.g. 'EXP', 'INV', 'SI'. */
   prefix: string
