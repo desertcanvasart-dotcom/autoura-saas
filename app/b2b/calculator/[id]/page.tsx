@@ -867,7 +867,7 @@ export default function TourPriceCalculator() {
                       <td colSpan={5} className="px-4 py-2 text-right">Subtotal:</td>
                       <td className="px-4 py-2 text-right">€{result.subtotal_cost.toFixed(2)}</td>
                     </tr>
-                    {result.tour_leader_included && result.tour_leader_cost && (
+                    {result.tour_leader_included && typeof result.tour_leader_cost === 'number' && result.tour_leader_cost > 0 && (
                       <tr>
                         <td colSpan={5} className="px-4 py-2 text-right text-blue-600">Tour Leader Cost:</td>
                         <td className="px-4 py-2 text-right text-blue-600">€{result.tour_leader_cost.toFixed(2)}</td>
