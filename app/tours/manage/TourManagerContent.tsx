@@ -2952,6 +2952,15 @@ export default function TourManagerContent() {
                       onSelect={addAttraction}
                       onRemove={removeAttraction}
                     />
+                    {/* Where these are PRICED — lib/tours/day-attractions.
+                        A one-day tour's single day takes them; a longer tour's
+                        days each name their own, because this list does not
+                        say which day visits what. */}
+                    <p className="mt-2 text-xs text-gray-500">
+                      {formData.itinerary.length <= 1
+                        ? 'On a one-day tour these are the entrance fees the day is priced for — unless the day names its own.'
+                        : 'These describe the tour. Entrance fees are priced from each DAY\'s attractions: press Edit on a day and pick what that day visits.'}
+                    </p>
                   </div>
 
                   {/* 3. Day-by-Day Itinerary (with meals per day) */}

@@ -20,6 +20,7 @@
 import { chooseEntranceFee } from './entrance-fee-match'
 import { buildAliasIndex, resolveAttractionAlias, type AttractionAliasRow } from './attraction-aliases'
 
+import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { COMBO_SEPARATOR, MAX_ALIAS_LENGTH, canonicalParts, type AliasHealth, type FeeName, type UnresolvedWording } from './alias-shared'
 
 // The browser-safe pieces live in ./alias-shared (see the note there); they
@@ -95,8 +96,8 @@ export function validateAlias(
 
 // ---- what the agency's tours say that finds no fee ----
 
-export interface TourDay { attractions?: unknown; attraction_ids?: unknown }
-export interface TourForScan { template_name?: string | null; itinerary?: unknown }
+export interface TourDay { attractions?: unknown; attraction_ids?: unknown; sightseeing?: unknown }
+export interface TourForScan { template_name?: string | null; itinerary?: unknown; main_attractions?: unknown }
 
 /**
  * Every attraction wording in the agency's tours that does not reach exactly
@@ -114,7 +115,9 @@ export function unresolvedWordings(
     const days = Array.isArray(tour.itinerary) ? (tour.itinerary as TourDay[]) : []
     for (const day of days) {
       if (Array.isArray(day.attraction_ids) && day.attraction_ids.length > 0) continue
-      const worded = Array.isArray(day.attractions) ? day.attractions.filter((a): a is string => typeof a === 'string' && a.trim() !== '') : []
+      // The same wording the engine prices: a one-day tour's day takes the
+      // attractions picked on the tour (lib/tours/day-attractions).
+      const worded = wordedAttractionsForDay(day, days.length, tour.main_attractions)
       for (const wording of worded) {
         for (const lookedUp of resolveAttractionAlias(wording, index)) {
           const choice = chooseEntranceFee(fees, lookedUp)
