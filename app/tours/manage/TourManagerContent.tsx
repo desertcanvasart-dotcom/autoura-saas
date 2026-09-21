@@ -45,6 +45,7 @@ import { useTierConfigs, useVocabulary } from '@/components/vocabulary'
 import { suggestTourType, durationForType, isSingleDayType } from '@/lib/tours/tour-type'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { applyDayForm, wordedAttractions } from '@/lib/tours/day-edit'
+import { legRoute, legAssistance, arrivalDayIndex, routeAirportCode, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
 import { sightseeingStatement, isDayTourProgramme, dayTourNamesNoAttractions, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
@@ -129,6 +130,11 @@ interface ItineraryDay {
   /** The EXACT ticket row when several serve the route ("Auto" = resolve
    *  by route at pricing time; ambiguity becomes a named hole). */
   transport_rate_id?: string
+  /** The leg's own route, when it is not "yesterday's city → today's", and a
+   *  flight's airport assistance (lib/pricing/flight-leg.ts). */
+  leg_from?: string
+  leg_to?: string
+  leg_assist?: LegAssist
   /** The hotel for this night, chosen per tier — the engine pins to it. */
   property_by_tier?: Record<string, string>
   /** A non-sightseeing transfer in town: sound & light, the market, dinner. */
@@ -411,6 +417,10 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   // Travel mode + optional exact row (B-item 2). '' = road, as before.
   const [dayTransportType, setDayTransportType] = useState<'' | 'flight' | 'train' | 'sleeping_train'>('')
   const [dayTransportRateId, setDayTransportRateId] = useState('')
+  const [dayLegFrom, setDayLegFrom] = useState('')
+  const [dayLegTo, setDayLegTo] = useState('')
+  // Only the ends the operator SET; an end left alone keeps the day's default.
+  const [dayLegAssist, setDayLegAssist] = useState<LegAssist>({})
   // Where the day is, and where the night is spent. Both were guessed from
   // the title before: an unplaced day priced as Cairo, and one mention of a
   // cruise made every night a cruise night.
@@ -484,6 +494,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayAttractions([])
     setDayTransportType('')
     setDayTransportRateId('')
+    setDayLegFrom('')
+    setDayLegTo('')
+    setDayLegAssist({})
     setDayCity('')
     setDayNight('')
     setDayProperties({})
@@ -511,6 +524,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayAttractions((day.attraction_ids || []).map((id, i) => ({ id, name: (day.attractions || [])[i] || id })))
     setDayTransportType((day.transport_type as typeof dayTransportType) || '')
     setDayTransportRateId(day.transport_rate_id || '')
+    setDayLegFrom(day.leg_from || '')
+    setDayLegTo(day.leg_to || '')
+    setDayLegAssist(sanitizeLegAssist(day.leg_assist) ?? {})
     setDayCity(day.city || '')
     setDayProperties((day.property_by_tier as Record<string, string>) || {})
     setDayCityTransfer(day.city_transfer === true)
@@ -519,6 +535,18 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayNight((day.accommodation_type as typeof dayNight) || '')
     setDayMealsError(null)
   }
+
+  // The leg this day's ticket runs, and its airport assistance, exactly as
+  // pricing reads them (lib/pricing/flight-leg.ts) — so the greyed route and
+  // the ticked boxes ARE what will be priced.
+  const formDayIndex = editingDayIndex ?? itinerary.length
+  const isArrivalDayForm = formDayIndex === (itinerary.length === 0 ? 0 : arrivalDayIndex(itinerary))
+  const usualLeg = dayTransportType
+    ? legRoute(dayTransportType, { city: dayCity }, itinerary[formDayIndex - 1], itinerary[formDayIndex + 1])
+    : { from: '', to: '' }
+  const shownAssist = legAssistance(dayLegAssist, isArrivalDayForm)
+  const legFromCode = routeAirportCode(dayLegFrom.trim() || usualLeg.from)
+  const legToCode = routeAirportCode(dayLegTo.trim() || usualLeg.to)
 
   const addDay = () => {
     const unstated = MEAL_SLOTS.filter(k => dayMeals[k] === '')
@@ -546,6 +574,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       picked: dayAttractions,
       transportType: dayTransportType,
       transportRateId: dayTransportRateId,
+      legFrom: dayLegFrom,
+      legTo: dayLegTo,
+      legAssist: dayLegAssist,
       city: dayCity,
       night: dayNight,
       cityTransfer: dayCityTransfer,
@@ -874,7 +905,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
               <button
                 key={label}
                 type="button"
-                onClick={() => { setDayTransportType(value as typeof dayTransportType); setDayTransportRateId('') }}
+                onClick={() => { setDayTransportType(value as typeof dayTransportType); setDayTransportRateId(''); if (!value) { setDayLegFrom(''); setDayLegTo('') } if (value !== 'flight') setDayLegAssist({}) }}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
                   dayTransportType === value
                     ? 'bg-green-600 text-white border-green-600'
@@ -906,6 +937,60 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                   ? 'Board tonight, wake in the next day\u2019s city \u2014 no hotel bed this night.'
                   : 'The leg runs from the previous day\u2019s city to this one; several matching rates become a pick-the-exact-one hole unless named here.'}
               </p>
+
+              {/* The leg's OWN route (lib/pricing/flight-leg.ts). Left blank it
+                  is the usual one, shown greyed; typed, it wins — which is how
+                  a CONNECTION on the arrival day is said: Cairo → Luxor on day
+                  1, where there is no "previous day's city" to leave from. */}
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-gray-500 shrink-0">Route:</span>
+                <input
+                  type="text" value={dayLegFrom} onChange={e => setDayLegFrom(e.target.value)} maxLength={80}
+                  aria-label="Leg from"
+                  placeholder={usualLeg.from || 'From \u2014 a city, or an airport code (NRT)'}
+                  className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 rounded-lg"
+                />
+                <span className="text-xs text-gray-400">\u2192</span>
+                <input
+                  type="text" value={dayLegTo} onChange={e => setDayLegTo(e.target.value)} maxLength={80}
+                  aria-label="Leg to"
+                  placeholder={usualLeg.to || 'To'}
+                  className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-300 rounded-lg"
+                />
+              </div>
+              {!usualLeg.from && !dayLegFrom.trim() && dayTransportType !== 'sleeping_train' && (
+                <p className="text-[11px] text-amber-700 mt-1">
+                  This is the first day, so there is no previous city to leave from \u2014 without a From, no ticket is priced. Type where the flight leaves from (Cairo for a connection after landing).
+                </p>
+              )}
+
+              {dayTransportType === 'flight' && (
+                <div className="mt-2 space-y-1">
+                  <label className="flex items-center gap-2 text-xs text-gray-700">
+                    <input
+                      type="checkbox" checked={shownAssist.from}
+                      onChange={e => setDayLegAssist(prev => ({ ...prev, from: e.target.checked }))}
+                      className="rounded border-gray-300"
+                    />
+                    {isArrivalDayForm
+                      ? `Meet & greet on landing${legFromCode ? ` at ${legFromCode}` : ''}`
+                      : `Departure assistance${legFromCode ? ` at ${legFromCode}` : ''}`}
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-gray-700">
+                    <input
+                      type="checkbox" checked={shownAssist.to}
+                      onChange={e => setDayLegAssist(prev => ({ ...prev, to: e.target.checked }))}
+                      className="rounded border-gray-300"
+                    />
+                    {`Arrival assistance${legToCode ? ` at ${legToCode}` : ''}`}
+                  </label>
+                  <p className="text-[11px] text-gray-500">
+                    {isArrivalDayForm
+                      ? 'On the arrival day both are on unless you untick them: the party is met where the international flight lands, and again where the connection lands.'
+                      : 'Off unless you tick them \u2014 a flight in the middle of a trip is priced as its ticket alone, as before.'}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -987,6 +1072,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                   <p className="text-xs text-sky-700 mt-0.5">
                     Travel: {day.transport_type === 'sleeping_train' ? 'Sleeping train' : day.transport_type === 'train' ? 'Day train' : 'Flight'}
                     {day.transport_rate_id ? ' (named rate)' : ' (auto by route)'}
+                    {(day.leg_from || day.leg_to) && ` · ${day.leg_from || '…'} → ${day.leg_to || '…'}`}
                   </p>
                 )}
                 {(() => {

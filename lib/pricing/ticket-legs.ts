@@ -1,3 +1,5 @@
+import { legRoute } from './flight-leg'
+
 // ============================================
 // Ticket legs — flights, day trains, sleeping trains (B-item 2)
 // ============================================
@@ -19,6 +21,10 @@ export interface TicketLegDay {
   city: string
   transport_type?: TicketMode
   transport_rate_id?: string
+  /** The leg's OWN route, when it is not "yesterday's city → today's" — a
+   *  connection on the arrival day (lib/pricing/flight-leg.ts). */
+  leg_from?: string
+  leg_to?: string
 }
 
 export interface TicketLeg {
@@ -43,11 +49,14 @@ export function normalizeStationCity(city: string | null | undefined): string {
 /**
  * Collect the ticket legs an itinerary implies.
  *
- * - flight / day train: only on an actual city change — the leg runs from
- *   the PREVIOUS day's city to this day's city. A marked day without a
- *   city change is not a leg (nothing to ride).
- * - sleeping train: board tonight, wake there — the leg runs from THIS
- *   day's city to the NEXT day's city.
+ * - flight / day train: the leg runs from the PREVIOUS day's city to this
+ *   day's city.
+ * - sleeping train: board tonight, wake there — the leg runs from THIS day's
+ *   city to the NEXT day's city.
+ * - THE DAY'S OWN ROUTE WINS (leg_from / leg_to): a connection on the arrival
+ *   day has no previous city, and used to be no leg at all.
+ * - Only an actual change of place is a leg: a marked day whose two ends are
+ *   the same station is nothing to ride.
  * - An unmarked city change stays a road transfer, exactly as before.
  */
 export function collectTicketLegs(days: TicketLegDay[]): TicketLeg[] {
@@ -55,29 +64,10 @@ export function collectTicketLegs(days: TicketLegDay[]): TicketLeg[] {
   for (let i = 0; i < days.length; i++) {
     const day = days[i]
     if (!day.transport_type) continue
-    if (day.transport_type === 'sleeping_train') {
-      const next = days[i + 1]
-      if (!next) continue
-      if (normalizeStationCity(day.city) === normalizeStationCity(next.city)) continue
-      legs.push({
-        mode: 'sleeping_train',
-        from: day.city,
-        to: next.city,
-        dayNumber: day.day,
-        namedRateId: day.transport_rate_id,
-      })
-      continue
-    }
-    const prev = days[i - 1]
-    if (!prev) continue
-    if (normalizeStationCity(prev.city) === normalizeStationCity(day.city)) continue
-    legs.push({
-      mode: day.transport_type,
-      from: prev.city,
-      to: day.city,
-      dayNumber: day.day,
-      namedRateId: day.transport_rate_id,
-    })
+    const { from, to } = legRoute(day.transport_type, day, days[i - 1], days[i + 1])
+    if (!from || !to) continue
+    if (normalizeStationCity(from) === normalizeStationCity(to)) continue
+    legs.push({ mode: day.transport_type, from, to, dayNumber: day.day, namedRateId: day.transport_rate_id })
   }
   return legs
 }

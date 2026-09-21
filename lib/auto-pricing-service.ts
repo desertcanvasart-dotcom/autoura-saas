@@ -52,6 +52,7 @@ import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
+import { knownAirportCode, routeAirportCode, legAssistance, arrivalDayIndex, sanitizeLegPlace, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
@@ -171,6 +172,13 @@ export interface ItineraryDay {
   transport_type?: 'flight' | 'train' | 'sleeping_train'
   /** The EXACT ticket row when several serve the route; named rows win. */
   transport_rate_id?: string
+  /** The leg's own route when it is not "yesterday's city → today's" — a
+   *  connection on the arrival day (lib/pricing/flight-leg.ts). */
+  leg_from?: string
+  leg_to?: string
+  /** Airport assistance at each end of a flight leg; absent = the day's
+   *  default (on for an arrival-day connection, off otherwise). */
+  leg_assist?: LegAssist
   /** The property this night is spent at, chosen per tier: the same programme
    *  is sold at several tiers and each has its own hotel. The value is the
    *  rate row's id, which the engine PINS to — a chosen property that is
@@ -523,17 +531,8 @@ export function getVehicleTypeByPax(totalPax: number, city?: string, bands?: Veh
  * client could be sent. Callers record a hole instead.
  */
 export function getAirportCode(city: string): string | null {
-  const cityMap: Record<string, string> = {
-    'cairo': 'CAI',
-    'luxor': 'LXR',
-    'aswan': 'ASW',
-    'hurghada': 'HRG',
-    'sharm el-sheikh': 'SSH',
-    'sharm': 'SSH',
-    'alexandria': 'ALY',
-    'abu simbel': 'ABS'
-  }
-  return cityMap[(city || '').toLowerCase().trim()] ?? null
+  // One map, in the client-safe module the day editor reads too.
+  return knownAirportCode(city)
 }
 
 /**
@@ -842,6 +841,9 @@ export function parseItinerary(itineraryData: any, opts?: {
       attraction_ids,
       transport_type,
       transport_rate_id,
+      // Only a day that travels by ticket has a leg to name.
+      ...(transport_type ? { leg_from: sanitizeLegPlace(day.leg_from), leg_to: sanitizeLegPlace(day.leg_to) } : {}),
+      ...(transport_type === 'flight' ? { leg_assist: sanitizeLegAssist(day.leg_assist) } : {}),
       city_transfer: day.city_transfer === true,
       sightseeing_length:
         day.sightseeing_length === 'half_day' || day.sightseeing_length === 'long_day_tour'
@@ -3396,9 +3398,63 @@ export async function calculateDayBasedPricing(
     const checkinLevel: HotelServiceType = day.services.hotel_checkin_level ?? 'checkin_assist'
     const checkoutLevel: HotelServiceType = day.services.hotel_checkout_level ?? 'checkout_assist'
 
+    // ----- A FLIGHT LEG'S TWO ENDS (lib/pricing/flight-leg.ts) -----
+    // On the arrival day a flight leg is a CONNECTION: the party is met where
+    // the international flight lands — the leg's origin, and that IS the day's
+    // Meet & Greet — and, by default, again where the connection lands. On any
+    // other flight day both ends default to no assistance, which is what every
+    // existing programme priced.
+    const flightLeg = ticketLegs.find(l => l.dayNumber === day.day && l.mode === 'flight')
+    const isArrivalDay = i === arrivalDayIndex(itinerary)
+    const legAssist = flightLeg ? legAssistance(day.leg_assist, isArrivalDay) : { from: false, to: false }
+    const connectionArrival = Boolean(flightLeg && isArrivalDay)
+    // Where the party LANDS: the connection's origin, else the day's city. A
+    // typed three-letter code counts; an unknown place is a gap naming it.
+    const landsAt = connectionArrival && flightLeg ? flightLeg.from : day.city
+    const meetOnArrival = connectionArrival ? legAssist.from : day.services.airport_arrival
+
+    const legEndAssist = async (place: string, direction: 'arrival' | 'departure', id: string, label: string) => {
+      const code = routeAirportCode(place)
+      if (!code) {
+        addHole({
+          kind: 'airport_service', reason: 'missing', tier, dayNumber: day.day, city: place,
+          lookupAttempted: `airport for "${place}" (${label.toLowerCase()})`,
+          message: `No airport is on file for "${place}", so the ${label.toLowerCase()} on day ${day.day} cannot be priced. Use a city with an airport (Cairo, Luxor, Aswan…) or its three-letter code in the day's route.`,
+        })
+        return
+      }
+      const rate = await getAirportServiceRate(catalogScope, code, direction, airportLevel)
+      if (rate != null) {
+        fixedCosts += rate
+        services.push({
+          id, dayNumber: day.day, serviceType: 'airport_service',
+          serviceName: `${label} (${code}) — ${flightLeg!.from} → ${flightLeg!.to}`,
+          quantity: 1, quantityMode: 'fixed', unitCost: rate, lineTotal: rate,
+          rateSource: 'airport_staff_rates', isPerPax: false, isOptional: false,
+        })
+      } else {
+        addHole({
+          kind: 'airport_service', reason: 'missing', tier, dayNumber: day.day, city: place,
+          lookupAttempted: `airport ${direction} ${airportLevel} (${code})`,
+          message: `No ${AIRPORT_LEVEL_LABEL[airportLevel]} ${direction} rate for ${code}. Add it in Rates → Airport Services.`,
+        })
+      }
+    }
+    // One assist per airport and direction: a day that ALSO carries the plain
+    // arrival / departure service at the same airport is not charged twice.
+    const sameAirport = (a: string, b: string) => !!routeAirportCode(a) && routeAirportCode(a) === routeAirportCode(b)
+    if (flightLeg && legAssist.from && !connectionArrival &&
+        !(day.services.airport_departure && sameAirport(flightLeg.from, day.city))) {
+      await legEndAssist(flightLeg.from, 'departure', `day${day.day}-airport-leg-from`, 'Airport Departure Assistance')
+    }
+    if (flightLeg && legAssist.to &&
+        !(!connectionArrival && day.services.airport_arrival && sameAirport(flightLeg.to, day.city))) {
+      await legEndAssist(flightLeg.to, 'arrival', `day${day.day}-airport-leg-to`, 'Airport Arrival Assistance')
+    }
+
     // ----- AIRPORT SERVICES (fixed per service) -----
-    if (day.services.airport_arrival) {
-      const airportCode = getAirportCode(day.city)
+    if (meetOnArrival) {
+      const airportCode = connectionArrival ? routeAirportCode(landsAt) : getAirportCode(landsAt)
       const rate = airportCode
         ? await getAirportServiceRate(catalogScope, airportCode, 'arrival', airportLevel)
         : null
@@ -3408,9 +3464,9 @@ export async function calculateDayBasedPricing(
           reason: 'missing',
           tier,
           dayNumber: day.day,
-          city: day.city,
-          lookupAttempted: `airport arrival meet & greet (${day.city || 'no city'})`,
-          message: `No airport is on file for "${day.city || 'this day'}", so the meet & greet cannot be priced. Name a city with an airport, or remove the service.`,
+          city: landsAt,
+          lookupAttempted: `airport arrival meet & greet (${landsAt || 'no city'})`,
+          message: `No airport is on file for "${landsAt || 'this day'}", so the meet & greet cannot be priced. Name a city with an airport, or remove the service.`,
         })
       }
       if (rate != null) {
@@ -3434,7 +3490,7 @@ export async function calculateDayBasedPricing(
           reason: 'missing',
           tier,
           dayNumber: day.day,
-          city: day.city,
+          city: landsAt,
           lookupAttempted: `airport arrival ${airportLevel} (${airportCode})`,
           message: `No airport meet & greet rate for ${airportCode}. Add it in Rates → Airport Services.`,
         })
@@ -3824,9 +3880,18 @@ export async function calculateDayBasedPricing(
 
     if (requiresTransport) {
       const needs = determineTransportNeeds(day, previousDay, nextDay)
+      // A CONNECTION on an arrival day: the party lands, stays airside and
+      // flies on — so its airport transfer is at the FINAL airport (the leg's
+      // destination), whatever city the day is filed under. Only when the leg
+      // names a city with an airport on file; a typed code is not a place a
+      // vehicle rate can be looked up in.
+      const connectsTo = day.transport_type === 'flight' && day.services.airport_arrival &&
+        needs.serviceType === 'airport_transfer' && day.leg_to && knownAirportCode(day.leg_to)
+        ? day.leg_to
+        : null
       transportInfoByDay.push({
         day: day.day,
-        city: day.city,
+        city: connectsTo ?? day.city,
         needs,
         requiresTransport: true
       })
