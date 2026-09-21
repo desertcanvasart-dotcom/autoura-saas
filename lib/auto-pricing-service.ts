@@ -2258,6 +2258,28 @@ export function extraTransfersFor(day: ItineraryDay): ExtraTransfer[] {
 }
 
 /**
+ * The agency's REAL one-way airport transfer in a city, for a group of this
+ * size — the rate the tour engine charges an arrival or departure day. For
+ * callers outside the engine (the AI itinerary generator) that used to make a
+ * transfer price up. null = no exact rate: a gap, never a substitute — the
+ * nearby-city fallback in findTransportRate is refused here ('fuzzy').
+ */
+export async function getAirportTransferRate(
+  scope: CatalogScope,
+  city: string | null | undefined,
+  totalPax: number
+): Promise<{ rate: number; rateId: string; vehicleType: string } | null> {
+  const where = String(city ?? '').trim()
+  if (!where) return null
+  const [cache, bands] = await Promise.all([buildTransportCache(scope), tenantVehicleBands(scope.tenantId)])
+  const vehicleType = getVehicleTypeByPax(totalPax, undefined, bands)
+  const match = findTransportRate(cache, { serviceType: 'airport_transfer', city: where, duration: 'one_way', area: null, vehicleType })
+  if (!match || match.source !== 'db') return null
+  const rate = Number(match.rate.base_rate_eur)
+  return rate > 0 ? { rate, rateId: match.rate.id, vehicleType } : null
+}
+
+/**
  * Smart transport rate lookup with fallbacks
  */
 export function findTransportRate(
