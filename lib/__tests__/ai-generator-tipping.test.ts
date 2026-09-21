@@ -20,7 +20,7 @@ const params = (tippingRows: unknown[], over: Record<string, unknown> = {}) => (
   finalLanguage: 'English', includeLunch: true, includeDinner: false, includeAccommodationFinal: true,
   vehiclePerDay: 80, guidePerDay: 60, selectedVehicle: { id: 'v' }, selectedGuide: { id: 'g' }, selectedHotel: { id: 'h' },
   hotelRate: 120, hotelName_final: 'Nile Ritz', roomsNeeded: 2, airportServiceRates: { arrival: 30, departure: 30 },
-  hotelServiceRate: 15, lunchRate: 18, dinnerRate: 25, allEntranceFees: [], tippingRows, ...over,
+  hotelServiceRate: 15, lunchRate: 18, dinnerRate: 25, allEntranceFees: [], transferRateByDay: { 3: 35 }, tippingRows, ...over,
 }) as never
 
 const run = async (tippingRows: unknown[], over: Record<string, unknown> = {}) => {

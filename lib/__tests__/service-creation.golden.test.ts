@@ -53,6 +53,9 @@ function baseParams(over: Partial<Parameters<typeof createLandItineraryServices>
     // What `dailyTips: 12` used to mean: one Per Day row of 12 on guided days.
     tippingRows: [{ role_type: 'driver', context: 'day_tour', rate_unit: 'per_day', rate_eur: 12 }],
     allEntranceFees: ALL_ENTRANCE_FEES,
+    // Day 3 is the departure transfer. 40 is what `vehiclePerDay * 0.5` used to
+    // make up; it now has to be GIVEN — the agency's airport transfer rate.
+    transferRateByDay: { 3: 40 },
     ...over,
   }
 }

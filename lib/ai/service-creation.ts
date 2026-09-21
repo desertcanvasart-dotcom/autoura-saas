@@ -17,6 +17,10 @@ export async function createLandItineraryServices(
     /** The agency's active tipping rows, in the run's currency — priced by the
      *  SAME rules as the tour engine (lib/pricing/tipping.ts). */
     tippingRows: TippingRow[]; allEntranceFees: any[] | null | undefined;
+    /** day number → the agency's real one-way airport transfer for that day's
+     *  city and this group (see transferOnlyDays). The route refuses to price
+     *  when one is missing, so every transfer-only day has an entry here. */
+    transferRateByDay: Record<number, number>;
   }
 ): Promise<{ totalSupplierCost: number; totalClientPrice: number }> {
   const {
@@ -28,7 +32,7 @@ export async function createLandItineraryServices(
     vehiclePerDay, guidePerDay, selectedVehicle, selectedGuide,
     selectedHotel, hotelRate, hotelName_final, roomsNeeded,
     airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
-    tippingRows, allEntranceFees,
+    tippingRows, allEntranceFees, transferRateByDay,
   } = params
 
   // Create days and services
@@ -130,7 +134,15 @@ export async function createLandItineraryServices(
 
     // Handle departure day - only transfer
     if (dayData.is_departure && isTransferOnly) {
-      const transferCost = vehiclePerDay * 0.5
+      // The agency's airport transfer rate. This was `vehiclePerDay * 0.5` —
+      // half the day rate of a fleet vehicle, a figure on nobody's rate sheet.
+      const transferCost = transferRateByDay[dayNumber]
+      if (!(transferCost > 0)) {
+        // Unreachable through the route (it withholds pricing first). Write
+        // no line rather than a made-up one.
+        console.error(`[service-creation] day ${dayNumber}: no airport transfer rate — transfer line not written`)
+        continue
+      }
       await supabase.from('itinerary_services').insert({
         itinerary_day_id: day.id,
         service_type: 'transportation',
@@ -205,8 +217,10 @@ export async function createLandItineraryServices(
     }
 
     // Transportation (always included unless it's a free day)
-    if (!isFreeDay) {
-      const transportRate = isTransferOnly ? vehiclePerDay * 0.5 : vehiclePerDay
+    if (!isFreeDay && !(isTransferOnly && !(transferRateByDay[dayNumber] > 0))) {
+      // A transfer-only day (an arrival with no sightseeing) is the agency's
+      // airport transfer, not half a day of the fleet vehicle.
+      const transportRate = isTransferOnly ? transferRateByDay[dayNumber] : vehiclePerDay
       services.push({
         service_type: 'transportation',
         service_code: selectedVehicle?.id || 'TRANS',
@@ -442,4 +456,14 @@ export function tipOccasionsForGeneratedDay(
     hotelServices: !departureTransferOnly && dayData.needs_hotel_service && !isFreeDay ? 1 : 0,
     night: departureTransferOnly ? null : isCruiseDay ? (isLastDay ? null : 'cruise') : hotelNight ? 'hotel' : null,
   }
+}
+
+/** The generated days that are a transfer and nothing else, with the city
+ *  whose airport transfer prices them. */
+export interface GeneratedDayFlags { day_number?: number; city?: string | null; is_transfer_only?: boolean; is_free_day?: boolean; is_sailing_day?: boolean }
+
+export function transferOnlyDays(days: readonly GeneratedDayFlags[] | null | undefined, effectiveCity: string): Array<{ day: number; city: string }> {
+  return (days ?? [])
+    .filter(d => d?.is_transfer_only && !(d.is_free_day || d.is_sailing_day))
+    .map(d => ({ day: d.day_number || 1, city: String(d.city || effectiveCity || '').trim() }))
 }

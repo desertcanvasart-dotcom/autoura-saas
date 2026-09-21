@@ -37,7 +37,8 @@ import { loadDestinationPromptContext } from '@/lib/ai/destination-context'
 import { getTenantRunCurrency, DEFAULT_RUN_CURRENCY } from '@/lib/rates/run-currency'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { createCruiseItineraryServices } from '@/lib/ai/cruise-service-creation'
-import { createLandItineraryServices } from '@/lib/ai/service-creation'
+import { createLandItineraryServices, transferOnlyDays } from '@/lib/ai/service-creation'
+import { getAirportTransferRate } from '@/lib/auto-pricing-service'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors)
 let _supabaseAdmin: ReturnType<typeof createAdminClient> | null = null
@@ -1100,8 +1101,8 @@ export async function POST(request: NextRequest) {
     // checkAmountDeliverable validates arithmetic, not provenance, so an
     // invented-but-plausible total passes it.
     // ============================================
-    const pricingBlocked = holes.length > 0
-    const effectiveSkipPricing = skip_pricing || pricingBlocked
+    let pricingBlocked = holes.length > 0
+    let effectiveSkipPricing = skip_pricing || pricingBlocked
 
     if (pricingBlocked && !skip_pricing) {
       console.warn(
@@ -1170,6 +1171,29 @@ export async function POST(request: NextRequest) {
       itineraryData.days = applyDayRules(itineraryData.days, effectivePackageType)
     }
 
+    // A TRANSFER-ONLY DAY IS PRICED FROM THE AGENCY'S AIRPORT TRANSFER RATE.
+    // It was `vehiclePerDay * 0.5` — half the day rate of a fleet vehicle, on
+    // nobody's rate sheet. Which days are transfer-only is only known now (the
+    // day rules above decide), so the gate is re-checked here: a day with no
+    // exact rate is a gap, and a gap withholds the price like any other.
+    const transferRateByDay: Record<number, number> = {}
+    if (!skip_pricing) {
+      for (const t of transferOnlyDays(itineraryData?.days, effectiveCity)) {
+        const found = await getAirportTransferRate({ tenantId: tenant_id }, t.city, totalPax)
+        if (found) { transferRateByDay[t.day] = found.rate; continue }
+        addHole({
+          kind: 'transport', tier, reason: 'missing',
+          lookupAttempted: `airport_transfer in '${t.city || 'no city'}' for ${totalPax} traveller(s)`,
+          message: `Day ${t.day} is an airport transfer${t.city ? ` in ${t.city}` : ''} and there is no Airport Transfer rate for a group of ${totalPax} there. Add it in Rates → Transportation.`,
+        })
+      }
+      if (!pricingBlocked && holes.length > 0) {
+        console.warn('[generate-itinerary] pricing withheld — no airport transfer rate:', holes.map(h => h.lookupAttempted).join(' | '))
+      }
+      pricingBlocked = holes.length > 0
+      effectiveSkipPricing = skip_pricing || pricingBlocked
+    }
+
     // Update duration from AI result
     if (itineraryData.total_days) {
       duration_days = itineraryData.total_days
@@ -1224,7 +1248,7 @@ export async function POST(request: NextRequest) {
       vehiclePerDay, guidePerDay, selectedVehicle, selectedGuide,
       selectedHotel, hotelRate, hotelName_final, roomsNeeded,
       airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
-      tippingRows, allEntranceFees,
+      tippingRows, allEntranceFees, transferRateByDay,
     })
 
     // Update totals — only when every rate behind them is real.
