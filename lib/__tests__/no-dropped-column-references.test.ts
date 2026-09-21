@@ -15,6 +15,8 @@ const DROPPED: Record<string, string> = {
   // Its twin. NOT `pricing_model`, which is a live column on b2b partners —
   // the match below is on the whole word.
   pricing_mode: '372_drop_pricing_mode.sql',
+  // Never this app's: the sibling's migration, pasted into this database.
+  status_override: '373_drop_bookings_status_override.sql',
 }
 
 const ROOTS = ['app', 'lib', 'components', 'hooks', 'scripts']

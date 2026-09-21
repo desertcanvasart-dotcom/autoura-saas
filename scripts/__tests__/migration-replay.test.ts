@@ -393,6 +393,25 @@ describe('migration replay from scratch', () => {
       SELECT count(*)::int AS n FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'tour_templates' AND column_name = 'pricing_mode'`)
     expect((pricingMode.rows[0] as { n: number }).n, 'the other dead flag is dropped').toBe(0)
+
+    // Migration 373: bookings.status_override was never this app's column — the
+    // sibling product's migration, pasted into this database. No migration
+    // here creates it, so on a fresh build it never exists; 373 must be a clean
+    // no-op there, and must leave `bookings` usable.
+    const override = await db.query(`
+      SELECT count(*)::int AS n FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'bookings' AND column_name = 'status_override'`)
+    expect((override.rows[0] as { n: number }).n, 'no column this repo did not create').toBe(0)
+    // And where it DOES exist — production — the statement removes it, and a
+    // second run is harmless.
+    await db.exec(`ALTER TABLE public.bookings ADD COLUMN status_override jsonb`)
+    const sql373 = readFileSync(path.join(MIGRATIONS_DIR, '373_drop_bookings_status_override.sql'), 'utf8')
+    await db.exec(sql373)
+    await db.exec(sql373)
+    const after373 = await db.query(`
+      SELECT count(*)::int AS n FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'bookings' AND column_name = 'status_override'`)
+    expect((after373.rows[0] as { n: number }).n, 'dropped where it exists, twice over').toBe(0)
     // …and a tour can still be created without it.
     await db.exec(`
       INSERT INTO tour_templates (tenant_id, template_code, template_name, tour_type, duration_days)
