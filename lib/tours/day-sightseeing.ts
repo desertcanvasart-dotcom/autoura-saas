@@ -23,8 +23,9 @@
 //   - saying `sightseeing: 'none'`: the day editor's "No guided sightseeing on
 //     this day", for the days it writes, which carry no services block.
 //
-// A word in the TITLE is not a statement. ("Temple" in a title still earns a
-// guide from the engine's old fallback; it does not make the day stated.)
+// A word in the TITLE is not a statement — and, since 2026-09-21, it is not
+// anything else either: the engine no longer earns a day a guide, or entrance
+// fees, from its title.
 //
 // Pure and import-free: the engine, the days sheet and the day editor — a
 // client component — all read this one rule.
