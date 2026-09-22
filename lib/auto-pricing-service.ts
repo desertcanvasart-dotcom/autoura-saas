@@ -2576,7 +2576,7 @@ async function loadCruisePackages(scope: CatalogScope): Promise<Array<PackageVeh
   return memoRead(`cruise-packages|${scope.tenantId}`, async () => {
     const { data } = await getSupabaseAdmin()
       .from('b2b_transport_packages')
-      .select('id, package_name, package_type, duration_days, sedan_rate, sedan_capacity, minivan_rate, minivan_capacity, van_rate, van_capacity, minibus_rate, minibus_capacity, bus_rate, bus_capacity, rate_currency, tenant_id')
+      .select('id, package_name, package_type, duration_days, vehicles, sedan_rate, sedan_capacity, minivan_rate, minivan_capacity, van_rate, van_capacity, minibus_rate, minibus_capacity, bus_rate, bus_capacity, rate_currency, tenant_id')
       .or(catalogOrExpr(scope))
       .eq('package_type', 'cruise_sightseeing')
       .eq('is_active', true)
@@ -4398,7 +4398,7 @@ export async function calculateDayBasedPricing(
   // line at 0 on every day it covers, so the days do not read as if their
   // transport had been left out.
   for (const { sailing, pkg } of sailingPackages) {
-    const vehicle = selectVehicleFromPackage(pkg, shownSeats)
+    const vehicle = selectVehicleFromPackage(pkg, shownSeats, vehicleBands)
     const firstDay = sailing.nightDays[0]
     if (vehicle) {
       services.push({
@@ -4482,7 +4482,7 @@ export async function calculateDayBasedPricing(
     // Each sailing's package, at this group's size (the hole for a missing
     // vehicle price is recorded once, with the lines above).
     for (const { pkg } of sailingPackages) {
-      const vehicle = selectVehicleFromPackage(pkg, pax)
+      const vehicle = selectVehicleFromPackage(pkg, pax, vehicleBands)
       if (vehicle) transportCost += vehicle.rate
     }
     for (const info of transportInfoByDay) {

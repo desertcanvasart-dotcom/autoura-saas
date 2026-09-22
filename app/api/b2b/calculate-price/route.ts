@@ -15,6 +15,7 @@ import { parseOptionalSelection, isOptionalSelected } from '@/lib/b2b/optional-s
 import { composeQuoteTotals, optionalContribution, type OptionalContribution } from '@/lib/b2b/optional-pricing'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { selectVehicleFromPackage } from '@/lib/pricing/package-vehicle'
+import { vehicleBandsForTenant } from '@/lib/vocabulary-server'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getCurrencySymbol } from '@/lib/currency'
 
@@ -587,6 +588,10 @@ export async function POST(request: NextRequest) {
     // this branch used to hardcode EUR for all three (C3.4).
     const runCurrency = await getTenantRunCurrency(getSupabaseAdmin(), tenantId ?? '')
     const symbol = getCurrencySymbol(runCurrency)
+    // A transport package prices its vehicle from the agency's vehicle_type
+    // vocabulary (mig 381), exactly as the engine does — the group's vehicle is
+    // the one the vocabulary sizes, its rate from the package's own list.
+    const vehicleBands = await vehicleBandsForTenant(getSupabaseAdmin() as never, tenantId ?? '')
 
     // Determine effective margin (partner override)
     let effectiveMargin = margin_percent
@@ -662,7 +667,7 @@ export async function POST(request: NextRequest) {
       if (rateSource === 'manual' && service.service_category === 'transportation') {
         if (service.service_name?.toLowerCase().includes('sightseeing')) {
           const pkg = await getTransportPackage('cruise_sightseeing', 'Luxor', 'Aswan', tenantId)
-          const vehicle = pkg ? selectVehicleFromPackage(pkg, num_pax) : null
+          const vehicle = pkg ? selectVehicleFromPackage(pkg, num_pax, vehicleBands) : null
           if (pkg && vehicle) {
             unitCost = vehicle.rate
             lineTotal = vehicle.rate
@@ -675,7 +680,7 @@ export async function POST(request: NextRequest) {
         else if (service.service_name?.toLowerCase().includes('transfer') || 
                  service.service_name?.toLowerCase().includes('airport')) {
           const pkg = await getTransportPackage('cruise_transfer', 'Luxor', 'Aswan', tenantId)
-          const vehicle = pkg ? selectVehicleFromPackage(pkg, num_pax) : null
+          const vehicle = pkg ? selectVehicleFromPackage(pkg, num_pax, vehicleBands) : null
           if (pkg && vehicle) {
             unitCost = vehicle.rate
             lineTotal = vehicle.rate
