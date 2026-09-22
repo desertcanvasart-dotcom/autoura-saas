@@ -133,6 +133,9 @@ export function createRateNormalizer(
         }
         // Periods too — an unconvertible row must not keep priceable windows.
         if ('seasons' in copy) copy.seasons = null
+        // A package's vehicle list is money too; null it so the package reads as
+        // a hole rather than pricing its vehicles at their raw contract number.
+        if ('vehicles' in copy) copy.vehicles = null
         misses.push({
           table,
           rowId: typeof row.id === 'string' ? row.id : null,
@@ -151,6 +154,11 @@ export function createRateNormalizer(
         // hotel's Christmas window at its raw contract number.
         if ('seasons' in copy) {
           copy.seasons = convertSeasons(copy.seasons, from, runCurrency, exchangeRates)
+        }
+        // A transport package carries its vehicle rates in a JSONB list keyed by
+        // the agency's vehicle_type vocabulary (mig 381); convert each rate.
+        if ('vehicles' in copy) {
+          copy.vehicles = convertVehicles(copy.vehicles, from, runCurrency, exchangeRates)
         }
       }
       // The copy is IN the run currency now; make that unambiguous downstream.
@@ -247,6 +255,25 @@ export function rateCurrencyWriteField(
  * is returned untouched rather than mangled, and an unconvertible number
  * becomes null — the same never-guess rule the flat columns follow.
  */
+// A package's vehicles: [{ vehicle_type, rate }]. Convert each rate; leave the
+// vehicle_type key untouched.
+function convertVehicles(
+  value: unknown,
+  from: string,
+  runCurrency: string,
+  exchangeRates: ExchangeRate[]
+): unknown {
+  const list = typeof value === 'string' ? safeParse(value) : value
+  if (!Array.isArray(list)) return value
+  return list.map(entry => {
+    if (!entry || typeof entry !== 'object') return entry
+    const e = entry as Record<string, unknown>
+    return typeof e.rate === 'number'
+      ? { ...e, rate: convertCurrency(e.rate, from, runCurrency, exchangeRates) }
+      : entry
+  })
+}
+
 function convertSeasons(
   value: unknown,
   from: string,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { sanitizePackageVehicles } from '@/lib/pricing/package-vehicle'
 
 // ============================================
 // B2B TRANSPORT PACKAGES API - Single Item
@@ -31,16 +32,8 @@ export async function PUT(
         origin_city: body.origin_city,
         destination_city: body.destination_city,
         duration_days: body.duration_days,
-        sedan_rate: body.sedan_rate,
-        sedan_capacity: body.sedan_capacity,
-        minivan_rate: body.minivan_rate,
-        minivan_capacity: body.minivan_capacity,
-        van_rate: body.van_rate,
-        van_capacity: body.van_capacity,
-        minibus_rate: body.minibus_rate,
-        minibus_capacity: body.minibus_capacity,
-        bus_rate: body.bus_rate,
-        bus_capacity: body.bus_capacity,
+        // Vehicles keyed by the agency's vehicle_type vocabulary (mig 381).
+        vehicles: sanitizePackageVehicles(body.vehicles),
         description: body.description,
         includes: body.includes,
         notes: body.notes,

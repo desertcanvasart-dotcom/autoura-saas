@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { selectVehicleFromPackage } from '@/lib/pricing/package-vehicle'
+import { selectVehicleFromPackage, packageVehicles } from '@/lib/pricing/package-vehicle'
+import type { VehicleBand } from '@/lib/vocabulary'
 
 // ============================================================================
 // A transport package with an empty rate column must not price at zero.
@@ -52,5 +53,67 @@ describe('selectVehicleFromPackage', () => {
         if (picked) expect(picked.rate, `${pax} pax`).toBeGreaterThan(0)
       }
     }
+  })
+})
+
+// ============================================================================
+// With the agency's vehicle vocabulary, a package prices like a transportation
+// rate: the vehicle is the one the vocabulary sizes for the group, and its rate
+// comes from the package's own list — not from five fixed columns that may name
+// vehicles the agency does not run.
+// ============================================================================
+
+// Travel2Egypt's fleet: sedan / suv / 4x4 / minivan — none of them a "Van",
+// "Minibus" or "Bus". The old fixed columns could not express it.
+const bands: VehicleBand[] = [
+  { key: 'sedan', min_pax: 1, max_pax: 2 },
+  { key: 'suv', min_pax: 3, max_pax: 7 },
+  { key: '4x4', min_pax: 8, max_pax: 12 },
+  { key: 'minivan', min_pax: 13, max_pax: 45 },
+]
+
+const pkg = { vehicles: [
+  { vehicle_type: 'sedan', rate: 90 },
+  { vehicle_type: 'suv', rate: 140 },
+  { vehicle_type: '4x4', rate: 220 },
+  { vehicle_type: 'minivan', rate: 400 },
+] }
+
+describe('selectVehicleFromPackage with the agency vocabulary', () => {
+  it('prices the vehicle the vocabulary sizes for the group', () => {
+    expect(selectVehicleFromPackage(pkg, 2, bands)).toEqual({ rate: 90, vehicle: 'sedan' })
+    expect(selectVehicleFromPackage(pkg, 5, bands)).toEqual({ rate: 140, vehicle: 'suv' })
+    expect(selectVehicleFromPackage(pkg, 10, bands)).toEqual({ rate: 220, vehicle: '4x4' })
+    expect(selectVehicleFromPackage(pkg, 30, bands)).toEqual({ rate: 400, vehicle: 'minivan' })
+  })
+
+  it('is a hole, not a $0 line, when the package has no rate for that vehicle', () => {
+    const partial = { vehicles: [{ vehicle_type: 'sedan', rate: 90 }] }
+    expect(selectVehicleFromPackage(partial, 2, bands)).toEqual({ rate: 90, vehicle: 'sedan' })
+    expect(selectVehicleFromPackage(partial, 10, bands)).toBeNull()
+    expect(selectVehicleFromPackage({ vehicles: [{ vehicle_type: 'suv', rate: 0 }] }, 5, bands)).toBeNull()
+  })
+
+  it('reads a legacy row (fixed columns, no list) through its columns', () => {
+    // A row entered before migration 381 still prices: the columns are read as
+    // a vehicles list keyed by the Egypt-preset words.
+    const egyptBands: VehicleBand[] = [
+      { key: 'sedan', min_pax: 1, max_pax: 3 },
+      { key: 'minivan', min_pax: 4, max_pax: 7 },
+    ]
+    expect(selectVehicleFromPackage(full, 2, egyptBands)).toEqual({ rate: 100, vehicle: 'sedan' })
+    expect(selectVehicleFromPackage(full, 6, egyptBands)).toEqual({ rate: 150, vehicle: 'minivan' })
+  })
+})
+
+describe('packageVehicles', () => {
+  it('returns the package list when present', () => {
+    expect(packageVehicles(pkg)).toHaveLength(4)
+  })
+  it('reads legacy columns as a list, in fleet order, skipping blanks', () => {
+    expect(packageVehicles({ sedan_rate: 100, van_rate: 200 })).toEqual([
+      { vehicle_type: 'sedan', rate: 100 },
+      { vehicle_type: 'van', rate: 200 },
+    ])
   })
 })
