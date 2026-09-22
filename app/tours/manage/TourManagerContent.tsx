@@ -124,6 +124,7 @@ interface ItineraryDay {
   /** Explicit entrance_fees ids — the engine prices THESE and ignores
    *  wording when present (A-item 13). */
   attraction_ids?: string[]
+  activity_ids?: string[]
   /** How this day travels (B-item 2). Absent = road. flight/train = the
    *  previous day's city → this day's; sleeping train = this day's city →
    *  the next day's (board tonight, wake there — no hotel that night). */
@@ -175,6 +176,15 @@ interface Attraction {
   city: string
   eur_rate: number
   non_eur_rate: number
+}
+
+/** An activity the operator can add to a day (the motorboat at Philae). */
+interface ActivityOption {
+  id: string
+  activity_name: string
+  city?: string | null
+  pricing_type?: string | null
+  unit_label?: string | null
 }
 
 type ViewMode = 'table' | 'cards' | 'compact'
@@ -397,6 +407,8 @@ interface ItineraryEditorProps {
   onChange: (itinerary: ItineraryDay[]) => void
   /** The entrance-fee catalogue, for picking attractions BY ID. */
   attractionOptions: Attraction[]
+  /** The activities catalogue, for adding an activity to a day BY ID. */
+  activityOptions: ActivityOption[]
   /** Ticket catalogues for the Travel picker (B-item 2). */
   ticketOptions: Record<'flight' | 'train' | 'sleeping_train', TicketOption[]>
   /** The tiers this template is sold at: a night is chosen PER TIER, because
@@ -407,7 +419,7 @@ interface ItineraryEditorProps {
   tourType?: string | null
 }
 
-function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions, tiers, tourType }: ItineraryEditorProps) {
+function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptions, ticketOptions, tiers, tourType }: ItineraryEditorProps) {
   // The same test the engine applies. `+ 1` while adding: a first day being
   // written into an empty programme is about to be a one-day tour.
   const isDayTour = isDayTourProgramme(tourType, Math.max(itinerary.length, 1))
@@ -423,6 +435,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   // Picked BY ID from the entrance-fee catalogue: the engine prices these
   // rows exactly and ignores the title's wording (A-item 13).
   const [dayAttractions, setDayAttractions] = useState<Array<{ id: string; name: string }>>([])
+  // Activities added to this day, BY ID from the activities catalogue (the
+  // motorboat at Philae). The engine prices them; a cruise day skips them.
+  const [dayActivities, setDayActivities] = useState<Array<{ id: string; name: string }>>([])
   // Travel mode + optional exact row (B-item 2). '' = road, as before.
   const [dayTransportType, setDayTransportType] = useState<'' | 'flight' | 'train' | 'sleeping_train'>('')
   const [dayTransportRateId, setDayTransportRateId] = useState('')
@@ -504,11 +519,19 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayAttractions(prev => [...prev, { id: attr.id, name: attr.attraction_name }])
   }
 
+  const addDayActivity = (id: string) => {
+    if (!id) return
+    const act = activityOptions.find(a => a.id === id)
+    if (!act || dayActivities.some(a => a.id === id)) return
+    setDayActivities(prev => [...prev, { id: act.id, name: act.activity_name }])
+  }
+
   const resetDayForm = () => {
     setDayTitle('')
     setDayDescription('')
     setDayMeals({ breakfast: '', lunch: '', dinner: '' })
     setDayAttractions([])
+    setDayActivities([])
     setDayTransportType('')
     setDayTransportRateId('')
     setDayLegFrom('')
@@ -542,6 +565,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayDescription(day.description || '')
     setDayMeals({ breakfast: meals.breakfast, lunch: meals.lunch, dinner: meals.dinner } as typeof dayMeals)
     setDayAttractions((day.attraction_ids || []).map((id, i) => ({ id, name: (day.attractions || [])[i] || id })))
+    setDayActivities((day.activity_ids || []).map((id: string) => ({ id, name: activityOptions.find(a => a.id === id)?.activity_name || id })))
     setDayTransportType((day.transport_type as typeof dayTransportType) || '')
     setDayTransportRateId(day.transport_rate_id || '')
     setDayLegFrom(day.leg_from || '')
@@ -604,8 +628,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       city: dayCity, night: dayNight, cityTransfer: dayCityTransfer, roadTransfers: dayRoad === '' ? undefined : dayRoad === 'on',
       cruiseAssist: dayCruiseAssist, transportLines: dayTransportLines ?? undefined,
       length: dayLength, propertiesByTier: dayProperties, noSightseeing: dayNoSightseeing,
+      activityIds: dayActivities.map(a => a.id),
     }, editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day)
-  }, [editingDayIndex, itinerary, dayTitle, dayDescription, dayMeals, dayAttractions, dayTransportType, dayTransportRateId, dayLegFrom, dayLegTo, dayLegAssist, dayCity, dayNight, dayCityTransfer, dayRoad, dayCruiseAssist, dayTransportLines, dayLength, dayProperties, dayNoSightseeing])
+  }, [editingDayIndex, itinerary, dayTitle, dayDescription, dayMeals, dayAttractions, dayActivities, dayTransportType, dayTransportRateId, dayLegFrom, dayLegTo, dayLegAssist, dayCity, dayNight, dayCityTransfer, dayRoad, dayCruiseAssist, dayTransportLines, dayLength, dayProperties, dayNoSightseeing])
   useEffect(() => {
     const idx = editingDayIndex ?? itinerary.length
     const days = itinerary.map((d, i) => (i === idx ? formDayForPreview : d))
@@ -659,6 +684,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       length: dayLength,
       propertiesByTier: dayProperties,
       noSightseeing: dayNoSightseeing,
+      activityIds: dayActivities.map(a => a.id),
     }, editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day) as unknown as ItineraryDay
 
     if (editingDayIndex === null) {
@@ -1063,6 +1089,54 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
               </span>
             </span>
           </label>
+        </div>
+
+        {/* Activities added to this day (the motorboat at Philae, a felucca).
+            Priced from Rates → Activities; skipped on a cruise day, where they
+            ride in the cruise sightseeing package. */}
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">Activities:</span>
+            <select
+              value=""
+              onChange={(e) => addDayActivity(e.target.value)}
+              className="px-2 py-1.5 text-xs border border-gray-300 rounded-lg bg-white"
+            >
+              <option value="">Add an activity…</option>
+              {activityOptions
+                .filter(a => !dayActivities.some(d => d.id === a.id))
+                .map(a => (
+                  <option key={a.id} value={a.id}>{a.activity_name}{a.city ? ` — ${a.city}` : ''}</option>
+                ))}
+            </select>
+          </div>
+          {dayActivities.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {dayActivities.map(a => (
+                <span key={a.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs">
+                  {a.name}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${a.name}`}
+                    onClick={() => setDayActivities(prev => prev.filter(x => x.id !== a.id))}
+                    className="text-amber-700 hover:text-amber-900"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          {activityOptions.length === 0 && (
+            <p className="text-[11px] text-gray-500 mt-1.5">
+              No activities yet. Add them in Rates → Activities &amp; Add-ons (e.g. the Philae motorboat), then they appear here.
+            </p>
+          )}
+          {dayActivities.length > 0 && dayNight === 'cruise' && (
+            <p className="text-[11px] text-amber-700 mt-1.5">
+              This is a cruise night — activities here are treated as included in the cruise sightseeing package and are not charged again.
+            </p>
+          )}
         </div>
 
         {/* Travel picker (B-item 2): how this day travels. Road is the
@@ -1560,6 +1634,7 @@ export default function TourManagerContent() {
   const { items: bestForItems } = useVocabulary('tour_best_for')
   const { items: themeItems } = useVocabulary('tour_theme')
   const [attractions, setAttractions] = useState<Attraction[]>([])  // NEW: Attractions from DB
+  const [activities, setActivities] = useState<ActivityOption[]>([])  // Activities the operator can add to a day
   // Ticket catalogues for the Travel picker (B-item 2), labelled
   // operator/class/route so the operator can name THE train or flight.
   const [ticketRows, setTicketRows] = useState<Record<'flight' | 'train' | 'sleeping_train', TicketRow[]>>({
@@ -1676,6 +1751,19 @@ export default function TourManagerContent() {
     }
   }
 
+  // Activities (Rates → Activities & Add-ons) the operator can add to a day —
+  // the motorboat at Philae, a felucca. The engine prices them per day.
+  const fetchActivities = async () => {
+    try {
+      const response = await fetch('/api/rates/activities?limit=500')
+      if (!response.ok) return
+      const data = await response.json()
+      if (data.success && Array.isArray(data.data)) setActivities(data.data as ActivityOption[])
+    } catch (error) {
+      console.error('Error fetching activities:', error)
+    }
+  }
+
   // Rows are kept raw and labelled at render, so the train class and sleeper
   // cabin read in the agency's words (Settings → Your vocabulary) even when
   // the vocabulary finishes loading after the rates do.
@@ -1708,6 +1796,7 @@ export default function TourManagerContent() {
     Promise.all([
       fetchTemplates(),
       fetchAttractions(),  // NEW: Fetch attractions on load
+      fetchActivities(),   // Activities the operator can add to a day
       fetchTicketOptions()  // Ticket catalogues for the Travel picker (B2)
     ]).finally(() => {
       clearTimeout(loadingTimeout)
@@ -3237,6 +3326,7 @@ export default function TourManagerContent() {
                       itinerary={formData.itinerary}
                       onChange={handleItineraryChange}
                       attractionOptions={attractions}
+                      activityOptions={activities}
                       ticketOptions={ticketOptions}
                       tiers={templateTierEntries.map(t => ({ key: t.key, label: t.label }))}
                       tourType={formData.tour_type}

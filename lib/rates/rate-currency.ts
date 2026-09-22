@@ -136,6 +136,8 @@ export function createRateNormalizer(
         // A package's vehicle list is money too; null it so the package reads as
         // a hole rather than pricing its vehicles at their raw contract number.
         if ('vehicles' in copy) copy.vehicles = null
+        // An activity's group-size bands carry their own rates.
+        if ('tiers' in copy) copy.tiers = null
         misses.push({
           table,
           rowId: typeof row.id === 'string' ? row.id : null,
@@ -159,6 +161,12 @@ export function createRateNormalizer(
         // the agency's vehicle_type vocabulary (mig 381); convert each rate.
         if ('vehicles' in copy) {
           copy.vehicles = convertVehicles(copy.vehicles, from, runCurrency, exchangeRates)
+        }
+        // An activity's tiered bands (activity_rates.tiers) hold rate_eur /
+        // rate_non_eur per band — convert them, or a foreign-currency felucca
+        // prices at its raw contract number.
+        if ('tiers' in copy) {
+          copy.tiers = convertActivityTiers(copy.tiers, from, runCurrency, exchangeRates)
         }
       }
       // The copy is IN the run currency now; make that unambiguous downstream.
@@ -255,6 +263,27 @@ export function rateCurrencyWriteField(
  * is returned untouched rather than mangled, and an unconvertible number
  * becomes null — the same never-guess rule the flat columns follow.
  */
+// An activity's tiers: [{ min_pax, max_pax, rate_eur, rate_non_eur?, label? }].
+// Convert both rates, leave the band bounds and label untouched.
+function convertActivityTiers(
+  value: unknown,
+  from: string,
+  runCurrency: string,
+  exchangeRates: ExchangeRate[]
+): unknown {
+  const list = typeof value === 'string' ? safeParse(value) : value
+  if (!Array.isArray(list)) return value
+  return list.map(entry => {
+    if (!entry || typeof entry !== 'object') return entry
+    const e = entry as Record<string, unknown>
+    const out: Record<string, unknown> = { ...e }
+    for (const k of ['rate_eur', 'rate_non_eur']) {
+      if (typeof e[k] === 'number') out[k] = convertCurrency(e[k] as number, from, runCurrency, exchangeRates)
+    }
+    return out
+  })
+}
+
 // A package's vehicles: [{ vehicle_type, rate }]. Convert each rate; leave the
 // vehicle_type key untouched.
 function convertVehicles(

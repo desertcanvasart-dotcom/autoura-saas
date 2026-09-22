@@ -27,7 +27,7 @@ const LIVE_DAY = {
 const formFor = (over: Partial<DayForm> = {}): DayForm => ({
   title: LIVE_DAY.title, description: LIVE_DAY.description, meals: { ...LIVE_DAY.meals },
   picked: [], transportType: 'flight', transportRateId: '', city: 'Cairo; Luxor', night: 'cruise',
-  cityTransfer: false, length: '', propertiesByTier: {}, noSightseeing: false, ...over,
+  cityTransfer: false, length: '', propertiesByTier: {}, noSightseeing: false, activityIds: [], ...over,
 })
 
 describe('correcting one field changes one field', () => {
@@ -251,5 +251,22 @@ describe('the editor asks a day tour the right question', () => {
     const engine = readFileSync(join(process.cwd(), 'lib/auto-pricing-service.ts'), 'utf8')
     expect(engine).toMatch(/const isDayTour = isDayTourProgramme\(t\.tour_type,/)
     expect(engine).toContain('${DAY_TOUR_NO_ATTRACTIONS}')
+  })
+})
+
+describe('activities the operator added to a day', () => {
+  it('writes exactly the activities picked, and nothing when none are picked', () => {
+    expect(applyDayForm(null, formFor({ activityIds: ['act-motorboat', 'act-felucca'] }), 1).activity_ids)
+      .toEqual(['act-motorboat', 'act-felucca'])
+    expect(applyDayForm(null, formFor({ activityIds: [] }), 1)).not.toHaveProperty('activity_ids')
+  })
+
+  it('removing every activity clears the field on a day that had some', () => {
+    const had = { ...LIVE_DAY, activity_ids: ['act-motorboat'] }
+    expect(applyDayForm(had, formFor({ activityIds: [] }), 1)).not.toHaveProperty('activity_ids')
+  })
+
+  it('drops blank ids', () => {
+    expect(applyDayForm(null, formFor({ activityIds: ['act-1', ''] }), 1).activity_ids).toEqual(['act-1'])
   })
 })
