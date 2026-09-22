@@ -6692,6 +6692,7 @@ export interface Database {
           rate_currency: string | null
           seasons: Json | null
           property_id: string | null
+          sailing_days: string[]
         }
         Insert: {
           id?: string
@@ -6783,6 +6784,7 @@ export interface Database {
           rate_currency?: string | null
           seasons?: Json | null
           property_id?: string | null
+          sailing_days: string[]
         }
         Update: {
           id?: string
@@ -6874,6 +6876,7 @@ export interface Database {
           rate_currency?: string | null
           seasons?: Json | null
           property_id?: string | null
+          sailing_days?: string[]
         }
         Relationships: [
           {
