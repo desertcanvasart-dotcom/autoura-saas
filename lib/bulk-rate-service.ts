@@ -1,5 +1,5 @@
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
-import { seasonsFromAccommodationColumns, seasonsFromCruiseColumns } from '@/lib/rates/rate-seasons'
+import { seasonsFromAccommodationColumns, seasonsFromCruiseColumns, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 /**
  * Bulk Rate Import/Export Service
@@ -865,15 +865,47 @@ export function exportCellValue(table: string, row: Record<string, unknown>, col
  *  carries at least one dated window; existing seasons are never replaced. */
 export function deriveImportSeasons(table: string, record: Record<string, unknown>): void {
   if (record.seasons != null) return
-  if (table === 'accommodation_rates') {
-    const seasons = seasonsFromAccommodationColumns(record)
-    if (seasons.length > 0) record.seasons = seasons
-  } else if (table === 'nile_cruises') {
-    // Runs AFTER cruiseImportDerive filled the engine family the derivation
-    // reads; the dated windows come from the CSV's own season date columns.
-    const seasons = seasonsFromCruiseColumns(record)
-    if (seasons.length > 0) record.seasons = seasons
+  const entity = table === 'accommodation_rates' ? 'accommodation' : table === 'nile_cruises' ? 'cruise' : null
+  if (!entity) return
+  // Runs AFTER applyCanonicalAliases / cruiseImportDerive filled the engine
+  // family the derivation reads; the dated windows come from the CSV's own
+  // season date columns.
+  let seasons = entity === 'accommodation' ? seasonsFromAccommodationColumns(record) : seasonsFromCruiseColumns(record)
+  // No season window on the sheet, but a price and Rate Valid From / To: ONE
+  // period over the validity dates — the same rule migration 379 applied to
+  // the 166 live rows that had arrived exactly this way and stayed
+  // column-priced, where the engine ignored their validity dates. A row with
+  // a price and no dates at all gets no period, and pricing reports it.
+  if (seasons.length === 0) seasons = contractPeriodFromValidity(record)
+  if (seasons.length > 0) {
+    record.seasons = seasons
+    // The first period IS the base columns (lib/rates/rate-seasons.ts) — the
+    // mirror the rate form writes on every save, so date-less readers agree.
+    Object.assign(record, legacyColumnMirror(seasons, entity))
   }
+}
+
+/** One 'Contract rate' period covering rate_valid_from → rate_valid_to at the
+ *  row's (already-derived) per-night rates. [] without a price or the dates. */
+export function contractPeriodFromValidity(record: Record<string, unknown>): RateSeason[] {
+  const day = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : v instanceof Date ? v.toISOString().slice(0, 10) : '')
+  const from = day(record.rate_valid_from), to = day(record.rate_valid_to)
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : 0)
+  const ppd = n(record.ppd_eur)
+  if (!from || !to || from > to || !(ppd > 0)) return []
+  const ppdNon = n(record.ppd_non_eur) || ppd
+  return [{
+    name: 'Contract rate', from, to,
+    rates: {
+      ppd_eur: ppd,
+      single_supplement_eur: Math.max(0, n(record.single_supplement_eur)),
+      triple_reduction_eur: Math.max(0, n(record.triple_reduction_eur)),
+      ppd_non_eur: ppdNon,
+      single_supplement_non_eur: Math.max(0, n(record.single_supplement_non_eur) || n(record.single_supplement_eur)),
+      triple_reduction_non_eur: Math.max(0, n(record.triple_reduction_non_eur) || n(record.triple_reduction_eur)),
+      guide_rate_eur: 0,
+    },
+  }]
 }
 
 export function getExportHeaders(config: RateTableConfig): string[] {
