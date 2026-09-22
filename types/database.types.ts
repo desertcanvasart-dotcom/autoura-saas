@@ -1183,6 +1183,7 @@ export interface Database {
           updated_at: string | null
           tenant_id: string | null
           rate_currency: string | null
+          vehicles: Json
         }
         Insert: {
           id?: string
@@ -1210,6 +1211,7 @@ export interface Database {
           updated_at?: string | null
           tenant_id?: string | null
           rate_currency?: string | null
+          vehicles: Json
         }
         Update: {
           id?: string
@@ -1237,6 +1239,7 @@ export interface Database {
           updated_at?: string | null
           tenant_id?: string | null
           rate_currency?: string | null
+          vehicles?: Json
         }
         Relationships: [
           {
