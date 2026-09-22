@@ -369,7 +369,9 @@ export async function POST(request: NextRequest) {
       is_eur_passport = true,
       margin_percent = 25,
       partner_id = null,
-      language = 'English',
+      // The guide's language: a vocabulary key from the calculator's picker.
+      // Blank (an old client) keeps the historical default.
+      language: rawLanguage = 'English',
       tier = 'standard',
       tour_leader_included = false,  // NEW: Added tour leader parameter
       // Guide grade + mode (B-item 1). Defaults = the historical behaviour.
@@ -381,6 +383,7 @@ export async function POST(request: NextRequest) {
       // include_optionals / selected_optional_ids are read off `body` by
       // parseOptionalSelection below, not destructured here.
     } = body
+    const language = typeof rawLanguage === 'string' && rawLanguage.trim() ? rawLanguage.trim() : 'English'
 
 
 

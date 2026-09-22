@@ -56,6 +56,7 @@ import { knownAirportCode, routeAirportCode, legAssistance, legRoute, arrivalDay
 import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type PropertyRow } from '@/lib/pricing/named-property'
 import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
 import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
+import { guideLanguageKey, pickGuideRateRow, type GuideRateRow } from '@/lib/guides/guide-language'
 import { selectVehicleFromPackage, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
@@ -490,23 +491,6 @@ async function tenantVocabularyLabels(tenantId: string, kind: VocabularyKind): P
 async function tenantVocabularyLabeller(tenantId: string, kind: VocabularyKind): Promise<(key: string | null | undefined) => string> {
   const labels = await tenantVocabularyLabels(tenantId, kind)
   return key => (key ? (labels.get(key) ?? key) : '')
-}
-
-/** The stored KEY a request means. A quote says "English" (or "english",
- *  or whatever the agency renamed it to); rate rows store the key. Matches
- *  a key, a label, or the slug of either; falls back to the slug so a
- *  tenant without the vocabulary behaves as before. */
-async function tenantVocabularyKey(tenantId: string, kind: VocabularyKind, value: string | null | undefined): Promise<string> {
-  const raw = String(value ?? '').trim()
-  if (!raw) return raw
-  const labels = await tenantVocabularyLabels(tenantId, kind)
-  if (labels.has(raw)) return raw
-  const lower = raw.toLowerCase()
-  for (const [k, l] of labels) if (l.toLowerCase() === lower) return k
-  const slug = slugifyKey(raw)
-  if (labels.has(slug)) return slug
-  for (const [k, l] of labels) if (slugifyKey(l) === slug) return k
-  return slug
 }
 
 /** Test seam: forget memoised vocabularies. */
@@ -1818,36 +1802,44 @@ export async function getGuideRate(
   scope: CatalogScope,
   language: string,
   tier: ServiceTier,
-  opts?: { grade?: GuideGrade; duration?: 'full_day' | 'half_day' | 'meet_greet' }
-): Promise<{ id: string; name: string; dailyRate: number; source: RateSource; ambiguous?: Ambiguity } | null> {
+  opts?: { grade?: GuideGrade; duration?: 'full_day' | 'half_day' | 'meet_greet'; city?: string | null }
+): Promise<{ id: string; name: string; dailyRate: number; source: RateSource; ambiguous?: Ambiguity; cityMatched?: boolean } | null> {
   const grade = opts?.grade ?? DEFAULT_GUIDE_GRADE
   const duration = opts?.duration ?? 'full_day'
   const isDefaultAsk = grade === DEFAULT_GUIDE_GRADE && duration === 'full_day'
   try {
-    // ---- guide_rates: the rate table, matched exactly ----
-    // The quote names a language; rows store the vocabulary KEY (346).
-    const languageKey = await tenantVocabularyKey(scope.tenantId, 'guide_language', language)
-    const { data: rawRateRows } = await getSupabaseAdmin()
-      .from('guide_rates')
-      .select('id, guide_language, guide_type, tour_duration, full_day_rate, half_day_rate, base_rate_eur, base_rate_non_eur, rate_currency, is_active')
-      .or(catalogOrExpr(scope))
-      .eq('is_active', true)
-      .ilike('guide_language', languageKey)
-      .eq('guide_type', grade)
-      .eq('tour_duration', duration)
-      .order('full_day_rate', { ascending: true })
-      .limit(1)
-    const rateRows = await normalizeRateRows(getSupabaseAdmin(), 'guide_rates', rawRateRows, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
-    if (rateRows && rateRows.length > 0) {
-      const r = rateRows[0] as any
-      const rate = r.full_day_rate ?? r.base_rate_eur
-      if (typeof rate === 'number' && rate > 0) {
-        return {
-          id: r.id,
-          name: `${language} ${grade === 'senior' ? 'Senior ' : ''}Guide`,
-          dailyRate: rate,
-          source: 'db',
-        }
+    // ---- guide_rates: the rate table, matched EXACTLY (lib/guides/guide-language) ----
+    // The language is a vocabulary key; a row may store the key or an older
+    // word, and both resolve to the same key — never a substring match. The
+    // day's CITY picks the row (the agency prices guides per city); with none,
+    // the row that names no city. Several rows at different prices are a gap.
+    const languageItems = [...(await tenantVocabularyLabels(scope.tenantId, 'guide_language'))].map(([key, label]) => ({ key, label }))
+    const languageKey = guideLanguageKey(language, languageItems)
+    const rateRows = await memoRead(`guide-rates|${scope.tenantId}|${grade}|${duration}`, async () => {
+      const { data } = await getSupabaseAdmin()
+        .from('guide_rates')
+        .select('id, guide_language, guide_type, tour_duration, city, full_day_rate, half_day_rate, base_rate_eur, base_rate_non_eur, rate_currency, is_active')
+        .or(catalogOrExpr(scope))
+        .eq('is_active', true)
+        .eq('guide_type', grade)
+        .eq('tour_duration', duration)
+      return (await normalizeRateRows(getSupabaseAdmin(), 'guide_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))) ?? []
+    })
+    const forLanguage = (rateRows as GuideRateRow[]).filter(r => guideLanguageKey(r.guide_language, languageItems) === languageKey)
+    const pick = pickGuideRateRow(forLanguage, opts?.city)
+    if (pick.kind === 'one') {
+      return {
+        id: pick.row.id,
+        name: `${language} ${grade === 'senior' ? 'Senior ' : ''}Guide`,
+        dailyRate: pick.rate,
+        source: 'db',
+        cityMatched: pick.cityMatched,
+      }
+    }
+    if (pick.kind === 'ambiguous') {
+      return {
+        id: '', name: '', dailyRate: 0, source: 'missing',
+        ambiguous: { count: pick.count, names: pick.rates.map(r => `${r}`), preferredCount: 0 },
       }
     }
 
@@ -1892,22 +1884,9 @@ export async function getGuideRate(
       }
     }
 
-    // Fallback: any guide regardless of language — approximate, never deliverable.
-    const { data: rawAnyGuide } = await getSupabaseAdmin()
-      .from('guides')
-      .select('*')
-      .or(catalogOrExpr(scope))
-      .eq('is_active', true)
-      .order('is_preferred', { ascending: false })
-      .limit(1)
-    const anyGuide = await normalizeRateRows(getSupabaseAdmin(), 'guides', rawAnyGuide, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
-
-    if (anyGuide && anyGuide.length > 0) {
-      const g = anyGuide[0] as any
-      if (!g.daily_rate) return null
-      return { id: g.id, name: g.name, dailyRate: g.daily_rate, source: 'fuzzy' }
-    }
-
+    // No guide of the asked language: a miss. (This used to fall back to a
+    // guide of ANY language, marked approximate — a line that could never be
+    // delivered and only muddied the gap.)
     return null
   } catch (err) {
     console.error('Error fetching guide rate:', err)
@@ -3200,14 +3179,12 @@ export async function calculateDayBasedPricing(
   // These four are independent — fetch concurrently. Water cost is
   // admin-configurable via Rates → Fixed Costs (fixed_daily_costs); falls back
   // to €2 (the previous hardcoded value) if the table is empty.
-  const [guideRate, guideMeetRate, mealRates, tippingRows, fixedDailyCosts] = await Promise.all([
-    getGuideRate(catalogScope, language, tier, { grade: guideGrade }),
-    // The throughout guide's cheaper fee for meet/goodbye/transit days.
-    // Only fetched when asked for — and it must be a REAL row: pricing a
-    // meet & assist day at the full-day rate would be a silent guess.
-    throughoutGuide
-      ? getGuideRate(catalogScope, language, tier, { grade: guideGrade, duration: 'meet_greet' })
-      : Promise.resolve(null),
+  // The guide rate is PER CITY (lib/guides/guide-language): each day asks for
+  // its own city's row. Rows are read once per grade and duration (memoised),
+  // so this is one read, not one per day.
+  const guideRateFor = (city: string | null | undefined, duration?: 'meet_greet') =>
+    getGuideRate(catalogScope, language, tier, { grade: guideGrade, ...(duration ? { duration } : {}), city })
+  const [mealRates, tippingRows, fixedDailyCosts] = await Promise.all([
     getMealRates(catalogScope, tier),
     loadTippingRows(catalogScope),
     getFixedDailyCosts(),
@@ -3628,6 +3605,11 @@ export async function calculateDayBasedPricing(
     // day. A missing meet/assist rate is a hole NAMING the duration to
     // add, never the full-day rate worn as a guess.
     const gradeLabel = guideGrade === 'senior' ? 'Senior ' : ''
+    const guideRate = (throughoutGuide || hasSightseeing) ? await guideRateFor(day.city) : null
+    // The throughout guide's cheaper fee for meet/goodbye/transit days. Only
+    // fetched when asked for — and it must be a REAL row: pricing a meet &
+    // assist day at the full-day rate would be a silent guess.
+    const guideMeetRate = throughoutGuide && !hasSightseeing ? await guideRateFor(day.city, 'meet_greet') : null
     if (throughoutGuide) {
       const dayRate = hasSightseeing ? guideRate : guideMeetRate
       const feeLabel = hasSightseeing
@@ -3658,7 +3640,7 @@ export async function calculateDayBasedPricing(
             ? `${language} ${gradeLabel}guide full_day (${tier})`
             : `${language} ${gradeLabel}guide meet_greet (${tier})`,
           message: dayRate?.ambiguous
-            ? ambiguityMessage(`${tier} ${language}-speaking guides`, dayRate.ambiguous, 'CRM → Guides')
+            ? `${dayRate.ambiguous.count} ${language} ${gradeLabel.toLowerCase()}guide rates apply to day ${day.day}${day.city ? ` (${day.city})` : ''} at different prices (${dayRate.ambiguous.names.join(', ')}). Keep one in Rates → Guides.`
             : hasSightseeing
             ? `No ${language} ${gradeLabel.toLowerCase()}guide full-day rate. Add it in Rates → Guides.`
             : `No ${language} ${gradeLabel.toLowerCase()}guide "Meet & Assist" rate for the throughout guide's non-sightseeing days. Add a meet_greet duration row in Rates → Guides.`,
@@ -3685,10 +3667,12 @@ export async function calculateDayBasedPricing(
           kind: 'guide',
           reason: guideRate && !guideRate.ambiguous ? 'fuzzy' : 'missing',
           tier,
-          lookupAttempted: `${language} ${gradeLabel}guide (${tier})`,
+          dayNumber: day.day,
+          city: day.city,
+          lookupAttempted: `${language} ${gradeLabel}guide (${tier}${day.city ? `, ${day.city}` : ''})`,
           message: guideRate?.ambiguous
-            ? ambiguityMessage(`${tier} ${language}-speaking guides`, guideRate.ambiguous, 'CRM → Guides')
-            : `No exact ${tier} ${language}-speaking ${gradeLabel.toLowerCase()}guide rate. Add it in Rates → Guides.`,
+            ? `${guideRate.ambiguous.count} ${language} ${gradeLabel.toLowerCase()}guide rates apply to day ${day.day}${day.city ? ` (${day.city})` : ''} at different prices (${guideRate.ambiguous.names.join(', ')}). Keep one in Rates → Guides.`
+            : `No ${language} ${gradeLabel.toLowerCase()}guide rate${day.city ? ` for ${day.city}, and none for all cities` : ''}. Add it in Rates → Guides.`,
         })
       }
     }

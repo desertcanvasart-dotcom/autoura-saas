@@ -145,6 +145,18 @@ export default function TourPriceCalculator() {
   // Guide grade + mode (B-item 1). Defaults = the historical behaviour.
   const [guideGrade, setGuideGrade] = useState<'egyptologist' | 'senior'>('egyptologist')
   const [guideMode, setGuideMode] = useState<'spot' | 'throughout'>('spot')
+  // The guide's language (sibling #459): the agency's own list, a language
+  // with no rate shown but not choosable; preselects the first that has one.
+  const [guideLanguages, setGuideLanguages] = useState<Array<{ key: string; label: string; hasRate: boolean }>>([])
+  const [language, setLanguage] = useState<string>('')
+  useEffect(() => {
+    fetch('/api/rates/guides/languages').then(r => r.json()).then(j => {
+      if (!j?.success) return
+      const list = j.data as Array<{ key: string; label: string; hasRate: boolean }>
+      setGuideLanguages(list)
+      setLanguage(prev => prev || list.find(l => l.hasRate)?.key || list[0]?.key || '')
+    }).catch(() => undefined)
+  }, [])
   // Catalogue extras (Rates → Extras) offered on this quote.
   const [availableExtras, setAvailableExtras] = useState<CatalogueExtraOption[]>([])
   const [selectedExtraIds, setSelectedExtraIds] = useState<string[]>([])
@@ -265,6 +277,7 @@ export default function TourPriceCalculator() {
           tour_leader_included: tourLeaderIncluded,
           guide_grade: guideGrade,
           guide_mode: guideMode,
+          language,
           extras: selectedExtraIds,
           selected_optional_ids: optionalIds
         })
@@ -294,6 +307,7 @@ export default function TourPriceCalculator() {
           tour_leader_included: tourLeaderIncluded,
           guide_grade: guideGrade,
           guide_mode: guideMode,
+          language,
           extras: selectedExtraIds,
           selected_optional_ids: selectedOptionals
         })
@@ -598,6 +612,17 @@ export default function TourPriceCalculator() {
                     Throughout (+1)
                   </button>
                 </div>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  aria-label="Guide language"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white mb-2"
+                >
+                  {guideLanguages.length === 0 && <option value="">Guide language…</option>}
+                  {guideLanguages.map(l => (
+                    <option key={l.key} value={l.key} disabled={!l.hasRate}>{l.label}{l.hasRate ? '' : ' — no rate'}</option>
+                  ))}
+                </select>
                 <select
                   value={guideGrade}
                   onChange={(e) => setGuideGrade(e.target.value as 'egyptologist' | 'senior')}
