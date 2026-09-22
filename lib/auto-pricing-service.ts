@@ -55,6 +55,8 @@ import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 import { knownAirportCode, routeAirportCode, legAssistance, legRoute, arrivalDayIndex, departureDayIndex, groundedNeighbour, isInTransit, sanitizeLegPlace, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
 import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type PropertyRow } from '@/lib/pricing/named-property'
 import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
+import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
+import { selectVehicleFromPackage, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
@@ -2571,6 +2573,21 @@ export async function previewDayTransport(
   return out
 }
 
+/** The agency's active cruise sightseeing packages (Rates → Transport
+ *  Packages), in the run's currency. Read once per calculation. */
+async function loadCruisePackages(scope: CatalogScope): Promise<Array<PackageVehicleRates & { id: string; package_name: string; duration_days: number | null }>> {
+  return memoRead(`cruise-packages|${scope.tenantId}`, async () => {
+    const { data } = await getSupabaseAdmin()
+      .from('b2b_transport_packages')
+      .select('id, package_name, package_type, duration_days, sedan_rate, sedan_capacity, minivan_rate, minivan_capacity, van_rate, van_capacity, minibus_rate, minibus_capacity, bus_rate, bus_capacity, rate_currency, tenant_id')
+      .or(catalogOrExpr(scope))
+      .eq('package_type', 'cruise_sightseeing')
+      .eq('is_active', true)
+    const rows = await normalizeRateRows(getSupabaseAdmin(), 'b2b_transport_packages', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+    return (rows ?? []) as unknown as Array<PackageVehicleRates & { id: string; package_name: string; duration_days: number | null }>
+  })
+}
+
 /** What a transport lookup outside the engine found. */
 export interface DayTransportRate { rate: number; rateId: string; vehicleType: string; serviceType: string }
 
@@ -4236,6 +4253,38 @@ export async function calculateDayBasedPricing(
   }
 
   // ============================================
+  // STEP 8b: CRUISE SIGHTSEEING PACKAGES (sibling #463)
+  // ============================================
+  // A sailing's sightseeing transport as ONE package for its exact length in
+  // days (nights + 1), when the agency has one: priced once for the whole
+  // sailing; each night aboard lists "Sightseeing transport — Included", the
+  // disembarkation day "Transfer off the ship — Included". With no package of
+  // that length the per-day rates apply, as they always have. A day the
+  // operator gave its own transport list keeps it.
+  const cruisePackages = await loadCruisePackages(catalogScope)
+  const sailingPackages: Array<{ sailing: Sailing; pkg: (typeof cruisePackages)[number] }> = []
+  if (cruisePackages.length > 0) {
+    for (const sailing of cruiseSailings(itinerary)) {
+      const pick = packageForDuration(cruisePackages, sailing.durationDays)
+      if (pick.kind === 'ambiguous') {
+        addHole({
+          kind: 'transport', reason: 'missing', tier, dayNumber: sailing.nightDays[0],
+          lookupAttempted: `cruise sightseeing package for ${sailing.durationDays} days`,
+          message: `${pick.count} cruise sightseeing packages are ${sailing.durationDays} days long — pricing will not choose between them. Keep one active in Rates → Transport Packages.`,
+        })
+        continue
+      }
+      if (pick.kind === 'none') continue
+      sailingPackages.push({ sailing, pkg: pick.pkg })
+      const covered = new Set([...sailing.nightDays, ...(sailing.disembarkDay != null ? [sailing.disembarkDay] : [])])
+      for (const info of transportInfoByDay) {
+        const day = itinerary.find(d => d.day === info.day)
+        if (covered.has(info.day) && !day?.transport_lines) info.requiresTransport = false
+      }
+    }
+  }
+
+  // ============================================
   // STEP 9: The transport LINES — for the group being priced
   // ============================================
   // These lines are what the breakdown shows; the money comes from
@@ -4325,6 +4374,37 @@ export async function calculateDayBasedPricing(
     }
   }
 
+  // The sailing's package: one line for the whole sailing, and an "Included"
+  // line at 0 on every day it covers, so the days do not read as if their
+  // transport had been left out.
+  for (const { sailing, pkg } of sailingPackages) {
+    const vehicle = selectVehicleFromPackage(pkg, shownSeats)
+    const firstDay = sailing.nightDays[0]
+    if (vehicle) {
+      services.push({
+        id: `sailing-${firstDay}-package-${pkg.id}`, dayNumber: firstDay, serviceType: 'transportation',
+        serviceName: `${pkg.package_name} (${sailing.durationDays} days, ${vehicle.vehicle})`,
+        quantity: 1, quantityMode: 'fixed', unitCost: vehicle.rate, lineTotal: vehicle.rate,
+        rateSource: 'b2b_transport_packages', isPerPax: false, isOptional: false,
+        notes: `cruise sightseeing package | ${sailing.nights} nights aboard`,
+      })
+    } else {
+      addHole({
+        kind: 'transport', reason: 'missing', tier, dayNumber: firstDay,
+        lookupAttempted: `${pkg.package_name}: vehicle for ${shownSeats}`,
+        message: `${pkg.package_name} has no vehicle price for a group of ${shownSeats}. Fill it in Rates → Transport Packages.`,
+      })
+    }
+    const included = (day: number, what: string) => services.push({
+      id: `day${day}-included-${pkg.id}`, dayNumber: day, serviceType: 'transportation',
+      serviceName: `${what} — Included in ${pkg.package_name}`,
+      quantity: 1, quantityMode: 'fixed', unitCost: 0, lineTotal: 0,
+      rateSource: 'b2b_transport_packages', isPerPax: false, isOptional: false, notes: 'included in the package',
+    })
+    for (const d of sailing.nightDays) included(d, 'Sightseeing transport')
+    if (sailing.disembarkDay != null) included(sailing.disembarkDay, 'Transfer off the ship')
+  }
+
   // The transfers a day needs BESIDES its sightseeing: dinner out, and the
   // local transfer the operator ticked. Priced per day, at the day's city.
   for (let i = 0; i < itinerary.length; i++) {
@@ -4379,6 +4459,12 @@ export async function calculateDayBasedPricing(
   // reproducing the original two inline loops (and their hole-recording) exactly.
   const transportAtPax = (pax: number): number => {
     let transportCost = 0
+    // Each sailing's package, at this group's size (the hole for a missing
+    // vehicle price is recorded once, with the lines above).
+    for (const { pkg } of sailingPackages) {
+      const vehicle = selectVehicleFromPackage(pkg, pax)
+      if (vehicle) transportCost += vehicle.rate
+    }
     for (const info of transportInfoByDay) {
       if (!info.requiresTransport) continue
 
