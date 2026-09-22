@@ -114,7 +114,6 @@ export async function POST(request: NextRequest) {
       // Dated rate periods (C3.2). Only named when the client sent them, so a
       // database without migration 305 never sees the column; the first period
       // is mirrored onto the base columns for date-less readers.
-      ...seasonsPatch,
       ...rateCurrencyWriteField(body),
       ...body,
       // The lengths sent, or NULL — never the column default, which used to make
@@ -124,7 +123,11 @@ export async function POST(request: NextRequest) {
       // Omitted when null so a database that has not run the migration yet
       // (an install mid-upgrade) still saves the rate.
       ...(ship.property_id ? { property_id: ship.property_id } : {}),
-      ...(ship.name ? { ship_name: ship.name } : {})
+      ...(ship.name ? { ship_name: ship.name } : {}),
+      // LAST, so it wins: a rate IS its dated periods, and the first period is
+      // mirrored onto the base columns for readers that have no travel date. It
+      // used to sit at the top, where the form's own base fields overwrote it.
+      ...seasonsPatch,
     }
 
     const { data, error } = await supabase

@@ -499,6 +499,43 @@ describe('migration replay from scratch', () => {
       expect(indexNames.has(name), `${name} would stop a second agency issuing its first document`).toBe(false)
     }
 
+    // ---- Migration 379: the default price becomes period 1 ----
+    // A fresh build has no rates, so production's state is MADE: a hotel priced
+    // from its room columns, a cruise from its base columns, a hotel with no
+    // price, a row with no dates, and one that already has periods.
+    const m379 = readFileSync(path.join(MIGRATIONS_DIR, '379_rates_are_dated_periods.sql'), 'utf8')
+    const T = `(SELECT id FROM tenants WHERE company_name = 'Replay Probe Co')`
+    await db.exec(`
+      INSERT INTO accommodation_rates (tenant_id, service_code, property_name, city, tier, double_rate_eur, single_rate_eur, rate_valid_from, rate_valid_to) VALUES
+        (${T}, 'P379-ROOM',   'Room Rate Hotel', 'Cairo', 'standard', 200, 150, DATE '2026-04-01', DATE '2027-04-30'),
+        (${T}, 'P379-NOPRICE','No Price Hotel',  'Cairo', 'luxury',   NULL, NULL, DATE '2026-04-01', DATE '2027-04-30'),
+        (${T}, 'P379-NODATES','No Dates Hotel',  'Cairo', 'standard', 200, 150, NULL, NULL);
+      INSERT INTO accommodation_rates (tenant_id, service_code, property_name, city, tier, ppd_eur, rate_valid_from, rate_valid_to, seasons) VALUES
+        (${T}, 'P379-HAS',    'Already Periods', 'Cairo', 'standard', 90, DATE '2026-04-01', DATE '2027-04-30',
+         '[{"name":"Winter","from":"2026-11-01","to":"2027-02-28","rates":{"ppd_eur":90}}]'::jsonb);
+      INSERT INTO nile_cruises (tenant_id, cruise_code, ship_name, tier, ppd_eur, single_supplement_eur, rate_valid_from, rate_valid_to) VALUES
+        (${T}, 'P379-SHIP', 'MS Probe', 'standard', 120, 40, DATE '2026-10-01', DATE '2027-04-30');
+    `)
+    await db.exec(m379)
+    const period = async (table: string, codeCol: string, code: string) =>
+      ((await db.query(`SELECT seasons, ppd_eur::float8 AS ppd_eur, single_supplement_eur::float8 AS supp FROM ${table} WHERE ${codeCol} = $1`, [code])).rows[0]) as
+        { seasons: Array<{ name: string; from: string; to: string; rates: Record<string, number> }> | null; ppd_eur: number | null; supp: number | null }
+    const room = await period('accommodation_rates', 'service_code', 'P379-ROOM')
+    expect(room.seasons, 'one period, the row’s own dates').toHaveLength(1)
+    expect(room.seasons![0]).toMatchObject({ name: 'Contract rate', from: '2026-04-01', to: '2027-04-30' })
+    expect(room.seasons![0].rates, 'half the double room, and the single room’s difference — what the engine charged').toMatchObject({ ppd_eur: 100, single_supplement_eur: 50, triple_reduction_eur: 0, ppd_non_eur: 100, guide_rate_eur: 0 })
+    expect(room.ppd_eur, 'the base column is period 1 too, for date-less readers').toBe(100)
+    expect((await period('accommodation_rates', 'service_code', 'P379-NOPRICE')).seasons, 'no price: left alone — a gap before, a gap after').toBeNull()
+    expect((await period('accommodation_rates', 'service_code', 'P379-NODATES')).seasons, 'no validity dates: no window to give it').toBeNull()
+    expect((await period('accommodation_rates', 'service_code', 'P379-HAS')).seasons![0].name, 'a rate that has periods is never touched').toBe('Winter')
+    const shipRow = await period('nile_cruises', 'cruise_code', 'P379-SHIP')
+    expect(shipRow.seasons![0]).toMatchObject({ name: 'Contract rate', from: '2026-10-01', to: '2027-04-30' })
+    expect(shipRow.seasons![0].rates).toMatchObject({ ppd_eur: 120, single_supplement_eur: 40, ppd_non_eur: 120 })
+    const once = JSON.stringify(room.seasons)
+    await db.exec(m379) // again: nothing left to convert, nothing re-written
+    expect(JSON.stringify((await period('accommodation_rates', 'service_code', 'P379-ROOM')).seasons)).toBe(once)
+    await db.exec(`DELETE FROM accommodation_rates WHERE service_code LIKE 'P379-%'; DELETE FROM nile_cruises WHERE cruise_code = 'P379-SHIP'`)
+
     // ---- Migration 378: a cruise's length has no default ----
     // 106 gave the column DEFAULT '[4]': a cruise saved without a length became
     // a four-night one, and the length is what turns a per-trip price into a
