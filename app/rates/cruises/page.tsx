@@ -690,7 +690,8 @@ export default function CruisesPage() {
       notes: cruise.notes || '',
       is_active: cruise.is_active,
       tier: cruise.tier || 'standard',
-      is_preferred: cruise.is_preferred || false,
+      // A clone is a NEW ship row; preferred is one-per-tier, so it does not carry over.
+      is_preferred: false,
       supplier_id: cruise.supplier_id || '',
       property_id: (cruise as { property_id?: string | null }).property_id || ''
     })
@@ -728,6 +729,10 @@ export default function CruisesPage() {
           ? { seasons: periods }
           : {}),
         ...formData,
+        // Preferred is written separately, through /api/rates/preferred, which
+        // clears the star on siblings so the one-per-tier index is never
+        // tripped. Freeze it to its stored value here so the raw write is inert.
+        is_preferred: editingCruise ? editingCruise.is_preferred === true : false,
         cruise_code: formData.cruise_code || generateCode(),
         route_name: formData.route_name || `${formData.embark_city} to ${formData.disembark_city}`,
         // Set legacy rates from PPD for backward compatibility
@@ -763,6 +768,22 @@ export default function CruisesPage() {
         const data = await response.json()
       
         if (data.success) {
+          // Apply the preferred choice through the star endpoint (clears siblings).
+          const was = editingCruise ? editingCruise.is_preferred === true : false
+          const savedId = data.data?.id || editingCruise?.id
+          if (savedId && formData.is_preferred !== was) {
+            try {
+              const pref = await fetch('/api/rates/preferred', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ table: 'nile_cruises', id: savedId, preferred: formData.is_preferred }),
+              })
+              const pr = await pref.json()
+              if (!pr.success) showToast('error', pr.error || 'Saved, but could not update Preferred')
+            } catch {
+              showToast('error', 'Saved, but could not update Preferred')
+            }
+          }
           showToast('success', editingCruise ? 'Cruise updated!' : 'Cruise created!')
           setShowModal(false)
           fetchCruises()
@@ -1412,6 +1433,22 @@ export default function CruisesPage() {
                     <span className="text-sm text-gray-700">Active</span>
                   </label>
                 </div>
+                <label className="flex items-start gap-2 cursor-pointer mt-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_preferred}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_preferred: e.target.checked }))}
+                    className="mt-0.5 w-4 h-4 text-amber-500 rounded focus:ring-amber-500"
+                  />
+                  <span className="text-sm">
+                    <span className="inline-flex items-center gap-1 font-medium text-gray-700">
+                      <Star className="w-4 h-4 text-amber-500" /> Preferred ship for this tier
+                    </span>
+                    <span className="block text-xs text-gray-500">
+                      The engine picks this ship when several fit the same tier. Setting it clears the star on the others.
+                    </span>
+                  </span>
+                </label>
               </div>
 
               {/* Section 11: Notes */}
