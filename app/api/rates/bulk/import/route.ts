@@ -6,7 +6,7 @@ import Papa from 'papaparse'
 import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES } from '@/lib/rates/periods-csv'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
-import { resolveRecordKeys, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
+import { resolveRecordKeys, resolveVocabularyKey, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { linkRowsBySupplierName, supplierNameGapMessage } from '@/lib/rates/link-supplier-by-name'
 
@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
 
       let updated = 0
       const periodErrors: Array<{ row: string; message: string }> = []
+      const seasonVocab = await loadVocabulary(supabase, 'rate_season')
       for (const group of sheet.groups) {
         interface PropRow { id: string }
         let query = supabase
@@ -85,7 +86,20 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        const seasons = sanitizeSeasons(group.periods, periodsTarget.entity) ?? []
+        // The Season cell is a word from the agency's rate_season vocabulary —
+        // its key or its label ("Christmas"). Resolved to the key; a word not
+        // in the list refuses the rate rather than storing something nothing
+        // will ever show.
+        const seasonWords = group.periods.map(p => p.season).filter(Boolean) as string[]
+        if (seasonWords.length > 0) {
+          const unknown = seasonWords.filter(w => !resolveVocabularyKey(seasonVocab, w))
+          if (unknown.length > 0) {
+            periodErrors.push({ row: label, message: `Season "${[...new Set(unknown)].join('", "')}" is not in your rate seasons list (Settings → Your vocabulary → Rate seasons).` })
+            continue
+          }
+        }
+        const periodsWithKeys = group.periods.map(p => (p.season ? { ...p, season: resolveVocabularyKey(seasonVocab, p.season) ?? undefined } : p))
+        const seasons = sanitizeSeasons(periodsWithKeys, periodsTarget.entity) ?? []
         const { error } = await supabase
           .from(periodsTarget.entity === 'accommodation' ? 'accommodation_rates' : 'nile_cruises')
           .update({

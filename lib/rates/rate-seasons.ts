@@ -25,6 +25,16 @@ export interface RateSeason {
   from: string
   to: string
   rates: Record<string, number>
+  /** The supplier's season word for this period — a key of the agency's own
+   *  `rate_season` vocabulary (Low Season, Christmas…). A label beside the
+   *  free-text name; pricing reads the dates, never the word. Optional. */
+  season?: string
+}
+
+/** A vocabulary key as stored: lower-case, letters, digits and underscores. */
+export const seasonKey = (v: unknown): string | undefined => {
+  const k = String(v ?? '').trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40)
+  return k || undefined
 }
 
 /** The rate fields each catalog's periods carry, in display order.
@@ -87,7 +97,8 @@ export function sanitizeSeasons(input: unknown, entity: RateSeasonEntity): RateS
     const name = typeof s.name === 'string' && s.name.trim()
       ? s.name.trim().slice(0, 80)
       : `${from} – ${to}`
-    seasons.push({ name, from, to, rates })
+    const season = seasonKey(s.season)
+    seasons.push({ name, from, to, rates, ...(season ? { season } : {}) })
   }
   if (seasons.length === 0) return null
   seasons.sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0))
@@ -433,6 +444,8 @@ export function displayPpd(
 
 export interface RatePeriodLine {
   name: string
+  /** The season word's key, when the period carries one. */
+  season?: string
   from: string
   to: string
   /** Per-person-in-double for each passport, null when the cell is blank. */
@@ -461,6 +474,7 @@ export function ratePeriodLines(
     const eur = usable(s.rates.ppd_eur)
     return {
       name: s.name,
+      ...(s.season ? { season: s.season } : {}),
       from: s.from,
       to: s.to,
       eur,

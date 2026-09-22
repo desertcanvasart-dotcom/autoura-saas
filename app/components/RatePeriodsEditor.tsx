@@ -16,6 +16,7 @@
 
 import { useMemo } from 'react'
 import { Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { VocabSelect } from '@/components/vocabulary'
 import {
   MAX_RATE_PERIODS,
   RATE_FIELDS,
@@ -108,6 +109,19 @@ export default function RatePeriodsEditor({
                     onChange={e => update(i, { name: e.target.value })}
                     placeholder="e.g. Christmas"
                     className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md"
+                  />
+                </div>
+                <div className="min-w-[150px]">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Season</label>
+                  {/* The supplier's season word, from Settings → Vocabulary → Rate
+                      seasons (sibling #452). A label: pricing reads the dates. */}
+                  <VocabSelect
+                    kind="rate_season"
+                    value={p.season ?? ''}
+                    onChange={v => update(i, { season: v || undefined })}
+                    placeholder="— none —"
+                    name={`season-${i}`}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md bg-white"
                   />
                 </div>
                 <div>
