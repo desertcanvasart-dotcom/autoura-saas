@@ -1251,7 +1251,6 @@ export default function SleepingTrainRatesContent() {
                   <div>
                     <label htmlFor="rate_oneway_eur" className="block text-xs font-medium text-gray-600 mb-1">One-way Rate ({rateSymbol}) *</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{rateSymbol}</span>
                       <input
                         type="number"
                         id="rate_oneway_eur"
@@ -1262,7 +1261,7 @@ export default function SleepingTrainRatesContent() {
                         min="0"
                         step="0.01"
                         placeholder="0.00"
-                        className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                       />
                     </div>
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
@@ -1270,7 +1269,6 @@ export default function SleepingTrainRatesContent() {
                   <div>
                     <label htmlFor="rate_roundtrip_eur" className="block text-xs font-medium text-gray-600 mb-1">Roundtrip Rate ({rateSymbol})</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{rateSymbol}</span>
                       <input
                         type="number"
                         id="rate_roundtrip_eur"
@@ -1280,7 +1278,7 @@ export default function SleepingTrainRatesContent() {
                         min="0"
                         step="0.01"
                         placeholder="0.00"
-                        className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                       />
                     </div>
                   </div>

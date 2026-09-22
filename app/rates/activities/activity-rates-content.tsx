@@ -1376,7 +1376,6 @@ export default function ActivityRatesContent() {
                       </span>
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{rateSymbol}</span>
                       <input
                         type="number"
                         name="base_rate_eur"
@@ -1385,7 +1384,7 @@ export default function ActivityRatesContent() {
                         required
                         min="0"
                         step="0.01"
-                        className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg"
                       />
                     </div>
                     <p className="text-xs text-gray-400 mt-1">Entered and shown in the rate&rsquo;s own currency</p>
