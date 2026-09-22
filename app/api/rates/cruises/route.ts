@@ -5,6 +5,7 @@ import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { validateRatePayload } from '@/lib/rate-validation'
 import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
 import { cruiseLengthsToStore } from '@/lib/rates/cruise-ppd'
+import { sanitizeSailingDays } from '@/lib/rates/cruise-sailing'
 
 export async function GET(request: NextRequest) {
   try {
@@ -119,6 +120,9 @@ export async function POST(request: NextRequest) {
       // The lengths sent, or NULL — never the column default, which used to make
       // a cruise saved without a length a four-night one (migration 378).
       duration_nights: cruiseLengthsToStore(body.duration_nights) ?? null,
+      // Weekday keys the sailing departs on, cleaned (migration 382); empty =
+      // no fixed day. Sanitized so a stray value never trips the CHECK.
+      sailing_days: sanitizeSailingDays(body.sailing_days),
       supplier_id: body.supplier_id || null,
       // Omitted when null so a database that has not run the migration yet
       // (an install mid-upgrade) still saves the rate.

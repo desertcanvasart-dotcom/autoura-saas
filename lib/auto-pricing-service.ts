@@ -52,6 +52,7 @@ import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { pickStartingPrice, type TierPrice } from '@/lib/tours/pick-starting-price'
 import { priceDayActivity, type ActivityRow } from '@/lib/pricing/day-activity'
+import { sailsOn, sailingDaysLabel } from '@/lib/rates/cruise-sailing'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
@@ -1189,6 +1190,9 @@ export async function getCruiseRates(
   durationNights: number
   season: 'low' | 'high' | 'peak'
   source: RateSource
+  /** The weekday keys this sailing departs on (migration 382); empty = no
+   *  fixed day. The day-loop warns when the boarding date does not match. */
+  sailingDays?: string[]
   /** The throughout guide's cabin for one night, from the resolved period's
    *  guide_rate_eur (B-item 1). Null = no concession on file — a pricing
    *  hole in throughout mode, never a free bed. */
@@ -1408,6 +1412,9 @@ export async function getCruiseRates(
       guideBedNight,
       durationNights,
       season,
+      // The weekdays this sailing departs on (migration 382); empty = no fixed
+      // day. The day-loop warns when the boarding date does not match.
+      sailingDays: cruise.sailing_days ?? [],
       source: 'db'
     }
   } catch (err) {
@@ -3050,6 +3057,23 @@ export async function calculateDayBasedPricing(
       })
     } else if (cr && cr.source === 'db') {
       cruiseRates = cr
+      // A sailing with fixed departure days cannot start on another one.
+      // Priced, not blocked — the numbers are real and the operator may be
+      // moving the itinerary to fit — but a quote nobody can book must not look
+      // clean, and this is the only place that knows the ship's schedule.
+      // Silent for a ship with no fixed day, which is most of them.
+      if (firstCruiseDay && travelDate) {
+        const start = Date.parse(`${travelDate.slice(0, 10)}T00:00:00Z`)
+        const boards = Number.isNaN(start)
+          ? null
+          : new Date(start + (firstCruiseDay.day - 1) * 86400000).toISOString().slice(0, 10)
+        if (!sailsOn(cr.sailingDays, boards)) {
+          warnings.push(
+            `${cr.shipName || 'The cruise'} departs ${sailingDaysLabel(cr.sailingDays)}, but day ${firstCruiseDay.day} boards on ${boards}. ` +
+            'Move the cruise day, or pick a sailing that leaves then.'
+          )
+        }
+      }
     } else if (cr?.ambiguous) {
       addHole({
         kind: 'cruise',

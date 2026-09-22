@@ -7,6 +7,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Ship, Plus, Edit, Trash2, X, Check, ChevronDown, AlertCircle, CheckCircle2, Star, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Copy } from 'lucide-react'
+import { SAILING_DAYS, dayName, sailingDaysLabel, sanitizeSailingDays, type SailingDay } from '@/lib/rates/cruise-sailing'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
 import { TierBadge, TierPicker, VocabSelect, VocabLabel } from '@/components/vocabulary'
@@ -48,6 +49,7 @@ interface Cruise {
   embark_city: string
   disembark_city: string
   duration_nights: number | number[]
+  sailing_days?: string[] | null
   cabin_type: string
   // Legacy single-rate fields (kept for backward compatibility / display)
   rate_single_eur: number
@@ -121,6 +123,7 @@ interface CruiseFormData {
   embark_city: string
   disembark_city: string
   duration_nights: number[]
+  sailing_days: SailingDay[]
   cabin_type: string
   // PPD Model - Low Season
   ppd_eur: number
@@ -417,6 +420,7 @@ export default function CruisesPage() {
     disembark_city: 'Aswan',
     // None preselected: a new cruise used to start as a four-night one.
     duration_nights: [],
+    sailing_days: [],
     cabin_type: 'standard',
     // PPD Model - Low Season
     ppd_eur: 0,
@@ -587,6 +591,7 @@ export default function CruisesPage() {
       embark_city: cruise.embark_city,
       disembark_city: cruise.disembark_city,
       duration_nights: Array.isArray(cruise.duration_nights) ? cruise.duration_nights : [cruise.duration_nights],
+      sailing_days: sanitizeSailingDays(cruise.sailing_days),
       cabin_type: cruise.cabin_type,
       // PPD Model - Low Season
       ppd_eur: cruise.ppd_eur || 0,
@@ -650,6 +655,7 @@ export default function CruisesPage() {
       embark_city: cruise.embark_city,
       disembark_city: cruise.disembark_city,
       duration_nights: Array.isArray(cruise.duration_nights) ? cruise.duration_nights : [cruise.duration_nights],
+      sailing_days: sanitizeSailingDays(cruise.sailing_days),
       cabin_type: cruise.cabin_type,
       // PPD Model - Low Season
       ppd_eur: cruise.ppd_eur || 0,
@@ -1067,6 +1073,7 @@ export default function CruisesPage() {
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Category</th>
                   <th className="px-4 py-2 text-left text-xs font-semibold text-blue-800">Route</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Nights</th>
+                  <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Departs</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Cabin</th>
                   <th className="px-4 py-2 text-center text-xs font-semibold text-blue-800">Tier</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold text-blue-800">PPD</th>
@@ -1112,6 +1119,21 @@ export default function CruisesPage() {
                           </span>
                         ))}
                       </div>
+                    </td>
+                    {/* The departure days — the weekday a sailing leaves decides
+                        whether it fits an itinerary at all. Empty = any day. */}
+                    <td className="px-4 py-3 text-center">
+                      {sanitizeSailingDays(cruise.sailing_days).length > 0 ? (
+                        <span className="inline-flex flex-wrap justify-center gap-1">
+                          {sanitizeSailingDays(cruise.sailing_days).map(d => (
+                            <span key={d} className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-[11px] font-medium">
+                              {dayName(d).slice(0, 3)}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">Any day</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800">
@@ -1170,7 +1192,7 @@ export default function CruisesPage() {
                 ))}
                 {paginatedCruises.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={13} className="px-4 py-12 text-center text-gray-500">
                       <Ship className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                       <p className="font-medium">No cruises found</p>
                       <button onClick={handleAddNew} className="mt-2 text-sm text-blue-600 hover:underline">
@@ -1317,6 +1339,44 @@ export default function CruisesPage() {
                   />
                   <p className="text-xs text-gray-500 mt-1">Select all applicable durations for this cruise</p>
                 </div>
+              </div>
+
+              {/* Sailing days — the weekdays this sailing departs on. A ship
+                  that leaves Aswan only on Mondays and Fridays cannot serve a
+                  Wednesday itinerary; the engine warns when one is chosen for a
+                  date that does not match. Empty = no fixed day (the default),
+                  which checks nothing. */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Sailing days
+                  <span className="ml-2 font-normal text-gray-400">leave empty if it sails any day</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {SAILING_DAYS.map(day => {
+                    const on = formData.sailing_days.includes(day)
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => setFormData(prev => ({
+                          ...prev,
+                          sailing_days: on
+                            ? prev.sailing_days.filter(d => d !== day)
+                            : SAILING_DAYS.filter(d => d === day || prev.sailing_days.includes(d)),
+                        }))}
+                        aria-pressed={on}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                          on ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {dayName(day).slice(0, 3)}
+                      </button>
+                    )
+                  })}
+                </div>
+                {formData.sailing_days.length > 0 && (
+                  <p className="mt-1 text-[11px] text-gray-500">Departs {sailingDaysLabel(formData.sailing_days)}</p>
+                )}
               </div>
 
               {/* Section 4: Cabin Type */}
