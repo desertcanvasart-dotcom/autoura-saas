@@ -185,11 +185,16 @@ describe('the editor uses it', () => {
     expect(SOURCE).toMatch(/setDayNoSightseeing\(false\)\n\s*setDayLength\(''\)/)
   })
 
-  it('both modules stay import-free — the editor is a client component', () => {
+  it('both modules reach nothing but pure rule files — the editor is a client component', () => {
+    // day-edit may import another import-free rule file (transport-lines);
+    // what it must never do is reach a module that touches the database.
+    const PURE = ['@/lib/pricing/transport-lines']
     for (const f of ['lib/tours/day-edit.ts', 'lib/tours/day-sightseeing.ts']) {
       const src = readFileSync(join(process.cwd(), f), 'utf8')
-      expect([...src.matchAll(/^import\s/gm)], f).toHaveLength(0)
+      const imports = [...src.matchAll(/^import\s.*from '([^']+)'/gm)].map(m => m[1]).filter(m => !PURE.includes(m))
+      expect(imports, f).toHaveLength(0)
     }
+    expect([...readFileSync(join(process.cwd(), 'lib/pricing/transport-lines.ts'), 'utf8').matchAll(/^import\s/gm)]).toHaveLength(0)
   })
 })
 

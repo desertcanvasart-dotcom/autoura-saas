@@ -49,6 +49,7 @@ import { readDayMeals } from '@/lib/tours/day-meals'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { sightseeingStatement, SIGHTSEEING_NOT_STATED } from '@/lib/tours/day-sightseeing'
 import { sanitizeLegPlace, sanitizeLegAssist } from '@/lib/pricing/flight-leg'
+import { sanitizeTransportLines, transportLinesToCell, transportLinesFromCell } from '@/lib/pricing/transport-lines'
 
 /** A stated yes/no, or blank for "not stated". */
 const yesNo = (v: boolean | undefined): string => (v === true ? 'yes' : v === false ? 'no' : '')
@@ -91,6 +92,9 @@ export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   { name: 'leg_assist_to', label: 'Assist At Arrival', allowed: YES_NO },
   // Road beside a ticket, or no vehicle on a road day (sibling #447). Blank =
   // as always. Boarding / leaving the ship: blank = derived from the nights.
+  // The day's own transport list (lib/pricing/transport-lines): blank = the
+  // rules decide; "none" = no transport; else "day_tour@Luxor; intercity_dropoff:Luxor>Aswan".
+  { name: 'transport_lines', label: 'Transport Lines' },
   { name: 'road_transfers', label: 'Road Transfers', allowed: YES_NO },
   { name: 'cruise_embark', label: 'Cruise Boarding Assist', allowed: YES_NO },
   { name: 'cruise_disembark', label: 'Cruise Leaving Assist', allowed: YES_NO },
@@ -157,6 +161,7 @@ export function serializeDaysCsv(
         leg_to: sanitizeLegPlace(d.leg_to) ?? '',
         leg_assist_from: yesNo(sanitizeLegAssist(d.leg_assist)?.from),
         leg_assist_to: yesNo(sanitizeLegAssist(d.leg_assist)?.to),
+        transport_lines: transportLinesToCell(sanitizeTransportLines(d.transport_lines)),
         road_transfers: yesNo(typeof d.road_transfers === 'boolean' ? d.road_transfers : undefined),
         cruise_embark: yesNo(typeof services.cruise_embark === 'boolean' ? services.cruise_embark : undefined),
         cruise_disembark: yesNo(typeof services.cruise_disembark === 'boolean' ? services.cruise_disembark : undefined),
@@ -439,6 +444,7 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
       ...(rec.cruise_disembark ? { cruise_disembark: rec.cruise_disembark === 'yes' } : {}),
     },
     ...(rec.road_transfers ? { road_transfers: rec.road_transfers === 'yes' } : {}),
+    ...(transportLinesFromCell(rec.transport_lines) !== undefined ? { transport_lines: transportLinesFromCell(rec.transport_lines) } : {}),
   }
   // Absent has always meant road; keep it absent so a re-read matches what the
   // day editor writes, rather than introducing a value it never sets.
