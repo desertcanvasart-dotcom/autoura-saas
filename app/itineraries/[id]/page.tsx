@@ -41,6 +41,10 @@ interface Itinerary {
   total_cost: number
   status: string
   notes: string
+  /** A cruise that boards on a day its ship does not sail — a note, never a
+   *  blocker (migration 382). Present only when the itinerary was loaded with
+   *  its days. */
+  cruise_sailing_notes?: string[]
   /** Team member who owns this itinerary (migration 272) — staff, not a supplier. */
   assigned_to: string | null
   assigned_guide_id: string
@@ -153,7 +157,9 @@ export default function ViewItineraryPage() {
 
   const fetchItinerary = async () => {
     try {
-      const itinResponse = await fetch(`/api/itineraries/${params.id}`)
+      // include=days so the route can flag a cruise that boards on a day its
+      // ship does not sail (cruise_sailing_notes) — a note, never a blocker.
+      const itinResponse = await fetch(`/api/itineraries/${params.id}?include=days`)
       const itinData = await itinResponse.json()
 
       if (!itinData.success) {
@@ -847,6 +853,22 @@ export default function ViewItineraryPage() {
           </div>
         </div>
       </header>
+
+      {/* Cruise sailing-day note: the ship does not leave on the day this
+          itinerary boards it. The price stands; the booking may not — confirm
+          the date before sending (migration 382). */}
+      {itinerary.cruise_sailing_notes && itinerary.cruise_sailing_notes.length > 0 && (
+        <div className="container mx-auto px-4 pt-3">
+          <div className="bg-amber-50 border border-amber-200 p-3 rounded-md">
+            <p className="text-sm font-semibold text-amber-800 mb-1">⚠ Check the cruise date</p>
+            <ul className="text-xs text-amber-700 space-y-0.5">
+              {itinerary.cruise_sailing_notes.map((n, i) => (
+                <li key={i}>• {n}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Success Messages */}
       {sendSuccess && (
