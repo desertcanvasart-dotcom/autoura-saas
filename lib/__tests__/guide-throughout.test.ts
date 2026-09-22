@@ -30,11 +30,15 @@ const BASE_PARAMS = {
 
 const SCOPE = { tenantId: 'test-tenant' } as unknown as CatalogScope
 
+// A rate says which MODE it is for (migration 380): the spot row prices a
+// spot quote, the throughout rows price a throughout one — never the other.
 const GUIDE_RATE_ROWS = [
   { id: 'gr-full', guide_language: 'English', guide_type: 'egyptologist', tour_duration: 'full_day', full_day_rate: 70, is_active: true },
-  { id: 'gr-meet', guide_language: 'English', guide_type: 'egyptologist', tour_duration: 'meet_greet', full_day_rate: 25, is_active: true },
+  { id: 'gr-thr-full', guide_language: 'English', guide_type: 'egyptologist', guide_mode: 'throughout', tour_duration: 'full_day', full_day_rate: 70, is_active: true },
+  { id: 'gr-meet', guide_language: 'English', guide_type: 'egyptologist', guide_mode: 'throughout', tour_duration: 'meet_greet', full_day_rate: 25, is_active: true },
   { id: 'gr-snr-full', guide_language: 'English', guide_type: 'senior', tour_duration: 'full_day', full_day_rate: 110, is_active: true },
-  { id: 'gr-snr-meet', guide_language: 'English', guide_type: 'senior', tour_duration: 'meet_greet', full_day_rate: 40, is_active: true },
+  { id: 'gr-snr-thr-full', guide_language: 'English', guide_type: 'senior', guide_mode: 'throughout', tour_duration: 'full_day', full_day_rate: 110, is_active: true },
+  { id: 'gr-snr-meet', guide_language: 'English', guide_type: 'senior', guide_mode: 'throughout', tour_duration: 'meet_greet', full_day_rate: 40, is_active: true },
 ]
 
 const HOTEL_SEASON = {

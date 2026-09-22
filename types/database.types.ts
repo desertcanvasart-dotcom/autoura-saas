@@ -4980,6 +4980,7 @@ export interface Database {
           id: string
           tenant_id: string
           guide_type: string | null
+          guide_mode: string
           city: string | null
           half_day_rate: number | null
           full_day_rate: number | null
@@ -5002,6 +5003,7 @@ export interface Database {
           id?: string
           tenant_id: string
           guide_type?: string | null
+          guide_mode?: string
           city?: string | null
           half_day_rate?: number | null
           full_day_rate?: number | null
@@ -5024,6 +5026,7 @@ export interface Database {
           id?: string
           tenant_id?: string
           guide_type?: string | null
+          guide_mode?: string
           city?: string | null
           half_day_rate?: number | null
           full_day_rate?: number | null

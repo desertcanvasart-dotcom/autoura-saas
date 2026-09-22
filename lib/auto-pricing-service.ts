@@ -1807,10 +1807,14 @@ export async function getGuideRate(
   scope: CatalogScope,
   language: string,
   tier: ServiceTier,
-  opts?: { grade?: GuideGrade; duration?: 'full_day' | 'half_day' | 'meet_greet'; city?: string | null }
+  opts?: { grade?: GuideGrade; duration?: 'full_day' | 'half_day' | 'meet_greet'; city?: string | null; mode?: string }
 ): Promise<{ id: string; name: string; dailyRate: number; source: RateSource; ambiguous?: Ambiguity; cityMatched?: boolean } | null> {
   const grade = opts?.grade ?? DEFAULT_GUIDE_GRADE
   const duration = opts?.duration ?? 'full_day'
+  // The quote's guide MODE (sibling #464): a Throughout quote is priced only
+  // from Throughout rates, a Spot quote only from Spot rates — a rate says
+  // which it is for (guide_rates.guide_mode, migration 380). Never the other.
+  const mode = opts?.mode ?? 'spot'
   const isDefaultAsk = grade === DEFAULT_GUIDE_GRADE && duration === 'full_day'
   try {
     // ---- guide_rates: the rate table, matched EXACTLY (lib/guides/guide-language) ----
@@ -1823,14 +1827,17 @@ export async function getGuideRate(
     const rateRows = await memoRead(`guide-rates|${scope.tenantId}|${grade}|${duration}`, async () => {
       const { data } = await getSupabaseAdmin()
         .from('guide_rates')
-        .select('id, guide_language, guide_type, tour_duration, city, full_day_rate, half_day_rate, base_rate_eur, base_rate_non_eur, rate_currency, is_active')
+        .select('id, guide_language, guide_type, guide_mode, tour_duration, city, full_day_rate, half_day_rate, base_rate_eur, base_rate_non_eur, rate_currency, is_active')
         .or(catalogOrExpr(scope))
         .eq('is_active', true)
         .eq('guide_type', grade)
         .eq('tour_duration', duration)
       return (await normalizeRateRows(getSupabaseAdmin(), 'guide_rates', data, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))) ?? []
     })
-    const forLanguage = (rateRows as GuideRateRow[]).filter(r => guideLanguageKey(r.guide_language, languageItems) === languageKey)
+    // A row with no mode is a Spot rate — the column's default (380).
+    const forLanguage = (rateRows as Array<GuideRateRow & { guide_mode?: string | null }>)
+      .filter(r => (r.guide_mode || 'spot') === mode)
+      .filter(r => guideLanguageKey(r.guide_language, languageItems) === languageKey)
     const pick = pickGuideRateRow(forLanguage, opts?.city)
     if (pick.kind === 'one') {
       return {
@@ -3193,8 +3200,9 @@ export async function calculateDayBasedPricing(
   // The guide rate is PER CITY (lib/guides/guide-language): each day asks for
   // its own city's row. Rows are read once per grade and duration (memoised),
   // so this is one read, not one per day.
+  const quoteGuideMode = throughoutGuide ? 'throughout' : 'spot'
   const guideRateFor = (city: string | null | undefined, duration?: 'meet_greet') =>
-    getGuideRate(catalogScope, language, tier, { grade: guideGrade, ...(duration ? { duration } : {}), city })
+    getGuideRate(catalogScope, language, tier, { grade: guideGrade, ...(duration ? { duration } : {}), city, mode: quoteGuideMode })
   const [mealRates, tippingRows, fixedDailyCosts] = await Promise.all([
     getMealRates(catalogScope, tier),
     loadTippingRows(catalogScope),
@@ -3653,8 +3661,8 @@ export async function calculateDayBasedPricing(
           message: dayRate?.ambiguous
             ? `${dayRate.ambiguous.count} ${language} ${gradeLabel.toLowerCase()}guide rates apply to day ${day.day}${day.city ? ` (${day.city})` : ''} at different prices (${dayRate.ambiguous.names.join(', ')}). Keep one in Rates → Guides.`
             : hasSightseeing
-            ? `No ${language} ${gradeLabel.toLowerCase()}guide full-day rate. Add it in Rates → Guides.`
-            : `No ${language} ${gradeLabel.toLowerCase()}guide "Meet & Assist" rate for the throughout guide's non-sightseeing days. Add a meet_greet duration row in Rates → Guides.`,
+            ? `No ${language} ${gradeLabel.toLowerCase()}guide full-day rate for the THROUGHOUT mode${day.city ? ` (${day.city}, or all cities)` : ''}. Add one with Guide Mode = Throughout in Rates → Guides — Spot rates are not used for a throughout guide.`
+            : `No ${language} ${gradeLabel.toLowerCase()}guide "Meet & Assist" rate for the throughout guide's non-sightseeing days. Add a meet_greet duration row with Guide Mode = Throughout in Rates → Guides.`,
         })
       }
     } else if (hasSightseeing) {

@@ -1257,7 +1257,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                   const m = readDayMeals(day.meals)
                   return (
                     <p className="text-xs text-blue-600 mt-1">
-                      🍽️ {MEAL_SLOTS.map(k => `${k[0].toUpperCase() + k.slice(1)}: ${mealStatusLabel(m[k])}`).join(' · ')}
+                      🍽️ {MEAL_SLOTS.map(k => `${k[0].toUpperCase() + k.slice(1)}: ${mealStatusLabel(m[k], day.accommodation_type)}`).join(' · ')}
                     </p>
                   )
                 })()}

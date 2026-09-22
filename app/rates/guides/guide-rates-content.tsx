@@ -40,6 +40,7 @@ interface GuideRate {
   service_code: string
   guide_language: string
   guide_type: string
+  guide_mode?: string | null
   city?: string
   tour_duration: string
   base_rate_eur: number
@@ -131,6 +132,7 @@ export default function GuideRatesContent() {
     service_code: '',
     guide_language: 'english',
     guide_type: 'egyptologist',
+    guide_mode: 'spot',
     city: '',
     tour_duration: 'full_day',
     base_rate_eur: 0,
@@ -211,6 +213,7 @@ export default function GuideRatesContent() {
       service_code: generateServiceCode(),
       guide_language: 'english',
       guide_type: 'egyptologist',
+      guide_mode: 'spot',
       city: '',
       tour_duration: 'full_day',
       base_rate_eur: 0,
@@ -232,6 +235,7 @@ export default function GuideRatesContent() {
       service_code: rate.service_code || '',
       guide_language: rate.guide_language || 'english',
       guide_type: rate.guide_type || 'egyptologist',
+      guide_mode: rate.guide_mode || 'spot',
       city: rate.city || '',
       tour_duration: rate.tour_duration || 'full_day',
       base_rate_eur: rate.base_rate_eur || 0,
@@ -254,6 +258,7 @@ export default function GuideRatesContent() {
       service_code: generateServiceCode(), // Generate new code
       guide_language: rate.guide_language || 'english',
       guide_type: rate.guide_type || 'egyptologist',
+      guide_mode: rate.guide_mode || 'spot',
       city: rate.city || '',
       tour_duration: rate.tour_duration || 'full_day',
       base_rate_eur: rate.base_rate_eur || 0,
@@ -862,6 +867,9 @@ export default function GuideRatesContent() {
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
                         <VocabLabel kind="guide_grade" value={rate.guide_type} />
+                        {rate.guide_mode && rate.guide_mode !== 'spot' && (
+                          <span className="ml-1 px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-medium"><VocabLabel kind="guide_mode" value={rate.guide_mode} /></span>
+                        )}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -1141,6 +1149,15 @@ export default function GuideRatesContent() {
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Guide Type *</label>
                     <VocabSelect kind="guide_grade" value={formData.guide_type} onChange={v => setFormData(prev => ({ ...prev, guide_type: v }))} placeholder={null} name="guide_type" required
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Guide Mode *</label>
+                    {/* Spot (a local guide per sightseeing day) or Throughout
+                        (one guide the whole trip) — the agency's words, from
+                        Settings → Vocabulary. A quote is priced only from rates
+                        of its own mode (sibling #464). */}
+                    <VocabSelect kind="guide_mode" value={formData.guide_mode} onChange={v => setFormData(prev => ({ ...prev, guide_mode: v }))} placeholder={null} name="guide_mode" required
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg" />
                   </div>
                   <div>

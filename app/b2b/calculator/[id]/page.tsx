@@ -9,6 +9,7 @@ import { useAuth } from '@/app/contexts/AuthContext'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { isBookableLine, sortByItineraryFlow } from '@/lib/pricing/breakdown-order'
 import { DayBandRow, groupByDay } from '@/components/pricing/DayBand'
+import { useVocabulary } from '@/components/vocabulary'
 
 // ============================================
 // B2B TOUR PRICE CALCULATOR PAGE
@@ -145,6 +146,8 @@ export default function TourPriceCalculator() {
   // Guide grade + mode (B-item 1). Defaults = the historical behaviour.
   const [guideGrade, setGuideGrade] = useState<'egyptologist' | 'senior'>('egyptologist')
   const [guideMode, setGuideMode] = useState<'spot' | 'throughout'>('spot')
+  // The buttons carry the agency's own words for the two modes (Settings → Vocabulary → Guide modes).
+  const { labelFor: guideModeLabel } = useVocabulary('guide_mode')
   // The guide's language (sibling #459): the agency's own list, a language
   // with no rate shown but not choosable; preselects the first that has one.
   const [guideLanguages, setGuideLanguages] = useState<Array<{ key: string; label: string; hasRate: boolean }>>([])
@@ -598,7 +601,7 @@ export default function TourPriceCalculator() {
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    Spot
+                    {guideModeLabel('spot') || 'Spot'}
                   </button>
                   <button
                     type="button"
@@ -609,7 +612,7 @@ export default function TourPriceCalculator() {
                         : 'bg-white border text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    Throughout (+1)
+                    {guideModeLabel('throughout') || 'Throughout'} (+1)
                   </button>
                 </div>
                 <select

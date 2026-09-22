@@ -210,6 +210,8 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       id(), serviceCode(),
       col('guide_language', 'Language', 'text', true),
       col('guide_type', 'Guide Type', 'text', true),
+      // Spot / Throughout (the agency's guide_mode vocabulary); blank = spot.
+      col('guide_mode', 'Guide Mode', 'text', false),
       col('city', 'City', 'text', false),
       col('tour_duration', 'Tour Duration', 'text', true),
       col('base_rate_eur', 'Rate', 'number', true),

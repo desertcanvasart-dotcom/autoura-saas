@@ -42,8 +42,11 @@ export function readDayMeals(meals: DayMeals | undefined): Record<MealSlot, DayM
 const LABEL: Record<MealSlot, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' }
 
 /** How the status reads on a card or in a summary. */
-export function mealStatusLabel(status: DayMealStatus): string {
-  return status === 'included' ? 'hotel' : status === 'external' ? 'restaurant' : 'not provided'
+/** Where a meal comes from, in words. An included meal on a night ABOARD
+ *  reads "included on board" (operator, 2026-09-17), not "hotel". */
+export function mealStatusLabel(status: DayMealStatus, night?: string | null): string {
+  if (status === 'included') return night === 'cruise' ? 'included on board' : 'hotel'
+  return status === 'external' ? 'restaurant' : 'not provided'
 }
 
 /**
@@ -60,11 +63,11 @@ export function summarizeMeals(itinerary: unknown): string[] {
   if (!Array.isArray(itinerary)) return []
   const out: string[] = []
   itinerary.forEach((raw, i) => {
-    const day = (raw ?? {}) as { day?: number; meals?: DayMeals }
+    const day = (raw ?? {}) as { day?: number; meals?: DayMeals; accommodation_type?: string | null }
     const m = readDayMeals(day.meals)
     const provided = MEAL_SLOTS
       .filter(k => m[k] !== 'none')
-      .map(k => `${LABEL[k]} (${mealStatusLabel(m[k])})`)
+      .map(k => `${LABEL[k]} (${mealStatusLabel(m[k], day.accommodation_type)})`)
     if (provided.length) out.push(`Day ${day.day ?? i + 1}: ${provided.join(', ')}`)
   })
   return out
