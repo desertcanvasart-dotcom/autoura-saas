@@ -75,6 +75,9 @@ interface PricingResult {
   // Harness: completeness surfaced from the de-fabricated b2b pricing route.
   complete?: boolean
   holes?: { kind?: string; message: string }[]
+  /** Notes that do not stop a price — e.g. a cruise whose sailing days do not
+   *  match the travel date. Shown to the operator, never a blocker. */
+  warnings?: string[]
 }
 
 interface RateSheetRow {
@@ -744,6 +747,24 @@ export default function TourPriceCalculator() {
                   </ul>
                   <p className="text-[11px] text-red-500 mt-1.5">
                     Add the missing rates before sending this rate sheet to a partner.
+                  </p>
+                </div>
+              )}
+              {/* Notes that do not stop a price but the operator should see —
+                  chiefly a cruise whose sailing days do not match the travel
+                  date. The price is real; the booking may not be. */}
+              {result.warnings && result.warnings.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <p className="text-sm font-semibold text-amber-800 mb-1">
+                    ⚠ Check this — {result.warnings.length} note(s)
+                  </p>
+                  <ul className="text-xs text-amber-700 space-y-0.5">
+                    {result.warnings.map((w, i) => (
+                      <li key={i}>• {w}</li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-amber-600 mt-1.5">
+                    The price is correct, but confirm the itinerary can be booked as dated.
                   </p>
                 </div>
               )}
