@@ -27,6 +27,9 @@ export interface DayForm {
   meals: Record<string, unknown>
   /** Attractions picked from the fee sheet. */
   picked: PickedAttraction[]
+  /** Activities added to this day (activity_rates ids) — the motorboat at
+   *  Philae, a felucca. The picker owns them: present = exactly these. */
+  activityIds: string[]
   /** '' = road. */
   transportType: string
   transportRateId: string
@@ -82,6 +85,15 @@ export function applyDayForm(existing: Day | null, form: DayForm, dayNumber: num
     day.attraction_ids = form.picked.map(a => a.id)
   } else if (Array.isArray(existing?.attraction_ids) && (existing!.attraction_ids as unknown[]).length > 0) {
     drop(day, 'attractions', 'attraction_ids')
+  }
+
+  // Activities (the motorboat at Philae, a felucca). The picker always shows
+  // the day's current activities, so it owns the field outright: a list is
+  // exactly those, and an empty list means the operator removed them.
+  if (Array.isArray(form.activityIds) && form.activityIds.filter(Boolean).length > 0) {
+    day.activity_ids = form.activityIds.filter(Boolean)
+  } else {
+    drop(day, 'activity_ids')
   }
 
   if (form.transportType) {

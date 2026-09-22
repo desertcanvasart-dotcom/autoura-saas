@@ -29,6 +29,7 @@ import { createClient } from '@supabase/supabase-js'
 import { PACKAGE_TYPE_CONFIGS } from '@/lib/package-types'
 import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
+import { getCurrencySymbol } from '@/lib/currency'
 import { seasonForDate, computeUplift, type SeasonWindow } from '@/lib/pricing/season-uplift'
 import { resolveTravelDateRates } from '@/lib/rates/rate-seasons'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
@@ -50,6 +51,7 @@ import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { pickStartingPrice, type TierPrice } from '@/lib/tours/pick-starting-price'
+import { priceDayActivity, type ActivityRow } from '@/lib/pricing/day-activity'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
@@ -171,6 +173,11 @@ export interface ItineraryDay {
    *  present they WIN and silence the free-text `attractions` wording —
    *  an id is a decision, wording is a guess. */
   attraction_ids?: string[]
+  /** Activities the operator added on this day (the motorboat at Philae, a
+   *  felucca) — activity_rates ids, priced from the catalogue by each row's
+   *  own model. Skipped on a cruise day, where they ride in the cruise
+   *  sightseeing package. Absent = none, exactly as before. */
+  activity_ids?: string[]
   /** How this day travels (B-item 2). Absent = road, exactly as before.
    *  flight/train legs run PREVIOUS day's city → this day's city; a
    *  sleeping train runs THIS day's city → the NEXT day's (board tonight,
@@ -743,6 +750,7 @@ export function parseItinerary(itineraryData: any, opts?: {
         meals: { breakfast: 'none' as MealStatus, lunch: 'none' as MealStatus, dinner: 'none' as MealStatus },
         attractions: [],
         attraction_ids: [],
+        activity_ids: [],
         transport_type: undefined,
         transport_rate_id: undefined,
         city_transfer: false,
@@ -853,6 +861,11 @@ export function parseItinerary(itineraryData: any, opts?: {
       ? day.attraction_ids.filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
       : []
 
+    // Activities the operator added on this day (the motorboat at Philae).
+    const activity_ids: string[] = Array.isArray(day.activity_ids)
+      ? day.activity_ids.filter((v: unknown): v is string => typeof v === 'string' && v.length > 0)
+      : []
+
     // Travel mode (B-item 2). Unknown values read as road — never a guess.
     const transport_type =
       day.transport_type === 'flight' || day.transport_type === 'train' || day.transport_type === 'sleeping_train'
@@ -898,6 +911,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       meals,
       attractions,
       attraction_ids,
+      activity_ids,
       transport_type,
       transport_rate_id,
       // Only a day that travels by ticket has a leg to name.
@@ -2586,6 +2600,24 @@ async function loadCruisePackages(scope: CatalogScope): Promise<Array<PackageVeh
   })
 }
 
+/** The activity_rates rows a day's activities point at (the motorboat at
+ *  Philae, a felucca), in the run currency, keyed by id. Read once per
+ *  calculation; only the tenant's own active rows come back, so a foreign or
+ *  withdrawn id is simply absent — a hole downstream, never a substitute. */
+async function loadActivitiesByIds(scope: CatalogScope, ids: string[]): Promise<Map<string, ActivityRow>> {
+  const map = new Map<string, ActivityRow>()
+  if (ids.length === 0) return map
+  const { data } = await getSupabaseAdmin()
+    .from('activity_rates')
+    .select('id, activity_name, pricing_type, base_rate_eur, base_rate_non_eur, unit_label, min_capacity, max_capacity, tiers, rate_currency, tenant_id')
+    .or(catalogOrExpr(scope))
+    .in('id', ids)
+    .eq('is_active', true)
+  const rows = await normalizeRateRows(getSupabaseAdmin(), 'activity_rates', data as Record<string, unknown>[] | null, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
+  for (const r of (rows ?? []) as unknown as ActivityRow[]) map.set(r.id, r)
+  return map
+}
+
 /** What a transport lookup outside the engine found. */
 export interface DayTransportRate { rate: number; rateId: string; vehicleType: string; serviceType: string }
 
@@ -4092,6 +4124,68 @@ export async function calculateDayBasedPricing(
     }
   })
 
+  // ----- Day activities (the motorboat at Philae, a felucca) -----
+  // Activities the operator added on a day, priced from Rates → Activities by
+  // each row's own model (per person / tiered scale with the group; per unit /
+  // flat are fixed). On a CRUISE day they are skipped — they ride in the cruise
+  // sightseeing package (operator, 2026-09-22) — and shown at 0 so the day does
+  // not read as if the activity were dropped. A missing row or an unusable rate
+  // is a hole, never a free activity.
+  let activitiesPerPax = 0
+  // The engine builds a pax-independent decomposition; a per-unit boat and a
+  // tiered band still need a group size, so size them at the requested pax (2
+  // by default) — one boat for a group within its capacity.
+  const activityPax = requestedPax ?? 2
+  const wantedActivityIds = [
+    ...new Set(itinerary.flatMap(d => (d.accommodation_type === 'cruise' ? [] : (d.activity_ids ?? [])))),
+  ]
+  const activityRows = await loadActivitiesByIds(catalogScope, wantedActivityIds)
+  const activityRunSym = getCurrencySymbol(await getTenantRunCurrency(getSupabaseAdmin(), catalogScope.tenantId))
+  for (const day of itinerary) {
+    const ids = day.activity_ids ?? []
+    if (ids.length === 0) continue
+    if (day.accommodation_type === 'cruise') {
+      // Included in the cruise sightseeing package: a 0 line, so the breakdown
+      // shows it and the operator sees it was not forgotten.
+      for (const id of ids) {
+        services.push({
+          id: `activity-${day.day}-${id}-incl`, dayNumber: day.day, serviceType: 'activity',
+          serviceName: 'Activity (included in cruise package)', quantity: 1, quantityMode: 'fixed',
+          unitCost: 0, lineTotal: 0, rateSource: 'activity_rates', isPerPax: false, isOptional: false,
+          notes: 'included on the cruise sightseeing package',
+        })
+      }
+      continue
+    }
+    for (const id of ids) {
+      const row = activityRows.get(id)
+      const line = row ? priceDayActivity(row, activityPax, isEurPassport, activityRunSym) : null
+      if (!row || !line) {
+        addHole({
+          kind: 'activity',
+          reason: 'missing',
+          tier,
+          dayNumber: day.day,
+          lookupAttempted: `activity id ${id}`,
+          message: row
+            ? `Day ${day.day}'s activity "${row.activity_name}" has no usable rate. Set its price in Rates → Activities & Add-ons.`
+            : `Day ${day.day}'s activity is no longer in Rates → Activities & Add-ons (or is inactive). Re-pick it on the day editor.`,
+        })
+        continue
+      }
+      if (line.isPerPax) activitiesPerPax += line.unitCost
+      else fixedCosts += line.lineTotal
+      services.push({
+        id: `activity-${day.day}-${id}`, dayNumber: day.day, serviceType: 'activity',
+        serviceName: row.activity_name, quantity: 1, quantityMode: line.quantityMode,
+        // A per-pax line stores the per-PERSON figure (the engine scales it by
+        // pax, like an entrance fee); a fixed line stores its group total.
+        unitCost: line.unitCost, lineTotal: line.isPerPax ? line.unitCost : line.lineTotal,
+        rateSource: 'activity_rates', isPerPax: line.isPerPax, isOptional: false, notes: line.note,
+      })
+    }
+  }
+
   // ----- External Meals (per pax) -----
   // Any meal a day states as 'external' — the operator takes the group to a
   // restaurant — is a per-pax line from meal rates. Breakfast included: a
@@ -4185,7 +4279,7 @@ export async function calculateDayBasedPricing(
     })
   }
 
-  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + tipsPerPax
+  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + tipsPerPax + activitiesPerPax
 
 
 
@@ -4567,7 +4661,7 @@ export async function calculateDayBasedPricing(
     transportAt: throughoutGuide ? (pax: number) => transportAtPax(pax + 1) : transportAtPax,
     // Tour leader: single room (PPD + single supplement) + their own per-pax costs
     // The tour leader pays CUSTOMER fare on tickets (B-item 2).
-    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax,
+    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + activitiesPerPax,
     paxFrom: PAX_COUNTS[0],
     paxTo: PAX_COUNTS[PAX_COUNTS.length - 1],
   })

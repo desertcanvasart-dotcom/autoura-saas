@@ -20,6 +20,9 @@ export type HoleKind =
   | 'tipping'
   | 'airport_service'
   | 'hotel_service'
+  // An activity the operator added to a day (the motorboat at Philae, a
+  // felucca) whose catalogue row is gone, deactivated, or has no usable rate.
+  | 'activity'
   // A catalogue extra (airport fast-track, late check-out…) chosen at quote
   // time that cannot be priced: no supplier cost and no operator-set price,
   // or a set price with the cost still unknown (margin can't be stated).

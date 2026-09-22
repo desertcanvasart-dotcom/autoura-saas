@@ -9,7 +9,7 @@ import { applyDayForm, type DayForm } from '@/lib/tours/day-edit'
 const blankForm = (over: Partial<DayForm> = {}): DayForm => ({
   title: 'A day', description: '', meals: { breakfast: 'none', lunch: 'none', dinner: 'none' }, picked: [],
   transportType: '', transportRateId: '', city: '', night: '', cityTransfer: false, length: '',
-  propertiesByTier: {}, noSightseeing: false, ...over,
+  propertiesByTier: {}, noSightseeing: false, activityIds: [], ...over,
 })
 
 // ============================================
