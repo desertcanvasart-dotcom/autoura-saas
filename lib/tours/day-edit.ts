@@ -14,7 +14,10 @@
 //
 // Found 2026-09-21, the day after the operator was asked to press Edit on 21
 // live days to correct their city. Each of those days has attractions and a
-// services block. Pure and import-free (the editor is a client component).
+// services block. Pure; imports only other pure rule files (the editor is a
+// client component, so nothing here may reach the database).
+
+import { sanitizeTransportLines, type TransportLine } from '@/lib/pricing/transport-lines'
 
 export interface PickedAttraction { id: string; name: string }
 
@@ -43,6 +46,9 @@ export interface DayForm {
   /** Boarding / leaving the ship: only the ends the operator SET; an end left
    *  alone is derived from the nights. */
   cruiseAssist?: { embark?: boolean; disembark?: boolean }
+  /** The day's own transport list (lib/pricing/transport-lines). undefined =
+   *  automatic (the rules); a list, even empty, = exactly these lines. */
+  transportLines?: TransportLine[]
   /** A ticket leg's own route; '' = the usual one (yesterday's city → today's). */
   legFrom?: string
   legTo?: string
@@ -114,6 +120,10 @@ export function applyDayForm(existing: Day | null, form: DayForm, dayNumber: num
 
   if (form.cityTransfer) day.city_transfer = true
   else drop(day, 'city_transfer')
+
+  // The operator's own transport list (sibling #454). Absent = automatic.
+  if (Array.isArray(form.transportLines)) day.transport_lines = sanitizeTransportLines(form.transportLines) ?? []
+  else drop(day, 'transport_lines')
 
   // Road beside the ticket (sibling #447). Stored only when stated: absent
   // keeps every existing programme priced as it was.

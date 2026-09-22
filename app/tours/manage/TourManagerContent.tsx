@@ -46,6 +46,7 @@ import { suggestTourType, durationForType, isSingleDayType } from '@/lib/tours/t
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { applyDayForm, wordedAttractions } from '@/lib/tours/day-edit'
 import { legRoute, legAssistance, arrivalDayIndex, routeAirportCode, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
+import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
 import { sightseeingStatement, isDayTourProgramme, dayTourNamesNoAttractions, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 
@@ -139,6 +140,8 @@ interface ItineraryDay {
   in_transit?: boolean
   /** Road beside a ticket, or no vehicle on a road day; absent = as always. */
   road_transfers?: boolean
+  /** The day's own transport list; absent = the rules decide. */
+  transport_lines?: TransportLine[]
   /** Airport, hotel and (cruise_embark / cruise_disembark) boarding flags. */
   services?: Record<string, unknown>
   /** The hotel for this night, chosen per tier — the engine pins to it. */
@@ -437,6 +440,10 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   const [dayCityTransfer, setDayCityTransfer] = useState(false)
   // Road beside a ticket / no vehicle on a road day. '' = not stated.
   const [dayRoad, setDayRoad] = useState<'' | 'on' | 'off'>('')
+  // The day's own transport list; null = automatic (the rules decide).
+  const [dayTransportLines, setDayTransportLines] = useState<TransportLine[] | null>(null)
+  const [transportPreview, setTransportPreview] = useState<Array<{ serviceType: string; city: string; route?: { from: string; to: string }; vehicleType: string; label: string; cost: number | null; reason?: string; rateName?: string; derived: boolean }> | null>(null)
+  const { items: transportTypeItems, labelFor: transportTypeLabel } = useVocabulary('transport_service_type')
   // Boarding / leaving the ship: only what the operator set.
   const [dayCruiseAssist, setDayCruiseAssist] = useState<{ embark?: boolean; disembark?: boolean }>({})
   const [dayNoSightseeing, setDayNoSightseeing] = useState(false)
@@ -513,6 +520,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayCityTransfer(false)
     setDayRoad('')
     setDayCruiseAssist({})
+    setDayTransportLines(null)
     setDayNoSightseeing(false)
     setDayLength('')
     setEditingDayIndex(null)
@@ -543,6 +551,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayProperties((day.property_by_tier as Record<string, string>) || {})
     setDayCityTransfer(day.city_transfer === true)
     setDayRoad(day.road_transfers === true ? 'on' : day.road_transfers === false ? 'off' : '')
+    setDayTransportLines(sanitizeTransportLines(day.transport_lines) ?? null)
     const svc = (day.services ?? {}) as Record<string, unknown>
     setDayCruiseAssist({
       ...(typeof svc.cruise_embark === 'boolean' ? { embark: svc.cruise_embark } : {}),
@@ -585,6 +594,33 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     return { embark: aboard && !wasAboard, disembark: !aboard && wasAboard }
   })()
 
+  // The preview reads the day AS THE FORM HAS IT — built exactly the way Save
+  // builds it — so what is shown is what will be priced once saved.
+  const formDayForPreview = useMemo(() => {
+    const existing = editingDayIndex === null ? null : (itinerary[editingDayIndex] as unknown as Record<string, unknown>)
+    return applyDayForm(existing, {
+      title: dayTitle || 'Day', description: dayDescription, meals: { ...dayMeals }, picked: dayAttractions,
+      transportType: dayTransportType, transportRateId: dayTransportRateId, legFrom: dayLegFrom, legTo: dayLegTo, legAssist: dayLegAssist,
+      city: dayCity, night: dayNight, cityTransfer: dayCityTransfer, roadTransfers: dayRoad === '' ? undefined : dayRoad === 'on',
+      cruiseAssist: dayCruiseAssist, transportLines: dayTransportLines ?? undefined,
+      length: dayLength, propertiesByTier: dayProperties, noSightseeing: dayNoSightseeing,
+    }, editingDayIndex === null ? itinerary.length + 1 : itinerary[editingDayIndex].day)
+  }, [editingDayIndex, itinerary, dayTitle, dayDescription, dayMeals, dayAttractions, dayTransportType, dayTransportRateId, dayLegFrom, dayLegTo, dayLegAssist, dayCity, dayNight, dayCityTransfer, dayRoad, dayCruiseAssist, dayTransportLines, dayLength, dayProperties, dayNoSightseeing])
+  useEffect(() => {
+    const idx = editingDayIndex ?? itinerary.length
+    const days = itinerary.map((d, i) => (i === idx ? formDayForPreview : d))
+    if (idx === itinerary.length) days.push(formDayForPreview as unknown as ItineraryDay)
+    const ctrl = new AbortController()
+    const t = setTimeout(() => {
+      fetch('/api/tours/transport-preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+        body: JSON.stringify({ itinerary: days, tour_type: tourType, pax: 2 }) })
+        .then(r => r.json())
+        .then(j => { if (j?.success) setTransportPreview((j.data as Array<{ day: number; lines: typeof transportPreview }>)[idx]?.lines ?? []) })
+        .catch(() => undefined)
+    }, 400)
+    return () => { clearTimeout(t); ctrl.abort() }
+  }, [formDayForPreview, itinerary, editingDayIndex, tourType])
+
   const addDay = () => {
     const unstated = MEAL_SLOTS.filter(k => dayMeals[k] === '')
     if (unstated.length) {
@@ -618,6 +654,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       night: dayNight,
       cityTransfer: dayCityTransfer,
       roadTransfers: dayRoad === '' ? undefined : dayRoad === 'on',
+      transportLines: dayTransportLines ?? undefined,
       cruiseAssist: dayCruiseAssist,
       length: dayLength,
       propertiesByTier: dayProperties,
@@ -753,6 +790,67 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
           <p className="text-[11px] text-gray-500 mt-1">
             The transport for the day is priced from the matching route.
           </p>
+        </div>
+
+        {/* TRANSPORT THIS DAY (sibling #454): what pricing will charge, from the
+            engine's own steps over the day AS IT IS IN THE FORM. Change a line,
+            remove it, add one — the day then carries its own list and the
+            rules stay out of it. "Reset to automatic" hands it back. */}
+        <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/60">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-xs font-medium text-gray-700">
+              Transport this day{dayTransportLines ? <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px]">Changed on this day</span> : <span className="ml-2 text-[10px] text-gray-500">automatic</span>}
+            </span>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setDayTransportLines(prev => [...(prev ?? (transportPreview ?? []).map(l => ({ service_type: l.serviceType, ...(l.route ? { from: l.route.from, to: l.route.to } : { city: l.city }) }))), { service_type: transportTypeItems[0]?.key ?? 'day_tour', city: dayCity.trim() || undefined }])}
+                className="px-2 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50">+ Add a line</button>
+              {dayTransportLines && (
+                <button type="button" onClick={() => setDayTransportLines(null)} className="px-2 py-1 text-xs rounded border border-gray-300 bg-white hover:bg-gray-50">Reset to automatic</button>
+              )}
+            </div>
+          </div>
+          {dayTransportLines ? (
+            <div className="mt-2 space-y-1">
+              {dayTransportLines.length === 0 && <p className="text-[11px] text-gray-500">No transport this day.</p>}
+              {dayTransportLines.map((line, n) => {
+                const shown = transportPreview?.[n]
+                return (
+                  <div key={n} className="flex items-center gap-1 flex-wrap text-xs">
+                    <select value={line.service_type} onChange={e => setDayTransportLines(prev => (prev ?? []).map((l, i) => (i === n ? { service_type: e.target.value, ...(isIntercityType(e.target.value) ? { from: l.from, to: l.to } : { city: l.city }) } : l)))}
+                      className="px-1.5 py-1 border border-gray-300 rounded bg-white">
+                      {transportTypeItems.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                    </select>
+                    {isIntercityType(line.service_type) ? (
+                      <>
+                        <input value={line.from ?? ''} placeholder="from" aria-label="Route from" onChange={e => setDayTransportLines(prev => (prev ?? []).map((l, i) => (i === n ? { ...l, from: e.target.value } : l)))} className="w-24 px-1.5 py-1 border border-gray-300 rounded" />
+                        <span className="text-gray-400">→</span>
+                        <input value={line.to ?? ''} placeholder="to" aria-label="Route to" onChange={e => setDayTransportLines(prev => (prev ?? []).map((l, i) => (i === n ? { ...l, to: e.target.value } : l)))} className="w-24 px-1.5 py-1 border border-gray-300 rounded" />
+                      </>
+                    ) : (
+                      <input value={line.city ?? ''} placeholder={dayCity.trim() || 'city'} aria-label="City" onChange={e => setDayTransportLines(prev => (prev ?? []).map((l, i) => (i === n ? { ...l, city: e.target.value } : l)))} className="w-28 px-1.5 py-1 border border-gray-300 rounded" />
+                    )}
+                    <span className={shown?.cost != null ? 'text-gray-700' : 'text-red-600'}>
+                      {shown ? (shown.cost != null ? `${shown.cost.toFixed(2)} (${shown.vehicleType}${shown.rateName ? `, ${shown.rateName}` : ''})` : `No rate — ${shown.reason}`) : '…'}
+                    </span>
+                    <button type="button" onClick={() => setDayTransportLines(prev => (prev ?? []).filter((_, i) => i !== n))} className="ml-auto text-gray-400 hover:text-red-600" aria-label="Remove line">✕</button>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="mt-2 space-y-1">
+              {transportPreview === null && <p className="text-[11px] text-gray-500">Working out this day’s transport…</p>}
+              {transportPreview?.length === 0 && <p className="text-[11px] text-gray-500">No transport this day, by the rules.</p>}
+              {transportPreview?.map((l, n) => (
+                <div key={n} className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-700">{transportTypeLabel(l.serviceType) || l.label}</span>
+                  <span className="text-gray-500">{l.route ? `${l.route.from} → ${l.route.to}` : l.city}</span>
+                  <span className={l.cost != null ? 'text-gray-700' : 'text-red-600'}>{l.cost != null ? `${l.cost.toFixed(2)} (${l.vehicleType}${l.rateName ? `, ${l.rateName}` : ''})` : `No rate — ${l.reason}`}</span>
+                </div>
+              ))}
+              <p className="text-[11px] text-gray-500">Decided by the rules from the day’s city, sightseeing and travel. Add or change a line to set it yourself.</p>
+            </div>
+          )}
         </div>
 
         {/* Road beside the ticket — or no vehicle on a road day (sibling #447).

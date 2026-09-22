@@ -54,6 +54,7 @@ import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 import { knownAirportCode, routeAirportCode, legAssistance, legRoute, arrivalDayIndex, departureDayIndex, groundedNeighbour, isInTransit, sanitizeLegPlace, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
 import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type PropertyRow } from '@/lib/pricing/named-property'
+import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
@@ -183,6 +184,9 @@ export interface ItineraryDay {
   /** The whole day is spent IN THE AIR (the overnight flight out): nothing is
    *  sold on it, and the arrival belongs to the next day on the ground. */
   in_transit?: boolean
+  /** The operator's own transport for the day (lib/pricing/transport-lines):
+   *  present = exactly these lines, nothing derived; absent = the rules. */
+  transport_lines?: TransportLine[]
   /** Road beside a ticket (sibling #447). Absent = as always: a road day has
    *  its vehicle, a ticket day has its ticket and nothing more. true on a
    *  ticket day adds the transfers at each end (airport / station); false on
@@ -909,6 +913,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       ...(transport_type === 'flight' ? { leg_assist: sanitizeLegAssist(day.leg_assist) } : {}),
       city_transfer: day.city_transfer === true,
       ...(typeof day.road_transfers === 'boolean' ? { road_transfers: day.road_transfers } : {}),
+      ...(Array.isArray(day.transport_lines) ? { transport_lines: sanitizeTransportLines(day.transport_lines) } : {}),
       sightseeing_length:
         day.sightseeing_length === 'half_day' || day.sightseeing_length === 'long_day_tour'
           ? day.sightseeing_length
@@ -2376,6 +2381,9 @@ export interface ExtraTransfer {
   /** Where the rate is looked up when it is not the day's own city — the
    *  airport or station at the OTHER end of a ticket leg. */
   city?: string
+  /** A road move between cities: its route (keyed from → to, never by a city). */
+  originCity?: string
+  destinationCity?: string
 }
 
 /** Boarding the ship / leaving it — derived from the nights unless the day
@@ -2392,6 +2400,25 @@ export function cruiseAssistanceFor(day: ItineraryDay, previousDay?: ItineraryDa
 
 export function extraTransfersFor(day: ItineraryDay, previousDay?: ItineraryDay | null, nextDay?: ItineraryDay | null): ExtraTransfer[] {
   const extras: ExtraTransfer[] = []
+
+  // THE OPERATOR'S OWN LIST (sibling #454): exactly these lines, and nothing
+  // derived beside them — the day's vehicle is switched off in the day loop
+  // (requiresTransport), and the derived extras below do not run.
+  if (day.transport_lines) {
+    return day.transport_lines.map((line, n) => {
+      const intercity = isIntercityType(line.service_type)
+      const from = intercity ? (line.from ?? previousDay?.city ?? '') : undefined
+      const to = intercity ? (line.to ?? day.city) : undefined
+      const where = intercity ? (to || day.city) : (line.city ?? day.city)
+      return {
+        serviceType: line.service_type as TransportServiceType,
+        label: intercity ? `${line.service_type.replace(/_/g, ' ')} ${from || '?'} → ${to || '?'}` : line.service_type.replace(/_/g, ' '),
+        slug: `line-${n + 1}-${line.service_type}`,
+        city: where,
+        ...(intercity ? { originCity: from, destinationCity: to } : {}),
+      }
+    })
+  }
 
   // ROAD BESIDE A TICKET (sibling #447). A ticket day priced its ticket and
   // nothing more — the operator's decision then. Now a day may SAY it wants
@@ -2462,6 +2489,86 @@ async function loadNamedPropertyRows(
       is_preferred: r.is_preferred === true,
     }))
   })
+}
+
+// ============================================
+// A day's transport, as it WILL be priced — for the day editor (sibling #454)
+// ============================================
+// The editor shows each day's transport lines before the tour is priced, so
+// the operator can change, remove or add them. It has to show exactly what
+// pricing will do, so this runs the engine's own steps — parseItinerary →
+// determineTransportNeeds / extraTransfersFor → findTransportRate — over the
+// editor's current (unsaved) days. Nothing here is a second opinion.
+
+export interface DayTransportPreviewLine {
+  serviceType: string
+  /** The city the rate is booked in, or the route. */
+  city: string
+  route?: { from: string; to: string }
+  vehicleType: string
+  label: string
+  /** For the group, or null with `reason` when no exact rate. */
+  cost: number | null
+  reason?: string
+  rateName?: string
+  /** Derived by the rules (true) or from the day's own list (false). */
+  derived: boolean
+}
+
+export async function previewDayTransport(
+  scope: CatalogScope,
+  itineraryData: unknown,
+  opts: { tourType?: string | null; pax?: number; throughoutGuide?: boolean }
+): Promise<Array<{ day: number; automatic: boolean; lines: DayTransportPreviewLine[] }>> {
+  const days = Array.isArray(itineraryData) ? itineraryData : []
+  const itinerary = parseItinerary(days, { dayTour: isDayTourProgramme(opts.tourType, days.length) })
+  const [cache, bands] = await Promise.all([buildTransportCache(scope), tenantVehicleBands(scope.tenantId)])
+  const seats = (opts.pax ?? 2) + (opts.throughoutGuide ? 1 : 0)
+  const out: Array<{ day: number; automatic: boolean; lines: DayTransportPreviewLine[] }> = []
+  for (let i = 0; i < itinerary.length; i++) {
+    const day = itinerary[i]
+    const previousDay = groundedNeighbour(itinerary, i, -1)
+    const nextDay = groundedNeighbour(itinerary, i, 1)
+    const lines: DayTransportPreviewLine[] = []
+    const lookup = (serviceType: string, city: string, route: { from: string; to: string } | undefined, alsoTry: string[], label: string, derived: boolean) => {
+      const vehicleType = getVehicleTypeByPax(seats, city, bands)
+      let match: ReturnType<typeof findTransportRate> = null
+      for (const st of [serviceType, ...alsoTry]) {
+        match = findTransportRate(cache, { serviceType: st as TransportServiceType, city, duration: '' as never, area: null, vehicleType, ...(route ? { originCity: route.from, destinationCity: route.to } : {}) })
+        if (match && match.source === 'db') break
+      }
+      const ok = match && match.source === 'db'
+      lines.push({
+        serviceType, city, route, vehicleType, label, derived,
+        cost: ok ? Number(match!.rate.base_rate_eur) : null,
+        rateName: ok ? (match!.rate.route_name ?? undefined) : undefined,
+        reason: ok ? undefined : match ? `Only an approximate rate (another city or length) — not used` : `No ${vehicleType} rate for ${serviceType.replace(/_/g, ' ')} ${route ? `${route.from} → ${route.to}` : `in ${city || 'this city'}`}`,
+      })
+    }
+    if (day.in_transit) { out.push({ day: day.day, automatic: !day.transport_lines, lines }); continue }
+    if (!day.transport_lines) {
+      // The rules: the day's one vehicle, as the day loop decides it.
+      const hasSightseeing = day.services.guide_required || day.attractions.length > 0 || (day.attraction_ids?.length ?? 0) > 0
+      const hasAirportService = day.services.airport_arrival || day.services.airport_departure
+      const isIntercityDay = !!previousDay && previousDay.city.toLowerCase() !== day.city.toLowerCase() && !day.transport_type &&
+        previousDay.transport_type !== 'sleeping_train' && day.accommodation_type !== 'cruise' && previousDay.accommodation_type !== 'cruise'
+      const requires = (hasSightseeing || hasAirportService || isIntercityDay) && !(day.road_transfers === false && !day.transport_type)
+      if (requires && day.city) {
+        const needs = determineTransportNeeds(day, previousDay, nextDay)
+        const intercity = isIntercityType(String(needs.serviceType))
+        lookup(String(needs.serviceType), day.city, intercity ? { from: previousDay?.city ?? '', to: day.city } : undefined, [],
+          intercity ? `Road transfer ${previousDay?.city ?? '?'} → ${day.city}` : String(needs.serviceType).replace(/_/g, ' '), true)
+      }
+    }
+    // The extras — the derived ones (dinner, local, the road legs of a ticket),
+    // or the operator's own list.
+    for (const extra of extraTransfersFor(day, previousDay, nextDay)) {
+      const route = extra.originCity !== undefined ? { from: extra.originCity ?? '', to: extra.destinationCity ?? '' } : undefined
+      lookup(String(extra.serviceType), extra.city ?? day.city, route, (extra.alsoTry ?? []).map(String), extra.label, !day.transport_lines)
+    }
+    out.push({ day: day.day, automatic: !day.transport_lines, lines })
+  }
+  return out
 }
 
 /** What a transport lookup outside the engine found. */
@@ -4097,7 +4204,7 @@ export async function calculateDayBasedPricing(
 
     // Determine if this day requires transport. Road switched OFF on a road
     // day (a walking day, a day the hotel's own shuttle covers): no vehicle.
-    const requiresTransport = (hasSightseeing || hasAirportService || isIntercityDay) && !(day.road_transfers === false && !day.transport_type)
+    const requiresTransport = (hasSightseeing || hasAirportService || isIntercityDay) && !(day.road_transfers === false && !day.transport_type) && !day.transport_lines
 
     if (requiresTransport) {
       const needs = determineTransportNeeds(day, previousDay, nextDay)
@@ -4159,6 +4266,7 @@ export async function calculateDayBasedPricing(
         duration: '' as never,
         area: null,
         vehicleType,
+        ...(extra.originCity !== undefined ? { originCity: extra.originCity, destinationCity: extra.destinationCity } : {}),
       })
       if (match && match.source === 'db') break
     }
