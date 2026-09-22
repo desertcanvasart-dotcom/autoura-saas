@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { loadPricesInBatches, type PriceState, type StartingFrom } from '@/lib/tours/price-loader'
+import { getCurrencySymbol } from '@/lib/currency'
 
 // Updated interface to match the new API response structure
 interface TourTemplate {
@@ -36,6 +37,10 @@ export default function ToursBrowsePage() {
   // engine before showing anything — 5–8 seconds on production data. The list
   // is cheap; each price arrives on its own and fills its card in.
   const [prices, setPrices] = useState<Record<string, PriceState>>({})
+  // The figures come back in the tenant's own run currency (not a hard-coded
+  // euro); the cards and the tiles show that agency's symbol.
+  const [currency, setCurrency] = useState('EUR')
+  const sym = getCurrencySymbol(currency)
   const pricing = useRef<AbortController | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +52,7 @@ export default function ToursBrowsePage() {
     const res = await fetch(`/api/tours/browse/prices?ids=${ids.join(',')}`, { signal })
     const json = await res.json().catch(() => ({}))
     if (!res.ok || !json?.success) throw new Error(json?.error || 'prices failed')
+    if (typeof json.data?.currency === 'string') setCurrency(json.data.currency)
     return json.data.prices as Record<string, StartingFrom>
   }, [])
 
@@ -74,7 +80,7 @@ export default function ToursBrowsePage() {
       const toPrice = all.filter(t => t.day_count > 0 || t.variations_count > 0).map(t => t.id)
       setPrices(Object.fromEntries(all.map(t => [t.id, toPrice.includes(t.id)
         ? { status: 'pending' } as PriceState
-        : { status: 'done', starting_from: null, starting_from_tier: null } as PriceState])))
+        : { status: 'done', starting_from: null, starting_from_tier: null, complete: true, gaps: 0 } as PriceState])))
       await loadPricesInBatches(toPrice, fetchPriceBatch, update => setPrices(prev => ({ ...prev, ...update })), { signal: controller.signal })
     } catch (err) {
       if (controller.signal.aborted) return
@@ -95,6 +101,10 @@ export default function ToursBrowsePage() {
     () => tours.map(t => prices[t.id]).filter((p): p is Extract<PriceState, { status: 'done' }> => p?.status === 'done' && p.starting_from != null),
     [tours, prices]
   )
+  // The "Starting From" headline uses COMPLETE prices only — an incomplete
+  // figure understates (its unpriced services cost nothing), so it must never
+  // become the agency's advertised cheapest trip.
+  const pricedComplete = useMemo(() => priced.filter(p => p.complete), [priced])
   const stillPricing = tours.filter(t => (prices[t.id]?.status ?? 'pending') === 'pending').length
 
   const filteredTours = tours.filter(tour => {
@@ -231,7 +241,7 @@ export default function ToursBrowsePage() {
             <p className="text-2xl font-semibold text-gray-900">{uniqueCategories.length}</p>
           </div>
         )}
-        {priced.length > 0 && (
+        {pricedComplete.length > 0 && (
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-lg">💰</span>
@@ -239,7 +249,7 @@ export default function ToursBrowsePage() {
             </div>
             <p className="text-xs text-gray-500 mb-1">Starting From</p>
             <p className="text-2xl font-semibold text-gray-900">
-              €{Math.min(...priced.map(p => p.starting_from as number)).toLocaleString()}
+              {sym}{Math.min(...pricedComplete.map(p => p.starting_from as number)).toLocaleString()}
             </p>
           </div>
         )}
@@ -391,12 +401,20 @@ export default function ToursBrowsePage() {
                     return (
                       <>
                         <p className="text-xl font-semibold text-[#647C47]">
-                          {price.starting_from ? `€${price.starting_from.toLocaleString()}` : 'Price on request'}
+                          {price.starting_from ? `${sym}${price.starting_from.toLocaleString()}` : 'Price on request'}
                         </p>
                         {price.starting_from && (
                           <p className="text-[10px] text-gray-400">
                             per person{price.starting_from_tier ? ` • ${price.starting_from_tier}` : ''}
                           </p>
+                        )}
+                        {/* An incomplete price is shown honestly flagged — some
+                            of this tour's services still have no rate, so the
+                            figure is lower than the finished tour will be. */}
+                        {price.starting_from != null && !price.complete && (
+                          <span className="inline-block mt-1 text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                            Incomplete · {price.gaps} {price.gaps === 1 ? 'service' : 'services'} without a rate
+                          </span>
                         )}
                       </>
                     )

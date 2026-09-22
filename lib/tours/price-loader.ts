@@ -13,11 +13,18 @@
 // Import-free and DOM-free: the page is a client component, and this is tested
 // without a browser.
 
-export interface StartingFrom { starting_from: number | null; starting_from_tier: string | null }
+export interface StartingFrom {
+  starting_from: number | null
+  starting_from_tier: string | null
+  /** false when the figure is from a tier that could not price every service. */
+  complete?: boolean
+  /** Services the chosen tier could not price; 0 when complete. */
+  gaps?: number
+}
 
 export type PriceState =
   | { status: 'pending' }
-  | { status: 'done'; starting_from: number | null; starting_from_tier: string | null }
+  | { status: 'done'; starting_from: number | null; starting_from_tier: string | null; complete: boolean; gaps: number }
   | { status: 'failed' }
 
 export const BATCH_SIZE = 3
@@ -57,7 +64,7 @@ export async function loadPricesInBatches(
           const p = prices[id]
           // Not in the answer = the server did not find that tour for this
           // agency. It has no price to show; that is "done", not "failed".
-          return [id, { status: 'done', starting_from: p?.starting_from ?? null, starting_from_tier: p?.starting_from_tier ?? null } as PriceState]
+          return [id, { status: 'done', starting_from: p?.starting_from ?? null, starting_from_tier: p?.starting_from_tier ?? null, complete: p?.complete ?? true, gaps: p?.gaps ?? 0 } as PriceState]
         })))
       } catch {
         if (opts.signal?.aborted) return

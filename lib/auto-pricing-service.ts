@@ -49,6 +49,7 @@ import type { VocabularyKind } from '@/lib/vocabulary'
 import { getFixedDailyCosts } from '@/lib/fixed-costs'
 import { parseDateOnly } from '@/lib/date-utils'
 import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
+import { pickStartingPrice, type TierPrice } from '@/lib/tours/pick-starting-price'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
@@ -4996,6 +4997,33 @@ export async function calculateMultiTierPricing(
     )
     return new Map<ServiceTier, PricingResult>(computed)
   })
+}
+
+/**
+ * The tour card's "starting from" figure. Prices every tenant tier for two
+ * travellers on a non-EU passport (the card basis, sibling #461) and picks one
+ * by pickStartingPrice: the cheapest COMPLETE tier, or — when none is complete
+ * — the tier missing the fewest services, marked incomplete with that count.
+ * Returns the figure in the tenant's run currency, or null when nothing priced.
+ */
+export async function getTemplateStartingPrice(
+  templateId: string,
+  tenantId: string,
+  isEurPassport: boolean = false,
+): Promise<{ minPrice: number; tier: ServiceTier; complete: boolean; gaps: number; currency: string } | null> {
+  const tiers: ServiceTier[] = await tenantTierLadder(tenantId)
+  const results = await calculateMultiTierPricing(templateId, tenantId, tiers, 2, isEurPassport)
+
+  let currency = 'EUR'
+  const tierPrices: TierPrice[] = []
+  for (const [tier, r] of results) {
+    if (r.success && r.currency) currency = r.currency
+    tierPrices.push({ tier, price: r.pricePerPerson, complete: r.complete && r.success, gaps: r.holes.length })
+  }
+
+  const choice = pickStartingPrice(tierPrices)
+  if (!choice) return null
+  return { minPrice: choice.price, tier: choice.tier as ServiceTier, complete: choice.complete, gaps: choice.gaps, currency }
 }
 
 /**
