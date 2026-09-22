@@ -137,6 +137,10 @@ interface ItineraryDay {
   leg_assist?: LegAssist
   /** The whole day is spent in the air — nothing on it is sold. */
   in_transit?: boolean
+  /** Road beside a ticket, or no vehicle on a road day; absent = as always. */
+  road_transfers?: boolean
+  /** Airport, hotel and (cruise_embark / cruise_disembark) boarding flags. */
+  services?: Record<string, unknown>
   /** The hotel for this night, chosen per tier — the engine pins to it. */
   property_by_tier?: Record<string, string>
   /** A non-sightseeing transfer in town: sound & light, the market, dinner. */
@@ -431,6 +435,10 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   const [dayProperties, setDayProperties] = useState<Record<string, string>>({})
   /** A transfer to somewhere else in town that is not sightseeing. */
   const [dayCityTransfer, setDayCityTransfer] = useState(false)
+  // Road beside a ticket / no vehicle on a road day. '' = not stated.
+  const [dayRoad, setDayRoad] = useState<'' | 'on' | 'off'>('')
+  // Boarding / leaving the ship: only what the operator set.
+  const [dayCruiseAssist, setDayCruiseAssist] = useState<{ embark?: boolean; disembark?: boolean }>({})
   const [dayNoSightseeing, setDayNoSightseeing] = useState(false)
   /** How long the sightseeing runs: four hours, eight, or twelve. */
   const [dayLength, setDayLength] = useState<'' | 'half_day' | 'day_tour' | 'long_day_tour'>('')
@@ -503,6 +511,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayNight('')
     setDayProperties({})
     setDayCityTransfer(false)
+    setDayRoad('')
+    setDayCruiseAssist({})
     setDayNoSightseeing(false)
     setDayLength('')
     setEditingDayIndex(null)
@@ -532,6 +542,12 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayCity(day.city || '')
     setDayProperties((day.property_by_tier as Record<string, string>) || {})
     setDayCityTransfer(day.city_transfer === true)
+    setDayRoad(day.road_transfers === true ? 'on' : day.road_transfers === false ? 'off' : '')
+    const svc = (day.services ?? {}) as Record<string, unknown>
+    setDayCruiseAssist({
+      ...(typeof svc.cruise_embark === 'boolean' ? { embark: svc.cruise_embark } : {}),
+      ...(typeof svc.cruise_disembark === 'boolean' ? { disembark: svc.cruise_disembark } : {}),
+    })
     setDayNoSightseeing(day.sightseeing === 'none')
     setDayLength((day.sightseeing_length as typeof dayLength) || '')
     setDayNight(day.in_transit === true ? 'in_transit' : ((day.accommodation_type as typeof dayNight) || ''))
@@ -549,6 +565,25 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   const shownAssist = legAssistance(dayLegAssist, isArrivalDayForm)
   const legFromCode = routeAirportCode(dayLegFrom.trim() || usualLeg.from)
   const legToCode = routeAirportCode(dayLegTo.trim() || usualLeg.to)
+
+  // What the road choice prices for THIS travel mode — the engine's rule
+  // (lib/auto-pricing-service extraTransfersFor), said in words.
+  const roadSentence = (() => {
+    const mode = dayTransportType
+    if (!mode) return dayRoad === 'off' ? 'No vehicle this day — a walking day, or one the hotel\u2019s own shuttle covers.' : 'A road day has its vehicle: the day tour, the intercity move, the airport run.'
+    if (dayRoad !== 'on') return 'The ticket only, as always. Switch road On to add the transfers at each end.'
+    if (mode === 'flight') return 'The ticket, plus the transfer to the airport it leaves from and from the airport it lands at (unless the day already has a vehicle there).'
+    if (mode === 'train') return 'The ticket, plus the transfer to the station and from the station at the other end.'
+    return 'The ticket, plus the transfer to the station tonight and from the station on arrival tomorrow.'
+  })()
+  // Boarding / leaving the ship, as pricing derives them when not stated.
+  const cruiseAssistDefaults = (() => {
+    const idx = editingDayIndex ?? itinerary.length
+    const prev = itinerary[idx - 1]
+    const aboard = dayNight === 'cruise'
+    const wasAboard = prev?.accommodation_type === 'cruise'
+    return { embark: aboard && !wasAboard, disembark: !aboard && wasAboard }
+  })()
 
   const addDay = () => {
     const unstated = MEAL_SLOTS.filter(k => dayMeals[k] === '')
@@ -582,6 +617,8 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
       city: dayCity,
       night: dayNight,
       cityTransfer: dayCityTransfer,
+      roadTransfers: dayRoad === '' ? undefined : dayRoad === 'on',
+      cruiseAssist: dayCruiseAssist,
       length: dayLength,
       propertiesByTier: dayProperties,
       noSightseeing: dayNoSightseeing,
@@ -717,6 +754,35 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
             The transport for the day is priced from the matching route.
           </p>
         </div>
+
+        {/* Road beside the ticket — or no vehicle on a road day (sibling #447).
+            Not stated keeps the day priced exactly as it always was. */}
+        <div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500">Road transfers:</span>
+            {([['', 'As usual'], ['on', 'On'], ['off', 'Off']] as const).map(([value, label]) => (
+              <button key={label} type="button" onClick={() => setDayRoad(value)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${dayRoad === value ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-gray-500 mt-1">{roadSentence}</p>
+        </div>
+
+        {(dayNight === 'cruise' || cruiseAssistDefaults.disembark) && (
+          <div className="space-y-1">
+            {([['embark', 'Boarding assistance at the quay'], ['disembark', 'Assistance leaving the ship']] as const).map(([k, label]) => (
+              <label key={k} className="flex items-center gap-2 text-xs text-gray-700">
+                <input type="checkbox" className="rounded border-gray-300"
+                  checked={dayCruiseAssist[k] ?? cruiseAssistDefaults[k]}
+                  onChange={e => setDayCruiseAssist(prev => ({ ...prev, [k]: e.target.checked }))} />
+                {label}
+              </label>
+            ))}
+            <p className="text-[11px] text-gray-500">Priced from your hotel check-in / check-out assistance rates. Ticked by itself on the first night aboard and the first day ashore; untick to leave it out.</p>
+          </div>
+        )}
 
         {/* A day tour is the sightseeing. This is getting somewhere else in
             town — the sound & light show, the market in Luxor or Aswan, an
