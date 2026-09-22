@@ -77,11 +77,31 @@ export function legAssistance(assist: LegAssist | undefined, isArrivalDay: boole
   return { from: assist?.from ?? isArrivalDay, to: assist?.to ?? isArrivalDay }
 }
 
-/** The arrival day: the first day of the programme. (When a night "in the
- *  air" is modelled — sibling #456 — this becomes the first day ON THE GROUND;
- *  it is one function so the editor and the engine change together.) */
+/** A day spent entirely IN THE AIR — the overnight flight out. Nothing is sold
+ *  on it: no bed, no vehicle, no guide, no meal, no airport help. The day
+ *  editor's Night option "In the air" stores it (sibling #456). */
+export function isInTransit(day: unknown): boolean {
+  return !!day && typeof day === 'object' && (day as { in_transit?: unknown }).in_transit === true
+}
+
+/** The arrival day: the first day ON THE GROUND — the first day not spent in
+ *  the air. One function, so the day editor's assistance boxes and the engine
+ *  can never disagree about which day that is. -1 when there is none. */
 export function arrivalDayIndex(days: ReadonlyArray<unknown>): number {
-  return days.length > 0 ? 0 : -1
+  return days.findIndex(d => !isInTransit(d))
+}
+
+/** The last day on the ground — where a departure belongs. -1 when none. */
+export function departureDayIndex(days: ReadonlyArray<unknown>): number {
+  for (let i = days.length - 1; i >= 0; i--) if (!isInTransit(days[i])) return i
+  return -1
+}
+
+/** The nearest day ON THE GROUND before / after index i — a day in the air is
+ *  not a place the party came from or is going to. */
+export function groundedNeighbour<T>(days: ReadonlyArray<T>, i: number, step: -1 | 1): T | null {
+  for (let j = i + step; j >= 0 && j < days.length; j += step) if (!isInTransit(days[j])) return days[j]
+  return null
 }
 
 export type LegMode = 'flight' | 'train' | 'sleeping_train'

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
+import { propertyFromService, propertyRateStatus, type PropertyRateStatus } from '@/lib/itineraries/overnight-property'
 
 export async function GET(
   request: Request,
@@ -30,6 +31,22 @@ export async function GET(
 
     if (daysError) throw daysError
 
+    // Every hotel and ship name in THIS agency's rates (RLS scopes the read),
+    // for the "no longer in your rates" warning on a night whose property was
+    // deleted or switched off after the itinerary was priced. Small tables.
+    // A catalogue that failed to load says nothing about its properties: the
+    // status is withheld for that kind, never reported as "not in your rates".
+    const [{ data: hotelRows, error: hotelError }, { data: shipRows, error: shipError }] = await Promise.all([
+      supabase.from('accommodation_rates').select('property_name, is_active'),
+      supabase.from('nile_cruises').select('ship_name, is_active'),
+    ])
+    if (hotelError || shipError) console.warn('[days-api] rates catalogue partly unavailable; overnight status withheld', hotelError?.message ?? shipError?.message)
+    const loadedFor = { hotel: !hotelError, cruise: !shipError }
+    const catalog = {
+      hotels: (hotelRows ?? []).map(r => ({ name: r.property_name, active: r.is_active })),
+      ships: (shipRows ?? []).map(r => ({ name: r.ship_name, active: r.is_active })),
+    }
+
     // Fetch services for each day
     const daysWithServices = await Promise.all(
       (days || []).map(async (day) => {
@@ -45,7 +62,14 @@ export async function GET(
 
         return {
           ...day,
-          services: services || []
+          // Staff-only: whether the night's hotel or ship is still in Rates.
+          services: (services || []).map(service => ({
+            ...service,
+            property_rate_status: ((): PropertyRateStatus | null => {
+              const property = propertyFromService(service as never)
+              return property && loadedFor[property.kind] ? propertyRateStatus(property, catalog) : null
+            })(),
+          }))
         }
       })
     )

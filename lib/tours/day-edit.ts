@@ -29,7 +29,7 @@ export interface DayForm {
   transportRateId: string
   /** '' = leave as it was. */
   city: string
-  /** '' = leave as it was. */
+  /** '' = leave as it was. 'in_transit' = the day is spent in the air. */
   night: string
   cityTransfer: boolean
   /** '' = a day tour, as before. */
@@ -93,7 +93,18 @@ export function applyDayForm(existing: Day | null, form: DayForm, dayNumber: num
 
   // Blank means "leave it", which is now true as well as written.
   if (form.city.trim()) day.city = form.city.trim()
-  if (form.night) day.accommodation_type = form.night
+  // "In the air" (the overnight flight out) is a statement about the WHOLE
+  // day: nothing on it is sold. It is stored as its own flag, with no bed —
+  // and choosing any other night takes it back.
+  if (form.night === 'in_transit') {
+    day.in_transit = true
+    day.overnight_kind = 'flight'
+    day.accommodation_type = 'none'
+  } else if (form.night) {
+    day.accommodation_type = form.night
+    drop(day, 'in_transit')
+    if (day.overnight_kind === 'flight') drop(day, 'overnight_kind')
+  }
 
   if (form.cityTransfer) day.city_transfer = true
   else drop(day, 'city_transfer')

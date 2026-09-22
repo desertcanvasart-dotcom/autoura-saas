@@ -91,7 +91,8 @@ describe('choosing the hotel for a night', () => {
   })
 
   it('offers it only where a night is actually spent', () => {
-    expect(SOURCE).toMatch(/dayNight !== 'none' && dayCity\.trim\(\) && tiers\.length > 0/)
+    // …and not on a day spent in the air, which has no night to pick a hotel for.
+    expect(SOURCE).toMatch(/dayNight !== 'none' && dayNight !== 'in_transit' && dayCity\.trim\(\) && tiers\.length > 0/)
   })
 
   it('says what a named hotel means when it later disappears', () => {

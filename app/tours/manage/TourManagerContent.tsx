@@ -135,6 +135,8 @@ interface ItineraryDay {
   leg_from?: string
   leg_to?: string
   leg_assist?: LegAssist
+  /** The whole day is spent in the air — nothing on it is sold. */
+  in_transit?: boolean
   /** The hotel for this night, chosen per tier — the engine pins to it. */
   property_by_tier?: Record<string, string>
   /** A non-sightseeing transfer in town: sound & light, the market, dinner. */
@@ -434,7 +436,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
   const [dayLength, setDayLength] = useState<'' | 'half_day' | 'day_tour' | 'long_day_tour'>('')
   /** What is on file for this day's city, per tier, for the pickers. */
   const [cityHotels, setCityHotels] = useState<Record<string, Array<{ id: string; name: string }>>>({})
-  const [dayNight, setDayNight] = useState<'' | 'hotel' | 'cruise' | 'none'>('')
+  const [dayNight, setDayNight] = useState<'' | 'hotel' | 'cruise' | 'none' | 'in_transit'>('')
   /** The day being edited, or null when the form is adding a new one. */
   const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null)
 
@@ -532,7 +534,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
     setDayCityTransfer(day.city_transfer === true)
     setDayNoSightseeing(day.sightseeing === 'none')
     setDayLength((day.sightseeing_length as typeof dayLength) || '')
-    setDayNight((day.accommodation_type as typeof dayNight) || '')
+    setDayNight(day.in_transit === true ? 'in_transit' : ((day.accommodation_type as typeof dayNight) || ''))
     setDayMealsError(null)
   }
 
@@ -684,7 +686,13 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
               <option value="hotel">Hotel</option>
               <option value="cruise">On board</option>
               <option value="none">No night (departure, or a day tour)</option>
+              <option value="in_transit">In the air (overnight flight) — nothing is sold this day</option>
             </select>
+            {dayNight === 'in_transit' && (
+              <p className="mt-1 text-xs text-sky-700">
+                The whole day is the flight out: no hotel, vehicle, guide, meal or airport help is priced on it, whatever else the day says. The arrival — its transfer and meet &amp; greet — moves to the next day on the ground.
+              </p>
+            )}
             <p className="text-[11px] text-gray-500 mt-1">
               Say it here and the words in the title stop deciding it.
             </p>
@@ -733,7 +741,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
             different hotels, so the choice cannot be one value. Left on
             Automatic, pricing picks as it always has — and refuses when the
             city holds several it cannot choose between. */}
-        {dayNight !== 'none' && dayCity.trim() && tiers.length > 0 && (
+        {dayNight !== 'none' && dayNight !== 'in_transit' && dayCity.trim() && tiers.length > 0 && (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
               {dayNight === 'cruise' ? 'Ship for this night' : 'Hotel for this night'}{' '}
@@ -1040,7 +1048,9 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, ticketOptions
                     </span>
                   )}
                   {' · 🌙 '}
-                  {day.accommodation_type === 'cruise'
+                  {day.in_transit === true
+                    ? 'In the air — nothing sold'
+                    : day.accommodation_type === 'cruise'
                     ? 'On board'
                     : day.accommodation_type === 'hotel'
                     ? 'Hotel'

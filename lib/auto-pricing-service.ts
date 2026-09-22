@@ -52,7 +52,7 @@ import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
-import { knownAirportCode, routeAirportCode, legAssistance, arrivalDayIndex, sanitizeLegPlace, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
+import { knownAirportCode, routeAirportCode, legAssistance, arrivalDayIndex, departureDayIndex, groundedNeighbour, isInTransit, sanitizeLegPlace, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
@@ -179,6 +179,9 @@ export interface ItineraryDay {
   /** Airport assistance at each end of a flight leg; absent = the day's
    *  default (on for an arrival-day connection, off otherwise). */
   leg_assist?: LegAssist
+  /** The whole day is spent IN THE AIR (the overnight flight out): nothing is
+   *  sold on it, and the arrival belongs to the next day on the ground. */
+  in_transit?: boolean
   /** The property this night is spent at, chosen per tier: the same programme
    *  is sold at several tiers and each has its own hotel. The value is the
    *  rate row's id, which the engine PINS to — a chosen property that is
@@ -699,7 +702,43 @@ export function parseItinerary(itineraryData: any, opts?: {
     return []
   }
 
+  // The first and last day ON THE GROUND. The defaults a day gets from its
+  // POSITION — the arrival transfer and meet & greet, the hotel check-in, the
+  // departure — belong to those, not to a day spent in the air before them.
+  const firstGrounded = arrivalDayIndex(itineraryData)
+  const lastGrounded = departureDayIndex(itineraryData)
+
   return itineraryData.map((day: any, index: number) => {
+    // IN THE AIR (sibling #456). The overnight flight out is a day of the
+    // programme — the traveller's Day 1 — and nothing on it is sold: no bed, no
+    // vehicle, no guide, no meal, no airport help. The operator SAYS so in the
+    // day editor; it wins over a city or attractions left on the day, because
+    // that is exactly what was being priced (a Cairo hotel, an airport
+    // transfer and a meet & greet for a night spent over the Mediterranean).
+    if (isInTransit(day)) {
+      return {
+        day: day.day || index + 1,
+        title: day.title || `Day ${index + 1}`,
+        description: day.description || '',
+        in_transit: true,
+        unstated: false,
+        sightseeingUnstated: false,
+        dayTourWithoutAttractions: false,
+        city: '',
+        accommodation_type: 'none' as AccommodationType,
+        meals: { breakfast: 'none' as MealStatus, lunch: 'none' as MealStatus, dinner: 'none' as MealStatus },
+        attractions: [],
+        attraction_ids: [],
+        transport_type: undefined,
+        transport_rate_id: undefined,
+        city_transfer: false,
+        sightseeing_length: undefined,
+        property_by_tier: undefined,
+        services: { airport_arrival: false, airport_departure: false, hotel_checkin: false, hotel_checkout: false, guide_required: false },
+        transport: undefined,
+      }
+    }
+
     // Handle old format (simple meals array)
     let meals = {
       breakfast: 'none' as MealStatus,
@@ -732,8 +771,8 @@ export function parseItinerary(itineraryData: any, opts?: {
     }
 
     // Handle services - default based on day position
-    const isFirstDay = index === 0
-    const isLastDay = index === itineraryData.length - 1
+    const isFirstDay = index === firstGrounded
+    const isLastDay = index === lastGrounded
     // What the day SAYS about sightseeing, read from what is stored — before
     // any wording is consulted. "No guided sightseeing" is a decision, so a
     // word in the title ("…Valley…") must not earn the day a guide anyway.
@@ -2174,8 +2213,8 @@ export async function loadTippingRows(scope: CatalogScope): Promise<TippingRow[]
 /** What happens on each day that a tip can be for (lib/pricing/tipping.ts). */
 export function tipOccasionsFor(itinerary: ItineraryDay[]): DayOccasions[] {
   return itinerary.map((day, i) => {
-    const previousDay = i > 0 ? itinerary[i - 1] : null
-    const nextDay = i < itinerary.length - 1 ? itinerary[i + 1] : null
+    const previousDay = groundedNeighbour(itinerary, i, -1)
+    const nextDay = groundedNeighbour(itinerary, i, 1)
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0 || (day.attraction_ids?.length ?? 0) > 0
     // The transfers the day is CHARGED: the airport runs, a road move to
     // another city (not one made by ticket), and the stated local ones.
@@ -3315,8 +3354,8 @@ export async function calculateDayBasedPricing(
 
   for (let i = 0; i < itinerary.length; i++) {
     const day = itinerary[i]
-    const previousDay = i > 0 ? itinerary[i - 1] : null
-    const nextDay = i < itinerary.length - 1 ? itinerary[i + 1] : null
+    const previousDay = groundedNeighbour(itinerary, i, -1)
+    const nextDay = groundedNeighbour(itinerary, i, 1)
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0
 
     // ----- GUIDE (fixed per day) -----
@@ -3857,8 +3896,8 @@ export async function calculateDayBasedPricing(
 
   for (let i = 0; i < itinerary.length; i++) {
     const day = itinerary[i]
-    const previousDay = i > 0 ? itinerary[i - 1] : null
-    const nextDay = i < itinerary.length - 1 ? itinerary[i + 1] : null
+    const previousDay = groundedNeighbour(itinerary, i, -1)
+    const nextDay = groundedNeighbour(itinerary, i, 1)
 
     const hasSightseeing = day.services.guide_required || day.attractions.length > 0
     const hasAirportService = day.services.airport_arrival || day.services.airport_departure
@@ -3868,7 +3907,8 @@ export async function calculateDayBasedPricing(
     // ride on the airport_arrival/departure services, unaffected here.
     // A sleeper's city change lands on the MORNING AFTER: the previous
     // day's overnight ticket covers this day's arrival too.
-    const isIntercityDay = previousDay && 
+    // A day in the air is nowhere: it neither arrives by road nor is left by one.
+    const isIntercityDay = !day.in_transit && previousDay && 
                            previousDay.city.toLowerCase() !== day.city.toLowerCase() &&
                            !day.transport_type &&
                            previousDay.transport_type !== 'sleeping_train' &&
