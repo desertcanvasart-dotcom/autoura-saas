@@ -1,6 +1,7 @@
 'use client'
 
 import { ratePeriodLines, type RateSeasonEntity } from '@/lib/rates/rate-seasons'
+import { VocabLabel } from '@/components/vocabulary'
 
 // ============================================
 // Every rate period, on its own line
@@ -36,6 +37,11 @@ export function RatePeriodLines({
           }`}
         >
           <span className="min-w-0 truncate">
+            {line.season && (
+              <span className="mr-1 rounded bg-sky-100 px-1 py-0.5 text-[10px] font-medium text-sky-800">
+                <VocabLabel kind="rate_season" value={line.season} />
+              </span>
+            )}
             {line.name}
             <span className="text-gray-400">
               {' '}

@@ -5,7 +5,7 @@
 // the OLD model. Since the period model became the one way to price
 // (#323), the natural rate sheet is one row per dated window:
 //
-//   Service Code, Property Name, Period Name, From, To,
+//   Service Code, Property Name, Period Name, Season, From, To,
 //   PP Double (EU passport), Single Supp (EU passport), Triple Red (…),
 //   …same for non-EU…, Guide Bed / Night
 //
@@ -44,6 +44,9 @@ const IDENTITY_HEADERS: Record<string, string> = {
   'ship name': 'property_name',
   'hotel name': 'property_name',
   'period name': 'name',
+  // The season word (sibling #452): a key or a label of the agency's
+  // rate_season vocabulary; resolved to the key by the import route.
+  'season': 'season',
   'from': 'from',
   'to': 'to',
 }
@@ -154,6 +157,7 @@ export function parsePeriodsCsv(rows: Array<Record<string, string>>): PeriodsCsv
       from,
       to,
       rates,
+      ...(rec.season ? { season: rec.season } : {}),
     })
     group.rows.push(rowNum)
   })
