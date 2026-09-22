@@ -4980,7 +4980,6 @@ export interface Database {
           id: string
           tenant_id: string
           guide_type: string | null
-          guide_mode: string
           city: string | null
           half_day_rate: number | null
           full_day_rate: number | null
@@ -4998,12 +4997,12 @@ export interface Database {
           is_active: boolean | null
           updated_at: string | null
           rate_currency: string | null
+          guide_mode: string
         }
         Insert: {
           id?: string
           tenant_id: string
           guide_type?: string | null
-          guide_mode?: string
           city?: string | null
           half_day_rate?: number | null
           full_day_rate?: number | null
@@ -5021,12 +5020,12 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
+          guide_mode?: string
         }
         Update: {
           id?: string
           tenant_id?: string
           guide_type?: string | null
-          guide_mode?: string
           city?: string | null
           half_day_rate?: number | null
           full_day_rate?: number | null
@@ -5044,6 +5043,7 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
+          guide_mode?: string
         }
         Relationships: [
           {
