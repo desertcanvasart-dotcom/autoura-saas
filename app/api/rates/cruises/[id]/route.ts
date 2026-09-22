@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/supabase-server'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
 import { sanitizeSeasons, legacyColumnMirror, ratePeriodCapError } from '@/lib/rates/rate-seasons'
 import { cruiseLengthsToStore } from '@/lib/rates/cruise-ppd'
+import { sanitizeSailingDays } from '@/lib/rates/cruise-sailing'
 
 export async function GET(
   request: NextRequest,
@@ -113,6 +114,8 @@ export async function PUT(
       // four-night one.
       duration_nights: cruiseLengthsToStore(body.duration_nights),
       cabin_type: body.cabin_type || 'standard',
+      // Weekday keys the sailing departs on, cleaned (migration 382).
+      sailing_days: sanitizeSailingDays(body.sailing_days),
 
       // Tier and preferences
       tier: body.tier || 'standard',
