@@ -57,6 +57,7 @@ import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type Property
 import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/lib/pricing/transport-lines'
 import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
 import { guideLanguageKey, pickGuideRateRow, type GuideRateRow } from '@/lib/guides/guide-language'
+import { roadShapeAt, type RoadShape } from '@/lib/pricing/road-trips'
 import { selectVehicleFromPackage, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
@@ -585,7 +586,10 @@ export function detectDurationFromAttractions(attractions: string[]): TransportD
 export function determineTransportNeeds(
   day: ItineraryDay,
   previousDay: ItineraryDay | null,
-  nextDay: ItineraryDay | null
+  nextDay: ItineraryDay | null,
+  /** The road move's shape read from the whole programme (lib/pricing/road-trips):
+   *  an overnight return is asked for as one, at its own rate. */
+  roadShape?: RoadShape | null
 ): {
   serviceType: TransportServiceType
   duration: TransportDuration
@@ -641,13 +645,14 @@ export function determineTransportNeeds(
       !day.transport_type &&
       previousDay.transport_type !== 'sleeping_train' &&
       day.accommodation_type !== 'cruise' &&
-      previousDay.accommodation_type !== 'cruise') {
+      previousDay.accommodation_type !== 'cruise' &&
+      roadShape?.kind !== 'return_included') {
     return {
       // Moving to another city and sleeping there is a one-way journey: the
-      // agency's "Intercity Drop-off". A same-day return would be an
-      // Intercity Day Trip and an overnight return an Intercity Overnight —
-      // neither of which a day that CHANGES city is.
-      serviceType: 'intercity_dropoff',
+      // agency's "Intercity Drop-off" — unless the programme comes BACK the
+      // next day, which is the agency's "Intercity Overnight", priced once
+      // (sibling #462). A same-day return is a day tour, not a city change.
+      serviceType: roadShape?.kind === 'overnight_return' ? 'intercity_overnight' : 'intercity_dropoff',
       duration: 'one_way',
       area: null,
       useSpecialVehicle: false
@@ -2534,11 +2539,17 @@ export async function previewDayTransport(
       const isIntercityDay = !!previousDay && previousDay.city.toLowerCase() !== day.city.toLowerCase() && !day.transport_type &&
         previousDay.transport_type !== 'sleeping_train' && day.accommodation_type !== 'cruise' && previousDay.accommodation_type !== 'cruise'
       const requires = (hasSightseeing || hasAirportService || isIntercityDay) && !(day.road_transfers === false && !day.transport_type)
-      if (requires && day.city) {
-        const needs = determineTransportNeeds(day, previousDay, nextDay)
+      const roadShape = roadShapeAt(itinerary, i)
+      if (roadShape?.kind === 'return_included') {
+        lines.push({ serviceType: 'intercity_return', city: day.city, route: { from: roadShape.from, to: roadShape.to }, vehicleType: '', derived: true,
+          label: `Road transfer back — included in the overnight return priced on day ${itinerary[roadShape.pricedOnIndex].day}`, cost: 0 })
+      }
+      const requiresHere = requires && !(roadShape?.kind === 'return_included' && !hasSightseeing && !hasAirportService)
+      if (requiresHere && day.city) {
+        const needs = determineTransportNeeds(day, previousDay, nextDay, roadShape)
         const intercity = isIntercityType(String(needs.serviceType))
         lookup(String(needs.serviceType), day.city, intercity ? { from: previousDay?.city ?? '', to: day.city } : undefined, [],
-          intercity ? `Road transfer ${previousDay?.city ?? '?'} → ${day.city}` : String(needs.serviceType).replace(/_/g, ' '), true)
+          intercity ? `${String(needs.serviceType).replace(/_/g, ' ')} ${previousDay?.city ?? '?'} → ${day.city}` : String(needs.serviceType).replace(/_/g, ' '), true)
       }
     }
     // The extras — the derived ones (dinner, local, the road legs of a ticket),
@@ -4207,8 +4218,23 @@ export async function calculateDayBasedPricing(
     // day (a walking day, a day the hotel's own shuttle covers): no vehicle.
     const requiresTransport = (hasSightseeing || hasAirportService || isIntercityDay) && !(day.road_transfers === false && !day.transport_type) && !day.transport_lines
 
-    if (requiresTransport) {
-      const needs = determineTransportNeeds(day, previousDay, nextDay)
+    // The road move's shape, from the whole programme (lib/pricing/road-trips).
+    // The day BACK of an overnight return is not looked up — it was priced on
+    // the day out — and is listed as included; its sightseeing, if any, still
+    // gets its day tour.
+    const roadShape = day.transport_lines ? null : roadShapeAt(itinerary, i)
+    const returnIncluded = roadShape?.kind === 'return_included'
+    if (returnIncluded) {
+      services.push({
+        id: `day${day.day}-road-return-included`, dayNumber: day.day, serviceType: 'transportation',
+        serviceName: `Road transfer back ${roadShape.from} → ${roadShape.to} — included in the overnight return priced on day ${itinerary[roadShape.pricedOnIndex].day}`,
+        quantity: 1, quantityMode: 'fixed', unitCost: 0, lineTotal: 0,
+        rateSource: 'transportation_rates', isPerPax: false, isOptional: false, notes: 'included in the overnight return',
+      })
+    }
+
+    if (requiresTransport && !(returnIncluded && !hasSightseeing && !hasAirportService)) {
+      const needs = determineTransportNeeds(day, previousDay, nextDay, roadShape)
       // A CONNECTION on an arrival day: the party lands, stays airside and
       // flies on — so its airport transfer is at the FINAL airport (the leg's
       // destination), whatever city the day is filed under. Only when the leg
@@ -4230,7 +4256,7 @@ export async function calculateDayBasedPricing(
       transportInfoByDay.push({
         day: day.day,
         city: day.city,
-        needs: determineTransportNeeds(day, previousDay, nextDay),
+        needs: determineTransportNeeds(day, previousDay, nextDay, roadShape),
         requiresTransport: false
       })
     }
@@ -4353,7 +4379,9 @@ export async function calculateDayBasedPricing(
         city: info.city,
         vehicleType,
         lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
-        message: `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
+        message: isIntercity(String(needs.serviceType))
+          ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${itinerary[info.day - 2]?.city ?? '?'} → ${info.city}. Add that route, in that shape, in Rates → Transportation.`
+          : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
       })
     }
   }
@@ -4484,7 +4512,9 @@ export async function calculateDayBasedPricing(
           city: info.city,
           vehicleType,
           lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
-          message: `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
+          message: isIntercity(String(needs.serviceType))
+            ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${itinerary[info.day - 2]?.city ?? '?'} → ${info.city}. Add that route, in that shape, in Rates → Transportation.`
+            : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
         })
       }
     }
