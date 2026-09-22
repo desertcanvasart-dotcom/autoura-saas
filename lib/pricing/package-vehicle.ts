@@ -96,7 +96,7 @@ function legacyLabel(key: string): string {
 
 /** Clean a vehicles list off a request body: keep the entries that name a
  *  vehicle_type and carry a positive rate, drop the rest. A blank rate is not
- *  stored — a vehicle the package does not price is a hole, not a €0 line. */
+ *  stored — a vehicle the package does not price is a hole, not a zero line. */
 export function sanitizePackageVehicles(input: unknown): PackageVehicle[] {
   if (!Array.isArray(input)) return []
   const out: PackageVehicle[] = []

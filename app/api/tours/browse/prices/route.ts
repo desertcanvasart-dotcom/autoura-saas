@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 import { startingFromFor, NO_PRICE, type PricedTemplate, type StartingFrom } from '@/lib/tours/starting-from'
+import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,7 +70,13 @@ export async function GET(request: NextRequest) {
       }
     }))
 
-    return NextResponse.json({ success: true, data: { prices, currency: 'EUR' } })
+    // The figures are in the tenant's own run currency, not a hard-coded EUR —
+    // an agency that prices in USD/EGP must not read its cards as euros. One
+    // tenant per request (RLS), so one currency for the batch.
+    const tenantId = (templates ?? [])[0]?.tenant_id
+    const currency = tenantId ? await getTenantRunCurrency(supabase, tenantId) : 'EUR'
+
+    return NextResponse.json({ success: true, data: { prices, currency } })
   } catch (error) {
     console.error('Error in tours browse prices API:', error)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })

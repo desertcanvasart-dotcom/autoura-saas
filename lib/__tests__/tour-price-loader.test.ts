@@ -52,7 +52,7 @@ describe('loading prices in batches', () => {
       if (batch.includes('t4')) throw new Error('network')
       return Object.fromEntries(batch.map(id => [id, price(250)]))
     }, u => Object.assign(state, u), { batchSize: 3, concurrency: 2 })
-    expect(state.t1).toEqual({ status: 'done', starting_from: 250, starting_from_tier: 'standard' })
+    expect(state.t1).toEqual({ status: 'done', starting_from: 250, starting_from_tier: 'standard', complete: true, gaps: 0 })
     expect(state.t4).toEqual({ status: 'failed' })
     expect(state.t6).toEqual({ status: 'failed' })
   })
@@ -67,7 +67,13 @@ describe('loading prices in batches', () => {
   it('a tour the server did not find has no price to show — that is done, not failed', async () => {
     const state: Record<string, PriceState> = {}
     await loadPricesInBatches(['mine', 'not-mine'], async () => ({ mine: price(90) }), u => Object.assign(state, u))
-    expect(state['not-mine']).toEqual({ status: 'done', starting_from: null, starting_from_tier: null })
+    expect(state['not-mine']).toEqual({ status: 'done', starting_from: null, starting_from_tier: null, complete: true, gaps: 0 })
+  })
+
+  it('carries an incomplete price and its gap count through to the card', async () => {
+    const state: Record<string, PriceState> = {}
+    await loadPricesInBatches(['t1'], async () => ({ t1: { starting_from: 2072, starting_from_tier: 'standard', complete: false, gaps: 4 } }), u => Object.assign(state, u))
+    expect(state.t1).toEqual({ status: 'done', starting_from: 2072, starting_from_tier: 'standard', complete: false, gaps: 4 })
   })
 
   it('asks for each tour once, however many times it is listed', async () => {

@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const UUIDS = ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333']
 let templates: Array<Record<string, unknown>> = []
 let manualPrices: Array<{ price_per_person: number }> = []
-let priceRange: { minPrice: number; tier: string } | null = null
+let priceRange: { minPrice: number; tier: string; complete?: boolean; gaps?: number } | null = null
 const asked: string[] = []
 let failFor: string | null = null
 const calls: Array<{ table: string; method: string; args: unknown[] }> = []
@@ -43,8 +43,13 @@ function from(table: string) {
 vi.mock('@/lib/supabase-server', () => ({ createAuthenticatedClient: async () => ({ from }) }))
 vi.mock('@/lib/vocabulary-server', () => ({ loadVocabulary: async () => [] }))
 vi.mock('@/lib/auto-pricing-service', () => ({
-  getTemplatePriceRange: async (templateId: string) => { asked.push(templateId); if (templateId === failFor) throw new Error('engine fell over'); return priceRange },
+  getTemplateStartingPrice: async (templateId: string) => {
+    asked.push(templateId)
+    if (templateId === failFor) throw new Error('engine fell over')
+    return priceRange ? { minPrice: priceRange.minPrice, tier: priceRange.tier, complete: priceRange.complete ?? true, gaps: priceRange.gaps ?? 0, currency: 'EUR' } : null
+  },
 }))
+vi.mock('@/lib/rates/run-currency', () => ({ getTenantRunCurrency: async () => 'EUR' }))
 
 import { GET as browseRoute } from '@/app/api/tours/browse/route'
 import { GET as pricesRoute } from '@/app/api/tours/browse/prices/route'
@@ -119,10 +124,17 @@ describe('the list does not price', () => {
 })
 
 describe('the prices, asked for afterwards', () => {
-  it('a tour the engine can price shows that price and its tier', async () => {
+  it('a tour the engine can price shows that price and its tier, in the tenant currency', async () => {
     priceRange = { minPrice: 880, tier: 'deluxe' }
     const { body } = await prices(UUIDS[0])
-    expect(body.data.prices[UUIDS[0]]).toEqual({ starting_from: 880, starting_from_tier: 'deluxe' })
+    expect(body.data.prices[UUIDS[0]]).toEqual({ starting_from: 880, starting_from_tier: 'deluxe', complete: true, gaps: 0 })
+    expect(body.data.currency).toBe('EUR')
+  })
+
+  it('a tour no tier can fully price shows an INCOMPLETE figure, flagged with its gap count (#461)', async () => {
+    priceRange = { minPrice: 2072, tier: 'standard', complete: false, gaps: 4 }
+    const { body } = await prices(UUIDS[0])
+    expect(body.data.prices[UUIDS[0]]).toEqual({ starting_from: 2072, starting_from_tier: 'standard', complete: false, gaps: 4 })
   })
 
   it('is priced with the flag OFF, as every imported tour has it (#484)', async () => {
@@ -142,7 +154,7 @@ describe('the prices, asked for afterwards', () => {
 
   it.each([Infinity, NaN, 0, -5])('a nonsense price (%s) is no price', async bad => {
     priceRange = { minPrice: bad as number, tier: 'standard' }
-    expect((await prices(UUIDS[0])).body.data.prices[UUIDS[0]]).toEqual({ starting_from: null, starting_from_tier: null })
+    expect((await prices(UUIDS[0])).body.data.prices[UUIDS[0]]).toEqual({ starting_from: null, starting_from_tier: null, complete: false, gaps: 0 })
   })
 
   it('a tour with NO days is not sent to the engine — there is nothing to price from', async () => {
@@ -156,7 +168,7 @@ describe('the prices, asked for afterwards', () => {
     templates = [template({ itinerary: [], tour_variations: [{ id: 'v1', is_active: true }, { id: 'v2', is_active: false }] })]
     manualPrices = [{ price_per_person: 450 }]
     const { body } = await prices(UUIDS[0])
-    expect(body.data.prices[UUIDS[0]]).toEqual({ starting_from: 450, starting_from_tier: null })
+    expect(body.data.prices[UUIDS[0]]).toEqual({ starting_from: 450, starting_from_tier: null, complete: true, gaps: 0 })
     expect(calls.find(c => c.table === 'variation_pricing' && c.method === 'in')?.args).toEqual(['variation_id', ['v1']])
   })
 
@@ -166,8 +178,8 @@ describe('the prices, asked for afterwards', () => {
     failFor = UUIDS[2]
     const { status, body } = await prices(`${UUIDS[1]},${UUIDS[2]}`)
     expect(status).toBe(200)
-    expect(body.data.prices[UUIDS[1]]).toEqual({ starting_from: 300, starting_from_tier: 'standard' })
-    expect(body.data.prices[UUIDS[2]]).toEqual({ starting_from: null, starting_from_tier: null })
+    expect(body.data.prices[UUIDS[1]]).toEqual({ starting_from: 300, starting_from_tier: 'standard', complete: true, gaps: 0 })
+    expect(body.data.prices[UUIDS[2]]).toEqual({ starting_from: null, starting_from_tier: null, complete: false, gaps: 0 })
   })
 
   it('another agency\'s tour is simply not found, and not priced — the read goes through the caller\'s RLS', async () => {
