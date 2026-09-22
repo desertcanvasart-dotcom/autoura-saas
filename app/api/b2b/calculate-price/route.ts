@@ -99,6 +99,9 @@ interface PriceCalculationResult {
   // Harness: deliverable only when complete; holes list services with no real rate.
   complete: boolean
   holes: { kind?: string; message: string }[]
+  /** Notes that do not stop a price but the operator should see — e.g. a cruise
+   *  whose sailing days do not match the travel date. */
+  warnings?: string[]
 }
 
 function getSeason(date: Date): 'low' | 'high' | 'peak' {
@@ -568,6 +571,10 @@ export async function POST(request: NextRequest) {
         // Harness: propagate completeness from the hardened engine.
         complete: autoPriceResult.complete,
         holes: (autoPriceResult.holes || []).map((h) => ({ kind: h.kind, message: h.message })),
+        // Notes that do not stop a price but the operator should see — a cruise
+        // whose sailing days do not match the travel date, a sleeper with no
+        // single cabin. They were computed and then dropped here.
+        warnings: autoPriceResult.warnings || [],
       }
 
       return NextResponse.json({
@@ -964,6 +971,9 @@ export async function POST(request: NextRequest) {
       currency: runCurrency,
       complete: holes.length === 0,
       holes,
+      // This path lists services directly; it does not run the day engine, so
+      // it has no engine warnings (the sailing-day check is on the auto path).
+      warnings: [],
     }
 
     return NextResponse.json({
