@@ -10,7 +10,7 @@ const NEW_PROPERTY = '__new__'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign } from 'lucide-react'
+import { Building2, Plus, Edit, Trash2, X, Check, Copy, LayoutGrid, List, Table2, Phone, Mail, MapPin, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, CheckCircle2, Crown, User, AtSign, Star } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
 import { TierBadge, TierPicker, VocabSelect, VocabLabel, useVocabulary } from '@/components/vocabulary'
@@ -338,6 +338,11 @@ export default function HotelsContent() {
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingRate, setEditingRate] = useState<AccommodationRate | null>(null)
+  // The preferred flag, edited in the form. Kept OUT of formData so it never
+  // rides the rate POST/PUT — it is written afterwards through
+  // /api/rates/preferred, which clears the star on this row's siblings so the
+  // one-per-scope index (migration 354) is never tripped.
+  const [preferred, setPreferred] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [toasts, setToasts] = useState<Toast[]>([])
   const [filterTier, setFilterTier] = useState<string | null>(null)
@@ -625,6 +630,7 @@ export default function HotelsContent() {
       notes: '',
       is_active: true
     })
+    setPreferred(false)
     setActiveSupplementTab(null)
     setShowModal(true)
   }
@@ -763,6 +769,7 @@ export default function HotelsContent() {
       notes: rate.notes || '',
       is_active: rate.is_active
     })
+    setPreferred(rate.is_preferred === true)
     setActiveSupplementTab(rate.supplements && rate.supplements.length > 0 ? rate.supplements[0].type : null)
     void loadHotelProperties(rate.supplier_id || '')
     setShowModal(true)
@@ -843,6 +850,22 @@ export default function HotelsContent() {
         }
 
         if (data.data) {
+          // Write the preferred flag through the star endpoint, which clears
+          // it on this row's city+tier siblings. Only when it actually changed.
+          const was = editingRate ? editingRate.is_preferred === true : false
+          if (data.data.id && preferred !== was) {
+            try {
+              const pref = await fetch('/api/rates/preferred', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ table: 'accommodation_rates', id: data.data.id, preferred }),
+              })
+              const pr = await pref.json()
+              if (!pr.success) showToast('error', pr.error || 'Saved, but could not update Preferred')
+            } catch {
+              showToast('error', 'Saved, but could not update Preferred')
+            }
+          }
           showToast('success', editingRate ? `${formData.property_name} updated!` : `${formData.property_name} created!`)
           setShowModal(false)
           fetchRates()
@@ -950,6 +973,8 @@ export default function HotelsContent() {
       notes: rate.notes || '',
       is_active: rate.is_active
     })
+    // A clone is a NEW row; preferred is one-per-scope, so it does not carry over.
+    setPreferred(false)
     setActiveSupplementTab(rate.supplements && rate.supplements.length > 0 ? rate.supplements[0].type : null)
     setShowModal(true)
     showToast('success', 'Hotel rate duplicated - modify and save as new')
@@ -2091,6 +2116,25 @@ export default function HotelsContent() {
                     className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                   />
                   <span className="text-sm font-medium text-gray-700">Active (available for bookings)</span>
+                </label>
+              </div>
+
+              <div className="mb-4">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={preferred}
+                    onChange={(e) => setPreferred(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 text-amber-500 border-gray-300 rounded focus:ring-amber-500"
+                  />
+                  <span className="text-sm">
+                    <span className="inline-flex items-center gap-1 font-medium text-gray-700">
+                      <Star className="w-4 h-4 text-amber-500" /> Preferred hotel for this city &amp; tier
+                    </span>
+                    <span className="block text-xs text-gray-500">
+                      The engine picks this hotel when several fit the same city and tier. Setting it clears the star on the others.
+                    </span>
+                  </span>
                 </label>
               </div>
 

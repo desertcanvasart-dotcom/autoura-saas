@@ -7,7 +7,7 @@ import { useSubmitGuard } from '@/app/hooks/useSubmitGuard'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Utensils, Plus, Edit, Trash2, X, Check, Copy, MapPin, Users, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
+import { Utensils, Plus, Edit, Trash2, X, Check, Copy, MapPin, Users, ChevronLeft, ChevronRight, LayoutGrid, List, Table2, AlertTriangle, CheckCircle, XCircle, Info, Star } from 'lucide-react'
 import PreferredStar, { type PreferredToggleResult } from '@/app/components/PreferredStar'
 import { useCurrency } from '@/hooks/useCurrency'
 import { useDestinationCities } from '@/hooks/useDestinationCities'
@@ -313,7 +313,8 @@ export default function MealRatesContent() {
       minimum_pax: rate.minimum_pax || 1,
       notes: rate.notes || '',
       is_active: rate.is_active,
-      is_preferred: rate.is_preferred === true
+      // A clone is a NEW row; preferred is one-per-scope, so it does not carry over.
+      is_preferred: false
     })
     setShowModal(true)
   }
@@ -331,7 +332,11 @@ export default function MealRatesContent() {
         const response = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...formData, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
+          // Preferred is written separately through /api/rates/preferred, which
+          // clears the star on this row's siblings (tier + meal type) so the
+          // one-per-scope index is never tripped. Freeze it to the stored value
+          // here so the raw write never changes the flag.
+          body: JSON.stringify({ ...formData, is_preferred: editingRate ? editingRate.is_preferred === true : false, base_rate_non_eur: formData.base_rate_eur, ...rateCurrencyPatch(rateCurrency, (editingRate as { rate_currency?: string | null } | null)?.rate_currency) })
         })
 
         const data = await response.json()
@@ -339,6 +344,22 @@ export default function MealRatesContent() {
         if (!response.ok || !data.success) {
           showNotification('error', 'Error', data.error || 'Failed to save rate')
           return
+        }
+
+        const was = editingRate ? editingRate.is_preferred === true : false
+        const savedId = data.data?.id || editingRate?.id
+        if (savedId && (formData.is_preferred === true) !== was) {
+          try {
+            const pref = await fetch('/api/rates/preferred', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ table: 'meal_rates', id: savedId, preferred: formData.is_preferred === true }),
+            })
+            const pr = await pref.json()
+            if (!pr.success) showNotification('error', 'Preferred', pr.error || 'Saved, but could not update Preferred')
+          } catch {
+            showNotification('error', 'Preferred', 'Saved, but could not update Preferred')
+          }
         }
 
         showNotification('success', 'Success', editingRate ? 'Meal rate updated successfully!' : 'Meal rate created successfully!')
@@ -1355,14 +1376,21 @@ export default function MealRatesContent() {
                   />
                   <span className="text-sm font-medium text-gray-900">Active (available for bookings)</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-start gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.is_preferred === true}
                     onChange={(e) => setFormData({ ...formData, is_preferred: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded"
+                    className="mt-0.5 w-4 h-4 text-amber-500 border-gray-300 rounded focus:ring-amber-500"
                   />
-                  <span className="text-sm font-medium text-gray-900">Preferred restaurant</span>
+                  <span className="text-sm">
+                    <span className="inline-flex items-center gap-1 font-medium text-gray-900">
+                      <Star className="w-4 h-4 text-amber-500" /> Preferred restaurant for this meal type &amp; tier
+                    </span>
+                    <span className="block text-xs text-gray-500">
+                      The engine picks this restaurant when several fit the same meal type and tier. Setting it clears the star on the others.
+                    </span>
+                  </span>
                 </label>
               </div>
             </form>
