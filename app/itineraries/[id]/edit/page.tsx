@@ -209,6 +209,9 @@ export default function ItineraryEditorPage() {
   const [calculating, setCalculating] = useState(false)
   const [itinerary, setItinerary] = useState<Itinerary | null>(null)
   const [days, setDays] = useState<ItineraryDay[]>([])
+  // A cruise that boards on a day its ship does not sail (migration 382),
+  // computed on the saved itinerary — a note, never a blocker.
+  const [cruiseSailingNotes, setCruiseSailingNotes] = useState<string[]>([])
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
   const [showAdvancedPackages, setShowAdvancedPackages] = useState(false)
   const [draggedDay, setDraggedDay] = useState<string | null>(null)
@@ -336,6 +339,19 @@ export default function ItineraryEditorPage() {
       }))
 
       setDays(transformedDays)
+
+      // The cruise sailing-day check runs on the SAVED itinerary (this screen
+      // does not run the day engine); the route computes it from each cruise
+      // day's date and the ship its service line names.
+      try {
+        const noteRes = await fetch(`/api/itineraries/${itineraryId}?include=days`)
+        const noteJson = await noteRes.json()
+        if (noteJson?.success && Array.isArray(noteJson.data?.cruise_sailing_notes)) {
+          setCruiseSailingNotes(noteJson.data.cruise_sailing_notes)
+        }
+      } catch {
+        // a note that cannot be fetched is not worth failing the editor over
+      }
 
       // Load services for each day
       if (daysData && daysData.length > 0) {
@@ -860,6 +876,20 @@ export default function ItineraryEditorPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-5">
+      {/* Cruise sailing-day note: this itinerary boards a cruise on a day its
+          ship does not leave. The price stands; confirm the date. Reflects the
+          SAVED itinerary — save and it refreshes (migration 382). */}
+      {cruiseSailingNotes.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mb-4">
+          <p className="text-sm font-semibold text-amber-800 mb-1">⚠ Check the cruise date</p>
+          <ul className="text-xs text-amber-700 space-y-0.5">
+            {cruiseSailingNotes.map((n, i) => (
+              <li key={i}>• {n}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* HEADER - Compact single row */}
       <div className="bg-white rounded-xl p-4 mb-5 shadow-sm">
         <div className="flex items-center justify-between gap-4 flex-wrap">
