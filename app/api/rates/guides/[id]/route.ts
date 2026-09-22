@@ -73,6 +73,7 @@ Object.assign(updateData, rateCurrencyWriteField(body))
     if (body.service_code !== undefined) updateData.service_code = body.service_code
     if (body.guide_language !== undefined) updateData.guide_language = body.guide_language
     if (body.guide_type !== undefined) updateData.guide_type = body.guide_type
+    if (body.guide_mode !== undefined) updateData.guide_mode = body.guide_mode || 'spot'
     if (body.city !== undefined) updateData.city = body.city || null
     if (body.tour_duration !== undefined) updateData.tour_duration = body.tour_duration
     if (body.base_rate_eur !== undefined) updateData.base_rate_eur = parseFloat(body.base_rate_eur) || 0

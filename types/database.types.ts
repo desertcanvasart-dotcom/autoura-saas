@@ -4997,6 +4997,7 @@ export interface Database {
           is_active: boolean | null
           updated_at: string | null
           rate_currency: string | null
+          guide_mode: string
         }
         Insert: {
           id?: string
@@ -5019,6 +5020,7 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
+          guide_mode?: string
         }
         Update: {
           id?: string
@@ -5041,6 +5043,7 @@ export interface Database {
           is_active?: boolean | null
           updated_at?: string | null
           rate_currency?: string | null
+          guide_mode?: string
         }
         Relationships: [
           {

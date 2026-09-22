@@ -82,6 +82,8 @@ export async function POST(request: NextRequest) {
       service_code: body.service_code || `GD-${Date.now().toString(36).toUpperCase()}`,
       guide_language: body.guide_language,
       guide_type: body.guide_type || 'licensed',
+      // The mode the rate is for; every rate so far was a Spot rate (380).
+      guide_mode: body.guide_mode || 'spot',
       city: body.city || null,
       tour_duration: body.tour_duration || 'full_day',
       base_rate_eur: parseFloat(body.base_rate_eur) || 0,

@@ -499,6 +499,14 @@ describe('migration replay from scratch', () => {
       expect(indexNames.has(name), `${name} would stop a second agency issuing its first document`).toBe(false)
     }
 
+    // ---- Migration 380: guide modes ----
+    const modes = await db.query(`SELECT key FROM tenant_vocabularies WHERE kind = 'guide_mode' AND tenant_id = (SELECT id FROM tenants WHERE company_name = 'Replay Probe Co') ORDER BY rank`)
+    expect((modes.rows as Array<{ key: string }>).map(r => r.key), 'a tenant made after 380 has both modes').toEqual(['spot', 'throughout'])
+    const modeCol = await db.query(`SELECT column_default, is_nullable FROM information_schema.columns WHERE table_name = 'guide_rates' AND column_name = 'guide_mode'`)
+    expect(modeCol.rows[0]).toMatchObject({ column_default: "'spot'::character varying", is_nullable: 'NO' })
+    await expect(db.exec(`INSERT INTO guide_rates (tenant_id, service_code, guide_language, guide_type, tour_duration, guide_mode) VALUES ((SELECT id FROM tenants WHERE company_name = 'Replay Probe Co'), 'P380', 'english', 'egyptologist', 'full_day', 'Bad Mode')`), 'a mode must be a key').rejects.toThrow()
+    await db.exec('ROLLBACK').catch(() => undefined)
+
     // ---- Migration 379: the default price becomes period 1 ----
     // A fresh build has no rates, so production's state is MADE: a hotel priced
     // from its room columns, a cruise from its base columns, a hotel with no
