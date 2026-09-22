@@ -53,6 +53,7 @@ import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTS
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
 import { knownAirportCode, routeAirportCode, legAssistance, arrivalDayIndex, departureDayIndex, groundedNeighbour, isInTransit, sanitizeLegPlace, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
+import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type PropertyRow } from '@/lib/pricing/named-property'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
@@ -2371,6 +2372,29 @@ export function extraTransfersFor(day: ItineraryDay): ExtraTransfer[] {
   return extras
 }
 
+/** The names on the agency's hotel or cruise sheet — what a programme can NAME
+ *  (lib/pricing/named-property.ts). Active rows only; read once per calculation. */
+async function loadNamedPropertyRows(
+  scope: CatalogScope,
+  table: 'accommodation_rates' | 'nile_cruises'
+): Promise<Array<PropertyRow & { city?: string | null }>> {
+  return memoRead(`named-properties|${table}|${scope.tenantId}`, async () => {
+    const hotel = table === 'accommodation_rates'
+    const { data } = await getSupabaseAdmin()
+      .from(table)
+      .select(hotel ? 'id, property_name, city, tier, is_preferred' : 'id, ship_name, tier, is_preferred')
+      .or(catalogOrExpr(scope))
+      .eq('is_active', true)
+    return ((data ?? []) as unknown as Array<Record<string, unknown>>).map(r => ({
+      id: String(r.id),
+      name: (hotel ? r.property_name : r.ship_name) as string | null,
+      city: (r.city ?? null) as string | null,
+      tier: (r.tier ?? null) as string | null,
+      is_preferred: r.is_preferred === true,
+    }))
+  })
+}
+
 /** What a transport lookup outside the engine found. */
 export interface DayTransportRate { rate: number; rateId: string; vehicleType: string; serviceType: string }
 
@@ -2781,10 +2805,27 @@ export async function calculateDayBasedPricing(
     // names its hotel. One sailing, so the first cruise day that says which
     // ship decides it. Absent, the engine picks as it always has.
     const chosenShip = cruiseDays.map(d => d.property_by_tier?.[tier]).find(Boolean) ?? null
-    const cr = await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate, {
-      rateId: chosenShip,
+    // The ship the programme NAMES wins over the tier — same rule as a hotel.
+    const namedShip: NamedPick = chosenShip
+      ? { kind: 'none' }
+      : pickNamedProperty(
+          [t.template_name, ...cruiseDays.flatMap(d => [d.title, d.description])],
+          await loadNamedPropertyRows(catalogScope, 'nile_cruises'),
+          tier
+        )
+    const cr = namedShip.kind === 'ambiguous' ? null : await getCruiseRates(catalogScope, tier, firstCruiseDay?.city, travelDate, {
+      rateId: chosenShip ?? (namedShip.kind === 'one' ? namedShip.rateId : undefined),
     })
-    if (cr && cr.source === 'db') {
+    if (namedShip.kind === 'ambiguous') {
+      addHole({
+        kind: 'cruise',
+        reason: 'missing',
+        tier,
+        city: firstCruiseDay?.city,
+        lookupAttempted: `ship named in the programme: ${namedShip.names.join(', ')}`,
+        message: namedAmbiguityMessage(namedShip, 'ship', 'for this sailing', 'Rates → Cruises'),
+      })
+    } else if (cr && cr.source === 'db') {
       cruiseRates = cr
     } else if (cr?.ambiguous) {
       addHole({
@@ -2873,15 +2914,44 @@ export async function calculateDayBasedPricing(
     const chosen = day.property_by_tier?.[tier]
     if (chosen && day.city && !chosenByCity.has(day.city)) chosenByCity.set(day.city, chosen)
   }
+  // A hotel the programme NAMES wins over the tier (lib/pricing/named-property):
+  // the full name of a hotel on the agency's own sheet, written in the text of
+  // the nights in that city. A pick on the day still comes first; with no name,
+  // the tier's own hotel — the only one, or the one starred — as before.
+  const namedHotelByCity = new Map<string, NamedPick>()
+  if (hotelCities.some(city => !chosenByCity.has(city))) {
+    const hotelSheet = await loadNamedPropertyRows(catalogScope, 'accommodation_rates')
+    for (const city of hotelCities) {
+      if (chosenByCity.has(city)) continue
+      const inCity = hotelSheet.filter(r => (r.city ?? '').trim().toLowerCase() === city.trim().toLowerCase())
+      const texts = hotelDays.filter(d => d.city === city).flatMap(d => [d.title, d.description])
+      namedHotelByCity.set(city, pickNamedProperty(texts, inCity, tier))
+    }
+  }
+  const hotelRateIdFor = (city: string): string | null => {
+    const named = namedHotelByCity.get(city)
+    return chosenByCity.get(city) ?? (named?.kind === 'one' ? named.rateId : null)
+  }
   const hotelRatesMap = new Map<string, NonNullable<Awaited<ReturnType<typeof getHotelRates>>>>()
   const hotelResults = await Promise.all(
     hotelCities.map(city =>
-      getHotelRates(catalogScope, city, tier, travelDate, { rateId: chosenByCity.get(city) ?? null })
+      getHotelRates(catalogScope, city, tier, travelDate, { rateId: hotelRateIdFor(city) })
     )
   )
   hotelCities.forEach((city, i) => {
     const rates = hotelResults[i]
-    if (rates && rates.source === 'db') {
+    const named = namedHotelByCity.get(city)
+    if (named?.kind === 'ambiguous') {
+      // Named, and not resolvable: never quietly replaced by the tier's hotel.
+      addHole({
+        kind: 'hotel',
+        reason: 'missing',
+        tier,
+        city,
+        lookupAttempted: `hotel named in the programme (${city}): ${named.names.join(', ')}`,
+        message: namedAmbiguityMessage(named, 'hotel', `in ${city}`, 'Rates → Hotels'),
+      })
+    } else if (rates && rates.source === 'db') {
       hotelRatesMap.set(city, rates)
     } else if (rates?.ambiguous) {
       addHole({
