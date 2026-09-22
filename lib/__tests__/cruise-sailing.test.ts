@@ -52,3 +52,44 @@ describe('sailsOn is silent until the operator says otherwise', () => {
     expect(sailsOn(['mon'], '')).toBe(true)
   })
 })
+
+import { cruiseSailingNotes } from '@/lib/rates/cruise-sailing'
+
+describe('cruiseSailingNotes for a built itinerary', () => {
+  const ships = new Map([
+    ['ship-monfri', { ship_name: 'MS Sunrise', sailing_days: ['mon', 'fri'] }],
+    ['ship-anyday', { ship_name: 'MS Anytime', sailing_days: [] }],
+  ])
+  const day = (n: number, over: Record<string, unknown> = {}) => ({
+    day_number: n, date: null, accommodation_type: 'hotel', is_cruise_day: false, itinerary_services: [], ...over,
+  })
+  const boardsMonFri = (date: string) => [
+    day(1),
+    day(2, { accommodation_type: 'cruise', date, itinerary_services: [{ rate_table: 'nile_cruises', rate_id: 'ship-monfri' }] }),
+    day(3, { accommodation_type: 'cruise', date: null }),
+    day(4),
+  ]
+
+  it('notes a cruise that boards on a day the ship does not sail', () => {
+    const notes = cruiseSailingNotes(boardsMonFri('2026-11-11'), ships) // Wednesday
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toContain('MS Sunrise departs Mondays and Fridays')
+    expect(notes[0]).toContain('day 2 boards on 2026-11-11')
+  })
+
+  it('is silent when the boarding day matches', () => {
+    expect(cruiseSailingNotes(boardsMonFri('2026-11-13'), ships)).toEqual([]) // Friday
+  })
+
+  it('is silent when the ship has no fixed day', () => {
+    const days = boardsMonFri('2026-11-11').map(d =>
+      d.day_number === 2 ? { ...d, itinerary_services: [{ rate_table: 'nile_cruises', rate_id: 'ship-anyday' }] } : d)
+    expect(cruiseSailingNotes(days, ships)).toEqual([])
+  })
+
+  it('is silent when no cruise day names a nile_cruises rate', () => {
+    const days = boardsMonFri('2026-11-11').map(d =>
+      d.day_number === 2 ? { ...d, itinerary_services: [] } : d)
+    expect(cruiseSailingNotes(days, ships)).toEqual([])
+  })
+})

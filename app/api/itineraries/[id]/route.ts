@@ -6,6 +6,7 @@ import { buildFrozenFx } from '@/lib/itinerary-fx'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { itineraryBookingFacts } from '@/lib/bookings/booking-on-confirm'
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
+import { cruiseSailingNotes, type CruiseShip, type ItineraryCruiseDay } from '@/lib/rates/cruise-sailing'
 
 /**
  * Create the booking a freshly-confirmed itinerary implies (B-item 7).
@@ -156,6 +157,28 @@ export async function GET(
         .eq('itinerary_id', id)
         .order('day_number', { ascending: true })
       ;(data as any).itinerary_days = days || []
+
+      // A cruise that boards on a day its ship does not sail — a note, never a
+      // blocker (parity with the calculator, migration 382). This screen does
+      // not run the day engine, so the check lives here, off each cruise day's
+      // own date and the nile_cruises rate its service line names.
+      const dayRows = (days ?? []) as unknown as ItineraryCruiseDay[]
+      const rateIds = [...new Set(
+        dayRows.flatMap(d => (d.itinerary_services ?? [])
+          .filter(s => s.rate_table === 'nile_cruises' && s.rate_id)
+          .map(s => s.rate_id as string))
+      )]
+      if (rateIds.length > 0) {
+        const { data: ships } = await supabase
+          .from('nile_cruises')
+          .select('id, ship_name, sailing_days')
+          .in('id', rateIds)
+        const shipRows = (ships ?? []) as unknown as Array<{ id: string; ship_name: string | null; sailing_days: unknown }>
+        const byRateId = new Map<string, CruiseShip>(
+          shipRows.map(s => [s.id, { ship_name: s.ship_name, sailing_days: s.sailing_days }])
+        )
+        ;(data as Record<string, unknown>).cruise_sailing_notes = cruiseSailingNotes(dayRows, byRateId)
+      }
     }
 
     return NextResponse.json({

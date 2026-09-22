@@ -71,3 +71,50 @@ export function sailingDaysLabel(days: unknown): string {
   if (list.length === 1) return list[0]
   return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`
 }
+
+// ============================================================================
+// The same check for a built B2C itinerary (which the day engine never runs):
+// each cruise segment's first day carries its own DATE, and a service line on
+// it points at the nile_cruises row (rate_table 'nile_cruises', rate_id). A
+// note when that date's weekday is not one the ship sails — never a blocker.
+// ============================================================================
+
+export interface ItineraryCruiseDay {
+  day_number?: number | null
+  date?: string | null
+  accommodation_type?: string | null
+  is_cruise_day?: boolean | null
+  itinerary_services?: Array<{ rate_table?: string | null; rate_id?: string | null }> | null
+}
+export interface CruiseShip { ship_name?: string | null; sailing_days?: unknown }
+
+const isCruiseDay = (d: ItineraryCruiseDay): boolean =>
+  d.accommodation_type === 'cruise' || d.is_cruise_day === true
+
+/** One note per cruise segment whose boarding date does not match the ship's
+ *  sailing days. Empty when every sailing fits, or none has a fixed day. */
+export function cruiseSailingNotes(days: ItineraryCruiseDay[], shipByRateId: Map<string, CruiseShip>): string[] {
+  const sorted = [...days].sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0))
+  const notes: string[] = []
+  let i = 0
+  while (i < sorted.length) {
+    if (!isCruiseDay(sorted[i])) { i++; continue }
+    const seg: ItineraryCruiseDay[] = []
+    while (i < sorted.length && isCruiseDay(sorted[i])) { seg.push(sorted[i]); i++ }
+    const first = seg[0]
+    // The ship for this segment: a nile_cruises rate on any of its days.
+    let rateId: string | null = null
+    for (const d of seg) {
+      const svc = (d.itinerary_services ?? []).find(s => s.rate_table === 'nile_cruises' && s.rate_id)
+      if (svc?.rate_id) { rateId = svc.rate_id; break }
+    }
+    if (!rateId) continue
+    const ship = shipByRateId.get(rateId)
+    if (!ship || sailsOn(ship.sailing_days, first.date)) continue
+    notes.push(
+      `${ship.ship_name || 'The cruise'} departs ${sailingDaysLabel(ship.sailing_days)}, but day ${first.day_number ?? '?'} boards on ${String(first.date).slice(0, 10)}. ` +
+      'Move the cruise day, or pick a sailing that leaves then.'
+    )
+  }
+  return notes
+}
