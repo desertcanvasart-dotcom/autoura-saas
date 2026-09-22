@@ -773,7 +773,6 @@ export default function HotelServicesPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Rate ({rateSymbol}) *</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">{rateSymbol}</span>
                   <input
                     type="number"
                     name="rate_eur"
@@ -784,7 +783,7 @@ export default function HotelServicesPage() {
                     required
                     placeholder="0.00"
                     title="Rate"
-                    className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-600"
                   />
                   <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
                 </div>

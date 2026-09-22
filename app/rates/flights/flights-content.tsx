@@ -1242,7 +1242,6 @@ export default function FlightsContent() {
                       Base Rate (EUR) <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">{rateSymbol}</span>
                       <input
                         type="number"
                         value={formData.base_rate_eur}
@@ -1250,7 +1249,7 @@ export default function FlightsContent() {
                         step="0.01"
                         min="0"
                         required
-                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                       />
                     </div>
                     <RateCurrencyField compact className="mt-2" value={rateCurrency} onChange={setRateCurrency} />
@@ -1262,14 +1261,13 @@ export default function FlightsContent() {
                     </label>
                     <div className="relative">
                       {/* tax_eur is EUR by definition — hard-coded symbol is correct here (euro-literal ratchet) */}
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">{rateSymbol}</span>
                       <input
                         type="number"
                         value={formData.tax_eur}
                         onChange={(e) => setFormData(prev => ({ ...prev, tax_eur: parseFloat(e.target.value) || 0 }))}
                         step="0.01"
                         min="0"
-                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
                       />
                     </div>
                   </div>
