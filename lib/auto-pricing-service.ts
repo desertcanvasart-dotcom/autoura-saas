@@ -52,7 +52,7 @@ import { namesSeveralPlaces, severalPlacesReason } from '@/lib/tours/day-city'
 import { sightseeingStatement, isDayTourProgramme, SINGLE_DAY_TOUR_TYPES, SIGHTSEEING_NOT_STATED, SIGHTSEEING_HOW_TO_STATE, DAY_TOUR_NO_ATTRACTIONS } from '@/lib/tours/day-sightseeing'
 import { wordedAttractionsForDay } from '@/lib/tours/day-attractions'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
-import { knownAirportCode, routeAirportCode, legAssistance, arrivalDayIndex, departureDayIndex, groundedNeighbour, isInTransit, sanitizeLegPlace, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
+import { knownAirportCode, routeAirportCode, legAssistance, legRoute, arrivalDayIndex, departureDayIndex, groundedNeighbour, isInTransit, sanitizeLegPlace, sanitizeLegAssist, type LegAssist } from '@/lib/pricing/flight-leg'
 import { pickNamedProperty, namedAmbiguityMessage, type NamedPick, type PropertyRow } from '@/lib/pricing/named-property'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
@@ -183,6 +183,11 @@ export interface ItineraryDay {
   /** The whole day is spent IN THE AIR (the overnight flight out): nothing is
    *  sold on it, and the arrival belongs to the next day on the ground. */
   in_transit?: boolean
+  /** Road beside a ticket (sibling #447). Absent = as always: a road day has
+   *  its vehicle, a ticket day has its ticket and nothing more. true on a
+   *  ticket day adds the transfers at each end (airport / station); false on
+   *  a road day means no vehicle that day. */
+  road_transfers?: boolean
   /** The property this night is spent at, chosen per tier: the same programme
    *  is sold at several tiers and each has its own hotel. The value is the
    *  rate row's id, which the engine PINS to — a chosen property that is
@@ -233,6 +238,11 @@ export interface ItineraryDay {
     hotel_checkin_level?: HotelServiceType
     /** Defaults to 'porter'. */
     hotel_checkout_level?: HotelServiceType
+    /** Boarding the ship / leaving it — priced from the hotel check-in and
+     *  check-out assistance rates. Derived from the nights (first night
+     *  aboard, first day ashore) when not stated; a stated value wins. */
+    cruise_embark?: boolean
+    cruise_disembark?: boolean
   }
   // NEW: Transport overrides (optional)
   transport?: {
@@ -630,9 +640,16 @@ export function determineTransportNeeds(
     }
   }
 
-  // Intercity transfer (city changed from previous day, and not a cruise)
+  // Intercity transfer (city changed from previous day, and not a cruise).
+  // NOT for a day that arrived by TICKET — its own flight or train, or last
+  // night's sleeper: the ticket made the journey, and a road drop-off on top
+  // of it was a second charge for the same move (found on a flight day and a
+  // sleeper morning that had sightseeing; sibling #447). Such a day is a
+  // sightseeing day in the city it arrived in.
   if (previousDay && 
       previousDay.city.toLowerCase() !== cityLower &&
+      !day.transport_type &&
+      previousDay.transport_type !== 'sleeping_train' &&
       day.accommodation_type !== 'cruise' &&
       previousDay.accommodation_type !== 'cruise') {
     return {
@@ -823,6 +840,12 @@ export function parseItinerary(itineraryData: any, opts?: {
     const services = dayTourGuide && !baseServices.guide_required
       ? { ...baseServices, guide_required: true }
       : baseServices
+    // A stated boarding / leaving tick rides on the services block; anything
+    // that is not a boolean is "not stated" and is derived from the nights.
+    for (const k of ['cruise_embark', 'cruise_disembark'] as const) {
+      const v = (day.services ?? {})[k]
+      if (typeof v === 'boolean') services[k] = v
+    }
 
     // The attractions the day names — and no others (see above). One
     // exception that is not a guess: a ONE-day tour whose day names none is
@@ -885,6 +908,7 @@ export function parseItinerary(itineraryData: any, opts?: {
       ...(transport_type ? { leg_from: sanitizeLegPlace(day.leg_from), leg_to: sanitizeLegPlace(day.leg_to) } : {}),
       ...(transport_type === 'flight' ? { leg_assist: sanitizeLegAssist(day.leg_assist) } : {}),
       city_transfer: day.city_transfer === true,
+      ...(typeof day.road_transfers === 'boolean' ? { road_transfers: day.road_transfers } : {}),
       sightseeing_length:
         day.sightseeing_length === 'half_day' || day.sightseeing_length === 'long_day_tour'
           ? day.sightseeing_length
@@ -2225,7 +2249,7 @@ export function tipOccasionsFor(itinerary: ItineraryDay[]): DayOccasions[] {
       (day.services.airport_arrival ? 1 : 0) +
       (day.services.airport_departure ? 1 : 0) +
       (intercityByRoad && !day.services.airport_arrival && !day.services.airport_departure ? 1 : 0) +
-      extraTransfersFor(day).length
+      extraTransfersFor(day, previousDay, nextDay).length
     return {
       day: day.day,
       city: day.city,
@@ -2233,7 +2257,8 @@ export function tipOccasionsFor(itinerary: ItineraryDay[]): DayOccasions[] {
       restaurantMeals: MEAL_KINDS.filter(kind => day.meals[kind] === 'external').length,
       transfers,
       airportServices: (day.services.airport_arrival ? 1 : 0) + (day.services.airport_departure ? 1 : 0),
-      hotelServices: (day.services.hotel_checkin ? 1 : 0) + (day.services.hotel_checkout ? 1 : 0),
+      hotelServices: (day.services.hotel_checkin ? 1 : 0) + (day.services.hotel_checkout ? 1 : 0) +
+        (cruiseAssistanceFor(day, previousDay).embark ? 1 : 0) + (cruiseAssistanceFor(day, previousDay).disembark ? 1 : 0),
       night: day.accommodation_type === 'hotel' || day.accommodation_type === 'cruise' ? day.accommodation_type : null,
     }
   })
@@ -2348,10 +2373,54 @@ export interface ExtraTransfer {
   slug: string
   /** Other keys that mean the same thing, tried in order. */
   alsoTry?: TransportServiceType[]
+  /** Where the rate is looked up when it is not the day's own city — the
+   *  airport or station at the OTHER end of a ticket leg. */
+  city?: string
 }
 
-export function extraTransfersFor(day: ItineraryDay): ExtraTransfer[] {
+/** Boarding the ship / leaving it — derived from the nights unless the day
+ *  says. The first night aboard boards; the first day ashore after a night
+ *  aboard leaves. A stated value (the day editor's tick) wins either way. */
+export function cruiseAssistanceFor(day: ItineraryDay, previousDay?: ItineraryDay | null): { embark: boolean; disembark: boolean } {
+  const aboard = day.accommodation_type === 'cruise'
+  const wasAboard = previousDay?.accommodation_type === 'cruise'
+  return {
+    embark: day.services.cruise_embark ?? (aboard && !wasAboard),
+    disembark: day.services.cruise_disembark ?? (!aboard && wasAboard),
+  }
+}
+
+export function extraTransfersFor(day: ItineraryDay, previousDay?: ItineraryDay | null, nextDay?: ItineraryDay | null): ExtraTransfer[] {
   const extras: ExtraTransfer[] = []
+
+  // ROAD BESIDE A TICKET (sibling #447). A ticket day priced its ticket and
+  // nothing more — the operator's decision then. Now a day may SAY it wants
+  // the road legs too (road_transfers: true): the transfer to the airport or
+  // station at one end and from it at the other. Absent keeps what it was.
+  if (day.transport_type && day.road_transfers === true) {
+    const { from, to } = legRoute(day.transport_type, day, previousDay, nextDay)
+    const station = (label: string, slug: string, city: string): ExtraTransfer => ({
+      serviceType: 'transfer_within_city', alsoTry: ['city_transfer'], label, slug, city,
+    })
+    if (day.transport_type === 'flight') {
+      // Departure side: to the airport the flight leaves from. Arrival side:
+      // from the airport it lands at — unless the day already has a vehicle
+      // there (its arrival service, or its sightseeing, which starts at the
+      // airport), so nothing is charged twice.
+      if (from) extras.push({ serviceType: 'airport_transfer', label: 'Transfer to the airport', slug: 'road-to-airport', city: from })
+      const coveredAtArrival = day.services.airport_arrival || day.services.guide_required || day.attractions.length > 0
+      if (to && !coveredAtArrival) extras.push({ serviceType: 'airport_transfer', label: 'Transfer from the airport', slug: 'road-from-airport', city: to })
+    } else if (day.transport_type === 'train') {
+      if (from) extras.push(station('Transfer to the station', 'road-to-station', from))
+      if (to) extras.push(station('Transfer from the station', 'road-from-station', to))
+    } else {
+      // A sleeper: to the station tonight, in this city; from the station on
+      // arrival, in the next day's city. Both belong to the sleeper day.
+      if (from) extras.push(station('Transfer to the station', 'road-to-station', from))
+      if (to) extras.push(station('Transfer from the station on arrival', 'road-from-station', to))
+    }
+  }
+
   // Eating out is a stated meal status ('external'), so the transfer to the
   // restaurant is stated too — no guessing from the title.
   if (day.meals?.dinner === 'external') {
@@ -3710,6 +3779,47 @@ export async function calculateDayBasedPricing(
         })
       }
     }
+
+    // ----- CRUISE BOARDING / LEAVING ASSISTANCE (sibling #447) -----
+    // Never priced by this engine, though every boarding has someone at the
+    // quay. Derived from the nights — the first night aboard, the first day
+    // ashore after it — unless the day SAYS (services.cruise_embark /
+    // cruise_disembark). Priced from the hotel check-in / check-out assistance
+    // rates, the same staff, so no new rate table.
+    const boarding = cruiseAssistanceFor(day, previousDay)
+    for (const [wanted, level, id, name] of [
+      [boarding.embark, checkinLevel, 'cruise-embark', 'Cruise Boarding Assistance'],
+      [boarding.disembark, checkoutLevel, 'cruise-disembark', 'Cruise Leaving Assistance'],
+    ] as const) {
+      if (!wanted) continue
+      const rate = await getHotelServiceRate(catalogScope, level, tier)
+      if (rate != null) {
+        fixedCosts += rate
+        services.push({
+          id: `day${day.day}-${id}`,
+          dayNumber: day.day,
+          serviceType: 'hotel_service',
+          serviceName: name,
+          quantity: 1,
+          quantityMode: 'fixed',
+          unitCost: rate,
+          lineTotal: rate,
+          rateSource: 'hotel_staff_rates',
+          isPerPax: false,
+          isOptional: false
+        })
+      } else {
+        addHole({
+          kind: 'hotel_service',
+          reason: 'missing',
+          tier,
+          dayNumber: day.day,
+          city: day.city,
+          lookupAttempted: `${name.toLowerCase()} — hotel ${level} (${tier})`,
+          message: `No hotel ${HOTEL_LEVEL_LABEL[level]} rate for ${tier}, so the ${name.toLowerCase()} on day ${day.day} cannot be priced. Add it in Rates → Hotel Services.`,
+        })
+      }
+    }
   }
 
   // ============================================
@@ -3985,8 +4095,9 @@ export async function calculateDayBasedPricing(
                            day.accommodation_type !== 'cruise' &&
                            previousDay.accommodation_type !== 'cruise'
 
-    // Determine if this day requires transport
-    const requiresTransport = hasSightseeing || hasAirportService || isIntercityDay
+    // Determine if this day requires transport. Road switched OFF on a road
+    // day (a walking day, a day the hotel's own shuttle covers): no vehicle.
+    const requiresTransport = (hasSightseeing || hasAirportService || isIntercityDay) && !(day.road_transfers === false && !day.transport_type)
 
     if (requiresTransport) {
       const needs = determineTransportNeeds(day, previousDay, nextDay)
@@ -4044,7 +4155,7 @@ export async function calculateDayBasedPricing(
     for (const serviceType of [extra.serviceType, ...(extra.alsoTry ?? [])]) {
       match = findTransportRate(transportCache, {
         serviceType,
-        city: day.city,
+        city: extra.city ?? day.city,
         duration: '' as never,
         area: null,
         vehicleType,
@@ -4108,16 +4219,18 @@ export async function calculateDayBasedPricing(
 
   // The transfers a day needs BESIDES its sightseeing: dinner out, and the
   // local transfer the operator ticked. Priced per day, at the day's city.
-  for (const day of itinerary) {
-    for (const extra of extraTransfersFor(day)) {
-      const extraVehicle = vehicleFor(shownSeats, day.city)
+  for (let i = 0; i < itinerary.length; i++) {
+    const day = itinerary[i]
+    for (const extra of extraTransfersFor(day, groundedNeighbour(itinerary, i, -1), groundedNeighbour(itinerary, i, 1))) {
+      const where = extra.city ?? day.city
+      const extraVehicle = vehicleFor(shownSeats, where)
       const match = findExtraTransfer(day, extra, extraVehicle)
       if (match && match.source === 'db') {
         services.push({
           id: `day${day.day}-${extra.slug}`,
           dayNumber: day.day,
           serviceType: 'transportation',
-          serviceName: match.rate.route_name || `${extra.label} - ${day.city}`,
+          serviceName: match.rate.route_name || `${extra.label} - ${where}`,
           quantity: 1,
           quantityMode: 'fixed',
           unitCost: match.rate.base_rate_eur,
@@ -4133,10 +4246,10 @@ export async function calculateDayBasedPricing(
           reason: match ? 'fuzzy' : 'missing',
           tier,
           dayNumber: day.day,
-          city: day.city,
+          city: where,
           vehicleType: extraVehicle,
-          lookupAttempted: `${extra.serviceType}/one_way ${extraVehicle} in ${day.city}`,
-          message: `No ${extra.label.toLowerCase()} rate for ${extraVehicle} in ${day.city || 'this day'}. Add it in Rates → Transportation.`,
+          lookupAttempted: `${extra.serviceType}/one_way ${extraVehicle} in ${where}`,
+          message: `No ${extra.label.toLowerCase()} rate for ${extraVehicle} in ${where || 'this day'}. Add it in Rates → Transportation.`,
         })
       }
     }
@@ -4202,9 +4315,11 @@ export async function calculateDayBasedPricing(
     // running total that nothing ever read — so a quote SHOWED "Dinner
     // transfer 25.00" and charged nothing for it. Latent on production only
     // because no such rate matched yet; the operator is about to add them.
-    for (const day of itinerary) {
-      for (const extra of extraTransfersFor(day)) {
-        const vehicleType = vehicleFor(pax, day.city)
+    for (let i = 0; i < itinerary.length; i++) {
+      const day = itinerary[i]
+      for (const extra of extraTransfersFor(day, groundedNeighbour(itinerary, i, -1), groundedNeighbour(itinerary, i, 1))) {
+        const where = extra.city ?? day.city
+        const vehicleType = vehicleFor(pax, where)
         const match = findExtraTransfer(day, extra, vehicleType)
         if (match && match.source === 'db') {
           transportCost += match.rate.base_rate_eur
@@ -4214,10 +4329,10 @@ export async function calculateDayBasedPricing(
             reason: match ? 'fuzzy' : 'missing',
             tier,
             dayNumber: day.day,
-            city: day.city,
+            city: where,
             vehicleType,
-            lookupAttempted: `${extra.serviceType}/one_way ${vehicleType} in ${day.city}`,
-            message: `No ${extra.label.toLowerCase()} rate for ${vehicleType} in ${day.city || 'this day'}. Add it in Rates → Transportation.`,
+            lookupAttempted: `${extra.serviceType}/one_way ${vehicleType} in ${where}`,
+            message: `No ${extra.label.toLowerCase()} rate for ${vehicleType} in ${where || 'this day'}. Add it in Rates → Transportation.`,
           })
         }
       }

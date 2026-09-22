@@ -89,6 +89,11 @@ export const DAY_CSV_COLUMNS: readonly DayCsvColumn[] = [
   { name: 'leg_to', label: 'Leg To' },
   { name: 'leg_assist_from', label: 'Assist At Departure', allowed: YES_NO },
   { name: 'leg_assist_to', label: 'Assist At Arrival', allowed: YES_NO },
+  // Road beside a ticket, or no vehicle on a road day (sibling #447). Blank =
+  // as always. Boarding / leaving the ship: blank = derived from the nights.
+  { name: 'road_transfers', label: 'Road Transfers', allowed: YES_NO },
+  { name: 'cruise_embark', label: 'Cruise Boarding Assist', allowed: YES_NO },
+  { name: 'cruise_disembark', label: 'Cruise Leaving Assist', allowed: YES_NO },
   { name: 'airport_arrival', label: 'Airport Arrival', kind: 'bool' },
   { name: 'airport_departure', label: 'Airport Departure', kind: 'bool' },
   { name: 'hotel_checkin', label: 'Hotel Check-in', kind: 'bool' },
@@ -152,6 +157,9 @@ export function serializeDaysCsv(
         leg_to: sanitizeLegPlace(d.leg_to) ?? '',
         leg_assist_from: yesNo(sanitizeLegAssist(d.leg_assist)?.from),
         leg_assist_to: yesNo(sanitizeLegAssist(d.leg_assist)?.to),
+        road_transfers: yesNo(typeof d.road_transfers === 'boolean' ? d.road_transfers : undefined),
+        cruise_embark: yesNo(typeof services.cruise_embark === 'boolean' ? services.cruise_embark : undefined),
+        cruise_disembark: yesNo(typeof services.cruise_disembark === 'boolean' ? services.cruise_disembark : undefined),
         airport_arrival: !!services.airport_arrival,
         airport_departure: !!services.airport_departure,
         hotel_checkin: !!services.hotel_checkin,
@@ -427,7 +435,10 @@ export function toItineraryDay(rec: Record<string, unknown>): Record<string, unk
       hotel_checkin: !!rec.hotel_checkin,
       hotel_checkout: !!rec.hotel_checkout,
       guide_required: !!rec.guide_required,
+      ...(rec.cruise_embark ? { cruise_embark: rec.cruise_embark === 'yes' } : {}),
+      ...(rec.cruise_disembark ? { cruise_disembark: rec.cruise_disembark === 'yes' } : {}),
     },
+    ...(rec.road_transfers ? { road_transfers: rec.road_transfers === 'yes' } : {}),
   }
   // Absent has always meant road; keep it absent so a re-read matches what the
   // day editor writes, rather than introducing a value it never sets.

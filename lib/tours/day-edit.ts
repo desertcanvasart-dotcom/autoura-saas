@@ -37,6 +37,12 @@ export interface DayForm {
   propertiesByTier: Record<string, string>
   /** "No guided sightseeing on this day". */
   noSightseeing: boolean
+  /** Road beside a ticket — or no vehicle on a road day. undefined = not
+   *  stated: the day prices as it always did. */
+  roadTransfers?: boolean
+  /** Boarding / leaving the ship: only the ends the operator SET; an end left
+   *  alone is derived from the nights. */
+  cruiseAssist?: { embark?: boolean; disembark?: boolean }
   /** A ticket leg's own route; '' = the usual one (yesterday's city → today's). */
   legFrom?: string
   legTo?: string
@@ -108,6 +114,22 @@ export function applyDayForm(existing: Day | null, form: DayForm, dayNumber: num
 
   if (form.cityTransfer) day.city_transfer = true
   else drop(day, 'city_transfer')
+
+  // Road beside the ticket (sibling #447). Stored only when stated: absent
+  // keeps every existing programme priced as it was.
+  if (typeof form.roadTransfers === 'boolean') day.road_transfers = form.roadTransfers
+  else drop(day, 'road_transfers')
+
+  // Boarding / leaving the ship — on the services block, beside the other
+  // assistance flags, and only the ends the operator set.
+  const services = { ...((day.services as Record<string, unknown> | undefined) ?? {}) }
+  for (const k of ['embark', 'disembark'] as const) {
+    const v = form.cruiseAssist?.[k]
+    if (typeof v === 'boolean') services[`cruise_${k}`] = v
+    else delete services[`cruise_${k}`]
+  }
+  if (Object.keys(services).length > 0) day.services = services
+  else if (day.services) drop(day, 'services')
 
   if (form.length) day.sightseeing_length = form.length
   else drop(day, 'sightseeing_length')
