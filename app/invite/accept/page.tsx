@@ -10,7 +10,6 @@ import {
   Eye,
   EyeOff,
   User,
-  Lock,
   Mail,
   Shield
 } from 'lucide-react'
@@ -18,8 +17,10 @@ import {
 interface InvitationData {
   email: string
   role: string
-  invited_by_name: string
+  inviter: { full_name?: string; email?: string } | null
   expires_at: string
+  /** A working login already exists: accepting keeps its password. */
+  has_account?: boolean
 }
 
 function AcceptInvitationContent() {
@@ -72,20 +73,23 @@ function AcceptInvitationContent() {
     e.preventDefault()
     setError(null)
 
-    // Validation
-    if (!fullName.trim()) {
-      setError('Please enter your full name')
-      return
-    }
+    // Validation — none for an existing login: nothing is created, and
+    // their name and password stay as they are.
+    if (!invitation?.has_account) {
+      if (!fullName.trim()) {
+        setError('Please enter your full name')
+        return
+      }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters')
-      return
-    }
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters')
+        return
+      }
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
+      if (password !== confirmPassword) {
+        setError('Passwords do not match')
+        return
+      }
     }
 
     setSubmitting(true)
@@ -99,7 +103,7 @@ function AcceptInvitationContent() {
       const res = await fetch('/api/invitations/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password, full_name: fullName })
+        body: JSON.stringify(invitation?.has_account ? { token } : { token, password, full_name: fullName })
       })
       const payload = await res.json()
 
@@ -208,7 +212,11 @@ function AcceptInvitationContent() {
             <Shield className="w-8 h-8 text-[#647C47]" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Accept Invitation</h1>
-          <p className="text-gray-600 mt-2">Create your account to join the team</p>
+          <p className="text-gray-600 mt-2">
+            {invitation?.has_account
+              ? 'You already have an Autoura login — accept to join this team'
+              : 'Create your account to join the team'}
+          </p>
         </div>
 
         {/* Invitation Info Card */}
@@ -220,7 +228,7 @@ function AcceptInvitationContent() {
           <div className="flex items-center gap-3 mb-3">
             <User className="w-5 h-5 text-[#647C47]" />
             <span className="text-sm text-gray-700">
-              Invited by <span className="font-medium">{invitation?.invited_by_name || 'Admin'}</span>
+              Invited by <span className="font-medium">{invitation?.inviter?.full_name || invitation?.inviter?.email || 'Admin'}</span>
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -239,17 +247,24 @@ function AcceptInvitationContent() {
             </div>
           )}
 
+          {invitation?.has_account ? (
+            <p className="text-sm text-gray-600">
+              <span className="font-medium text-gray-900">{invitation.email}</span> already has an
+              Autoura login. Accepting adds you to this team; afterwards, sign in with your
+              <span className="font-medium"> existing password</span>. Forgot it?{' '}
+              <a href="/forgot-password" className="text-[#647C47] hover:underline font-medium">Reset it</a>.
+            </p>
+          ) : (<>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Full Name
             </label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
                 placeholder="Enter your full name"
                 required
               />
@@ -261,12 +276,11 @@ function AcceptInvitationContent() {
               Password
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+                className="w-full px-4 pr-10 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
                 placeholder="Create a password"
                 required
                 minLength={8}
@@ -287,17 +301,17 @@ function AcceptInvitationContent() {
               Confirm Password
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-transparent"
                 placeholder="Confirm your password"
                 required
               />
             </div>
           </div>
+          </>)}
 
           <button
             type="submit"
@@ -307,10 +321,10 @@ function AcceptInvitationContent() {
             {submitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Creating Account...
+                {invitation?.has_account ? 'Joining...' : 'Creating Account...'}
               </>
             ) : (
-              'Create Account'
+              invitation?.has_account ? 'Accept & Join Team' : 'Create Account'
             )}
           </button>
         </form>

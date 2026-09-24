@@ -89,6 +89,20 @@ describe('an invitee is never asked to confirm an email', () => {
     expect(j).toBeGreaterThan(-1)
     expect(i).toBeLessThan(j) // the early return guards the sign-in
   })
+
+  // An existing login keeps its password, so asking for a new one on the
+  // invite form only produces a password that never works (live 2026-09-24).
+  it('tells the page up front when the address already has a login', () => {
+    const verify = bodyOf(read('app/api/invitations/verify/route.ts'), 'export async function GET')
+    expect(verify).toContain('has_account: hasAccount')
+    expect(verify).toContain('email_confirmed_at') // same test as the accept route
+  })
+
+  it('an existing login is asked for no password and sends none', () => {
+    const page = codeOnly(read('app/invite/accept/page.tsx'))
+    expect(page).toMatch(/invitation\?\.has_account \? \(\s*<p/) // the note replaces the fields
+    expect(page).toContain('invitation?.has_account ? { token } : { token, password, full_name: fullName }')
+  })
 })
 
 describe('inviting someone is scoped to the workspace', () => {
