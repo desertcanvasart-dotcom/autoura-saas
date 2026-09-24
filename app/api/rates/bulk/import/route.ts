@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/supabase-server'
 import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, partitionImportRows, applyCanonicalAliases, deriveImportSeasons, propertyLinkFor } from '@/lib/bulk-rate-service'
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
-import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES } from '@/lib/rates/periods-csv'
+import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES, keepStoredPeriods } from '@/lib/rates/periods-csv'
 import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { resolveRecordKeys, resolveVocabularyKey, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
@@ -359,6 +359,7 @@ export async function POST(request: NextRequest) {
     const partition = partitionImportRows(rowsToUpsert, uniqueKey)
 
     let inserted = 0, updated = 0
+    const periodsKept: Array<{ row: string; operation: string; message: string }> = []
     const importErrors: any[] = [
       ...supplierCodeErrors,
       ...partition.duplicates.map(d => ({
@@ -378,14 +379,19 @@ export async function POST(request: NextRequest) {
       // global-catalog row visible to the tenant classified the row as
       // "existing" and the tenant-scoped update then silently did nothing.
       const existingKeys = new Set<string>()
+      // Hotels/cruises: the periods each existing row holds now (see below).
+      const storedPeriods = new Map<string, unknown>()
       if (keyValues.length > 0) {
         const { data: existing } = await dynTable()
-          .select(uniqueKey.join(', '))
+          .select([...uniqueKey, ...(periodsTarget ? ['seasons'] : [])].join(', '))
           .in(uniqueKeyColumn, keyValues)
           .eq('tenant_id', tenant_id)
         for (const row of existing ?? []) {
           const key = importRowKey(row, uniqueKey)
-          if (key !== null) existingKeys.add(key)
+          if (key !== null) {
+            existingKeys.add(key)
+            if (periodsTarget) storedPeriods.set(key, row.seasons)
+          }
         }
       }
 
@@ -403,6 +409,23 @@ export async function POST(request: NextRequest) {
         const updateData = { ...record }
         for (const col of uniqueKey) delete updateData[col]
         delete updateData.tenant_id
+        // This flat sheet is one row per property with room for ONE dated
+        // period (plus the old high/peak columns). Re-importing it onto a
+        // hotel that has five replaced the five with what the row could say
+        // — silently, four periods gone (operator, 2026-09-24). A row's
+        // periods are never shrunk from here: they stay as stored, and the
+        // price columns keep mirroring period 1. Periods change through the
+        // periods sheet (Export periods → edit → Import) or the rate form.
+        if (periodsTarget) {
+          const kept = keepStoredPeriods(updateData, storedPeriods.get(keyOf(record) ?? ''), periodsTarget.entity)
+          if (kept) {
+            periodsKept.push({
+              row: uniqueKey.map(c => `${c}=${String(record[c])}`).join(', '),
+              operation: 'periods kept',
+              message: `${String(record[uniqueKeyColumn])} kept its ${kept.kept} rate periods — this sheet holds only ${kept.incoming || 'no'} period${kept.incoming === 1 ? '' : 's'}. To change periods, use Export periods, edit, and import that file.`,
+            })
+          }
+        }
         let updateQuery = dynTable().update(updateData).eq('tenant_id', tenant_id)
         for (const col of uniqueKey) updateQuery = updateQuery.eq(col, record[col])
         const { error } = await updateQuery
@@ -414,7 +437,7 @@ export async function POST(request: NextRequest) {
     // A company name that matched nothing is REPORTED, not a failure: the rate
     // itself imported cleanly and the missing link is something to fix in
     // Suppliers, not a reason to tell the operator the import broke.
-    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, supplierNamesLinked, supplierNameGaps: supplierNameGaps.length, propertyLinksUnresolved, supplierCodeErrors: supplierCodeErrors.length, errors: [...importErrors, ...supplierNameGaps] })
+    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, supplierNamesLinked, supplierNameGaps: supplierNameGaps.length, propertyLinksUnresolved, supplierCodeErrors: supplierCodeErrors.length, periodsKept: periodsKept.length, errors: [...importErrors, ...supplierNameGaps, ...periodsKept] })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }

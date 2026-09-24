@@ -112,7 +112,9 @@ describe('the import uses it', () => {
   it('reports an unmatched name without calling the import a failure', () => {
     // The rate imported cleanly; a missing company is something to fix in
     // Suppliers, not a reason to tell the operator the import broke.
-    expect(ROUTE).toContain('errors: [...importErrors, ...supplierNameGaps]')
+    // Reported beside the errors (as are rows that kept their rate periods),
+    // but only importErrors decide success.
+    expect(ROUTE).toMatch(/errors: \[\.\.\.importErrors, \.\.\.supplierNameGaps[,\]]/)
     expect(ROUTE).toContain('success: importErrors.length === 0')
   })
 })

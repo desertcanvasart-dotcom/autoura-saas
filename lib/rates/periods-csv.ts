@@ -17,7 +17,7 @@
 // sheet without a city and tier would be an unpriceable ghost, so an
 // unknown code/name is a refusal naming the fix.
 
-import { MAX_RATE_PERIODS, type RateSeason, type RateSeasonEntity } from '@/lib/rates/rate-seasons'
+import { MAX_RATE_PERIODS, sanitizeSeasons, legacyColumnMirror, type RateSeason, type RateSeasonEntity } from '@/lib/rates/rate-seasons'
 
 const RATE_FIELD_HEADERS: Record<string, string> = {
   'pp double (eu passport)': 'ppd_eur',
@@ -104,6 +104,12 @@ export function parsePeriodsCsv(rows: Array<Record<string, string>>): PeriodsCsv
     }
     const from = rec.from || ''
     const to = rec.to || ''
+    // The export lists a property with no periods yet as one line with the
+    // dates and prices blank. Read back, that line says nothing: skip it —
+    // it must neither fail the file nor wipe anything.
+    const saysNothing = !from && !to && !rec.name && !rec.season &&
+      Object.keys(RATE_FIELD_HEADERS).every(h => !rec[RATE_FIELD_HEADERS[h]])
+    if (saysNothing) return
     if (!ISO_DATE.test(from) || !ISO_DATE.test(to)) {
       errors.push({ row: rowNum, column: 'from', message: `"${name || code}": From/To must be real dates (YYYY-MM-DD) — got "${from}" → "${to}"` })
       return
@@ -185,4 +191,134 @@ export const PERIODS_CSV_TABLES: Record<string, {
     nameColumn: 'ship_name',
     createHint: 'create the cruise first (Rates → Nile Cruises → Add), then re-import its periods',
   },
+}
+
+// ============================================
+// EXPORT — the same shape, written out (2026-09-24)
+// ============================================
+// Operator, 2026-09-24: "Hotels are exported and shows only one date period,
+// while actually each hotel has five periods." The flat export is one row
+// per property with fixed low/high/peak columns, so it carries period 1 and
+// nothing else; the periods sheet above could be IMPORTED but was never
+// offered for download. This writes it: one row per period, headers this
+// module's parser reads back, so export → import is lossless.
+//
+// Identity columns beyond the code and name (city, tier, board, cabin,
+// nights) are there for the person reading the sheet; the importer ignores
+// them — the rows find their property by Service Code / Cruise Code.
+
+interface PeriodsSheetSpec {
+  codeHeader: string
+  nameHeader: string
+  /** [header, row column] shown for the reader; ignored on import. */
+  context: Array<[string, string]>
+  guideHeader: string
+}
+
+const PERIODS_SHEET: Record<RateSeasonEntity, PeriodsSheetSpec> = {
+  accommodation: {
+    codeHeader: 'Service Code',
+    nameHeader: 'Property Name',
+    context: [['City', 'city'], ['Tier', 'tier'], ['Board', 'board_basis']],
+    guideHeader: 'Guide Bed / Night',
+  },
+  cruise: {
+    codeHeader: 'Cruise Code',
+    nameHeader: 'Ship Name',
+    context: [['Cabin Type', 'cabin_type'], ['Nights', 'duration_nights']],
+    guideHeader: 'Guide Cabin / Night',
+  },
+}
+
+const RATE_EXPORT_HEADERS: Array<[string, string]> = [
+  ['PP Double (EU passport)', 'ppd_eur'],
+  ['Single Supp (EU passport)', 'single_supplement_eur'],
+  ['Triple Red (EU passport)', 'triple_reduction_eur'],
+  ['PP Double (non-EU passport)', 'ppd_non_eur'],
+  ['Single Supp (non-EU passport)', 'single_supplement_non_eur'],
+  ['Triple Red (non-EU passport)', 'triple_reduction_non_eur'],
+]
+
+export function periodsSheetHeaders(entity: RateSeasonEntity): string[] {
+  const s = PERIODS_SHEET[entity]
+  return [
+    s.codeHeader, s.nameHeader, ...s.context.map(([h]) => h),
+    'Period Name', 'Season', 'From', 'To',
+    ...RATE_EXPORT_HEADERS.map(([h]) => h), s.guideHeader,
+  ]
+}
+
+/** The columns the periods sheet reads from a rate row — named, never `*`. */
+export function periodsSheetColumns(entity: RateSeasonEntity, codeColumn: string, nameColumn: string): string[] {
+  return [codeColumn, nameColumn, ...PERIODS_SHEET[entity].context.map(([, col]) => col), 'seasons']
+}
+
+/**
+ * One sheet row per stored period of every rate row. A row with no periods
+ * yet still gets ONE line, dates and prices blank, so the sheet lists every
+ * property and says plainly which ones have nothing to price from.
+ * `seasonLabel` turns a stored season key into the agency's own word.
+ */
+export function buildPeriodsSheetRows(
+  rows: Array<Record<string, unknown>>,
+  entity: RateSeasonEntity,
+  codeColumn: string,
+  nameColumn: string,
+  seasonLabel: (key: string) => string = k => k,
+): Array<Record<string, string | number>> {
+  const s = PERIODS_SHEET[entity]
+  const cell = (v: unknown) => (v == null ? '' : Array.isArray(v) ? v.join('/') : String(v))
+  const out: Array<Record<string, string | number>> = []
+  for (const row of rows) {
+    const identity: Record<string, string> = {
+      [s.codeHeader]: cell(row[codeColumn]),
+      [s.nameHeader]: cell(row[nameColumn]),
+    }
+    for (const [h, col] of s.context) identity[h] = cell(row[col])
+    const periods = Array.isArray(row.seasons) ? (row.seasons as RateSeason[]) : []
+    if (periods.length === 0) {
+      out.push({
+        ...identity, 'Period Name': '', Season: '', From: '', To: '',
+        ...Object.fromEntries(RATE_EXPORT_HEADERS.map(([h]) => [h, ''])), [s.guideHeader]: '',
+      })
+      continue
+    }
+    for (const p of periods) {
+      const rates = p.rates ?? {}
+      out.push({
+        ...identity,
+        'Period Name': p.name ?? '',
+        Season: p.season ? seasonLabel(p.season) : '',
+        From: p.from ?? '',
+        To: p.to ?? '',
+        ...Object.fromEntries(RATE_EXPORT_HEADERS.map(([h, f]) => [h, rates[f] ?? 0])),
+        [s.guideHeader]: rates.guide_rate_eur ?? 0,
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * The flat (one row per property) sheet updating an EXISTING hotel/cruise:
+ * it may never shrink the periods the row holds. When the row stores more
+ * periods than the sheet's row carries, the stored periods stay untouched
+ * (`seasons` leaves the update; the price columns mirror period 1) and the
+ * counts are returned so the import can say so. null = nothing to protect.
+ * (Operator, 2026-09-24: re-importing the export turned five periods into one.)
+ */
+export function keepStoredPeriods(
+  update: Record<string, unknown>,
+  storedRaw: unknown,
+  entity: RateSeasonEntity,
+): { kept: number; incoming: number } | null {
+  const storedCount = Array.isArray(storedRaw) ? storedRaw.length : 0
+  const incoming = Array.isArray(update.seasons) ? update.seasons.length : 0
+  if (storedCount <= incoming) return null
+  // Not written at all: the row keeps its periods exactly as stored, byte
+  // for byte. Only the price columns are set — from stored period 1 — so the
+  // sheet's one-period prices cannot sit beside periods that say otherwise.
+  delete update.seasons
+  Object.assign(update, legacyColumnMirror(sanitizeSeasons(storedRaw, entity), entity))
+  return { kept: storedCount, incoming }
 }
