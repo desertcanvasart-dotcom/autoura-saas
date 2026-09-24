@@ -104,10 +104,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 interface Props {
   briefId: string
   onClose: () => void
-  onStatusChange: (id: string, to: StatusKey) => Promise<void> | void
+  /** Resolves false when the change was refused — the drawer then keeps its status. */
+  onStatusChange: (id: string, to: StatusKey) => Promise<boolean | void> | boolean | void
+  /** Archived leads only; absent = the viewer may not delete. */
+  onDelete?: (id: string) => Promise<boolean> | boolean
 }
 
-export default function BriefDetailDrawer({ briefId, onClose, onStatusChange }: Props) {
+export default function BriefDetailDrawer({ briefId, onClose, onStatusChange, onDelete }: Props) {
   const [brief, setBrief] = useState<FullBrief | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
@@ -170,8 +173,8 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange }: 
   const handleStatus = async (to: StatusKey) => {
     setUpdating(true)
     try {
-      await onStatusChange(briefId, to)
-      setBrief(prev => (prev ? { ...prev, review_status: to } : prev))
+      const ok = await onStatusChange(briefId, to)
+      if (ok !== false) setBrief(prev => (prev ? { ...prev, review_status: to } : prev))
     } finally {
       setUpdating(false)
     }
@@ -339,6 +342,15 @@ export default function BriefDetailDrawer({ briefId, onClose, onStatusChange }: 
                     {a.label}
                   </button>
                 ))}
+                {brief.review_status === 'archived' && onDelete && (
+                  <button
+                    onClick={() => onDelete(briefId)}
+                    disabled={updating}
+                    className="px-3 py-1.5 text-sm font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    Delete permanently
+                  </button>
+                )}
               </div>
             </div>
           </div>
