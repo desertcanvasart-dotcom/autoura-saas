@@ -267,23 +267,14 @@ export async function POST(request: NextRequest) {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
-    // Get unread count
-    const unreadList = await gmail.users.messages.list({
-      userId: 'me',
-      q: 'in:inbox is:unread',
-      maxResults: 1,
-    })
-
-    // Get total inbox count (for pagination info)
-    const inboxList = await gmail.users.messages.list({
-      userId: 'me',
-      q: 'in:inbox',
-      maxResults: 1,
-    })
+    // The INBOX label's own counters: exact, and one cheap call. (The old
+    // `messages.list` resultSizeEstimate was a rough guess.) Counts every
+    // unread message in the inbox, the same set the Inbox page lists.
+    const inbox = await gmail.users.labels.get({ userId: 'me', id: 'INBOX' })
 
     return NextResponse.json({
-      unreadCount: unreadList.data.resultSizeEstimate || 0,
-      totalInbox: inboxList.data.resultSizeEstimate || 0,
+      unreadCount: inbox.data.messagesUnread || 0,
+      totalInbox: inbox.data.messagesTotal || 0,
     })
 
   } catch (error: any) {

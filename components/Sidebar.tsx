@@ -8,6 +8,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useRole, UserRole } from '@/hooks/useRole'
 import NotificationBell from '@/components/NotificationBell'
 import TenantSwitcher from '@/components/TenantSwitcher'
+import { useInboxUnreadCount } from '@/lib/use-inbox-unread'
 import {
   LayoutDashboard,
   Users,
@@ -325,9 +326,15 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname()
-  const { profile, signOut, isSuperAdmin } = useAuth()
+  const { user, profile, signOut, isSuperAdmin } = useAuth()
   const { tenant } = useTenant()
   const { role, canAccess } = useRole()
+  // Unread emails in the user's Gmail inbox, badged on the Inbox link. A new
+  // arrival also pops a toast — except on the Inbox page, which shows it itself.
+  const inboxUnread = useInboxUnreadCount(
+    canAccess(['admin', 'manager', 'member']) ? user?.id : null, // who sees the Inbox link
+    { notify: !pathname.startsWith('/inbox') },
+  )
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'sell', 'crm', 'trips'])
@@ -636,7 +643,8 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                       )
                     }
 
-                    // Regular items
+                    // Regular items. Only the Inbox carries a count badge.
+                    const badge = item.href === '/inbox' && inboxUnread ? inboxUnread : null
                     return (
                       <Link
                         key={item.href}
@@ -651,13 +659,22 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                           }
                           ${isCollapsed ? 'justify-center' : ''}
                         `}
-                        title={isCollapsed ? item.label : ''}
+                        title={isCollapsed ? (badge !== null ? `${item.label} (${badge} unread)` : item.label) : ''}
                       >
-                        <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary-600' : 'text-gray-500'}`} />
+                        <span className="relative flex-shrink-0">
+                          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary-600' : 'text-gray-500'}`} />
+                          {isCollapsed && badge !== null && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
+                          )}
+                        </span>
                         {!isCollapsed && (
                           <span className="text-[13px]">{item.label}</span>
                         )}
-                        {!isCollapsed && isActive && (
+                        {!isCollapsed && badge !== null ? (
+                          <span className="ml-auto min-w-[20px] px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none text-center">
+                            {badge > 99 ? '99+' : badge}
+                          </span>
+                        ) : !isCollapsed && isActive && (
                           <div className="ml-auto w-1 h-1 rounded-full bg-primary-600" />
                         )}
                       </Link>
