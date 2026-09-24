@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { showToast } from '@/app/contexts/ToastContext'
 
-// How many unread emails sit in the signed-in user's Gmail inbox — the number
-// the sidebar's Inbox link and the Inbox page header show.
+// How many unread emails sit in the Primary tab of the signed-in user's Gmail
+// inbox (Promotions, Social, Updates and Forums are left out) — the number the
+// sidebar's Inbox link and the Inbox page header show.
 //
-// Read from POST /api/gmail/poll (the INBOX label's own counter, one cheap
-// Gmail call). Checked every minute while the tab is visible, again the moment
-// the tab comes back into view, and on demand when the Inbox page reads,
-// marks or moves mail (requestInboxUnreadRefresh).
+// Read from POST /api/gmail/poll. Checked every minute while the tab is
+// visible, again the moment the tab comes back into view, and on demand when
+// the Inbox page reads, marks or moves mail (requestInboxUnreadRefresh).
 
 const REFRESH_EVENT = 'autoura:inbox-unread-refresh'
 const POLL_MS = 60_000

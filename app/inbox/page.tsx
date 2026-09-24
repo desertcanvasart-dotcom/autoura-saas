@@ -218,7 +218,7 @@ export default function InboxPage() {
   const supabase = createClient()
 
   // NEW: Email polling hook for real-time updates
-  // The live unread count (the sidebar badge reads the same number).
+  // Unread in the Primary tab (the sidebar badge reads the same number).
   const unreadCount = useInboxUnreadCount(user?.id) ?? 0
 
   const {
