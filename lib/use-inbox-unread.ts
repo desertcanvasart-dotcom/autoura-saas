@@ -18,6 +18,10 @@ import { showToast } from '@/app/contexts/ToastContext'
 const REFRESH_EVENT = 'autoura:badges-refresh'
 const POLL_MS = 60_000
 
+/** The bell re-reads on this: each Gmail check may have filed new-email
+ *  notifications (POST /api/gmail/poll). */
+export const NOTIFICATIONS_REFRESH_EVENT = 'autoura:notifications-refresh'
+
 /** Ask every mounted counter to re-read now (e.g. after marking mail read). */
 export function requestBadgeRefresh() {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(REFRESH_EVENT))
@@ -136,6 +140,7 @@ export function useInboxUnreadCount(
     const bad = outcome(res)
     if (bad) return bad
     const data = await res.json()
+    window.dispatchEvent(new Event(NOTIFICATIONS_REFRESH_EVENT))
     return { email: Number(data.unreadCount) || 0 }
   }, [userId])
   return useLiveCounts(EMAIL_KEYS, userId ? read : null, EMAIL_TOASTS, notify).email

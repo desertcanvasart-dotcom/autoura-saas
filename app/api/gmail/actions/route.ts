@@ -189,6 +189,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
+    // Mail you have read, archived or deleted is no longer news: its bell
+    // notification (gmail:<id>, see /api/gmail/poll) goes read too.
+    if (['markRead', 'archive', 'delete', 'permanentDelete', 'move'].includes(action)) {
+      const { error: notifError } = await createAdminClient()
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', user.id)
+        .eq('is_read', false)
+        .in('dedupe_key', ids.map((id: string) => `gmail:${id}`))
+      if (notifError) console.error('clearing new-email notifications failed:', notifError.message)
+    }
+
     return NextResponse.json({ success: true })
   } catch (err: any) {
     console.error('Email action error:', err)
