@@ -65,7 +65,14 @@ async function getHandler(request: NextRequest) {
     return NextResponse.json({ success: false, error: `Could not read who owns the mailboxes: ${memberError.message}` }, { status: 500 })
   }
   const { mailboxes, skipped } = planMailboxSweep(rows, (memberRows ?? []) as MembershipRow[])
-  const origin = new URL(request.url).origin
+  // Call this same server over loopback. request.url's origin is whatever
+  // the proxy handed Next — on Railway it did not connect back at all, and the
+  // first live run (2026-09-24) failed every mailbox with "fetch failed".
+  // PORT is the port this server listens on; outside such a host (tests,
+  // local dev without PORT) the request's own origin still works.
+  const origin = process.env.PORT
+    ? `http://127.0.0.1:${process.env.PORT}`
+    : new URL(request.url).origin
   const results: Array<{ user_id: string; ok: boolean; messages?: number; error?: string }> = []
 
   for (const box of mailboxes) {

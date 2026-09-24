@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 // New mail announced while Autoura is closed (operator, 2026-09-24): the
 // server checks every connected Gmail and rings its owner.
 let boxes: Array<Record<string, unknown>> = []
-const notifyNewEmails = vi.fn(async (_gmail: unknown, _userId: string) => {})
+const notifyNewEmails = vi.fn<(gmail: unknown, userId: string) => Promise<void>>(async () => {})
 
 vi.mock('@/lib/supabase-server', () => ({
   createAdminClient: () => ({

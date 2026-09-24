@@ -181,7 +181,16 @@ export function withJobRun<A extends unknown[]>(
           // Somebody probed the endpoint. Not a run.
           await db.from('job_runs').delete().eq('id', runId).then(undefined, () => {})
         } else {
-          await finishRun(db, runId, response.ok ? 'ok' : 'failed', response.ok ? null : `HTTP ${response.status}`)
+          // A 200 can still describe a bad run: the sweeps answer
+          // { success: false, ... } when some of their work failed. Read it —
+          // otherwise a run that synced 0 of 5 mailboxes is recorded as "ok"
+          // (it was, 2026-09-24). A body that isn't JSON counts by its status.
+          const bodyFailure = response.ok ? await reportedFailure(response) : null
+          await finishRun(
+            db, runId,
+            response.ok && !bodyFailure ? 'ok' : 'failed',
+            !response.ok ? `HTTP ${response.status}` : bodyFailure,
+          )
           await pruneOldRuns(db, name)
         }
       }
@@ -193,6 +202,21 @@ export function withJobRun<A extends unknown[]>(
       throw err
     }
   }
+}
+
+/** The failure a JSON body reports about its own run, or null. Never throws. */
+async function reportedFailure(response: Response): Promise<string | null> {
+  try {
+    const body = await response.clone().json()
+    if (body && typeof body === 'object' && body.success === false) {
+      return typeof body.error === 'string' && body.error
+        ? body.error
+        : `reported failure${typeof body.failed === 'number' ? ` (${body.failed} failed)` : ''}`
+    }
+  } catch {
+    // Not JSON: the status decides.
+  }
+  return null
 }
 
 function safeDb(getDb: () => DbClient): DbClient | null {
