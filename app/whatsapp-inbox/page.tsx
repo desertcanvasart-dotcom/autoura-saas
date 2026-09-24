@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import CopilotSuggestPanel from '@/components/CopilotSuggestPanel'
 import { showToast } from '@/app/contexts/ToastContext'
+import { requestBadgeRefresh } from '@/lib/use-inbox-unread'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // Supported languages for translation
@@ -676,10 +677,22 @@ export default function WhatsAppInboxPage() {
         body: JSON.stringify({ conversation_id: conversationId, action: 'mark_read' })
       })
       setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, unread_count: 0 } : c))
+      requestBadgeRefresh() // the sidebar's WhatsApp count drops now, not in a minute
     } catch (error) {
       console.error('Error marking as read:', error)
     }
   }
+
+  // A message that lands in the conversation you have open is read — you are
+  // looking at it (the list refreshes every 15s). Otherwise the sidebar would
+  // count it as unread until you clicked away and back.
+  const openUnread = conversations.find(c => c.id === selectedConversation?.id)?.unread_count ?? 0
+  useEffect(() => {
+    if (selectedConversation && openUnread > 0 && document.visibilityState === 'visible') {
+      markAsRead(selectedConversation.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConversation?.id, openUnread])
 
   // Delete conversation
   const handleDeleteConversation = async () => {
@@ -689,6 +702,7 @@ export default function WhatsAppInboxPage() {
       const res = await fetch(`/api/whatsapp/conversations?id=${conversationToDelete.id}`, { method: 'DELETE' })
       if (res.ok) {
         setConversations(prev => prev.filter(c => c.id !== conversationToDelete.id))
+        requestBadgeRefresh()
         if (selectedConversation?.id === conversationToDelete.id) {
           setSelectedConversation(null)
           setMessages([])

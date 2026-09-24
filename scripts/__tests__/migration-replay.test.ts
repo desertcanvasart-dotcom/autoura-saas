@@ -698,5 +698,33 @@ describe('migration replay from scratch', () => {
         'REVOKE them (see migration 361) or justify them in SAFE_FOR_BROWSER_ROLES:\n  ' +
         leaks.join('\n  ')
     ).toEqual([])
+
+    // Migration 383: a WhatsApp message keeps its conversation's counters —
+    // inbound raises unread, every message moves last_message_at forward and
+    // counts, and an older message arriving late never moves it back.
+    const tenant = (await db.query(
+      "SELECT id FROM tenants WHERE company_name = 'Replay Probe Co'"
+    )).rows[0] as { id: string }
+    const conv = (await db.query(
+      `INSERT INTO whatsapp_conversations (tenant_id, phone_number, status)
+       VALUES ($1, '+200000000383', 'active') RETURNING id`,
+      [tenant.id]
+    )).rows[0] as { id: string }
+    const msg = (direction: string, at: string) => db.query(
+      `INSERT INTO whatsapp_messages (tenant_id, conversation_id, direction, message_body, sent_at)
+       VALUES ($1, $2, $3, 'hi', $4)`,
+      [tenant.id, conv.id, direction, at]
+    )
+    await msg('inbound', '2026-09-24T10:00:00Z')
+    await msg('inbound', '2026-09-24T10:05:00Z')
+    await msg('outbound', '2026-09-24T10:06:00Z')
+    await msg('inbound', '2026-09-24T09:00:00Z') // late delivery of an older one
+    const counters = (await db.query(
+      'SELECT unread_count, message_count, last_message_at FROM whatsapp_conversations WHERE id = $1',
+      [conv.id]
+    )).rows[0] as { unread_count: number; message_count: number; last_message_at: Date }
+    expect(counters.unread_count).toBe(3)
+    expect(counters.message_count).toBe(4)
+    expect(new Date(counters.last_message_at).toISOString()).toBe('2026-09-24T10:06:00.000Z')
   }, 120_000)
 })

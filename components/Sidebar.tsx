@@ -8,6 +8,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useRole, UserRole } from '@/hooks/useRole'
 import NotificationBell from '@/components/NotificationBell'
 import TenantSwitcher from '@/components/TenantSwitcher'
+import { useInboxUnreadCount, useTeamBadges } from '@/lib/use-inbox-unread'
 import {
   LayoutDashboard,
   Users,
@@ -325,9 +326,29 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   const pathname = usePathname()
-  const { profile, signOut, isSuperAdmin } = useAuth()
+  const { user, profile, signOut, isSuperAdmin } = useAuth()
   const { tenant } = useTenant()
   const { role, canAccess } = useRole()
+  // Unread emails in the user's Gmail inbox, badged on the Inbox link. A new
+  // arrival also pops a toast — except on the Inbox page, which shows it itself.
+  const inboxUnread = useInboxUnreadCount(
+    canAccess(['admin', 'manager', 'member']) ? user?.id : null, // who sees the Inbox link
+    { notify: !pathname.startsWith('/inbox') },
+  )
+  // The team's unread WhatsApp messages and concierge leads awaiting review
+  // (both links sit in sections admin/manager/member see). No toast on the
+  // page that already shows the thing.
+  const team = useTeamBadges(canAccess(['admin', 'manager', 'member']), {
+    notify: {
+      whatsapp: !pathname.startsWith('/whatsapp-inbox'),
+      concierge: !pathname.startsWith('/concierge-briefs'),
+    },
+  })
+  const badgeFor: Record<string, number | null> = {
+    '/inbox': inboxUnread,
+    '/whatsapp-inbox': team.whatsapp,
+    '/concierge-briefs': team.concierge,
+  }
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'sell', 'crm', 'trips'])
@@ -542,6 +563,10 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                     <h3 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider group-hover:text-gray-600">
                       {section.title}
                     </h3>
+                    {/* A folded section still says something new is inside. */}
+                    {!isSectionExpanded && section.items.some(i => badgeFor[i.href]) && (
+                      <span className="ml-auto mr-1.5 w-2 h-2 rounded-full bg-red-500" title="Something new inside" />
+                    )}
                     <ChevronDown 
                       className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${
                         isSectionExpanded ? '' : '-rotate-90'
@@ -636,7 +661,8 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                       )
                     }
 
-                    // Regular items
+                    // Regular items. Inbox, WhatsApp and Concierge Leads carry a count.
+                    const badge = badgeFor[item.href] || null
                     return (
                       <Link
                         key={item.href}
@@ -651,13 +677,22 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
                           }
                           ${isCollapsed ? 'justify-center' : ''}
                         `}
-                        title={isCollapsed ? item.label : ''}
+                        title={isCollapsed ? (badge !== null ? `${item.label} (${badge} new)` : item.label) : ''}
                       >
-                        <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary-600' : 'text-gray-500'}`} />
+                        <span className="relative flex-shrink-0">
+                          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary-600' : 'text-gray-500'}`} />
+                          {isCollapsed && badge !== null && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white" />
+                          )}
+                        </span>
                         {!isCollapsed && (
                           <span className="text-[13px]">{item.label}</span>
                         )}
-                        {!isCollapsed && isActive && (
+                        {!isCollapsed && badge !== null ? (
+                          <span className="ml-auto min-w-[20px] px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none text-center">
+                            {badge > 99 ? '99+' : badge}
+                          </span>
+                        ) : !isCollapsed && isActive && (
                           <div className="ml-auto w-1 h-1 rounded-full bg-primary-600" />
                         )}
                       </Link>

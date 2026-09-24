@@ -50,7 +50,6 @@ export function useEmailPolling({
   const [historyId, setHistoryId] = useState<string | null>(null)
   const [isPolling, setIsPolling] = useState(false)
   const [lastPollTime, setLastPollTime] = useState<Date | null>(null)
-  const [unreadCount, setUnreadCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [newEmailCount, setNewEmailCount] = useState(0)
 
@@ -134,27 +133,6 @@ export function useEmailPolling({
     }
   }, [userId, historyId, onNewEmails, onDeletedEmails, onLabelChanges, onNeedRefresh])
 
-  // Fetch unread count
-  const fetchUnreadCount = useCallback(async () => {
-    if (!userId) return
-
-    try {
-      const response = await fetch('/api/gmail/poll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setUnreadCount(data.unreadCount || 0)
-      }
-    } catch (err) {
-      // Fail silently
-      console.warn('Error fetching unread count (non-critical):', err)
-    }
-  }, [userId])
-
   // Clear new email notification count
   const clearNewEmailCount = useCallback(() => {
     setNewEmailCount(0)
@@ -198,7 +176,6 @@ export function useEmailPolling({
   return {
     isPolling,
     lastPollTime,
-    unreadCount,
     newEmailCount,
     error,
     refresh,

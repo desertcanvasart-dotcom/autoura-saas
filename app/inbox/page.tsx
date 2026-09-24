@@ -9,6 +9,7 @@ import RichTextEditor from '@/components/email/RichTextEditor'
 import AttachmentList, { AttachmentIndicator } from '@/components/AttachmentList'
 import ClientLinkButton from '@/components/ClientLinkButton'
 import { useEmailPolling, useEmailCache } from '@/lib/use-email-polling'
+import { useInboxUnreadCount, requestInboxUnreadRefresh } from '@/lib/use-inbox-unread'
 import { replacePlaceholders, buildPlaceholderData, getPlaceholders } from '@/lib/template-placeholders'
 import { 
   Mail, 
@@ -217,9 +218,11 @@ export default function InboxPage() {
   const supabase = createClient()
 
   // NEW: Email polling hook for real-time updates
+  // Unread in the Primary tab (the sidebar badge reads the same number).
+  const unreadCount = useInboxUnreadCount(user?.id) ?? 0
+
   const {
     isPolling,
-    unreadCount,
     newEmailCount: polledNewCount,
     refresh: pollRefresh,
     clearNewEmailCount,
@@ -628,6 +631,7 @@ ${bodyText}`
       }
 
       await fetchEmails()
+      requestInboxUnreadRefresh()
       setSelectedEmail(null)
       setSelectedEmails(new Set())
       setShowMoveMenu(null)
@@ -636,6 +640,28 @@ ${bodyText}`
     } finally {
       setActionLoading(false)
     }
+  }
+
+  // Opening an unread email reads it, as in Gmail — otherwise the unread
+  // count only ever went down via the "Mark as read" button. Quiet on purpose:
+  // no list reload, no closing the email; a failure just leaves it unread.
+  const openEmail = (email: Email, isSentByMe: boolean) => {
+    setSelectedEmail(email)
+    if (!user || !email.isUnread || isSentByMe) return
+    const read = { ...email, isUnread: false }
+    setEmails(prev => prev.map(e => (e.id === email.id ? { ...e, isUnread: false } : e)))
+    setSelectedEmail(read)
+    fetch('/api/gmail/actions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, messageIds: [email.id], action: 'markRead' }),
+    })
+      .then(async res => {
+        if (!res.ok) return
+        if (isCacheReady) await updateCached(email.id, { isUnread: false })
+        requestInboxUnreadRefresh()
+      })
+      .catch(() => {})
   }
 
   const handleDelete = () => handleEmailAction('delete')
@@ -1134,7 +1160,7 @@ ${bodyText}`
                     return (
                       <div
                         key={email.id}
-                        onClick={() => setSelectedEmail(email)}
+                        onClick={() => openEmail(email, !!isSentByMe)}
                         className={`group px-3 py-2.5 border-b border-gray-100 cursor-pointer transition-colors ${
                           selectedEmail?.id === email.id
                             ? 'bg-primary-50'

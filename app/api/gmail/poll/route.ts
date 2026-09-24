@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/gmail/poll
-// Get unread count
+// Unread count of the Primary inbox (the sidebar badge)
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user first
@@ -267,23 +267,21 @@ export async function POST(request: NextRequest) {
 
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
-    // Get unread count
-    const unreadList = await gmail.users.messages.list({
+    // Unread mail in the Primary tab only — Promotions, Social, Updates and
+    // Forums don't count, so the badge means "someone wrote to you".
+    // Gmail tags Primary as CATEGORY_PERSONAL; labelIds filters are ANDed.
+    // Counted from the ids themselves (exact), not resultSizeEstimate (a
+    // guess). One page of 100 is enough: the badge shows 99+ beyond that.
+    const unread = await gmail.users.messages.list({
       userId: 'me',
-      q: 'in:inbox is:unread',
-      maxResults: 1,
+      labelIds: ['INBOX', 'CATEGORY_PERSONAL', 'UNREAD'],
+      maxResults: 100,
+      fields: 'messages/id,nextPageToken',
     })
-
-    // Get total inbox count (for pagination info)
-    const inboxList = await gmail.users.messages.list({
-      userId: 'me',
-      q: 'in:inbox',
-      maxResults: 1,
-    })
+    const onPage = unread.data.messages?.length || 0
 
     return NextResponse.json({
-      unreadCount: unreadList.data.resultSizeEstimate || 0,
-      totalInbox: inboxList.data.resultSizeEstimate || 0,
+      unreadCount: unread.data.nextPageToken ? Math.max(onPage, 100) : onPage,
     })
 
   } catch (error: any) {
