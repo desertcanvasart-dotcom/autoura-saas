@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { withJobRun } from '@/lib/support/job-runs'
 import { planMailboxSweep, lookBackDays, type MailboxRow, type MembershipRow } from '@/lib/email/scheduled-sync'
+import { POST as syncMailbox } from '@/app/api/email/sync/route'
 
 // ============================================
 // Mail arrives on its own
@@ -11,10 +12,10 @@ import { planMailboxSweep, lookBackDays, type MailboxRow, type MembershipRow } f
 // morning, and the reply-status work is worth nothing if the messages that
 // start the clock only appear when someone goes looking.
 //
-// Every connected mailbox, every ten minutes. Each one is synced through the
-// existing sync route with the server-to-server secret, so there is ONE sync
-// implementation rather than a scheduled copy that can drift from the one
-// people use by hand.
+// Every connected mailbox, every ten minutes. Each one is synced by the
+// existing sync route's own handler with the server-to-server secret, so
+// there is ONE sync implementation rather than a scheduled copy that can
+// drift from the one people use by hand.
 
 const CRON_SECRET = process.env.CRON_SECRET
 
@@ -65,26 +66,25 @@ async function getHandler(request: NextRequest) {
     return NextResponse.json({ success: false, error: `Could not read who owns the mailboxes: ${memberError.message}` }, { status: 500 })
   }
   const { mailboxes, skipped } = planMailboxSweep(rows, (memberRows ?? []) as MembershipRow[])
-  // Call this same server over loopback. request.url's origin is whatever
-  // the proxy handed Next — on Railway it did not connect back at all, and the
-  // first live run (2026-09-24) failed every mailbox with "fetch failed".
-  // PORT is the port this server listens on; outside such a host (tests,
-  // local dev without PORT) the request's own origin still works.
-  const origin = process.env.PORT
-    ? `http://127.0.0.1:${process.env.PORT}`
-    : new URL(request.url).origin
   const results: Array<{ user_id: string; ok: boolean; messages?: number; error?: string }> = []
 
   for (const box of mailboxes) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), PER_MAILBOX_TIMEOUT_MS)
     try {
-      const res = await fetch(`${origin}/api/email/sync`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
-        body: JSON.stringify({ user_id: box.user_id, full_sync: false, max_results: 50, days_back: await daysToLookBack(admin, box.tenant_id) }),
-        signal: controller.signal,
-      })
+      // The sync route's own handler, called in-process with the server
+      // secret: still ONE sync implementation, and no HTTP hop. The hop
+      // failed twice on the first live runs (2026-09-24): the proxy's origin
+      // did not connect back, and over loopback the session gate in
+      // middleware.ts refused the call before the route's secret check ran.
+      const res = await Promise.race([
+        syncMailbox(new NextRequest('http://internal/api/email/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
+          body: JSON.stringify({ user_id: box.user_id, full_sync: false, max_results: 50, days_back: await daysToLookBack(admin, box.tenant_id) }),
+        })),
+        new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error(`timed out after ${PER_MAILBOX_TIMEOUT_MS / 1000}s`)))),
+      ])
       const body = await res.json().catch(() => ({}))
       results.push(
         res.ok && body.success
