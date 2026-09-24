@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Bell, Check, X, ExternalLink, Loader2, Trash2 } from 'lucide-react'
 import { NOTIFICATIONS_REFRESH_EVENT } from '@/lib/use-inbox-unread'
+import PushToggle from '@/components/PushToggle'
 
 interface Notification {
   id: string
@@ -337,7 +338,11 @@ export default function NotificationBell() {
           </div>
 
           {/* Footer */}
-          <div className="px-4 py-2 border-t border-gray-100 bg-gray-50">
+          <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 space-y-1.5">
+            {/* Alerts on this phone/computer, even with Autoura closed. */}
+            <div className="pt-1">
+              <PushToggle variant="light" />
+            </div>
             <Link
               href="/notifications"
               onClick={() => setIsOpen(false)}

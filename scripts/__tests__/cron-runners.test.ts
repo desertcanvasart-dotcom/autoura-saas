@@ -392,3 +392,42 @@ describe('cron-gmail-sync', { timeout: 30_000 }, () => {
     expect(noSecret.stderr).toContain('CRON_SECRET')
   })
 })
+
+// ============================================================================
+// cron-mail-alerts — new mail rings phones while Autoura is closed
+// (operator, 2026-09-24). Same exit-code rule as gmail-sync.
+// ============================================================================
+
+const MAIL_ALERTS = path.join(ROOT, 'scripts/cron-mail-alerts.mjs')
+
+describe('cron-mail-alerts', { timeout: 30_000 }, () => {
+  it('exits 0 on a clean run, and asks with a Bearer secret', async () => {
+    const stub = await stubByPath({
+      '/api/cron/mail-alerts': { body: JSON.stringify({ success: true, mailboxes: 4, checked: 4, failed: 0, results: [] }) },
+    })
+    const res = await run(MAIL_ALERTS, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
+    expect(res.code).toBe(0)
+    expect(res.stdout).toContain('4/4 mailboxes checked')
+    expect(stub.auth[0]).toBe('Bearer s3cret')
+  })
+
+  it('exits 1 when ANY mailbox failed, and names it', async () => {
+    const stub = await stubByPath({
+      '/api/cron/mail-alerts': {
+        body: JSON.stringify({
+          success: false, mailboxes: 2, checked: 1, failed: 1,
+          results: [{ email: 'a@x.com', ok: true }, { email: 'b@x.com', ok: false, error: 'invalid_grant' }],
+        }),
+      },
+    })
+    const res = await run(MAIL_ALERTS, { CRON_TARGET_URL: stub.url, CRON_SECRET: 's3cret' })
+    expect(res.code).toBe(1)
+    expect(res.stderr).toContain('b@x.com')
+    expect(res.stderr).toContain('invalid_grant')
+  })
+
+  it('refuses to run without a target or a secret', async () => {
+    expect((await run(MAIL_ALERTS, { CRON_SECRET: 's3cret' })).code).toBe(1)
+    expect((await run(MAIL_ALERTS, { CRON_TARGET_URL: 'http://127.0.0.1:1' })).code).toBe(1)
+  })
+})

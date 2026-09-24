@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, ChevronDown, ChevronUp, MessageCircle, Radio } from 'lucide-react'
 import TripTimeline from '@/app/components/TripTimeline'
 import TravellerChat from '@/app/components/TravellerChat'
-import PushToggle from './PushToggle'
+import PushToggle from '@/components/PushToggle'
 
 // ============================================
 // /ops — the phone-first ops board (PWA start_url)

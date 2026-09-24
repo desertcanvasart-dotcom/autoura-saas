@@ -12,6 +12,7 @@
     "cron:agent-memory": "node scripts/cron-agent-memory.mjs",
     "cron:exchange-rates": "node scripts/cron-exchange-rates.mjs",
     "cron:gmail-sync": "node scripts/cron-gmail-sync.mjs",
+    "cron:mail-alerts": "node scripts/cron-mail-alerts.mjs",
     "cron:reminders": "node scripts/cron-reminders.mjs",
     "lint": "eslint",
     "test": "vitest run",
