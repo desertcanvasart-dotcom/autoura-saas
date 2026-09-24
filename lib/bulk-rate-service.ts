@@ -1,6 +1,7 @@
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
 import { seasonsFromAccommodationColumns, seasonsFromCruiseColumns, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
 import { cruiseNightsStated } from '@/lib/rates/cruise-ppd'
+import { formatSailingDaysCell, parseSailingDaysCell } from '@/lib/rates/cruise-sailing'
 /**
  * Bulk Rate Import/Export Service
  * Provides CSV import/export for all rate tables with validation and upsert.
@@ -406,6 +407,11 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       // and older files without the column still import exactly as before.
       // The agency's own words (Settings → Cruise cabin types).
       col('cabin_type', 'Cabin Type', 'text', false),
+      // The weekdays the sailing departs on (migration 382), written
+      // "mon;fri" — "any" = no fixed day, blank = leave as stored
+      // (lib/rates/cruise-sailing.ts). The form had them; the sheet did not,
+      // so 132 cruises could only be filled in one form at a time.
+      col('sailing_days', 'Sailing Days', 'text', false),
       // Low season
       col('low_season_start', 'Low Season Start', 'date', false),
       col('low_season_end', 'Low Season End', 'date', false),
@@ -686,6 +692,17 @@ export function validateImportData(
         errors.push({ row: rowNum, column: colDef.name, message: error })
         rowValid = false
       } else if (parsed !== null) {
+        // Sailing days: weekday words only ("mon;fri", "any").
+        if (colDef.name === 'sailing_days') {
+          const { days, bad } = parseSailingDaysCell(parsed)
+          if (bad.length > 0) {
+            errors.push({ row: rowNum, column: colDef.name, message: `"${bad.join('", "')}" is not a day — write the sailing days like mon;fri, or "any" for no fixed day` })
+            rowValid = false
+          } else if (days) {
+            parsedRow[colDef.name] = days
+          }
+          continue
+        }
         // Per-rate currency: only the supported set; blank = EUR default.
         if (colDef.name === 'rate_currency' && !(SUPPORTED_CURRENCIES as readonly string[]).includes(String(parsed).toUpperCase())) {
           errors.push({ row: rowNum, column: colDef.name, message: `Unsupported currency "${parsed}" — use one of ${SUPPORTED_CURRENCIES.join(', ')} (blank = default)` })
@@ -846,6 +863,7 @@ export function applyCanonicalAliases(table: string, record: Record<string, unkn
 
 /** Export cell: the named column, else its alias partner. */
 export function exportCellValue(table: string, row: Record<string, unknown>, column: string): unknown {
+  if (column === 'sailing_days') return formatSailingDaysCell(row.sailing_days)
   const direct = row[column]
   if (direct !== null && direct !== undefined && direct !== 0) return direct
   if (table === 'nile_cruises') {
@@ -999,6 +1017,7 @@ function exampleValue(colDef: ColumnDef, config: RateTableConfig): string {
   if (name === 'property_type') return 'hotel'
   if (name === 'board_basis') return 'bb'
   if (name === 'tier') return 'standard'
+  if (name === 'sailing_days') return 'mon;fri'
   if (name === 'vehicle_type') return 'sedan'
   if (/(property|ship|hotel|supplier|contact|attraction|activity|guide|route|template)_?name/.test(name)) {
     return 'Example Name'

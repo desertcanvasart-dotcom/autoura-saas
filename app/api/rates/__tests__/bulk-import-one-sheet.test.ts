@@ -47,8 +47,8 @@ const HEAD = 'service_code,property_name,city,period_name,period_season,period_f
 const line = (code: string, name: string, period: string, season: string, from: string, to: string, ppd: number) =>
   `${code},${name},Aswan,${period},${season},${from},${to},${ppd},${ppd - 20},2,${ppd - 10},${ppd - 25},2,60`
 
-async function importCsv(csv: string, dryRun = false) {
-  const req = { json: async () => ({ table: 'accommodation_rates', csvData: csv, dryRun }) }
+async function importCsv(csv: string, dryRun = false, table = 'accommodation_rates') {
+  const req = { json: async () => ({ table, csvData: csv, dryRun }) }
   return (await POST(req as never)).json()
 }
 
@@ -117,5 +117,26 @@ describe('importing the one hotel sheet', () => {
       line('ACC-B', 'B', 'P1', '', '2026-05-01', '2026-09-30', 70),
     ].join('\n'), true)
     expect(res).toMatchObject({ success: true, dryRun: true, totalRows: 2, validRows: 2 })
+  })
+})
+
+describe('importing the one cruise sheet with sailing days', () => {
+  const CHEAD = 'cruise_code,ship_name,ship_category,route_name,embark_city,disembark_city,duration_nights,sailing_days,period_name,period_from,period_to,period_pp_double_eur'
+  it('stores the days as keys on a new cruise, with its periods', async () => {
+    const res = await importCsv([CHEAD,
+      'NC-1,MS Nile,deluxe,Luxor-Aswan,Luxor,Aswan,4,Mon;Fri,Winter,2026-10-01,2027-04-30,110',
+    ].join('\n'), false, 'nile_cruises')
+    expect(res.inserted).toBe(1)
+    expect(inserted[0].sailing_days).toEqual(['mon', 'fri'])
+    expect((inserted[0].seasons as unknown[]).length).toBe(1)
+  })
+
+  it('a blank cell leaves an existing cruise\'s days alone; "any" clears them', async () => {
+    existing = [{ cruise_code: 'NC-1', seasons: [] }]
+    await importCsv([CHEAD, 'NC-1,MS Nile,deluxe,Luxor-Aswan,Luxor,Aswan,4,,,,,'].join('\n'), false, 'nile_cruises')
+    expect(updated[0].data).not.toHaveProperty('sailing_days')
+    updated = []
+    await importCsv([CHEAD, 'NC-1,MS Nile,deluxe,Luxor-Aswan,Luxor,Aswan,4,any,,,,'].join('\n'), false, 'nile_cruises')
+    expect(updated[0].data.sailing_days).toEqual([])
   })
 })
