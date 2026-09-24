@@ -28,7 +28,7 @@ beforeAll(async () => {
       amount numeric, currency text, payment_type text, payment_method text, payment_date date, status text,
       transaction_reference text, notes text, created_by uuid);`)
   await db.exec(fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/388_booking_status_follows_money.sql'), 'utf8'))
-})
+}, 60_000) // booting PGlite under a full parallel run can exceed the 10 s default
 
 async function booking(total: number, deposit: number | null, status = 'pending_deposit') {
   const r = await db.query<{ id: string }>(

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 
+const SUPPLIER_STATUSES = ['pending', 'contacted', 'confirmed', 'no_response', 'cancelled']
+
 // GET - List suppliers for a booking
 export async function GET(
   request: NextRequest,
@@ -49,7 +51,15 @@ export async function POST(
     // Update existing supplier
     if (body.id) {
       const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
-      if (body.status !== undefined) updates.status = body.status
+      if (body.status !== undefined) {
+        if (!SUPPLIER_STATUSES.includes(body.status)) {
+          return NextResponse.json({ success: false, error: `status must be one of: ${SUPPLIER_STATUSES.join(', ')}` }, { status: 400 })
+        }
+        updates.status = body.status
+        // Leaving 'confirmed' clears the stamp; the booking's own status is
+        // the operator's call (checked against these rows when it moves on).
+        if (body.status !== 'confirmed') updates.confirmed_at = null
+      }
       if (body.confirmation_number !== undefined) updates.confirmation_number = body.confirmation_number
       if (body.confirmation_notes !== undefined) updates.confirmation_notes = body.confirmation_notes
       if (body.confirmed_cost !== undefined) updates.confirmed_cost = body.confirmed_cost
@@ -66,9 +76,6 @@ export async function POST(
         .single()
 
       if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-
-      // Check if all suppliers confirmed → update booking status
-      await checkAndUpdateBookingStatus(supabase, id)
 
       return NextResponse.json({ success: true, data })
     }
@@ -102,30 +109,5 @@ export async function POST(
   } catch (error) {
     console.error('Suppliers POST error:', error)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-async function checkAndUpdateBookingStatus(supabase: any, bookingId: string) {
-  const { data: suppliers } = await supabase
-    .from('booking_supplier_status')
-    .select('status')
-    .eq('booking_id', bookingId)
-
-  if (!suppliers || suppliers.length === 0) return
-
-  const allConfirmed = suppliers.every((s: any) => s.status === 'confirmed')
-  if (allConfirmed) {
-    const { data: booking } = await supabase
-      .from('bookings')
-      .select('status')
-      .eq('id', bookingId)
-      .single()
-
-    if (booking && booking.status === 'pending') {
-      await supabase
-        .from('bookings')
-        .update({ status: 'supplier_confirmed', updated_at: new Date().toISOString() })
-        .eq('id', bookingId)
-    }
   }
 }

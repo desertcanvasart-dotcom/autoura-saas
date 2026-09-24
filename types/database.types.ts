@@ -2080,6 +2080,7 @@ export interface Database {
           total_paid: number
           balance_due: number
           status: string
+          status_override: Json | null
           confirmation_date: string | null
           payment_deadline: string | null
           full_payment_date: string | null
@@ -2122,6 +2123,7 @@ export interface Database {
           total_paid?: number
           balance_due: number
           status?: string
+          status_override?: Json | null
           confirmation_date?: string | null
           payment_deadline?: string | null
           full_payment_date?: string | null
@@ -2164,6 +2166,7 @@ export interface Database {
           total_paid?: number
           balance_due?: number
           status?: string
+          status_override?: Json | null
           confirmation_date?: string | null
           payment_deadline?: string | null
           full_payment_date?: string | null

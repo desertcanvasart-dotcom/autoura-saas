@@ -4,6 +4,7 @@ import { b2bNumTravelers, b2bTotalAmount, b2cNumTravelers, b2cTotalAmount, calcu
 import { resolveDepositRule } from '@/lib/bookings/deposit-rule'
 import type { Tables, TablesInsert } from '@/types/database.types'
 import { quoteCompleteness, allowsIncomplete, describeGaps } from '@/lib/pricing/quote-completeness'
+import { syncBookingSuppliers } from '@/lib/bookings/booking-suppliers'
 
 export async function POST(request: NextRequest) {
   try {
@@ -409,6 +410,13 @@ export async function POST(request: NextRequest) {
     }
 
 
+
+    // Its suppliers, listed from the itinerary straight away (best effort —
+    // the booking stands either way; the Suppliers tab can re-sync).
+    if (itinerary_id && booking?.id) {
+      const synced = await syncBookingSuppliers(adminClient, tenant_id, String(booking.id))
+      if (!synced.ok) console.error('from-quote supplier sync failed:', synced.error)
+    }
 
     return NextResponse.json({
       success: true,
