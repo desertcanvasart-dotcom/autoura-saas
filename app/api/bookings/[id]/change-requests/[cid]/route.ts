@@ -41,7 +41,11 @@ export async function POST(
     const [{ data: booking }, { data: cr }] = await Promise.all([
       supabase
         .from('bookings')
-        .select('id, num_travelers, total_amount, deposit_percent, balance_due')
+        // base_total_cost (the price WITHOUT extras) must be read: it was
+        // missing, so oldBaseTotal was always undefined and approving extra
+        // travellers divided a total that included the extras — charging
+        // every new traveller a share of them.
+        .select('id, num_travelers, total_amount, base_total_cost, deposit_percent, balance_due')
         .eq('id', id)
         .maybeSingle(),
       supabase
@@ -76,7 +80,7 @@ export async function POST(
       oldTotal: booking.total_amount,
       // The agreed trip price WITHOUT extras (migration 321). Undefined on a
       // booking that has never had one — the same arithmetic as before.
-      oldBaseTotal: (booking as Record<string, unknown>).base_total_cost as number | null | undefined,
+      oldBaseTotal: booking.base_total_cost,
       oldPax,
       addedPax: cr.requested_count,
       depositPercent: booking.deposit_percent,
