@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
-import { createNotification, resolveTeamMemberIdForUser } from '@/lib/notifications'
+import { createNotification, myNotificationsFilter } from '@/lib/notifications'
 
-// GET - Fetch notifications for the authenticated user's team_member record.
+// GET - Fetch notifications for the authenticated user: addressed to their
+// login, or to their team_member record.
 // Scoped server-side to the caller; a client-supplied id is never trusted.
 export async function GET(request: NextRequest) {
   try {
@@ -15,16 +16,7 @@ export async function GET(request: NextRequest) {
     const unreadOnly = searchParams.get('unreadOnly') === 'true'
     const limit = parseInt(searchParams.get('limit') || '20')
 
-    const teamMemberId = await resolveTeamMemberIdForUser(
-      auth.supabase!,
-      auth.tenant_id!,
-      auth.user!.email
-    )
-
-    // No staff record for this user → nothing addressed to them.
-    if (!teamMemberId) {
-      return NextResponse.json({ success: true, data: [], unreadCount: 0 })
-    }
+    const mine = await myNotificationsFilter(auth.supabase!, auth.tenant_id!, auth.user!)
 
     const admin = createAdminClient() as any
 
@@ -34,7 +26,7 @@ export async function GET(request: NextRequest) {
         *,
         team_member:team_members(id, name, email)
       `)
-      .eq('team_member_id', teamMemberId)
+      .or(mine)
       .order('created_at', { ascending: false })
       .limit(limit)
 
@@ -55,7 +47,7 @@ export async function GET(request: NextRequest) {
     const { count: unreadCount } = await admin
       .from('notifications')
       .select('id', { count: 'exact', head: true })
-      .eq('team_member_id', teamMemberId)
+      .or(mine)
       .eq('is_read', false)
 
     return NextResponse.json({

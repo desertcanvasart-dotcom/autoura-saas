@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Bell, Check, X, ExternalLink, Loader2, Trash2 } from 'lucide-react'
+import { NOTIFICATIONS_REFRESH_EVENT } from '@/lib/use-inbox-unread'
 
 interface Notification {
   id: string
@@ -46,9 +47,14 @@ export default function NotificationBell() {
   useEffect(() => {
     fetchNotifications()
     
-    // Poll every 30 seconds for new notifications
+    // Poll every 30 seconds for new notifications, and straight after the
+    // sidebar's Gmail check (which is what files new-email notifications).
     const interval = setInterval(fetchNotifications, 30000)
-    return () => clearInterval(interval)
+    window.addEventListener(NOTIFICATIONS_REFRESH_EVENT, fetchNotifications)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener(NOTIFICATIONS_REFRESH_EVENT, fetchNotifications)
+    }
   }, [])
 
   useEffect(() => {
@@ -169,6 +175,7 @@ export default function NotificationBell() {
   // Get icon based on notification type
   const getIcon = (type: string) => {
     switch (type) {
+      case 'new_email': return '✉️'
       case 'task_assigned': return '📋'
       case 'task_due_soon': return '⏰'
       case 'task_overdue': return '🚨'

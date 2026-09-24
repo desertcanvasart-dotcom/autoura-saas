@@ -6905,7 +6905,7 @@ export interface Database {
       notifications: {
         Row: {
           id: string
-          team_member_id: string
+          team_member_id: string | null
           type: string
           title: string
           message: string | null
@@ -6914,10 +6914,12 @@ export interface Database {
           is_read: boolean
           email_sent: boolean
           created_at: string
+          user_id: string | null
+          dedupe_key: string | null
         }
         Insert: {
           id?: string
-          team_member_id: string
+          team_member_id?: string | null
           type: string
           title: string
           message?: string | null
@@ -6926,10 +6928,12 @@ export interface Database {
           is_read?: boolean
           email_sent?: boolean
           created_at?: string
+          user_id?: string | null
+          dedupe_key?: string | null
         }
         Update: {
           id?: string
-          team_member_id?: string
+          team_member_id?: string | null
           type?: string
           title?: string
           message?: string | null
@@ -6938,6 +6942,8 @@ export interface Database {
           is_read?: boolean
           email_sent?: boolean
           created_at?: string
+          user_id?: string | null
+          dedupe_key?: string | null
         }
         Relationships: [
           {

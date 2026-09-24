@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
-import { resolveTeamMemberIdForUser } from '@/lib/notifications'
+import { myNotificationsFilter } from '@/lib/notifications'
 
 // PUT - Mark a notification as read (only the caller's own notifications)
 export async function PUT(
@@ -13,14 +13,7 @@ export async function PUT(
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 
-    const teamMemberId = await resolveTeamMemberIdForUser(
-      auth.supabase!,
-      auth.tenant_id!,
-      auth.user!.email
-    )
-    if (!teamMemberId) {
-      return NextResponse.json({ success: false, error: 'Notification not found' }, { status: 404 })
-    }
+    const mine = await myNotificationsFilter(auth.supabase!, auth.tenant_id!, auth.user!)
 
     const { id } = await params
     const body = await request.json()
@@ -30,7 +23,7 @@ export async function PUT(
       .from('notifications')
       .update({ is_read })
       .eq('id', id)
-      .eq('team_member_id', teamMemberId)
+      .or(mine)
       .select()
       .single()
 
@@ -57,14 +50,7 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: auth.error }, { status: auth.status })
     }
 
-    const teamMemberId = await resolveTeamMemberIdForUser(
-      auth.supabase!,
-      auth.tenant_id!,
-      auth.user!.email
-    )
-    if (!teamMemberId) {
-      return NextResponse.json({ success: false, error: 'Notification not found' }, { status: 404 })
-    }
+    const mine = await myNotificationsFilter(auth.supabase!, auth.tenant_id!, auth.user!)
 
     const { id } = await params
 
@@ -72,7 +58,7 @@ export async function DELETE(
       .from('notifications')
       .delete()
       .eq('id', id)
-      .eq('team_member_id', teamMemberId)
+      .or(mine)
 
     if (error) throw error
 

@@ -726,5 +726,27 @@ describe('migration replay from scratch', () => {
     expect(counters.unread_count).toBe(3)
     expect(counters.message_count).toBe(4)
     expect(new Date(counters.last_message_at).toISOString()).toBe('2026-09-24T10:06:00.000Z')
+
+    // Migration 384: a notification can go to a login, once per dedupe_key —
+    // the second of two racing inserts (two tabs) is ignored, not doubled —
+    // and a row must name SOMEONE.
+    const login = (await db.query(
+      "INSERT INTO auth.users (email) VALUES ('probe-384@example.com') RETURNING id"
+    )).rows[0] as { id: string }
+    const fileOnce = () => db.query(
+      `INSERT INTO notifications (user_id, dedupe_key, type, title)
+       VALUES ($1, 'gmail:abc', 'new_email', 'New email from Probe')
+       ON CONFLICT (user_id, dedupe_key) DO NOTHING`,
+      [login.id]
+    )
+    await fileOnce()
+    await fileOnce()
+    const filed = (await db.query(
+      'SELECT count(*)::int AS n FROM notifications WHERE user_id = $1', [login.id]
+    )).rows[0] as { n: number }
+    expect(filed.n).toBe(1)
+    await expect(
+      db.query("INSERT INTO notifications (type, title) VALUES ('x', 'nobody')")
+    ).rejects.toThrow(/notifications_has_recipient/)
   }, 120_000)
 })

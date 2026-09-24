@@ -51,6 +51,53 @@ export async function resolveTeamMemberIdForUser(
 }
 
 /**
+ * The PostgREST `or` filter for "notifications addressed to me": rows for the
+ * login itself (user_id, migration 384) and rows for its staff record, if it
+ * has one. Both ids come from the server-side session — never from the client.
+ */
+export async function myNotificationsFilter(
+  supabase: SupabaseClient,
+  tenantId: string,
+  user: { id: string; email?: string | null }
+): Promise<string> {
+  const teamMemberId = await resolveTeamMemberIdForUser(supabase, tenantId, user.email)
+  return teamMemberId
+    ? `user_id.eq.${user.id},team_member_id.eq.${teamMemberId}`
+    : `user_id.eq.${user.id}`
+}
+
+/**
+ * Notify a LOGIN once per thing (e.g. one new email). `dedupe_key` is unique
+ * per user (migration 384), so a second insert of the same key — another tab
+ * polling at the same moment — is silently ignored. In-app only; no email.
+ */
+export async function notifyUserOnce(input: {
+  user_id: string
+  dedupe_key: string
+  type: string
+  title: string
+  message: string
+  link?: string | null
+}) {
+  const { error } = await createAdminClient()
+    .from('notifications')
+    .upsert(
+      {
+        user_id: input.user_id,
+        dedupe_key: input.dedupe_key,
+        type: input.type,
+        title: input.title,
+        message: input.message,
+        link: input.link ?? null,
+        is_read: false,
+        email_sent: false,
+      },
+      { onConflict: 'user_id,dedupe_key', ignoreDuplicates: true }
+    )
+  if (error) throw error
+}
+
+/**
  * Insert a notification (admin client) and optionally email the recipient.
  * The caller MUST have already validated that `team_member_id` is legitimate
  * for the current tenant.
