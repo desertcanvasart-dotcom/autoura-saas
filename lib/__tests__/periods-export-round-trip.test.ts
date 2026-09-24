@@ -1,11 +1,17 @@
 // Operator, 2026-09-24: "Hotels are exported and shows only one date period,
-// while actually each hotel has five periods." The periods now export as
-// their own sheet, and re-importing the one-row-per-hotel sheet can no longer
-// turn five periods into one.
+// while actually each hotel has five periods." Hotels and cruises now export
+// ONE sheet — a row per period, the property's details on each — which
+// Import reads back. And an older one-row-per-hotel file can no longer turn
+// five periods into one.
 import { describe, it, expect } from 'vitest'
 import Papa from 'papaparse'
-import { buildPeriodsSheetRows, periodsSheetHeaders, parsePeriodsCsv, detectPeriodsCsv, keepStoredPeriods } from '@/lib/rates/periods-csv'
+import { RATE_TABLE_CONFIGS, exportCellValue } from '@/lib/bulk-rate-service'
+import { buildOneSheetRows, oneSheetHeaders, parseOneSheet, detectOneSheet, detailColumns, oneSheetTemplateRows } from '@/lib/rates/rate-sheet'
+import { keepStoredPeriods } from '@/lib/rates/periods-csv'
 import { sanitizeSeasons, seasonKey } from '@/lib/rates/rate-seasons'
+
+const HOTELS = RATE_TABLE_CONFIGS.accommodation_rates
+const CRUISES = RATE_TABLE_CONFIGS.nile_cruises
 
 // Basma Aswan as stored live on 2026-09-24: five periods.
 const rates = (ppd: number, single: number, ppdNon: number, singleNon: number) => ({
@@ -21,73 +27,105 @@ const BASMA = [
 ]
 const LABELS: Record<string, string> = { low_season: 'Low Season', high_season: 'High Season', christmas: 'Christmas', peak_season: 'Peak Season' }
 
-const hotel = { service_code: 'ACC-ASW-WOV', property_name: 'Basma Aswan', city: 'Aswan', tier: 'standard', board_basis: 'bb', seasons: BASMA }
-
-/** Export → CSV text → parse, as a browser round trip would. */
-function roundTrip(rows: Array<Record<string, unknown>>) {
-  const fields = periodsSheetHeaders('accommodation')
-  const built = buildPeriodsSheetRows(rows, 'accommodation', 'service_code', 'property_name', k => LABELS[k] ?? k)
-  const csv = Papa.unparse({ fields, data: built.map(r => fields.map(h => r[h] ?? '')) })
-  const parsed = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true })
-  return { csv, built, parsed, sheet: parsePeriodsCsv(parsed.data) }
+const basma = {
+  id: '47dee0db', service_code: 'ACC-ASW-WOV', property_name: 'Basma Aswan', property_type: 'hotel', city: 'Aswan',
+  board_basis: 'bb', tier: 'standard', supplier_name: 'South Sinai Hotels', rate_currency: 'USD',
+  rate_valid_from: '2026-04-01', rate_valid_to: '2027-04-30', is_active: true,
+  ppd_eur: 96, pp_double_eur: 96, low_season_from: '2026-05-01', seasons: BASMA,
 }
 
-describe('Export periods', () => {
-  it('writes every period, one row each — five, not one', () => {
-    const { built } = roundTrip([hotel])
+/** Export → CSV text → parse, as a browser round trip would. */
+function roundTrip(rows: Array<Record<string, unknown>>, config = HOTELS) {
+  const fields = oneSheetHeaders(config)
+  const built = buildOneSheetRows(rows, config, (r, c) => exportCellValue(config.tableName, r, c), k => LABELS[k] ?? k)
+  const csv = Papa.unparse({ fields, data: built.map(r => fields.map(h => r[h] ?? '')) })
+  const parsed = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true })
+  return { built, parsed, sheet: parseOneSheet(parsed.data, config) }
+}
+
+describe('the one hotel sheet — export', () => {
+  it('a row per period, five for Basma, each carrying the hotel details', () => {
+    const { built } = roundTrip([basma])
     expect(built).toHaveLength(5)
-    expect(built.map(r => r['Period Name'])).toEqual(BASMA.map(p => p.name))
-    expect(built[2]).toMatchObject({ 'Service Code': 'ACC-ASW-WOV', City: 'Aswan', Season: 'Christmas', From: '2026-12-21', To: '2026-12-26', 'PP Double (EU passport)': 130, 'Guide Bed / Night': 60 })
+    expect(built.map(r => r.period_name)).toEqual(BASMA.map(p => p.name))
+    for (const r of built) expect(r).toMatchObject({ service_code: 'ACC-ASW-WOV', property_name: 'Basma Aswan', city: 'Aswan', tier: 'standard', rate_currency: 'USD' })
+    expect(built[2]).toMatchObject({ period_season: 'Christmas', period_from: '2026-12-21', period_to: '2026-12-26', period_pp_double_eur: 130, period_guide_rate_eur: 60 })
   })
 
-  it('is the shape Import reads, and reads back to the same periods', () => {
-    const { parsed, sheet } = roundTrip([hotel])
-    expect(detectPeriodsCsv(parsed.meta.fields ?? [])).toBe(true)
+  it('leaves out the old low/high/peak columns — the periods are those prices', () => {
+    const cols = detailColumns(HOTELS)
+    for (const gone of ['pp_double_eur', 'low_season_from', 'high_pp_double_eur', 'peak_season_2_to']) expect(cols).not.toContain(gone)
+    for (const kept of ['service_code', 'property_name', 'supplier_name', 'rate_valid_from', 'contact_email', 'rate_currency', 'suite_rate_eur']) expect(cols).toContain(kept)
+  })
+})
+
+describe('the one hotel sheet — import', () => {
+  it('reads back to one hotel with the same details and the same five periods', () => {
+    const { parsed, sheet } = roundTrip([basma])
+    expect(detectOneSheet(parsed.meta.fields ?? [])).toBe(true)
     expect(sheet.errors).toEqual([])
     expect(sheet.groups).toHaveLength(1)
-    expect(sheet.groups[0].service_code).toBe('ACC-ASW-WOV')
+    expect(sheet.groups[0].details).toMatchObject({ service_code: 'ACC-ASW-WOV', city: 'Aswan', rate_currency: 'USD' })
     // The route resolves the season WORD back to the key; seasonKey stands in.
     const back = sanitizeSeasons(sheet.groups[0].periods.map(p => ({ ...p, season: p.season ? seasonKey(p.season) : undefined })), 'accommodation')
     expect(back).toEqual(sanitizeSeasons(BASMA, 'accommodation'))
   })
 
-  it('lists a hotel with no periods as one blank line, which Import skips (no error, no wipe)', () => {
-    const { built, sheet } = roundTrip([hotel, { service_code: 'ACC-X', property_name: 'Unpriced Inn', seasons: [] }])
+  it('a hotel with no periods is one row, read back with none (no error, no wipe)', () => {
+    const { built, sheet } = roundTrip([basma, { service_code: 'ACC-X', property_name: 'Unpriced Inn', city: 'Luxor', seasons: [] }])
     expect(built).toHaveLength(6)
-    expect(built[5]).toMatchObject({ 'Property Name': 'Unpriced Inn', From: '', To: '' })
     expect(sheet.errors).toEqual([])
-    expect(sheet.groups.map(g => g.service_code)).toEqual(['ACC-ASW-WOV'])
+    expect(sheet.groups.map(g => [g.details.service_code, g.periods.length])).toEqual([['ACC-ASW-WOV', 5], ['ACC-X', 0]])
   })
 
-  it('cruises: Cruise Code / Ship Name / Guide Cabin headers, still read back', () => {
-    const fields = periodsSheetHeaders('cruise')
-    expect(fields.slice(0, 2)).toEqual(['Cruise Code', 'Ship Name'])
-    expect(fields).toContain('Guide Cabin / Night')
-    expect(detectPeriodsCsv(fields)).toBe(true)
+  it('refuses a hotel whose rows disagree on a detail, naming both values', () => {
+    const { parsed } = roundTrip([basma])
+    parsed.data[3].city = 'Luxor'
+    const sheet = parseOneSheet(parsed.data, HOTELS)
+    expect(sheet.groups).toHaveLength(0)
+    expect(sheet.errors[0]).toMatchObject({ row: 5, column: 'city' })
+    expect(sheet.errors[0].message).toContain('"Aswan"')
+  })
+
+  it('a NEW hotel without a service code groups by its name', () => {
+    const rows = [1, 2].map(n => ({ service_code: '', property_name: 'New Nile Hotel', city: 'Aswan', period_name: `P${n}`, period_from: `2026-0${n}-01`, period_to: `2026-0${n}-20`, period_pp_double_eur: '50' }))
+    const sheet = parseOneSheet(rows as Array<Record<string, string>>, HOTELS)
+    expect(sheet.errors).toEqual([])
+    expect(sheet.groups).toHaveLength(1)
+    expect(sheet.groups[0].periods).toHaveLength(2)
+  })
+
+  it('the sample is the same shape: one example hotel, two periods', () => {
+    const rows = oneSheetTemplateRows(HOTELS, { service_code: 'EXAMPLE-DELETE-THIS-ROW', property_name: 'Example' })
+    expect(rows).toHaveLength(2)
+    expect(detectOneSheet(Object.keys(rows[0]))).toBe(true)
   })
 })
 
-describe('re-importing the one-row-per-hotel sheet', () => {
+describe('the one cruise sheet', () => {
+  it('groups by cruise code and leaves out the old per-trip season prices', () => {
+    const ship = { cruise_code: 'NC-1', ship_name: 'MS Nile', ship_category: 'deluxe', route_name: 'Luxor-Aswan', embark_city: 'Luxor', disembark_city: 'Aswan', duration_nights: [4], seasons: BASMA.slice(0, 2) }
+    const { built, sheet } = roundTrip([ship], CRUISES)
+    expect(built).toHaveLength(2)
+    expect(detailColumns(CRUISES)).not.toContain('rate_low_double_eur')
+    expect(sheet.errors).toEqual([])
+    expect(sheet.groups[0].periods).toHaveLength(2)
+  })
+})
+
+describe('an OLDER one-row-per-hotel file', () => {
   it('keeps all five stored periods instead of replacing them with the one the row holds', () => {
     const update: Record<string, unknown> = {
       seasons: [{ name: 'Contract rate', from: '2026-05-01', to: '2026-09-30', rates: rates(96, 80, 84, 69) }],
       ppd_eur: 96, city: 'Aswan',
     }
-    const kept = keepStoredPeriods(update, BASMA, 'accommodation')
-    expect(kept).toEqual({ kept: 5, incoming: 1 })
-    expect(update).not.toHaveProperty('seasons') // the stored list is not rewritten at all
-    expect(update).toMatchObject({ ppd_eur: 96, low_season_from: '2026-05-01', low_season_to: '2026-09-30', city: 'Aswan' })
+    expect(keepStoredPeriods(update, BASMA, 'accommodation')).toEqual({ kept: 5, incoming: 1 })
+    expect(update).not.toHaveProperty('seasons')
+    expect(update).toMatchObject({ ppd_eur: 96, low_season_from: '2026-05-01', city: 'Aswan' })
   })
 
-  it('a row with one stored period is still edited by the sheet, as before', () => {
-    const one = [BASMA[0]]
+  it('a row with no more stored periods than it carries is edited as before', () => {
     const update: Record<string, unknown> = { seasons: [{ ...BASMA[0], rates: rates(99, 80, 84, 69) }] }
-    expect(keepStoredPeriods(update, one, 'accommodation')).toBeNull()
-    expect((update.seasons as Array<{ rates: { ppd_eur: number } }>)[0].rates.ppd_eur).toBe(99)
-  })
-
-  it('a row with no stored periods takes what the sheet says', () => {
-    const update: Record<string, unknown> = { seasons: [BASMA[0]] }
-    expect(keepStoredPeriods(update, null, 'accommodation')).toBeNull()
+    expect(keepStoredPeriods(update, [BASMA[0]], 'accommodation')).toBeNull()
   })
 })
