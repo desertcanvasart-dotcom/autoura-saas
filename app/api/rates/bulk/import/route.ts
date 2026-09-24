@@ -4,7 +4,8 @@ import { RATE_TABLE_CONFIGS, validateImportData, isExampleRow, importRowKey, par
 import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES, keepStoredPeriods } from '@/lib/rates/periods-csv'
-import { sanitizeSeasons, legacyColumnMirror } from '@/lib/rates/rate-seasons'
+import { usesOneSheet, detectOneSheet, parseOneSheet, oneSheetEntity } from '@/lib/rates/rate-sheet'
+import { sanitizeSeasons, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { resolveRecordKeys, resolveVocabularyKey, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
 import { resolveRateProperty } from '@/lib/suppliers/resolve-property'
@@ -121,7 +122,45 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const preview = validateImportData(rows, config)
+    // ---- The one sheet (hotels, cruises): a row per dated period ----
+    // lib/rates/rate-sheet.ts. Grouped back into one row per property (its
+    // details) plus the periods the file lists for it; from there it runs
+    // through the same pipeline as a flat file, with the periods attached.
+    let importRows = rows
+    let periodsForRow: RateSeason[][] | null = null
+    let fileLineOf: number[] | null = null
+    if (usesOneSheet(table) && detectOneSheet(parsed.meta.fields ?? [])) {
+      const entity = oneSheetEntity(table)!
+      const sheet = parseOneSheet(rows, config)
+      const seasonVocab = await loadVocabulary(supabase, 'rate_season')
+      const sheetErrors = [...sheet.errors]
+      const resolvedPeriods = sheet.groups.map(g => {
+        const withKeys = g.periods.map(p => {
+          if (!p.season) return p
+          const key = resolveVocabularyKey(seasonVocab, p.season)
+          if (!key) {
+            sheetErrors.push({ row: g.line, column: 'period_season', message: `Season "${p.season}" is not in your rate seasons list (Settings → Your vocabulary → Rate seasons).` })
+          }
+          return { ...p, season: key ?? undefined }
+        })
+        return sanitizeSeasons(withKeys, entity) ?? []
+      })
+      if (sheetErrors.length > 0) {
+        const body = { totalRows: rows.length, validRows: 0, invalidRows: sheetErrors.length, errors: sheetErrors, sampleData: [] }
+        if (dryRun) return NextResponse.json({ success: true, dryRun: true, ...body })
+        return NextResponse.json({ success: false, error: `${sheetErrors.length} rows have errors`, ...body })
+      }
+      importRows = sheet.groups.map(g => g.details)
+      periodsForRow = resolvedPeriods
+      fileLineOf = sheet.groups.map(g => g.line)
+    }
+    // A message's row number is the FILE's line, also when rows were grouped.
+    const lineOf = (i: number) => (fileLineOf ? fileLineOf[i] : i + 2)
+
+    const preview = validateImportData(importRows, config)
+    if (fileLineOf) {
+      for (const e of preview.errors) e.row = lineOf(e.row - 2)
+    }
 
     // The sheet says "Deluxe", "BB", "Sedan"; rows store the agency's keys
     // (Settings → Your vocabulary). Resolve every vocabulary column up front
@@ -133,9 +172,9 @@ export async function POST(request: NextRequest) {
     const vocab: Partial<Record<VocabularyKind, VocabularyItem[]>> = {}
     for (const kind of new Set(Object.values(vocabColumns))) vocab[kind] = await loadVocabulary(supabase, kind)
     const vocabErrors: Array<{ row: number; column: string; message: string }> = []
-    const resolvedRows = rows.map((row, i) => {
+    const resolvedRows = importRows.map((row, i) => {
       const { record, errors } = resolveRecordKeys(row, vocab, vocabColumns)
-      for (const message of errors) vocabErrors.push({ row: i + 2, column: message.split(':')[0], message })
+      for (const message of errors) vocabErrors.push({ row: lineOf(i), column: message.split(':')[0], message })
       return record as Record<string, string>
     })
     if (vocabErrors.length > 0) {
@@ -171,7 +210,7 @@ export async function POST(request: NextRequest) {
 
     const rowsToUpsert: Record<string, any>[] = []
     let exampleRowsSkipped = 0
-    for (const row of resolvedRows) {
+    for (const [rowIndex, row] of resolvedRows.entries()) {
       // The downloaded template ships one filled-in example row. Skip it, so
       // the classic mistake -- filling in the sheet underneath and importing
       // the sample along with it -- cannot land a junk rate.
@@ -204,6 +243,14 @@ export async function POST(request: NextRequest) {
 
       // Heal the accommodation split-brain at the write boundary: fill both
       // column families and turn dated season columns into real periods.
+      // One sheet: the periods the file lists ARE the rate — period 1 mirrored
+      // onto the price columns, as the rate form does on every save.
+      const listed = periodsForRow?.[rowIndex]
+      if (listed && listed.length > 0 && periodsTarget) {
+        record.seasons = listed
+        Object.assign(record, legacyColumnMirror(listed, periodsTarget.entity))
+      }
+
       applyCanonicalAliases(table, record)
       deriveImportSeasons(table, record)
 
@@ -415,14 +462,18 @@ export async function POST(request: NextRequest) {
         // — silently, four periods gone (operator, 2026-09-24). A row's
         // periods are never shrunk from here: they stay as stored, and the
         // price columns keep mirroring period 1. Periods change through the
-        // periods sheet (Export periods → edit → Import) or the rate form.
-        if (periodsTarget) {
+        // one sheet (Export CSV → edit → Import) or the rate form.
+        // One sheet: the file's periods replace the stored ones (a period
+        // deleted from the file is deleted) — unless it lists none for this
+        // property, which never wipes.
+        const fileSaysPeriods = periodsForRow !== null && Array.isArray(updateData.seasons)
+        if (periodsTarget && !fileSaysPeriods) {
           const kept = keepStoredPeriods(updateData, storedPeriods.get(keyOf(record) ?? ''), periodsTarget.entity)
           if (kept) {
             periodsKept.push({
               row: uniqueKey.map(c => `${c}=${String(record[c])}`).join(', '),
               operation: 'periods kept',
-              message: `${String(record[uniqueKeyColumn])} kept its ${kept.kept} rate periods — this sheet holds only ${kept.incoming || 'no'} period${kept.incoming === 1 ? '' : 's'}. To change periods, use Export periods, edit, and import that file.`,
+              message: `${String(record[uniqueKeyColumn])} kept its ${kept.kept} rate periods — this sheet holds only ${kept.incoming || 'no'} period${kept.incoming === 1 ? '' : 's'}. To change periods, use Export CSV (a row per period), edit, and import it.`,
             })
           }
         }
@@ -437,7 +488,7 @@ export async function POST(request: NextRequest) {
     // A company name that matched nothing is REPORTED, not a failure: the rate
     // itself imported cleanly and the missing link is something to fix in
     // Suppliers, not a reason to tell the operator the import broke.
-    return NextResponse.json({ success: importErrors.length === 0, totalRows: rows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, supplierNamesLinked, supplierNameGaps: supplierNameGaps.length, propertyLinksUnresolved, supplierCodeErrors: supplierCodeErrors.length, periodsKept: periodsKept.length, errors: [...importErrors, ...supplierNameGaps, ...periodsKept] })
+    return NextResponse.json({ success: importErrors.length === 0, totalRows: importRows.length, validRows: preview.validRows, invalidRows: preview.invalidRows, inserted, updated, refusedDuplicates: partition.duplicates.length, exampleRowsSkipped, supplierLinksCleared, supplierNamesLinked, supplierNameGaps: supplierNameGaps.length, propertyLinksUnresolved, supplierCodeErrors: supplierCodeErrors.length, periodsKept: periodsKept.length, errors: [...importErrors, ...supplierNameGaps, ...periodsKept] })
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }

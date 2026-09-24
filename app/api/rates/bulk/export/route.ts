@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { RATE_TABLE_CONFIGS, getExportHeaders, getTemplateHeaders, buildTemplateRow, exportCellValue, propertyLinkFor } from '@/lib/bulk-rate-service'
 import type { Database } from '@/types/database.types'
-import { PERIODS_CSV_TABLES, periodsSheetHeaders, periodsSheetColumns, buildPeriodsSheetRows } from '@/lib/rates/periods-csv'
+import { usesOneSheet, oneSheetHeaders, oneSheetTemplateRows, buildOneSheetRows } from '@/lib/rates/rate-sheet'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import Papa from 'papaparse'
 
@@ -25,57 +25,20 @@ export async function GET(request: NextRequest) {
     // moment somebody most needs to know the format (their first import,
     // before any data exists) was the moment the system told them nothing.
     if (request.nextUrl.searchParams.get('template') === '1') {
+      // Hotels and cruises: the one sheet, one example property with two
+      // periods (lib/rates/rate-sheet.ts).
+      const oneSheet = usesOneSheet(table)
+      const fields = oneSheet ? oneSheetHeaders(config, { template: true }) : getTemplateHeaders(config)
       const csv = Papa.unparse({
-        fields: getTemplateHeaders(config),
-        data: [buildTemplateRow(config)],
+        fields,
+        data: (oneSheet ? oneSheetTemplateRows(config, buildTemplateRow(config)) : [buildTemplateRow(config)])
+          .map(r => fields.map(f => r[f] ?? '')),
       })
       return new NextResponse(csv, {
         status: 200,
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="${table}_template.csv"`,
-        },
-      })
-    }
-
-    // `format=periods` (hotels, cruises): one row per dated rate period — the
-    // sheet the importer reads back losslessly. The flat sheet below is one
-    // row per property and holds period 1 only; a hotel with five periods
-    // exported as one (operator, 2026-09-24).
-    if (request.nextUrl.searchParams.get('format') === 'periods') {
-      const target = PERIODS_CSV_TABLES[table]
-      if (!target) {
-        return NextResponse.json({ success: false, error: `Rate periods export is for: ${Object.keys(PERIODS_CSV_TABLES).join(', ')}` }, { status: 400 })
-      }
-      interface PeriodQuery {
-        select(columns: string): {
-          order(column: string, opts: { ascending: boolean }): PromiseLike<{
-            data: Record<string, unknown>[] | null
-            error: { message: string } | null
-          }>
-        }
-      }
-      // RLS scopes the tenant.
-      const { data, error } = await (supabase.from(config.tableName as 'accommodation_rates') as unknown as PeriodQuery)
-        .select(periodsSheetColumns(target.entity, target.codeColumn, target.nameColumn).join(', '))
-        .order(target.nameColumn, { ascending: true })
-      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-
-      // The Season cell carries the agency's own word, which the importer
-      // resolves back to the key.
-      const vocab = await loadVocabulary(supabase, 'rate_season').catch(() => [])
-      const labelByKey = new Map(vocab.map(v => [v.key, v.label]))
-      const sheetRows = buildPeriodsSheetRows(
-        data ?? [], target.entity, target.codeColumn, target.nameColumn,
-        key => labelByKey.get(key) ?? key,
-      )
-      const fields = periodsSheetHeaders(target.entity)
-      const csv = Papa.unparse({ fields, data: sheetRows.map(r => fields.map(h => r[h] ?? '')) })
-      return new NextResponse(csv, {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${table}_periods_${new Date().toISOString().split('T')[0]}.csv"`,
         },
       })
     }
@@ -154,6 +117,28 @@ export async function GET(request: NextRequest) {
         ;(row as Record<string, unknown>)[propertyLink.nameColumn] =
           row.property_id ? nameById.get(row.property_id as string) ?? '' : ''
       }
+    }
+
+    // Hotels and cruises: ONE sheet — a row per dated period, the property's
+    // details repeated on each (operator, 2026-09-24: a hotel with five
+    // periods exported as one). lib/rates/rate-sheet.ts; Import reads it back.
+    if (usesOneSheet(table)) {
+      const vocab = await loadVocabulary(supabase, 'rate_season')
+      const labelByKey = new Map(vocab.map(v => [v.key, v.label]))
+      const fields = oneSheetHeaders(config)
+      const sheetRows = buildOneSheetRows(
+        (data || []) as Record<string, unknown>[], config,
+        (row, column) => exportCellValue(table, row, column),
+        key => labelByKey.get(key) ?? key,
+      )
+      const csv = Papa.unparse({ fields, data: sheetRows.map(r => fields.map(f => r[f] ?? '')) })
+      return new NextResponse(csv, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${table}_export_${new Date().toISOString().split('T')[0]}.csv"`,
+        },
+      })
     }
 
     // exportCellValue reads a cell's column OR its alias partner, so a hotel
