@@ -380,7 +380,18 @@ function extractPhoneFromText(text: string): string {
   return ''
 }
 
+// HIDDEN: no screen calls this any more — Parse (email/WhatsApp) opens the
+// Pricing Grid, which parses through /api/pricing-grid/parse. The code is
+// kept for possible later use; it answers 404 unless switched back on with
+// PARSE_WHATSAPP_ENABLED=true.
+function parseWhatsappEnabled(): boolean {
+  return process.env.PARSE_WHATSAPP_ENABLED === 'true'
+}
+
 export async function POST(request: Request) {
+  if (!parseWhatsappEnabled()) {
+    return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
+  }
   try {
     // Require authentication - this makes expensive Anthropic API calls
     const authResult = await requireAuth()

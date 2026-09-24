@@ -68,6 +68,7 @@ const DEFAULT_CONFIG: GridConfig = {
   partnerId: null,
   partnerName: '',
   clientId: null,
+  clientSource: null,
 }
 
 // ============================================
@@ -287,7 +288,45 @@ function PricingGridContent() {
   useEffect(() => {
     if (hasProcessedParams.current) return
     const conversationParam = searchParams?.get('conversation')
-    if (!conversationParam) return
+    if (!conversationParam) {
+      // No conversation: "New booking" from a client's page (?clientId=) or
+      // "New quote" from the quotes lists (?type=b2b|b2c) — a fresh grid for
+      // that client / audience.
+      const clientIdOnly = searchParams?.get('clientId')
+      const typeParam = searchParams?.get('type')
+      if (!clientIdOnly && typeParam !== 'b2b' && typeParam !== 'b2c') return
+      hasProcessedParams.current = true
+      setDays([])
+      setSaveMessage(null)
+      setSavedQuoteId(null)
+      setSavedQuoteNumber(null)
+      clearStorage()
+      setConfig(prev => ({
+        ...DEFAULT_CONFIG,
+        currency: prev.currency,
+        exchangeRate: prev.exchangeRate,
+        ...(typeParam === 'b2b' || typeParam === 'b2c' ? { clientType: typeParam } : {}),
+        clientId: clientIdOnly || null,
+      }))
+      window.history.replaceState({}, '', '/pricing-grid')
+      if (clientIdOnly) {
+        fetch(`/api/clients/${clientIdOnly}`)
+          .then(r => (r.ok ? r.json() : null))
+          .then(c => {
+            if (!c?.id) return
+            setConfig(prev => ({
+              ...prev,
+              clientId: c.id,
+              clientName: c.full_name || `${c.first_name || ''} ${c.last_name || ''}`.trim(),
+              clientEmail: c.email || '',
+              clientPhone: c.phone || '',
+              nationality: c.nationality && c.nationality !== 'Unknown' ? c.nationality : prev.nationality,
+            }))
+          })
+          .catch(() => showToast('error', 'Could not load the client'))
+      }
+      return
+    }
     hasProcessedParams.current = true
 
     // Decode conversation (handle both standard and URL-safe base64)
@@ -322,11 +361,16 @@ function PricingGridContent() {
     const emailParam = searchParams?.get('email')
     const phoneParam = searchParams?.get('phone')
     const clientNameParam = searchParams?.get('clientName')
+    const clientIdParam = searchParams?.get('clientId')
+    const sourceParam = searchParams?.get('source')
     setConfig(prev => ({
       ...prev,
       clientEmail: emailParam || '',
       clientPhone: phoneParam || '',
       clientName: clientNameParam || '',
+      // The CRM client the inbox already knows this person as.
+      clientId: clientIdParam || null,
+      clientSource: sourceParam === 'email' || sourceParam === 'whatsapp' ? sourceParam : null,
       itineraryId: null,
       itineraryCode: null,
     }))
@@ -492,6 +536,9 @@ function PricingGridContent() {
         clientName: itn.client_name || '',
         clientEmail: itn.client_email || '',
         clientPhone: itn.client_phone || '',
+        // Keep the itinerary's CRM client, so a re-save stays linked.
+        clientId: itn.client_id || null,
+        clientSource: null,
         tourName: itn.trip_name || '',
         pax: itn.num_adults || 2,
         tier: itn.tier || 'standard',
@@ -597,6 +644,7 @@ function PricingGridContent() {
           ...prev,
           itineraryId: data.itineraryId,
           itineraryCode: data.itineraryCode,
+          clientId: data.clientId ?? prev.clientId,
         }))
 
         // For B2B: create quote + template, then redirect to /tours/manage

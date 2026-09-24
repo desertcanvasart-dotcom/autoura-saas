@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, User } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronDown, ChevronUp, Link2, User } from 'lucide-react'
 import type { GridConfig } from '../types'
 
 interface ClientInfoBarProps {
@@ -27,6 +28,16 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
           <div className="flex-1 flex items-center gap-3 text-sm">
             {config.clientName && (
               <span className="font-medium text-gray-900">{config.clientName}</span>
+            )}
+            {config.clientId && (
+              <Link
+                href={`/clients/${config.clientId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[11px] font-medium rounded bg-green-50 text-green-700 hover:bg-green-100"
+                title="This trip saves onto this CRM client"
+              >
+                <Link2 className="w-3 h-3" />CRM client
+              </Link>
             )}
             {config.clientName && config.tourName && (
               <span className="text-gray-300">—</span>
@@ -74,13 +85,16 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
               />
             </div>
 
-            {/* Email */}
+            {/* Email — a different email or phone is a different person, so
+                editing either drops the CRM link and the save matches (or
+                creates) the client by the new details. A name edit is a
+                spelling fix and keeps it. */}
             <div>
               <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider block mb-1">Email</label>
               <input
                 type="email"
                 value={config.clientEmail}
-                onChange={(e) => update({ clientEmail: e.target.value })}
+                onChange={(e) => update({ clientEmail: e.target.value, clientId: null })}
                 placeholder="client@example.com"
                 className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-200 transition-all"
               />
@@ -92,7 +106,7 @@ export default function ClientInfoBar({ config, onChange }: ClientInfoBarProps) 
               <input
                 type="tel"
                 value={config.clientPhone}
-                onChange={(e) => update({ clientPhone: e.target.value })}
+                onChange={(e) => update({ clientPhone: e.target.value, clientId: null })}
                 placeholder="+1 (555) 123-4567"
                 className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-200 transition-all"
               />

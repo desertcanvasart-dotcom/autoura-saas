@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import Anthropic from '@anthropic-ai/sdk'
@@ -50,6 +50,16 @@ beforeEach(() => {
 describe('POST /api/ai/parse-whatsapp', async () => {
   const { POST } = await import('@/app/api/ai/parse-whatsapp/route')
   const conversation = 'Hi, we are 2 adults wanting 5 days in Cairo and Luxor in March.'
+  // The route is hidden (404) unless switched on; these tests switch it on.
+  beforeEach(() => { vi.stubEnv('PARSE_WHATSAPP_ENABLED', 'true') })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  it('is hidden unless PARSE_WHATSAPP_ENABLED=true, and never calls the AI', async () => {
+    vi.stubEnv('PARSE_WHATSAPP_ENABLED', '')
+    const { status } = await call(POST, { conversation })
+    expect(status).toBe(404)
+    expect(create).not.toHaveBeenCalled()
+  })
 
   it('a rejected key is named', async () => {
     create.mockRejectedValue(invalidKey())

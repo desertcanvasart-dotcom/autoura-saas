@@ -56,34 +56,26 @@ export default function CommunicationPage() {
         </Tip>
       </section>
 
-      {/* WhatsApp Parser */}
+      {/* Parse to the Pricing Grid */}
       <section className="mb-10">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">WhatsApp Parser (AI)</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Parse a Request into the Pricing Grid</h2>
         <p className="text-gray-600 mb-4">
-          The AI parser reads a WhatsApp conversation and extracts all the trip details automatically. This is the fastest way to turn a client inquiry into a professional quote &mdash; no copying and pasting needed.
+          Every email and WhatsApp conversation has a <strong>Parse</strong> button. It sends the conversation straight to the <strong>Pricing Grid</strong> &mdash; the pricing engine &mdash; which reads it, lays out the trip day by day and prices every day from your rate sheets.
         </p>
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">How to Use It</h3>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Open the conversation in the WhatsApp inbox and click <strong>Parse</strong> &mdash; the parser opens with the conversation already loaded</li>
-          <li><strong>Step 1 &mdash; Analyze:</strong> Click <strong>Analyze with AI</strong>. The AI extracts:
-            <ul className="list-disc list-inside ml-6 mt-2 space-y-1 text-gray-600">
-              <li>Client name, email, phone</li>
-              <li>Nationality</li>
-              <li>Desired travel dates and duration</li>
-              <li>Number of travelers (adults and children)</li>
-              <li>Cities and interests</li>
-              <li>Budget tier</li>
-              <li>Special requests</li>
-            </ul>
-          </li>
-          <li><strong>Step 2 &mdash; Configure:</strong> Review the extracted details, pick the budget tier, and choose the output: a <strong>B2C quote</strong>, a <strong>B2B quote</strong>, both together, or an <strong>itinerary only</strong> (add quotes later)</li>
-          <li><strong>Step 3 &mdash; Confirm Client:</strong> Match the inquiry to an existing client, or review the new client details and click <strong>Create Client &amp; Generate</strong></li>
-          <li><strong>Step 4 &mdash; Generate:</strong> Click <strong>Quick Generate</strong> to build the itinerary in one go, or <strong>Generate &amp; Edit</strong> to open it in the editor straight away</li>
+          <li>Open the email or WhatsApp conversation and click <strong>Parse</strong></li>
+          <li>The Pricing Grid opens and parses the conversation: days, cities, travellers, start date and nationality are filled in for you</li>
+          <li>Review each day, adjust services, tier and margin, then <strong>Save</strong></li>
         </ol>
-        <DocScreenshot src="/docs/communication/whatsapp-parser.jpg" alt="WhatsApp Parser wizard opened from a conversation, showing the 4-step flow (Analyze, Configure, Confirm Client, Generate) with extracted trip details" />
+
+        <h3 className="text-lg font-medium text-gray-900 mt-6 mb-3">The Client in your CRM</h3>
+        <p className="text-gray-600 mb-4">
+          The saved itinerary and quote always land on a CRM client. If the conversation is already linked to a client, that client is used (a green <strong>CRM client</strong> tag shows in the grid). Otherwise the grid matches a client by email, then phone. If none exists, a new <strong>Lead</strong> is created from the name and contact details &mdash; and for WhatsApp, the chat is linked to that Lead too.
+        </p>
         <Tip>
-          If the client already sent you a day-by-day plan, the parser detects the structured itinerary and can follow it exactly instead of designing its own.
+          Changing the email or phone in the grid points the save at whoever owns the new details; correcting the spelling of the name keeps the same client.
         </Tip>
       </section>
 

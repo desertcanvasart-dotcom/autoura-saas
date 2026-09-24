@@ -558,10 +558,13 @@ ${bodyText}`
       encoded: 'base64'
     })
 
+    // The pricing grid is the pricing engine: it decodes the conversation,
+    // parses it into days and prices them, and saves onto the CRM client.
+    params.set('clientName', matchedClient?.name || senderName)
     if (matchedClient) params.set('clientId', matchedClient.id)
     if (senderEmail) params.set('email', senderEmail)
 
-    window.location.href = `/whatsapp-parser?${params.toString()}`
+    window.location.href = `/pricing-grid?${params.toString()}`
   }
   useEffect(() => {
     if (isConnected) {
@@ -1349,7 +1352,7 @@ ${bodyText}`
                   <button
                     onClick={handleParseEmail}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Parse to Itinerary"
+                    title="Parse and price in the Pricing Grid"
                   >
                     <Sparkles className="w-4 h-4 text-purple-500" />
                   </button>
@@ -1508,7 +1511,7 @@ ${bodyText}`
           <button
             onClick={handleParseEmail}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Parse to Itinerary"
+            title="Parse and price in the Pricing Grid"
           >
             <Sparkles className="w-5 h-5 text-purple-500" />
           </button>
