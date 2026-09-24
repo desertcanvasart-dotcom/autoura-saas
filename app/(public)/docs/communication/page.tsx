@@ -14,7 +14,7 @@ export default function CommunicationPage() {
 
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Communication</h1>
       <p className="text-gray-600 mb-8">
-        Everything you use to talk with clients lives in the <strong>Communicate</strong> group in the sidebar: Conversations, Inbox (email), WhatsApp, Copilot and its knowledge base, Message Templates, Email Signatures, and the Content Library.
+        Everything you use to talk with clients lives in the <strong>Communicate</strong> group, second in the sidebar right under Home: Conversations, Inbox (email), WhatsApp, Concierge Leads, Copilot and its knowledge base, Message Templates, Email Signatures, and the Content Library.
       </p>
 
       {/* Conversations */}
@@ -34,7 +34,7 @@ export default function CommunicationPage() {
 
         <h3 className="text-lg font-medium text-gray-900 mb-3">Using the Inbox</h3>
         <ol className="list-decimal list-inside space-y-2 text-gray-700">
-          <li>Go to <strong>WhatsApp</strong> in the sidebar (under Communication)</li>
+          <li>Go to <strong>WhatsApp</strong> in the sidebar (under Communicate)</li>
           <li>The left panel lists conversations with the latest message preview. Use the <strong>All</strong>, <strong>Mine</strong>, and <strong>Unassigned</strong> tabs to filter by assignment.</li>
           <li>Click a conversation to open the full chat on the right</li>
           <li>Type your reply at the bottom and send</li>
@@ -143,7 +143,7 @@ export default function CommunicationPage() {
       <section className="mb-10">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Concierge Leads</h2>
         <p className="text-gray-600">
-          Inquiries submitted through your concierge intake form arrive as briefs under <strong>Concierge Leads</strong> (in the Operate group). Treat it as another inbound channel: review each brief, then follow up by WhatsApp or email.
+          Inquiries submitted through your concierge intake form arrive as briefs under <strong>Concierge Leads</strong> (in the Communicate group). Treat it as another inbound channel: review each brief, then follow up by WhatsApp or email.
         </p>
       </section>
 
