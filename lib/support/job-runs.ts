@@ -189,7 +189,9 @@ export function withJobRun<A extends unknown[]>(
           await finishRun(
             db, runId,
             response.ok && !bodyFailure ? 'ok' : 'failed',
-            !response.ok ? `HTTP ${response.status}` : bodyFailure,
+            // A good run may say what it did (`summary`) — so "0 new" and
+            // "did nothing" can be told apart in the log.
+            !response.ok ? `HTTP ${response.status}` : bodyFailure ?? await reportedSummary(response),
           )
           await pruneOldRuns(db, name)
         }
@@ -217,6 +219,16 @@ async function reportedFailure(response: Response): Promise<string | null> {
     // Not JSON: the status decides.
   }
   return null
+}
+
+/** A run's own one-line account of itself, when its body gives one. */
+async function reportedSummary(response: Response): Promise<string | null> {
+  try {
+    const body = await response.clone().json()
+    return body && typeof body.summary === 'string' && body.summary ? body.summary : null
+  } catch {
+    return null
+  }
 }
 
 function safeDb(getDb: () => DbClient): DbClient | null {
