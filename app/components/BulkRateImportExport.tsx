@@ -6,6 +6,7 @@ import { Download, Upload, FileText, AlertCircle, CheckCircle, X, Loader2 } from
 
 import { showToast } from '@/app/contexts/ToastContext'
 import { RATE_TABLE_CONFIGS } from '@/lib/bulk-rate-service'
+import { PERIODS_CSV_TABLES } from '@/lib/rates/periods-csv'
 import type { ValidationError } from '@/lib/bulk-rate-service'
 
 interface BulkRateImportExportProps {
@@ -49,10 +50,18 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
   // the data. It is the answer to the empty-table problem: exporting a table
   // with no rows yields a completely blank file, so the one moment somebody
   // most needs to know the format is the moment the export tells them nothing.
-  const handleExport = async (mode: 'export' | 'template' = 'export') => {
+  // Hotels and cruises price from DATED PERIODS (up to six per rate), which
+  // the one-row-per-property sheet cannot hold — it carries period 1 only.
+  // Their periods come as their own sheet, one row per period, which Import
+  // reads back as is (operator, 2026-09-24: five periods exported as one).
+  const hasPeriods = tableName in PERIODS_CSV_TABLES
+
+  const handleExport = async (mode: 'export' | 'template' | 'periods' = 'export') => {
     setExporting(true)
     try {
-      const qs = mode === 'template' ? `table=${tableName}&template=1` : `table=${tableName}`
+      const qs = mode === 'template' ? `table=${tableName}&template=1`
+        : mode === 'periods' ? `table=${tableName}&format=periods`
+        : `table=${tableName}`
       const res = await fetch(`/api/rates/bulk/export?${qs}`)
       if (!res.ok) {
         const err = await res.json()
@@ -66,6 +75,8 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
       a.href = url
       a.download = mode === 'template'
         ? `${tableName}_template.csv`
+        : mode === 'periods'
+        ? `${tableName}_periods_${todayLocal()}.csv`
         : `${tableName}_export_${todayLocal()}.csv`
       document.body.appendChild(a)
       a.click()
@@ -171,7 +182,12 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
         // A named ship/hotel/train that could not be hung off a supplier —
         // almost always because the row carries no supplier. The rate lands;
         // the property link is a gap the operator can see and close.
-        if (data.propertyLinksUnresolved > 0) {
+        // A flat sheet never shrinks a hotel's/cruise's dated periods; say
+        // which rows kept theirs, so nobody thinks the file's one period won.
+        if (data.periodsKept > 0) {
+          showToast('info', `${data.periodsKept} rows kept their rate periods — this sheet holds one period per row. To change periods, use Export periods, edit that file and import it.`)
+        }
+                if (data.propertyLinksUnresolved > 0) {
           showToast('warning', `${data.propertyLinksUnresolved} rows named a property that couldn't be linked — they need a supplier first; set it on those rows and re-import to link them.`)
         }
         setImportState(prev => ({
@@ -221,15 +237,29 @@ export default function BulkRateImportExport({ tableName, onImportComplete }: Bu
           onClick={() => handleExport('export')}
           disabled={exporting}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-          title="Export all rates as CSV"
+          title={hasPeriods
+            ? 'Export the details of every rate (city, tier, supplier, contacts), one row each. Prices by date are in Export periods.'
+            : 'Export all rates as CSV'}
         >
           {exporting ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
             <Download className="w-3.5 h-3.5" />
           )}
-          Export CSV
+          {hasPeriods ? 'Export details' : 'Export CSV'}
         </button>
+
+        {hasPeriods && (
+          <button
+            onClick={() => handleExport('periods')}
+            disabled={exporting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            title="Export every dated rate period, one row per period (name, season, from, to, prices). Import reads this file back as is."
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export periods
+          </button>
+        )}
 
         <button
           onClick={() => handleExport('template')}

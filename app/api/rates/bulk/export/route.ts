@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { RATE_TABLE_CONFIGS, getExportHeaders, getTemplateHeaders, buildTemplateRow, exportCellValue, propertyLinkFor } from '@/lib/bulk-rate-service'
 import type { Database } from '@/types/database.types'
+import { PERIODS_CSV_TABLES, periodsSheetHeaders, periodsSheetColumns, buildPeriodsSheetRows } from '@/lib/rates/periods-csv'
+import { loadVocabulary } from '@/lib/vocabulary-server'
 import Papa from 'papaparse'
 
 export async function GET(request: NextRequest) {
@@ -32,6 +34,48 @@ export async function GET(request: NextRequest) {
         headers: {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="${table}_template.csv"`,
+        },
+      })
+    }
+
+    // `format=periods` (hotels, cruises): one row per dated rate period — the
+    // sheet the importer reads back losslessly. The flat sheet below is one
+    // row per property and holds period 1 only; a hotel with five periods
+    // exported as one (operator, 2026-09-24).
+    if (request.nextUrl.searchParams.get('format') === 'periods') {
+      const target = PERIODS_CSV_TABLES[table]
+      if (!target) {
+        return NextResponse.json({ success: false, error: `Rate periods export is for: ${Object.keys(PERIODS_CSV_TABLES).join(', ')}` }, { status: 400 })
+      }
+      interface PeriodQuery {
+        select(columns: string): {
+          order(column: string, opts: { ascending: boolean }): PromiseLike<{
+            data: Record<string, unknown>[] | null
+            error: { message: string } | null
+          }>
+        }
+      }
+      // RLS scopes the tenant.
+      const { data, error } = await (supabase.from(config.tableName as 'accommodation_rates') as unknown as PeriodQuery)
+        .select(periodsSheetColumns(target.entity, target.codeColumn, target.nameColumn).join(', '))
+        .order(target.nameColumn, { ascending: true })
+      if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+
+      // The Season cell carries the agency's own word, which the importer
+      // resolves back to the key.
+      const vocab = await loadVocabulary(supabase, 'rate_season').catch(() => [])
+      const labelByKey = new Map(vocab.map(v => [v.key, v.label]))
+      const sheetRows = buildPeriodsSheetRows(
+        data ?? [], target.entity, target.codeColumn, target.nameColumn,
+        key => labelByKey.get(key) ?? key,
+      )
+      const fields = periodsSheetHeaders(target.entity)
+      const csv = Papa.unparse({ fields, data: sheetRows.map(r => fields.map(h => r[h] ?? '')) })
+      return new NextResponse(csv, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${table}_periods_${new Date().toISOString().split('T')[0]}.csv"`,
         },
       })
     }
