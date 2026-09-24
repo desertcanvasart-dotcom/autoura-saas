@@ -42,6 +42,8 @@ import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useRole } from '@/hooks/useRole'
+import ItineraryBookingLink from '@/components/ItineraryBookingLink'
+import { itineraryClientTotal } from '@/lib/itinerary-client-total'
 
 // ============================================
 // TYPES
@@ -96,12 +98,14 @@ interface Itinerary {
   package_type: string
   status: string
   total_cost: number
+  margin_percent: number | null
   notes: string
 }
 
 interface ItineraryService {
   id: string
   itinerary_day_id: string | null
+  client_price?: number | null
   day_number?: number
   service_type: string | null
   service_name: string
@@ -307,6 +311,7 @@ export default function ItineraryEditorPage() {
         package_type: itin.package_type ?? '',
         status: itin.status ?? 'draft',
         total_cost: itin.total_cost ?? 0,
+        margin_percent: itin.margin_percent ?? null,
         notes: itin.notes ?? ''
       })
 
@@ -626,12 +631,11 @@ export default function ItineraryEditorPage() {
     return (service.quantity ?? 0) * rate
   }
 
+  // The client total, the same figure saveDraft stores (see there).
   const recalculateTotalCost = () => {
-    const total = services
-      .filter(s => !s.isDeleted)
-      .reduce((sum, s) => sum + (s.total_cost || 0), 0)
-    if (itinerary) {
-      setItinerary({ ...itinerary, total_cost: total })
+    const live = services.filter(s => !s.isDeleted)
+    if (itinerary && live.length > 0) {
+      setItinerary({ ...itinerary, total_cost: itineraryClientTotal(live, itinerary.margin_percent) })
     }
   }
 
@@ -668,10 +672,14 @@ export default function ItineraryEditorPage() {
     try {
 
 
-      // 1. Update itinerary metadata
-      const totalCost = services
-        .filter(s => !s.isDeleted)
-        .reduce((sum, s) => sum + (s.total_cost || 0), 0)
+      // 1. Update itinerary metadata.
+      // total_cost holds the CLIENT total (what the grid saves and the header,
+      // invoice and P&L read) — not the raw supplier sum this used to write.
+      // And never a total from an empty list: with no services loaded there
+      // is nothing to recompute, so the stored total stands. (Seeing none,
+      // this wrote 0 over a priced trip — live ITN-S-2026-6386.)
+      const liveServices = services.filter(s => !s.isDeleted)
+      const clientTotal = itineraryClientTotal(liveServices, itinerary.margin_percent)
 
       const { error: itinError } = await supabase
         .from('itineraries')
@@ -680,7 +688,7 @@ export default function ItineraryEditorPage() {
           tier: itinerary.tier,
           package_type: itinerary.package_type,
           total_days: days.length,
-          total_cost: totalCost,
+          ...(liveServices.length > 0 ? { total_cost: clientTotal } : {}),
           status: itinerary.status, // Preserve the current status
           updated_at: new Date().toISOString()
         })
@@ -916,6 +924,8 @@ export default function ItineraryEditorPage() {
                 <option key={status.value} value={status.value}>{status.label}</option>
               ))}
             </select>
+
+            <ItineraryBookingLink itineraryId={itineraryId} refreshKey={itinerary.status} />
 
             {/* FX reprice — confirmed trips only; supplier costs, never the client price */}
             {isAdmin && itinerary.status === 'confirmed' && (

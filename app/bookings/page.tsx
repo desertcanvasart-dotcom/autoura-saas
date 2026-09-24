@@ -21,7 +21,8 @@ interface Booking {
   balance_due: number
   currency: string
   booking_date: string
-  quote_type: string
+  // Null for a booking made by confirming an itinerary (no quote behind it).
+  quote_type: string | null
   created_at: string
   clients: {
     id: string
@@ -297,7 +298,7 @@ export default function BookingsPage() {
                           {STATUS_LABELS[booking.status]}
                         </span>
                         <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                          {booking.quote_type.toUpperCase()}
+                          {booking.quote_type ? booking.quote_type.toUpperCase() : 'DIRECT'}
                         </span>
                       </div>
 

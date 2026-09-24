@@ -29,7 +29,8 @@ interface Booking {
   booking_date: string
   confirmation_date: string | null
   payment_deadline: string | null
-  quote_type: string
+  // Null for a booking made by confirming an itinerary (no quote behind it).
+  quote_type: string | null
   special_requests: string | null
   internal_notes: string | null
   assigned_to: string | null
@@ -414,7 +415,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Action Buttons */}
-            {booking.quote_type === 'b2c' && booking.clients && (
+            {booking.quote_type !== 'b2b' && booking.clients && (
               <div className="flex gap-2">
                 <button
                   onClick={() => handleSendConfirmation('email')}
@@ -482,7 +483,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">Quote Type</label>
-                  <p className="font-medium text-gray-900">{booking.quote_type.toUpperCase()}</p>
+                  <p className="font-medium text-gray-900">{booking.quote_type ? booking.quote_type.toUpperCase() : 'Direct (confirmed itinerary)'}</p>
                 </div>
                 <div>
                   <label className="text-sm text-gray-500">Travel Dates</label>

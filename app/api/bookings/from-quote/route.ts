@@ -160,6 +160,41 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // One sale, one booking. Confirming an itinerary books it directly (PUT
+    // /api/itineraries/[id]); its quote still showed "Convert to Booking",
+    // and converting made a SECOND booking — a second deposit — for the same
+    // trip (live: ITN-S-2026-6386 booked as BK-2026-0003, its draft quote
+    // Q-2026-0007 still convertible). The quote-level check above and
+    // uq_bookings_one_per_quote cannot see a quote-less booking. Refused: a
+    // direct booking of this itinerary, or one already made from another
+    // quote of the same kind.
+    if (itinerary_id) {
+      const { data: itineraryBookings, error: itinBookingErr } = await adminClient
+        .from('bookings')
+        .select('id, booking_number, quote_type')
+        .eq('itinerary_id', itinerary_id)
+        .eq('tenant_id', tenant_id)
+      if (itinBookingErr) {
+        console.error('Error checking the itinerary for a booking:', itinBookingErr)
+        return NextResponse.json(
+          { success: false, error: 'Could not verify whether this trip is already booked' },
+          { status: 500 }
+        )
+      }
+      const already = (itineraryBookings ?? []).find(b => b.quote_type == null || b.quote_type === quote_type)
+      if (already) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `This trip is already booked as ${already.booking_number}`,
+            booking_number: already.booking_number,
+            booking_id: already.id,
+          },
+          { status: 409 }
+        )
+      }
+    }
+
     let itinerary: Tables<'itineraries'> | null = null
     if (itinerary_id) {
       const { data, error: itineraryError } = await adminClient

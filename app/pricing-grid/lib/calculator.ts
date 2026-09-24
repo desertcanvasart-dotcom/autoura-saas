@@ -8,6 +8,7 @@ import type {
   DayCalc, GridTotals, PaxRangeResult, SLOT_DEFINITIONS,
 } from '../types'
 import { priceAcrossPax } from '@/lib/pricing/pax-range'
+import { soldItems, customAmountSold } from './guide-rule'
 
 // --- Helpers ---
 
@@ -41,15 +42,10 @@ export function calculateDay(day: GridDay, config: GridConfig): DayCalc {
     const cost = slotTotal(slot, passport)
 
     if (GROUP_SLOT_IDS.has(slot.slotId)) {
-      // Group: guide slot respects the withGuide toggle
-      if (slot.slotId === 'guide' && !config.withGuide) continue
-      // Tipping: skip guide_tip if no guide
-      if (slot.slotId === 'tipping' && !config.withGuide) {
-        // Only include non-guide tips (driver_tip, etc.)
-        const nonGuideTips = slot.selectedItems
-          .filter(item => !item.rateId.includes('guide'))
-          .reduce((sum, item) => sum + getRate(item, passport), 0)
-        groupTotal += nonGuideTips
+      // Guide off: the guide slot sells nothing and tipping only its non-guide
+      // tips — the same rule the save applies (guide-rule.ts).
+      if (!customAmountSold(slot.slotId, config.withGuide)) {
+        groupTotal += soldItems(slot, config.withGuide).reduce((sum, item) => sum + getRate(item, passport), 0)
         continue
       }
       groupTotal += cost
@@ -216,11 +212,8 @@ function aggregateNonTransport(days: GridDay[], config: GridConfig) {
       if (slot.slotId === 'route') continue // transport is pax-dependent — handled separately
 
       if (GROUP_SLOT_IDS.has(slot.slotId)) {
-        if (slot.slotId === 'guide' && !withGuide) continue
-        if (slot.slotId === 'tipping' && !withGuide) {
-          groupFixed += slot.selectedItems
-            .filter(item => !item.rateId.includes('guide'))
-            .reduce((sum, item) => sum + getRate(item, passport), 0)
+        if (!customAmountSold(slot.slotId, withGuide)) {
+          groupFixed += soldItems(slot, withGuide).reduce((sum, item) => sum + getRate(item, passport), 0)
           continue
         }
         groupFixed += slotTotal(slot, passport)
