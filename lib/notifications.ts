@@ -98,6 +98,74 @@ export async function notifyUserOnce(input: {
 }
 
 /**
+ * Notify EVERYONE on the tenant's team — every active login (tenant_members),
+ * whatever their role. Operator, 2026-09-24: new WhatsApp messages and new
+ * concierge leads go to "everyone on the team".
+ *
+ * One bell item per person per THING (the dedupe_key, e.g. wa:<conversation>),
+ * not per event: a customer sending five messages in a row leaves one item
+ * that says the latest, bumped back to unread and to the top — not five.
+ * In-app only; no email. Throws on failure — callers treat it as best-effort.
+ */
+export async function notifyTeam(input: {
+  tenant_id: string
+  dedupe_key: string
+  type: string
+  title: string
+  message: string
+  link?: string | null
+}) {
+  const admin = createAdminClient()
+  const { data: members, error: membersError } = await admin
+    .from('tenant_members')
+    .select('user_id')
+    .eq('tenant_id', input.tenant_id)
+    .eq('status', 'active')
+  if (membersError) throw membersError
+
+  const userIds = [...new Set((members ?? []).map(m => m.user_id).filter((id): id is string => !!id))]
+  if (userIds.length === 0) return
+
+  const now = new Date().toISOString()
+  const { error } = await admin.from('notifications').upsert(
+    userIds.map(user_id => ({
+      user_id,
+      dedupe_key: input.dedupe_key,
+      type: input.type,
+      title: input.title,
+      message: input.message,
+      link: input.link ?? null,
+      is_read: false,
+      email_sent: false,
+      created_at: now, // a repeat moves it back to the top of the bell
+    })),
+    { onConflict: 'user_id,dedupe_key' }
+  )
+  if (error) throw error
+}
+
+/**
+ * The thing has been dealt with (a chat read, a lead picked up) — for the
+ * whole team, so its bell item goes read for everyone. Keys carry the
+ * conversation/brief UUID, so they cannot collide across tenants.
+ * Best-effort: logs, never throws.
+ */
+export async function markTeamNotificationsRead(dedupe_key: string) {
+  const { error } = await createAdminClient()
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('dedupe_key', dedupe_key)
+    .eq('is_read', false)
+  if (error) console.error(`marking ${dedupe_key} notifications read failed:`, error.message)
+}
+
+/** Shorten a message body for a bell line. */
+export function bellSnippet(text: string | null | undefined, max = 140): string {
+  const t = (text ?? '').replace(/\s+/g, ' ').trim()
+  return t.length > max ? t.slice(0, max - 1) + '…' : t
+}
+
+/**
  * Insert a notification (admin client) and optionally email the recipient.
  * The caller MUST have already validated that `team_member_id` is legitimate
  * for the current tenant.
