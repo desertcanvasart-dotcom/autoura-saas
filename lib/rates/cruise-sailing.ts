@@ -41,6 +41,36 @@ export function sanitizeSailingDays(input: unknown): SailingDay[] {
   return DAY_KEYS.filter(d => seen.has(d))
 }
 
+// ── The CSV cell (operator, 2026-09-25: fill all 132 cruises in one sheet) ──
+// Written as the keys joined by ';' — "mon;fri". Read leniently, because a
+// person types it: any of ; , / or spaces between, day keys or names in any
+// case ("Mon", "Friday"). "any" (or "none", "-") says NO FIXED DAY, clearing
+// what is stored; a BLANK cell says nothing and leaves the stored days alone,
+// so an older file without the column never wipes them.
+
+const DAY_WORDS: Record<string, SailingDay> = Object.fromEntries(
+  DAY_KEYS.flatMap(k => [[k, k], [DAY_NAMES[k].toLowerCase(), k]])
+) as Record<string, SailingDay>
+const NO_FIXED_DAY = new Set(['any', 'none', '-', 'any day'])
+
+/** The cell an export writes: "mon;fri", or blank for no fixed day. */
+export function formatSailingDaysCell(days: unknown): string {
+  return sanitizeSailingDays(days).join(';')
+}
+
+/**
+ * Read a sheet cell. `days` null = blank (change nothing); [] = "any" (no
+ * fixed day). `bad` lists the words that are not days, for the error.
+ */
+export function parseSailingDaysCell(cell: unknown): { days: SailingDay[] | null; bad: string[] } {
+  const raw = String(cell ?? '').trim()
+  if (!raw) return { days: null, bad: [] }
+  if (NO_FIXED_DAY.has(raw.toLowerCase())) return { days: [], bad: [] }
+  const words = raw.split(/[;,/\s]+/).map(w => w.trim()).filter(Boolean)
+  const bad = words.filter(w => !DAY_WORDS[w.toLowerCase()])
+  return { days: sanitizeSailingDays(words.map(w => DAY_WORDS[w.toLowerCase()]).filter(Boolean)), bad }
+}
+
 /** The weekday an ISO date falls on, or null when it is not a date. */
 export function dayOfDate(iso: string | null | undefined): SailingDay | null {
   const s = String(iso ?? '').slice(0, 10)

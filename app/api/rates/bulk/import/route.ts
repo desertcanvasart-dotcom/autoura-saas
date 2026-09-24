@@ -5,6 +5,7 @@ import type { ImportResult } from '@/lib/bulk-rate-service'
 import Papa from 'papaparse'
 import { detectPeriodsCsv, parsePeriodsCsv, PERIODS_CSV_TABLES, keepStoredPeriods } from '@/lib/rates/periods-csv'
 import { usesOneSheet, detectOneSheet, parseOneSheet, oneSheetEntity } from '@/lib/rates/rate-sheet'
+import { parseSailingDaysCell } from '@/lib/rates/cruise-sailing'
 import { sanitizeSeasons, legacyColumnMirror, type RateSeason } from '@/lib/rates/rate-seasons'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { resolveRecordKeys, resolveVocabularyKey, vocabularyColumnsFor, type VocabularyKind, type VocabularyItem } from '@/lib/vocabulary'
@@ -228,6 +229,15 @@ export async function POST(request: NextRequest) {
           case 'boolean': record[colDef.name] = ['true', '1', 'yes'].includes(raw.toLowerCase()); break
           default: record[colDef.name] = colDef.name === 'rate_currency' ? raw.toUpperCase() : raw
         }
+      }
+
+      // Sailing days arrive as the cell's words ("mon;fri"); the table stores
+      // the keys. Blank already skipped above; "any" stores none. (Bad words
+      // were refused by validateImportData before anything is written.)
+      if (typeof record.sailing_days === 'string') {
+        const { days } = parseSailingDaysCell(record.sailing_days)
+        if (days) record.sailing_days = days
+        else delete record.sailing_days
       }
 
       // The passport-split columns are no longer in the template, and this
