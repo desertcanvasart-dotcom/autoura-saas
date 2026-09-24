@@ -22,6 +22,9 @@ const SERVICE_TO_DOC_TYPE: Record<string, { docType: string | null, category?: s
 
   // Creates Service Order for ENTRANCE FEES
   entrance: { docType: 'service_order', category: 'entrance' },
+  // What the Pricing Grid saves. Unlisted, every grid-priced trip's entrance
+  // fees were skipped silently (live ITN-S-2026-6386: 5 fees, no order).
+  entrance_fee: { docType: 'service_order', category: 'entrance' },
   activity: { docType: 'service_order', category: 'entrance' },
   tour: { docType: 'service_order', category: 'entrance' },
   excursion: { docType: 'service_order', category: 'entrance' },
@@ -35,6 +38,9 @@ const SERVICE_TO_DOC_TYPE: Record<string, { docType: string | null, category?: s
 
   // NO document needed - skip these
   tips: { docType: null },
+  tip: { docType: null }, // the grid's word
+  flight: { docType: null }, // ticketed by the airline, not a supplier voucher
+  other: { docType: null },
   supplies: { docType: null },
   water: { docType: null },
   service_fee: { docType: null }
@@ -232,7 +238,12 @@ export async function POST(
         const serviceCity = day.city || 'Cairo'
 
         // Check if this service type should generate a document
-        const serviceMapping = service.service_type ? SERVICE_TO_DOC_TYPE[service.service_type] : undefined
+        // The grid saves a cruise as 'accommodation' (its slot tag says
+        // cruise) — that is a cruise voucher, not a hotel voucher.
+        const isGridCruise = String(service.description ?? '').startsWith('[pricing-grid:cruise]')
+        const serviceMapping = isGridCruise
+          ? SERVICE_TO_DOC_TYPE.cruise
+          : service.service_type ? SERVICE_TO_DOC_TYPE[service.service_type] : undefined
         if (!serviceMapping || serviceMapping.docType === null) {
           // Skip services that don't need documents (tips, water, supplies, service_fee)
 

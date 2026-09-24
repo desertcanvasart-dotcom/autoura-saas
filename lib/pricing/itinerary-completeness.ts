@@ -90,7 +90,11 @@ export async function loadItineraryCompleteness(
 
   const { data: days, error } = await supabase
     .from('itinerary_days')
-    .select('day_number, services:itinerary_services(service_name, rate_eur, total_cost, client_price, notes)')
+    // Hinted: itinerary_services has TWO keys to itinerary_days (day_id,
+    // itinerary_day_id), so an unhinted embed is ambiguous (PGRST201) and
+    // this check failed on every itinerary — "Could not check this
+    // itinerary's services" on Share link / Send (live 2026-09-24).
+    .select('day_number, services:itinerary_services!itinerary_services_day_id_fkey(service_name, rate_eur, total_cost, client_price, notes)')
     .eq('itinerary_id', itineraryId)
   if (error) return { ok: false, status: 503, error: "Could not check this itinerary's services. Try again." }
 

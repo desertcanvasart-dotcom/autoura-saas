@@ -9,20 +9,25 @@ import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import Link from 'next/link'
 import { ArrowLeft, Download, Eye, Edit2, Plus, X, Loader2 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { contractNumber, contractTravelers, contractDuration, contractDestinations } from '@/lib/contract-facts'
 
+// The fields an itinerary actually has (the old shape named num_travelers,
+// tour_name, destinations and parsed_data — none of which exist).
 interface Itinerary {
   id: string
   itinerary_code: string
   client_name: string
   client_email: string
   client_phone?: string
-  num_travelers: number
+  trip_name?: string | null
+  num_adults?: number | null
+  num_children?: number | null
+  total_days?: number | null
   start_date: string
   end_date: string
   total_cost: number
-  tour_name: string
-  destinations: string
-  parsed_data: any
+  currency?: string | null
+  itinerary_days?: { day_number?: number | null; city?: string | null; overnight_city?: string | null }[]
 }
 
 interface ContractData {
@@ -116,7 +121,8 @@ export default function ContractPage() {
 
   const fetchItinerary = async (id: string) => {
     try {
-      const response = await fetch(`/api/itineraries/${id}`)
+      // ?include=days: the destinations are the trip's own cities.
+      const response = await fetch(`/api/itineraries/${id}?include=days`)
       const data = await response.json()
       
       if (data.success) {
@@ -125,15 +131,18 @@ export default function ContractPage() {
         
         setContractData(prev => ({
           ...prev,
-          contractNumber: `TC-2025-${itin.id.slice(0, 8).toUpperCase()}`,
+          // From the itinerary itself (lib/contract-facts.ts) — these read
+          // fields an itinerary does not have, then invented "Cairo, Luxor,
+          // Aswan", "N/A", a blank traveller count and a 2025 number.
+          contractNumber: contractNumber(itin.id),
           clientName: itin.client_name,
           clientEmail: itin.client_email || '',
-          numTravelers: itin.num_travelers,
-          tourPackage: itin.tour_name || 'Custom Egypt Tour',
+          numTravelers: contractTravelers(itin) ?? 0,
+          tourPackage: itin.trip_name || '',
           startDate: itin.start_date,
           endDate: itin.end_date,
-          duration: itin.parsed_data?.duration || 'N/A',
-          destinations: itin.destinations || 'Cairo, Luxor, Aswan',
+          duration: contractDuration(itin) ?? '',
+          destinations: contractDestinations(itin.itinerary_days ?? []),
           totalCost: itin.total_cost
         }))
       }
@@ -189,7 +198,7 @@ export default function ContractPage() {
         endDate: contractData.endDate,
         destinations: contractData.destinations,
         totalCost: contractData.totalCost,
-        currency: 'USD'
+        currency: itinerary?.currency || ''
       })
       
       // Download the PDF
@@ -482,7 +491,7 @@ export default function ContractPage() {
             {editMode ? (
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-gray-600">Total Package Price (USD)</label>
+                  <label className="text-xs text-gray-600">Total Package Price ({itinerary?.currency || 'currency'})</label>
                   <input
                     type="number"
                     value={contractData.totalCost}
@@ -516,11 +525,13 @@ export default function ContractPage() {
               <>
                 <div className="bg-primary-50 border border-primary-200 rounded-md p-4 mb-3">
                   <p className="text-lg font-bold text-gray-900">
-                    Total Package Price: <span className="text-primary-600">USD ${contractData.totalCost.toLocaleString()}</span>
+                    Total Package Price: <span className="text-primary-600">{itinerary?.currency} {contractData.totalCost.toLocaleString()}</span>
                   </p>
-                  <p className="text-gray-600 text-xs mt-1">
-                    (USD ${(contractData.totalCost / contractData.numTravelers).toFixed(2)} per person × {contractData.numTravelers} {contractData.numTravelers === 1 ? 'traveler' : 'travelers'})
-                  </p>
+                  {contractData.numTravelers > 0 && (
+                    <p className="text-gray-600 text-xs mt-1">
+                      ({itinerary?.currency} {(contractData.totalCost / contractData.numTravelers).toFixed(2)} per person × {contractData.numTravelers} {contractData.numTravelers === 1 ? 'traveler' : 'travelers'})
+                    </p>
+                  )}
                 </div>
 
                 <h3 className="font-semibold text-gray-900 mb-2 text-sm">PAYMENT SCHEDULE</h3>
