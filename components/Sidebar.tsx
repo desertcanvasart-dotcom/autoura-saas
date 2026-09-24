@@ -91,11 +91,13 @@ interface NavSection {
 // Define navigation with role-based visibility.
 //
 // Nine sections, ordered by how often a person opens them, each named for the
-// work it holds rather than the kind of screen: Home (read the day), Sell
+// work it holds rather than the kind of screen: Home (read the day),
+// Communicate (the channels where new things arrive: Inbox, WhatsApp,
+// Concierge Leads; second, straight under Home — operator, 2026-09-24), Sell
 // (quote → itinerary → booking), Operate (run what was sold), Tours (define
 // and price the catalogue), Suppliers & Rates (what you buy and what it
-// costs), People, Communicate, Finance, Settings. Section KEYS are kept from
-// the old layout where a section survived, so remembered collapse states
+// costs), People, Finance, Settings. Section KEYS are kept from the old
+// layout where a section survived, so remembered collapse states
 // carry over. Role gates travel with the item, never with the section, so a
 // move never widens or narrows who sees a page.
 const navigation: NavSection[] = [
@@ -108,6 +110,31 @@ const navigation: NavSection[] = [
       { label: 'Reports', href: '/financial-reports', icon: BarChart3, roles: ['admin', 'manager'] },
       // How the Copilot is doing is analytics, not a Copilot setting.
       { label: 'Copilot Analytics', href: '/settings/copilot-analytics', icon: BarChart3, roles: ['admin', 'manager'] },
+    ]
+  },
+  // The channels, the things used while writing in them, and the library
+  // that feeds the words the Copilot and the itinerary writer use.
+  // '/communications' and '/whatsapp-parser' are deliberately not listed:
+  // both pages stay live (the first duplicates Conversations + Inbox, the
+  // second is deep-linked from the inbox) but are not browse destinations.
+  {
+    title: 'Communicate',
+    key: 'communication',
+    roles: ['admin', 'manager', 'member'],
+    items: [
+      { label: 'Conversations', href: '/conversations', icon: MessageSquare },
+      { label: 'Inbox', href: '/inbox', icon: Mail },
+      { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageSquare },
+      // Leads the website's AI concierge hands over — a channel like the two
+      // above, so it sits with them (operator, 2026-09-24).
+      { label: 'Concierge Leads', href: '/concierge-briefs', icon: ConciergeBell },
+      { label: 'Copilot', href: '/copilot', icon: Sparkles },
+      { label: 'Copilot Knowledge', href: '/copilot-knowledge', icon: Sparkles },
+      { label: 'Message Templates', href: '/templates', icon: FileText },
+      { label: 'Email Signatures', href: '/settings/email-signatures', icon: PenLine },
+      { label: 'Content Library', href: '/content-library', icon: Library, roles: ['admin', 'manager'] },
+      { label: 'AI Prompts', href: '/content-library/prompts', icon: Library, roles: ['admin', 'manager'] },
+      { label: 'Writing Rules', href: '/content-library/rules', icon: BookOpen, roles: ['admin', 'manager'] },
     ]
   },
   // The sale's lifecycle in one place: start it, price it, save it, book it,
@@ -145,7 +172,6 @@ const navigation: NavSection[] = [
       // Planned alongside departures, not configured once. Still admin-only.
       { label: 'Capacity Calendar', href: '/settings/capacity', icon: CalendarRange, roles: ['admin'] },
       { label: 'Follow-ups', href: '/followups', icon: CheckSquare },
-      { label: 'Concierge Leads', href: '/concierge-briefs', icon: ConciergeBell },
       // Contracts and vouchers generated from itineraries — operational
       // paperwork, not content.
       { label: 'Documents', href: '/documents', icon: FileText, roles: ['admin', 'manager'] },
@@ -222,28 +248,6 @@ const navigation: NavSection[] = [
       { label: 'Partners', href: '/b2b/partners', icon: Handshake, roles: ['admin', 'manager'] },
       // The staff directory tasks are assigned to — NOT logins (User Management).
       { label: 'Team Members', href: '/team-members', icon: Users, roles: ['admin', 'manager'] },
-    ]
-  },
-  // The channels, the things used while writing in them, and the library
-  // that feeds the words the Copilot and the itinerary writer use.
-  // '/communications' and '/whatsapp-parser' are deliberately not listed:
-  // both pages stay live (the first duplicates Conversations + Inbox, the
-  // second is deep-linked from the inbox) but are not browse destinations.
-  {
-    title: 'Communicate',
-    key: 'communication',
-    roles: ['admin', 'manager', 'member'],
-    items: [
-      { label: 'Conversations', href: '/conversations', icon: MessageSquare },
-      { label: 'Inbox', href: '/inbox', icon: Mail },
-      { label: 'WhatsApp', href: '/whatsapp-inbox', icon: MessageSquare },
-      { label: 'Copilot', href: '/copilot', icon: Sparkles },
-      { label: 'Copilot Knowledge', href: '/copilot-knowledge', icon: Sparkles },
-      { label: 'Message Templates', href: '/templates', icon: FileText },
-      { label: 'Email Signatures', href: '/settings/email-signatures', icon: PenLine },
-      { label: 'Content Library', href: '/content-library', icon: Library, roles: ['admin', 'manager'] },
-      { label: 'AI Prompts', href: '/content-library/prompts', icon: Library, roles: ['admin', 'manager'] },
-      { label: 'Writing Rules', href: '/content-library/rules', icon: BookOpen, roles: ['admin', 'manager'] },
     ]
   },
   {
@@ -351,7 +355,7 @@ export default function Sidebar({ isCollapsed, setIsCollapsed }: SidebarProps) {
   }
 
   const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'sell', 'crm', 'trips'])
+  const [expandedSections, setExpandedSections] = useState<string[]>(['main', 'communication', 'sell', 'crm', 'trips'])
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
   const [currentUrl, setCurrentUrl] = useState('')
 
