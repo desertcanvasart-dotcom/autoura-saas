@@ -14,6 +14,7 @@ import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
 import { ratePin } from '@/lib/pricing/rate-pin'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { resolveGridClient } from '@/lib/grid-client-link'
+import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
 import type { TablesInsert } from '@/types/database.types'
 
 function generateItineraryCode(): string {
@@ -21,6 +22,9 @@ function generateItineraryCode(): string {
   const random = Math.floor(Math.random() * 9000) + 1000
   return `ITN-S-${year}-${random}`
 }
+
+// A selected rate as the grid sends it.
+interface SavedGridItem { rateId: string; name?: string; rateEur?: number; rateNonEur?: number }
 
 // Group slots are charged once for the whole group; per-person slots scale by pax.
 const GRID_GROUP_SLOTS = ['route', 'guide', 'airport_services', 'hotel_services', 'tipping', 'boat_rides', 'other_group']
@@ -31,13 +35,15 @@ function itemRate(item: any, passport: string): number {
 }
 
 // Supplier (cost) total for one slot under the given passport, before margin.
-function slotSupplierCost(slot: any, passport: string, pax: number): number {
+// Only what is SOLD: with the guide switched off the guide slot (and guide
+// tips) are not — the calculator's own rule (guide-rule.ts).
+function slotSupplierCost(slot: any, passport: string, pax: number, withGuide: boolean): number {
   const isGroup = GRID_GROUP_SLOTS.includes(slot.slotId)
-  if (slot.customAmount && slot.customAmount > 0) {
+  if (slot.customAmount && slot.customAmount > 0 && customAmountSold(slot.slotId, withGuide)) {
     return isGroup ? slot.customAmount : slot.customAmount * pax
   }
   let line = 0
-  for (const item of (slot.selectedItems || [])) {
+  for (const item of soldItems(slot, withGuide)) {
     const rate = itemRate(item, passport)
     line += isGroup ? rate : rate * pax
   }
@@ -68,6 +74,8 @@ export async function POST(request: NextRequest) {
 
     const pax = Math.max(config.pax || 1, 1)
     const passport = config.passport || 'non_eu'
+    // Missing on older clients = the guide was on (the grid's default).
+    const withGuide = config.withGuide !== false
     const itineraryCode = generateItineraryCode()
 
     // Calculate dates
@@ -83,7 +91,7 @@ export async function POST(request: NextRequest) {
     // invoice and PDF consume it).
     const supplierTotal = (days || []).reduce((sum: number, day: any) => {
       return sum + (day.slots || []).reduce((dsum: number, slot: any) => {
-        return dsum + slotSupplierCost(slot, passport, pax)
+        return dsum + slotSupplierCost(slot, passport, pax, withGuide)
       }, 0)
     }, 0)
     // `resolveMarginPercent`, not `|| 25`: 0 is an at-cost grid, and `0 || 25`
@@ -239,8 +247,11 @@ export async function POST(request: NextRequest) {
       //    charged once; per-person slots × pax — identical to calculator.ts.
       const services: any[] = []
       for (const slot of day.slots) {
-        const hasItems = (slot.selectedItems?.length ?? 0) > 0
-        const hasCustom = slot.customAmount && slot.customAmount > 0
+        // Only what the grid SOLD — guide off leaves the guide out here
+        // exactly as it does in the price (guide-rule.ts).
+        const sold = soldItems<SavedGridItem>(slot, withGuide)
+        const hasItems = sold.length > 0
+        const hasCustom = slot.customAmount && slot.customAmount > 0 && customAmountSold(slot.slotId, withGuide)
         if (!hasItems && !hasCustom) continue
 
         const isGroup = GRID_GROUP_SLOTS.includes(slot.slotId)
@@ -262,7 +273,7 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        for (const item of (slot.selectedItems || [])) {
+        for (const item of sold) {
           const rate = itemRate(item, passport)
           services.push({
             itinerary_id: itineraryId,
@@ -303,9 +314,14 @@ export async function POST(request: NextRequest) {
       }
 
       if (services.length > 0) {
+        // Both day columns (the itinerary pages read itinerary_day_id; the
+        // grid wrote only day_id, so its services were invisible there —
+        // migration 385 now keeps them in step regardless). client_price is
+        // left empty: the service is priced at cost × margin, and the old
+        // column default of 0 read as "sold for free".
         const { error: svcError } = await supabase
           .from('itinerary_services')
-          .insert(services)
+          .insert(services.map(svc => ({ ...svc, itinerary_day_id: dayRecord.id, client_price: null })))
         if (svcError) {
           console.error(`Error creating services for day ${day.dayNumber}:`, svcError)
         } else {
