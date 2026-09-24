@@ -23,6 +23,7 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
+import { notifyTeam, bellSnippet } from '@/lib/notifications'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import {
   verifyConciergeSignature,
@@ -189,6 +190,34 @@ export async function POST(request: NextRequest) {
           requestId,
           brief_id: result.briefId,
           error: promoteErr?.message,
+        })
+      }
+    }
+
+    // The bell, for everyone on the team (operator, 2026-09-24). A revision
+    // re-opens the lead, so it re-announces it (same item, back to unread).
+    // Best-effort: the brief is already stored.
+    if (result.outcome === 'received' || result.outcome === 'updated') {
+      try {
+        const who = mapped.briefRow.visitor_name ? String(mapped.briefRow.visitor_name) : 'a visitor'
+        const where = Array.isArray(mapped.briefRow.destinations) ? mapped.briefRow.destinations.join(', ') : ''
+        await notifyTeam({
+          tenant_id: tenantId,
+          dedupe_key: `concierge:${result.briefId}`,
+          type: 'concierge_lead',
+          title: result.outcome === 'received'
+            ? `New concierge lead from ${who}`
+            : `Concierge lead updated: ${who}`,
+          message: bellSnippet(
+            (mapped.briefRow.brief_summary as string | null | undefined) || where
+          ),
+          link: '/concierge-briefs',
+        })
+      } catch (notifyErr) {
+        console.warn('[concierge] bell notification failed (non-fatal)', {
+          requestId,
+          brief_id: result.briefId,
+          error: (notifyErr as Error).message,
         })
       }
     }

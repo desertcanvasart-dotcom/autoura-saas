@@ -176,6 +176,7 @@ export default function NotificationBell() {
   const getIcon = (type: string) => {
     switch (type) {
       case 'new_email': return '✉️'
+      case 'concierge_lead': return '🛎️'
       case 'task_assigned': return '📋'
       case 'task_due_soon': return '⏰'
       case 'task_overdue': return '🚨'

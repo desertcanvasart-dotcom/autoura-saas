@@ -2,6 +2,7 @@
 // Single unified conversation - Get details, messages, update, delete
 
 import { NextRequest, NextResponse } from 'next/server'
+import { markTeamNotificationsRead } from '@/lib/notifications'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
 
 export async function GET(
@@ -154,6 +155,13 @@ export async function PATCH(
         .single()
 
       if (conv?.whatsapp_conversation_id) {
+        // The WhatsApp link's badge and the bell count the conversation, not
+        // its messages — both go quiet too when it is read from here.
+        await supabase
+          .from('whatsapp_conversations')
+          .update({ unread_count: 0 })
+          .eq('id', conv.whatsapp_conversation_id)
+        await markTeamNotificationsRead(`wa:${conv.whatsapp_conversation_id}`)
         await supabase
           .from('whatsapp_messages')
           .update({ status: 'read', read_at: new Date().toISOString() })

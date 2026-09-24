@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { markTeamNotificationsRead } from '@/lib/notifications'
 
 // GET /api/whatsapp/conversations - List all conversations
 
@@ -290,6 +291,9 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) throw error
+
+    // Read by one = read for the team: the bell item goes read for everyone.
+    if (action === 'mark_read') await markTeamNotificationsRead(`wa:${conversation_id}`)
 
     // Log activity if agent provided
     if (agent_id && action) {

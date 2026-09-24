@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { markTeamNotificationsRead } from '@/lib/notifications'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 
 const ALLOWED_STATUSES = ['needs_review', 'in_progress', 'responded', 'archived'] as const
@@ -79,6 +80,9 @@ export async function PATCH(
     if (!data) {
       return NextResponse.json({ success: false, error: 'Brief not found' }, { status: 404 })
     }
+
+    // Picked up (or answered, or archived) by one = no longer new for anyone.
+    if (reviewStatus !== 'needs_review') await markTeamNotificationsRead(`concierge:${id}`)
 
     return NextResponse.json({ success: true, data })
   } catch (error) {

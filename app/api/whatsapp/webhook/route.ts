@@ -27,6 +27,7 @@ import {
 } from '@/lib/whatsapp-cloud-api'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
 import { whatsappModel } from '@/lib/ai/models'
+import { notifyTeam, bellSnippet } from '@/lib/notifications'
 
 const TWIML_EMPTY = '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
 
@@ -485,6 +486,24 @@ async function processInboundWhatsAppMessage({
     console.error('❌ Error storing message:', msgError)
   } else if (isDuplicateDelivery) {
     console.warn(`⚠️ Duplicate delivery of ${messageSid} — not replying again`)
+  }
+
+  // The bell, for everyone on the team (operator, 2026-09-24): one item per
+  // conversation, refreshed with the latest message. Only for a message that
+  // was actually stored — never for a re-delivery. Best-effort.
+  if (conversationId && tenantId && !msgError) {
+    try {
+      await notifyTeam({
+        tenant_id: tenantId,
+        dedupe_key: `wa:${conversationId}`,
+        type: 'whatsapp_new_message',
+        title: `New WhatsApp message from ${clientName || senderName || phoneNumber}`,
+        message: bellSnippet(body) || (mediaUrl ? '📎 Attachment' : ''),
+        link: '/whatsapp-inbox',
+      })
+    } catch (e) {
+      console.error('WhatsApp bell notification failed:', (e as Error).message)
+    }
   }
 
   // ============================================
