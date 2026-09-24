@@ -21,7 +21,7 @@ import ItineraryExpenses from '@/app/components/ItineraryExpenses'
 import TripTimeline from '@/app/components/TripTimeline'
 import TravellerChat from '@/app/components/TravellerChat'
 import { showToast } from '@/app/contexts/ToastContext'
-import ItineraryBookingLink from '@/components/ItineraryBookingLink'
+import ItineraryBookingAction from '@/components/ItineraryBookingAction'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 
@@ -741,6 +741,11 @@ export default function ViewItineraryPage() {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
+              <ItineraryBookingAction
+                itineraryId={itinerary.id}
+                status={itinerary.status}
+                onStatusChange={status => setItinerary({ ...itinerary, status })}
+              />
               <button
                 onClick={() => setShowSendModal(true)}
                 className="bg-primary-600 text-white px-3 py-1.5 rounded-md hover:bg-primary-700 transition-colors text-sm font-medium flex items-center gap-1.5"
@@ -1006,7 +1011,7 @@ export default function ViewItineraryPage() {
                 <span className={`inline-block px-2 py-0.5 rounded border text-xs font-medium ${getStatusBadge(itinerary.status)}`}>
                   {itinerary.status.charAt(0).toUpperCase() + itinerary.status.slice(1)}
                 </span>
-                <ItineraryBookingLink itineraryId={itinerary.id} refreshKey={itinerary.status} className="!px-2 !py-0.5 !rounded" />
+                <ItineraryBookingAction itineraryId={itinerary.id} status={itinerary.status} variant="tag" />
                 {existingInvoice && (
                   <Link href={`/invoices/${existingInvoice.id}`} className="inline-block px-2 py-0.5 rounded border text-xs font-medium bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">
                     {existingInvoice.invoice_number}

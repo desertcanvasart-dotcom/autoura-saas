@@ -218,6 +218,9 @@ const COLOR_CLASSES: Record<string, { bg: string, border: string, text: string, 
   orange: { bg: 'bg-orange-600', border: 'border-orange-200', text: 'text-orange-600', light: 'bg-orange-50' },
   indigo: { bg: 'bg-indigo-600', border: 'border-indigo-200', text: 'text-indigo-600', light: 'bg-indigo-50' },
   cyan: { bg: 'bg-cyan-600', border: 'border-cyan-200', text: 'text-cyan-600', light: 'bg-cyan-50' },
+  // Drivers are teal. Missing, the Drivers tab crashed the page the moment it
+  // became active (COLOR_CLASSES['teal'].text on undefined) — live 2026-09-24.
+  teal: { bg: 'bg-teal-600', border: 'border-teal-200', text: 'text-teal-600', light: 'bg-teal-50' },
   pink: { bg: 'bg-pink-600', border: 'border-pink-200', text: 'text-pink-600', light: 'bg-pink-50' }
 }
 
@@ -675,7 +678,7 @@ export default function ResourceAssignmentV2({
   }
 
   const activeTypeConfig = RESOURCE_TYPES.find(t => t.key === activeTab)!
-  const activeColor = COLOR_CLASSES[activeTypeConfig.color]
+  const activeColor = COLOR_CLASSES[activeTypeConfig.color] ?? COLOR_CLASSES.blue
   const activeResources = getResourcesForType(activeTab)
   const activeConflicts = getConflictsForType(activeTab)
   const filteredAvailableResources = getFilteredResourcesForModal()
@@ -707,7 +710,7 @@ export default function ResourceAssignmentV2({
             const count = getResourcesForType(type.key).length
             const hasConflict = getConflictsForType(type.key).length > 0
             const isActive = activeTab === type.key
-            const colorClass = COLOR_CLASSES[type.color]
+            const colorClass = COLOR_CLASSES[type.color] ?? COLOR_CLASSES.blue
 
             return (
               <button

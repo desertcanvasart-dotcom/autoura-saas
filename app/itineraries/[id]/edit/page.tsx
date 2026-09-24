@@ -42,7 +42,7 @@ import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
 import { showToast } from '@/app/contexts/ToastContext'
 import { useRole } from '@/hooks/useRole'
-import ItineraryBookingLink from '@/components/ItineraryBookingLink'
+import ItineraryBookingAction from '@/components/ItineraryBookingAction'
 import { itineraryClientTotal } from '@/lib/itinerary-client-total'
 
 // ============================================
@@ -925,7 +925,12 @@ export default function ItineraryEditorPage() {
               ))}
             </select>
 
-            <ItineraryBookingLink itineraryId={itineraryId} refreshKey={itinerary.status} />
+            <ItineraryBookingAction
+              itineraryId={itineraryId}
+              status={itinerary.status}
+              onStatusChange={status => setItinerary({ ...itinerary, status })}
+              className="!px-2.5 !py-1 !text-xs"
+            />
 
             {/* FX reprice — confirmed trips only; supplier costs, never the client price */}
             {isAdmin && itinerary.status === 'confirmed' && (

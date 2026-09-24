@@ -27,8 +27,8 @@ describe('a booking with no quote renders', () => {
 
 describe('the itinerary shows its booking', () => {
   for (const f of ['app/itineraries/[id]/page.tsx', 'app/itineraries/[id]/edit/page.tsx']) {
-    it(`${f} renders ItineraryBookingLink`, () => {
-      expect(read(f)).toContain('<ItineraryBookingLink')
+    it(`${f} renders the booking action (Go to / Create / Convert to Booking)`, () => {
+      expect(read(f)).toContain('<ItineraryBookingAction')
     })
   }
 })
@@ -50,5 +50,27 @@ describe('the itinerary editor never zeroes a priced trip', () => {
     const body = src.slice(src.indexOf('const saveDraft = async'), src.indexOf('// 2. Update each day'))
     expect(body).toContain('itineraryClientTotal(liveServices, itinerary.margin_percent)')
     expect(body).toContain('...(liveServices.length > 0 ? { total_cost: clientTotal } : {})')
+  })
+})
+
+describe('resource assignment tabs', () => {
+  // Live 2026-09-24: Drivers is 'teal' and COLOR_CLASSES had no teal — the
+  // tab crashed the page the moment it became active.
+  it('every tab colour has an entry in COLOR_CLASSES', () => {
+    const src = read('app/components/ResourceAssignmentV2.tsx')
+    const table = src.slice(src.indexOf('const COLOR_CLASSES'), src.indexOf('export default function'))
+    const used = new Set([...src.matchAll(/^\s+color: '(\w+)'/gm)].map(m => m[1]))
+    expect(used.size).toBeGreaterThan(5)
+    for (const c of used) expect(table, `missing colour ${c}`).toMatch(new RegExp(`\\n\\s+${c}: \\{`))
+  })
+})
+
+describe('Create Booking for a confirmed itinerary', () => {
+  it('books only a confirmed itinerary, through the one booking-on-confirm step', () => {
+    const src = code(read('app/api/itineraries/[id]/booking/route.ts'))
+    expect(src).toContain("itinerary.status !== 'confirmed'")
+    expect(src).toContain('createBookingOnConfirm(id,')
+    // Confirm itself uses the same function — one implementation.
+    expect(read('app/api/itineraries/[id]/route.ts')).toContain("from '@/lib/bookings/create-booking-on-confirm'")
   })
 })
