@@ -74,9 +74,28 @@ export async function GET(request: NextRequest) {
       inviter = profile ?? null
     }
 
+    // Does this address already have a working login? Then accepting only
+    // adds the membership and KEEPS their password (the accept route never
+    // resets a live password), so the page must not ask them to create one —
+    // it did, they typed a new password, and every sign-in with it failed.
+    // Same test as the accept route: a profile + a confirmed auth user. An
+    // unconfirmed one is repaired with the password typed here, so it still
+    // gets the form. Token-gated: only the invitee learns this.
+    let hasAccount = false
+    const { data: existingProfile } = await db
+      .from('user_profiles')
+      .select('id')
+      .eq('email', String(invitation.email).toLowerCase())
+      .maybeSingle()
+    if (existingProfile?.id) {
+      const { data: existing } = await getSupabase().auth.admin.getUserById(existingProfile.id)
+      hasAccount = !!existing?.user?.email_confirmed_at
+    }
+
     return NextResponse.json({
       success: true,
       data: {
+        has_account: hasAccount,
         email: invitation.email,
         role: invitation.role,
         inviter,
