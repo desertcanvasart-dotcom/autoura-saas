@@ -125,7 +125,23 @@ export default defineRailway(() => {
     },
   });
 
+  // New email reaches phones and desktops while Autoura is closed (operator,
+  // 2026-09-24): checks every connected Gmail and rings its owner's devices.
+  // Every 5 minutes — Railway's shortest schedule.
+  const cronMailAlerts = service("cron:mail-alerts", {
+    source: autouraSaas,
+    build: "",
+    start: "npm run cron:mail-alerts",
+    replicas: { "asia-southeast1-eqsg3a": 1 },
+    deploy: { cronSchedule: "*/5 * * * *", restartPolicyType: "NEVER" },
+    networking: { privateNetworkEndpoint: "mail-alerts-cron" },
+    env: {
+      CRON_TARGET_URL: preserve(),
+      CRON_SECRET: preserve(),
+    },
+  });
+
   return project("Autoura multi-tenant", {
-    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync],
+    resources: [AgentMemoryCron, RemindersCron, getAutoura, cronexchangeRates, cronGmailSync, cronMailAlerts],
   });
 });

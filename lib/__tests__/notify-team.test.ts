@@ -18,9 +18,13 @@ function fakeAdmin() {
         return chain
       }
       return {
-        upsert: async (rows: Record<string, unknown>[], opts: unknown) => {
-          upserts.push({ rows, opts })
-          return { error: null }
+        upsert: (rows: Record<string, unknown>[] | Record<string, unknown>, opts: unknown) => {
+          upserts.push({ rows: Array.isArray(rows) ? rows : [rows], opts })
+          const done = { error: null }
+          return {
+            then: (ok: (v: unknown) => unknown) => ok(done),
+            select: async () => ({ data: filedBack, error: null }),
+          }
         },
         update: (set: unknown) => {
           const rec = { set, filters: [] as Array<[string, unknown]> }
@@ -38,10 +42,15 @@ function fakeAdmin() {
 
 vi.mock('@/lib/supabase-server', () => ({ createAdminClient: () => fakeAdmin() }))
 vi.mock('@/lib/email', () => ({ sendSystemEmail: vi.fn() }))
+const push = vi.fn(async () => ({ outcome: 'sent', delivered: 1 }))
+vi.mock('@/lib/push', () => ({ sendPushToUsers: (...a: unknown[]) => push(...(a as [])) }))
 
-import { notifyTeam, markTeamNotificationsRead, bellSnippet } from '@/lib/notifications'
+import { notifyTeam, notifyUserOnce, markTeamNotificationsRead, bellSnippet } from '@/lib/notifications'
 
-beforeEach(() => { members = []; upserts = []; updates = [] })
+// notifyUserOnce reads back what the upsert filed: [] when the key existed.
+let filedBack: Array<{ id: string }> = []
+
+beforeEach(() => { members = []; upserts = []; updates = []; filedBack = []; push.mockClear() })
 
 describe('notifyTeam — new WhatsApp messages and concierge leads go to everyone', () => {
   const base = {
@@ -79,5 +88,23 @@ describe('bellSnippet', () => {
     expect(bellSnippet('  hi\n\nthere ')).toBe('hi there')
     expect(bellSnippet('x'.repeat(200))).toHaveLength(140)
     expect(bellSnippet(null)).toBe('')
+  })
+})
+
+describe('the alert on phones and computers (push)', () => {
+  it('a team event rings every login on the team, tagged so one chat = one alert', async () => {
+    members = [{ user_id: 'u1' }, { user_id: 'u2' }]
+    await notifyTeam({ tenant_id: 't1', dedupe_key: 'wa:c1', type: 'whatsapp_new_message', title: 'New WhatsApp message from Ahmed', message: 'Hello', link: '/whatsapp-inbox' })
+    expect(push).toHaveBeenCalledWith(['u1', 'u2'], { title: 'New WhatsApp message from Ahmed', body: 'Hello', url: '/whatsapp-inbox', tag: 'wa:c1' })
+  })
+
+  it('a new email rings its owner once — the second check that sees it stays quiet', async () => {
+    const email = { user_id: 'u1', dedupe_key: 'gmail:m1', type: 'new_email', title: 'New email from Jane', message: 'Booking', link: '/inbox' }
+    filedBack = [{ id: 'n1' }]
+    expect(await notifyUserOnce(email)).toBe(true)
+    filedBack = [] // already filed: the upsert ignored it
+    expect(await notifyUserOnce(email)).toBe(false)
+    expect(push).toHaveBeenCalledTimes(1)
+    expect(push).toHaveBeenCalledWith(['u1'], expect.objectContaining({ tag: 'gmail:m1', url: '/inbox' }))
   })
 })

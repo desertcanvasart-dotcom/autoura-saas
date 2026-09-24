@@ -14,6 +14,7 @@
 
 import { createAdminClient } from '@/lib/supabase-server'
 import { sendSystemEmail } from '@/lib/email'
+import { sendPushToUsers, type PushPayload } from '@/lib/push'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface CreateNotificationInput {
@@ -79,7 +80,7 @@ export async function notifyUserOnce(input: {
   message: string
   link?: string | null
 }) {
-  const { error } = await createAdminClient()
+  const { data: filed, error } = await createAdminClient()
     .from('notifications')
     .upsert(
       {
@@ -94,7 +95,20 @@ export async function notifyUserOnce(input: {
       },
       { onConflict: 'user_id,dedupe_key', ignoreDuplicates: true }
     )
+    .select('id')
   if (error) throw error
+  // Only the insert that actually filed it rings the phone: a duplicate comes
+  // back empty, so two racing checks cannot alert twice.
+  if ((filed ?? []).length > 0) {
+    await sendPushToUsers([input.user_id], pushPayload(input))
+  }
+  return (filed ?? []).length > 0
+}
+
+/** The phone/desktop alert for a bell item. `tag` = the dedupe key, so a new
+ *  message in the same chat replaces its alert instead of stacking a second. */
+function pushPayload(input: { dedupe_key: string; title: string; message: string; link?: string | null }): PushPayload {
+  return { title: input.title, body: input.message, url: input.link ?? '/dashboard', tag: input.dedupe_key }
 }
 
 /**
@@ -142,6 +156,8 @@ export async function notifyTeam(input: {
     { onConflict: 'user_id,dedupe_key' }
   )
   if (error) throw error
+  // Every event rings: each is new (a new message, a new or reopened lead).
+  await sendPushToUsers(userIds, pushPayload(input))
 }
 
 /**

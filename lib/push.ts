@@ -32,10 +32,31 @@ export function isPushConfigured(): boolean {
 }
 
 /**
+ * Notify the devices of particular PEOPLE — a new email is its owner's, a new
+ * WhatsApp message or concierge lead is for everyone on the team (operator,
+ * 2026-09-24: alerts on phones and computers while Autoura is closed). Same
+ * fire-and-forget contract as below: never throws.
+ */
+export async function sendPushToUsers(userIds: string[], payload: PushPayload): Promise<PushResult> {
+  const ids = [...new Set(userIds.filter(Boolean))]
+  if (ids.length === 0) return { outcome: 'no_subscriptions', delivered: 0 }
+  return sendToSubscriptions('user_id', ids, payload)
+}
+
+/**
  * Notify every subscribed browser of a tenant. Dead endpoints (404/410 from
  * the push service) are pruned so the table tracks reality.
  */
 export async function sendPushToTenant(tenantId: string, payload: PushPayload): Promise<PushResult> {
+  return sendToSubscriptions('tenant_id', [tenantId], payload)
+}
+
+/** Every subscription whose `column` is one of `values`. */
+async function sendToSubscriptions(
+  column: 'tenant_id' | 'user_id',
+  values: string[],
+  payload: PushPayload
+): Promise<PushResult> {
   try {
     if (!isPushConfigured()) {
       console.log('[push] not configured (VAPID env missing) — skipping')
@@ -51,7 +72,7 @@ export async function sendPushToTenant(tenantId: string, payload: PushPayload): 
     const { data: subs, error } = await supabase
       .from('push_subscriptions')
       .select('id, endpoint, p256dh, auth')
-      .eq('tenant_id', tenantId)
+      .in(column, values)
     if (error || !subs || subs.length === 0) {
       if (error) {
         console.error('[push] load subscriptions failed:', error.message)
