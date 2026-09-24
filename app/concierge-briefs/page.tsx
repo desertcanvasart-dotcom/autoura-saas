@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import BriefDetailDrawer from './BriefDetailDrawer'
 import { conciergeSla, type SlaLevel } from '@/lib/concierge-sla'
+import { requestBadgeRefresh } from '@/lib/use-inbox-unread'
 
 interface Brief {
   id: string
@@ -132,6 +133,7 @@ export default function ConciergeBriefsPage() {
       })
       if (res.ok) {
         setBriefs(prev => prev.map(b => (b.id === id ? { ...b, review_status: to } : b)))
+        requestBadgeRefresh() // the sidebar's "needs review" count follows now
       }
     } catch (e) {
       console.error('Error updating brief:', e)

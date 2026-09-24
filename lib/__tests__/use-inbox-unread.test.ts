@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client'
 const toast = vi.fn()
 vi.mock('@/app/contexts/ToastContext', () => ({ showToast: (...a: unknown[]) => toast(...a) }))
 
-import { useInboxUnreadCount, requestInboxUnreadRefresh } from '@/lib/use-inbox-unread'
+import { useInboxUnreadCount, requestInboxUnreadRefresh, useTeamBadges } from '@/lib/use-inbox-unread'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -20,13 +20,13 @@ let root: Root
 let host: HTMLElement
 const flush = () => act(async () => { await new Promise(r => setTimeout(r, 0)) })
 
-function respond(...answers: Array<{ status: number; unreadCount?: number }>) {
+function respond(...answers: Array<{ status: number } & Record<string, unknown>>) {
   const fetchMock = vi.fn()
   for (const a of answers) {
     fetchMock.mockResolvedValueOnce({
       ok: a.status >= 200 && a.status < 300,
       status: a.status,
-      json: async () => ({ unreadCount: a.unreadCount }),
+      json: async () => a,
     })
   }
   vi.stubGlobal('fetch', fetchMock)
@@ -97,5 +97,44 @@ describe('useInboxUnreadCount', () => {
     await mount(null)
     expect(f).not.toHaveBeenCalled()
     expect(seen.at(-1)).toBeNull()
+  })
+})
+
+let team: Array<{ whatsapp: number | null; concierge: number | null }> = []
+function TeamProbe({ notify }: { notify: { whatsapp?: boolean; concierge?: boolean } }) {
+  team.push(useTeamBadges(true, { notify }))
+  return null
+}
+
+describe('useTeamBadges', () => {
+  beforeEach(() => { team = [] })
+
+  it('reads WhatsApp and concierge counts together, one request', async () => {
+    const f = respond({ status: 200, whatsappUnread: 4, conciergeNew: 8 })
+    await act(async () => { root.render(createElement(TeamProbe, { notify: {} })) })
+    await flush()
+    expect(team.at(-1)).toEqual({ whatsapp: 4, concierge: 8 })
+    expect(f).toHaveBeenCalledWith('/api/badges')
+    expect(f).toHaveBeenCalledTimes(1)
+  })
+
+  it('toasts per kind, only where notify is on', async () => {
+    respond(
+      { status: 200, whatsappUnread: 0, conciergeNew: 8 },
+      { status: 200, whatsappUnread: 1, conciergeNew: 9 },
+    )
+    await act(async () => { root.render(createElement(TeamProbe, { notify: { whatsapp: true } })) })
+    await flush()
+    await act(async () => { requestInboxUnreadRefresh() })
+    await flush()
+    expect(toast).toHaveBeenCalledTimes(1)
+    expect(toast).toHaveBeenCalledWith('info', 'New WhatsApp message')
+  })
+
+  it('a count the server could not read hides that badge only', async () => {
+    respond({ status: 200, whatsappUnread: null, conciergeNew: 2 })
+    await act(async () => { root.render(createElement(TeamProbe, { notify: {} })) })
+    await flush()
+    expect(team.at(-1)).toEqual({ whatsapp: null, concierge: 2 })
   })
 })

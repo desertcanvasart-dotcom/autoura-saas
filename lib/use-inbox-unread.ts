@@ -3,94 +3,163 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { showToast } from '@/app/contexts/ToastContext'
 
-// How many unread emails sit in the Primary tab of the signed-in user's Gmail
-// inbox (Promotions, Social, Updates and Forums are left out) — the number the
-// sidebar's Inbox link and the Inbox page header show.
+// The live counts the sidebar badges, so you notice something new arrived:
 //
-// Read from POST /api/gmail/poll. Checked every minute while the tab is
-// visible, again the moment the tab comes back into view, and on demand when
-// the Inbox page reads, marks or moves mail (requestInboxUnreadRefresh).
+//   email     — unread emails in the Primary tab of YOUR Gmail inbox
+//               (Promotions, Social, Updates, Forums left out).
+//               POST /api/gmail/poll.
+//   whatsapp  — the team's unread WhatsApp messages.       GET /api/badges
+//   concierge — concierge leads still in "Needs review".    GET /api/badges
+//
+// Each is checked every minute while the tab is visible, again the moment the
+// tab comes back into view, and on demand when a page reads, marks or moves
+// something (requestBadgeRefresh). When a count goes UP it can pop a toast.
 
-const REFRESH_EVENT = 'autoura:inbox-unread-refresh'
+const REFRESH_EVENT = 'autoura:badges-refresh'
 const POLL_MS = 60_000
 
 /** Ask every mounted counter to re-read now (e.g. after marking mail read). */
-export function requestInboxUnreadRefresh() {
+export function requestBadgeRefresh() {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(REFRESH_EVENT))
 }
+/** The Inbox page's name for the same thing. */
+export const requestInboxUnreadRefresh = requestBadgeRefresh
 
-interface Options {
-  /** Pop a "new email" toast when the count goes up. */
-  notify?: boolean
-}
+/** A count per key (null = unknown: the badge hides); 'stop' = never ask again
+ *  this page load (signed out / no Gmail); 'skip' = transient failure. */
+type Reading<K extends string> = Record<K, number | null> | 'stop' | 'skip'
 
 /**
- * The unread count, or null while unknown or when Gmail is not connected
- * (the badge then shows nothing rather than a misleading 0).
+ * Polls `read` and returns its counts. When a key's count rises, pops
+ * `toasts[key](howManyNew)` — unless notify is off. The first reading is
+ * never "new".
  */
-export function useInboxUnreadCount(userId: string | null | undefined, { notify = false }: Options = {}) {
-  const [count, setCount] = useState<number | null>(null)
-  const lastRef = useRef<number | null>(null)
-  const stoppedRef = useRef(false) // Gmail not connected: stop asking
+function useLiveCounts<K extends string>(
+  keys: readonly K[],
+  read: (() => Promise<Reading<K>>) | null,
+  toasts: Partial<Record<K, (n: number) => string>>,
+  notify: boolean,
+): Record<K, number | null> {
+  const empty = useCallback(
+    () => Object.fromEntries(keys.map(k => [k, null])) as Record<K, number | null>,
+    [keys],
+  )
+  const [counts, setCounts] = useState<Record<K, number | null>>(empty)
+  const lastRef = useRef<Record<K, number | null>>(empty())
+  const stoppedRef = useRef(false)
   const inFlightRef = useRef(false)
   const notifyRef = useRef(notify)
   notifyRef.current = notify
+  const toastsRef = useRef(toasts)
+  toastsRef.current = toasts
 
-  const read = useCallback(async () => {
-    if (!userId || stoppedRef.current || inFlightRef.current) return
+  const tick = useCallback(async () => {
+    if (!read || stoppedRef.current || inFlightRef.current) return
     inFlightRef.current = true
     try {
-      const res = await fetch('/api/gmail/poll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      })
-      if (res.status === 401 || res.status === 403) {
-        // No Gmail connected (or signed out). Nothing to count until the page
-        // reloads — e.g. after connecting Gmail in Settings.
+      const r = await read()
+      if (r === 'skip') return // keep the last known counts
+      if (r === 'stop') {
         stoppedRef.current = true
-        lastRef.current = null
-        setCount(null)
+        lastRef.current = empty()
+        setCounts(empty())
         return
       }
-      if (!res.ok) return // transient (Gmail hiccup): keep the last known count
-      const data = await res.json()
-      const next = Number(data.unreadCount) || 0
-      const prev = lastRef.current
-      if (notifyRef.current && prev !== null && next > prev) {
-        const n = next - prev
-        showToast('info', n === 1 ? 'New email in your Inbox' : `${n} new emails in your Inbox`)
+      for (const k of keys) {
+        const prev = lastRef.current[k]
+        const next = r[k]
+        const say = toastsRef.current[k]
+        if (notifyRef.current && say && prev !== null && next !== null && next > prev) {
+          showToast('info', say(next - prev))
+        }
       }
-      lastRef.current = next
-      setCount(next)
+      lastRef.current = r
+      setCounts(r)
     } catch {
-      // Network blip: keep the last known count, try again next tick.
+      // Network blip: keep the last known counts, try again next tick.
     } finally {
       inFlightRef.current = false
     }
-  }, [userId])
+  }, [read, keys, empty])
 
   useEffect(() => {
     stoppedRef.current = false
-    lastRef.current = null
-    setCount(null)
-    if (!userId) return
+    lastRef.current = empty()
+    setCounts(empty())
+    if (!read) return
 
-    read()
+    tick()
     const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') read()
+      if (document.visibilityState === 'visible') tick()
     }, POLL_MS)
     const onVisible = () => {
-      if (document.visibilityState === 'visible') read()
+      if (document.visibilityState === 'visible') tick()
     }
     document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener(REFRESH_EVENT, read)
+    window.addEventListener(REFRESH_EVENT, tick)
     return () => {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener(REFRESH_EVENT, read)
+      window.removeEventListener(REFRESH_EVENT, tick)
     }
-  }, [userId, read])
+  }, [read, tick, empty])
 
-  return count
+  return counts
+}
+
+/** Signed out / no access / no Gmail → stop asking; other failures → try again later. */
+function outcome(res: Response): 'stop' | 'skip' | null {
+  if (res.status === 401 || res.status === 403) return 'stop'
+  if (!res.ok) return 'skip'
+  return null
+}
+
+const EMAIL_KEYS = ['email'] as const
+const EMAIL_TOASTS = {
+  email: (n: number) => (n === 1 ? 'New email in your Inbox' : `${n} new emails in your Inbox`),
+}
+
+/**
+ * Unread Primary-tab emails, or null while unknown or when Gmail is not
+ * connected (the badge then shows nothing rather than a misleading 0).
+ */
+export function useInboxUnreadCount(
+  userId: string | null | undefined,
+  { notify = false }: { notify?: boolean } = {},
+) {
+  const read = useCallback(async (): Promise<Reading<'email'>> => {
+    const res = await fetch('/api/gmail/poll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    })
+    const bad = outcome(res)
+    if (bad) return bad
+    const data = await res.json()
+    return { email: Number(data.unreadCount) || 0 }
+  }, [userId])
+  return useLiveCounts(EMAIL_KEYS, userId ? read : null, EMAIL_TOASTS, notify).email
+}
+
+const TEAM_KEYS = ['whatsapp', 'concierge'] as const
+type TeamKey = (typeof TEAM_KEYS)[number]
+
+/** The team's unread WhatsApp messages and concierge leads awaiting review. */
+export function useTeamBadges(
+  enabled: boolean,
+  { notify = {} }: { notify?: Partial<Record<TeamKey, boolean>> } = {},
+) {
+  const read = useCallback(async (): Promise<Reading<TeamKey>> => {
+    const res = await fetch('/api/badges')
+    const bad = outcome(res)
+    if (bad) return bad
+    const data = await res.json()
+    const n = (v: unknown) => (typeof v === 'number' ? v : null)
+    return { whatsapp: n(data.whatsappUnread), concierge: n(data.conciergeNew) }
+  }, [])
+  // Per-key toast switches (e.g. no WhatsApp toast while on the WhatsApp page).
+  const toasts: Partial<Record<TeamKey, (n: number) => string>> = {}
+  if (notify.whatsapp) toasts.whatsapp = n => (n === 1 ? 'New WhatsApp message' : `${n} new WhatsApp messages`)
+  if (notify.concierge) toasts.concierge = n => (n === 1 ? 'New concierge lead' : `${n} new concierge leads`)
+  return useLiveCounts(TEAM_KEYS, enabled ? read : null, toasts, true)
 }
