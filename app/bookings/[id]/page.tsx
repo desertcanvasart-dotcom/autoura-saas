@@ -11,6 +11,9 @@ import {
 } from 'lucide-react'
 import AssigneeSelect from '@/components/AssigneeSelect'
 import BookingExtrasPanel from '@/components/BookingExtrasPanel'
+import BookingStatusControl, { type StatusOverride } from '@/components/booking/BookingStatusControl'
+import BookingSuppliersPanel from '@/components/booking/BookingSuppliersPanel'
+import { useRole } from '@/hooks/useRole'
 
 interface Booking {
   id: string
@@ -103,6 +106,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+  const { isAdmin, isManager, isViewer } = useRole()
   const [toasts, setToasts] = useState<Toast[]>([])
 
   // New passenger form
@@ -414,6 +418,15 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-sm text-gray-500 mt-1">{booking.trip_name}</p>
             </div>
 
+            <BookingStatusControl
+              bookingId={booking.id}
+              status={booking.status}
+              override={(booking as { status_override?: StatusOverride | null }).status_override}
+              canEdit={isAdmin || isManager}
+              onChanged={fetchBooking}
+              notify={showToast}
+            />
+
             {/* Action Buttons */}
             {booking.quote_type !== 'b2b' && booking.clients && (
               <div className="flex gap-2">
@@ -439,7 +452,7 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Tabs */}
           <div className="flex gap-1 border-b border-gray-200">
-            {['overview', 'passengers', 'payments', 'documents'].map((tab) => (
+            {['overview', 'suppliers', 'passengers', 'payments', 'documents'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -600,6 +613,16 @@ export default function BookingDetailPage({ params }: { params: Promise<{ id: st
               </div>
             ))}
           </div>
+        )}
+
+        {activeTab === 'suppliers' && (
+          <BookingSuppliersPanel
+            bookingId={booking.id}
+            currency={booking.currency}
+            hasItinerary={Boolean((booking as { itinerary_id?: string | null }).itinerary_id)}
+            canEdit={!isViewer}
+            notify={showToast}
+          />
         )}
 
         {activeTab === 'passengers' && (

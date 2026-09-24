@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { validateAssignee, notifyTripAssignment } from '@/lib/trip-assignee'
+import { checkStatusChange, normalizeStatusChoice, OPERATOR_STATUS_CHOICES } from '@/lib/bookings/booking-status'
 
 // GET single booking
 export async function GET(
@@ -134,31 +135,62 @@ export async function PATCH(
       internal_notes,
       payment_deadline,
       cancellation_reason,
-      assigned_to
+      assigned_to,
+      status_override_ack
     } = body
 
     // Build update object
     const updates: any = { updated_at: new Date().toISOString() }
 
     if (status !== undefined) {
-      // Validate status transitions
-      const validStatuses = ['pending_deposit', 'confirmed', 'paid_full', 'in_progress', 'completed', 'cancelled']
-      if (!validStatuses.includes(status)) {
+      // The operator's choices (lib/bookings/booking-status.ts). Payment
+      // statuses are never typed in: 'active' — and the old payment values,
+      // which mean the same — hands the status back to the money (migration
+      // 388's trigger re-derives it when total_paid is in the update).
+      const choice = normalizeStatusChoice(status)
+      if (!choice) {
         return NextResponse.json(
-          { success: false, error: 'Invalid status' },
+          { success: false, error: `status must be one of: ${OPERATOR_STATUS_CHOICES.join(', ')}` },
           { status: 400 }
         )
       }
-      updates.status = status
 
-      // Set dates based on status changes
-      if (status === 'confirmed') {
-        updates.confirmation_date = new Date().toISOString().split('T')[0]
-      } else if (status === 'cancelled') {
-        updates.cancellation_date = new Date().toISOString().split('T')[0]
-      } else if (status === 'paid_full') {
-        updates.full_payment_date = new Date().toISOString().split('T')[0]
+      const [{ data: current }, { data: supplierRows }] = await Promise.all([
+        adminClient.from('bookings').select('total_paid').eq('id', id).eq('tenant_id', tenant_id).maybeSingle(),
+        adminClient.from('booking_supplier_status').select('status').eq('booking_id', id).eq('tenant_id', tenant_id),
+      ])
+      if (!current) {
+        return NextResponse.json({ success: false, error: 'Booking not found' }, { status: 404 })
       }
+
+      const check = checkStatusChange(choice, supplierRows, status_override_ack === true)
+      if (!check.ok) {
+        return NextResponse.json(
+          { success: false, code: check.code, error: check.message, backing: check.backing },
+          { status: 409 }
+        )
+      }
+
+      if (choice === 'active') {
+        updates.status = 'pending_deposit'
+        updates.total_paid = current.total_paid ?? 0 // fires the status trigger
+      } else {
+        updates.status = choice
+      }
+      if (choice === 'cancelled') updates.cancellation_date = new Date().toISOString().split('T')[0]
+
+      // Recorded only when the operator went ahead without supplier backing;
+      // any other status change clears it (it describes the current status).
+      updates.status_override = check.overridden
+        ? {
+            to: choice,
+            by: authResult.user.id,
+            email: authResult.user.email ?? null,
+            at: new Date().toISOString(),
+            confirmed: check.backing.confirmed,
+            total: check.backing.total,
+          }
+        : null
     }
 
     if (special_requests !== undefined) updates.special_requests = special_requests
