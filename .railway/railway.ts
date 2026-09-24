@@ -72,11 +72,16 @@ export default defineRailway(() => {
       GOOGLE_CLIENT_SECRET: preserve(),
       GOOGLE_REDIRECT_URI: preserve(),
       NEXT_PUBLIC_APP_URL: preserve(),
+      // Added in the dashboard, never written here — an apply without these
+      // three would DELETE them from the live site (caught 2026-09-24).
+      NEXT_PUBLIC_GROWTH_WIDGET_URL: preserve(),
       NEXT_PUBLIC_SUPABASE_ANON_KEY: preserve(),
       NEXT_PUBLIC_SUPABASE_URL: preserve(),
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: preserve(),
       OAUTH_STATE_SECRET: preserve(),
       OPENAI_API_KEY: preserve(),
+      OUTBOUND_FROM_EMAIL: preserve(),
+      OUTBOUND_REPLY_TO: preserve(),
       RESEND_API_KEY: preserve(),
       RESEND_FROM_EMAIL: preserve(),
       SAWA_SYNC_SECRET: preserve(),
