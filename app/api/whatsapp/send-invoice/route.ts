@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
 import { requireAuth } from '@/lib/supabase-server'
+import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
 import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { checkAmountDeliverable } from '@/lib/pricing-guards'
@@ -311,26 +312,19 @@ export async function POST(request: NextRequest) {
 
     // Upload to Supabase Storage (use admin client for storage)
 
-    const fileName = `invoices/invoice-${invoice.invoice_number}-${Date.now()}.pdf`
-
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('documents')
-      .upload(fileName, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true
-      })
-
-    if (uploadError) {
-      console.error('❌ Upload error:', uploadError)
-      throw new Error(`Failed to upload PDF: ${uploadError.message}`)
+    // Private bucket + signed link (lib/storage/shareable-pdf.ts): the old
+    // `documents` bucket never existed, and a public link would expose it.
+    const shared = await uploadShareablePdf(supabaseAdmin, {
+      tenantId: authResult.tenant_id,
+      kind: 'invoices',
+      fileName: `invoice-${invoice.invoice_number}-${Date.now()}.pdf`,
+      bytes: pdfBytes,
+    })
+    if (!shared.ok) {
+      console.error('❌ Upload error:', shared.error)
+      throw new Error(shared.error)
     }
-
-    // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
-      .from('documents')
-      .getPublicUrl(fileName)
-
-    const pdfUrl = urlData.publicUrl
+    const pdfUrl = shared.url
 
 
     const businessName = senderTenant?.company_name || ''

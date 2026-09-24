@@ -42,7 +42,10 @@ export async function GET(
     if (url.searchParams.get('include') === 'days') {
       const { data: days } = await supabase
         .from('itinerary_days')
-        .select('*, itinerary_services(*)')
+        // Hinted — two keys to itinerary_days make the bare embed ambiguous
+        // (PGRST201), and this load (the grid's "load itinerary") came back
+        // with no days at all.
+        .select('*, itinerary_services!itinerary_services_day_id_fkey(*)')
         .eq('itinerary_id', id)
         .order('day_number', { ascending: true })
       ;(data as any).itinerary_days = days || []

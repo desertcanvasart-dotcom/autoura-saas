@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { sendWhatsAppMessage } from '@/lib/whatsapp'
-import { requireAuth } from '@/lib/supabase-server'
+import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
+import { contractNumber, contractDestinations } from '@/lib/contract-facts'
 import { generateContractPDF } from '@/lib/contract-pdf-generator'
 import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
 
@@ -62,6 +64,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const { data: contractDays } = await supabase
+      .from('itinerary_days')
+      .select('day_number, city, overnight_city')
+      .eq('itinerary_id', itineraryId)
+
     const numAdults = itinerary.num_adults || 1
     const numChildren = itinerary.num_children || 0
     const totalCost = itinerary.total_cost || 0
@@ -86,7 +93,7 @@ export async function POST(request: NextRequest) {
             ? senderTenant.logo_url
             : null,
       },
-      contractNumber: `TC-2025-${itineraryId.slice(0, 8).toUpperCase()}`,
+      contractNumber: contractNumber(itineraryId),
       contractDate: new Date().toISOString(),
       clientName: itinerary.client_name || 'Valued Guest',
       clientEmail: itinerary.client_email || undefined,
@@ -94,7 +101,8 @@ export async function POST(request: NextRequest) {
       tourName: itinerary.trip_name || 'Egypt Tour',
       startDate: itinerary.start_date,
       endDate: itinerary.end_date,
-      destinations: 'Cairo, Luxor, Aswan',
+      // The trip's own cities — never an invented default.
+      destinations: contractDestinations(contractDays ?? []),
       totalCost: totalCost,
       currency: itinerary.currency || 'EUR'
     }
@@ -103,26 +111,19 @@ export async function POST(request: NextRequest) {
 
     // Upload to Supabase Storage
 
-    const fileName = `contracts/contract-${itineraryId}-${Date.now()}.pdf`
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('documents')
-      .upload(fileName, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true
-      })
-
-    if (uploadError) {
-      console.error('❌ Upload error:', uploadError)
-      throw new Error(`Failed to upload PDF: ${uploadError.message}`)
+    // Private bucket + signed link (lib/storage/shareable-pdf.ts): the old
+    // `documents` bucket never existed — "Bucket not found".
+    const shared = await uploadShareablePdf(createAdminClient(), {
+      tenantId: authResult.tenant_id,
+      kind: 'contracts',
+      fileName: `contract-${itineraryId}-${Date.now()}.pdf`,
+      bytes: pdfBytes,
+    })
+    if (!shared.ok) {
+      console.error('❌ Upload error:', shared.error)
+      throw new Error(shared.error)
     }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('documents')
-      .getPublicUrl(fileName)
-
-    const pdfUrl = urlData.publicUrl
+    const pdfUrl = shared.url
 
 
     // Build message
