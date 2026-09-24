@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
-import { generateInvoicePDF } from '@/lib/invoice-pdf-generator'
+import { loadSenderTenant } from '@/lib/sender-tenant'
+import { sendSystemEmail } from '@/lib/email'
+import { sendWhatsAppMessage } from '@/lib/whatsapp'
+import {
+  confirmationRecipient, confirmationText, confirmationEmail, fromWithCompany,
+  type ConfirmationBooking,
+} from '@/lib/bookings/confirmation-message'
 
+// POST /api/bookings/[id]/send-confirmation  { send_via: 'email' | 'whatsapp' }
+//
+// Sends the booking confirmation — it used to build the text and return it
+// as a "preview" ("integration pending"), sending nothing, and refused every
+// booking made by confirming an itinerary. Direct and B2C bookings now send;
+// a partner (B2B) booking is confirmed to the partner, not from here.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -9,151 +21,74 @@ export async function POST(
   try {
     const { id } = await params
 
-
     const authResult = await requireAuth()
     if (authResult.error !== null) {
-      return NextResponse.json(
-        { success: false, error: authResult.error },
-        { status: authResult.status }
-      )
+      return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status })
     }
-
     const { tenant_id, role } = authResult
-
-    // Only managers and above can send confirmations
     if (!['owner', 'admin', 'manager'].includes(role || '')) {
-      return NextResponse.json(
-        { success: false, error: 'Insufficient permissions' },
-        { status: 403 }
-      )
+      return NextResponse.json({ success: false, error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    const adminClient = createAdminClient()
-    const body = await request.json()
-    const { send_via = 'email', include_deposit_invoice = true } = body
+    const body = await request.json().catch(() => ({}))
+    const sendVia = body.send_via === 'whatsapp' ? 'whatsapp' : body.send_via === 'email' || body.send_via === undefined ? 'email' : null
+    if (!sendVia) {
+      return NextResponse.json({ success: false, error: 'send_via must be "email" or "whatsapp"' }, { status: 400 })
+    }
 
-    // Fetch booking with related data
-    const { data: booking, error: bookingError } = await adminClient
+    const { data: booking, error: bookingError } = await createAdminClient()
       .from('bookings')
       .select(`
-        *,
-        itineraries (
-          id,
-          itinerary_code,
-          trip_name,
-          client_name
-        ),
-        clients (
-          id,
-          full_name,
-          email,
-          phone,
-          whatsapp
-        )
+        booking_number, quote_type, trip_name, start_date, end_date, num_travelers, currency,
+        total_amount, total_paid, balance_due, deposit_amount, payment_deadline, special_requests,
+        itineraries ( client_name, client_email, client_phone ),
+        clients ( full_name, email, phone, whatsapp )
       `)
       .eq('id', id)
       .eq('tenant_id', tenant_id)
-      .single()
-
+      .maybeSingle()
     if (bookingError || !booking) {
-      return NextResponse.json(
-        { success: false, error: 'Booking not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, error: 'Booking not found' }, { status: 404 })
+    }
+    if (booking.quote_type === 'b2b') {
+      return NextResponse.json({ success: false, error: 'A partner booking is confirmed to the partner, not from here' }, { status: 400 })
     }
 
-    if (booking.quote_type !== 'b2c') {
-      return NextResponse.json(
-        { success: false, error: 'Confirmations are only available for B2C bookings' },
-        { status: 400 }
-      )
-    }
+    const b = booking as unknown as ConfirmationBooking
+    const to = confirmationRecipient(b)
+    const tenant = await loadSenderTenant(tenant_id)
+    const company = tenant?.company_name || ''
 
-    // Check if client has contact info
-    const client = booking.clients
-    if (!client?.email && send_via === 'email') {
-      return NextResponse.json(
-        { success: false, error: 'Client email not found' },
-        { status: 400 }
-      )
-    }
-
-    if (!client?.whatsapp && send_via === 'whatsapp') {
-      return NextResponse.json(
-        { success: false, error: 'Client WhatsApp number not found' },
-        { status: 400 }
-      )
-    }
-
-    // Generate confirmation message
-    const confirmationMessage = `
-Dear ${client?.full_name || 'Valued Customer'},
-
-Thank you for booking with us! Your booking is confirmed.
-
-📋 Booking Details:
-━━━━━━━━━━━━━━━━━━━━━
-🎫 Booking Number: ${booking.booking_number}
-✈️ Trip: ${booking.trip_name}
-📅 Dates: ${new Date(booking.start_date).toLocaleDateString()} - ${new Date(booking.end_date).toLocaleDateString()}
-👥 Travelers: ${booking.num_travelers}
-💰 Total Amount: ${booking.currency} ${booking.total_amount.toFixed(2)}
-
-📊 Payment Status:
-━━━━━━━━━━━━━━━━━━━━━
-✅ Paid: ${booking.currency} ${booking.total_paid.toFixed(2)}
-⏳ Balance: ${booking.currency} ${booking.balance_due.toFixed(2)}
-${booking.balance_due > 0 && booking.payment_deadline ? `📆 Payment Due: ${new Date(booking.payment_deadline).toLocaleDateString()}` : ''}
-
-${booking.special_requests ? `\n📝 Special Requests:\n${booking.special_requests}\n` : ''}
-
-We look forward to serving you!
-
-Best regards,
-Your Travel Team
-    `.trim()
-
-    // Send via email or WhatsApp
-    if (send_via === 'email') {
-      // TODO: Integrate with existing email system
-      // For now, return the message that would be sent
-
-
-
-      return NextResponse.json({
-        success: true,
-        message: 'Confirmation would be sent via email (email integration pending)',
-        preview: {
-          to: client?.email,
-          subject: `Booking Confirmation - ${booking.booking_number}`,
-          body: confirmationMessage
-        }
+    if (sendVia === 'email') {
+      if (!to.email) {
+        return NextResponse.json({ success: false, error: 'No email address for this client — add one to the client or the itinerary' }, { status: 400 })
+      }
+      const { subject, html } = confirmationEmail(b, company)
+      const result = await sendSystemEmail({
+        to: to.email,
+        subject,
+        html,
+        from: fromWithCompany(company, process.env.RESEND_FROM_EMAIL),
+        ...(tenant?.contact_email ? { replyTo: tenant.contact_email } : {}),
       })
-    } else if (send_via === 'whatsapp') {
-      // TODO: Integrate with WhatsApp API
-
-
-
-      return NextResponse.json({
-        success: true,
-        message: 'Confirmation would be sent via WhatsApp (WhatsApp integration pending)',
-        preview: {
-          to: client?.whatsapp,
-          message: confirmationMessage
-        }
-      })
-    } else {
-      return NextResponse.json({
-        success: false,
-        error: 'Invalid send_via parameter. Must be "email" or "whatsapp"'
-      },
-        { status: 400 }
-      )
+      if (!result.sent) {
+        return NextResponse.json({ success: false, error: 'Email is not configured (RESEND_API_KEY) — nothing was sent' }, { status: 503 })
+      }
+      return NextResponse.json({ success: true, message: `Confirmation emailed to ${to.email}` })
     }
-  } catch (error: any) {
-    console.error('❌ Error sending confirmation:', error)
+
+    if (!to.whatsapp) {
+      return NextResponse.json({ success: false, error: 'No WhatsApp or phone number for this client' }, { status: 400 })
+    }
+    const result = await sendWhatsAppMessage({ to: to.whatsapp, body: confirmationText(b, company) })
+    if (!result.success) {
+      return NextResponse.json({ success: false, error: result.error || 'WhatsApp send failed' }, { status: 502 })
+    }
+    return NextResponse.json({ success: true, message: `Confirmation sent by WhatsApp to ${to.whatsapp}` })
+  } catch (error) {
+    console.error('Error sending confirmation:', error)
     return NextResponse.json(
-      { success: false, error: error?.message || 'Internal server error' },
+      { success: false, error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }
     )
   }

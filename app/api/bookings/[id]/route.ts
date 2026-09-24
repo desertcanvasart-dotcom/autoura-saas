@@ -32,6 +32,8 @@ export async function GET(
           itinerary_code,
           trip_name,
           client_name,
+          client_email,
+          client_phone,
           start_date,
           end_date,
           total_days,
