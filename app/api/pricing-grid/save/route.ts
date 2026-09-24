@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
 import { ratePin } from '@/lib/pricing/rate-pin'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { resolveGridClient } from '@/lib/grid-client-link'
 import type { TablesInsert } from '@/types/database.types'
 
 function generateItineraryCode(): string {
@@ -96,11 +97,23 @@ export async function POST(request: NextRequest) {
     const finalSupplierTotal = (totals?.totalCost && totals.totalCost > 0) ? totals.totalCost : computedSupplierTotal
     const finalSellingTotal = (totals?.sellingPriceTotal && totals.sellingPriceTotal > 0) ? totals.sellingPriceTotal : computedSellingTotal
 
+    // 0. The CRM client this trip belongs to: the one the grid was opened for,
+    //    else a match by email/phone, else (direct travellers) a new Lead.
+    const clientLink = await resolveGridClient(supabase, tenant_id, {
+      clientId: config.clientId,
+      name: config.clientName,
+      email: config.clientEmail,
+      phone: config.clientPhone,
+      source: config.clientSource === 'email' || config.clientSource === 'whatsapp' ? config.clientSource : null,
+      allowCreate: config.clientType !== 'b2b',
+    })
+    const clientId = clientLink.clientId
+
     // 1. Create/update itinerary record
     const itineraryData: TablesInsert<'itineraries'> = {
       tenant_id,
       itinerary_code: itineraryCode,
-      client_id: config.clientId || null,
+      client_id: clientId,
       client_name: config.clientName || null,
       client_email: config.clientEmail || null,
       client_phone: config.clientPhone || null,
@@ -134,9 +147,12 @@ export async function POST(request: NextRequest) {
     let itinerary: any
     if (config.itineraryId) {
       // Update existing
+      // Re-saving never unlinks: with no client resolved, the itinerary keeps
+      // whichever client it already had.
+      const { client_id: _clientId, ...unlinked } = itineraryData
       const { data, error } = await supabase
         .from('itineraries')
-        .update(itineraryData)
+        .update(clientId ? itineraryData : unlinked)
         .eq('id', config.itineraryId)
         .select()
         .single()
@@ -186,6 +202,8 @@ export async function POST(request: NextRequest) {
     }
 
     const itineraryId = itinerary.id
+    // The client the saved itinerary actually carries (a re-save keeps its own).
+    const linkedClientId: string | null = clientId ?? itinerary.client_id ?? null
 
     // 2. Create days
     let daysCreated = 0
@@ -351,7 +369,7 @@ export async function POST(request: NextRequest) {
           .insert({
             tenant_id,
             itinerary_id: itineraryId,
-            client_id: config.clientId || null,
+            client_id: linkedClientId,
             // Attribution (mig 269): the staff member saving the quote.
             created_by: authResult.user!.id,
             quote_number: quoteNum || `B2C-${Date.now()}`,
@@ -391,6 +409,8 @@ export async function POST(request: NextRequest) {
       daysCreated,
       servicesCreated,
       quoteId,
+      clientId: linkedClientId,
+      clientLinkedBy: clientLink.how,
       redirectUrl: redirectUrl || `/itineraries/${itineraryId}`,
     })
 

@@ -387,7 +387,7 @@ export default function B2CQuotesPage() {
             </div>
 
             <Link
-              href="/whatsapp-parser"
+              href="/pricing-grid?type=b2c"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2"
             >
               <FileText className="w-4 h-4" />

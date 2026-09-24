@@ -838,7 +838,14 @@ export default function WhatsAppInboxPage() {
     const base64 = btoa(String.fromCharCode(...bytes))
     // Make it URL-safe: replace + with -, / with _, remove =
     const encoded = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-    router.push(`/whatsapp-parser?conversation=${encoded}&encoded=base64&clientId=${selectedConversation.client_id || ''}&phone=${selectedConversation.phone_number}`)
+    // The pricing grid is the pricing engine: it decodes the conversation,
+    // parses it into days and prices them, and saves onto the CRM client.
+    const params = new URLSearchParams({ conversation: encoded, encoded: 'base64', source: 'whatsapp', phone: selectedConversation.phone_number })
+    if (selectedConversation.client_id) params.set('clientId', selectedConversation.client_id)
+    const clientName = selectedConversation.clients?.full_name || selectedConversation.client_name
+    if (clientName) params.set('clientName', clientName)
+    if (selectedConversation.clients?.email) params.set('email', selectedConversation.clients.email)
+    router.push(`/pricing-grid?${params.toString()}`)
   }
 
   // Select conversation

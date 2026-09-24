@@ -50,8 +50,11 @@ export interface GridConfig {
   partnerId: string | null
   partnerName: string
   // Linked CRM client (multi-tenant): the itinerary/quote is stamped with this
-  // client_id on save. Null for ad-hoc quotes not tied to a CRM client.
+  // client_id on save. Null for ad-hoc quotes not tied to a CRM client — the
+  // save then matches one by email/phone or creates a Lead (grid-client-link).
   clientId: string | null
+  // Where the request came in (inbox hand-off); stamped on a new Lead.
+  clientSource?: 'email' | 'whatsapp' | null
 }
 
 // --- Day Type Preset + Component Model (consolidation Phase B / rich gate) ---

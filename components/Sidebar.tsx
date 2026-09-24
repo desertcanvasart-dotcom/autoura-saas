@@ -114,9 +114,9 @@ const navigation: NavSection[] = [
   },
   // The channels, the things used while writing in them, and the library
   // that feeds the words the Copilot and the itinerary writer use.
-  // '/communications' and '/whatsapp-parser' are deliberately not listed:
-  // both pages stay live (the first duplicates Conversations + Inbox, the
-  // second is deep-linked from the inbox) but are not browse destinations.
+  // '/communications' is deliberately not listed: it stays live but
+  // duplicates Conversations + Inbox. ('/whatsapp-parser' now just redirects
+  // to the Pricing Grid.)
   {
     title: 'Communicate',
     key: 'communication',

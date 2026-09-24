@@ -412,7 +412,7 @@ export default function B2BQuotesPage() {
             </div>
 
             <Link
-              href="/whatsapp-parser"
+              href="/pricing-grid?type=b2b"
               className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 flex items-center gap-2"
             >
               <FileText className="w-4 h-4" />
