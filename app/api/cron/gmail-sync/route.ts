@@ -60,13 +60,16 @@ async function getHandler(request: NextRequest) {
   const rows = (data ?? []) as MailboxRow[]
   const ownerIds = [...new Set(rows.map(r => r.user_id).filter((v): v is string => Boolean(v)))]
   const { data: memberRows, error: memberError } = ownerIds.length
-    ? await admin.from('tenant_members').select('user_id, tenant_id, joined_at').in('user_id', ownerIds)
+    ? await admin.from('tenant_members').select('user_id, tenant_id, joined_at').in('user_id', ownerIds).eq('status', 'active')
     : { data: [], error: null }
   if (memberError) {
     return NextResponse.json({ success: false, error: `Could not read who owns the mailboxes: ${memberError.message}` }, { status: 500 })
   }
   const { mailboxes, skipped } = planMailboxSweep(rows, (memberRows ?? []) as MembershipRow[])
-  const results: Array<{ user_id: string; ok: boolean; messages?: number; error?: string }> = []
+  const results: Array<{
+    user_id: string; email?: string | null; ok: boolean; messages?: number; error?: string
+    mode?: string; downloaded?: number; already_stored?: number
+  }> = []
 
   for (const box of mailboxes) {
     const controller = new AbortController()
@@ -81,15 +84,19 @@ async function getHandler(request: NextRequest) {
         syncMailbox(new NextRequest('http://internal/api/email/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-cron-secret': CRON_SECRET },
-          body: JSON.stringify({ user_id: box.user_id, full_sync: false, max_results: 50, days_back: await daysToLookBack(admin, box.tenant_id) }),
+          // use_history: only what Gmail added since the last clean run (the
+          // date window is the fallback — lib/email/gmail-candidates.ts).
+          body: JSON.stringify({ user_id: box.user_id, full_sync: false, max_results: 50, days_back: await daysToLookBack(admin, box.tenant_id), use_history: true }),
         })),
         new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error(`timed out after ${PER_MAILBOX_TIMEOUT_MS / 1000}s`)))),
       ])
       const body = await res.json().catch(() => ({}))
+      // A run that stored what it could but failed some downloads/saves is a
+      // failure here (body.warning), not a quiet success — they are retried.
       results.push(
-        res.ok && body.success
-          ? { user_id: box.user_id, ok: true, messages: body.messages_created ?? 0 }
-          : { user_id: box.user_id, ok: false, error: body.error || `HTTP ${res.status}` }
+        res.ok && body.success && !body.warning
+          ? { user_id: box.user_id, email: box.email, ok: true, messages: body.messages_created ?? 0, mode: body.mode, downloaded: body.downloaded, already_stored: body.already_stored }
+          : { user_id: box.user_id, email: box.email, ok: false, error: body.warning || body.error || `HTTP ${res.status}`, messages: body.messages_created ?? 0 }
       )
     } catch (e) {
       // One mailbox's failure is recorded and the sweep carries on.
@@ -104,8 +111,14 @@ async function getHandler(request: NextRequest) {
   // night: that is exactly how this sweep would have reported "success" while
   // pulling nothing.
   const nothingSyncable = rows.length > 0 && mailboxes.length === 0
+  // One line for job_runs.detail: per mailbox, how it was read and what came
+  // of it — "history: 0 new" is a quiet night, "listing" means no history id.
+  const summary = results
+    .map(r => `${r.email ?? r.user_id.slice(0, 8)} ${r.ok ? `${r.mode ?? '?'}: ${r.messages ?? 0} new/${r.downloaded ?? 0} fetched` : 'FAILED'}`)
+    .join('; ')
   return NextResponse.json({
     success: failed.length === 0 && !nothingSyncable,
+    summary,
     ...(nothingSyncable ? { error: `None of the ${rows.length} connected mailbox(es) could be synced — see "skipped".` } : {}),
     skipped,
     mailboxes: mailboxes.length,

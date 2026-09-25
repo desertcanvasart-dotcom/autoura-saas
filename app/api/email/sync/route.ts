@@ -13,6 +13,7 @@ import { autoLinkEmails, type SyncedEmailRef } from '@/lib/email-auto-link'
 import { syncQueries } from '@/lib/inbox-business-filter'
 import { getGmailClient, refreshAccessToken } from '@/lib/gmail'
 import { generateDraftReplies } from '@/lib/copilot-suggest'
+import { collectCandidates, storedIds, downloadMessages } from '@/lib/email/gmail-candidates'
 
 function extractEmailAddress(from: string | null | undefined): string {
   if (!from) return ''
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
   let userId: string | undefined
   try {
     const body = await request.json()
-    const { user_id, full_sync = false, max_results = 100, days_back = 30 } = body
+    const { user_id, full_sync = false, max_results = 100, days_back = 30, use_history = false } = body
 
     // Two ways in. A person, with a session — or the scheduled sweep, with the
     // server-to-server secret, because mail must arrive whether or not anybody
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest) {
         .from('tenant_members')
         .select('user_id, tenant_id, joined_at')
         .eq('user_id', userId)
+        .eq('status', 'active') // the one company rule (migration 390)
       tenant_id = tenantForUser(userId, owner?.tenant_id ?? null, (memberships ?? []) as MembershipRow[])
       if (!tenant_id) return NextResponse.json({ error: 'Mailbox is not linked to a company', success: false }, { status: 404 })
       // No session, so no RLS client: the sweep spans every tenant and writes
@@ -175,20 +177,36 @@ export async function POST(request: NextRequest) {
     const { data: knownRows } = await createAdminClient().from('clients').select('email').eq('tenant_id', tenant_id).not('email', 'is', null)
     const { main: mainQuery, rescues } = syncQueries(query, (knownRows ?? []).map((r: { email: string | null }) => r.email || ''))
 
-    const response = await gmail.users.messages.list({ userId: 'me', maxResults: max_results, q: mainQuery })
-    const seen = new Set<string>()
-    const messageIds: Array<{ id?: string | null; threadId?: string | null }> = []
-    for (const m of response.data.messages || []) { if (m.id && !seen.has(m.id)) { seen.add(m.id); messageIds.push(m) } }
-    for (const q of rescues) {
-      try {
-        const rescued = await gmail.users.messages.list({ userId: 'me', maxResults: 50, q })
-        for (const m of rescued.data.messages || []) { if (m.id && !seen.has(m.id)) { seen.add(m.id); messageIds.push(m) } }
-      } catch (rescueErr: unknown) {
-        console.error('[Email Sync] rescue query failed:', rescueErr instanceof Error ? rescueErr.message : rescueErr)
-      }
-    }
+    // Which messages to download (lib/email/gmail-candidates.ts): what Gmail
+    // added since the stored history id on a scheduled run, else the date
+    // window — then only the ones not already stored.
+    const { data: syncState } = await db.from('email_sync_state').select('last_history_id').eq('user_id', userId).maybeSingle()
+    const knownSenders = new Set((knownRows ?? []).map((r: { email: string | null }) => (r.email || '').trim().toLowerCase()).filter(Boolean))
+    const candidates = await collectCandidates(gmail, {
+      useHistory: Boolean(use_history) && !full_sync,
+      startHistoryId: (syncState as { last_history_id?: string | null } | null)?.last_history_id ?? null,
+      mainQuery,
+      rescueQueries: rescues,
+      maxResults: max_results,
+      knownSenders,
+    })
+    const alreadyStored = await storedIds(db, tenant_id, candidates.refs.map(r => r.id))
+    const toFetch = candidates.refs.filter(r => !alreadyStored.has(r.id))
+    const downloaded = await downloadMessages(gmail, toFetch)
+    let insertFailed = 0
 
-    const result = { success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0, history_id: null as string | null, auto_linked: 0, direction_repaired: repaired.repaired, leads_created: 0 }
+    const result = {
+      success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0,
+      history_id: candidates.historyId, auto_linked: 0, direction_repaired: repaired.repaired, leads_created: 0,
+      // What the run did, so "0 new" can be told apart from "nothing worked".
+      mode: candidates.mode,
+      ...(candidates.fellBackBecause ? { fell_back_because: candidates.fellBackBecause } : {}),
+      candidates: candidates.refs.length,
+      already_stored: alreadyStored.size,
+      downloaded: downloaded.messages.length,
+      download_failed: downloaded.failed,
+      insert_failed: 0,
+    }
 
     // Track conversation ids that received at least one new inbound message
     // during this sync — used to fire opt-in pre-generation after the loop.
@@ -198,15 +216,12 @@ export async function POST(request: NextRequest) {
     // Conversations that did not exist before this sync, for lead detection.
     const newConversations: NewConversation[] = []
 
-    // Group by thread
+    // Group by thread (only the newly downloaded messages)
     const threadMessages = new Map<string, any[]>()
-    for (const msg of messageIds) {
-      try {
-        const detail = await gmail.users.messages.get({ userId: 'me', id: msg.id!, format: 'full' })
-        const threadId = detail.data.threadId!
-        if (!threadMessages.has(threadId)) threadMessages.set(threadId, [])
-        threadMessages.get(threadId)!.push(detail.data)
-      } catch {}
+    for (const detail of downloaded.messages) {
+      const threadId = detail.threadId!
+      if (!threadMessages.has(threadId)) threadMessages.set(threadId, [])
+      threadMessages.get(threadId)!.push(detail)
     }
 
     // Process threads — write to unified_conversations (customer-scoped) and
@@ -355,6 +370,7 @@ export async function POST(request: NextRequest) {
 
           if (insErr && insErr.code !== '23505') {
             console.error('email_messages insert failed:', insErr.message)
+            insertFailed++
             continue
           }
 
@@ -458,8 +474,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update sync state
-    await db.from('email_sync_state').upsert({ user_id: userId, sync_status: 'idle', last_full_sync_at: full_sync ? new Date().toISOString() : undefined, last_incremental_sync_at: new Date().toISOString(), emails_synced: result.messages_created, error_message: null, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    // Update sync state. The history id only advances after a CLEAN run: a
+    // failed download or insert is then replayed next time, not lost. A clean
+    // run's time is the mailbox's "last successful sync".
+    result.insert_failed = insertFailed
+    const clean = downloaded.failed === 0 && insertFailed === 0
+    const advance = clean && !candidates.truncated && Boolean(candidates.historyId)
+    const problem = clean ? null : `${downloaded.failed} message(s) could not be downloaded and ${insertFailed} could not be saved — they are retried on the next run`
+    await db.from('email_sync_state').upsert({
+      user_id: userId,
+      sync_status: clean ? 'idle' : 'partial',
+      last_full_sync_at: full_sync ? new Date().toISOString() : undefined,
+      ...(clean ? { last_incremental_sync_at: new Date().toISOString() } : {}),
+      ...(advance ? { last_history_id: candidates.historyId } : {}),
+      emails_synced: result.messages_created,
+      error_message: problem,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' })
+    if (!clean) (result as Record<string, unknown>).warning = problem
 
     return NextResponse.json(result)
   } catch (error: any) {
