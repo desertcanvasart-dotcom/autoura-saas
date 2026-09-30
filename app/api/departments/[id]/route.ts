@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import { validateDepartmentInput, isNameTaken, findClaimConflict, type ClaimCheckDept } from '@/lib/departments'
+import { deleteDepartment } from '@/lib/department-delete'
 
 const WRITE_ROLES = ['owner', 'admin', 'manager']
 
@@ -139,26 +140,35 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: guard.error }, { status: guard.status })
     }
 
-    // team_members.department_id and tasks.department_id are ON DELETE SET
-    // NULL (migration 214), so deleting silently un-files staff and tasks
-    // rather than failing. Report the counts so the UI can warn first and the
-    // response can say what actually happened.
+    // Where the department's members and tasks go: another department's id,
+    // or 'none'. team_members.department_id and tasks.department_id are ON
+    // DELETE SET NULL (migration 214), so a plain delete silently un-filed
+    // them; a department anything references now needs that choice made.
+    const reassign = request.nextUrl.searchParams.get('reassign_to')
+
     const [{ count: memberCount }, { count: taskCount }] = await Promise.all([
       supabase.from('team_members').select('id', { count: 'exact', head: true }).eq('department_id', id),
       supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('department_id', id),
     ])
+    const expected = { team_members: memberCount ?? 0, tasks: taskCount ?? 0 }
 
-    const { error } = await supabase.from('departments').delete().eq('id', id)
-
-    if (error) {
-      console.error('Error deleting department:', error)
-      return NextResponse.json({ success: false, error: 'Failed to delete department' }, { status: 500 })
+    if (!reassign && (expected.team_members > 0 || expected.tasks > 0)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `${expected.team_members} team member(s) and ${expected.tasks} task(s) are filed here — choose where they move (reassign_to)`,
+          references: expected,
+        },
+        { status: 409 }
+      )
     }
 
-    return NextResponse.json({
-      success: true,
-      unfiled: { team_members: memberCount ?? 0, tasks: taskCount ?? 0 },
-    })
+    const result = await deleteDepartment(supabase, id, reassign && reassign !== 'none' ? reassign : null, expected)
+    if (!result.ok) {
+      return NextResponse.json({ success: false, error: result.error }, { status: result.status })
+    }
+
+    return NextResponse.json({ success: true, moved: result.moved, unrouted: result.unrouted })
   } catch (error) {
     console.error('Error in department DELETE:', error)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })

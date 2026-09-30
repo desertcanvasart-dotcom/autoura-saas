@@ -54,6 +54,8 @@ export default function DepartmentsSettingsPage() {
   const [form, setForm] = useState(EMPTY_FORM)
 
   const [confirmDelete, setConfirmDelete] = useState<Department | null>(null)
+  // Where the deleted department's members and tasks go ('none' = no department).
+  const [moveTo, setMoveTo] = useState('none')
 
   useEffect(() => {
     loadAll()
@@ -188,7 +190,10 @@ export default function DepartmentsSettingsPage() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/departments/${confirmDelete.id}`, { method: 'DELETE' })
+      const response = await fetch(
+        `/api/departments/${confirmDelete.id}?reassign_to=${encodeURIComponent(moveTo)}`,
+        { method: 'DELETE' }
+      )
       const result = await response.json().catch(() => ({}))
 
       if (!response.ok || result.success === false) {
@@ -196,11 +201,19 @@ export default function DepartmentsSettingsPage() {
         return
       }
 
-      const unfiled = result.unfiled?.team_members || 0
+      const movedMembers: number = result.moved?.team_members || 0
+      const movedTasks: number = result.moved?.tasks || 0
+      const target = departments.find(d => d.id === moveTo)
+      const where = target ? `moved to ${target.name}` : 'left with no department'
+      const parts = [
+        movedMembers > 0 ? `${movedMembers} team member${movedMembers === 1 ? '' : 's'}` : '',
+        movedTasks > 0 ? `${movedTasks} task${movedTasks === 1 ? '' : 's'}` : '',
+      ].filter(Boolean)
+      const unrouted: string[] = result.unrouted || []
       setNotice(
-        unfiled > 0
-          ? `Department deleted. ${unfiled} team member${unfiled === 1 ? '' : 's'} now have no department.`
-          : 'Department deleted'
+        `Department deleted.` +
+        (parts.length ? ` ${parts.join(' and ')} ${where}.` : '') +
+        (unrouted.length ? ` No department now handles: ${unrouted.join(', ')}.` : '')
       )
       setConfirmDelete(null)
       await loadAll()
@@ -354,7 +367,7 @@ export default function DepartmentsSettingsPage() {
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => { setError(null); setConfirmDelete(dept) }}
+                    onClick={() => { setError(null); setMoveTo('none'); setConfirmDelete(dept) }}
                     className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
                     aria-label={`Delete ${dept.name}`}
                   >
@@ -545,21 +558,47 @@ export default function DepartmentsSettingsPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-2">
               Delete {confirmDelete.name}?
             </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              {memberCount(confirmDelete.id) > 0 ? (
-                <>
-                  {memberCount(confirmDelete.id)} team member
-                  {memberCount(confirmDelete.id) === 1 ? '' : 's'} will be left with no department,
-                  and tasks filed here keep their assignee but lose their department. Deactivating
-                  keeps the grouping instead.
-                </>
-              ) : (
-                <>
-                  Nobody is filed under this department. Tasks that reference it will lose their
-                  department.
-                </>
-              )}
-            </p>
+            {(() => {
+              // Where its people and tasks go. Any active department may take
+              // them, the shared built-in ones included; its service types go
+              // too, but only to one of this company's own departments.
+              const targets = departments.filter(d => d.id !== confirmDelete.id && d.is_active !== false)
+              const target = targets.find(d => d.id === moveTo)
+              const types = confirmDelete.is_active === false ? [] : confirmDelete.service_types || []
+              const count = memberCount(confirmDelete.id)
+              return (
+                <div className="space-y-3 mb-4">
+                  <p className="text-sm text-gray-600">
+                    {count > 0
+                      ? `${count} team member${count === 1 ? ' is' : 's are'} filed here, and tasks may be too.`
+                      : 'Nobody is filed here, but tasks may be.'}{' '}
+                    Choose where they go.
+                  </p>
+                  <label className="block text-sm text-gray-700">
+                    Move its members and tasks to
+                    <select
+                      value={moveTo}
+                      onChange={e => setMoveTo(e.target.value)}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                    >
+                      <option value="none">No department</option>
+                      {targets.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}{isBuiltIn(d) ? ' (built-in)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {types.length > 0 && (
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
+                      {target && !isBuiltIn(target)
+                        ? `Its service types (${types.join(', ')}) move to ${target.name} too.`
+                        : `Its service types (${types.join(', ')}) will no longer be handled by any of your departments.`}
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
 
             {error && (
               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
