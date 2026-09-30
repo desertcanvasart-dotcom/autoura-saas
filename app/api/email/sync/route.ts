@@ -205,6 +205,7 @@ export async function POST(request: NextRequest) {
       already_stored: alreadyStored.size,
       downloaded: downloaded.messages.length,
       download_failed: downloaded.failed,
+      download_gone: downloaded.gone,
       insert_failed: 0,
     }
 
@@ -475,12 +476,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Update sync state. The history id only advances after a CLEAN run: a
-    // failed download or insert is then replayed next time, not lost. A clean
+    // failed download or insert is then replayed next time, not lost (a message
+    // deleted since, "gone", is not a failure). A clean
     // run's time is the mailbox's "last successful sync".
     result.insert_failed = insertFailed
     const clean = downloaded.failed === 0 && insertFailed === 0
     const advance = clean && !candidates.truncated && Boolean(candidates.historyId)
-    const problem = clean ? null : `${downloaded.failed} message(s) could not be downloaded and ${insertFailed} could not be saved — they are retried on the next run`
+    const why = downloaded.reasons.length > 0 ? ` (${downloaded.reasons.join('; ')})` : ''
+    const problem = clean ? null : `${downloaded.failed} message(s) could not be downloaded and ${insertFailed} could not be saved — they are retried on the next run${why}`
     await db.from('email_sync_state').upsert({
       user_id: userId,
       sync_status: clean ? 'idle' : 'partial',

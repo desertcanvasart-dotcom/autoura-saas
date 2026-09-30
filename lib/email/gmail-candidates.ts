@@ -176,25 +176,46 @@ export async function storedIds(
   return out
 }
 
-/** Download in full, `concurrency` at a time; failures counted, never hidden. */
+/**
+ * Download in full, `concurrency` at a time; failures counted, never hidden.
+ *
+ * A message Gmail answers 404 / 410 for is `gone`: the history still lists it
+ * but it was deleted (or moved out of reach) since. That is not a failure —
+ * retrying it can never succeed, and counting it as one held the mailbox's
+ * history position back for good, failing every scheduled run on the same
+ * message (live 2026-09-30). Any other error is `failed` and retried; the
+ * first few reasons are kept so the run log says why.
+ */
 export async function downloadMessages(
   gmail: Gmail,
   refs: CandidateRef[],
   concurrency = 5,
-): Promise<{ messages: gmail_v1.Schema$Message[]; failed: number; skipped: number }> {
+): Promise<{ messages: gmail_v1.Schema$Message[]; failed: number; skipped: number; gone: number; reasons: string[] }> {
   const messages: gmail_v1.Schema$Message[] = []
   let failed = 0
   let skipped = 0
+  let gone = 0
+  const reasons: string[] = []
   for (let i = 0; i < refs.length; i += concurrency) {
+    const slice = refs.slice(i, i + concurrency)
     const batch = await Promise.allSettled(
-      refs.slice(i, i + concurrency).map(r => gmail.users.messages.get({ userId: 'me', id: r.id, format: 'full' })),
+      slice.map(r => gmail.users.messages.get({ userId: 'me', id: r.id, format: 'full' })),
     )
-    for (const b of batch) {
-      if (b.status === 'rejected') { failed++; continue }
+    batch.forEach((b, j) => {
+      if (b.status === 'rejected') {
+        const status = errStatus(b.reason)
+        if (status === 404 || status === 410) { gone++; return }
+        failed++
+        if (reasons.length < 3) {
+          const msg = b.reason instanceof Error ? b.reason.message : String(b.reason)
+          reasons.push(`${slice[j].id}: ${status ? `${status} ` : ''}${msg}`.slice(0, 200))
+        }
+        return
+      }
       const labels = b.value.data.labelIds ?? []
-      if (labels.some(l => SKIP_LABELS.has(l))) { skipped++; continue }
+      if (labels.some(l => SKIP_LABELS.has(l))) { skipped++; return }
       messages.push(b.value.data)
-    }
+    })
   }
-  return { messages, failed, skipped }
+  return { messages, failed, skipped, gone, reasons }
 }
