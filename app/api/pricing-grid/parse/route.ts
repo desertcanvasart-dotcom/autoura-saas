@@ -504,8 +504,11 @@ Generate a reasonable 5-7 day Egypt itinerary covering popular sites.`
       const waterSlot = day.slots.find((s: any) => s.slotId === 'water')
       const waterEmpty = waterSlot && (waterSlot.selectedItems?.length ?? 0) === 0 && !waterSlot.customAmount
       if (waterEmpty) {
-        waterSlot.customAmount = 1 // €1 pp/day (per-person slot)
-        waterSlot.label = 'Water (€1 pp/day)'
+        // A visible Water item, priced by the grid from the company's water
+        // rate (hydrate-rates.ts). It used to be a hidden custom amount of 1
+        // that the Water row could neither show nor replace.
+        waterSlot.selectedItems = [{ rateId: 'water-standard', name: 'Water Bottles', rateEur: 0, rateNonEur: 0 }]
+        waterSlot.customAmount = 0
       }
     }
 
