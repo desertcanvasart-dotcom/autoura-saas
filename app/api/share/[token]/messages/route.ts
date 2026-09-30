@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-server'
 import { isValidShareToken, toClientTripMessages, cleanClientText } from '@/lib/itinerary-share'
-import { checkRateLimit } from '@/lib/rate-limit'
+import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit'
 import { notifyTripMessage } from '@/lib/trip-message-notify'
 
 /**
@@ -59,7 +59,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 export async function POST(request: NextRequest, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    // Hardened client IP — never the client-controllable leftmost XFF entry.
+    const ip = getClientIdentifier(request)
     if (!checkRateLimit(`share-msg:${ip}`, 'chat').success ||
         !checkRateLimit(`share-msg:${token}`, 'chat').success) {
       return NextResponse.json(
