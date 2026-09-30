@@ -23,7 +23,8 @@
 //   - 'missing' (a reload or a restored draft): only an item with no price
 //               takes it, so a saved quote's prices are never silently moved.
 // Water held as a hidden amount becomes a visible Water item: at the
-// company's water rate after a parse, at its own amount otherwise.
+// company's water rate after a parse, at its own amount otherwise. An item
+// with no pricing basis takes its rate's (per group / person / unit).
 
 import type { AllRates, GridDay, RateOption, SelectedItem, SlotValue } from '../types'
 
@@ -67,11 +68,19 @@ export function hydrateDayRates(
       const items = out.selectedItems.map(item => {
         const opt = byId.get(item.rateId)
         if (!opt) return item
-        if (mode === 'missing' && priced(item)) return item
-        if (opt.rateEur === item.rateEur && opt.rateNonEur === item.rateNonEur) return item
+        let next = item
+        // How the rate applies to the group (per group / person / unit) is
+        // the rate's, not the saved line's: a reloaded or parsed item takes it.
+        if (opt.pricing_basis && !item.pricingBasis) {
+          next = { ...next, pricingBasis: opt.pricing_basis, unitCapacity: opt.unit_capacity ?? null }
+        }
+        const repriced = !(mode === 'missing' && priced(item)) &&
+          (opt.rateEur !== item.rateEur || opt.rateNonEur !== item.rateNonEur)
+        if (repriced) next = { ...next, rateEur: opt.rateEur, rateNonEur: opt.rateNonEur }
+        if (next === item) return item
         itemsChanged = true
         changed++
-        return { ...item, rateEur: opt.rateEur, rateNonEur: opt.rateNonEur }
+        return next
       })
       return itemsChanged ? { ...out, selectedItems: items } : out
     })

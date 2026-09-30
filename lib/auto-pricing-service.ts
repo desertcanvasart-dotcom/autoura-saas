@@ -68,6 +68,7 @@ import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-f
 // The shared multi-pax rate-sheet primitive — the ONE engine both the pricing
 // grid and this service feed. See lib/pricing/pax-range.ts and STEP 10 below.
 import { priceAcrossPax } from '@/lib/pricing/pax-range'
+import { priceByBasis, toPricingBasis, unitsFor, type PricingBasis } from '@/lib/pricing/pricing-basis'
 
 // Lazy-initialized Supabase admin client (avoids build-time errors)
 let _supabaseAdmin: ReturnType<typeof createClient> | null = null
@@ -2083,6 +2084,31 @@ export async function getAirportServiceRate(
   direction: 'arrival' | 'departure',
   serviceType: AirportServiceType = 'meet_greet'
 ): Promise<number | null> {
+  return (await getAirportServiceRateDetail(scope, airportCode, direction, serviceType))?.rate ?? null
+}
+
+/** An airport or hotel assistance rate, with how it applies to the group
+ *  (migration 393: per group / per person / per unit). */
+export interface StaffServiceRate {
+  rate: number
+  basis: PricingBasis
+  capacity: number | null
+}
+
+function staffRateOf(row: unknown): StaffServiceRate | null {
+  const r = row as { rate_eur?: unknown; pricing_type?: unknown; max_capacity?: unknown } | undefined
+  if (!r || typeof r.rate_eur !== 'number') return null
+  const capacity = typeof r.max_capacity === 'number' && r.max_capacity > 0 ? r.max_capacity : null
+  return { rate: r.rate_eur, basis: toPricingBasis(r.pricing_type) ?? 'flat', capacity }
+}
+
+/** getAirportServiceRate, with the rate's pricing basis. */
+export async function getAirportServiceRateDetail(
+  scope: CatalogScope,
+  airportCode: string,
+  direction: 'arrival' | 'departure',
+  serviceType: AirportServiceType = 'meet_greet'
+): Promise<StaffServiceRate | null> {
   try {
     const { data: rawAirportRates } = await getSupabaseAdmin()
       .from('airport_staff_rates')
@@ -2110,8 +2136,7 @@ export async function getAirportServiceRate(
       return null
     }
 
-    const rate = (rates[0] as any).rate_eur
-    return typeof rate === 'number' ? rate : null
+    return staffRateOf(rates[0])
   } catch (err) {
     return null
   }
@@ -2125,10 +2150,19 @@ export async function getHotelServiceRate(
   serviceType: HotelServiceType,
   tier: ServiceTier
 ): Promise<number | null> {
+  return (await getHotelServiceRateDetail(scope, serviceType, tier))?.rate ?? null
+}
+
+/** getHotelServiceRate, with the rate's pricing basis. */
+export async function getHotelServiceRateDetail(
+  scope: CatalogScope,
+  serviceType: HotelServiceType,
+  tier: ServiceTier
+): Promise<StaffServiceRate | null> {
   try {
     const category = getTierCategory(tier, await tenantTierLadder(scope.tenantId))
 
-    const lookup = async (type: HotelServiceType): Promise<number | null> => {
+    const lookup = async (type: HotelServiceType): Promise<StaffServiceRate | null> => {
       const { data: rawHotelStaffRates } = await getSupabaseAdmin()
         .from('hotel_staff_rates')
         .select('*')
@@ -2143,8 +2177,7 @@ export async function getHotelServiceRate(
         .limit(1)
       const rates = await normalizeRateRows(getSupabaseAdmin(), 'hotel_staff_rates', rawHotelStaffRates, await getTenantRunCurrency(getSupabaseAdmin(), scope.tenantId))
       if (!rates || rates.length === 0) return null
-      const rate = (rates[0] as any).rate_eur
-      return typeof rate === 'number' ? rate : null
+      return staffRateOf(rates[0])
     }
 
     const direct = await lookup(serviceType)
@@ -3637,6 +3670,10 @@ export async function calculateDayBasedPricing(
   // ============================================
 
   let fixedCosts = 0
+  // Airport / hotel assistance priced per person (migration 393) scales with
+  // the group; per-unit rates are sized at the requested pax.
+  let staffPerPax = 0
+  const staffPax = requestedPax ?? 2
 
   // The throughout guide's beds (STEP 5) and ticket seats (B-item 2) are
   // fixed costs too.
@@ -3753,6 +3790,28 @@ export async function calculateDayBasedPricing(
       }
     }
 
+    // ----- AIRPORT / HOTEL ASSISTANCE: per group, per person or per unit -----
+    // (migration 393). A per-person rate scales with the group like an
+    // entrance fee; per group and per unit are fixed costs, a unit sized at
+    // the requested pax like a per-unit activity boat.
+    const priceStaff = (info: StaffServiceRate) => {
+      const line = priceByBasis(info.rate, info.basis, staffPax, info.capacity)
+      if (line.isPerPax) staffPerPax += info.rate
+      else fixedCosts += line.lineTotal
+      return {
+        quantity: 1,
+        quantityMode: line.isPerPax ? ('per_pax' as const) : ('fixed' as const),
+        unitCost: info.rate,
+        // A per-pax line stores the per-PERSON figure (scaled by pax later);
+        // a fixed line stores its group total.
+        lineTotal: line.isPerPax ? info.rate : line.lineTotal,
+        isPerPax: line.isPerPax,
+        ...(info.basis === 'per_unit'
+          ? { notes: `${unitsFor(staffPax, info.capacity)} unit(s)${info.capacity ? ` of ${info.capacity}` : ''} × ${info.rate}` }
+          : {}),
+      }
+    }
+
     // ----- SERVICE LEVELS -----
     // Each defaults to the level that has always been charged, so an itinerary
     // that does not specify one prices exactly as it did before.
@@ -3785,14 +3844,14 @@ export async function calculateDayBasedPricing(
         })
         return
       }
-      const rate = await getAirportServiceRate(catalogScope, code, direction, airportLevel)
+      const rate = await getAirportServiceRateDetail(catalogScope, code, direction, airportLevel)
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id, dayNumber: day.day, serviceType: 'airport_service',
           serviceName: `${label} (${code}) — ${flightLeg!.from} → ${flightLeg!.to}`,
-          quantity: 1, quantityMode: 'fixed', unitCost: rate, lineTotal: rate,
-          rateSource: 'airport_staff_rates', isPerPax: false, isOptional: false,
+          ...priced,
+          rateSource: 'airport_staff_rates', isOptional: false,
         })
       } else {
         addHole({
@@ -3818,7 +3877,7 @@ export async function calculateDayBasedPricing(
     if (meetOnArrival) {
       const airportCode = connectionArrival ? routeAirportCode(landsAt) : getAirportCode(landsAt)
       const rate = airportCode
-        ? await getAirportServiceRate(catalogScope, airportCode, 'arrival', airportLevel)
+        ? await getAirportServiceRateDetail(catalogScope, airportCode, 'arrival', airportLevel)
         : null
       if (!airportCode) {
         addHole({
@@ -3832,18 +3891,14 @@ export async function calculateDayBasedPricing(
         })
       }
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-airport-arrival`,
           dayNumber: day.day,
           serviceType: 'airport_service',
           serviceName: `Airport Meet & Greet (${airportCode})`,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'airport_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else if (airportCode) {
@@ -3862,7 +3917,7 @@ export async function calculateDayBasedPricing(
     if (day.services.airport_departure) {
       const airportCode = getAirportCode(day.city)
       const rate = airportCode
-        ? await getAirportServiceRate(catalogScope, airportCode, 'departure', airportLevel)
+        ? await getAirportServiceRateDetail(catalogScope, airportCode, 'departure', airportLevel)
         : null
       if (!airportCode) {
         addHole({
@@ -3876,18 +3931,14 @@ export async function calculateDayBasedPricing(
         })
       }
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-airport-departure`,
           dayNumber: day.day,
           serviceType: 'airport_service',
           serviceName: `Airport Departure Assist (${airportCode})`,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'airport_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else if (airportCode) {
@@ -3905,20 +3956,16 @@ export async function calculateDayBasedPricing(
 
     // ----- HOTEL SERVICES (fixed per service) -----
     if (day.services.hotel_checkin) {
-      const rate = await getHotelServiceRate(catalogScope, checkinLevel, tier)
+      const rate = await getHotelServiceRateDetail(catalogScope, checkinLevel, tier)
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-hotel-checkin`,
           dayNumber: day.day,
           serviceType: 'hotel_service',
           serviceName: `Hotel ${HOTEL_LEVEL_LABEL[checkinLevel]}`,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'hotel_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else {
@@ -3935,20 +3982,16 @@ export async function calculateDayBasedPricing(
     }
 
     if (day.services.hotel_checkout) {
-      const rate = await getHotelServiceRate(catalogScope, checkoutLevel, tier)
+      const rate = await getHotelServiceRateDetail(catalogScope, checkoutLevel, tier)
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-hotel-checkout`,
           dayNumber: day.day,
           serviceType: 'hotel_service',
           serviceName: `Hotel ${HOTEL_LEVEL_LABEL[checkoutLevel]}`,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'hotel_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else {
@@ -3976,20 +4019,16 @@ export async function calculateDayBasedPricing(
       [boarding.disembark, checkoutLevel, 'cruise-disembark', 'Cruise Leaving Assistance'],
     ] as const) {
       if (!wanted) continue
-      const rate = await getHotelServiceRate(catalogScope, level, tier)
+      const rate = await getHotelServiceRateDetail(catalogScope, level, tier)
       if (rate != null) {
-        fixedCosts += rate
+        const priced = priceStaff(rate)
         services.push({
           id: `day${day.day}-${id}`,
           dayNumber: day.day,
           serviceType: 'hotel_service',
           serviceName: name,
-          quantity: 1,
-          quantityMode: 'fixed',
-          unitCost: rate,
-          lineTotal: rate,
+          ...priced,
           rateSource: 'hotel_staff_rates',
-          isPerPax: false,
           isOptional: false
         })
       } else {
@@ -4303,7 +4342,7 @@ export async function calculateDayBasedPricing(
     })
   }
 
-  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + tipsPerPax + activitiesPerPax
+  const perPaxCosts = accommodationPPD + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + tipsPerPax + activitiesPerPax + staffPerPax
 
 
 
@@ -4685,7 +4724,7 @@ export async function calculateDayBasedPricing(
     transportAt: throughoutGuide ? (pax: number) => transportAtPax(pax + 1) : transportAtPax,
     // Tour leader: single room (PPD + single supplement) + their own per-pax costs
     // The tour leader pays CUSTOMER fare on tickets (B-item 2).
-    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + activitiesPerPax,
+    tourLeaderCost: accommodationPPD + singleSupplement + entranceFeesPerPax + externalMealsPerPax + waterPerPax + ticketFaresPerPax + activitiesPerPax + staffPerPax,
     paxFrom: PAX_COUNTS[0],
     paxTo: PAX_COUNTS[PAX_COUNTS.length - 1],
   })

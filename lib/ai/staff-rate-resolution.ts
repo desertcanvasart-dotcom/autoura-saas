@@ -22,6 +22,7 @@
 // (2026-07-27), not derived from the data. They are the only place to change
 // what a tier buys.
 
+import { toPricingBasis, type PricingBasis } from '@/lib/pricing/pricing-basis'
 import type { ServiceTier } from '@/lib/ai/parsing-utils'
 import { presetTierFor } from '@/lib/vocabulary'
 
@@ -73,18 +74,35 @@ export interface AirportStaffRateRow {
   service_type?: string | null
   direction?: string | null
   rate_eur?: number | string | null
+  pricing_type?: string | null
+  max_capacity?: number | null
+}
+
+/** How an assistance rate applies to the group (migration 393). */
+export interface StaffPricing {
+  basis: PricingBasis
+  capacity: number | null
+}
+
+function pricingOf(row: { pricing_type?: string | null; max_capacity?: number | null } | undefined): StaffPricing {
+  const capacity = typeof row?.max_capacity === 'number' && row.max_capacity > 0 ? row.max_capacity : null
+  return { basis: toPricingBasis(row?.pricing_type) ?? 'flat', capacity }
 }
 
 export interface HotelStaffRateRow {
   service_type?: string | null
   hotel_category?: string | null
   rate_eur?: number | string | null
+  pricing_type?: string | null
+  max_capacity?: number | null
 }
 
 /** Rates for one airport, by the direction of travel on a given day. */
 export interface AirportServiceRates {
   arrival: number
   departure: number
+  arrivalPricing: StaffPricing
+  departurePricing: StaffPricing
   airportCode: string
   serviceType: string
 }
@@ -103,10 +121,12 @@ function pickDirectional(
   rows: AirportStaffRateRow[],
   direction: 'arrival' | 'departure'
 ): number | null {
-  const exact = rows.find(r => r.direction === direction)
-  if (exact) return toRate(exact.rate_eur)
-  const both = rows.find(r => r.direction === 'both')
-  return both ? toRate(both.rate_eur) : null
+  const row = directionalRow(rows, direction)
+  return row ? toRate(row.rate_eur) : null
+}
+
+function directionalRow(rows: AirportStaffRateRow[], direction: 'arrival' | 'departure'): AirportStaffRateRow | undefined {
+  return rows.find(r => r.direction === direction) ?? rows.find(r => r.direction === 'both')
 }
 
 export type AirportResolution =
@@ -159,11 +179,19 @@ export function resolveAirportRates(
     }
   }
 
-  return { ok: true, rates: { arrival, departure, airportCode: code, serviceType } }
+  return {
+    ok: true,
+    rates: {
+      arrival, departure,
+      arrivalPricing: pricingOf(directionalRow(forService, 'arrival')),
+      departurePricing: pricingOf(directionalRow(forService, 'departure')),
+      airportCode: code, serviceType,
+    },
+  }
 }
 
 export type HotelResolution =
-  | { ok: true; rate: number; serviceType: string; category: string }
+  | { ok: true; rate: number; pricing: StaffPricing; serviceType: string; category: string }
   | { ok: false; detail: string }
 
 /** Resolve the single hotel assistance rate. */
@@ -180,5 +208,5 @@ export function resolveHotelServiceRate(
       detail: `No active ${HOTEL_SERVICE_TYPE} rate in the "${HOTEL_SERVICE_CATEGORY}" category`,
     }
   }
-  return { ok: true, rate, serviceType: HOTEL_SERVICE_TYPE, category: HOTEL_SERVICE_CATEGORY }
+  return { ok: true, rate, pricing: pricingOf(match), serviceType: HOTEL_SERVICE_TYPE, category: HOTEL_SERVICE_CATEGORY }
 }

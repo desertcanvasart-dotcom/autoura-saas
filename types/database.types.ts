@@ -694,6 +694,8 @@ export interface Database {
           airport_name: string | null
           supplier_name: string | null
           rate_currency: string | null
+          pricing_type: string
+          max_capacity: number | null
           supplier_id: string | null
         }
         Insert: {
@@ -712,6 +714,8 @@ export interface Database {
           airport_name?: string | null
           supplier_name?: string | null
           rate_currency?: string | null
+          pricing_type?: string
+          max_capacity?: number | null
           supplier_id?: string | null
         }
         Update: {
@@ -730,6 +734,8 @@ export interface Database {
           airport_name?: string | null
           supplier_name?: string | null
           rate_currency?: string | null
+          pricing_type?: string
+          max_capacity?: number | null
           supplier_id?: string | null
         }
         Relationships: [
@@ -5428,6 +5434,8 @@ export interface Database {
           updated_at: string | null
           destination: string | null
           rate_currency: string | null
+          pricing_type: string
+          max_capacity: number | null
           supplier_id: string | null
           supplier_name: string | null
         }
@@ -5445,6 +5453,8 @@ export interface Database {
           updated_at?: string | null
           destination?: string | null
           rate_currency?: string | null
+          pricing_type?: string
+          max_capacity?: number | null
           supplier_id?: string | null
           supplier_name?: string | null
         }
@@ -5462,6 +5472,8 @@ export interface Database {
           updated_at?: string | null
           destination?: string | null
           rate_currency?: string | null
+          pricing_type?: string
+          max_capacity?: number | null
           supplier_id?: string | null
           supplier_name?: string | null
         }

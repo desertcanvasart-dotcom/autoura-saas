@@ -52,6 +52,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
           // carry these and the gate falls through to its count-based path.
           serviceType: opt.service_type,
           pricingClass: opt.pricing_class,
+          ...(opt.pricing_basis ? { pricingBasis: opt.pricing_basis, unitCapacity: opt.unit_capacity ?? null } : {}),
         }]
       })
     }
@@ -72,6 +73,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
       rateNonEur: opt.rateNonEur,
       serviceType: opt.service_type,
       pricingClass: opt.pricing_class,
+      ...(opt.pricing_basis ? { pricingBasis: opt.pricing_basis, unitCapacity: opt.unit_capacity ?? null } : {}),
     }
     const items: SelectedItem[] = [item]
     if (definition.slotId === 'accommodation' && (opt as any).single_supp_eur) {
@@ -168,6 +170,10 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
                   >
                     {item.name.length > 30 ? item.name.substring(0, 30) + '...' : item.name}
                     {' '}€{item[rateKey].toFixed(2)}
+                    {item.pricingBasis === 'per_person' && <span className="opacity-70">/person</span>}
+                    {item.pricingBasis === 'per_unit' && (
+                      <span className="opacity-70">/unit{item.unitCapacity ? ` of ${item.unitCapacity}` : ''}</span>
+                    )}
                     <span className="font-bold ml-0.5 text-[10px]">×</span>
                   </span>
                 ))}

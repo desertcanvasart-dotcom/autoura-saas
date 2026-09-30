@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { validateRatePayload } from '@/lib/rate-validation'
+import { cleanPricingBasisFields } from '@/lib/pricing/pricing-basis'
 
 export async function GET() {
   try {
@@ -59,9 +60,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Per group / per person / per unit (migration 393).
+    const basis = cleanPricingBasisFields(body)
+    if (!basis.ok) {
+      return NextResponse.json({ success: false, error: basis.error }, { status: 400 })
+    }
+
     const { data, error } = await supabase
       .from('hotel_staff_rates')
-      .insert([{ ...body, tenant_id }])
+      .insert([{ ...body, ...basis.fields, tenant_id }])
       .select()
       .single()
 
