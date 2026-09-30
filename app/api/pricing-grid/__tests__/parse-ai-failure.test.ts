@@ -125,6 +125,12 @@ describe('pricing-grid parse — AI service failures are named', () => {
     expect(slot('entrance_fees').selectedItems).toEqual([
       { rateId: 'ent-1', name: 'Pyramids of Giza', rateEur: 20, rateNonEur: 10 },
     ])
-    expect(slot('water').customAmount).toBe(1)
+    // Water is a visible item the grid prices from the company's water rate
+    // (hydrate-rates.ts) — no longer a hidden custom amount the Water row
+    // could neither show nor replace.
+    expect(slot('water')).toMatchObject({
+      customAmount: 0,
+      selectedItems: [{ rateId: 'water-standard', name: 'Water Bottles', rateEur: 0, rateNonEur: 0 }],
+    })
   })
 })

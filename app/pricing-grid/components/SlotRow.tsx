@@ -58,8 +58,11 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
   }
 
   const selectSingle = (opt: RateOption | null) => {
+    // A choice made in the row replaces any hidden custom amount — the
+    // calculator prefers a custom amount, so a leftover one made the row's
+    // choice count for nothing (hydrate-rates.ts).
     if (!opt) {
-      onChange({ ...value, selectedItems: [] })
+      onChange({ ...value, selectedItems: [], customAmount: 0 })
       return
     }
     const item: SelectedItem = {
@@ -79,7 +82,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
         rateNonEur: (opt as any).single_supp_non_eur || 0,
       })
     }
-    onChange({ ...value, selectedItems: items })
+    onChange({ ...value, selectedItems: items, customAmount: 0 })
   }
 
   const unselectedCount = options.filter(o => !value.selectedItems.some(i => i.rateId === o.id)).length

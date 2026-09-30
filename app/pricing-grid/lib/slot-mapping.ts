@@ -174,13 +174,14 @@ export function mapServicesToSlots(
     // The grid's save never writes rate_eur / rate_non_eur — only the rate it
     // priced the line at (unit_cost). Without this fallback every reloaded
     // grid line was worth nothing.
+    // rate_eur / rate_non_eur default to 0, so 0 means "not written" too.
     const unit = Number(svc.unit_cost) || 0
-    const rateEur = svc.rate_eur ?? unit
-    const rateNonEur = svc.rate_non_eur ?? unit
+    const rateEur = Number(svc.rate_eur) > 0 ? Number(svc.rate_eur) : unit
+    const rateNonEur = Number(svc.rate_non_eur) > 0 ? Number(svc.rate_non_eur) : unit
 
     // Check if this was a custom amount
     if (metaSource.includes('custom_amount') || (gridTag && gridTag[2] === 'custom')) {
-      slot.customAmount = svc.rate_eur ?? unit
+      slot.customAmount = Number(svc.rate_eur) > 0 ? Number(svc.rate_eur) : unit
       continue
     }
 

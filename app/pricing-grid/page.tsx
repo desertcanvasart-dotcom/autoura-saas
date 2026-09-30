@@ -10,6 +10,7 @@ import { getCurrencySymbol } from '@/lib/currency'
 import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/throughout-guide'
 import { mapServicesToSlots } from './lib/slot-mapping'
 import { parsedDaysToGrid } from './lib/parsed-days'
+import { hydrateDayRates } from './lib/hydrate-rates'
 import GridHeader from './components/GridHeader'
 import ClientInfoBar from './components/ClientInfoBar'
 import InputPanel from './components/InputPanel'
@@ -178,7 +179,12 @@ function PricingGridContent() {
       setLoading(true)
       const res = await fetch(`/api/pricing-grid/rates?tier=${tier}`)
       const data = await res.json()
-      if (data.success) setRates(data.data)
+      if (data.success) {
+        setRates(data.data)
+        // A draft restored from this browser may hold items with no price, or
+        // water as a hidden amount (hydrate-rates.ts) — fill them from the rates.
+        setDays(prev => hydrateDayRates(prev, data.data, 'missing').days)
+      }
     } catch (err) {
       console.error('Failed to fetch rates:', err)
     } finally {
@@ -508,7 +514,9 @@ function PricingGridContent() {
       const data = await res.json()
       if (data.success && data.days) {
         const parsedDays: GridDay[] = parsedDaysToGrid(data.days, () => crypto.randomUUID())
-        setDays(parsedDays)
+        // The parser's prices are its own derivation (a seasonal hotel came in
+        // at 0); the grid's rate list is the authority (hydrate-rates.ts).
+        setDays(rates ? hydrateDayRates(parsedDays, rates, 'all').days : parsedDays)
         // Show indicator if itinerary was AI-generated (not parsed from detailed text)
         if (data.generationMode === 'generated') {
           setSaveMessage('✨ AI-suggested itinerary based on inquiry — review and adjust as needed')
@@ -613,7 +621,9 @@ function PricingGridContent() {
             intercity: dayData.intercity ?? undefined,
           }
         })
-        setDays(loadedDays)
+        // A saved line with no price (rate_eur defaults to 0) takes the rate
+        // list's; priced lines keep the price they were saved at.
+        setDays(rates ? hydrateDayRates(loadedDays, rates, 'missing').days : loadedDays)
         setSaveMessage(`Loaded ${itn.itinerary_code}`)
       }
     } catch (err) {
