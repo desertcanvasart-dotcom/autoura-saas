@@ -39,6 +39,8 @@ import {
   EyeOff
 } from 'lucide-react'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import { TaskChecklist, ChecklistSummary } from '@/components/tasks/TaskChecklist'
+import type { ChecklistItem, GenerationSnapshot } from '@/lib/tasks/itinerary-tasks'
 
 interface TeamMember {
   id: string
@@ -80,6 +82,11 @@ interface Task {
   archived_at?: string
   assigned_member?: TeamMember
   linked_name?: string
+  /** Generated operations tasks (lib/tasks/itinerary-tasks.ts): the category,
+   *  and one row per service to tick as booked. NULL on a task made by hand. */
+  service_type?: string | null
+  checklist?: ChecklistItem[] | null
+  generation_snapshot?: GenerationSnapshot | null
 }
 
 interface Summary {
@@ -317,6 +324,10 @@ export default function TasksPage() {
       })
       if (response.ok) {
         fetchTasks()
+      } else {
+        // e.g. 409: a booking left the itinerary and must be cancelled first.
+        const result = await response.json().catch(() => null)
+        await dialog.alert('Could not change the status', result?.error || 'Please try again.', 'warning')
       }
     } catch (error) {
       console.error('Error updating task status:', error)
@@ -882,7 +893,9 @@ export default function TasksPage() {
                             </div>
                           </div>
 
-                          {task.description && (
+                          {Array.isArray(task.checklist) ? (
+                            <div className="mb-2"><ChecklistSummary items={task.checklist} /></div>
+                          ) : task.description && (
                             <p className="text-xs text-gray-500 mb-2 line-clamp-2">{task.description}</p>
                           )}
 
@@ -1055,7 +1068,9 @@ export default function TasksPage() {
                             {task.archived && <Archive className="h-3 w-3 text-gray-400" />}
                             <span className="text-sm font-medium text-gray-900">{task.title}</span>
                           </div>
-                          {task.description && (
+                          {Array.isArray(task.checklist) ? (
+                            <div className="mt-1 max-w-sm"><ChecklistSummary items={task.checklist} /></div>
+                          ) : task.description && (
                             <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{task.description}</p>
                           )}
                         </td>
@@ -1254,7 +1269,9 @@ export default function TasksPage() {
                             {task.title}
                           </h4>
                         </div>
-                        {task.description && (
+                        {Array.isArray(task.checklist) ? (
+                          <div className="mt-1 max-w-sm"><ChecklistSummary items={task.checklist} /></div>
+                        ) : task.description && (
                           <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{task.description}</p>
                         )}
                       </div>
@@ -1446,7 +1463,7 @@ export default function TasksPage() {
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+          <div className={`bg-white rounded-lg shadow-xl ${Array.isArray(editingTask?.checklist) ? 'max-w-4xl' : 'max-w-lg'} w-full max-h-[90vh] overflow-y-auto`}>
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">
                 {editingTask ? 'Edit Task' : 'Add Task'}
@@ -1474,6 +1491,18 @@ export default function TasksPage() {
                 />
               </div>
 
+              {editingTask && Array.isArray(editingTask.checklist) ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Checklist</label>
+                  <TaskChecklist
+                    task={{ ...editingTask, checklist: editingTask.checklist }}
+                    onUpdated={updated => {
+                      setEditingTask(updated)
+                      setTasks(prev => prev.map(t => (t.id === updated.id ? { ...t, ...updated } : t)))
+                    }}
+                  />
+                </div>
+              ) : (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
@@ -1484,6 +1513,7 @@ export default function TasksPage() {
                   placeholder="Task description..."
                 />
               </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

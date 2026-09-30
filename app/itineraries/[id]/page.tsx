@@ -22,6 +22,7 @@ import TripTimeline from '@/app/components/TripTimeline'
 import TravellerChat from '@/app/components/TravellerChat'
 import { showToast } from '@/app/contexts/ToastContext'
 import ItineraryBookingAction from '@/components/ItineraryBookingAction'
+import GenerateTasksButton from '@/components/tasks/GenerateTasksButton'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 
@@ -793,6 +794,7 @@ export default function ViewItineraryPage() {
                   </>
                 )}
               </button>
+              <GenerateTasksButton itineraryId={itinerary.id} />
                    <GenerateDocumentsButton 
                   itineraryId={itinerary.id}
                    itineraryCode={itinerary.itinerary_code}

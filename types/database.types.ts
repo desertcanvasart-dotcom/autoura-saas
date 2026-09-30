@@ -8548,6 +8548,9 @@ export interface Database {
           created_at: string | null
           updated_at: string | null
           department_id: string | null
+          service_type: string | null
+          generation_snapshot: Json | null
+          checklist: Json | null
         }
         Insert: {
           id?: string
@@ -8567,6 +8570,9 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           department_id?: string | null
+          service_type?: string | null
+          generation_snapshot?: Json | null
+          checklist?: Json | null
         }
         Update: {
           id?: string
@@ -8586,6 +8592,9 @@ export interface Database {
           created_at?: string | null
           updated_at?: string | null
           department_id?: string | null
+          service_type?: string | null
+          generation_snapshot?: Json | null
+          checklist?: Json | null
         }
         Relationships: [
           {
