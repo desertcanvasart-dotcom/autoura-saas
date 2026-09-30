@@ -6,7 +6,7 @@ import {
   isValidServiceType,
   serviceTypeLabel,
 } from '../service-types'
-import { SERVICE_TYPE_TO_DEPARTMENT } from '../ai/task-generation'
+import { TASK_CATEGORIES, categoryOfType } from '../tasks/itinerary-tasks'
 
 // ============================================================================
 // Departments were seed-only until now: four global rows written by migration
@@ -15,22 +15,25 @@ import { SERVICE_TYPE_TO_DEPARTMENT } from '../ai/task-generation'
 // invisible in normal use:
 //
 //   - a service_type outside the known vocabulary makes task auto-routing
-//     silently stop matching (findDepartmentForServiceType returns null, and
-//     the generated task lands unassigned)
+//     silently stop matching (no department claims the task's category, and
+//     the generator skips it)
 //   - UNIQUE(tenant_id, name) treats NULL tenant_ids as distinct, so the DB
 //     will NOT stop a tenant creating their own "Aviation" next to the global
 //     one — two identical entries in every picker
 // ============================================================================
 
 describe('service type vocabulary', () => {
-  it('stays in sync with the task router mapping', () => {
-    // If someone adds a service type to the router but not here, the editor
-    // silently can't express it — and vice versa, this offers a checkbox that
-    // routes nothing. Both directions are drift.
-    const routable = ROUTABLE_SERVICE_TYPES.map(t => t.value).sort()
-    const routerTypes = Object.keys(SERVICE_TYPE_TO_DEPARTMENT).sort()
-
-    expect(routable).toEqual(routerTypes)
+  it('stays in sync with the task categories', () => {
+    // Every category the generator makes a task for must be offered in the
+    // editor, or no department can ever take it; and every type offered must
+    // lead to a category, or ticking it routes nothing.
+    const routable = ROUTABLE_SERVICE_TYPES.map(t => t.value)
+    for (const category of Object.keys(TASK_CATEGORIES)) {
+      expect(routable).toContain(category)
+    }
+    for (const value of routable) {
+      expect(Object.keys(TASK_CATEGORIES)).toContain(categoryOfType(value))
+    }
   })
 
   it('marks back-office types as non-routable', () => {

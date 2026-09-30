@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
+import { completeChecklist, type ChecklistItem } from '@/lib/tasks/itinerary-tasks'
 
 // GET - Fetch single task
 export async function GET(
@@ -67,7 +68,7 @@ export async function PUT(
     }
     const body = await request.json()
 
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString()
     }
 
@@ -84,6 +85,30 @@ export async function PUT(
     // Status change with completed_at tracking
     if (body.status !== undefined) {
       updateData.status = body.status
+      // A generated task's status follows its checklist, so completing it
+      // ticks every row — otherwise it reads "Done, 0 of 2 booked" and the
+      // next tick or regenerate moves it back to To Do.
+      if (body.status === 'done') {
+        const { data: current, error: readError } = await supabase
+          .from('tasks')
+          .select('checklist')
+          .eq('id', id)
+          .maybeSingle()
+        if (readError) throw readError
+        if (Array.isArray(current?.checklist)) {
+          const done = completeChecklist(current.checklist as unknown as ChecklistItem[], updateData.updated_at as string)
+          if (!done.ok) {
+            return NextResponse.json(
+              {
+                error: `${done.toCancel} booking${done.toCancel === 1 ? '' : 's'} left the itinerary and must be cancelled first — open the task and mark ${done.toCancel === 1 ? 'it' : 'them'} Cancelled.`,
+                to_cancel: done.toCancel,
+              },
+              { status: 409 }
+            )
+          }
+          updateData.checklist = done.items
+        }
+      }
       if (body.status === 'done') {
         updateData.completed_at = new Date().toISOString()
       } else {
@@ -98,7 +123,7 @@ export async function PUT(
     }
 
     // Block tenant_id updates
-    delete (updateData as any).tenant_id
+    delete updateData.tenant_id
 
     const { data, error } = await supabase
       .from('tasks')

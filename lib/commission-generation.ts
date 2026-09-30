@@ -73,6 +73,7 @@ export const SERVICE_TYPE_TO_CATEGORY: Readonly<Record<string, CommissionCategor
   guide: 'other',
   tips: 'other',
   supplies: 'other',
+  other: 'other',
 }
 
 export type CommissionDirection = 'payable' | 'receivable'
