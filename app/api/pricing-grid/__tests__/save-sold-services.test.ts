@@ -13,14 +13,34 @@ import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
 
 type Row = Record<string, unknown>
 const inserted: Record<string, Row[]> = {}
+const deleted: string[] = []
 let seq = 0
+// What save_pricing_grid_days (migration 391) received, and whether it fails.
+let rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = []
+let rpcError: { message: string } | null = null
+
+// The days and services go to the database in ONE call; its SQL (tested on
+// PGlite in lib/__tests__/pricing-grid-atomic-save.test.ts) writes them.
+async function rpc(fn: string, args: Record<string, unknown>) {
+  rpcCalls.push({ fn, args })
+  if (rpcError) return { data: null, error: rpcError }
+  const days = (args.p_days as Row[]) ?? []
+  let services = 0
+  for (const d of days) {
+    const { services: svcs, ...dayRow } = d as Row & { services: Row[] }
+    ;(inserted.itinerary_days ??= []).push(dayRow)
+    ;(inserted.itinerary_services ??= []).push(...svcs)
+    services += svcs.length
+  }
+  return { data: [{ days_inserted: days.length, services_inserted: services }], error: null }
+}
 
 function table(name: string) {
   let payload: Row | Row[] | null = null
   const chain = {
     insert(p: Row | Row[]) { payload = p; return chain },
     update() { return chain },
-    delete() { return chain },
+    delete() { deleted.push(name); return chain },
     select() { return chain },
     eq() { return chain }, in() { return chain }, is() { return chain }, ilike() { return chain }, limit() { return chain },
     maybeSingle() { return Promise.resolve({ data: null, error: null }) },
@@ -40,7 +60,7 @@ function table(name: string) {
 }
 
 vi.mock('@/lib/supabase-server', () => ({
-  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: { from: table } }),
+  requireAuth: async () => ({ error: null, status: 200, tenant_id: 't1', user: { id: 'u1' }, supabase: { from: table, rpc } }),
   createAdminClient: () => ({ rpc: async () => ({ data: 'Q-1', error: null }), from: table }),
 }))
 
@@ -59,17 +79,22 @@ const config = (withGuide: boolean) => ({
   startDate: '2026-11-01', clientName: '', clientEmail: '', clientPhone: '', tourName: 'T',
 }) as unknown as GridConfig
 
-async function save(withGuide: boolean) {
+async function save(withGuide: boolean, days: GridDay[] = [day()]) {
   for (const k of Object.keys(inserted)) delete inserted[k]
+  deleted.length = 0
+  rpcCalls = []
   const { POST } = await import('@/app/api/pricing-grid/save/route')
   const res = await POST(new Request('http://x', {
     method: 'POST',
-    body: JSON.stringify({ config: config(withGuide), days: [day()], totals: {} }),
+    body: JSON.stringify({ config: config(withGuide), days, totals: {} }),
   }) as never)
-  return res.json()
+  return { status: res.status, ...(await res.json()) }
 }
 
-beforeEach(() => { vi.spyOn(console, 'error').mockImplementation(() => {}) })
+beforeEach(() => {
+  rpcError = null
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+})
 
 describe('the grid saves what it priced', () => {
   it('guide OFF: no guide row and no guide tip is saved, the driver tip is', async () => {
@@ -93,15 +118,34 @@ describe('the grid saves what it priced', () => {
     expect(names).toEqual(['English Cairo', 'Guide tip', 'Driver tip', 'Pyramids'])
   })
 
-  it('every service names its day in BOTH columns and leaves client_price empty', async () => {
-    await save(true)
-    const dayId = inserted.itinerary_days?.[0]?.id
-    expect(dayId).toBeTruthy()
-    for (const s of inserted.itinerary_services ?? []) {
-      expect(s.day_id).toBe(dayId)
-      expect(s.itinerary_day_id).toBe(dayId)
-      expect(s.client_price).toBeNull()
-    }
+  // Both day columns and an empty client_price are now set by the SQL
+  // function itself — asserted on PGlite (pricing-grid-atomic-save.test.ts).
+})
+
+describe('the save is one transaction and keeps each day\'s settings (migration 391)', () => {
+  it('days and services go to save_pricing_grid_days in ONE call; nothing is deleted or inserted piecemeal', async () => {
+    const body = await save(true)
+    expect(body.success).toBe(true)
+    expect(rpcCalls.map(c => c.fn)).toEqual(['save_pricing_grid_days'])
+    expect(deleted).not.toContain('itinerary_days')
+    expect(body.daysCreated).toBe(1)
+    expect(body.servicesCreated).toBe(4)
+  })
+
+  it("each day carries its type and overrides; an unset override stays null", async () => {
+    const d = { ...day(), dayType: 'transfer', intercity: 'flight', hasSightseeing: true } as GridDay
+    await save(true, [d, { ...day(), id: 'd2', dayNumber: 2 }])
+    const [first, second] = inserted.itinerary_days ?? []
+    expect(first).toMatchObject({ day_type: 'transfer', intercity: 'flight', has_sightseeing: true, overnight: null })
+    expect(second).toMatchObject({ day_type: 'tour', intercity: null, has_sightseeing: null })
+  })
+
+  it('a failed save answers 500 — never success — and removes the empty new itinerary', async () => {
+    rpcError = { message: 'boom' }
+    const body = await save(true)
+    expect(body.status).toBe(500)
+    expect(body.success).toBe(false)
+    expect(deleted).toEqual(['itineraries'])
   })
 })
 
