@@ -13,6 +13,7 @@ function fakeGmail(opts: {
   history?: Msg[] | { status: number }
   listing?: Msg[]
   failGet?: Set<string>
+  goneGet?: Set<string>
   full?: Record<string, Msg>
 }) {
   const calls = { list: 0, historyList: 0, getFull: [] as string[], getMeta: [] as string[] }
@@ -36,6 +37,7 @@ function fakeGmail(opts: {
           }
           calls.getFull.push(id)
           if (opts.failGet?.has(id)) throw new Error('backend error')
+          if (opts.goneGet?.has(id)) throw Object.assign(new Error('Requested entity was not found.'), { code: 404 })
           const m = opts.full?.[id] ?? { id, labelIds: ['INBOX'] }
           return { data: { id, threadId: m.threadId ?? `t-${id}`, labelIds: m.labelIds ?? ['INBOX'] } }
         },
@@ -134,5 +136,17 @@ describe('only new mail is downloaded, and failures are counted', () => {
     expect(r.failed).toBe(1)
     expect(r.skipped).toBe(1)
     expect(calls.getFull.sort()).toEqual(['a', 'b', 'c'])
+    expect(r.reasons).toEqual(['b: backend error'])
+  })
+
+  it('a message deleted since the history listed it is gone, not failed (live 2026-09-30)', async () => {
+    // Counted as failed, it held the history id back and failed every
+    // scheduled run on the same message.
+    const { gmail } = fakeGmail({ goneGet: new Set(['b']) })
+    const r = await downloadMessages(gmail, [{ id: 'a', threadId: null }, { id: 'b', threadId: null }])
+    expect(r.messages.map(m => m.id)).toEqual(['a'])
+    expect(r.failed).toBe(0)
+    expect(r.gone).toBe(1)
+    expect(r.reasons).toEqual([])
   })
 })
