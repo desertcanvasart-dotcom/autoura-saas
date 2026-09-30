@@ -23,6 +23,16 @@ const DEFAULTS = {
   'Water Bottle': 2,
 }
 
+/** The water cost per person per day when a company has not set its own
+ *  "Water Bottle" fixed cost — shared by the pricing engine and the grid. */
+export const DEFAULT_WATER_PER_PERSON_PER_DAY = DEFAULTS['Water Bottle']
+
+/** The fixed_daily_costs row that prices water: cost_type "Water Bottle"
+ *  (matched loosely, as operators type it). */
+export function isWaterCostType(costType: unknown): boolean {
+  return typeof costType === 'string' && /water/i.test(costType)
+}
+
 export interface FixedDailyCosts {
   waterPerPersonPerDay: number
 }

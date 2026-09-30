@@ -5,7 +5,8 @@ import { todayLocal } from '@/lib/today'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { GridConfig, GridDay, AllRates, SlotValue, GridTotals } from './types'
 import { SLOT_DEFINITIONS } from './types'
-import { calculateGrandTotals, calculateDay } from './lib/calculator'
+import { calculateGrandTotals, calculateDay, convertAmount } from './lib/calculator'
+import { getCurrencySymbol } from '@/lib/currency'
 import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/throughout-guide'
 import { mapServicesToSlots } from './lib/slot-mapping'
 import { parsedDaysToGrid } from './lib/parsed-days'
@@ -117,6 +118,9 @@ function PricingGridContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null)
+  // The selling total as last saved (or loaded), so the Update button can
+  // show what a re-save changes. Only meaningful while config.itineraryId is set.
+  const [savedSellingTotal, setSavedSellingTotal] = useState<number | null>(null)
   const [savedQuoteNumber, setSavedQuoteNumber] = useState<string | null>(null)
 
   const isInitialLoad = useRef(true)
@@ -411,6 +415,25 @@ function PricingGridContent() {
   const expandAll = () => setDays(prev => prev.map(d => ({ ...d, isExpanded: true })))
   const collapseAll = () => setDays(prev => prev.map(d => ({ ...d, isExpanded: false })))
 
+  // Jump to a day from the day bar: open it and bring it into view.
+  const jumpToDay = (dayId: string) => {
+    setDays(prev => prev.map(d => d.id === dayId ? { ...d, isExpanded: true } : d))
+    requestAnimationFrame(() =>
+      document.getElementById(`grid-day-${dayId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  // Copy one service to every day (offered on Water, a daily item).
+  const applySlotToAllDays = (slotId: string, value: SlotValue) => {
+    const copy = (): SlotValue => ({ ...value, slotId, selectedItems: value.selectedItems.map(i => ({ ...i })) })
+    setDays(prev => prev.map(d => ({
+      ...d,
+      slots: d.slots.some(s => s.slotId === slotId)
+        ? d.slots.map(s => (s.slotId === slotId ? copy() : s))
+        : [...d.slots, copy()],
+    })))
+    showToast('success', `Applied to all ${days.length} days`)
+  }
+
   const updateDay = (dayId: string, partial: Partial<GridDay>) => {
     setDays(prev => prev.map(d => d.id === dayId ? { ...d, ...partial } : d))
   }
@@ -554,6 +577,7 @@ function PricingGridContent() {
         itineraryId: itn.id,
         itineraryCode: itn.itinerary_code,
       }))
+      setSavedSellingTotal(typeof itn.total_cost === 'number' ? itn.total_cost : Number(itn.total_cost) || null)
 
       // Fetch days with services
       const daysRes = await fetch(`/api/itineraries/${itineraryId}/days?language=en`)
@@ -646,6 +670,7 @@ function PricingGridContent() {
           itineraryCode: data.itineraryCode,
           clientId: data.clientId ?? prev.clientId,
         }))
+        if (typeof data.sellingTotal === 'number') setSavedSellingTotal(data.sellingTotal)
 
         // For B2B: create quote + template, then redirect to /tours/manage
         if (config.clientType === 'b2b') {
@@ -709,9 +734,21 @@ function PricingGridContent() {
             setSaveMessage(`Saved as ${data.itineraryCode} (B2B processing failed)`)
           }
         } else {
-          setSavedQuoteId(null)
-          setSavedQuoteNumber(null)
-          setSaveMessage(`Saved as ${data.itineraryCode}`)
+          // B2C: the save repriced the itinerary's open quote, or created one.
+          setSavedQuoteId(data.quoteId ?? null)
+          setSavedQuoteNumber(data.quoteNumber ?? null)
+          const money = (n: number) => `${getCurrencySymbol(config.currency)}${convertAmount(n, config.exchangeRate).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          if (data.quoteAction === 'updated') {
+            const before = typeof data.previousSellingTotal === 'number' ? data.previousSellingTotal : null
+            setSaveMessage(
+              `Saved ${data.itineraryCode} · quote ${data.quoteNumber} repriced` +
+              (before !== null && Math.abs(before - data.sellingTotal) >= 0.01 ? `: ${money(before)} → ${money(data.sellingTotal)}` : ' (price unchanged)')
+            )
+          } else if (data.quoteAction === 'created') {
+            setSaveMessage(`Saved as ${data.itineraryCode} + quote ${data.quoteNumber}`)
+          } else {
+            setSaveMessage(`Saved as ${data.itineraryCode}`)
+          }
         }
       } else {
         showToast('error', `Save failed: ${data.error}`)
@@ -832,8 +869,36 @@ function PricingGridContent() {
             </div>
           </div>
 
+          {/* Day bar: every day at a glance, one click to jump to it */}
+          <div className="sticky top-0 z-20 -mx-1 mb-2 px-1 py-1.5 bg-gray-50/95 backdrop-blur border-b border-gray-200">
+            <div className="flex gap-1.5 overflow-x-auto">
+              {days.map(day => {
+                const perPerson = calculateDay(day, config).dailyPerPerson
+                return (
+                  <button
+                    key={day.id}
+                    type="button"
+                    onClick={() => jumpToDay(day.id)}
+                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-full border transition-colors ${
+                      day.isExpanded
+                        ? 'bg-[#556B2F] text-white border-[#556B2F]'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-[#556B2F]'
+                    }`}
+                    title={day.title || `Day ${day.dayNumber}`}
+                  >
+                    <span className="font-semibold">Day {day.dayNumber}</span>
+                    {day.city && <span className="opacity-80">{day.city}</span>}
+                    <span className="tabular-nums opacity-80">
+                      {getCurrencySymbol(config.currency)}{convertAmount(perPerson, config.exchangeRate).toFixed(0)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           {/* Day Cards */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             {days.map(day => (
               <DayRow
                 key={day.id}
@@ -845,6 +910,7 @@ function PricingGridContent() {
                 onUpdateSlot={(slotId, value) => updateSlot(day.id, slotId, value)}
                 onUpdateDay={(partial) => updateDay(day.id, partial)}
                 onRemoveDay={() => removeDay(day.id)}
+                onApplyToAllDays={applySlotToAllDays}
               />
             ))}
           </div>
@@ -862,6 +928,7 @@ function PricingGridContent() {
             savedQuoteId={savedQuoteId}
             savedQuoteNumber={savedQuoteNumber}
             saveMessage={saveMessage}
+            savedSellingTotal={config.itineraryId ? savedSellingTotal : null}
           />
         </>
       )}

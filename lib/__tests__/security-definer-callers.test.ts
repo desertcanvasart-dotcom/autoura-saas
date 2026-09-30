@@ -18,7 +18,7 @@ const ALLOWED_CALLERS: Record<string, string[]> = {
   increment_usage: ['lib/usage-enforcement.ts'],
   get_tenant_agent_memories: ['lib/agent-memory.ts'],
   create_b2b_quote_version: ['app/api/quotes/b2b/[id]/route.ts'],
-  create_b2c_quote_version: ['app/api/quotes/b2c/[id]/route.ts'],
+  create_b2c_quote_version: ['app/api/quotes/b2c/[id]/route.ts', 'app/api/pricing-grid/save/route.ts'],
   revert_b2b_quote_to_version: ['app/api/quotes/[type]/[id]/versions/revert/route.ts'],
   revert_b2c_quote_to_version: ['app/api/quotes/[type]/[id]/versions/revert/route.ts'],
   purge_expired_agent_memories: ['app/api/cron/process-agent-memory/route.ts'],
@@ -77,6 +77,7 @@ describe('the helpers that wrap them default to the service-role client', () => 
     expect(read('app/api/billing/webhook/route.ts')).toMatch(/getSupabaseAdmin\(\) as any\)\.rpc\('log_activity'/)
     expect(read('app/api/quotes/b2b/[id]/route.ts')).toMatch(/supabaseAdmin\.rpc\('create_b2b_quote_version'/)
     expect(read('app/api/quotes/b2c/[id]/route.ts')).toMatch(/supabaseAdmin\.rpc\('create_b2c_quote_version'/)
+    expect(read('app/api/pricing-grid/save/route.ts')).toMatch(/createAdminClient\(\)\.rpc\('create_b2c_quote_version'/)
     expect(read('app/api/quotes/[type]/[id]/versions/revert/route.ts')).toMatch(/supabaseAdmin\s*\n?\s*\.rpc\(functionName/)
     expect(read('app/api/cron/process-agent-memory/route.ts')).toMatch(/supabaseAdmin\.rpc\(\s*\n?\s*'purge_expired_agent_memories'/)
   })
