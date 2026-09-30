@@ -12,6 +12,7 @@ import { normalizeRateRows } from '@/lib/rates/rate-currency'
 import { parseSeasons } from '@/lib/rates/rate-seasons'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
+import { DEFAULT_WATER_PER_PERSON_PER_DAY, isWaterCostType } from '@/lib/fixed-costs'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
       { data: rawCruiseRates },
       { data: rawCruiseTransportPkgs },
       { data: rawFlightRates },
+      { data: rawFixedCosts },
     ] = await Promise.all([
       supabase.from('transportation_rates').select('*').eq('is_active', true),
       supabase.from('guide_rates').select('*').eq('is_active', true),
@@ -65,6 +67,10 @@ export async function GET(request: NextRequest) {
       supabase.from('nile_cruises').select('*').eq('is_active', true).eq('tier', tier),
       supabase.from('b2b_transport_packages').select('*').eq('is_active', true),
       supabase.from('flight_rates').select('*').eq('is_active', true),
+      // Water is priced from the company's "Water Bottle" fixed cost (Rates →
+      // Fixed costs), the same rate the pricing engine uses — the grid used a
+      // hardcoded 0.50 of its own. rate_currency lets normalizeRateRows convert it.
+      supabase.from('fixed_daily_costs').select('cost_type, cost_per_person_per_day, rate_currency, tenant_id').eq('is_active', true),
     ])
 
     // Per-rate currency (P3): rows priced in a contract currency are
@@ -74,7 +80,7 @@ export async function GET(request: NextRequest) {
     const [
       transportRates, guideRates, airportRates, hotelServiceRates,
       tippingRates, activityRates, accommodationRates, entranceFees,
-      mealRates, cruiseRates, cruiseTransportPkgs, flightRates,
+      mealRates, cruiseRates, cruiseTransportPkgs, flightRates, fixedCosts,
     ] = await Promise.all([
       normalizeRateRows(supabase, 'transportation_rates', rawTransportRates as Record<string, unknown>[], runCurrency),
       normalizeRateRows(supabase, 'guide_rates', rawGuideRates as Record<string, unknown>[], runCurrency),
@@ -88,7 +94,12 @@ export async function GET(request: NextRequest) {
       normalizeRateRows(supabase, 'nile_cruises', rawCruiseRates as Record<string, unknown>[], runCurrency),
       normalizeRateRows(supabase, 'b2b_transport_packages', rawCruiseTransportPkgs as Record<string, unknown>[], runCurrency),
       normalizeRateRows(supabase, 'flight_rates', rawFlightRates as Record<string, unknown>[], runCurrency),
+      normalizeRateRows(supabase, 'fixed_daily_costs', rawFixedCosts as Record<string, unknown>[], runCurrency),
     ])
+    // The company's own row wins over a shared (tenant-less) one.
+    const waterRows = (fixedCosts || []).filter(r => isWaterCostType(r.cost_type))
+    const waterRow = waterRows.find(r => r.tenant_id === authResult.tenant_id) ?? waterRows[0]
+    const waterRate = waterRow ? toNum(waterRow.cost_per_person_per_day) : DEFAULT_WATER_PER_PERSON_PER_DAY
 
     // First stored period's guide bed rate (B-item 3); 0 in a period means
     // "no concession entered" (the sanitizer stores blanks as 0) → null.
@@ -240,7 +251,10 @@ export async function GET(request: NextRequest) {
       })),
 
       water: [
-        { id: 'water-standard', name: 'Water Bottles', rateEur: 0.50, rateNonEur: 0.50, details: 'Per person per day' }
+        {
+          id: 'water-standard', name: 'Water Bottles', rateEur: waterRate, rateNonEur: waterRate,
+          details: waterRow ? 'Per person per day' : 'Per person per day (default — set it in Rates → Fixed costs)',
+        }
       ],
 
       cruise: (cruiseRates || []).map((r: any) => ({

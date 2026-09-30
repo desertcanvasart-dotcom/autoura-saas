@@ -15,6 +15,7 @@ import { ratePin } from '@/lib/pricing/rate-pin'
 import { gridDayComponents } from '@/lib/pricing/grid-day-components'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { resolveGridClient } from '@/lib/grid-client-link'
+import { findOpenGridQuote, quotePriceFields } from '@/lib/pricing/grid-quote-sync'
 import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
 import type { Json, TablesInsert } from '@/types/database.types'
 
@@ -155,13 +156,23 @@ export async function POST(request: NextRequest) {
     // Try with new columns, fallback without
     let itinerary: any
     if (config.itineraryId) {
-      // Update existing
+      // Update existing. A re-save changes the trip and its price — it does
+      // not rename it (a fresh random code on every save broke every
+      // reference to it), re-open it as a draft, or overwrite its notes.
       // Re-saving never unlinks: with no client resolved, the itinerary keeps
       // whichever client it already had.
-      const { client_id: _clientId, ...unlinked } = itineraryData
+      const {
+        client_id: _clientId, itinerary_code: _code, status: _status, notes: _notes, trip_name: _tripName,
+        ...changes
+      } = itineraryData
+      const update = {
+        ...changes,
+        ...(clientId ? { client_id: clientId } : {}),
+        ...(config.tourName ? { trip_name: config.tourName } : {}),
+      }
       const { data, error } = await supabase
         .from('itineraries')
-        .update(clientId ? itineraryData : unlinked)
+        .update(update)
         .eq('id', config.itineraryId)
         .select()
         .single()
@@ -325,6 +336,7 @@ export async function POST(request: NextRequest) {
 
     // 4. B2B: Create quote if needed
     let quoteId: string | undefined
+    let quoteNumber: string | undefined
     let redirectUrl: string | undefined
 
     if (config.clientType === 'b2b' && config.partnerId) {
@@ -364,11 +376,56 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. B2C: create the commercial-offer wrapper, mirroring the B2B branch.
+    // 5. B2C: the commercial-offer wrapper, mirroring the B2B branch.
     // The priced itinerary is the trip; the b2c_quotes row is the offer with
     // the sales lifecycle (quote number, sent/viewed, versioning) and the
     // anchor bookings convert from (one booking per quote, migration 256).
-    if (config.clientType === 'b2c') {
+    // A re-save REPRICES the itinerary's open quote (lib/pricing/
+    // grid-quote-sync.ts) — it used to add a new draft every time, leaving
+    // the quote the operator was working from at the old price.
+    let quoteAction: 'created' | 'updated' | undefined
+    let previousSellingTotal: number | null = null
+    const openQuote = config.clientType === 'b2c' && config.itineraryId
+      ? await findOpenGridQuote(supabase, itineraryId).catch(err => {
+          console.error('B2C quote lookup error:', err instanceof Error ? err.message : err)
+          return null
+        })
+      : null
+    if (openQuote) {
+      const { data: updated, error: updateError } = await supabase
+        .from('b2c_quotes')
+        .update({
+          ...quotePriceFields({
+            pax, tier: config.tier || 'standard', currency: config.currency || 'EUR',
+            supplierTotal: finalSupplierTotal, sellingTotal: finalSellingTotal, marginPercent: marginPct,
+          }),
+          ...(linkedClientId ? { client_id: linkedClientId } : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', openQuote.id)
+        .select('id')
+        .maybeSingle()
+      if (updateError || !updated) {
+        console.error('B2C quote update error:', updateError?.message ?? 'not visible')
+      } else {
+        quoteId = openQuote.id
+        quoteNumber = openQuote.quote_number
+        quoteAction = 'updated'
+        previousSellingTotal = openQuote.selling_price
+        redirectUrl = `/quotes/b2c/${openQuote.id}`
+        // The same version snapshot the quote editor records. The quote id
+        // came from the caller's own (RLS) read and update just above.
+        try {
+          await createAdminClient().rpc('create_b2c_quote_version', {
+            p_quote_id: openQuote.id,
+            p_changed_by: authResult.user!.id,
+            p_change_reason: 'Repriced from the Pricing Grid',
+          })
+        } catch (versionError) {
+          console.error('Error creating quote version:', versionError instanceof Error ? versionError.message : versionError)
+        }
+      }
+    } else if (config.clientType === 'b2c') {
       try {
         const adminClient = createAdminClient()
         const { data: quoteNum } = await adminClient.rpc('generate_b2c_quote_number')
@@ -401,6 +458,8 @@ export async function POST(request: NextRequest) {
 
         if (!quoteError && quote) {
           quoteId = quote.id
+          quoteNumber = quote.quote_number
+          quoteAction = 'created'
           redirectUrl = `/quotes/b2c/${quote.id}`
         } else if (quoteError) {
           console.error('B2C quote creation error:', quoteError.message)
@@ -414,10 +473,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       itineraryId,
-      itineraryCode,
+      // A re-save keeps the itinerary's own code.
+      itineraryCode: itinerary.itinerary_code ?? itineraryCode,
       daysCreated,
       servicesCreated,
       quoteId,
+      quoteNumber,
+      quoteAction,
+      previousSellingTotal,
+      sellingTotal: finalSellingTotal,
       clientId: linkedClientId,
       clientLinkedBy: clientLink.how,
       redirectUrl: redirectUrl || `/itineraries/${itineraryId}`,
