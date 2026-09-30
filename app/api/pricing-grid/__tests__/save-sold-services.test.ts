@@ -164,3 +164,29 @@ describe('guide-rule', () => {
     expect(customAmountSold('guide', true)).toBe(true)
   })
 })
+
+// Migration 393: airport / hotel services and activities save by their own
+// basis, so the itinerary stores what the grid priced.
+describe('the grid saves each line by its rate’s basis', () => {
+  const basisDay = (): GridDay => ({
+    id: 'd1', dayNumber: 1, title: 'Aswan', city: 'Aswan', description: '',
+    slots: [
+      { slotId: 'airport_services', selectedItems: [{ ...item('a1', 'ASW meet & assist', 30), pricingBasis: 'per_person' }] },
+      { slotId: 'hotel_services', selectedItems: [{ ...item('h1', 'Porterage', 5), pricingBasis: 'per_unit', unitCapacity: 2 }] },
+      { slotId: 'experiences', selectedItems: [{ ...item('x1', 'Private felucca', 40), pricingBasis: 'flat' }] },
+    ],
+  } as unknown as GridDay)
+
+  it('quantity and total follow the basis; the itinerary total matches the calculator', async () => {
+    await save(true, [basisDay()])
+    const rows = (inserted.itinerary_services ?? []).map(s => [s.service_name, s.quantity, s.total_cost])
+    expect(rows).toEqual([
+      ['ASW meet & assist', 2, 60],
+      ['Porterage', 1, 5],
+      ['Private felucca', 1, 40],
+    ])
+    const priced = calculateDay(basisDay(), config(true))
+    expect(priced.dailyTotal).toBe(105)
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(105 * 1.3, 2)
+  })
+})

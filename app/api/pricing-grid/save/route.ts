@@ -17,6 +17,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { resolveGridClient } from '@/lib/grid-client-link'
 import { findOpenGridQuote, quotePriceFields } from '@/lib/pricing/grid-quote-sync'
 import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
+import { BASIS_SLOTS, itemCost } from '@/app/pricing-grid/lib/item-basis'
 import type { Json, TablesInsert } from '@/types/database.types'
 
 function generateItineraryCode(): string {
@@ -26,7 +27,11 @@ function generateItineraryCode(): string {
 }
 
 // A selected rate as the grid sends it.
-interface SavedGridItem { rateId: string; name?: string; rateEur?: number; rateNonEur?: number }
+interface SavedGridItem {
+  rateId: string; name?: string; rateEur?: number; rateNonEur?: number
+  /** Per group / per person / per unit (item-basis.ts). */
+  pricingBasis?: 'flat' | 'per_person' | 'per_unit'; unitCapacity?: number | null
+}
 
 // Group slots are charged once for the whole group; per-person slots scale by pax.
 const GRID_GROUP_SLOTS = ['route', 'guide', 'airport_services', 'hotel_services', 'tipping', 'boat_rides', 'other_group']
@@ -45,9 +50,11 @@ function slotSupplierCost(slot: any, passport: string, pax: number, withGuide: b
     return isGroup ? slot.customAmount : slot.customAmount * pax
   }
   let line = 0
-  for (const item of soldItems(slot, withGuide)) {
+  for (const item of soldItems<SavedGridItem>(slot, withGuide)) {
     const rate = itemRate(item, passport)
-    line += isGroup ? rate : rate * pax
+    // Airport / hotel services and activities: by the item's own basis.
+    if (BASIS_SLOTS.has(slot.slotId)) line += itemCost(slot.slotId, item, rate, pax).lineTotal
+    else line += isGroup ? rate : rate * pax
   }
   return line
 }
@@ -258,13 +265,16 @@ export async function POST(request: NextRequest) {
 
         for (const item of sold) {
           const rate = itemRate(item, passport)
+          // Airport / hotel services and activities: quantity and total by the
+          // item's own basis (per group / per person / per unit).
+          const byBasis = BASIS_SLOTS.has(slot.slotId) ? itemCost(slot.slotId, item, rate, pax) : null
           services.push({
             service_type: serviceType,
             service_name: item.name || slot.slotId.replace(/_/g, ' '),
             description: `[pricing-grid:${slot.slotId}] ${item.name || ''}`,
-            quantity: isGroup ? 1 : pax,
+            quantity: byBasis ? byBasis.quantity : isGroup ? 1 : pax,
             unit_cost: rate,
-            total_cost: isGroup ? rate : rate * pax,
+            total_cost: byBasis ? byBasis.lineTotal : isGroup ? rate : rate * pax,
             is_included: true,
             // The pin (migration 353): which rate row this line was priced
             // from, so a later re-price (B2B quote, single supplement) reads

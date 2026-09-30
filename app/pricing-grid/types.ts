@@ -1,3 +1,4 @@
+import type { PricingBasis } from '@/lib/pricing/pricing-basis'
 import type { PackageType } from '@/lib/package-types'
 
 // ============================================
@@ -162,6 +163,12 @@ export interface SelectedItem {
   // path. See app/pricing-grid/lib/grid-completeness.ts.
   serviceType?: string         // e.g. 'airport_transfer' / 'day_tour' / 'intercity_transfer' on route slot
   pricingClass?: PricingClass  // 'mandatory' / 'optional' / 'free' on entrance_fees
+  /** How the rate applies to the group — per group (flat), per person or per
+   *  unit (lib/pricing/pricing-basis.ts). Set on airport / hotel services and
+   *  activities (boat rides, experiences); absent = the slot's own bucket. */
+  pricingBasis?: PricingBasis
+  /** per_unit only: people per unit. */
+  unitCapacity?: number | null
 }
 
 export interface SlotValue {
@@ -224,6 +231,10 @@ export interface RateOption {
    *  unpriced night, never a silent zero), or a flight's negotiated guide
    *  fare (null = customer fare, 0 = rides free). */
   guide_rate_eur?: number | null
+  /** The rate's pricing basis and, for per_unit, people per unit
+   *  (airport / hotel services, activities). */
+  pricing_basis?: PricingBasis
+  unit_capacity?: number | null
 }
 
 export interface AllRates {

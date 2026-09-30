@@ -359,6 +359,9 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('service_type', 'Service Type', 'text', true),
       col('direction', 'Direction', 'text', true),
       col('rate_eur', 'Rate', 'number', true),
+      // flat (per group, the default) / per_person / per_unit — migration 393.
+      col('pricing_type', 'Pricing Type', 'text', false),
+      col('max_capacity', 'People per Unit', 'number', false),
       col('description', 'Description', 'text', false),
       // The ground handler this rate is bought from. The form has always had
       // the picker; only the CSV was blind to it, so a round-trip silently
@@ -378,6 +381,9 @@ export const RATE_TABLE_CONFIGS: Record<string, RateTableConfig> = {
       col('service_type', 'Service Type', 'text', true),
       col('hotel_category', 'Hotel Category', 'text', true),
       col('rate_eur', 'Rate', 'number', true),
+      // flat (per group, the default) / per_person / per_unit — migration 393.
+      col('pricing_type', 'Pricing Type', 'text', false),
+      col('max_capacity', 'People per Unit', 'number', false),
       col('description', 'Description', 'text', false),
       supplierId(),
       notes(), isActive(),
@@ -658,6 +664,9 @@ function parseCell(value: string | undefined | null, colDef: ColumnDef): { parse
   }
 }
 
+/** Rate tables whose pricing_type is one of flat / per_person / per_unit. */
+const STAFF_RATE_TABLES = new Set(['airport_staff_rates', 'hotel_staff_rates'])
+
 /**
  * Validate parsed CSV data against a table config.
  * Returns an ImportPreview with validation results.
@@ -701,6 +710,13 @@ export function validateImportData(
           } else if (days) {
             parsedRow[colDef.name] = days
           }
+          continue
+        }
+        // Airport / hotel assistance: the pricing basis (migration 393).
+        if (colDef.name === 'pricing_type' && STAFF_RATE_TABLES.has(config.tableName)
+          && !['flat', 'per_person', 'per_unit'].includes(String(parsed))) {
+          errors.push({ row: rowNum, column: colDef.name, message: `"${parsed}" is not a pricing type — use flat (per group), per_person or per_unit (blank = flat)` })
+          rowValid = false
           continue
         }
         // Per-rate currency: only the supported set; blank = EUR default.

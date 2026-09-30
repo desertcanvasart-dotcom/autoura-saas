@@ -1,3 +1,5 @@
+import { priceByBasis } from '@/lib/pricing/pricing-basis'
+import type { StaffPricing } from '@/lib/ai/staff-rate-resolution'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
 import type { ServiceTier } from './parsing-utils'
 import { getCruiseRate } from './cruise-pricing'
@@ -17,7 +19,11 @@ export async function createLandItineraryServices(
      *  nights). Per person in a double; an odd traveller pays the single
      *  supplement. The route refuses to price when a night has no rate. */
     hotelByDay: Record<number, { ppd: number; singleSupplement: number; hotelName: string; rateId: string }>;
-    airportServiceRates: { arrival: number; departure: number }; hotelServiceRate: number; lunchRate: number; dinnerRate: number;
+    airportServiceRates: { arrival: number; departure: number; arrivalPricing?: StaffPricing; departurePricing?: StaffPricing };
+    hotelServiceRate: number;
+    /** How the hotel assistance rate applies to the group (migration 393); absent = per group. */
+    hotelServicePricing?: StaffPricing;
+    lunchRate: number; dinnerRate: number;
     /** The agency's active tipping rows, in the run's currency — priced by the
      *  SAME rules as the tour engine (lib/pricing/tipping.ts). */
     tippingRows: TippingRow[]; allEntranceFees: any[] | null | undefined;
@@ -36,7 +42,7 @@ export async function createLandItineraryServices(
     includeLunch, includeDinner, includeAccommodationFinal,
     guidePerDay, selectedGuide,
     hotelByDay,
-    airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
+    airportServiceRates, hotelServiceRate, hotelServicePricing, lunchRate, dinnerRate,
     tippingRows, allEntranceFees, transportByDay,
   } = params
 
@@ -187,38 +193,42 @@ export async function createLandItineraryServices(
       const dayRate = dayData.is_arrival
         ? airportServiceRates.arrival
         : airportServiceRates.departure
+      // Per group, per person or per unit (migration 393).
+      const pricing = dayData.is_arrival ? airportServiceRates.arrivalPricing : airportServiceRates.departurePricing
+      const line = priceByBasis(dayRate, pricing?.basis, totalPax, pricing?.capacity)
 
       services.push({
         service_type: 'airport_service',
         service_code: 'AIRPORT',
         service_name: serviceDesc,
-        quantity: 1,
+        quantity: line.quantity,
         rate_eur: dayRate,
         rate_non_eur: dayRate,
-        total_cost: dayRate,
-        client_price: withMargin(dayRate),
+        total_cost: line.lineTotal,
+        client_price: withMargin(line.lineTotal),
         notes: dayData.flight_info ? `Flight: ${dayData.flight_info}` : 'Airport assistance'
       })
-      totalSupplierCost += dayRate
-      totalClientPrice += withMargin(dayRate)
+      totalSupplierCost += line.lineTotal
+      totalClientPrice += withMargin(line.lineTotal)
     }
 
     // Hotel Services (for check-in/check-out including cruise)
     if (dayData.needs_hotel_service && !isFreeDay) {
       const isCruiseService = dayData.accommodation_type === 'cruise' || dayData.is_cruise_day
+      const line = priceByBasis(hotelServiceRate, hotelServicePricing?.basis, totalPax, hotelServicePricing?.capacity)
       services.push({
         service_type: 'hotel_service',
         service_code: 'HOTEL-SVC',
         service_name: isCruiseService ? 'Cruise Boarding Assistance' : 'Hotel Porterage & Assistance',
-        quantity: 1,
+        quantity: line.quantity,
         rate_eur: hotelServiceRate,
         rate_non_eur: hotelServiceRate,
-        total_cost: hotelServiceRate,
-        client_price: withMargin(hotelServiceRate),
+        total_cost: line.lineTotal,
+        client_price: withMargin(line.lineTotal),
         notes: isCruiseService ? 'Cruise embarkation/disembarkation assistance' : 'Hotel check-in/out assistance'
       })
-      totalSupplierCost += hotelServiceRate
-      totalClientPrice += withMargin(hotelServiceRate)
+      totalSupplierCost += line.lineTotal
+      totalClientPrice += withMargin(line.lineTotal)
     }
 
     // Transportation — what the day NEEDS (an airport transfer, a road move to

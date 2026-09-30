@@ -15,6 +15,7 @@ import {
   resolveAirportRates,
   resolveHotelServiceRate,
   AIRPORT_SERVICE_BY_TIER,
+  type StaffPricing,
 } from '@/lib/ai/staff-rate-resolution'
 import type { ServiceTier, InputMode, ExtractedDay } from '@/lib/ai/parsing-utils'
 import {
@@ -972,11 +973,14 @@ export async function POST(request: NextRequest) {
       message: 'No active airport staff rates are set up. Add them in Rates → Airport Services.',
     })
 
-    let airportServiceRates = { arrival: 0, departure: 0 }
+    let airportServiceRates: { arrival: number; departure: number; arrivalPricing?: StaffPricing; departurePricing?: StaffPricing } = { arrival: 0, departure: 0 }
     if (haveAirportRows) {
       const resolved = resolveAirportRates(airportStaffRates, { tier, city: effectiveCity, ladder: tierLadder })
       if (resolved.ok) {
-        airportServiceRates = { arrival: resolved.rates.arrival, departure: resolved.rates.departure }
+        airportServiceRates = {
+          arrival: resolved.rates.arrival, departure: resolved.rates.departure,
+          arrivalPricing: resolved.rates.arrivalPricing, departurePricing: resolved.rates.departurePricing,
+        }
       } else {
         const wanted = AIRPORT_SERVICE_BY_TIER[presetTierFor(tierLadder, tier)]
         addHole({
@@ -998,10 +1002,12 @@ export async function POST(request: NextRequest) {
     })
 
     let hotelServiceRate = 0
+    let hotelServicePricing: StaffPricing | undefined
     if (haveHotelRows) {
       const resolved = resolveHotelServiceRate(hotelStaffRates)
       if (resolved.ok) {
         hotelServiceRate = resolved.rate
+        hotelServicePricing = resolved.pricing
       } else {
         addHole({
           kind: 'hotel_service', tier, reason: 'missing',
@@ -1230,7 +1236,7 @@ export async function POST(request: NextRequest) {
       includeLunch: include_lunch, includeDinner: include_dinner, includeAccommodationFinal,
       guidePerDay, selectedGuide,
       hotelByDay,
-      airportServiceRates, hotelServiceRate, lunchRate, dinnerRate,
+      airportServiceRates, hotelServiceRate, hotelServicePricing, lunchRate, dinnerRate,
       tippingRows, allEntranceFees, transportByDay,
     })
 

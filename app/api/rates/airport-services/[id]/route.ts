@@ -1,6 +1,7 @@
 // app/api/rates/airport-services/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
+import { cleanPricingBasisFields } from '@/lib/pricing/pricing-basis'
 
 export async function PUT(
   request: NextRequest,
@@ -27,9 +28,15 @@ export async function PUT(
     }
     const body = await request.json()
 
+    // Per group / per person / per unit (migration 393).
+    const basis = cleanPricingBasisFields(body)
+    if (!basis.ok) {
+      return NextResponse.json({ success: false, error: basis.error }, { status: 400 })
+    }
+
     const { data, error } = await supabase
       .from('airport_staff_rates')
-      .update(body)
+      .update({ ...body, ...basis.fields })
       .eq('id', id)
       .eq('tenant_id', authResult.tenant_id)
       .select()

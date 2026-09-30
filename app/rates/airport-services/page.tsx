@@ -10,6 +10,8 @@ import { useConfirmDialog } from '@/components/ConfirmDialog'
 import { VocabSelect, useVocabulary } from '@/components/vocabulary'
 import { useCurrency } from '@/hooks/useCurrency'
 import RateCurrencyField, { rateCurrencyPatch } from '@/app/components/RateCurrencyField'
+import PricingBasisField from '@/components/rates/PricingBasisField'
+import { pricingBasisLabel, toPricingBasis, type PricingBasis } from '@/lib/pricing/pricing-basis'
 import { useRateCurrency, useRateRowFormat } from '@/hooks/useRateCurrencySymbol'
 import { averageRateInOneCurrency } from '@/lib/currency-totals'
 
@@ -46,6 +48,9 @@ interface AirportStaffRate {
   /** The outside company this service is bought from (migration 339); null = in-house. */
   supplier_id?: string | null
   supplier_name?: string | null
+  /** Per group (flat) / per person / per unit — migration 393. */
+  pricing_type?: string | null
+  max_capacity?: number | null
 }
 
 interface Toast { 
@@ -223,7 +228,9 @@ export default function AirportServicesPage() {
     notes: '',
     is_active: true,
     supplier_id: '',
-    supplier_name: ''
+    supplier_name: '',
+    pricing_type: 'flat' as PricingBasis,
+    max_capacity: '' as number | ''
   })
 
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -296,7 +303,9 @@ export default function AirportServicesPage() {
       notes: '',
       is_active: true,
       supplier_id: '',
-      supplier_name: ''
+      supplier_name: '',
+      pricing_type: 'flat' as PricingBasis,
+      max_capacity: '' as number | ''
     })
     setShowModal(true)
   }
@@ -314,7 +323,9 @@ export default function AirportServicesPage() {
       notes: rate.notes || '',
       is_active: rate.is_active,
       supplier_id: rate.supplier_id || '',
-      supplier_name: rate.supplier_name || ''
+      supplier_name: rate.supplier_name || '',
+      pricing_type: toPricingBasis(rate.pricing_type) ?? 'flat',
+      max_capacity: rate.max_capacity ?? ''
     })
     setShowModal(true)
   }
@@ -384,7 +395,9 @@ export default function AirportServicesPage() {
       notes: rate.notes || '',
       is_active: rate.is_active,
       supplier_id: rate.supplier_id || '',
-      supplier_name: rate.supplier_name || ''
+      supplier_name: rate.supplier_name || '',
+      pricing_type: toPricingBasis(rate.pricing_type) ?? 'flat',
+      max_capacity: rate.max_capacity ?? ''
     })
     setShowModal(true)
     showToast('success', 'Rate cloned - modify and save as new')
@@ -669,6 +682,9 @@ export default function AirportServicesPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
                       {fmtRate(Number(rate.rate_eur), rate, 2)}
+                      <span className="block text-[11px] font-normal text-gray-500">
+                        {pricingBasisLabel(toPricingBasis(rate.pricing_type), rate.max_capacity)}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-600 max-w-[200px] truncate">
                       {rate.description || '-'}
@@ -812,6 +828,12 @@ export default function AirportServicesPage() {
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Entered and shown in the rate&rsquo;s own currency</p>
                 </div>
+                <PricingBasisField
+                  basis={formData.pricing_type}
+                  capacity={formData.max_capacity}
+                  onChange={next => setFormData(prev => ({ ...prev, ...next }))}
+                  focusRing="focus:ring-sky-600"
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>

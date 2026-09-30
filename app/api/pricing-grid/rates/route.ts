@@ -13,6 +13,7 @@ import { parseSeasons } from '@/lib/rates/rate-seasons'
 import { getTenantRunCurrency } from '@/lib/rates/run-currency'
 import { requireAuth } from '@/lib/supabase-server'
 import { DEFAULT_WATER_PER_PERSON_PER_DAY, isWaterCostType } from '@/lib/fixed-costs'
+import { pricingBasisLabel, toPricingBasis } from '@/lib/pricing/pricing-basis'
 import { loadVocabulary } from '@/lib/vocabulary-server'
 import { labelFor } from '@/lib/vocabulary'
 
@@ -152,7 +153,8 @@ export async function GET(request: NextRequest) {
         rateEur: toNum(r.rate_eur),
         rateNonEur: toNum(r.rate_eur),
         city: r.airport_code,
-        details: `${directionLabel(r.direction)} | ${r.description || ''}`.trim(),
+        details: `${directionLabel(r.direction)} | ${pricingBasisLabel(toPricingBasis(r.pricing_type), r.max_capacity)}${r.description ? ` | ${r.description}` : ''}`,
+        ...basisOf(r),
       })),
 
       hotel_services: (hotelServiceRates || []).map((r: any) => {
@@ -167,7 +169,8 @@ export async function GET(request: NextRequest) {
           rateNonEur: toNum(r.rate_eur),
           category: r.hotel_category,
           city: r.destination,  // Use destination as city for filtering
-          details: r.description || `${typeLabel} | ${r.hotel_category || 'all'}`,
+          details: `${pricingBasisLabel(toPricingBasis(r.pricing_type), r.max_capacity)} | ${r.description || `${typeLabel} | ${r.hotel_category || 'all'}`}`,
+          ...basisOf(r),
         }
       }),
 
@@ -188,6 +191,7 @@ export async function GET(request: NextRequest) {
           rateNonEur: toNum(r.rate_non_eur || r.base_rate_non_eur || r.rate_eur || r.base_rate_eur),
           city: r.city,
           details: pricingTypeLabel(r.pricing_type),
+          ...basisOf(r),
         })),
 
       accommodation: (accommodationRates || []).map((r: any) => ({
@@ -238,6 +242,7 @@ export async function GET(request: NextRequest) {
           rateNonEur: toNum(r.rate_non_eur || r.base_rate_non_eur || r.rate_eur || r.base_rate_eur),
           city: r.city,
           details: pricingTypeLabel(r.pricing_type),
+          ...basisOf(r),
         })),
 
       meals: (mealRates || []).map((r: any) => ({
@@ -285,6 +290,13 @@ export async function GET(request: NextRequest) {
     console.error('Failed to fetch grid rates:', error)
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
+}
+
+/** A rate row's pricing basis for the grid (lib/pricing/pricing-basis.ts). */
+function basisOf(r: { pricing_type?: unknown; max_capacity?: unknown }) {
+  const basis = toPricingBasis(r.pricing_type)
+  const capacity = typeof r.max_capacity === 'number' && r.max_capacity > 0 ? r.max_capacity : null
+  return basis ? { pricing_basis: basis, unit_capacity: capacity } : {}
 }
 
 function toNum(v: any): number {
