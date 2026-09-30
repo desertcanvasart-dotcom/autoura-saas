@@ -6004,6 +6004,14 @@ export interface Database {
           is_sailing_day: boolean | null
           is_transfer_only: boolean | null
           flight_to: string | null
+          day_type: string
+          overnight: boolean | null
+          has_sightseeing: boolean | null
+          airport_arrival: boolean | null
+          airport_departure: boolean | null
+          hotel_check_in: boolean | null
+          hotel_check_out: boolean | null
+          intercity: string | null
         }
         Insert: {
           id?: string
@@ -6034,6 +6042,14 @@ export interface Database {
           is_sailing_day?: boolean | null
           is_transfer_only?: boolean | null
           flight_to?: string | null
+          day_type?: string
+          overnight?: boolean | null
+          has_sightseeing?: boolean | null
+          airport_arrival?: boolean | null
+          airport_departure?: boolean | null
+          hotel_check_in?: boolean | null
+          hotel_check_out?: boolean | null
+          intercity?: string | null
         }
         Update: {
           id?: string
@@ -6064,6 +6080,14 @@ export interface Database {
           is_sailing_day?: boolean | null
           is_transfer_only?: boolean | null
           flight_to?: string | null
+          day_type?: string
+          overnight?: boolean | null
+          has_sightseeing?: boolean | null
+          airport_arrival?: boolean | null
+          airport_departure?: boolean | null
+          hotel_check_in?: boolean | null
+          hotel_check_out?: boolean | null
+          intercity?: string | null
         }
         Relationships: [
           {
@@ -11399,6 +11423,16 @@ export interface Database {
     // every select('*') result to {}.
     Views: { [_ in never]: never }
     Functions: {
+      save_pricing_grid_days: {
+        Args: {
+          p_itinerary_id: string
+          p_days: Json
+        }
+        Returns: {
+          days_inserted: number
+          services_inserted: number
+        }[]
+      }
       attraction_alias_resolves: {
         Args: {
           p_canonical?: string

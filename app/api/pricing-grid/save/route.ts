@@ -12,10 +12,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
 import { ratePin } from '@/lib/pricing/rate-pin'
+import { gridDayComponents } from '@/lib/pricing/grid-day-components'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { resolveGridClient } from '@/lib/grid-client-link'
 import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
-import type { TablesInsert } from '@/types/database.types'
+import type { Json, TablesInsert } from '@/types/database.types'
 
 function generateItineraryCode(): string {
   const year = new Date().getFullYear()
@@ -166,19 +167,9 @@ export async function POST(request: NextRequest) {
         .single()
       if (error) throw error
       itinerary = data
-
-      // Delete old days and services — CHECKED, because the replacements are
-      // inserted immediately below. A silent failure here leaves the old days
-      // in place alongside the new ones and the itinerary silently doubles.
-      const { error: daysErr } = await supabase
-        .from('itinerary_days').delete().eq('itinerary_id', config.itineraryId)
-      if (daysErr) {
-        console.error('[pricing-grid/save] clearing old days:', daysErr.message)
-        return NextResponse.json(
-          { error: 'Could not clear the existing itinerary days — nothing was saved' },
-          { status: 500 }
-        )
-      }
+      // The old days are replaced inside save_pricing_grid_days (below), in
+      // the same transaction as the new ones — deleting them here first
+      // would leave an itinerary with no days if the save then failed.
     } else {
       // Create new
       try {
@@ -213,36 +204,19 @@ export async function POST(request: NextRequest) {
     // The client the saved itinerary actually carries (a re-save keeps its own).
     const linkedClientId: string | null = clientId ?? itinerary.client_id ?? null
 
-    // 2. Create days
-    let daysCreated = 0
-    let servicesCreated = 0
+    // 2. Days and their services — built here, written in ONE transaction by
+    //    save_pricing_grid_days (migration 391). It used to delete the old
+    //    days and insert day by day, only logging a failed day or service and
+    //    carrying on: a failure part-way left the itinerary missing days or
+    //    services while the save still answered success. Now any error rolls
+    //    the whole write back and the previous days survive.
+    const dayPayload: Array<Record<string, unknown>> = []
 
     for (const day of days) {
       const dayDate = new Date(new Date(startDate).getTime() + (day.dayNumber - 1) * 86400000)
         .toISOString().split('T')[0]
 
-      const { data: dayRecord, error: dayError } = await supabase
-        .from('itinerary_days')
-        .insert({
-          tenant_id,
-          itinerary_id: itineraryId,
-          day_number: day.dayNumber,
-          date: dayDate,
-          title: day.title || `Day ${day.dayNumber}`,
-          description: day.description || '',
-          city: day.city || '',
-          overnight_city: day.city || '',
-        })
-        .select()
-        .single()
-
-      if (dayError) {
-        console.error(`Error creating day ${day.dayNumber}:`, dayError)
-        continue
-      }
-      daysCreated++
-
-      // 3. Create services from non-empty slots. One service row per selected
+      // 3. Services from non-empty slots. One service row per selected
       //    item (passport-aware rate), plus custom-amount slots. Group slots are
       //    charged once; per-person slots × pax — identical to calculator.ts.
       const services: any[] = []
@@ -260,8 +234,6 @@ export async function POST(request: NextRequest) {
         if (hasCustom) {
           const unit = slot.customAmount
           services.push({
-            itinerary_id: itineraryId,
-            day_id: dayRecord.id,
             service_type: serviceType,
             service_name: slot.slotId === 'other_group' ? 'Other (Group)' : 'Other (Per Person)',
             description: `[pricing-grid:${slot.slotId}] custom`,
@@ -276,8 +248,6 @@ export async function POST(request: NextRequest) {
         for (const item of sold) {
           const rate = itemRate(item, passport)
           services.push({
-            itinerary_id: itineraryId,
-            day_id: dayRecord.id,
             service_type: serviceType,
             service_name: item.name || slot.slotId.replace(/_/g, ' '),
             description: `[pricing-grid:${slot.slotId}] ${item.name || ''}`,
@@ -301,8 +271,6 @@ export async function POST(request: NextRequest) {
       for (const extra of throughoutExtras.filter((e: { dayNumber: number }) => e.dayNumber === day.dayNumber)) {
         const kind = String(extra.kind)
         services.push({
-          itinerary_id: itineraryId,
-          day_id: dayRecord.id,
           service_type: kind === 'bed' ? 'accommodation' : kind === 'meal' ? 'meal' : 'flight',
           service_name: String(extra.label || 'Throughout Guide'),
           description: `[pricing-grid:throughout_guide] ${kind}`,
@@ -313,22 +281,47 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      if (services.length > 0) {
-        // Both day columns (the itinerary pages read itinerary_day_id; the
-        // grid wrote only day_id, so its services were invisible there —
-        // migration 385 now keeps them in step regardless). client_price is
-        // left empty: the service is priced at cost × margin, and the old
-        // column default of 0 read as "sold for free".
-        const { error: svcError } = await supabase
-          .from('itinerary_services')
-          .insert(services.map(svc => ({ ...svc, itinerary_day_id: dayRecord.id, client_price: null })))
-        if (svcError) {
-          console.error(`Error creating services for day ${day.dayNumber}:`, svcError)
-        } else {
-          servicesCreated += services.length
-        }
-      }
+      dayPayload.push({
+        day_number: day.dayNumber,
+        date: dayDate,
+        title: day.title || `Day ${day.dayNumber}`,
+        description: day.description || '',
+        city: day.city || '',
+        overnight_city: day.city || '',
+        // The day's type and its per-part overrides (NULL = the type's
+        // default). The grid's reload and completeness gate read these back;
+        // they were never stored, so every reload reset every day to "tour".
+        ...gridDayComponents(day),
+        services,
+      })
     }
+
+    const { data: saved, error: saveError } = await supabase
+      .rpc('save_pricing_grid_days', { p_itinerary_id: itineraryId, p_days: dayPayload as unknown as Json })
+
+    if (saveError) {
+      console.error('[pricing-grid/save] saving days:', saveError.message)
+      // A NEW itinerary's header was created just above; without its days it
+      // is an empty shell, so it goes too. A re-saved itinerary keeps its
+      // previous days — the transaction rolled back.
+      if (!config.itineraryId) {
+        const { error: cleanupError } = await supabase.from('itineraries').delete().eq('id', itineraryId)
+        if (cleanupError) console.error('[pricing-grid/save] removing the empty itinerary:', cleanupError.message)
+      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: config.itineraryId
+            ? 'Could not save the itinerary days — nothing was changed'
+            : 'Could not save the itinerary days — nothing was saved',
+        },
+        { status: 500 }
+      )
+    }
+
+    const savedRow = Array.isArray(saved) ? saved[0] : saved
+    const daysCreated: number = savedRow?.days_inserted ?? dayPayload.length
+    const servicesCreated: number = savedRow?.services_inserted ?? 0
 
     // 4. B2B: Create quote if needed
     let quoteId: string | undefined
