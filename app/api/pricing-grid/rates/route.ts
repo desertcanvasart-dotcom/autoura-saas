@@ -253,7 +253,11 @@ export async function GET(request: NextRequest) {
       water: [
         {
           id: 'water-standard', name: 'Water Bottles', rateEur: waterRate, rateNonEur: waterRate,
-          details: waterRow ? 'Per person per day' : 'Per person per day (default — set it in Rates → Fixed costs)',
+          details: !waterRow
+            ? 'Per person per day (default — set it in Rates → Fixed costs)'
+            : waterRate > 0
+              ? 'Per person per day'
+              : 'rate is 0 — set it in Rates → Fixed costs',
         }
       ],
 
