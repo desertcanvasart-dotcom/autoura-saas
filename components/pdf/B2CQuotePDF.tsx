@@ -1,10 +1,11 @@
 import React from 'react'
 import type { CompanyIdentity } from '@/lib/company-identity'
-import { QuoteHeader, QuoteFooter, QUOTE_FOOTER_SPACE } from './QuoteLetterhead'
+import { QuoteHeader, QuoteFooter, quotePalette, QUOTE_FOOTER_SPACE } from './QuoteLetterhead'
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 
-// Create styles
-const styles = StyleSheet.create({
+// Styles take the agency's brand colour (Settings → Organization); they were
+// a fixed blue (B2C) / purple (B2B) whatever the agency's colours.
+const makeStyles = ({ main, light }: { main: string; light: string }) => StyleSheet.create({
   page: {
     padding: 40,
     // Room for the letterhead footer on every page (QuoteLetterhead).
@@ -15,13 +16,13 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 30,
-    borderBottom: '2 solid #3b82f6',
+    borderBottom: `2 solid ${main}`,
     paddingBottom: 15,
   },
   logo: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#3b82f6',
+    color: main,
     marginBottom: 5,
   },
   companyInfo: {
@@ -71,7 +72,7 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     backgroundColor: '#f3f4f6',
-    borderBottom: '2 solid #3b82f6',
+    borderBottom: `2 solid ${main}`,
     paddingVertical: 8,
   },
   tableCell: {
@@ -94,7 +95,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: 10,
     padding: 10,
-    backgroundColor: '#eff6ff',
+    backgroundColor: light,
     borderRadius: 5,
   },
   totalLabel: {
@@ -107,7 +108,7 @@ const styles = StyleSheet.create({
     width: '40%',
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#3b82f6',
+    color: main,
     textAlign: 'right',
   },
   perPersonRow: {
@@ -131,8 +132,8 @@ const styles = StyleSheet.create({
   notes: {
     marginTop: 10,
     padding: 10,
-    backgroundColor: '#f0f9ff',
-    borderLeft: '3 solid #3b82f6',
+    backgroundColor: light,
+    borderLeft: `3 solid ${main}`,
     borderRadius: 3,
   },
   notesText: {
@@ -186,6 +187,7 @@ interface B2CQuotePDFProps {
 }
 
 const B2CQuotePDF: React.FC<B2CQuotePDFProps> = ({ quote, company = { name: '' } }) => {
+  const styles = makeStyles(quotePalette(company))
   const costBreakdownEntries = Object.entries(quote.cost_breakdown || {}).filter(([_, value]) => value > 0)
 
   return (
