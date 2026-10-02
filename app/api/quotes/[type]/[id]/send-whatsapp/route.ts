@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadDocumentIdentity } from '@/lib/document-identity'
 import { loadSenderTenant } from '@/lib/sender-tenant'
 import { createAdminClient, requireAuth } from '@/lib/supabase-server'
 import { renderToBuffer } from '@react-pdf/renderer'
@@ -164,10 +165,10 @@ export async function POST(
       // Generate PDF
       let pdfBuffer: Buffer
       if (type === 'b2c') {
-        const pdfDoc = createElement(B2CQuotePDF, { quote })
+        const pdfDoc = createElement(B2CQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
         pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
       } else {
-        const pdfDoc = createElement(B2BQuotePDF, { quote })
+        const pdfDoc = createElement(B2BQuotePDF, { quote, company: await loadDocumentIdentity(tenantId) })
         pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
       }
 

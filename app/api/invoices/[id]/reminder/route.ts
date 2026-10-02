@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server'
 import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
+import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
 import { getCurrencySymbol } from '@/lib/currency'
 
 // Reuse the email generation from the main route
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
+  // The agency the invoice belongs to (joined as `tenant`), never a fixed brand.
+  const company = emailIdentity(invoice.tenant)
   const currencySymbol = getCurrencySymbol(invoice.currency)
   const balanceDue = `${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`
   const totalAmount = `${currencySymbol}${Number(invoice.total_amount).toFixed(2)}`
@@ -38,11 +41,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
           
-          <tr>
-            <td style="background-color: #647C47; padding: 30px 40px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Travel2Egypt</h1>
-            </td>
-          </tr>
+          <!-- Header: the agency (Settings → Organization) -->${emailHeaderRow(company)}
           
           <tr>
             <td style="background-color: ${urgencyColor}; padding: 15px 40px;">
@@ -105,18 +104,12 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
               ` : ''}
               
               <p style="margin: 30px 0 0; color: #374151; font-size: 16px;">
-                Best regards,<br><strong>Travel2Egypt Team</strong>
+                ${emailSignOff(company)}
               </p>
             </td>
           </tr>
           
-          <tr>
-            <td style="background-color: #f9fafb; padding: 25px 40px; border-top: 1px solid #e5e7eb;">
-              <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center;">
-                This is an automated payment reminder from Travel2Egypt.
-              </p>
-            </td>
-          </tr>
+          <!-- Footer: the agency's details -->${emailFooterRow(company, 'This is a payment reminder.')}
           
         </table>
       </td>
@@ -159,7 +152,7 @@ export async function POST(
       .from('invoices')
       // Tenant joined so the reminder is sent as the operator with replies
       // routed to them, rather than to the platform's verified domain.
-      .select('*, tenant:tenants(company_name, contact_email, email_domain, email_from_local, email_domain_status)')
+      .select('*, tenant:tenants(company_name, contact_email, company_phone, company_website, logo_url, primary_color, tagline, company_address, license_number, tax_number, document_footer_text, email_domain, email_from_local, email_domain_status)')
       .eq('id', id)
       .single()
 
