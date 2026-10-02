@@ -195,8 +195,12 @@ export const PLACEHOLDER_REFERENCE = [
   { key: 'total', label: 'Total Cost', example: '€3,500' },
   { key: 'deposit', label: 'Deposit Amount', example: '€1,050' },
   { key: 'balance', label: 'Balance Due', example: '€2,450' },
+  { key: 'deposit_due_date', label: 'Deposit Due Date', example: 'December 1, 2024' },
+  { key: 'final_payment_due', label: 'Balance Due Date', example: 'January 1, 2025' },
   { key: 'company_name', label: 'Company Name', example: 'Your Company' },
   { key: 'agent_name', label: 'Agent Name', example: 'Islam' },
+  { key: 'company_phone', label: 'Company Phone', example: '+20 2 1234 5678' },
+  { key: 'company_email', label: 'Company Email', example: 'info@yourcompany.com' },
   // Partner & supplier correspondence (seeded lifecycle templates use these)
   { key: 'partner_name', label: 'Partner Contact', example: 'Maria' },
   { key: 'partner_company', label: 'Partner Company', example: 'Sunrise Travel GmbH' },

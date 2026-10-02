@@ -160,6 +160,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [placeholders, setPlaceholders] = useState<Placeholder[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingStarter, setLoadingStarter] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedChannel, setSelectedChannel] = useState('all')
@@ -206,6 +207,29 @@ export default function TemplatesPage() {
     fetchPlaceholders()
     fetchAnalytics()
   }, [])
+
+  // The customer journey's basic templates (lib/templates/starter-customer-templates),
+  // added as ordinary templates. Safe to repeat: existing names are skipped.
+  const loadStarterTemplates = async () => {
+    setLoadingStarter(true)
+    try {
+      const res = await fetch('/api/templates/starter', { method: 'POST' })
+      const data = await res.json().catch(() => ({ success: false }))
+      if (!res.ok || !data.success) {
+        showToast('error', data.error || 'Could not add the starter templates')
+        return
+      }
+      showToast(
+        data.created > 0 ? 'success' : 'info',
+        data.created > 0
+          ? `Added ${data.created} starter template${data.created === 1 ? '' : 's'}${data.skipped ? ` (${data.skipped} you already had were kept as they are)` : ''}.`
+          : 'You already have all the starter templates.'
+      )
+      await fetchTemplates()
+    } finally {
+      setLoadingStarter(false)
+    }
+  }
 
   const fetchTemplates = async () => {
     try {
@@ -493,6 +517,16 @@ export default function TemplatesPage() {
           </button>
           <button
             type="button"
+            onClick={loadStarterTemplates}
+            disabled={loadingStarter}
+            title="Add ready-made customer templates (enquiry reply, quotation, deposit, confirmation, day before, welcome, thank you). Templates you already have are kept."
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          >
+            {loadingStarter ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Load starter templates
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setSelectedTemplate(null)
               setFormData({
@@ -677,8 +711,30 @@ export default function TemplatesPage() {
       {filteredTemplates.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
           <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-500">No templates found</p>
-          <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or create a new template</p>
+          {templates.length === 0 ? (
+            <>
+              <p className="text-gray-700 font-medium">No templates yet</p>
+              <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
+                Start with ready-made customer templates for every step of a booking — enquiry reply, quotation,
+                deposit, confirmation, the day before, welcome and thank you — in email and WhatsApp versions.
+                You can edit or delete any of them.
+              </p>
+              <button
+                type="button"
+                onClick={loadStarterTemplates}
+                disabled={loadingStarter}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#647C47] text-white rounded-lg hover:bg-[#4f6339] transition-colors disabled:opacity-50"
+              >
+                {loadingStarter ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Load starter templates
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-gray-500">No templates found</p>
+              <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or create a new template</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
