@@ -9288,6 +9288,10 @@ export interface Database {
           default_currency: string | null
           services_offered: Json | null
           company_website: string | null
+          company_address: string | null
+          license_number: string | null
+          tax_number: string | null
+          document_footer_text: string | null
           company_phone: string | null
           tagline: string | null
           is_primary: boolean | null
@@ -9320,6 +9324,10 @@ export interface Database {
           default_currency?: string | null
           services_offered?: Json | null
           company_website?: string | null
+          company_address?: string | null
+          license_number?: string | null
+          tax_number?: string | null
+          document_footer_text?: string | null
           company_phone?: string | null
           tagline?: string | null
           is_primary?: boolean | null
@@ -9352,6 +9360,10 @@ export interface Database {
           default_currency?: string | null
           services_offered?: Json | null
           company_website?: string | null
+          company_address?: string | null
+          license_number?: string | null
+          tax_number?: string | null
+          document_footer_text?: string | null
           company_phone?: string | null
           tagline?: string | null
           is_primary?: boolean | null

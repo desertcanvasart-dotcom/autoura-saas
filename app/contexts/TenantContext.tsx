@@ -34,6 +34,11 @@ interface Tenant {
   company_phone: string | null
   company_website: string | null
   tagline: string | null
+  // Letterhead footer on documents (migration 394). NULL = line omitted.
+  company_address?: string | null
+  license_number?: string | null
+  tax_number?: string | null
+  document_footer_text?: string | null
   created_at: string | null
   updated_at: string | null
 }
