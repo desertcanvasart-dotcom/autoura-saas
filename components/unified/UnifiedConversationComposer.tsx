@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import {
-  Sparkles, Loader2, RefreshCw, X, Check, Send, Paperclip, PenLine, MessageSquare, Mail,
+  Sparkles, Loader2, RefreshCw, X, Check, Send, Paperclip, PenLine, MessageSquare, Mail, Reply, ChevronDown,
 } from 'lucide-react'
 import RichReplyEditor, { plainTextToHtml, htmlToPlainText } from './RichReplyEditor'
 
@@ -52,10 +52,15 @@ export default function UnifiedConversationComposer({ conversation, userId, onSe
 
   // ---------- Channel selection ----------
   const [channel, setChannel] = useState<Channel>(hasWhatsApp ? 'whatsapp' : 'email')
+  // The email composer (copilot, To, Subject, a tall editor) was always open
+  // and took most of the panel, leaving the mail itself a strip to scroll
+  // through. It opens on "Reply" now; closing it keeps what was typed.
+  const [emailOpen, setEmailOpen] = useState(false)
 
   // Re-pick channel when conversation changes
   useEffect(() => {
     setChannel(hasWhatsApp ? 'whatsapp' : 'email')
+    setEmailOpen(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation.id])
 
@@ -97,7 +102,37 @@ export default function UnifiedConversationComposer({ conversation, userId, onSe
       {channel === 'whatsapp' && hasWhatsApp ? (
         <WhatsAppCompose conversation={conversation} onSent={onSent} />
       ) : (
-        <EmailCompose conversation={conversation} userId={userId} onSent={onSent} />
+        <>
+          {!emailOpen && (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <button
+                onClick={() => setEmailOpen(true)}
+                className="flex-1 flex items-center gap-2 px-4 py-2.5 text-sm text-left text-gray-500 border border-gray-200 rounded-lg hover:border-[#647C47] hover:text-gray-700 transition-colors"
+              >
+                <Reply className="w-4 h-4 text-[#647C47]" />
+                Reply to {conversation.contact_email}…
+              </button>
+            </div>
+          )}
+          {/* Kept mounted while closed, so a draft and copilot suggestions
+              survive closing; capped in height so the mail stays readable. */}
+          <div className={emailOpen ? 'max-h-[60vh] overflow-y-auto' : 'hidden'}>
+            <div className="flex justify-end px-4 pt-2">
+              <button
+                onClick={() => setEmailOpen(false)}
+                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100"
+                title="Close the reply box (your draft is kept)"
+              >
+                <ChevronDown className="w-3.5 h-3.5" /> Hide reply
+              </button>
+            </div>
+            <EmailCompose
+              conversation={conversation}
+              userId={userId}
+              onSent={() => { setEmailOpen(false); onSent?.() }}
+            />
+          </div>
+        </>
       )}
     </div>
   )

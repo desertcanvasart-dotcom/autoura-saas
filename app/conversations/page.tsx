@@ -230,9 +230,9 @@ export default function ConversationsPage() {
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-120px)]">
+      <div className="flex h-[calc(100vh-120px)] overflow-hidden">
         {/* Left Panel - Conversation List */}
-        <div className="w-96 bg-white border-r border-gray-200 flex flex-col">
+        <div className="w-96 min-h-0 bg-white border-r border-gray-200 flex flex-col">
           {/* Search & Filters */}
           <div className="p-4 border-b border-gray-200 space-y-3">
             <input
@@ -334,7 +334,7 @@ export default function ConversationsPage() {
         </div>
 
         {/* Right Panel - Conversation Detail */}
-        <div className="flex-1 flex flex-col bg-gray-100">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col bg-gray-100">
           {selectedConversation ? (
             <>
               {/* Conversation Header */}
@@ -378,7 +378,7 @@ export default function ConversationsPage() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
                 {loadingMessages ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
@@ -398,7 +398,7 @@ export default function ConversationsPage() {
                         className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div
-                          className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                          className={`${msg.channel === 'email' ? 'max-w-[85%]' : 'max-w-[70%]'} rounded-2xl px-4 py-3 ${
                             msg.direction === 'outbound'
                               ? 'bg-primary-500 text-white rounded-br-md'
                               : 'bg-white text-gray-900 rounded-bl-md shadow-sm'
