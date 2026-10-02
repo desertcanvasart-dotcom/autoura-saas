@@ -1,6 +1,7 @@
 'use client'
 
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
+import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -219,19 +220,8 @@ export default function ReceiptPage() {
 
         {/* Receipt Card */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {/* Receipt Header */}
-          <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-primary-200 text-xs uppercase tracking-wider mb-1">Payment Receipt</p>
-                <h1 className="text-2xl font-bold">{receiptNumber}</h1>
-              </div>
-              <div className="text-right">
-                <p className="text-primary-200 text-xs mb-1">Travel2Egypt</p>
-                <p className="text-xs opacity-75">Cairo, Egypt</p>
-              </div>
-            </div>
-          </div>
+          {/* Header: the agency's letterhead (Settings → Organization) */}
+          <DocumentLetterhead company={identityFromTenant(tenant)} title="Payment Receipt" number={receiptNumber} />
 
           {/* Status Badge */}
           <div className="px-6 py-3 bg-green-50 border-b border-green-100 flex items-center justify-center gap-2">
@@ -350,10 +340,12 @@ export default function ReceiptPage() {
               <p className="text-sm text-gray-600">
                 This receipt confirms your payment has been received and processed.
               </p>
-              <p className="text-xs text-gray-500 mt-3">
-                {tenant?.contact_email ? `Questions? Contact us at ${tenant.contact_email}` : ''}
-              </p>
             </div>
+          </div>
+
+          {/* Footer: Settings → Organization */}
+          <div className="border-t border-gray-100 bg-gray-50/60 px-6 py-4">
+            <DocumentFooter company={identityFromTenant(tenant)} />
           </div>
         </div>
       </div>
