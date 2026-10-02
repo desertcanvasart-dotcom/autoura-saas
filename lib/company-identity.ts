@@ -24,6 +24,15 @@ export interface CompanyIdentity {
   /** data: URL for the tenant's logo, fetched by the caller (jsPDF cannot load
    *  a remote URL itself). Absent = text-only header, as before. */
   logoDataUrl?: string
+  /** The logo's own URL, for on-screen documents (an <img> loads it directly). */
+  logoUrl?: string
+  tagline?: string
+  // Letterhead footer (migration 394). Each one omitted when blank.
+  address?: string
+  licenseNumber?: string
+  taxNumber?: string
+  /** The agency's own line — bank details, a legal note. May span lines. */
+  footerText?: string
 }
 
 /** The tenant fields documents render. All optional so partial rows degrade. */
@@ -34,6 +43,11 @@ export interface TenantIdentityFields {
   company_website?: string | null
   primary_color?: string | null
   logo_url?: string | null
+  tagline?: string | null
+  company_address?: string | null
+  license_number?: string | null
+  tax_number?: string | null
+  document_footer_text?: string | null
 }
 
 export function identityFromTenant(
@@ -46,7 +60,30 @@ export function identityFromTenant(
     phone: tenant?.company_phone?.trim() || undefined,
     website: tenant?.company_website?.trim() || undefined,
     primaryColor: tenant?.primary_color?.trim() || undefined,
+    logoUrl: tenant?.logo_url?.trim() || undefined,
+    tagline: tenant?.tagline?.trim() || undefined,
+    address: tenant?.company_address?.trim() || undefined,
+    licenseNumber: tenant?.license_number?.trim() || undefined,
+    taxNumber: tenant?.tax_number?.trim() || undefined,
+    footerText: tenant?.document_footer_text?.trim() || undefined,
   }
+}
+
+/**
+ * The letterhead footer, as lines, each built from whatever exists — the same
+ * lines on screen and in the PDF. Empty lines are dropped, so an agency that
+ * filled in nothing gets no footer text at all.
+ */
+export function letterheadFooterLines(company: CompanyIdentity): string[] {
+  const contact = [company.phone, company.email, company.website]
+    .filter((p): p is string => !!p)
+    .join('  ·  ')
+  const legal = [
+    company.licenseNumber ? `License No. ${company.licenseNumber}` : '',
+    company.taxNumber ? `Tax No. ${company.taxNumber}` : '',
+  ].filter(Boolean).join('  ·  ')
+  const address = (company.address ?? '').replace(/\s*\n\s*/g, ', ')
+  return [address, contact, legal].filter(l => l.trim().length > 0)
 }
 
 /**

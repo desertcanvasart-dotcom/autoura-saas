@@ -23,6 +23,8 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import { SUPPORTED_CURRENCIES } from '@/lib/currency'
+import { identityFromTenant } from '@/lib/company-identity'
+import { DocumentFooter } from '@/components/documents/Letterhead'
 
 const supabase = createClient()
 
@@ -32,6 +34,15 @@ export default function TenantSettingsPage() {
   // Tenant basic info state
   const [companyName, setCompanyName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
+  // Document letterhead & footer (migration 394; phone/website/tagline are
+  // older columns that had no field here). Blank = the line is omitted.
+  const [tagline, setTagline] = useState('')
+  const [companyPhone, setCompanyPhone] = useState('')
+  const [companyWebsite, setCompanyWebsite] = useState('')
+  const [companyAddress, setCompanyAddress] = useState('')
+  const [licenseNumber, setLicenseNumber] = useState('')
+  const [taxNumber, setTaxNumber] = useState('')
+  const [footerText, setFooterText] = useState('')
 
 
   // Branding state
@@ -71,6 +82,13 @@ export default function TenantSettingsPage() {
     if (tenant) {
       setCompanyName(tenant.company_name)
       setContactEmail(tenant.contact_email || '')
+      setTagline(tenant.tagline || '')
+      setCompanyPhone(tenant.company_phone || '')
+      setCompanyWebsite(tenant.company_website || '')
+      setCompanyAddress(tenant.company_address || '')
+      setLicenseNumber(tenant.license_number || '')
+      setTaxNumber(tenant.tax_number || '')
+      setFooterText(tenant.document_footer_text || '')
       setLogoUrl(tenant.logo_url || null)
       setLogoPreview(tenant.logo_url || null)
       setPrimaryColor(tenant.primary_color || '#647C47')
@@ -229,6 +247,14 @@ export default function TenantSettingsPage() {
           company_name: companyName,
           contact_email: contactEmail,
           logo_url: finalLogoUrl,
+          // Blank -> NULL -> the document omits the line.
+          tagline: tagline.trim() || null,
+          company_phone: companyPhone.trim() || null,
+          company_website: companyWebsite.trim() || null,
+          company_address: companyAddress.trim() || null,
+          license_number: licenseNumber.trim() || null,
+          tax_number: taxNumber.trim() || null,
+          document_footer_text: footerText.trim() || null,
           primary_color: primaryColor,
           secondary_color: secondaryColor,
           // Empty field -> NULL -> the resolver falls through to the platform
@@ -726,6 +752,74 @@ export default function TenantSettingsPage() {
                 Primary & Secondary colors
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Document header & footer */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <FileText className="w-4 h-4 text-gray-600" />
+            <h2 className="text-sm font-semibold text-gray-900">Document header &amp; footer</h2>
+          </div>
+          <p className="text-[11px] text-gray-500 mb-3">
+            Printed on the documents you send suppliers (vouchers, service orders). The header shows your logo, company name and tagline; the footer shows the details below. Leave a field blank to leave it off.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {([
+              ['Tagline', tagline, setTagline, 'e.g. Tailor-made journeys across Egypt'],
+              ['Phone', companyPhone, setCompanyPhone, '+20 2 1234 5678'],
+              ['Website', companyWebsite, setCompanyWebsite, 'www.yourcompany.com'],
+              ['Tourism license no.', licenseNumber, setLicenseNumber, 'e.g. 1234'],
+              ['Tax / registration no.', taxNumber, setTaxNumber, 'e.g. 123-456-789'],
+            ] as const).map(([label, value, set, placeholder]) => (
+              <div key={label}>
+                <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+                <input
+                  type="text"
+                  value={value}
+                  onChange={(e) => set(e.target.value)}
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                  placeholder={placeholder}
+                />
+              </div>
+            ))}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
+              <textarea
+                value={companyAddress}
+                onChange={(e) => setCompanyAddress(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                placeholder="Street, city, country"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Footer note
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(bank details, a legal note — printed at the bottom of every page)</span>
+              </label>
+              <textarea
+                value={footerText}
+                onChange={(e) => setFooterText(e.target.value)}
+                rows={2}
+                maxLength={400}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                placeholder="e.g. Bank: CIB · IBAN EG00 0000 0000 0000 0000 0000 000"
+              />
+            </div>
+          </div>
+
+          {/* Live preview of exactly what the footer will print */}
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+            <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-2">Footer preview</p>
+            <DocumentFooter
+              company={identityFromTenant({
+                company_name: companyName, contact_email: contactEmail, company_phone: companyPhone,
+                company_website: companyWebsite, company_address: companyAddress, license_number: licenseNumber,
+                tax_number: taxNumber, document_footer_text: footerText, primary_color: primaryColor,
+              })}
+            />
           </div>
         </div>
       </div>
