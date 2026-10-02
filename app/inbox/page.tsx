@@ -581,7 +581,14 @@ ${bodyText}`
     setShowNewEmailBanner(false)
     setNewEmailCount(0)
     clearNewEmailCount()
-    fetchEmails(searchQuery)
+    // Straight to Gmail, never the browser's copy: a recent copy was shown
+    // and the real fetch ran in the background, where a failure (an expired
+    // Google sign-in) was dropped silently — Refresh then "worked" and showed
+    // the old list. Now the fetch is the visible one and its error is shown.
+    setRefreshing(true)
+    setNextPageToken(null)
+    setHasMore(true)
+    fetchFreshEmails(searchQuery || undefined, folder, false)
   }
 
   const toggleStar = (emailId: string, e: React.MouseEvent) => {

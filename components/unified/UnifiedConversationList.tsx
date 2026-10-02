@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, Loader2, Mail, Archive, User } from 'lucide-react'
 import ChannelBadge from './ChannelBadge'
+import { showToast } from '@/app/contexts/ToastContext'
+import { syncSummary } from '@/lib/email/sync-summary'
 
 interface Conversation {
   /** Set while a customer is waiting on us (migration 366). */
@@ -55,13 +57,21 @@ export default function UnifiedConversationList({ onSelectConversation, selected
     if (!userId) return
     setSyncing(true)
     try {
-      await fetch('/api/email/sync', {
+      const res = await fetch('/api/email/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId, max_results: 50, days_back: 30 }),
       })
-      fetchConversations()
-    } catch {} finally { setSyncing(false) }
+      // The answer was ignored, so a refused sync looked like "no new mail".
+      const data = await res.json().catch(() => ({ success: false, error: `HTTP ${res.status}` }))
+      const summary = syncSummary(res.ok, data)
+      showToast(summary.kind, summary.text)
+    } catch (err) {
+      showToast('error', `Sync failed: ${err instanceof Error ? err.message : 'network error'}`)
+    } finally {
+      await fetchConversations()
+      setSyncing(false)
+    }
   }
 
   const timeAgo = (date: string) => {

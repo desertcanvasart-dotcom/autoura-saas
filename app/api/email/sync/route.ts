@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { officeRule, isOfficeAddress, type OfficeRule } from '@/lib/email/office-addresses'
 import { repairOfficeDirections } from '@/lib/email/repair-direction'
 import { createLeadsFromNewConversations, type NewConversation } from '@/lib/email/create-leads'
+import { contactNameFromThread, fillMissingContactNames } from '@/lib/email/contact-name'
 
 /** Either client writes the same rows; the sweep's is the service role. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -198,6 +199,7 @@ export async function POST(request: NextRequest) {
     const result = {
       success: true, conversations_created: 0, conversations_updated: 0, messages_created: 0,
       history_id: candidates.historyId, auto_linked: 0, direction_repaired: repaired.repaired, leads_created: 0,
+      conversations_reopened: 0, names_filled: 0,
       // What the run did, so "0 new" can be told apart from "nothing worked".
       mode: candidates.mode,
       ...(candidates.fellBackBecause ? { fell_back_because: candidates.fellBackBecause } : {}),
@@ -246,30 +248,46 @@ export async function POST(request: NextRequest) {
         const firstDir = getDirection(firstFrom, office)
         const customerHeader = firstDir === 'inbound' ? firstFrom : firstTo
         const contactEmail = extractEmailAddress(customerHeader)
-        const contactName = extractDisplayName(customerHeader)
+        // Any header in the thread that names the customer — not only the
+        // first one, which is a bare address when the office wrote first
+        // (lib/email/contact-name.ts).
+        const contactName = contactNameFromThread(sorted, contactEmail) ?? extractDisplayName(customerHeader)
 
         if (!contactEmail) continue // can't route without a customer address
+
+        // The customer wrote in this batch: an archived conversation comes
+        // back to Active, or the new mail is filed where nobody looks.
+        const hasNewInbound = sorted.some((m: any) => getDirection(getH(m.payload?.headers || [], 'From'), office) === 'inbound')
 
         // Upsert unified_conversations keyed by (tenant_id, contact_email)
         let unifiedId: string
         const { data: existingUnified } = await db
           .from('unified_conversations')
-          .select('id, total_messages')
+          .select('id, total_messages, contact_name, last_message_at, status')
           .eq('tenant_id', tenant_id)
           .eq('contact_email', contactEmail)
           .maybeSingle()
 
         if (existingUnified) {
+          // An older message reached late (a retried download, a rescued
+          // sender) must not move the conversation's latest message back.
+          const isNewer = !existingUnified.last_message_at
+            || new Date(lastDate).getTime() >= new Date(existingUnified.last_message_at).getTime()
           await db
             .from('unified_conversations')
             .update({
-              contact_name: contactName || undefined,
-              last_message_at: lastDate,
-              last_message_preview: lastMsg.snippet || null,
-              last_message_channel: 'email',
+              // A name already set (possibly by hand) is kept.
+              ...(!existingUnified.contact_name && contactName ? { contact_name: contactName } : {}),
+              ...(isNewer ? {
+                last_message_at: lastDate,
+                last_message_preview: lastMsg.snippet || null,
+                last_message_channel: 'email',
+              } : {}),
+              ...(hasNewInbound && existingUnified.status === 'archived' ? { status: 'active' } : {}),
               updated_at: new Date().toISOString(),
             })
             .eq('id', existingUnified.id)
+          if (hasNewInbound && existingUnified.status === 'archived') result.conversations_reopened++
           unifiedId = existingUnified.id
           result.conversations_updated++
         } else {
@@ -406,6 +424,10 @@ export async function POST(request: NextRequest) {
         console.error('[Email Sync] Thread error:', threadErr?.message || threadErr)
       }
     }
+
+    // Conversations stored without a name ("Unknown") get the one their
+    // stored mail already carries. Never fails the sync.
+    result.names_filled = await fillMissingContactNames(createAdminClient() as unknown as SupabaseLike, tenant_id)
 
     // ============================================
     // Auto-link: every new message whose sender (or recipient) is a client
