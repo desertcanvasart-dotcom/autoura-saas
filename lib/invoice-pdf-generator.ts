@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
-import { brandColorRgb } from './company-identity'
+import { brandColorRgb, type CompanyIdentity } from './company-identity'
+import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from './pdf-letterhead'
 import { formatDateOnly } from '@/lib/date-utils'
 import { getCurrencySymbol as canonicalCurrencySymbol } from '@/lib/currency'
 
@@ -35,21 +36,22 @@ interface Invoice {
   payment_instructions: string | null
 }
 
-export interface CompanyInfo {
-  name: string
-  /** Hex brand color; unset keeps the default olive palette. */
-  primaryColor?: string
-  /** data: URL logo for the letterhead; unset = text-only header. */
-  logoDataUrl?: string
-  // All optional: lines render only when present. They were required when the
-  // default was a hardcoded company with a fictional address.
-  address?: string
+/**
+ * The agency's identity (Settings → Organization, lib/company-identity), plus
+ * the older split address fields some callers still pass. Every line renders
+ * only when present.
+ */
+export interface CompanyInfo extends CompanyIdentity {
   city?: string
   country?: string
-  email?: string
-  phone?: string
-  website?: string
+  /** Older name for taxNumber. */
   taxId?: string
+}
+
+/** The letterhead identity: one address line, one tax number. */
+function letterheadIdentity(company: CompanyInfo): CompanyIdentity {
+  const address = [company.address, company.city, company.country].filter(Boolean).join(', ')
+  return { ...company, address: address || undefined, taxNumber: company.taxNumber || company.taxId }
 }
 
 // The identity bug this replaced: the default here was Travel2Egypt with a
@@ -110,66 +112,39 @@ export function generateInvoicePDF(
   const typeConfig = getInvoiceTypeConfig(invoiceType)
 
   // ============================================
-  // HEADER SECTION
+  // HEADER: the agency's letterhead (lib/pdf-letterhead) — logo, name and
+  // tagline; the agency's details are in the footer on every page.
   // ============================================
-  
-  // Company Name (left)
-  doc.setFontSize(24)
-  doc.setTextColor(...primaryColor)
-  doc.setFont('helvetica', 'bold')
-  // Letterhead: logo left of the name when the tenant uploaded one.
-  let nameX = margin
-  if (company.logoDataUrl) {
-    try {
-      doc.addImage(company.logoDataUrl, margin, y - 8, 12, 12)
-      nameX = margin + 15
-    } catch { /* bad image data — text-only header */ }
-  }
-  doc.text(company.name, nameX, y)
 
-  // INVOICE label with type (right)
-  doc.setFontSize(24)
-  doc.setTextColor(...typeConfig.color)
-  doc.text(typeConfig.label, pageWidth - margin, y, { align: 'right' })
-
-  y += 8
+  const identity = letterheadIdentity(company)
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const brand = { r: primaryColor[0], g: primaryColor[1], b: primaryColor[2] }
+  y = drawLetterhead(doc, identity, brand, {
+    title: typeConfig.label,
+    number: invoice.invoice_number,
+    dateLine: `Issued ${formatDate(invoice.issue_date)}`,
+  }, margin)
 
   // Invoice type badge (for deposit/final)
   if (invoiceType !== 'standard' && invoice.deposit_percent) {
     doc.setFontSize(10)
     doc.setTextColor(...typeConfig.color)
-    doc.setFont('helvetica', 'normal')
-    const badgeText = invoiceType === 'deposit' 
+    doc.setFont('helvetica', 'bold')
+    const badgeText = invoiceType === 'deposit'
       ? `${invoice.deposit_percent}% Booking Deposit`
       : `Balance After ${invoice.deposit_percent}% Deposit`
-    doc.text(badgeText, pageWidth - margin, y, { align: 'right' })
-    y += 2
+    doc.text(badgeText, pageWidth - margin, y - 2, { align: 'right' })
+    y += 6
   }
 
-  // Company details
-  doc.setFontSize(9)
-  doc.setTextColor(...mediumGray)
-  doc.setFont('helvetica', 'normal')
-  if (company.address) doc.text(company.address, margin, y)
-  y += 4
-  if (company.city || company.country) doc.text([company.city, company.country].filter(Boolean).join(', '), margin, y)
-  y += 4
-  if (company.email) doc.text(company.email, margin, y)
-  y += 4
-  if (company.phone) doc.text(company.phone, margin, y)
-  if (company.website) {
-    y += 4
-    doc.text(company.website, margin, y)
+  // Content stops above the footer; a new page starts with the brand bar.
+  const bottomLimit = pageHeight - footerReserve(doc, identity, contentWidth) - 4
+  const ensureSpace = (needed: number): boolean => {
+    if (y + needed <= bottomLimit) return false
+    doc.addPage()
+    y = drawContinuationHeader(doc, brand)
+    return true
   }
-
-  y += 15
-
-  // Divider line
-  doc.setDrawColor(...primaryColor)
-  doc.setLineWidth(0.5)
-  doc.line(margin, y, pageWidth - margin, y)
-
-  y += 15
 
   // ============================================
   // TRIP COST BREAKDOWN (for deposit/final invoices)
@@ -304,32 +279,33 @@ export function generateInvoicePDF(
     doc.text(`• ${invoiceType.toUpperCase()}`, leftColX + 60, y)
   }
 
-  y += 20
+  y += 12
 
   // ============================================
   // LINE ITEMS TABLE
   // ============================================
 
-  // Table header background
-  doc.setFillColor(...primaryColor)
-  doc.rect(margin, y, contentWidth, 10, 'F')
-
-  // Table header text
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'bold')
-  
   const colDescription = margin + 3
   const colQty = margin + contentWidth * 0.55
   const colUnitPrice = margin + contentWidth * 0.70
   const colAmount = margin + contentWidth * 0.88
 
-  doc.text('Description', colDescription, y + 7)
-  doc.text('Qty', colQty, y + 7, { align: 'center' })
-  doc.text('Unit Price', colUnitPrice, y + 7, { align: 'right' })
-  doc.text('Amount', colAmount, y + 7, { align: 'right' })
+  // Drawn again at the top of a continuation page.
+  const drawTableHeader = () => {
+    doc.setFillColor(...primaryColor)
+    doc.rect(margin, y, contentWidth, 10, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Description', colDescription, y + 7)
+    doc.text('Qty', colQty, y + 7, { align: 'center' })
+    doc.text('Unit Price', colUnitPrice, y + 7, { align: 'right' })
+    doc.text('Amount', colAmount, y + 7, { align: 'right' })
+    y += 10
+  }
 
-  y += 10
+  ensureSpace(30)
+  drawTableHeader()
 
   // Table rows
   doc.setTextColor(...darkGray)
@@ -339,6 +315,9 @@ export function generateInvoicePDF(
   const lineItems = invoice.line_items || []
   
   lineItems.forEach((item, index) => {
+    if (ensureSpace(10)) drawTableHeader()
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
     // Alternate row background
     if (index % 2 === 0) {
       doc.setFillColor(...lightGray)
@@ -362,12 +341,13 @@ export function generateInvoicePDF(
     y += 10
   })
 
-  // Table border
+  // Closing rule (a box around the rows cannot span a page break)
   doc.setDrawColor(...mediumGray)
   doc.setLineWidth(0.1)
-  doc.rect(margin, y - (lineItems.length * 10) - 10, contentWidth, (lineItems.length * 10) + 10)
+  doc.line(margin, y, pageWidth - margin, y)
 
   y += 10
+  ensureSpace(55)
 
   // ============================================
   // TOTALS SECTION
@@ -468,6 +448,7 @@ export function generateInvoicePDF(
     y += 10
 
     if (invoice.payment_terms) {
+      ensureSpace(doc.splitTextToSize(invoice.payment_terms, contentWidth).length * 4 + 13)
       doc.setFontSize(9)
       doc.setTextColor(...primaryColor)
       doc.setFont('helvetica', 'bold')
@@ -481,6 +462,7 @@ export function generateInvoicePDF(
     }
 
     if (invoice.payment_instructions) {
+      ensureSpace(doc.splitTextToSize(invoice.payment_instructions, contentWidth).length * 4 + 13)
       doc.setFontSize(9)
       doc.setTextColor(...primaryColor)
       doc.setFont('helvetica', 'bold')
@@ -494,6 +476,7 @@ export function generateInvoicePDF(
     }
 
     if (invoice.notes) {
+      ensureSpace(doc.splitTextToSize(invoice.notes, contentWidth).length * 4 + 13)
       doc.setFontSize(9)
       doc.setTextColor(...primaryColor)
       doc.setFont('helvetica', 'bold')
@@ -512,6 +495,7 @@ export function generateInvoicePDF(
   // ============================================
 
   if (invoiceType === 'deposit') {
+    ensureSpace(30)
     y += 5
     doc.setFillColor(254, 243, 199) // Light amber
     doc.roundedRect(margin, y, contentWidth, 20, 2, 2, 'F')
@@ -532,6 +516,7 @@ export function generateInvoicePDF(
   }
 
   if (invoiceType === 'final') {
+    ensureSpace(30)
     y += 5
     doc.setFillColor(209, 250, 229) // Light emerald
     doc.roundedRect(margin, y, contentWidth, 20, 2, 2, 'F')
@@ -552,21 +537,17 @@ export function generateInvoicePDF(
   }
 
   // ============================================
-  // FOOTER
+  // CLOSING LINE, then the letterhead footer on every page
   // ============================================
 
-  const footerY = doc.internal.pageSize.getHeight() - 15
-  
-  doc.setFontSize(8)
+  ensureSpace(12)
+  y += 6
+  doc.setFontSize(9)
   doc.setTextColor(...mediumGray)
   doc.setFont('helvetica', 'normal')
-  doc.text(company.name ? `Thank you for choosing ${company.name}!` : 'Thank you for your business!', pageWidth / 2, footerY, { align: 'center' })
-  doc.text(
-    `Generated on ${formatDate(new Date().toISOString())}`,
-    pageWidth / 2,
-    footerY + 4,
-    { align: 'center' }
-  )
+  doc.text(company.name ? `Thank you for choosing ${company.name}!` : 'Thank you for your business!', pageWidth / 2, y, { align: 'center' })
+
+  drawFooters(doc, identity, brand, invoice.invoice_number, margin)
 
   return doc
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { identityFromTenant } from '@/lib/company-identity'
+import { DocumentLetterhead, DocumentFooter } from '@/components/documents/Letterhead'
 import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState } from 'react'
@@ -71,8 +72,10 @@ export default function ContractPage() {
     contractNumber: '',
     contractDate: todayLocal(),
     serviceProvider: tenant?.company_name || '',
-    providerWebsite: 'https://travel2egypt.org/',
-    providerLocation: 'Cairo, Egypt',
+    // The agency's own details (Settings → Organization) — these defaulted to
+    // Travel2Egypt's website and city for every agency.
+    providerWebsite: tenant?.company_website || '',
+    providerLocation: tenant?.company_address || '',
     clientName: '',
     clientEmail: '',
     numTravelers: 2,
@@ -109,9 +112,22 @@ export default function ContractPage() {
     cancellation14to0Days: 'Cancellations received 14 days to 0 days before travel date are subject to 100% cancellation fees.',
     flightCancellation: 'Any ticket cancellation (domestic and/or international) will be subject to a 50% fee from the flight price from day 1 of booking.',
     noShowPolicy: 'Clients who fail to show up for departure without prior notification will forfeit 100% of the tour cost.',
-    forceMajeure: 'In case of cancellation due to force majeure events (natural disasters, political unrest, pandemic restrictions, etc.), Travel2Egypt will work with clients to reschedule or provide credit for future travel, subject to supplier policies.',
+    forceMajeure: 'In case of cancellation due to force majeure events (natural disasters, political unrest, pandemic restrictions, etc.), the Service Provider will work with clients to reschedule or provide credit for future travel, subject to supplier policies.',
     specialNotes: 'Safety & Comfort: Meet & assist at all airports, trusted vetted teams, 24/7 WhatsApp support.\nPractical: Bottled water provided daily, restaurants chosen for cleanliness and hygiene.'
   })
+
+  // The tenant often loads after the first render: fill the provider's own
+  // fields then, without overwriting anything already typed.
+  useEffect(() => {
+    if (!tenant) return
+    setContractData(prev => ({
+      ...prev,
+      serviceProvider: prev.serviceProvider || tenant.company_name || '',
+      providerWebsite: prev.providerWebsite || tenant.company_website || '',
+      providerLocation: prev.providerLocation || tenant.company_address || '',
+    }))
+  }, [tenant])
+
 
   useEffect(() => {
     if (params.id) {
@@ -181,8 +197,7 @@ export default function ContractPage() {
   const handleDownloadPDF = async () => {
     setSaving(true)
     try {
-      // Loaded on demand: pdf-lib is ~176 KB gzipped and this page is the only
-      // route that needs it, so it must not sit in the first-load bundle.
+      // Loaded on demand, so the PDF library is not in the first-load bundle.
       const { generateContractPDF } = await import('@/lib/contract-pdf-generator')
 
       // Use client-side PDF generation
@@ -299,8 +314,11 @@ export default function ContractPage() {
         </div>
 
         {/* COMPACT CONTRACT FORM/PREVIEW */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-6">
-          
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          {/* Header: the agency's letterhead (Settings → Organization) */}
+          <DocumentLetterhead company={identityFromTenant(tenant)} title="Travel Contract" number={contractData.contractNumber} />
+          <div className="p-6 space-y-6">
+
           {/* Title */}
           <div className="text-center border-b border-gray-200 pb-4">
             <h1 className="text-2xl font-bold text-gray-900 mb-3">TRAVEL CONTRACT</h1>
@@ -849,7 +867,12 @@ export default function ContractPage() {
               </p>
             </div>
           </div>
+          </div>
 
+          {/* Footer: Settings → Organization */}
+          <div className="border-t border-gray-100 bg-gray-50/60 px-6 py-4">
+            <DocumentFooter company={identityFromTenant(tenant)} />
+          </div>
         </div>
       </div>
     </div>

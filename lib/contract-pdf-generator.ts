@@ -1,19 +1,23 @@
 // ============================================
-// CONTRACT PDF GENERATOR (Server-side)
+// CONTRACT PDF GENERATOR (browser and server)
 // ============================================
+// On the agency's letterhead (lib/pdf-letterhead), like every other document:
+// logo, name and tagline at the top; address, contacts, licence/tax numbers
+// and the agency's note at the foot of every page — all from Settings →
+// Organization. Was pdf-lib with its own header and a one-line footer.
 
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import jsPDF from 'jspdf'
 import { formatDateOnly } from '@/lib/date-utils'
-import { brandColorRgb, fetchLogoBytes } from '@/lib/company-identity'
+import { brandColorRgb, fetchLogoDataUrl, type CompanyIdentity } from '@/lib/company-identity'
+import { drawLetterhead, drawContinuationHeader, drawFooters, footerReserve } from '@/lib/pdf-letterhead'
 
 interface ContractData {
   /** The operator issuing the contract — the "Service Provider" party. This
    *  generator hardcoded Travel2Egypt there, i.e. named the wrong LEGAL PARTY
    *  on other tenants' contracts. Omitted fields omit their lines; a missing
    *  primaryColor keeps the original olive palette, a missing logoUrl keeps
-   *  the text-only header. */
-  company?: {
-    name: string
+   *  the text-only header. Server callers validate logoUrl (SSRF) first. */
+  company?: Omit<CompanyIdentity, 'logoUrl' | 'primaryColor' | 'email' | 'phone' | 'website'> & {
     email?: string | null
     phone?: string | null
     website?: string | null
@@ -35,154 +39,150 @@ interface ContractData {
   exclusions?: string[]
 }
 
+const DEFAULT_INCLUSIONS = [
+  'Private transportation throughout',
+  'Licensed Egyptologist guide',
+  'Entrance fees to all sites',
+  'Accommodation as specified',
+  'Meals as mentioned',
+  'All taxes and service charges',
+]
+
+const DEFAULT_EXCLUSIONS = [
+  'International flights',
+  'Travel insurance',
+  'Personal expenses',
+  'Guide gratuities (optional)',
+]
+
 export async function generateContractPDF(data: ContractData): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.create()
-  let page = pdfDoc.addPage([595, 842]) // A4 size
-  
-  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  
-  const { width, height } = page.getSize()
-  let y = height - 50
-
-  // Brand accent: tenant color, falling back to the template's original olive.
-  const [br, bg, bb] = brandColorRgb(
-    { primaryColor: data.company?.primaryColor || undefined },
-    [100, 124, 71]
-  )
-  const brand = rgb(br / 255, bg / 255, bb / 255)
-
-  // Tenant logo, top-right of the letterhead (best-effort — the title sits at
-  // x:200 so the right corner is free).
-  const logo = await fetchLogoBytes(data.company?.logoUrl)
-  if (logo) {
-    try {
-      const img = logo.format === 'png' ? await pdfDoc.embedPng(logo.bytes) : await pdfDoc.embedJpg(logo.bytes)
-      const scale = Math.min(36 / img.height, 110 / img.width, 1)
-      const w = img.width * scale
-      const h = img.height * scale
-      page.drawImage(img, { x: width - 50 - w, y: y - 8, width: w, height: h })
-    } catch { /* bad image data — text-only header */ }
+  const c = data.company
+  const company: CompanyIdentity = {
+    name: c?.name || '',
+    email: c?.email || undefined,
+    phone: c?.phone || undefined,
+    website: c?.website || undefined,
+    primaryColor: c?.primaryColor || undefined,
+    tagline: c?.tagline,
+    address: c?.address,
+    licenseNumber: c?.licenseNumber,
+    taxNumber: c?.taxNumber,
+    footerText: c?.footerText,
+    logoDataUrl: c?.logoDataUrl ?? (await fetchLogoDataUrl(c?.logoUrl)),
   }
 
-  // Title
-  page.drawText('TRAVEL CONTRACT', {
-    x: 200, y, size: 20, font: helveticaBold, color: brand
-  })
-  y -= 30
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 18
+  const contentWidth = pageWidth - margin * 2
 
-  // Contract number
-  page.drawText(`Contract: ${data.contractNumber}`, {
-    x: 50, y, size: 11, font: helvetica, color: rgb(0.3, 0.3, 0.3)
-  })
-  y -= 15
-  page.drawText(`Date: ${formatDateOnly(data.contractDate, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, {
-    x: 50, y, size: 11, font: helvetica, color: rgb(0.3, 0.3, 0.3)
-  })
-  y -= 30
+  const [br, bg, bb] = brandColorRgb(company, [100, 124, 71])
+  const brand = { r: br, g: bg, b: bb }
+  const issued = formatDateOnly(data.contractDate, 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  let y = drawLetterhead(pdf, company, brand, { title: 'Travel Contract', number: data.contractNumber, dateLine: `Dated ${issued}` }, margin)
+
+  const bottomLimit = pageHeight - footerReserve(pdf, company, contentWidth) - 4
+  const ensureSpace = (needed: number) => {
+    if (y + needed > bottomLimit) {
+      pdf.addPage()
+      y = drawContinuationHeader(pdf, brand)
+    }
+  }
+
+  // `keepWith`: room for what must follow the heading on the same page.
+  const heading = (text: string, keepWith = 8) => {
+    ensureSpace(8 + keepWith)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(10)
+    pdf.setTextColor(br, bg, bb)
+    pdf.text(text.toUpperCase(), margin, y)
+    pdf.setDrawColor(230, 230, 230)
+    pdf.setLineWidth(0.3)
+    pdf.line(margin, y + 2, pageWidth - margin, y + 2)
+    y += 8
+  }
+
+  const line = (label: string, value: string, opts: { muted?: boolean } = {}) => {
+    const wrapped = pdf.splitTextToSize(value, contentWidth - 42) as string[]
+    ensureSpace(wrapped.length * 5 + 1)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(9.5)
+    pdf.setTextColor(110, 110, 110)
+    pdf.text(label, margin, y)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setTextColor(opts.muted ? 100 : 30, opts.muted ? 100 : 30, opts.muted ? 100 : 30)
+    pdf.text(wrapped, margin + 42, y)
+    y += wrapped.length * 5 + 1
+  }
 
   // Parties
-  page.drawText('PARTIES', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  y -= 20
-  page.drawText(`Service Provider: ${data.company?.name || '(operator not specified)'}`, { x: 50, y, size: 11, font: helvetica })
-  y -= 15
-  if (data.company?.website) {
-    page.drawText(`Website: ${data.company.website}`, { x: 50, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-    y -= 15
-  }
-  y -= 10
-  page.drawText(`Client: ${data.clientName}`, { x: 50, y, size: 11, font: helvetica })
-  y -= 15
-  if (data.clientEmail) {
-    page.drawText(`Email: ${data.clientEmail}`, { x: 50, y, size: 10, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
-    y -= 15
-  }
-  page.drawText(`Travelers: ${data.numTravelers} person${data.numTravelers > 1 ? 's' : ''}`, { x: 50, y, size: 11, font: helvetica })
-  y -= 35
+  heading('Parties')
+  line('Service Provider', company.name || '(operator not specified)')
+  if (company.address) line('Address', company.address.replace(/\s*\n\s*/g, ', '), { muted: true })
+  if (company.licenseNumber) line('License No.', company.licenseNumber, { muted: true })
+  y += 3
+  line('Client', data.clientName)
+  if (data.clientEmail) line('Email', data.clientEmail, { muted: true })
+  line('Travelers', `${data.numTravelers} person${data.numTravelers > 1 ? 's' : ''}`)
+  y += 6
 
-  // Tour Details
-  page.drawText('TOUR DETAILS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  y -= 20
-  page.drawText(`Tour: ${data.tourName}`, { x: 50, y, size: 11, font: helvetica })
-  y -= 15
-  page.drawText(`Dates: ${formatDateOnly(data.startDate, 'en-GB')} - ${formatDateOnly(data.endDate, 'en-GB')}`, { x: 50, y, size: 11, font: helvetica })
-  y -= 15
-  page.drawText(`Destinations: ${data.destinations}`, { x: 50, y, size: 11, font: helvetica })
-  y -= 35
+  // Tour details
+  heading('Tour details')
+  line('Tour', data.tourName)
+  line('Dates', `${formatDateOnly(data.startDate, 'en-GB')} – ${formatDateOnly(data.endDate, 'en-GB')}`)
+  line('Destinations', data.destinations)
+  y += 6
 
-  // Financial
-  page.drawText('FINANCIAL TERMS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  y -= 20
-  page.drawText(`Total Price: ${data.currency} ${data.totalCost.toLocaleString()}`, {
-    x: 50, y, size: 13, font: helveticaBold, color: brand
-  })
-  y -= 20
-  page.drawText('Payment: 10% deposit to confirm. Balance due upon arrival.', { x: 50, y, size: 10, font: helvetica })
-  y -= 35
+  // Financial terms
+  heading('Financial terms')
+  ensureSpace(10)
+  pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(9.5)
+  pdf.setTextColor(110, 110, 110)
+  pdf.text('Total price', margin, y)
+  pdf.setFontSize(13)
+  pdf.setTextColor(br, bg, bb)
+  pdf.text(`${data.currency} ${data.totalCost.toLocaleString()}`, margin + 42, y + 0.5)
+  y += 7
+  line('Payment', '10% deposit to confirm. Balance due upon arrival.')
+  y += 6
 
-  // Inclusions
-  if (y < 80) {
-    page = pdfDoc.addPage([595, 842])
-    y = 842 - 50
-  }
-  page.drawText('INCLUSIONS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  y -= 18
-  const inclusions = data.inclusions && data.inclusions.length > 0
-    ? data.inclusions.map(i => `• ${i}`)
-    : [
-      '• Private transportation throughout',
-      '• Licensed Egyptologist guide',
-      '• Entrance fees to all sites',
-      '• Accommodation as specified',
-      '• Meals as mentioned',
-      '• All taxes and service charges'
-    ]
-  for (const item of inclusions) {
-    if (y < 60) {
-      page = pdfDoc.addPage([595, 842])
-      y = 842 - 50
+  const bullets = (title: string, items: string[]) => {
+    heading(title)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(9.5)
+    pdf.setTextColor(30, 30, 30)
+    for (const item of items) {
+      const wrapped = pdf.splitTextToSize(item, contentWidth - 8) as string[]
+      ensureSpace(wrapped.length * 5)
+      pdf.text('•', margin + 1, y)
+      pdf.text(wrapped, margin + 6, y)
+      y += wrapped.length * 5
     }
-    page.drawText(item, { x: 55, y, size: 10, font: helvetica })
-    y -= 14
+    y += 6
   }
-  y -= 20
-
-  // Exclusions
-  if (y < 80) {
-    page = pdfDoc.addPage([595, 842])
-    y = 842 - 50
-  }
-  page.drawText('EXCLUSIONS', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  y -= 18
-  const exclusions = data.exclusions && data.exclusions.length > 0
-    ? data.exclusions.map(e => `• ${e}`)
-    : [
-      '• International flights',
-      '• Travel insurance',
-      '• Personal expenses',
-      '• Guide gratuities (optional)'
-    ]
-  for (const item of exclusions) {
-    if (y < 60) {
-      page = pdfDoc.addPage([595, 842])
-      y = 842 - 50
-    }
-    page.drawText(item, { x: 55, y, size: 10, font: helvetica })
-    y -= 14
-  }
-  y -= 30
+  bullets('Inclusions', data.inclusions?.length ? data.inclusions : DEFAULT_INCLUSIONS)
+  bullets('Exclusions', data.exclusions?.length ? data.exclusions : DEFAULT_EXCLUSIONS)
 
   // Signatures
-  page.drawText('SIGNATURES', { x: 50, y, size: 14, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
-  y -= 25
-  page.drawText('Service Provider: _________________________  Date: __________', { x: 50, y, size: 10, font: helvetica })
-  y -= 25
-  page.drawText('Client: _________________________  Date: __________', { x: 50, y, size: 10, font: helvetica })
+  heading('Signatures', 30)
+  y += 12
+  const sigWidth = (contentWidth - 16) / 2
+  pdf.setDrawColor(170, 170, 170)
+  pdf.setLineWidth(0.3)
+  pdf.line(margin, y, margin + sigWidth, y)
+  pdf.line(pageWidth - margin - sigWidth, y, pageWidth - margin, y)
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(8.5)
+  pdf.setTextColor(110, 110, 110)
+  pdf.text(company.name ? `Service Provider — ${company.name}` : 'Service Provider', margin, y + 5)
+  pdf.text('Client', pageWidth - margin - sigWidth, y + 5)
+  pdf.text('Date: ______________', margin, y + 11)
+  pdf.text('Date: ______________', pageWidth - margin - sigWidth, y + 11)
 
-  // Footer
-  page.drawText([data.company?.name, data.company?.website, data.company?.email].filter(Boolean).join(' | ') || ' ', {
-    x: 150, y: 30, size: 9, font: helvetica, color: rgb(0.5, 0.5, 0.5)
-  })
+  drawFooters(pdf, company, brand, data.contractNumber, margin)
 
-  return await pdfDoc.save()
+  return new Uint8Array(pdf.output('arraybuffer'))
 }

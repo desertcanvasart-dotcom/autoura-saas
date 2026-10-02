@@ -5,6 +5,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { uploadShareablePdf } from '@/lib/storage/shareable-pdf'
 import { contractNumber, contractDestinations } from '@/lib/contract-facts'
 import { generateContractPDF } from '@/lib/contract-pdf-generator'
+import { identityFromTenant } from '@/lib/company-identity'
 import { checkPublicHttpUrl } from '@/lib/ssrf-guard'
 
 export async function POST(request: NextRequest) {
@@ -80,6 +81,8 @@ export async function POST(request: NextRequest) {
     const senderTenant = await loadSenderTenant(authResult.tenant_id)
     const contractData = {
       company: {
+        // The letterhead: Settings → Organization, as on every document.
+        ...identityFromTenant(senderTenant),
         name: senderTenant?.company_name || '',
         email: senderTenant?.contact_email || null,
         phone: senderTenant?.company_phone || null,
