@@ -4,6 +4,8 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useAuth } from '@/app/contexts/AuthContext'
 import UnifiedConversationComposer from '@/components/unified/UnifiedConversationComposer'
 import { showToast } from '@/app/contexts/ToastContext'
+import { conversationTitle } from '@/lib/email/contact-name'
+import { syncSummary } from '@/lib/email/sync-summary'
 
 interface Message {
   id: string
@@ -57,6 +59,7 @@ export default function ConversationsPage() {
   const [loading, setLoading] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
@@ -199,23 +202,30 @@ export default function ConversationsPage() {
           </div>
           <button
             onClick={async () => {
-              if (!user?.id) return
-              const res = await fetch('/api/email/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: user.id, max_results: 50, days_back: 30 })
-              })
-              const data = await res.json()
-              if (res.ok && data.success !== false) {
-                showToast('success', `Synced ${data.messages_created || 0} messages (${data.conversations_created || 0} new, ${data.conversations_updated || 0} updated)`)
-                fetchConversations()
-              } else {
-                showToast('error', data.error || 'Sync failed')
+              if (!user?.id || syncing) return
+              setSyncing(true)
+              try {
+                const res = await fetch('/api/email/sync', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ user_id: user.id, max_results: 50, days_back: 30 })
+                })
+                const data = await res.json().catch(() => ({ success: false, error: `Sync failed (HTTP ${res.status})` }))
+                const summary = syncSummary(res.ok, data)
+                showToast(summary.kind, summary.text)
+              } catch (err: any) {
+                showToast('error', `Sync failed: ${err?.message || 'network error'}`)
+              } finally {
+                // The list is reloaded whatever happened: the scheduled sync
+                // may have stored mail since the page opened.
+                await fetchConversations()
+                setSyncing(false)
               }
             }}
-            className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
+            disabled={syncing}
+            className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-60"
           >
-            Sync Emails
+            {syncing ? 'Syncing…' : 'Sync Emails'}
           </button>
         </div>
       </div>
@@ -276,12 +286,12 @@ export default function ConversationsPage() {
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {/* Avatar */}
                       <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-semibold text-lg flex-shrink-0">
-                        {conv.contact_name?.charAt(0)?.toUpperCase() || '?'}
+                        {conversationTitle(conv).charAt(0).toUpperCase() || '?'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <h3 className={`font-semibold truncate ${conv.unread_messages > 0 ? 'text-gray-900' : 'text-gray-700'}`}>
-                            {conv.contact_name || 'Unknown'}
+                            {conversationTitle(conv)}
                           </h3>
                           {conv.unread_messages > 0 && (
                             <span className="px-2 py-0.5 bg-primary-500 text-white text-xs font-bold rounded-full">
@@ -332,11 +342,11 @@ export default function ConversationsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white font-semibold text-xl">
-                      {selectedConversation.contact_name?.charAt(0)?.toUpperCase() || '?'}
+                      {conversationTitle(selectedConversation).charAt(0).toUpperCase() || '?'}
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-gray-900">
-                        {selectedConversation.contact_name || 'Unknown'}
+                        {conversationTitle(selectedConversation)}
                       </h2>
                       <div className="flex items-center gap-3 text-sm text-gray-500">
                         {selectedConversation.contact_phone && (
