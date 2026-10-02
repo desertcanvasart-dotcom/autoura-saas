@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { loadDocumentIdentity } from '@/lib/document-identity'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createElement } from 'react'
 import B2CQuotePDF from '@/components/pdf/B2CQuotePDF'
@@ -118,10 +119,10 @@ export async function GET(
     let pdfBuffer: Buffer
 
     if (type === 'b2c') {
-      const pdfDoc = createElement(B2CQuotePDF, { quote })
+      const pdfDoc = createElement(B2CQuotePDF, { quote, company: await loadDocumentIdentity(authResult.tenant_id) })
       pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
     } else {
-      const pdfDoc = createElement(B2BQuotePDF, { quote })
+      const pdfDoc = createElement(B2BQuotePDF, { quote, company: await loadDocumentIdentity(authResult.tenant_id) })
       pdfBuffer = await renderToBuffer(pdfDoc as any) as Buffer
     }
 

@@ -5,6 +5,7 @@ import { sendMail } from '@/lib/email-send'
 import { resolveSender } from '@/lib/tenant-email-domain'
 import { withJobRun } from '@/lib/support/job-runs'
 import { getCurrencySymbol } from '@/lib/currency'
+import { emailIdentity, emailHeaderRow, emailFooterRow, emailSignOff } from '@/lib/email/letterhead-html'
 
 // Verify cron secret for security
 const CRON_SECRET = process.env.CRON_SECRET
@@ -29,6 +30,8 @@ async function sendReminderEmail(params: {
 }
 
 function generateReminderEmail(invoice: any, reminderType: string): { subject: string; html: string } {
+  // The agency the invoice belongs to (joined as `tenant`), never a fixed brand.
+  const company = emailIdentity(invoice.tenant)
   const currencySymbol = getCurrencySymbol(invoice.currency)
   const balanceDue = `${currencySymbol}${Number(invoice.balance_due).toFixed(2)}`
   const dueDate = new Date(invoice.due_date).toLocaleDateString('en-GB', { 
@@ -65,9 +68,7 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;">
-<tr><td style="background:#647C47;padding:30px;text-align:center;">
-<h1 style="margin:0;color:#fff;font-size:24px;">Travel2Egypt</h1>
-</td></tr>
+${emailHeaderRow(company)}
 <tr><td style="background:${urgencyColor};padding:15px 40px;">
 <p style="margin:0;color:#fff;text-align:center;font-size:14px;">${urgencyMessage}</p>
 </td></tr>
@@ -81,11 +82,9 @@ function generateReminderEmail(invoice: any, reminderType: string): { subject: s
 </td></tr>
 </table>
 <p style="color:#374151;">Please arrange payment at your earliest convenience.</p>
-<p style="color:#374151;margin-top:30px;">Best regards,<br><strong>Travel2Egypt Team</strong></p>
+<p style="color:#374151;margin-top:30px;">${emailSignOff(company)}</p>
 </td></tr>
-<tr><td style="background:#f9fafb;padding:20px;text-align:center;border-top:1px solid #e5e7eb;">
-<p style="margin:0;color:#9ca3af;font-size:12px;">Automated reminder from Travel2Egypt</p>
-</td></tr>
+${emailFooterRow(company, 'This is an automated payment reminder.')}
 </table>
 </td></tr>
 </table>
@@ -121,7 +120,7 @@ async function getHandler(request: NextRequest) {
       // The tenant is joined so each reminder can be sent AS that operator with
       // replies routed to them. This cron spans every tenant, so a single
       // platform reply-to would send every client's answer to the wrong place.
-      .select('*, tenant:tenants(company_name, contact_email, email_domain, email_from_local, email_domain_status)')
+      .select('*, tenant:tenants(company_name, contact_email, company_phone, company_website, logo_url, primary_color, tagline, company_address, license_number, tax_number, document_footer_text, email_domain, email_from_local, email_domain_status)')
       .not('status', 'in', '("paid","cancelled")')
       .gt('balance_due', 0)
       .eq('reminder_paused', false)

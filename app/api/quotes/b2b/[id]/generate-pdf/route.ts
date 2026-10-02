@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { loadDocumentIdentity } from '@/lib/document-identity'
 import { createAuthenticatedClient, requireAuth } from '@/lib/supabase-server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import B2BQuotePDF from '@/components/pdf/B2BQuotePDF';
@@ -118,7 +119,7 @@ export async function POST(
 
     // Generate PDF using React PDF renderer
     const pdfBuffer = await renderToBuffer(
-      React.createElement(B2BQuotePDF, { quote: toPdfQuote(quote) }) as any
+      React.createElement(B2BQuotePDF, { quote: toPdfQuote(quote), company: await loadDocumentIdentity(tenantId) }) as any
     );
 
     // Generate storage path
@@ -235,7 +236,7 @@ export async function GET(
 
     // Generate PDF using React PDF renderer
     const pdfBuffer = await renderToBuffer(
-      React.createElement(B2BQuotePDF, { quote: toPdfQuote(quote) }) as any
+      React.createElement(B2BQuotePDF, { quote: toPdfQuote(quote), company: await loadDocumentIdentity(tenantId) }) as any
     );
 
     // Return PDF as downloadable file
