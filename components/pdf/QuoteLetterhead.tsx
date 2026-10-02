@@ -17,6 +17,14 @@ export function quoteBrandColor(company: CompanyIdentity): string {
   return /^#?[0-9a-fA-F]{6}$/.test(hex) ? (hex.startsWith('#') ? hex : `#${hex}`) : FALLBACK
 }
 
+/** The brand colour and a pale tint of it, for a quote's accents. */
+export function quotePalette(company: CompanyIdentity): { main: string; light: string } {
+  const main = quoteBrandColor(company)
+  const n = parseInt(main.slice(1), 16)
+  const mix = (v: number) => Math.round(v + (255 - v) * 0.9).toString(16).padStart(2, '0')
+  return { main, light: `#${mix((n >> 16) & 255)}${mix((n >> 8) & 255)}${mix(n & 255)}` }
+}
+
 /** Bottom padding a page needs so content stays clear of the footer. */
 export const QUOTE_FOOTER_SPACE = 95
 

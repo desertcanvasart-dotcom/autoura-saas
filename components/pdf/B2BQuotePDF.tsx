@@ -1,10 +1,11 @@
 import React from 'react'
 import type { CompanyIdentity } from '@/lib/company-identity'
-import { QuoteHeader, QuoteFooter, QuoteTopBar, QUOTE_FOOTER_SPACE } from './QuoteLetterhead'
+import { QuoteHeader, QuoteFooter, quotePalette, QuoteTopBar, QUOTE_FOOTER_SPACE } from './QuoteLetterhead'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 
-// Create styles
-const styles = StyleSheet.create({
+// Styles take the agency's brand colour (Settings → Organization); they were
+// a fixed blue (B2C) / purple (B2B) whatever the agency's colours.
+const makeStyles = ({ main, light }: { main: string; light: string }) => StyleSheet.create({
   page: {
     padding: 40,
     // Room for the letterhead footer on every page (QuoteLetterhead).
@@ -15,13 +16,13 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 25,
-    borderBottom: '2 solid #9333ea',
+    borderBottom: `2 solid ${main}`,
     paddingBottom: 15,
   },
   logo: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#9333ea',
+    color: main,
     marginBottom: 5,
   },
   companyInfo: {
@@ -64,10 +65,10 @@ const styles = StyleSheet.create({
   pricingTableTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#9333ea',
+    color: main,
     marginBottom: 10,
     textAlign: 'center',
-    backgroundColor: '#f3e8ff',
+    backgroundColor: light,
     padding: 8,
     borderRadius: 5,
   },
@@ -81,8 +82,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   pricingTableHeader: {
-    backgroundColor: '#9333ea',
-    borderBottom: '2 solid #9333ea',
+    backgroundColor: main,
+    borderBottom: `2 solid ${main}`,
     paddingVertical: 8,
   },
   pricingTableCell: {
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     padding: 10,
     backgroundColor: '#f9fafb',
-    borderLeft: '3 solid #9333ea',
+    borderLeft: `3 solid ${main}`,
     borderRadius: 3,
   },
   notesText: {
@@ -201,6 +202,7 @@ interface B2BQuotePDFProps {
 }
 
 const B2BQuotePDF: React.FC<B2BQuotePDFProps> = ({ quote, company = { name: '' } }) => {
+  const styles = makeStyles(quotePalette(company))
   // Sort pax counts
   const sortedPax = Object.keys(quote.pricing_table)
     .map(Number)

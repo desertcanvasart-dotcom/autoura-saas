@@ -57,7 +57,6 @@
   "lib/currency.ts": 2,
   "lib/onboarding-fee.ts": 1,
   "lib/template-placeholders.ts": 3,
-  "lib/templates/transport-voucher.tsx": 2,
   "lib/twilio-whatsapp.ts": 1,
   "lib/whatsapp-ai-agent.ts": 1
 }
