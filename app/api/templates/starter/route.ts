@@ -2,10 +2,14 @@ import { NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/supabase-server'
 import type { TablesInsert } from '@/types/database.types'
 import { STARTER_CUSTOMER_TEMPLATES } from '@/lib/templates/starter-customer-templates'
+import { STARTER_SUPPLIER_TEMPLATES } from '@/lib/templates/starter-supplier-templates'
 import { getPlaceholders } from '@/lib/template-placeholders'
 
-// POST - Add the starter customer templates (lib/templates/starter-customer-templates)
-// to the caller's own company. Safe to repeat: a starter whose name is already
+// Customers first, then suppliers (hotels, cruises, transport, guides).
+const STARTERS = [...STARTER_CUSTOMER_TEMPLATES, ...STARTER_SUPPLIER_TEMPLATES]
+
+// POST - Add the starter templates (lib/templates/starter-*-templates) to the
+// caller's own company. Safe to repeat: a starter whose name is already
 // among the company's active templates is skipped, never duplicated or
 // overwritten — an agency that edited "Booking confirmed" keeps its version.
 // A deleted one (is_active = false) can be loaded again.
@@ -31,7 +35,7 @@ export async function POST() {
     }
 
     const taken = new Set((existing ?? []).map(r => (r.name || '').trim().toLowerCase()))
-    const rows: TablesInsert<'message_templates'>[] = STARTER_CUSTOMER_TEMPLATES
+    const rows: TablesInsert<'message_templates'>[] = STARTERS
       .filter(s => !taken.has(s.name.toLowerCase()))
       .map(s => ({
         tenant_id,
@@ -51,7 +55,7 @@ export async function POST() {
       }))
 
     if (rows.length === 0) {
-      return NextResponse.json({ success: true, created: 0, skipped: STARTER_CUSTOMER_TEMPLATES.length })
+      return NextResponse.json({ success: true, created: 0, skipped: STARTERS.length })
     }
 
     const { error: insertError } = await supabase.from('message_templates').insert(rows)
@@ -63,7 +67,7 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       created: rows.length,
-      skipped: STARTER_CUSTOMER_TEMPLATES.length - rows.length,
+      skipped: STARTERS.length - rows.length,
     })
   } catch (error) {
     console.error('Starter templates POST error:', error)
