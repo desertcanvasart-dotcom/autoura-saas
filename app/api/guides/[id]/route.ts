@@ -5,11 +5,21 @@
 // GET: Get guide details
 // PUT: Update guide
 // DELETE: Delete guide
+//
+// A guide is a SUPPLIER row (supplier_type='guide') — the same source the
+// list at /api/guides reads, and the id every guide picker stores. This
+// route used to read the legacy `guides` table, so a guide picked in the app
+// 404'd here (ResourceSummaryCard, the resources page's Delete).
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'
-import { rateCurrencyWriteField } from '@/lib/rates/rate-currency'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
+import { evaluateDeleteGuard } from '@/lib/delete-guard'
+import {
+  GUIDE_SUPPLIER_TYPE,
+  guideBodyToSupplierUpdate,
+  supplierToGuide,
+} from '@/lib/guides/supplier-guide'
 
 export async function GET(
   request: NextRequest,
@@ -26,15 +36,49 @@ export async function GET(
 
     const supabase = createAdminClient()
     const { id } = await params
+    const tenant_id = authResult.tenant_id
 
-    const { data: guide, error } = await supabase
-      .from('guides')
+    const { data: supplier, error } = await supabase
+      .from('suppliers')
       .select('*')
       .eq('id', id)
-      .eq('tenant_id', authResult.tenant_id)
-      .single()
+      .eq('supplier_type', GUIDE_SUPPLIER_TYPE)
+      .eq('tenant_id', tenant_id)
+      .maybeSingle()
 
-    if (error || !guide) {
+    if (error) {
+      console.error('Error fetching guide:', error)
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch guide' },
+        { status: 500 }
+      )
+    }
+
+    let guide: Record<string, unknown> | null = supplier ? supplierToGuide(supplier) : null
+
+    // Assignments made before guides moved to suppliers may still point at
+    // the legacy guides table (lib/staff-link.ts reads it the same way).
+    // Read-only: nothing in the app edits or deletes those rows any more.
+    if (!guide) {
+      const { data: legacy } = await supabase
+        .from('guides')
+        .select('id, name, full_name, phone, whatsapp, email, city, languages, is_active, profile_photo_url')
+        .eq('id', id)
+        .eq('tenant_id', tenant_id)
+        .maybeSingle()
+      if (legacy) {
+        guide = {
+          ...legacy,
+          name: legacy.name ?? legacy.full_name,
+          phone: legacy.phone || legacy.whatsapp,
+          languages: legacy.languages || [],
+          photo_url: legacy.profile_photo_url,
+          legacy: true,
+        }
+      }
+    }
+
+    if (!guide) {
       return NextResponse.json(
         { success: false, error: 'Guide not found' },
         { status: 404 }
@@ -46,7 +90,7 @@ export async function GET(
       .from('itineraries')
       .select('id, itinerary_code, client_name, start_date, end_date, total_cost')
       .eq('assigned_guide_id', id)
-      .eq('tenant_id', authResult.tenant_id)
+      .eq('tenant_id', tenant_id)
       .order('start_date', { ascending: true })
 
     return NextResponse.json({
@@ -83,47 +127,25 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
 
-    // Debug log
-
-    // Prepare update data (only include provided fields)
-    const updateData: any = {}
-    Object.assign(updateData, rateCurrencyWriteField(body))
-
-    if (body.name !== undefined) updateData.name = body.name
-    if (body.email !== undefined) updateData.email = body.email
-    if (body.phone !== undefined) updateData.phone = body.phone
-    if (body.languages !== undefined) updateData.languages = body.languages
-    if (body.specialties !== undefined) updateData.specialties = body.specialties
-    if (body.certification_number !== undefined) updateData.certification_number = body.certification_number
-
-    // ⭐ FIX: Convert empty string to null for date fields
-    if (body.license_expiry !== undefined) {
-      updateData.license_expiry = body.license_expiry === '' ? null : body.license_expiry
+    const updateData = guideBodyToSupplierUpdate(body ?? {})
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No guide fields to update' },
+        { status: 400 }
+      )
     }
 
-    if (body.is_active !== undefined) updateData.is_active = body.is_active
-    if (body.max_group_size !== undefined) updateData.max_group_size = body.max_group_size
-    if (body.hourly_rate !== undefined) updateData.hourly_rate = body.hourly_rate
-    if (body.daily_rate !== undefined) updateData.daily_rate = body.daily_rate
-    if (body.emergency_contact_name !== undefined) updateData.emergency_contact_name = body.emergency_contact_name
-    if (body.emergency_contact_phone !== undefined) updateData.emergency_contact_phone = body.emergency_contact_phone
-    if (body.address !== undefined) updateData.address = body.address
-    if (body.notes !== undefined) updateData.notes = body.notes
-    if (body.profile_photo_url !== undefined) updateData.profile_photo_url = body.profile_photo_url
-
-    // Debug log
-
-    // Update in database
     const { data, error } = await supabase
-      .from('guides')
+      .from('suppliers')
       .update(updateData)
       .eq('id', id)
+      .eq('supplier_type', GUIDE_SUPPLIER_TYPE)
       .eq('tenant_id', authResult.tenant_id)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) {
-      console.error('❌ Supabase error updating guide:', error)
+      console.error('Error updating guide:', error)
 
       if (error.code === '23505') {
         return NextResponse.json(
@@ -145,16 +167,14 @@ export async function PUT(
       )
     }
 
-    // Debug log
-
     return NextResponse.json({
       success: true,
-      data: data,
+      data: supplierToGuide(data),
       message: 'Guide updated successfully',
     })
 
   } catch (error) {
-    console.error('❌ Error in guide PUT:', error)
+    console.error('Error in guide PUT:', error)
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }
@@ -177,38 +197,61 @@ export async function DELETE(
 
     const supabase = createAdminClient()
     const { id } = await params
+    const tenant_id = authResult.tenant_id
 
-    // Check if guide has any assigned bookings
-    const { data: bookings, error: bookingsError } = await supabase
-      .from('itineraries')
+    const { data: existing, error: findError } = await supabase
+      .from('suppliers')
       .select('id')
-      .eq('assigned_guide_id', id)
-      .limit(1)
+      .eq('id', id)
+      .eq('supplier_type', GUIDE_SUPPLIER_TYPE)
+      .eq('tenant_id', tenant_id)
+      .maybeSingle()
 
-    if (bookingsError) {
+    if (findError) {
+      console.error('Error finding guide:', findError)
       return NextResponse.json(
-        { success: false, error: 'Failed to check guide assignments' },
+        { success: false, error: 'Failed to delete guide' },
         { status: 500 }
       )
     }
-
-    // If guide has bookings, don't allow deletion (or unassign first)
-    if (bookings && bookings.length > 0) {
+    if (!existing) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Cannot delete guide with assigned bookings. Please unassign bookings first or set guide to inactive.' 
-        },
-        { status: 409 }
+        { success: false, error: 'Guide not found' },
+        { status: 404 }
       )
     }
 
-    // Delete guide
+    // Assignments live in itinerary_resources (mig 289; assigned_guide_id is
+    // derived from the confirmed ones). Count every assignment, day-level and
+    // unconfirmed included — deleting the guide would orphan any of them.
+    const { count, error: countError } = await supabase
+      .from('itinerary_resources')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant_id)
+      .eq('resource_type', 'guide')
+      .eq('resource_id', id)
+
+    const guard = evaluateDeleteGuard('guide', [
+      { label: `${count ?? 0} itinerary assignment(s)`, count, error: countError },
+    ])
+    if (!guard.ok) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: guard.kind === 'blocked'
+            ? `${guard.message} Or set the guide to inactive instead.`
+            : guard.message,
+        },
+        { status: guard.kind === 'blocked' ? 409 : 500 }
+      )
+    }
+
     const { error } = await supabase
-      .from('guides')
+      .from('suppliers')
       .delete()
       .eq('id', id)
-      .eq('tenant_id', authResult.tenant_id)
+      .eq('supplier_type', GUIDE_SUPPLIER_TYPE)
+      .eq('tenant_id', tenant_id)
 
     if (error) {
       console.error('Error deleting guide:', error)
