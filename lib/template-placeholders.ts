@@ -226,4 +226,9 @@ export const PLACEHOLDER_REFERENCE = [
   { key: 'due_date', label: 'Due Date', example: 'March 1, 2026' },
   { key: 'statement_period', label: 'Statement Period', example: 'January 2026' },
   { key: 'commission_amount', label: 'Commission Amount', example: '1,250.00' },
+  // Internal (team) templates
+  { key: 'team_member_name', label: 'Team Member', example: 'Sara' },
+  { key: 'incident_time', label: 'Incident Date & Time', example: 'Jan 16, 14:30' },
+  { key: 'actions_taken', label: 'Actions Taken', example: 'Replacement vehicle sent' },
+  { key: 'follow_up', label: 'Follow-up / Next Steps', example: 'Call the client tomorrow' },
 ]

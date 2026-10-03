@@ -3,8 +3,9 @@ import { describe, it, expect, vi } from 'vitest'
 import { STARTER_CUSTOMER_TEMPLATES } from '@/lib/templates/starter-customer-templates'
 import { STARTER_SUPPLIER_TEMPLATES } from '@/lib/templates/starter-supplier-templates'
 import { STARTER_PARTNER_TEMPLATES } from '@/lib/templates/starter-partner-templates'
+import { STARTER_INTERNAL_TEMPLATES } from '@/lib/templates/starter-internal-templates'
 
-const ALL = [...STARTER_CUSTOMER_TEMPLATES, ...STARTER_SUPPLIER_TEMPLATES, ...STARTER_PARTNER_TEMPLATES]
+const ALL = [...STARTER_CUSTOMER_TEMPLATES, ...STARTER_SUPPLIER_TEMPLATES, ...STARTER_PARTNER_TEMPLATES, ...STARTER_INTERNAL_TEMPLATES]
 import { getPlaceholders, PLACEHOLDER_REFERENCE } from '@/lib/template-placeholders'
 
 describe('starter customer templates', () => {
@@ -79,6 +80,22 @@ describe('starter partner templates', () => {
       expect(t.body).toContain('{{partner_name}}')
       if (t.channel === 'email') expect(t.subject).toBeTruthy()
       else expect(t.subject).toBeNull()
+    }
+  })
+})
+
+describe('starter internal templates', () => {
+  it('cover handover, incident and debrief, addressed to the colleague picked', () => {
+    const steps = new Set(STARTER_INTERNAL_TEMPLATES.map(t => t.subcategory))
+    for (const s of ['handover', 'incident', 'debrief']) expect(steps.has(s)).toBe(true)
+    for (const t of STARTER_INTERNAL_TEMPLATES) {
+      expect(t.category).toBe('internal')
+      if (t.channel === 'email') {
+        expect(t.subject).toBeTruthy()
+        expect(t.body).toContain('{{team_member_name}}')
+      } else {
+        expect(t.subject).toBeNull()
+      }
     }
   })
 })

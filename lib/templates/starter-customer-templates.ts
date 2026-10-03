@@ -11,7 +11,7 @@
 export interface StarterTemplate {
   name: string
   description: string
-  category: 'customer' | 'supplier' | 'partner'
+  category: 'customer' | 'supplier' | 'partner' | 'internal'
   subcategory: string
   channel: 'email' | 'whatsapp'
   subject: string | null

@@ -4,10 +4,16 @@ import type { TablesInsert } from '@/types/database.types'
 import { STARTER_CUSTOMER_TEMPLATES } from '@/lib/templates/starter-customer-templates'
 import { STARTER_SUPPLIER_TEMPLATES } from '@/lib/templates/starter-supplier-templates'
 import { STARTER_PARTNER_TEMPLATES } from '@/lib/templates/starter-partner-templates'
+import { STARTER_INTERNAL_TEMPLATES } from '@/lib/templates/starter-internal-templates'
 import { getPlaceholders } from '@/lib/template-placeholders'
 
-// Customers, suppliers (hotels, cruises, transport, guides), then B2B partners.
-const STARTERS = [...STARTER_CUSTOMER_TEMPLATES, ...STARTER_SUPPLIER_TEMPLATES, ...STARTER_PARTNER_TEMPLATES]
+// Customers, suppliers (hotels, cruises, transport, guides), B2B partners, then the team's own.
+const STARTERS = [
+  ...STARTER_CUSTOMER_TEMPLATES,
+  ...STARTER_SUPPLIER_TEMPLATES,
+  ...STARTER_PARTNER_TEMPLATES,
+  ...STARTER_INTERNAL_TEMPLATES,
+]
 
 // POST - Add the starter templates (lib/templates/starter-*-templates) to the
 // caller's own company. Safe to repeat: a starter whose name is already
