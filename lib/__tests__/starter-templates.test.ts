@@ -2,8 +2,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { STARTER_CUSTOMER_TEMPLATES } from '@/lib/templates/starter-customer-templates'
 import { STARTER_SUPPLIER_TEMPLATES } from '@/lib/templates/starter-supplier-templates'
+import { STARTER_PARTNER_TEMPLATES } from '@/lib/templates/starter-partner-templates'
 
-const ALL = [...STARTER_CUSTOMER_TEMPLATES, ...STARTER_SUPPLIER_TEMPLATES]
+const ALL = [...STARTER_CUSTOMER_TEMPLATES, ...STARTER_SUPPLIER_TEMPLATES, ...STARTER_PARTNER_TEMPLATES]
 import { getPlaceholders, PLACEHOLDER_REFERENCE } from '@/lib/template-placeholders'
 
 describe('starter customer templates', () => {
@@ -63,6 +64,19 @@ describe('starter supplier templates', () => {
     for (const t of STARTER_SUPPLIER_TEMPLATES) {
       expect(t.category).toBe('supplier')
       expect(t.body).toContain('{{supplier_name}}')
+      if (t.channel === 'email') expect(t.subject).toBeTruthy()
+      else expect(t.subject).toBeNull()
+    }
+  })
+})
+
+describe('starter partner templates', () => {
+  it('cover every B2B partner step, filed under the category the send window treats as a partner', () => {
+    const steps = new Set(STARTER_PARTNER_TEMPLATES.map(t => t.subcategory))
+    for (const s of ['partnership', 'rate_sheet', 'partner_quote', 'commission_statement']) expect(steps.has(s)).toBe(true)
+    for (const t of STARTER_PARTNER_TEMPLATES) {
+      expect(t.category).toBe('partner')
+      expect(t.body).toContain('{{partner_name}}')
       if (t.channel === 'email') expect(t.subject).toBeTruthy()
       else expect(t.subject).toBeNull()
     }

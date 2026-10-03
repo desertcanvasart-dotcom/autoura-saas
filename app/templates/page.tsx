@@ -86,6 +86,8 @@ interface Recipient {
   name: string
   email?: string
   phone?: string
+  /** The person to address (a partner's or supplier's contact), when known. */
+  contactName?: string
   type: 'client' | 'hotel' | 'cruise' | 'transport' | 'guide' | 'b2b_partner'
 }
 
@@ -210,7 +212,7 @@ export default function TemplatesPage() {
     fetchAnalytics()
   }, [])
 
-  // The basic customer and supplier templates (lib/templates/starter-*-templates),
+  // The basic customer, supplier and partner templates (lib/templates/starter-*-templates),
   // added as ordinary templates. Safe to repeat: existing names are skipped.
   const loadStarterTemplates = async () => {
     setLoadingStarter(true)
@@ -521,7 +523,7 @@ export default function TemplatesPage() {
             type="button"
             onClick={loadStarterTemplates}
             disabled={loadingStarter}
-            title="Add ready-made customer templates (enquiry reply to thank you) and supplier templates (hotels, Nile cruises, transport, guides). Templates you already have are kept."
+            title="Add ready-made customer templates (enquiry reply to thank you), supplier templates (hotels, Nile cruises, transport, guides) and B2B partner templates (introduction, rate sheet, quotations, payments). Templates you already have are kept."
             className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             {loadingStarter ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -718,8 +720,9 @@ export default function TemplatesPage() {
               <p className="text-gray-700 font-medium">No templates yet</p>
               <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
                 Start with ready-made templates: customer messages for every step of a booking — enquiry reply,
-                quotation, deposit, confirmation, the day before, welcome and thank you — and supplier messages
-                for hotels, Nile cruises, transport and guides. Email and WhatsApp versions; edit or delete any of them.
+                quotation, deposit, confirmation, the day before, welcome and thank you — supplier messages
+                for hotels, Nile cruises, transport and guides, and B2B partner messages for the agencies that sell
+                your trips. Email and WhatsApp versions; edit or delete any of them.
               </p>
               <button
                 type="button"
@@ -1344,6 +1347,8 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
         values['{{supplier_name}}'] = name
       } else if (isPartnerTemplate) {
         values['{{partner_company}}'] = name
+        // Greet the contact person; the company name when there is none.
+        values['{{partner_name}}'] = selectedRecipient.contactName || name
       } else if (!isInternalTemplate) {
         values['{{client_name}}'] = name
         values['{{client_first_name}}'] = name.split(/\s+/)[0] || ''
@@ -1447,6 +1452,7 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
           name: item.name || item.company_name || item.hotel_name || item.cruise_name || item.full_name || 'Unknown',
           email: item.email || item.contact_email || item.reservations_email,
           phone: item.phone || item.contact_phone || item.whatsapp_number,
+          contactName: item.contact_name || item.contact_person || undefined,
           type: recipientType
         }))
 
