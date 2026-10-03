@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   FileText,
   Plus,
@@ -32,6 +32,8 @@ import {
   Handshake
 } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import { useTenant } from '@/app/contexts/TenantContext'
+import { useAuth } from '@/app/contexts/AuthContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // ============================================
@@ -208,7 +210,7 @@ export default function TemplatesPage() {
     fetchAnalytics()
   }, [])
 
-  // The customer journey's basic templates (lib/templates/starter-customer-templates),
+  // The basic customer and supplier templates (lib/templates/starter-*-templates),
   // added as ordinary templates. Safe to repeat: existing names are skipped.
   const loadStarterTemplates = async () => {
     setLoadingStarter(true)
@@ -519,7 +521,7 @@ export default function TemplatesPage() {
             type="button"
             onClick={loadStarterTemplates}
             disabled={loadingStarter}
-            title="Add ready-made customer templates (enquiry reply, quotation, deposit, confirmation, day before, welcome, thank you). Templates you already have are kept."
+            title="Add ready-made customer templates (enquiry reply to thank you) and supplier templates (hotels, Nile cruises, transport, guides). Templates you already have are kept."
             className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             {loadingStarter ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -715,9 +717,9 @@ export default function TemplatesPage() {
             <>
               <p className="text-gray-700 font-medium">No templates yet</p>
               <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-                Start with ready-made customer templates for every step of a booking — enquiry reply, quotation,
-                deposit, confirmation, the day before, welcome and thank you — in email and WhatsApp versions.
-                You can edit or delete any of them.
+                Start with ready-made templates: customer messages for every step of a booking — enquiry reply,
+                quotation, deposit, confirmation, the day before, welcome and thank you — and supplier messages
+                for hotels, Nile cruises, transport and guides. Email and WhatsApp versions; edit or delete any of them.
               </p>
               <button
                 type="button"
@@ -1166,6 +1168,12 @@ interface SendTemplateModalProps {
 }
 
 function SendTemplateModal({ template: initialTemplate, onClose, placeholders }: SendTemplateModalProps) {
+  // The sender's own details, for {{company_name}} / {{agent_name}} etc.
+  const { tenant } = useTenant()
+  const { profile, user } = useAuth()
+  // Fields the last client lookup filled — cleared when the recipient changes,
+  // so one client's deposit or dates never stay on another client's message.
+  const clientFilledKeys = useRef<string[]>([])
   // Language variants support
   const [activeTemplate, setActiveTemplate] = useState<Template>(initialTemplate)
   const [languageVariants, setLanguageVariants] = useState<Template[]>([])
@@ -1325,9 +1333,53 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
         values['{{ClientEmail}}'] = selectedRecipient.email || ''
       }
 
-      setFilledValues(prev => ({ ...prev, ...values }))
+      // The snake_case placeholders the starter templates use
+      // (lib/templates/starter-*-templates), alongside the PascalCase ones.
+      const name = selectedRecipient.name || ''
+      values['{{company_name}}'] = tenant?.company_name || ''
+      values['{{company_phone}}'] = tenant?.company_phone || ''
+      values['{{company_email}}'] = tenant?.contact_email || ''
+      values['{{agent_name}}'] = profile?.full_name || (user?.user_metadata?.full_name as string | undefined) || ''
+      if (isSupplierTemplate) {
+        values['{{supplier_name}}'] = name
+      } else if (isPartnerTemplate) {
+        values['{{partner_company}}'] = name
+      } else if (!isInternalTemplate) {
+        values['{{client_name}}'] = name
+        values['{{client_first_name}}'] = name.split(/\s+/)[0] || ''
+        values['{{client_email}}'] = selectedRecipient.email || ''
+        values['{{client_phone}}'] = selectedRecipient.phone || ''
+      }
+      // The recipient's details replace the previous recipient's, as before.
+      const stale = clientFilledKeys.current
+      clientFilledKeys.current = []
+      setFilledValues(prev => {
+        const next = { ...prev }
+        for (const k of stale) delete next[k]
+        return { ...next, ...values }
+      })
+
+      // A client's trip details (dates, deposit, balance, booking reference)
+      // come from their latest itinerary — the same data the Inbox fills.
+      if (!isSupplierTemplate && !isPartnerTemplate && !isInternalTemplate && selectedRecipient.id) {
+        let cancelled = false
+        fetch(`/api/clients/${selectedRecipient.id}/template-data`)
+          .then(r => (r.ok ? r.json() : null))
+          .then(data => {
+            const pd = data?.placeholderData as Record<string, unknown> | undefined
+            if (cancelled || !pd) return
+            const filled: Record<string, string> = {}
+            for (const [k, v] of Object.entries(pd)) {
+              if (typeof v === 'string' && v) filled[`{{${k}}}`] = v
+            }
+            clientFilledKeys.current = Object.keys(filled)
+            setFilledValues(prev => ({ ...prev, ...filled }))
+          })
+          .catch(() => { /* typed by hand instead */ })
+        return () => { cancelled = true }
+      }
     }
-  }, [selectedRecipient, isPartnerTemplate, isSupplierTemplate, isInternalTemplate, supplierType])
+  }, [selectedRecipient, isPartnerTemplate, isSupplierTemplate, isInternalTemplate, supplierType, tenant, profile, user])
 
   useEffect(() => {
     // Generate preview

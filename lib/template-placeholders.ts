@@ -206,4 +206,17 @@ export const PLACEHOLDER_REFERENCE = [
   { key: 'partner_company', label: 'Partner Company', example: 'Sunrise Travel GmbH' },
   { key: 'supplier_name', label: 'Supplier Name', example: 'Nile View Hotel' },
   { key: 'details', label: 'Details / Changes', example: 'Room type upgraded to suite' },
+  // Booking specifics in supplier templates — typed in when sending
+  { key: 'guest_name', label: 'Guest Name', example: 'Mr & Mrs Smith' },
+  { key: 'num_guests', label: 'Number of Guests', example: '2 adults' },
+  { key: 'check_in', label: 'Check-in / Embarkation', example: 'January 15, 2025' },
+  { key: 'check_out', label: 'Check-out / Disembarkation', example: 'January 18, 2025' },
+  { key: 'room_details', label: 'Rooms / Cabins', example: '1 double, sea view' },
+  { key: 'meal_plan', label: 'Meal Plan', example: 'Half board' },
+  { key: 'service_date', label: 'Service Date', example: 'January 16, 2025' },
+  { key: 'pickup_time', label: 'Pickup Time', example: '08:00' },
+  { key: 'pickup_location', label: 'Pickup Location', example: 'Hotel lobby' },
+  { key: 'dropoff_location', label: 'Drop-off Location', example: 'Cairo Airport' },
+  { key: 'vehicle_type', label: 'Vehicle', example: 'Minivan' },
+  { key: 'guide_language', label: 'Guide Language', example: 'Spanish' },
 ]
