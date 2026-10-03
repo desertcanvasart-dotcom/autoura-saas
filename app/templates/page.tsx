@@ -523,7 +523,7 @@ export default function TemplatesPage() {
             type="button"
             onClick={loadStarterTemplates}
             disabled={loadingStarter}
-            title="Add ready-made customer templates (enquiry reply to thank you), supplier templates (hotels, Nile cruises, transport, guides) and B2B partner templates (introduction, rate sheet, quotations, payments). Templates you already have are kept."
+            title="Add ready-made customer templates (enquiry reply to thank you), supplier templates (hotels, Nile cruises, transport, guides), B2B partner templates (introduction, rate sheet, quotations, payments) and team templates (handover, incident, debrief). Templates you already have are kept."
             className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             {loadingStarter ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -721,8 +721,9 @@ export default function TemplatesPage() {
               <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
                 Start with ready-made templates: customer messages for every step of a booking — enquiry reply,
                 quotation, deposit, confirmation, the day before, welcome and thank you — supplier messages
-                for hotels, Nile cruises, transport and guides, and B2B partner messages for the agencies that sell
-                your trips. Email and WhatsApp versions; edit or delete any of them.
+                for hotels, Nile cruises, transport and guides, B2B partner messages for the agencies that sell
+                your trips, and team notes for handovers, incidents and debriefs. Email and WhatsApp versions; edit
+                or delete any of them.
               </p>
               <button
                 type="button"
@@ -1298,63 +1299,75 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
     fetchRecipients()
   }, [])
 
+  // The placeholder values one recipient fills — used for a single send and
+  // for each recipient of a bulk send. Both the older PascalCase placeholders
+  // and the snake_case ones the starter templates use
+  // (lib/templates/starter-*-templates).
+  const recipientPlaceholderValues = (r: Recipient): Record<string, string> => {
+    const values: Record<string, string> = {}
+    const name = r.name || ''
+
+    if (isPartnerTemplate) {
+      values['{{PartnerName}}'] = name
+      values['{{PartnerCompany}}'] = name
+      values['{{PartnerEmail}}'] = r.email || ''
+      values['{{PartnerPhone}}'] = r.phone || ''
+      values['{{partner_company}}'] = name
+      // Greet the contact person; the company name when there is none.
+      values['{{partner_name}}'] = r.contactName || name
+    } else if (isSupplierTemplate) {
+      values['{{SupplierName}}'] = name
+      values['{{SupplierEmail}}'] = r.email || ''
+      values['{{SupplierPhone}}'] = r.phone || ''
+      if (supplierType === 'hotel') values['{{HotelName}}'] = name
+      else if (supplierType === 'cruise') values['{{CruiseName}}'] = name
+      else if (supplierType === 'guide') values['{{GuideName}}'] = name
+      else if (supplierType === 'transport') values['{{TransportCompany}}'] = name
+      values['{{supplier_name}}'] = name
+    } else if (isInternalTemplate) {
+      values['{{TeamMemberName}}'] = name
+      values['{{TeamMemberEmail}}'] = r.email || ''
+      values['{{team_member_name}}'] = name.split(/\s+/)[0] || name
+    } else {
+      values['{{GuestName}}'] = name
+      values['{{ClientName}}'] = name
+      values['{{ClientPhone}}'] = r.phone || ''
+      values['{{ClientEmail}}'] = r.email || ''
+      values['{{client_name}}'] = name
+      values['{{client_first_name}}'] = name.split(/\s+/)[0] || ''
+      values['{{client_email}}'] = r.email || ''
+      values['{{client_phone}}'] = r.phone || ''
+    }
+
+    // The sender: the agency and the person sending.
+    values['{{company_name}}'] = tenant?.company_name || ''
+    values['{{company_phone}}'] = tenant?.company_phone || ''
+    values['{{company_email}}'] = tenant?.contact_email || ''
+    values['{{agent_name}}'] = profile?.full_name || (user?.user_metadata?.full_name as string | undefined) || ''
+    return values
+  }
+
+  /** A client's trip details (dates, deposit, balance, reference) — the data the Inbox fills. */
+  const fetchClientPlaceholderValues = async (clientId: string): Promise<Record<string, string>> => {
+    try {
+      const res = await fetch(`/api/clients/${clientId}/template-data`)
+      if (!res.ok) return {}
+      const data = await res.json()
+      const pd = data?.placeholderData as Record<string, unknown> | undefined
+      const out: Record<string, string> = {}
+      for (const [k, v] of Object.entries(pd ?? {})) if (typeof v === 'string' && v) out[`{{${k}}}`] = v
+      return out
+    } catch {
+      return {}
+    }
+  }
+
+  const isClientTemplate = !isSupplierTemplate && !isPartnerTemplate && !isInternalTemplate
+
   useEffect(() => {
     // Auto-fill from selected recipient
     if (selectedRecipient) {
-      const values: Record<string, string> = {}
-
-      if (isPartnerTemplate) {
-        // B2B Partner placeholders
-        values['{{PartnerName}}'] = selectedRecipient.name || ''
-        values['{{PartnerCompany}}'] = selectedRecipient.name || ''
-        values['{{PartnerEmail}}'] = selectedRecipient.email || ''
-        values['{{PartnerPhone}}'] = selectedRecipient.phone || ''
-      } else if (isSupplierTemplate) {
-        // Supplier placeholders based on type
-        values['{{SupplierName}}'] = selectedRecipient.name || ''
-        values['{{SupplierEmail}}'] = selectedRecipient.email || ''
-        values['{{SupplierPhone}}'] = selectedRecipient.phone || ''
-        // Type-specific placeholders
-        if (supplierType === 'hotel') {
-          values['{{HotelName}}'] = selectedRecipient.name || ''
-        } else if (supplierType === 'cruise') {
-          values['{{CruiseName}}'] = selectedRecipient.name || ''
-        } else if (supplierType === 'guide') {
-          values['{{GuideName}}'] = selectedRecipient.name || ''
-        } else if (supplierType === 'transport') {
-          values['{{TransportCompany}}'] = selectedRecipient.name || ''
-        }
-      } else if (isInternalTemplate) {
-        // Internal team member placeholders
-        values['{{TeamMemberName}}'] = selectedRecipient.name || ''
-        values['{{TeamMemberEmail}}'] = selectedRecipient.email || ''
-      } else {
-        // Customer placeholders
-        values['{{GuestName}}'] = selectedRecipient.name || ''
-        values['{{ClientName}}'] = selectedRecipient.name || ''
-        values['{{ClientPhone}}'] = selectedRecipient.phone || ''
-        values['{{ClientEmail}}'] = selectedRecipient.email || ''
-      }
-
-      // The snake_case placeholders the starter templates use
-      // (lib/templates/starter-*-templates), alongside the PascalCase ones.
-      const name = selectedRecipient.name || ''
-      values['{{company_name}}'] = tenant?.company_name || ''
-      values['{{company_phone}}'] = tenant?.company_phone || ''
-      values['{{company_email}}'] = tenant?.contact_email || ''
-      values['{{agent_name}}'] = profile?.full_name || (user?.user_metadata?.full_name as string | undefined) || ''
-      if (isSupplierTemplate) {
-        values['{{supplier_name}}'] = name
-      } else if (isPartnerTemplate) {
-        values['{{partner_company}}'] = name
-        // Greet the contact person; the company name when there is none.
-        values['{{partner_name}}'] = selectedRecipient.contactName || name
-      } else if (!isInternalTemplate) {
-        values['{{client_name}}'] = name
-        values['{{client_first_name}}'] = name.split(/\s+/)[0] || ''
-        values['{{client_email}}'] = selectedRecipient.email || ''
-        values['{{client_phone}}'] = selectedRecipient.phone || ''
-      }
+      const values = recipientPlaceholderValues(selectedRecipient)
       // The recipient's details replace the previous recipient's, as before.
       const stale = clientFilledKeys.current
       clientFilledKeys.current = []
@@ -1364,26 +1377,18 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
         return { ...next, ...values }
       })
 
-      // A client's trip details (dates, deposit, balance, booking reference)
-      // come from their latest itinerary — the same data the Inbox fills.
-      if (!isSupplierTemplate && !isPartnerTemplate && !isInternalTemplate && selectedRecipient.id) {
+      // A client's trip details come from their latest itinerary.
+      if (isClientTemplate && selectedRecipient.id) {
         let cancelled = false
-        fetch(`/api/clients/${selectedRecipient.id}/template-data`)
-          .then(r => (r.ok ? r.json() : null))
-          .then(data => {
-            const pd = data?.placeholderData as Record<string, unknown> | undefined
-            if (cancelled || !pd) return
-            const filled: Record<string, string> = {}
-            for (const [k, v] of Object.entries(pd)) {
-              if (typeof v === 'string' && v) filled[`{{${k}}}`] = v
-            }
-            clientFilledKeys.current = Object.keys(filled)
-            setFilledValues(prev => ({ ...prev, ...filled }))
-          })
-          .catch(() => { /* typed by hand instead */ })
+        fetchClientPlaceholderValues(selectedRecipient.id).then(filled => {
+          if (cancelled) return
+          clientFilledKeys.current = Object.keys(filled)
+          setFilledValues(prev => ({ ...prev, ...filled }))
+        })
         return () => { cancelled = true }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the helpers read the same inputs listed here
   }, [selectedRecipient, isPartnerTemplate, isSupplierTemplate, isInternalTemplate, supplierType, tenant, profile, user])
 
   useEffect(() => {
@@ -1590,44 +1595,18 @@ function SendTemplateModal({ template: initialTemplate, onClose, placeholders }:
         continue
       }
 
-      // Generate personalized message for this recipient
+      // Generate personalized message for this recipient: its own details
+      // (and, for a client, its own trip) over what was typed. Values a
+      // previously picked single client filled are dropped, so one client's
+      // deposit or dates never reach another.
       let personalizedBody = activeTemplate.body
-      const recipientValues: Record<string, string> = {}
-
-      if (isPartnerTemplate) {
-        // B2B Partner placeholders
-        recipientValues['{{PartnerName}}'] = recipient.name || ''
-        recipientValues['{{PartnerCompany}}'] = recipient.name || ''
-        recipientValues['{{PartnerEmail}}'] = recipient.email || ''
-        recipientValues['{{PartnerPhone}}'] = recipient.phone || ''
-      } else if (isSupplierTemplate) {
-        // Supplier placeholders
-        recipientValues['{{SupplierName}}'] = recipient.name || ''
-        recipientValues['{{SupplierEmail}}'] = recipient.email || ''
-        recipientValues['{{SupplierPhone}}'] = recipient.phone || ''
-        if (supplierType === 'hotel') {
-          recipientValues['{{HotelName}}'] = recipient.name || ''
-        } else if (supplierType === 'cruise') {
-          recipientValues['{{CruiseName}}'] = recipient.name || ''
-        } else if (supplierType === 'guide') {
-          recipientValues['{{GuideName}}'] = recipient.name || ''
-        } else if (supplierType === 'transport') {
-          recipientValues['{{TransportCompany}}'] = recipient.name || ''
-        }
-      } else if (isInternalTemplate) {
-        // Internal team member placeholders
-        recipientValues['{{TeamMemberName}}'] = recipient.name || ''
-        recipientValues['{{TeamMemberEmail}}'] = recipient.email || ''
-      } else {
-        // Customer placeholders
-        recipientValues['{{GuestName}}'] = recipient.name || ''
-        recipientValues['{{ClientName}}'] = recipient.name || ''
-        recipientValues['{{ClientPhone}}'] = recipient.phone || ''
-        recipientValues['{{ClientEmail}}'] = recipient.email || ''
+      const typed = { ...filledValues }
+      for (const k of clientFilledKeys.current) delete typed[k]
+      const recipientValues = {
+        ...recipientPlaceholderValues(recipient),
+        ...(isClientTemplate && recipient.id ? await fetchClientPlaceholderValues(recipient.id) : {}),
       }
-
-      // Merge with manual values (manual values take priority)
-      const allValues = { ...recipientValues, ...filledValues }
+      const allValues = { ...typed, ...recipientValues }
       Object.entries(allValues).forEach(([key, value]) => {
         personalizedBody = personalizedBody.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), 'g'), value || key)
       })
