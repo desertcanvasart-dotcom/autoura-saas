@@ -219,4 +219,11 @@ export const PLACEHOLDER_REFERENCE = [
   { key: 'dropoff_location', label: 'Drop-off Location', example: 'Cairo Airport' },
   { key: 'vehicle_type', label: 'Vehicle', example: 'Minivan' },
   { key: 'guide_language', label: 'Guide Language', example: 'Spanish' },
+  // B2B partner templates — typed in when sending
+  { key: 'group_name', label: 'Group Name', example: 'Sunrise Travel — Spring group' },
+  { key: 'season', label: 'Season', example: 'Winter 2025/26' },
+  { key: 'valid_until', label: 'Valid Until', example: 'April 30, 2026' },
+  { key: 'due_date', label: 'Due Date', example: 'March 1, 2026' },
+  { key: 'statement_period', label: 'Statement Period', example: 'January 2026' },
+  { key: 'commission_amount', label: 'Commission Amount', example: '1,250.00' },
 ]
