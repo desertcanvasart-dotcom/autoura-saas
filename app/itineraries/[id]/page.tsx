@@ -25,6 +25,7 @@ import ItineraryBookingAction from '@/components/ItineraryBookingAction'
 import GenerateTasksButton from '@/components/tasks/GenerateTasksButton'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
+import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 
 interface Itinerary {
   id: string
@@ -170,14 +171,16 @@ export default function ViewItineraryPage() {
         return
       }
 
-      setItinerary(itinData.data)
+      // Empty fields in their neutral form (a Pricing Grid itinerary can have
+      // no client name) — the page reads them as plain strings and numbers.
+      setItinerary(normalizeItineraryForView(itinData.data))
       setCostMode(itinData.data.cost_mode || 'auto')
 
       const daysResponse = await fetch(`/api/itineraries/${params.id}/days`)
       const daysData = await daysResponse.json()
 
       if (daysData.success) {
-        setDays(daysData.data)
+        setDays(normalizeDaysForView(daysData.data))
       }
 
       setLoading(false)
@@ -722,7 +725,7 @@ export default function ViewItineraryPage() {
                 <p className="text-sm text-gray-500">
                   <span className="font-mono text-primary-600">{itinerary.itinerary_code}</span>
                   <span className="mx-2">•</span>
-                  {itinerary.client_name}
+                  {itinerary.client_name || 'No client'}
                   {itinerary.tier && (
                     <>
                       <span className="mx-2">•</span>
@@ -964,7 +967,7 @@ export default function ViewItineraryPage() {
       {/* PDF Preview Modal */}
       <PDFPreviewModal
         pdfBlob={pdfPreviewBlob}
-        filename={`${itinerary.itinerary_code}_${itinerary.client_name.replace(/\s+/g, '_')}.pdf`}
+        filename={`${itinerary.itinerary_code}${itinerary.client_name ? `_${itinerary.client_name.replace(/\s+/g, '_')}` : ''}.pdf`}
         isOpen={showPdfPreview}
         onClose={() => { setShowPdfPreview(false); setPdfPreviewBlob(null) }}
         onSendEmail={() => { setShowPdfPreview(false); setShowSendModal(true) }}
@@ -979,7 +982,7 @@ export default function ViewItineraryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <p className="text-xs text-gray-500 mb-1">Client</p>
-              <p className="text-sm font-semibold text-gray-900">{itinerary.client_name}</p>
+              <p className="text-sm font-semibold text-gray-900">{itinerary.client_name || 'No client'}</p>
               {itinerary.client_email && (
                 <p className="text-xs text-gray-600 truncate">{itinerary.client_email}</p>
               )}
