@@ -148,8 +148,9 @@ const navigation: NavSection[] = [
     key: 'sell',
     roles: ['admin', 'manager', 'member'],
     items: [
-      { label: 'New Quote', href: '/itineraries/new', icon: Sparkles },
-      { label: 'Pricing Grid', href: '/pricing-grid', icon: Grid3x3 },
+      // "New Quote" (the new-itinerary form) is hidden here: quotes start in
+      // the Quote Builder, and the dashboard's quick action still opens the form.
+      { label: 'Quote Builder', href: '/pricing-grid', icon: Grid3x3 },
       { label: 'B2C Quotes', href: '/quotes/b2c', icon: User },
       // Single B2B quote store since migration 270 — calculator and
       // grid/AI-born quotes all land in b2b_quotes at /quotes/b2b.

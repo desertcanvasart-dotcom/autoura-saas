@@ -173,7 +173,7 @@ export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onC
             onClick={async () => {
               const ok = await confirm({
                 title: 'Start New Quote',
-                message: 'This will clear all days and reset the pricing grid. Any unsaved changes will be lost.',
+                message: 'This will clear all days and reset the Quote Builder. Any unsaved changes will be lost.',
                 confirmText: 'New Quote',
                 cancelText: 'Cancel',
                 variant: 'warning',
@@ -316,7 +316,7 @@ export default function InputPanel({ onParseDays, onAddDay, onLoadItinerary, onC
                 onClick={async () => {
                   const ok = await confirm({
                     title: 'Clear All Days',
-                    message: 'This will remove all days and reset the pricing grid. This cannot be undone.',
+                    message: 'This will remove all days and reset the Quote Builder. This cannot be undone.',
                     confirmText: 'Clear All',
                     cancelText: 'Cancel',
                     variant: 'danger',

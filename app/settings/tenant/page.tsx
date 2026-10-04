@@ -28,6 +28,18 @@ import { DocumentFooter } from '@/components/documents/Letterhead'
 
 const supabase = createClient()
 
+const LETTERHEAD_LABELS: Record<string, string> = {
+  tagline: 'Tagline', company_phone: 'Phone', company_website: 'Website', company_address: 'Address',
+  license_number: 'Tourism license no.', tax_number: 'Tax / registration no.', document_footer_text: 'Footer note',
+}
+
+/** PostgREST / Postgres saying one of `columns` does not exist on the table. */
+function isMissingColumnError(err: { code?: string; message?: string }, columns: string[]): boolean {
+  const msg = err.message || ''
+  if (err.code !== 'PGRST204' && err.code !== '42703' && !/schema cache|does not exist/i.test(msg)) return false
+  return columns.some(c => msg.includes(c))
+}
+
 export default function TenantSettingsPage() {
   const { tenant, tenantMember, features, isAdmin, loading, refetchTenant } = useTenant()
 
@@ -241,36 +253,81 @@ export default function TenantSettingsPage() {
       // (Colors used to go to tenant_features while the PDF generators read
       // tenants.primary_color, so every document rendered the default blue
       // no matter what was picked here. Migration 255 consolidated this.)
-      const { error: tenantError } = await supabase
+      const letterhead = {
+        // Blank -> NULL -> the document omits the line.
+        tagline: tagline.trim() || null,
+        company_phone: companyPhone.trim() || null,
+        company_website: companyWebsite.trim() || null,
+        company_address: companyAddress.trim() || null,
+        license_number: licenseNumber.trim() || null,
+        tax_number: taxNumber.trim() || null,
+        document_footer_text: footerText.trim() || null,
+      }
+      const core = {
+        company_name: companyName,
+        contact_email: contactEmail,
+        logo_url: finalLogoUrl,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
+        // Empty field -> NULL -> the resolver falls through to the platform
+        // constant. Storing 0 here would silently make every quote at-cost.
+        default_margin_percent: defaultMargin.trim() === '' ? null : Number(defaultMargin),
+        // Blank -> NULL -> resolveDepositRule falls back to the defaults.
+        deposit_percent: depositPercent.trim() === '' ? null : Number(depositPercent),
+        deposit_due_days: depositDueDays.trim() === '' ? null : Number(depositDueDays),
+        ...(ratesCurrency || (tenant as { rates_currency?: string | null }).rates_currency
+          ? { rates_currency: ratesCurrency || null }
+          : {}),
+      }
+
+      // .select() returns the row as stored: an update that RLS blocks or
+      // that matched nothing comes back EMPTY with no error, and used to be
+      // reported as "saved" — the form then reloaded the old values and the
+      // edit looked lost.
+      let { data: saved, error: tenantError } = await supabase
         .from('tenants')
-        .update({
-          company_name: companyName,
-          contact_email: contactEmail,
-          logo_url: finalLogoUrl,
-          // Blank -> NULL -> the document omits the line.
-          tagline: tagline.trim() || null,
-          company_phone: companyPhone.trim() || null,
-          company_website: companyWebsite.trim() || null,
-          company_address: companyAddress.trim() || null,
-          license_number: licenseNumber.trim() || null,
-          tax_number: taxNumber.trim() || null,
-          document_footer_text: footerText.trim() || null,
-          primary_color: primaryColor,
-          secondary_color: secondaryColor,
-          // Empty field -> NULL -> the resolver falls through to the platform
-          // constant. Storing 0 here would silently make every quote at-cost.
-          default_margin_percent: defaultMargin.trim() === '' ? null : Number(defaultMargin),
-          // Blank -> NULL -> resolveDepositRule falls back to the defaults.
-          deposit_percent: depositPercent.trim() === '' ? null : Number(depositPercent),
-          deposit_due_days: depositDueDays.trim() === '' ? null : Number(depositDueDays),
-          ...(ratesCurrency || (tenant as { rates_currency?: string | null }).rates_currency
-            ? { rates_currency: ratesCurrency || null }
-            : {}),
-        })
+        .update({ ...core, ...letterhead })
         .eq('id', tenant.id)
+        .select('id, tagline, company_phone, company_website, company_address, license_number, tax_number, document_footer_text')
+
+      // The document-letterhead columns arrive with migration 394. Where the
+      // database does not have them yet, the whole write failed and nothing
+      // saved; save the rest and say exactly what is missing.
+      let letterheadMissing = false
+      if (tenantError && isMissingColumnError(tenantError, Object.keys(letterhead))) {
+        letterheadMissing = true
+        ;({ data: saved, error: tenantError } = await supabase
+          .from('tenants')
+          .update(core)
+          .eq('id', tenant.id)
+          .select('id'))
+      }
 
       if (tenantError) throw tenantError
+      if (!saved || saved.length === 0) {
+        throw new Error('Nothing was saved — your account may not have permission to change the organization. Ask the owner, or sign out and in again.')
+      }
 
+      // What we asked for vs what the database kept, field by field.
+      const stored = saved[0] as Record<string, unknown>
+      const notKept = letterheadMissing ? [] : Object.entries(letterhead)
+        .filter(([k, v]) => (stored[k] ?? null) !== v)
+        .map(([k]) => LETTERHEAD_LABELS[k] || k)
+
+      // Refetch tenant data
+      await refetchTenant()
+
+      if (letterheadMissing) {
+        setMessage({
+          type: 'error',
+          text: 'Saved — except the document header & footer fields (tagline, phone, website, address, licence, tax, footer note): the database has not been updated for them yet. Run the database migration (npm run migrate), then save again.',
+        })
+        return
+      }
+      if (notKept.length > 0) {
+        setMessage({ type: 'error', text: `Saved, but these fields were not kept by the database: ${notKept.join(', ')}.` })
+        return
+      }
       // Refetch tenant data
       await refetchTenant()
 

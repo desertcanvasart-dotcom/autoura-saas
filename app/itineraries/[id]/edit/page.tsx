@@ -828,7 +828,7 @@ export default function ItineraryEditorPage() {
       router.push(`/pricing-grid?itinerary=${itineraryId}`)
     } catch (error: any) {
       console.error('❌ Error opening pricing grid:', error)
-      showToast('error', `Failed to open pricing grid: ${error.message || 'Unknown error'}`)
+      showToast('error', `Failed to open the Quote Builder: ${error.message || 'Unknown error'}`)
       setCalculating(false)
     }
   }
@@ -1612,7 +1612,7 @@ export default function ItineraryEditorPage() {
           {/* Action Box */}
           <div className="bg-[#f4f7f1] rounded-xl p-5 border border-[#b8c9a8]">
             <p className="text-sm text-[#4a5c35] mb-4">
-              ✨ Edit content, then save or price it in the pricing grid.
+              ✨ Edit content, then save or price it in the Quote Builder.
             </p>
             <button
               onClick={saveDraft}
