@@ -47,8 +47,8 @@ export function trackEvent(name: string, params?: Record<string, unknown>) {
 function loadGa(gaId: string) {
   if (document.getElementById('ga4-script')) return
   window.dataLayer = window.dataLayer || []
-  window.gtag = function gtag(...args: unknown[]) {
-    window.dataLayer!.push(args)
+  window.gtag = function gtag(..._args: unknown[]) {
+    window.dataLayer!.push(arguments)
   }
   window.gtag('js', new Date())
   // Consent Mode: only reached after an explicit grant.
