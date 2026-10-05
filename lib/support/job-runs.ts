@@ -185,13 +185,18 @@ export function withJobRun<A extends unknown[]>(
           // { success: false, ... } when some of their work failed. Read it —
           // otherwise a run that synced 0 of 5 mailboxes is recorded as "ok"
           // (it was, 2026-09-24). A body that isn't JSON counts by its status.
-          const bodyFailure = response.ok ? await reportedFailure(response) : null
+          // Read on a non-2xx too: a 500 carries its error in the body, and
+          // recording only "HTTP 500" left the reminders sweep failing for
+          // three nights with nothing to say why (2026-10-03..05).
+          const bodyFailure = await reportedFailure(response)
           await finishRun(
             db, runId,
             response.ok && !bodyFailure ? 'ok' : 'failed',
             // A good run may say what it did (`summary`) — so "0 new" and
             // "did nothing" can be told apart in the log.
-            !response.ok ? `HTTP ${response.status}` : bodyFailure ?? await reportedSummary(response),
+            !response.ok
+              ? `HTTP ${response.status}${bodyFailure ? `: ${bodyFailure}` : ''}`
+              : bodyFailure ?? await reportedSummary(response),
           )
           await pruneOldRuns(db, name)
         }

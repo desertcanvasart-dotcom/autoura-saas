@@ -40,4 +40,21 @@ describe('withJobRun outcome', () => {
       expect(finished[0].outcome).toBe(want)
     }
   })
+
+  // The reminders sweep answered 500 three nights running (2026-10-03..05) and
+  // the history said only "HTTP 500" — the reason was in the body, discarded.
+  it('a 500 records the error its body gives, not just the status', async () => {
+    const { db, finished } = fakeDb()
+    const res = await withJobRun('reminders', () => db, async () =>
+      json({ success: false, error: 'column tenants_1.foo does not exist' }, 500))()
+    expect(res.status).toBe(500)
+    expect(finished[0].outcome).toBe('failed')
+    expect(String(finished[0].detail)).toBe('HTTP 500: column tenants_1.foo does not exist')
+  })
+
+  it('a 500 with no usable body still records its status', async () => {
+    const { db, finished } = fakeDb()
+    await withJobRun('reminders', () => db, async () => new Response('boom', { status: 500 }))()
+    expect(finished[0].detail).toBe('HTTP 500')
+  })
 })
