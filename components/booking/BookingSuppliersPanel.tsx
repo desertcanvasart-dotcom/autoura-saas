@@ -41,6 +41,15 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: 'bg-gray-50 text-gray-400 line-through',
 }
 
+// The EXPENSE's state (what the agency owes this supplier), not the
+// supplier's: a fresh expense still has to be approved, then paid.
+const EXPENSE_STATE: Record<string, { label: string; style: string }> = {
+  pending: { label: 'To approve', style: 'bg-amber-50 text-amber-800 ring-1 ring-amber-200' },
+  approved: { label: 'To pay', style: 'bg-blue-50 text-blue-800 ring-1 ring-blue-200' },
+  paid: { label: 'Paid', style: 'bg-green-50 text-green-800 ring-1 ring-green-200' },
+  rejected: { label: 'Rejected', style: 'bg-gray-100 text-gray-500 ring-1 ring-gray-200' },
+}
+
 export default function BookingSuppliersPanel({
   bookingId,
   currency,
@@ -155,7 +164,7 @@ export default function BookingSuppliersPanel({
                 <th className="py-2 pr-3 font-medium text-right">Cost</th>
                 <th className="py-2 pr-3 font-medium">Status</th>
                 <th className="py-2 pr-3 font-medium">Confirmation no.</th>
-                <th className="py-2 font-medium">Expense</th>
+                <th className="py-2 font-medium" title="What the agency owes this supplier, recorded when the supplier is confirmed">Expense</th>
               </tr>
             </thead>
             <tbody>
@@ -223,9 +232,15 @@ export default function BookingSuppliersPanel({
                   </td>
                   <td className="py-2 whitespace-nowrap text-xs">
                     {r.expense ? (
-                      <Link href={`/expenses/${r.expense.id}`} className="text-[#647C47] hover:underline">
-                        {r.expense.expense_number}
-                        <span className="text-gray-400 capitalize"> · {r.expense.status}</span>
+                      <Link
+                        href={`/expenses/${r.expense.id}`}
+                        title="Open the expense"
+                        className="inline-flex items-center gap-2 group"
+                      >
+                        <span className="font-medium text-gray-900 group-hover:underline">{r.expense.expense_number}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${EXPENSE_STATE[r.expense.status]?.style ?? 'bg-gray-100 text-gray-700'}`}>
+                          {EXPENSE_STATE[r.expense.status]?.label ?? r.expense.status}
+                        </span>
                       </Link>
                     ) : <span className="text-gray-300">—</span>}
                   </td>
