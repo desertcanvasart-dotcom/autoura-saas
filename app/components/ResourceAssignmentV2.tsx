@@ -134,7 +134,8 @@ const RESOURCE_TYPES = [
     nameField: 'name',
     phoneField: 'phone',
     displayField: (r: { name?: string; phone?: string }) => `${r.name}${r.phone ? ` · ${r.phone}` : ''}`,
-    canNotify: true
+    canNotify: true,
+    allowManual: true
   },
   { 
     key: 'hotel', 
@@ -193,6 +194,7 @@ const RESOURCE_TYPES = [
     phoneField: 'phone',
     displayField: (r: any) => `${r.name}${r.airport_location ? ` - ${r.airport_location}` : ''}${r.role ? ` (${r.role})` : ''}`,
     canNotify: true,
+    allowManual: true,
     filterType: 'airport',
     cityField: 'airport_location'
   },
@@ -206,6 +208,7 @@ const RESOURCE_TYPES = [
     phoneField: 'phone',
     displayField: (r: any) => `${r.name}${r.hotel?.name ? ` - ${r.hotel.name}` : ''}${r.hotel?.city ? ` (${r.hotel.city})` : ''}${r.role ? ` • ${r.role}` : ''}`,
     canNotify: true,
+    allowManual: true,
     filterType: 'hotelCity',
     cityField: 'hotel.city'
   }
@@ -261,6 +264,12 @@ export default function ResourceAssignmentV2({
     notes: '',
     quantity: 1
   })
+  // Drivers, airport and hotel staff are often hired case by case — someone
+  // from outside who is not in the directory. They can be typed in for this
+  // trip only; nothing is added to the directory.
+  const [manualMode, setManualMode] = useState(false)
+  const [manualName, setManualName] = useState('')
+  const [manualPhone, setManualPhone] = useState('')
 
   // WhatsApp sending state
   const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null)
@@ -434,7 +443,12 @@ export default function ResourceAssignmentV2({
   }
 
   const handleAddResource = async () => {
-    if (!addFormData.resource_id) {
+    const manual = manualMode && Boolean(RESOURCE_TYPES.find(t => t.key === activeTab)?.allowManual)
+    if (manual && !manualName.trim()) {
+      showToast('error', 'Please enter a name')
+      return
+    }
+    if (!manual && !addFormData.resource_id) {
       showToast('error', 'Please select a resource')
       return
     }
@@ -464,13 +478,23 @@ export default function ResourceAssignmentV2({
         resourceName += ` (${selectedResource.city})`
       }
 
+      // Someone typed in by hand has no directory row: a fresh id stands in
+      // (resource_id has no foreign key), and the name carries the phone so
+      // it is on the trip for whoever reads it.
+      let resourceId = addFormData.resource_id
+      if (manual) {
+        resourceId = crypto.randomUUID()
+        const phone = manualPhone.trim()
+        resourceName = `${manualName.trim()}${phone ? ` · ${phone}` : ''} (outside)`
+      }
+
       const response = await fetch('/api/itinerary-resources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           itinerary_id: itineraryId,
           resource_type: activeTab,
-          resource_id: addFormData.resource_id,
+          resource_id: resourceId,
           resource_name: resourceName,
           start_date: addFormData.start_date,
           end_date: addFormData.end_date,
@@ -597,7 +621,7 @@ export default function ResourceAssignmentV2({
           itineraryId, 
           guideId: resource.resource_id 
         }
-      } else if (['restaurant', 'airport_staff', 'hotel_staff'].includes(resource.resource_type)) {
+      } else if (['restaurant', 'airport_staff', 'hotel_staff', 'driver'].includes(resource.resource_type)) {
         endpoint = '/api/whatsapp/notify-resource'
         body = {
           itineraryId,
@@ -649,6 +673,9 @@ export default function ResourceAssignmentV2({
       notes: '',
       quantity: 1
     })
+    setManualMode(false)
+    setManualName('')
+    setManualPhone('')
     resetModalFilters()
   }
 
@@ -766,7 +793,11 @@ export default function ResourceAssignmentV2({
           <div className="space-y-3 mb-4">
             {activeResources.map((resource) => {
               const typeConfig = RESOURCE_TYPES.find(t => t.key === resource.resource_type)
-              const canNotify = typeConfig?.canNotify || false
+              // Typed in by hand: no record, so no number to message. The staff
+              // link still works for them.
+              const inDirectory = !typeConfig?.allowManual ||
+                (availableResources[resource.resource_type] || []).some(r => r.id === resource.resource_id)
+              const canNotify = (typeConfig?.canNotify || false) && inDirectory
               const isSending = sendingWhatsApp === resource.id
               const wasSent = whatsAppSent.has(resource.id)
 
@@ -956,7 +987,7 @@ export default function ResourceAssignmentV2({
               )}
 
               {/* Airport Location Filter - for airport staff */}
-              {activeTypeConfig.filterType === 'airport' && (
+              {activeTypeConfig.filterType === 'airport' && !manualMode && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Plane className="w-4 h-4 inline mr-1.5 text-gray-400" />
@@ -984,7 +1015,7 @@ export default function ResourceAssignmentV2({
               )}
 
               {/* Hotel City Filter - for hotel staff */}
-              {activeTypeConfig.filterType === 'hotelCity' && (
+              {activeTypeConfig.filterType === 'hotelCity' && !manualMode && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Hotel className="w-4 h-4 inline mr-1.5 text-gray-400" />
@@ -1043,33 +1074,83 @@ export default function ResourceAssignmentV2({
               )}
 
               {/* ===== RESOURCE SELECTION ===== */}
+              {activeTypeConfig.allowManual && manualMode ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      placeholder="e.g. Ahmed Hassan"
+                      autoFocus
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone <span className="font-normal text-gray-400">(optional)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={manualPhone}
+                      onChange={(e) => setManualPhone(e.target.value)}
+                      placeholder="+20 100 000 0000"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    For this trip only — they won’t be added to your directory. WhatsApp notify isn’t available
+                    for them; use the staff link instead.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setManualMode(false)}
+                    className="text-sm font-medium text-primary-700 hover:underline"
+                  >
+                    ← Choose from your list instead
+                  </button>
+                </div>
+              ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select {activeTypeConfig.label.slice(0, -1)} *
-                </label>
-                <select
-                  value={addFormData.resource_id}
-                  onChange={(e) => setAddFormData({ ...addFormData, resource_id: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select {activeTypeConfig.label.slice(0, -1)} *
+                  </label>
+                  <select
+                    value={addFormData.resource_id}
+                    onChange={(e) => setAddFormData({ ...addFormData, resource_id: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                  >
+                    <option value="">Choose...</option>
+                    {filteredAvailableResources.map((resource) => (
+                      <option key={resource.id} value={resource.id}>
+                        {activeTypeConfig.displayField(resource)}
+                      </option>
+                    ))}
+                  </select>
+                  {filteredAvailableResources.length === 0 && (
+                    <p className="text-sm text-orange-600 mt-2">
+                      No {activeTypeConfig.label.toLowerCase()} found for this filter. Try selecting a different option.
+                    </p>
+                  )}
+                  {(modalCityFilter !== 'all' || modalAirportFilter !== 'all' || modalRouteFilter !== 'all') && filteredAvailableResources.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Showing {filteredAvailableResources.length} of {allAvailableForType.length}
+                    </p>
+                  )}
+                </div>
+              )}
+              {activeTypeConfig.allowManual && !manualMode && (
+                <button
+                  type="button"
+                  onClick={() => { setManualMode(true); setAddFormData({ ...addFormData, resource_id: '' }) }}
+                  className="-mt-2 text-sm font-medium text-primary-700 hover:underline"
                 >
-                  <option value="">Choose...</option>
-                  {filteredAvailableResources.map((resource) => (
-                    <option key={resource.id} value={resource.id}>
-                      {activeTypeConfig.displayField(resource)}
-                    </option>
-                  ))}
-                </select>
-                {filteredAvailableResources.length === 0 && (
-                  <p className="text-sm text-orange-600 mt-2">
-                    No {activeTypeConfig.label.toLowerCase()} found for this filter. Try selecting a different option.
-                  </p>
-                )}
-                {(modalCityFilter !== 'all' || modalAirportFilter !== 'all' || modalRouteFilter !== 'all') && filteredAvailableResources.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Showing {filteredAvailableResources.length} of {allAvailableForType.length}
-                  </p>
-                )}
-              </div>
+                  Not in the list? Enter a name manually
+                </button>
+              )}
 
               {/* Date Range */}
               <div className="grid grid-cols-2 gap-4">
@@ -1141,7 +1222,7 @@ export default function ResourceAssignmentV2({
               </button>
               <button
                 onClick={handleAddResource}
-                disabled={saving || !addFormData.resource_id}
+                disabled={saving || (manualMode ? !manualName.trim() : !addFormData.resource_id)}
                 className={`px-6 py-2 text-white rounded-lg font-medium flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${activeColor.bg} hover:opacity-90`}
               >
                 {saving ? (
