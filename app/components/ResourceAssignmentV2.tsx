@@ -141,7 +141,7 @@ const RESOURCE_TYPES = [
     label: 'Hotels', 
     icon: Hotel, 
     color: 'purple',
-    apiEndpoint: '/api/resources/hotels',
+    apiEndpoint: '/api/resources/hotels/assignable',
     nameField: 'name',
     phoneField: 'phone',
     displayField: (r: any) => `${r.name}${r.city ? ` - ${r.city}` : ''}${r.star_rating ? ` ⭐${r.star_rating}` : ''}`,
@@ -154,7 +154,7 @@ const RESOURCE_TYPES = [
     label: 'Restaurants', 
     icon: UtensilsCrossed, 
     color: 'orange',
-    apiEndpoint: '/api/resources/restaurants',
+    apiEndpoint: '/api/resources/restaurants/assignable',
     nameField: 'name',
     phoneField: 'phone',
     displayField: (r: any) => `${r.name}${r.city ? ` - ${r.city}` : ''}${r.cuisine_type ? ` (${r.cuisine_type})` : ''}`,
@@ -167,7 +167,7 @@ const RESOURCE_TYPES = [
     label: 'Nile Cruises', 
     icon: Ship, 
     color: 'indigo',
-    apiEndpoint: '/api/cruises',
+    apiEndpoint: '/api/cruises/assignable',
     nameField: 'name',
     phoneField: 'phone',
     displayField: (r: any) => {
@@ -177,7 +177,7 @@ const RESOURCE_TYPES = [
         'round_trip': 'Round Trip (7n)'
       }
       const routeLabel = r.route ? routeLabels[r.route] || r.route : ''
-      return `${r.name}${r.ship_name ? ` - ${r.ship_name}` : ''}${routeLabel ? ` • ${routeLabel}` : ''}`
+      return `${r.name}${routeLabel ? ` • ${routeLabel}` : ''}`
     },
     canNotify: false,
     filterType: 'route',
@@ -1027,11 +1027,14 @@ export default function ResourceAssignmentV2({
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                   >
                     <option value="all">All Routes ({allAvailableForType.length})</option>
-                    {CRUISE_ROUTE_OPTIONS.filter(r => r.value !== 'all' && getUniqueCruiseRoutes().includes(r.value)).map((route) => {
-                      const count = allAvailableForType.filter(r => r.route === route.value).length
+                    {/* Every route the cruises actually sail — a route written
+                        in its own words is offered too, not hidden. */}
+                    {getUniqueCruiseRoutes().sort().map((value) => {
+                      const label = CRUISE_ROUTE_OPTIONS.find(o => o.value === value)?.label ?? value
+                      const count = allAvailableForType.filter(r => r.route === value).length
                       return (
-                        <option key={route.value} value={route.value}>
-                          {route.label} ({count})
+                        <option key={value} value={value}>
+                          {label} ({count})
                         </option>
                       )
                     })}
