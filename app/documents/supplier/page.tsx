@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { 
   FileText, Send, Eye, Trash2, Pencil,
@@ -28,7 +28,9 @@ interface SupplierDocument {
   itinerary?: {
     id: string
     itinerary_code: string
-  }
+    trip_name?: string | null
+    client_name?: string | null
+  } | null
 }
 
 interface Stats {
@@ -66,8 +68,14 @@ export default function SupplierDocumentsPage() {
   const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [mounted, setMounted] = useState(false)
+  // One itinerary's documents. Generating documents from an itinerary links
+  // here with ?itineraryId=…, which this page used to ignore — so it showed
+  // every document from every trip (reported 2026-10-06). Read off window,
+  // as app/team-members does, so the page needs no Suspense boundary.
+  const [itineraryFilter, setItineraryFilter] = useState<string | null>(null)
 
   useEffect(() => {
+    setItineraryFilter(new URLSearchParams(window.location.search).get('itineraryId'))
     setMounted(true)
   }, [])
 
@@ -75,7 +83,12 @@ export default function SupplierDocumentsPage() {
     if (mounted) {
       fetchDocuments()
     }
-  }, [mounted, typeFilter, statusFilter])
+  }, [mounted, typeFilter, statusFilter, itineraryFilter])
+
+  const showItinerary = (id: string | null) => {
+    setItineraryFilter(id)
+    window.history.replaceState(null, '', id ? `/documents/supplier?itineraryId=${encodeURIComponent(id)}` : '/documents/supplier')
+  }
 
   const fetchDocuments = async () => {
     setLoading(true)
@@ -85,6 +98,7 @@ export default function SupplierDocumentsPage() {
       const params = new URLSearchParams()
       if (typeFilter) params.append('type', typeFilter)
       if (statusFilter) params.append('status', statusFilter)
+      if (itineraryFilter) params.append('itineraryId', itineraryFilter)
       
       const response = await fetch(`/api/supplier-documents?${params}`)
       
@@ -156,6 +170,20 @@ export default function SupplierDocumentsPage() {
     )
   })
 
+  // Every trip's documents together: groups in the order their newest
+  // document appears (the list arrives newest first).
+  const groups: Array<{ key: string; itinerary: SupplierDocument['itinerary']; docs: SupplierDocument[] }> = []
+  for (const doc of filteredDocuments) {
+    const key = doc.itinerary?.id ?? ''
+    let g = groups.find(x => x.key === key)
+    if (!g) {
+      g = { key, itinerary: doc.itinerary ?? null, docs: [] }
+      groups.push(g)
+    }
+    g.docs.push(doc)
+  }
+  const current = itineraryFilter ? groups[0]?.itinerary ?? null : null
+
   if (!mounted) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -170,16 +198,45 @@ export default function SupplierDocumentsPage() {
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Supplier Documents</h1>
-              <p className="text-sm text-gray-500">Vouchers, service orders, and supplier communications</p>
-            </div>
-            <Link
-              href="/documents"
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-            >
-              ← Back to All Documents
-            </Link>
+            {itineraryFilter ? (
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">
+                  Documents for {current?.itinerary_code ?? 'this itinerary'}
+                </h1>
+                <p className="text-sm text-gray-500">
+                  {[current?.trip_name, current?.client_name].filter(Boolean).join(' · ') || 'Vouchers and service orders for this trip only'}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">Supplier Documents</h1>
+                <p className="text-sm text-gray-500">Vouchers, service orders, and supplier communications — grouped by itinerary</p>
+              </div>
+            )}
+            {itineraryFilter ? (
+              <div className="flex items-center gap-4">
+                <Link
+                  href={`/itineraries/${itineraryFilter}`}
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  ← Back to itinerary
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => showItinerary(null)}
+                  className="text-sm text-gray-600 hover:text-gray-900 font-medium"
+                >
+                  Show all documents
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/documents"
+                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              >
+                ← Back to All Documents
+              </Link>
+            )}
           </div>
         </div>
       </header>
@@ -304,7 +361,11 @@ export default function SupplierDocumentsPage() {
             <div className="p-8 text-center">
               <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-sm font-medium text-gray-900">No documents found</p>
-              <p className="text-xs text-gray-500 mt-1">Generate documents from an itinerary to get started</p>
+              <p className="text-xs text-gray-500 mt-1">
+                {itineraryFilter
+                  ? 'This itinerary has no documents yet. Use Documents → Generate on the itinerary.'
+                  : 'Generate documents from an itinerary to get started'}
+              </p>
               <Link
                 href="/itineraries"
                 className="inline-block mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700"
@@ -325,115 +386,149 @@ export default function SupplierDocumentsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredDocuments.map((doc) => {
-                    const typeConfig = getDocTypeConfig(doc.document_type)
-                    const statusConfig = getStatusConfig(doc.status)
-                    const TypeIcon = typeConfig.icon
+                  {groups.map((g) => (
+                    <Fragment key={g.key || 'none'}>
+                      {/* A heading per trip, unless the page already is one trip. */}
+                      {!itineraryFilter && (
+                        <tr className="bg-gray-50/70">
+                          <td colSpan={5} className="px-4 py-2 border-t border-gray-200">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-gray-900">
+                                {g.itinerary?.itinerary_code ?? 'Not linked to an itinerary'}
+                                {(g.itinerary?.trip_name || g.itinerary?.client_name) && (
+                                  <span className="font-normal text-gray-500">
+                                    {' · '}{[g.itinerary?.trip_name, g.itinerary?.client_name].filter(Boolean).join(' · ')}
+                                  </span>
+                                )}
+                                <span className="ml-2 text-xs font-normal text-gray-400">
+                                  {g.docs.length} document{g.docs.length === 1 ? '' : 's'}
+                                </span>
+                              </p>
+                              {g.itinerary && (
+                                <div className="flex items-center gap-3 text-xs font-medium">
+                                  <button type="button" onClick={() => showItinerary(g.itinerary!.id)} className="text-primary-600 hover:text-primary-700">
+                                    Show only these
+                                  </button>
+                                  <Link href={`/itineraries/${g.itinerary.id}`} className="text-gray-500 hover:text-gray-700">
+                                    Open itinerary →
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {g.docs.map((doc) => {
+                        const typeConfig = getDocTypeConfig(doc.document_type)
+                        const statusConfig = getStatusConfig(doc.status)
+                        const TypeIcon = typeConfig.icon
                     
-                    return (
-                      <tr key={doc.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className={`p-1.5 rounded ${typeConfig.color}`}>
-                              <TypeIcon className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{doc.document_number}</p>
-                              <p className="text-xs text-gray-500">{typeConfig.label}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-medium text-gray-900">{doc.supplier_name}</p>
-                          {doc.city && <p className="text-xs text-gray-500">{doc.city}</p>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-sm text-gray-900">{doc.client_name}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
-                            {statusConfig.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1">
-                            {/* View */}
-                            <Link
-                              href={`/documents/supplier/${doc.id}`}
-                              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
-                              title="View"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Link>
+                        return (
+                          <tr key={doc.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className={`p-1.5 rounded ${typeConfig.color}`}>
+                                  <TypeIcon className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{doc.document_number}</p>
+                                  <p className="text-xs text-gray-500">{typeConfig.label}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="text-sm font-medium text-gray-900">{doc.supplier_name}</p>
+                              {doc.city && <p className="text-xs text-gray-500">{doc.city}</p>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="text-sm text-gray-900">{doc.client_name}</p>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+                                {statusConfig.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-end gap-1">
+                                {/* View */}
+                                <Link
+                                  href={`/documents/supplier/${doc.id}`}
+                                  className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                                  title="View"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Link>
                             
-                            {/* Edit - available for all statuses EXCEPT cancelled */}
-                            {doc.status !== 'cancelled' && (
-                              <Link
-                                href={`/documents/supplier/${doc.id}/edit`}
-                                className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
-                                title="Edit"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </Link>
-                            )}
+                                {/* Edit - available for all statuses EXCEPT cancelled */}
+                                {doc.status !== 'cancelled' && (
+                                  <Link
+                                    href={`/documents/supplier/${doc.id}/edit`}
+                                    className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded"
+                                    title="Edit"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Link>
+                                )}
                             
-                            {/* Mark as Sent - only for drafts */}
-                            {doc.status === 'draft' && (
-                              <button
-                                onClick={() => handleUpdateStatus(doc.id, 'sent')}
-                                className="p-1.5 text-blue-500 hover:bg-blue-50 rounded"
-                                title="Mark as Sent"
-                              >
-                                <Send className="w-4 h-4" />
-                              </button>
-                            )}
+                                {/* Mark as Sent - only for drafts */}
+                                {doc.status === 'draft' && (
+                                  <button
+                                    onClick={() => handleUpdateStatus(doc.id, 'sent')}
+                                    className="p-1.5 text-blue-500 hover:bg-blue-50 rounded"
+                                    title="Mark as Sent"
+                                  >
+                                    <Send className="w-4 h-4" />
+                                  </button>
+                                )}
                             
-                            {/* Mark as Confirmed - only for sent */}
-                            {doc.status === 'sent' && (
-                              <button
-                                onClick={() => handleUpdateStatus(doc.id, 'confirmed')}
-                                className="p-1.5 text-green-500 hover:bg-green-50 rounded"
-                                title="Mark as Confirmed"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </button>
-                            )}
+                                {/* Mark as Confirmed - only for sent */}
+                                {doc.status === 'sent' && (
+                                  <button
+                                    onClick={() => handleUpdateStatus(doc.id, 'confirmed')}
+                                    className="p-1.5 text-green-500 hover:bg-green-50 rounded"
+                                    title="Mark as Confirmed"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </button>
+                                )}
                             
-                            {/* Mark as Completed - only for confirmed */}
-                            {doc.status === 'confirmed' && (
-                              <button
-                                onClick={() => handleUpdateStatus(doc.id, 'completed')}
-                                className="p-1.5 text-purple-500 hover:bg-purple-50 rounded"
-                                title="Mark as Completed"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </button>
-                            )}
+                                {/* Mark as Completed - only for confirmed */}
+                                {doc.status === 'confirmed' && (
+                                  <button
+                                    onClick={() => handleUpdateStatus(doc.id, 'completed')}
+                                    className="p-1.5 text-purple-500 hover:bg-purple-50 rounded"
+                                    title="Mark as Completed"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </button>
+                                )}
                             
-                            {/* Revert to Draft - for sent/confirmed/completed */}
-                            {['sent', 'confirmed', 'completed'].includes(doc.status) && (
-                              <button
-                                onClick={() => handleUpdateStatus(doc.id, 'draft')}
-                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                                title="Revert to Draft"
-                              >
-                                <RotateCcw className="w-4 h-4" />
-                              </button>
-                            )}
+                                {/* Revert to Draft - for sent/confirmed/completed */}
+                                {['sent', 'confirmed', 'completed'].includes(doc.status) && (
+                                  <button
+                                    onClick={() => handleUpdateStatus(doc.id, 'draft')}
+                                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                                    title="Revert to Draft"
+                                  >
+                                    <RotateCcw className="w-4 h-4" />
+                                  </button>
+                                )}
                             
-                            {/* Delete */}
-                            <button
-                              onClick={() => handleDelete(doc.id)}
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                                {/* Delete */}
+                                <button
+                                  onClick={() => handleDelete(doc.id)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
