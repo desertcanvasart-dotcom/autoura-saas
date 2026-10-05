@@ -255,6 +255,9 @@ export interface AwaitingConversation {
   contact_name?: string | null
   contact_email?: string | null
   awaiting_reply_since?: string | null
+  /** The customer's newest message (migration 366). Part of the dismissal
+   *  fingerprint: writing again brings a dismissed conversation back. */
+  last_inbound_at?: string | null
 }
 
 /** Hours without an answer before a customer reaches the dashboard. */
@@ -283,9 +286,63 @@ export function buildAwaitingReplyItems(
       tripName: null,
       clientName: c.contact_name || c.contact_email || 'A customer',
       startDate: null,
-      detail: { waitingSince: waiting, hours: Math.floor(hours) },
+      detail: { waitingSince: waiting, lastInboundAt: c.last_inbound_at ?? null, hours: Math.floor(hours) },
       href: `/conversations?conversation=${c.id}`,
     })
   }
   return items.sort((a, z) => Number(z.detail.hours ?? 0) - Number(a.detail.hours ?? 0))
+}
+
+// ============================================
+// Dismissed — "seen it, handled elsewhere"
+// ============================================
+// An operator can dismiss a row (migration 397). A dismissal is remembered
+// with a fingerprint of the state it was made in, and only holds while that
+// state does: when the situation changes the row comes back, because that is
+// new news. Pure, so the "comes back" rules are testable without a database.
+
+export interface AttentionDismissal {
+  item_key: string
+  fingerprint: string
+}
+
+/** Detail fields that move by themselves with the clock. A dismissal must not
+ *  expire just because another hour passed. */
+const CLOCK_FIELDS = new Set(['hours'])
+
+/** Which item this is, stable across reloads: its kind and the record it is
+ *  about. A booking can carry several requests, so those add when they were
+ *  made (and an extra its title) to tell them apart. */
+export function attentionKey(item: AttentionItem): string {
+  const d = item.detail ?? {}
+  const parts: string[] = [item.type, item.bookingId]
+  if (item.type === 'change_request' || item.type === 'extra_request') {
+    parts.push(String(d.requestedAt ?? ''))
+  }
+  if (item.type === 'extra_request') parts.push(String(d.title ?? ''))
+  if (item.type === 'no_guide') parts.push(item.href)
+  return parts.join(':').slice(0, 500)
+}
+
+/** The state the item was in, minus what the clock changes on its own. Keys
+ *  are sorted so the same state always reads the same, wherever computed. */
+export function attentionFingerprint(item: AttentionItem): string {
+  const d = item.detail ?? {}
+  const kept = Object.keys(d)
+    .filter(k => !CLOCK_FIELDS.has(k))
+    .sort()
+    .map(k => [k, d[k] ?? null])
+  return JSON.stringify(kept).slice(0, 2000)
+}
+
+/** Drops the items dismissed in their current state. A dismissal made in a
+ *  state that no longer holds is ignored, so the item shows again. */
+export function withoutDismissed(
+  items: AttentionItem[],
+  dismissals: readonly AttentionDismissal[]
+): { items: AttentionItem[]; dismissed: number } {
+  if (dismissals.length === 0) return { items, dismissed: 0 }
+  const held = new Map(dismissals.map(r => [r.item_key, r.fingerprint]))
+  const kept = items.filter(i => held.get(attentionKey(i)) !== attentionFingerprint(i))
+  return { items: kept, dismissed: items.length - kept.length }
 }

@@ -3679,6 +3679,33 @@ export interface Database {
           },
         ]
       }
+      dashboard_attention_dismissals: {
+        Row: {
+          id: string
+          tenant_id: string
+          item_key: string
+          fingerprint: string
+          dismissed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          item_key: string
+          fingerprint: string
+          dismissed_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          item_key?: string
+          fingerprint?: string
+          dismissed_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       departments: {
         Row: {
           id: string
