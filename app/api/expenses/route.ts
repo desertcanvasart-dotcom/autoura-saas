@@ -138,6 +138,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // A picked supplier must be one of this agency's (RLS scopes the read).
+    if (body.supplier_id) {
+      const { data: supplier } = await supabase
+        .from('suppliers')
+        .select('id')
+        .eq('id', body.supplier_id)
+        .maybeSingle()
+      if (!supplier) {
+        return NextResponse.json({ error: 'Supplier not found or access denied' }, { status: 404 })
+      }
+    }
+
     // Expense number generation goes through nextDocumentNumber + the INSERT
     // is wrapped in insertWithUniqueRetry so a 23505 violation from the new
     // UNIQUE constraint regenerates the number rather than crashing.
