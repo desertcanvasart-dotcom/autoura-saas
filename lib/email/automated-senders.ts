@@ -35,6 +35,12 @@ const TOKENS = [
   'admin',
   'root',
   'verifymyaccount',
+  // Added 2026-10-05: ticketing and booking systems confirm, they do not ask.
+  'auto[-_.]?reply',
+  'auto[-_.]?confirm',
+  'confirmations?',
+  'receipts?',
+  'portal',
 ].join('|')
 
 /** The word, bounded by a separator, a digit, or the ends of the local part. */
@@ -43,11 +49,35 @@ const AUTOMATED = new RegExp(`(?:^|[-._+])(?:${TOKENS})(?:[-._+0-9]|$)`, 'i')
 /** The whole-address cases: a service whose local part looks human. */
 const AUTOMATED_ADDRESSES = /@(mailer|notifications?|email|mail|bounces?|reply)\./i
 
+/**
+ * Services whose mail is never a customer, whatever the local part says.
+ * Reported from the dashboard on 2026-10-05: "Supabase", "GEM-Portal" and
+ * "Egymonuments" sat at the top of Needs attention as customers waiting up to
+ * 19 days — a hosting provider and two monument-ticket systems. Matched on the
+ * domain or any subdomain of it ("mail.app.supabase.io").
+ *
+ * Kept to services a tour operator's CUSTOMER never writes from. A hotel or
+ * supplier domain does not belong here: their reservations desk is a person.
+ */
+export const AUTOMATED_DOMAINS = [
+  'supabase.com',
+  'supabase.io',
+  'egymonuments.gov.eg',
+  'egymonuments.com',
+  'visit-gem.com',
+  'gem.gov.eg',
+]
+
+function fromAutomatedDomain(address: string): boolean {
+  const domain = address.slice(address.lastIndexOf('@') + 1)
+  return AUTOMATED_DOMAINS.some(d => domain === d || domain.endsWith(`.${d}`))
+}
+
 export function isAutomatedSender(value: string | null | undefined): boolean {
   const address = String(value ?? '').trim().toLowerCase()
   if (!address.includes('@')) return false
   const local = address.split('@')[0]
-  return AUTOMATED.test(local) || AUTOMATED_ADDRESSES.test(address)
+  return AUTOMATED.test(local) || AUTOMATED_ADDRESSES.test(address) || fromAutomatedDomain(address)
 }
 
 /**
