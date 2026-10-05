@@ -154,7 +154,7 @@ const RESOURCE_TYPES = [
     label: 'Restaurants', 
     icon: UtensilsCrossed, 
     color: 'orange',
-    apiEndpoint: '/api/resources/restaurants',
+    apiEndpoint: '/api/resources/restaurants/assignable',
     nameField: 'name',
     phoneField: 'phone',
     displayField: (r: any) => `${r.name}${r.city ? ` - ${r.city}` : ''}${r.cuisine_type ? ` (${r.cuisine_type})` : ''}`,
