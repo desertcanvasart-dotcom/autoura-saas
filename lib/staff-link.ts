@@ -13,6 +13,7 @@
 // details, other assignments, or anything else on the itinerary.
 
 import { generateShareToken, isValidShareToken, str } from '@/lib/itinerary-share'
+import { parseManualAssignee } from '@/lib/notify/assignment-message'
 
 export const generateStaffToken = generateShareToken
 export const isValidStaffToken = isValidShareToken
@@ -84,6 +85,19 @@ type ContactClient = {
 }
 
 export async function resolveAssigneeContact(
+  supabase: ContactClient,
+  resource: { resource_type?: string | null; resource_id?: string | null; resource_name?: string | null }
+): Promise<{ name: string | null; phone: string | null } | null> {
+  const found = await lookupAssigneeContact(supabase, resource)
+  if (found?.phone) return found
+  // Typed in by hand for this trip: no directory row, so the phone lives in
+  // the saved name ("Name · +20 … (outside)").
+  const manual = parseManualAssignee(resource?.resource_name)
+  if (manual) return { name: manual.name, phone: manual.phone }
+  return found
+}
+
+async function lookupAssigneeContact(
   supabase: ContactClient,
   resource: { resource_type?: string | null; resource_id?: string | null; resource_name?: string | null }
 ): Promise<{ name: string | null; phone: string | null } | null> {

@@ -8,6 +8,8 @@ import {
   ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor, Link2, Car } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { formatPhoneForWhatsApp, generateWhatsAppLink } from '@/lib/communication-utils'
+import { buildAssignmentMessage } from '@/lib/notify/assignment-message'
+import { useTenant } from '@/app/contexts/TenantContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 // Types
@@ -237,6 +239,7 @@ export default function ResourceAssignmentV2({
   onUpdate
 }: ResourceAssignmentV2Props) {
   const dialog = useConfirmDialog()
+  const { tenant } = useTenant()
   const [activeTab, setActiveTab] = useState('guide')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -568,7 +571,8 @@ export default function ResourceAssignmentV2({
   // Hand the tap-link over on the OFFICE's own WhatsApp (wa.me deep link) —
   // our API never sends, so no template approval and no auto-send risk. The
   // staff-link POST returns the assignee's contact alongside the URL.
-  const handleWhatsAppStaffLink = async (resourceId: string) => {
+  const handleWhatsAppStaffLink = async (resource: AssignedResource) => {
+    const resourceId = resource.id
     setCopyingLink(resourceId)
     // Open the tab SYNCHRONOUSLY, inside the click's gesture stack — a
     // window.open after an await is popup-blocked on Safari, leaving a
@@ -590,8 +594,20 @@ export default function ResourceAssignmentV2({
         }
         return
       }
-      const firstName = (data.contact?.name as string | undefined)?.split(' ')[0] ?? 'there'
-      const text = `Hi ${firstName}! Here is your check-in link${tripName ? ` for "${tripName}"` : ''}. Tap a button at each step (Departed, Arrived, Picked up…) — no login needed:\n${data.url}`
+      // The whole assignment, not just the link: this is usually the first
+      // the person hears of it (Meta blocks our number from starting the
+      // chat without an approved template — this goes from the office's own).
+      const text = buildAssignmentMessage({
+        name: (data.contact?.name as string | undefined) ?? resource.resource_name,
+        agency: tenant?.company_name,
+        tripName,
+        clientName,
+        startDate: resource.start_date,
+        endDate: resource.end_date,
+        travelers: numTravelers,
+        notes: resource.notes,
+        url: data.url,
+      })
       // formatPhoneForWhatsApp normalizes local numbers ('01…' -> '201…');
       // a raw digit-strip mints dead wa.me links for most Egyptian entries.
       const waUrl = generateWhatsAppLink(formatPhoneForWhatsApp(phone), text)
@@ -889,13 +905,13 @@ export default function ResourceAssignmentV2({
 
                       {/* Same tap-link, handed over via the office's own WhatsApp */}
                       <button
-                        onClick={() => handleWhatsAppStaffLink(resource.id)}
+                        onClick={() => handleWhatsAppStaffLink(resource)}
                         disabled={copyingLink === resource.id}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
-                        title="Send the staff tap-link from your WhatsApp"
+                        title="Open your own WhatsApp with the assignment and check-in link typed in — works for anyone, no Meta template needed"
                       >
                         <MessageCircle className="w-4 h-4" />
-                        <span className="hidden sm:inline">WhatsApp link</span>
+                        <span className="hidden sm:inline">Send via my WhatsApp</span>
                       </button>
 
                       {/* Remove Button */}
