@@ -4,11 +4,11 @@ import {
   assignableRestaurants,
   type MealRateRow,
   type RestaurantContactRow,
-} from '@/lib/resources/assignable-restaurants'
+} from '@/lib/resources/assignable'
 
 // GET /api/resources/restaurants/assignable — every restaurant an itinerary
 // can be assigned: the Restaurants directory AND Rates → Meals, merged one per
-// restaurant per city (lib/resources/assignable-restaurants.ts). RLS scopes
+// restaurant per city (lib/resources/assignable.ts). RLS scopes
 // both reads to the caller's tenant. One source failing still returns the
 // other — a short list beats an empty picker.
 
