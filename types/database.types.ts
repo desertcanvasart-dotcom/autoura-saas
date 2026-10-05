@@ -4528,6 +4528,7 @@ export interface Database {
           category: string
           description: string | null
           amount: number
+          booking_supplier_status_id: string | null
           currency: string
           expense_date: string
           supplier_name: string | null
@@ -4551,6 +4552,7 @@ export interface Database {
           category: string
           description?: string | null
           amount: number
+          booking_supplier_status_id?: string | null
           currency?: string
           expense_date: string
           supplier_name?: string | null
@@ -4574,6 +4576,7 @@ export interface Database {
           category?: string
           description?: string | null
           amount?: number
+          booking_supplier_status_id?: string | null
           currency?: string
           expense_date?: string
           supplier_name?: string | null
