@@ -77,6 +77,7 @@ export async function PUT(
       'expense_date',
       'supplier_id',
       'supplier_name',
+      'supplier_type',
       'itinerary_id',
       'booking_id',
       'notes',
@@ -87,6 +88,18 @@ export async function PUT(
     const updateData: Record<string, any> = { updated_at: new Date().toISOString() }
     for (const field of allowedFields) {
       if (body[field] !== undefined) updateData[field] = body[field]
+    }
+
+    // A picked supplier must be one of this agency's (RLS scopes the read).
+    if (updateData.supplier_id) {
+      const { data: supplier } = await supabase
+        .from('suppliers')
+        .select('id')
+        .eq('id', updateData.supplier_id)
+        .maybeSingle()
+      if (!supplier) {
+        return NextResponse.json({ success: false, error: 'Supplier not found or access denied' }, { status: 404 })
+      }
     }
 
     const { data, error } = await supabase

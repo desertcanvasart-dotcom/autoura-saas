@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { Plus, X, Receipt } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
+import ExpenseSupplierPicker from '@/components/expenses/ExpenseSupplierPicker'
+import { TRIP_EXPENSE_CATEGORIES } from '@/lib/expense-categories'
 
 interface AddExpenseFromItineraryProps {
   itineraryId: string
@@ -17,6 +19,7 @@ interface FormData {
   amount: number
   currency: string
   expense_date: string
+  supplier_id: string | null
   supplier_name: string
   supplier_type: string
   receipt_url: string
@@ -24,37 +27,6 @@ interface FormData {
   payment_method: string
   notes: string
 }
-
-const CATEGORIES = [
-  { value: 'guide', label: 'Tour Guide', icon: '👨‍🏫' },
-  { value: 'driver', label: 'Driver', icon: '🚗' },
-  { value: 'hotel', label: 'Hotel/Accommodation', icon: '🏨' },
-  { value: 'transportation', label: 'Transportation', icon: '🚐' },
-  { value: 'entrance', label: 'Entrance Fees', icon: '🎫' },
-  { value: 'meal', label: 'Meals', icon: '🍽️' },
-  { value: 'airport_staff', label: 'Airport Staff', icon: '✈️' },
-  { value: 'hotel_staff', label: 'Hotel Staff', icon: '🛎️' },
-  { value: 'ground_handler', label: 'Ground Handler', icon: '🧳' },
-  { value: 'tipping', label: 'Tipping', icon: '💵' },
-  { value: 'permits', label: 'Permits/Permissions', icon: '📋' },
-  { value: 'toll', label: 'Toll Fees', icon: '🛣️' },
-  { value: 'parking', label: 'Parking', icon: '🅿️' },
-  { value: 'fuel', label: 'Fuel', icon: '⛽' },
-  { value: 'other', label: 'Other', icon: '📦' }
-]
-
-const SUPPLIER_TYPES = [
-  { value: 'guide', label: 'Tour Guide' },
-  { value: 'driver', label: 'Driver' },
-  { value: 'hotel', label: 'Hotel' },
-  { value: 'restaurant', label: 'Restaurant' },
-  { value: 'transport_company', label: 'Transport Company' },
-  { value: 'airport_staff', label: 'Airport Staff' },
-  { value: 'hotel_staff', label: 'Hotel Staff' },
-  { value: 'ground_handler', label: 'Ground Handler' },
-  { value: 'government', label: 'Government/Authority' },
-  { value: 'other', label: 'Other' }
-]
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -72,12 +44,14 @@ export default function AddExpenseFromItinerary({
 }: AddExpenseFromItineraryProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [city, setCity] = useState('')
   const [formData, setFormData] = useState<FormData>({
     category: '',
     description: '',
     amount: 0,
     currency: 'EUR',
     expense_date: new Date().toISOString().split('T')[0],
+    supplier_id: null,
     supplier_name: '',
     supplier_type: '',
     receipt_url: '',
@@ -93,6 +67,7 @@ export default function AddExpenseFromItinerary({
       amount: 0,
       currency: 'EUR',
       expense_date: new Date().toISOString().split('T')[0],
+      supplier_id: null,
       supplier_name: '',
       supplier_type: '',
       receipt_url: '',
@@ -169,12 +144,13 @@ export default function AddExpenseFromItinerary({
                   </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    // A new category lists other suppliers: the one picked for the old one goes.
+                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value, supplier_id: null, supplier_name: '', supplier_type: '' }))}
                     required
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] focus:border-[#647C47] bg-white"
                   >
                     <option value="">Select Category</option>
-                    {CATEGORIES.map(cat => (
+                    {TRIP_EXPENSE_CATEGORIES.map(cat => (
                       <option key={cat.value} value={cat.value}>{cat.icon} {cat.label}</option>
                     ))}
                   </select>
@@ -232,32 +208,14 @@ export default function AddExpenseFromItinerary({
                 />
               </div>
 
-              {/* Supplier */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Supplier Name</label>
-                  <input
-                    type="text"
-                    value={formData.supplier_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, supplier_name: e.target.value }))}
-                    placeholder="e.g., Ahmed Mohamed"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Supplier Type</label>
-                  <select
-                    value={formData.supplier_type}
-                    onChange={(e) => setFormData(prev => ({ ...prev, supplier_type: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#647C47] bg-white"
-                  >
-                    <option value="">Select Type</option>
-                    {SUPPLIER_TYPES.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              {/* Supplier: location, then one of the agency's suppliers for this category */}
+              <ExpenseSupplierPicker
+                category={formData.category}
+                city={city}
+                onCityChange={setCity}
+                value={{ supplier_id: formData.supplier_id, supplier_name: formData.supplier_name, supplier_type: formData.supplier_type }}
+                onChange={v => setFormData(prev => ({ ...prev, ...v }))}
+              />
 
               {/* Payment Method */}
               <div>

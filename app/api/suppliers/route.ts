@@ -64,6 +64,24 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status)
     }
 
+    // ?city= — the suppliers in a place: based there, or owning an active
+    // property there (a hotel group's Luxor hotel, a cruise line's ship).
+    // City names only (letters, digits, spaces, . ' -): no LIKE wildcards or
+    // PostgREST filter syntax reaches the query.
+    const city = searchParams.get('city')?.replace(/[^\p{L}\p{N} .'-]/gu, '').trim()
+    if (city) {
+      const { data: props, error: propErr } = await supabase
+        .from('supplier_properties')
+        .select('supplier_id')
+        .ilike('city', city)
+        .eq('is_active', true)
+      if (propErr) console.error('Error fetching supplier properties by city:', propErr.message)
+      const ids = [...new Set((props || []).map((p: { supplier_id: string }) => p.supplier_id))]
+      query = ids.length
+        ? query.or(`city.ilike."${city}",id.in.(${ids.join(',')})`)
+        : query.ilike('city', city)
+    }
+
     // The is_property / parent_supplier_id filters are gone with the columns
     // (the supplier-IS-a-property model retired by migration 311); a
     // supplier's assets now live in supplier_properties.
