@@ -230,9 +230,9 @@ export default function NeedsAttention() {
                   onClick={() => dismiss(item, i)}
                   title="Dismiss"
                   aria-label={`Dismiss: ${headline(item)} — ${describe(item)}`}
-                  className="mt-2 p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 shrink-0"
+                  className="mt-2 p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
               </li>
             )
