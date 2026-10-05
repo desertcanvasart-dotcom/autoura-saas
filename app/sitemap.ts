@@ -13,7 +13,7 @@ const DOC_PAGES = [
 ]
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const top = ['', '/pricing', '/about', '/contact', '/integrations', '/docs'].map((p) => ({
+  const top = ['', '/pricing', '/about', '/demo', '/contact', '/integrations', '/docs'].map((p) => ({
     url: `${SITE_URL}${p}`,
     changeFrequency: 'weekly' as const,
     priority: p === '' ? 1 : 0.8,

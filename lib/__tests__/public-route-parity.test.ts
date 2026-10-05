@@ -34,7 +34,7 @@ describe('customer-facing routes are public in BOTH senses', () => {
     // /pricing used to be exempted here as "marketing-only" — which is exactly
     // how it shipped rendering the operator sidebar to logged-in visitors.
     // No exemptions: access-public ⇒ chrome-free.
-    for (const route of ['/login', '/signup', '/pricing', '/privacy', '/terms', '/contact', '/about', '/integrations']) {
+    for (const route of ['/login', '/signup', '/pricing', '/privacy', '/terms', '/contact', '/about', '/integrations', '/demo']) {
       const inMiddleware = middleware.includes(`'${route}'`)
       const inLayout = layout.includes(`'${route}'`)
       if (inMiddleware) {
