@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { CheckCircle2, Loader2, RefreshCw } from 'lucide-react'
 import { supplierBacking } from '@/lib/bookings/booking-suppliers'
 
@@ -8,6 +9,8 @@ import { supplierBacking } from '@/lib/bookings/booking-suppliers'
 // list is filled from the itinerary when the booking is made; "Sync from
 // itinerary" adds anything new. Mark each row as it is chased and confirmed —
 // "Not needed" takes it out of the count (e.g. a ticket bought at the gate).
+// Confirming a row with a cost records it as a pending expense (what the trip
+// owes that supplier); the Expense column links to it.
 
 interface SupplierRow {
   id: string
@@ -16,8 +19,10 @@ interface SupplierRow {
   service_date: string | null
   service_description: string | null
   quoted_cost: number | null
+  confirmed_cost: number | null
   status: string
   confirmation_number: string | null
+  expense: { id: string; expense_number: string; status: string } | null
 }
 
 const STATUS_OPTIONS = [
@@ -83,7 +88,7 @@ export default function BookingSuppliersPanel({
     }
   }
 
-  const update = async (row: SupplierRow, patch: Partial<Pick<SupplierRow, 'status' | 'confirmation_number'>>) => {
+  const update = async (row: SupplierRow, patch: Partial<Pick<SupplierRow, 'status' | 'confirmation_number' | 'confirmed_cost'>>) => {
     setSavingId(row.id)
     try {
       const res = await fetch(`/api/bookings/${bookingId}/suppliers`, {
@@ -94,6 +99,14 @@ export default function BookingSuppliersPanel({
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data.success) { notify('error', data.error || 'Could not update the supplier'); return }
       setRows(prev => prev.map(r => (r.id === row.id ? { ...r, ...data.data } : r)))
+      const exp = data.data?.expense as SupplierRow['expense']
+      if (data.expense_error) notify('error', data.expense_error)
+      else if (data.expense_action === 'create' && exp) notify('success', `Expense ${exp.expense_number} recorded for ${row.supplier_name}`)
+      else if (data.expense_action === 'update' && exp) notify('info', `Expense ${exp.expense_number} updated`)
+      else if (data.expense_action === 'remove') notify('info', `Pending expense for ${row.supplier_name} removed`)
+      else if (data.expense_action === 'kept' && exp && (patch.status !== undefined || patch.confirmed_cost !== undefined)) {
+        notify('info', `Expense ${exp.expense_number} is already ${exp.status} — change it on the Expenses page`)
+      }
     } finally {
       setSavingId(null)
     }
@@ -141,7 +154,8 @@ export default function BookingSuppliersPanel({
                 <th className="py-2 pr-3 font-medium">Type</th>
                 <th className="py-2 pr-3 font-medium text-right">Cost</th>
                 <th className="py-2 pr-3 font-medium">Status</th>
-                <th className="py-2 font-medium">Confirmation no.</th>
+                <th className="py-2 pr-3 font-medium">Confirmation no.</th>
+                <th className="py-2 font-medium">Expense</th>
               </tr>
             </thead>
             <tbody>
@@ -153,7 +167,33 @@ export default function BookingSuppliersPanel({
                   <td className="py-2 pr-3 text-gray-900">{r.supplier_name}</td>
                   <td className="py-2 pr-3 text-gray-500 capitalize">{r.supplier_type}</td>
                   <td className="py-2 pr-3 text-right text-gray-700 whitespace-nowrap">
-                    {r.quoted_cost != null ? `${currency} ${Number(r.quoted_cost).toFixed(2)}` : '—'}
+                    {canEdit ? (
+                      // The cost the supplier confirmed (defaults to the quote);
+                      // it is what the expense records.
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-xs text-gray-400">{currency}</span>
+                        <input
+                          key={`${r.id}:${r.confirmed_cost ?? ''}`}
+                          aria-label={`Confirmed cost for ${r.supplier_name}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          defaultValue={r.confirmed_cost ?? r.quoted_cost ?? ''}
+                          disabled={savingId === r.id}
+                          onBlur={e => {
+                            const raw = e.target.value.trim()
+                            const v = raw === '' ? null : Math.round(Number(raw) * 100) / 100
+                            if (v !== null && !Number.isFinite(v)) return
+                            const current = r.confirmed_cost ?? r.quoted_cost ?? null
+                            if (v !== (current === null ? null : Number(current))) update(r, { confirmed_cost: v })
+                          }}
+                          className="!w-24 !px-2 !py-1 !text-xs text-right border border-gray-200 rounded-md"
+                        />
+                      </span>
+                    ) : (r.confirmed_cost ?? r.quoted_cost) != null ? `${currency} ${Number(r.confirmed_cost ?? r.quoted_cost).toFixed(2)}` : '—'}
+                    {r.confirmed_cost != null && r.quoted_cost != null && Number(r.confirmed_cost) !== Number(r.quoted_cost) && (
+                      <div className="text-[10px] text-gray-400">quoted {Number(r.quoted_cost).toFixed(2)}</div>
+                    )}
                   </td>
                   <td className="py-2 pr-3">
                     <select
@@ -168,7 +208,7 @@ export default function BookingSuppliersPanel({
                       {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </td>
-                  <td className="py-2">
+                  <td className="py-2 pr-3">
                     <input
                       aria-label={`Confirmation number for ${r.supplier_name}`}
                       defaultValue={r.confirmation_number ?? ''}
@@ -180,6 +220,14 @@ export default function BookingSuppliersPanel({
                       placeholder="—"
                       className="!w-32 !px-2 !py-1 !text-xs border border-gray-200 rounded-md"
                     />
+                  </td>
+                  <td className="py-2 whitespace-nowrap text-xs">
+                    {r.expense ? (
+                      <Link href={`/expenses/${r.expense.id}`} className="text-[#647C47] hover:underline">
+                        {r.expense.expense_number}
+                        <span className="text-gray-400 capitalize"> · {r.expense.status}</span>
+                      </Link>
+                    ) : <span className="text-gray-300">—</span>}
                   </td>
                 </tr>
               ))}
