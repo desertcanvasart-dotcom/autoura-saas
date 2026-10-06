@@ -848,6 +848,22 @@ function SettingsContent() {
         </Link>
       </div>
 
+      {/* The agency's standard days (migration 398). */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-900">Day blocks</p>
+          <p className="text-xs text-gray-500">
+            Your standard days &mdash; what each one includes and where its night is. Keep them in a sheet and import it.
+          </p>
+        </div>
+        <Link
+          href="/settings/day-blocks"
+          className="px-3 py-1.5 text-sm font-medium text-[#647C47] border border-[#647C47]/40 rounded-lg hover:bg-[#647C47]/5 transition-colors"
+        >
+          Manage blocks
+        </Link>
+      </div>
+
       {/* Destinations live in their own manager (P1: countries/cities as data). */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex items-center justify-between">
         <div>

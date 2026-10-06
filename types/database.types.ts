@@ -3679,6 +3679,84 @@ export interface Database {
           },
         ]
       }
+      day_blocks: {
+        Row: {
+          id: string
+          tenant_id: string
+          code: string
+          name: string
+          shorthand: string[]
+          day_type: string
+          city: string | null
+          to_city: string | null
+          night: string
+          night_place: string | null
+          attractions: string[]
+          photo_stops: string[]
+          guide: string
+          meals: Json
+          transport: string | null
+          assistance: string[]
+          optional_extras: string[]
+          description: string | null
+          notes: string | null
+          source: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          code: string
+          name: string
+          shorthand?: string[]
+          day_type?: string
+          city?: string | null
+          to_city?: string | null
+          night?: string
+          night_place?: string | null
+          attractions?: string[]
+          photo_stops?: string[]
+          guide?: string
+          meals?: Json
+          transport?: string | null
+          assistance?: string[]
+          optional_extras?: string[]
+          description?: string | null
+          notes?: string | null
+          source?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          code?: string
+          name?: string
+          shorthand?: string[]
+          day_type?: string
+          city?: string | null
+          to_city?: string | null
+          night?: string
+          night_place?: string | null
+          attractions?: string[]
+          photo_stops?: string[]
+          guide?: string
+          meals?: Json
+          transport?: string | null
+          assistance?: string[]
+          optional_extras?: string[]
+          description?: string | null
+          notes?: string | null
+          source?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       dashboard_attention_dismissals: {
         Row: {
           id: string
