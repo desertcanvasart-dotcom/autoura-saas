@@ -11,6 +11,10 @@ interface AddExpenseFromItineraryProps {
   itineraryCode: string
   clientName: string
   onExpenseAdded?: () => void
+  /** Bump to open the form from elsewhere (the itinerary page's ⋯ menu). */
+  openSignal?: number
+  /** No button of its own: opened only by openSignal. */
+  hideTrigger?: boolean
 }
 
 interface FormData {
@@ -40,9 +44,14 @@ export default function AddExpenseFromItinerary({
   itineraryId, 
   itineraryCode, 
   clientName,
-  onExpenseAdded 
+  onExpenseAdded,
+  openSignal = 0,
+  hideTrigger = false,
 }: AddExpenseFromItineraryProps) {
   const [isOpen, setIsOpen] = useState(false)
+  useEffect(() => {
+    if (openSignal > 0) setIsOpen(true)
+  }, [openSignal])
   const [saving, setSaving] = useState(false)
   const [city, setCity] = useState('')
   const [formData, setFormData] = useState<FormData>({
@@ -110,13 +119,15 @@ export default function AddExpenseFromItinerary({
   return (
     <>
       {/* Trigger Button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-[#647C47] hover:text-[#647C47] transition-colors"
-      >
-        <Receipt className="h-4 w-4" />
-        Add Expense
-      </button>
+      {!hideTrigger && (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-[#647C47] hover:text-[#647C47] transition-colors"
+        >
+          <Receipt className="h-4 w-4" />
+          Add Expense
+        </button>
+      )}
 
       {/* Modal */}
       {isOpen && (
