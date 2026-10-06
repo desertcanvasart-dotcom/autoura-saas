@@ -59,6 +59,7 @@ import {
   Globe,
   BookA,
   Signpost,
+  Blocks,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -282,6 +283,8 @@ const navigation: NavSection[] = [
       { label: 'Your Vocabulary', href: '/settings/vocabulary', icon: BookA, roles: ['admin'] },
       // Which fee a tour's wording means. The agency's own since migration 370.
       { label: 'Attraction Names', href: '/settings/attraction-aliases', icon: Signpost, roles: ['admin'] },
+      // The agency's standard days, kept once (migration 398).
+      { label: 'Day Blocks', href: '/settings/day-blocks', icon: Blocks, roles: ['admin'] },
       { label: 'Destinations', href: '/settings/destinations', icon: Globe, roles: ['admin'] },
       // The demand calendar: the dates you charge more on, and by how much
       // (lib/pricing/season-uplift.ts). Managers price, so they keep this.
