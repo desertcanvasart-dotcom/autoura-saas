@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { GridConfig, GridDay } from '@/app/pricing-grid/types'
-import { calculateDay } from '@/app/pricing-grid/lib/calculator'
+import { calculateDay, calculatePaxRange } from '@/app/pricing-grid/lib/calculator'
 import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
 
 // ============================================================================
@@ -225,4 +225,26 @@ describe('the grid saves the single supplement only for a party of one', () => {
     expect(priced.dailyTotal).toBe(160)
     expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(160 * 1.3, 2)
   })
+})
+
+// A typed accommodation amount (a legacy saved row, an old draft) is per
+// person and wins over a picked hotel, as in every other slot. The on-screen
+// price used to ignore it while the B2B sheet and the save counted it.
+describe('a typed accommodation amount: the price, the B2B sheet and the save agree', () => {
+  const amountDay = (items: ReturnType<typeof item>[] = []): GridDay => ({
+    id: 'd1', dayNumber: 1, title: 'Cairo', city: 'Cairo', description: '',
+    slots: [{ slotId: 'accommodation', selectedItems: items, customAmount: 90 }],
+  } as unknown as GridDay)
+
+  for (const [label, items] of [['alone', []], ['beside a picked hotel', [item('mena', 'Mena House', 100)]]] as const) {
+    it(label, async () => {
+      const d = amountDay([...items])
+      expect(calculateDay(d, config(true)).dailyTotal).toBe(180)
+      const sheet = calculatePaxRange([d], { ...config(true), marginPercent: 0 }, new Map(), { paxFrom: 2, paxTo: 2 })
+      expect(sheet.paxPricing[0].withoutLeader.totalCost).toBe(180)
+      await save(true, [d])
+      expect((inserted.itinerary_services ?? []).map(s => [s.quantity, s.total_cost])).toEqual([[2, 180]])
+      expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(180 * 1.3, 2)
+    })
+  }
 })
