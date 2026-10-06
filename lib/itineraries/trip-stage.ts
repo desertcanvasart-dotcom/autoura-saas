@@ -101,6 +101,20 @@ export function nextAction(f: TripFacts): PrimaryAction | null {
   return { kind: 'assign_resources', label: 'Assign resources' }
 }
 
+// ── Which section to open ─────────────────────────────────────────────────
+
+export type TabKey = 'itinerary' | 'operations' | 'finance' | 'messages'
+
+/** Before the trip, its days; while it runs, its operations; after, its money. */
+export function defaultTab(f: Pick<TripFacts, 'startDate' | 'endDate' | 'today' | 'status'>): TabKey {
+  const start = day(f.startDate)
+  const end = day(f.endDate)
+  if (String(f.status ?? '').toLowerCase() === 'cancelled') return 'itinerary'
+  if (end && end < f.today) return 'finance'
+  if (start && f.today >= start) return 'operations'
+  return 'itinerary'
+}
+
 // ── What needs attention ───────────────────────────────────────────────────
 
 export type AttentionAction = 'create_invoice' | 'record_payment' | 'close_out' | 'go_to_day'

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { nextAction, tripAttention, tripSteps, type TripFacts } from '@/lib/itineraries/trip-stage'
+import { defaultTab, nextAction, tripAttention, tripSteps, type TripFacts } from '@/lib/itineraries/trip-stage'
 
 const facts = (over: Partial<TripFacts> = {}): TripFacts => ({
   status: 'draft', hasBooking: false, hasInvoice: false, invoiced: null, paid: null,
@@ -73,5 +73,14 @@ describe('what needs attention', () => {
 
   it('nothing on a cancelled trip', () => {
     expect(tripAttention({ ...facts({ status: 'cancelled' }), ...base, cruiseNotes: ['x'] })).toEqual([])
+  })
+})
+
+describe('which section opens', () => {
+  it('before the trip its days, while it runs its operations, after it its money', () => {
+    expect(defaultTab(facts({ today: '2026-10-06' }))).toBe('itinerary')
+    expect(defaultTab(facts({ today: '2026-11-02' }))).toBe('operations')
+    expect(defaultTab(facts({ today: '2026-11-05' }))).toBe('finance')
+    expect(defaultTab(facts({ status: 'cancelled', today: '2026-11-05' }))).toBe('itinerary')
   })
 })
