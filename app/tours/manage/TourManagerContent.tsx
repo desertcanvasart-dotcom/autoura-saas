@@ -10,6 +10,9 @@ import ToolbarMenu from '@/components/ToolbarMenu'
 import { sampleTemplateCsv } from '@/lib/tours/template-csv'
 import { sampleDaysCsv } from '@/lib/tours/itinerary-csv'
 import { readDayMeals, summarizeMeals, mealStatusLabel, MEAL_SLOTS, type DayMeals, type DayMealStatus, type MealSlot } from '@/lib/tours/day-meals'
+import BlockPicker from '@/components/day-blocks/BlockPicker'
+import type { GridBlock } from '@/lib/day-blocks/grid-apply'
+import { blockToTourDay } from '@/lib/day-blocks/tour-form'
 import {
   Map,
   Plus,
@@ -470,6 +473,38 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
   /** The day being edited, or null when the form is adding a new one. */
   const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null)
 
+  // The agency's day blocks (Settings → Day blocks): "Fill from a block"
+  // fills this form; the operator reviews it and adds the day as always.
+  const [blocks, setBlocks] = useState<GridBlock[]>([])
+  const [blockFill, setBlockFill] = useState<{ code: string; notes: string[] } | null>(null)
+  useEffect(() => {
+    let live = true
+    fetch('/api/day-blocks')
+      .then(r => r.json())
+      .then(j => { if (live && j?.success) setBlocks((j.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active)) })
+      .catch(() => undefined)
+    return () => { live = false }
+  }, [])
+
+  const fillFromBlock = (block: GridBlock) => {
+    const fill = blockToTourDay(block, attractionOptions, { dayTour: isDayTour })
+    setDayTitle(fill.title)
+    setDayDescription(fill.description)
+    setDayCity(fill.city)
+    setDayNight(fill.night)
+    setDayMeals(fill.meals)
+    setDayMealsError(null)
+    setDayAttractions(fill.picked)
+    setDayTransportType(fill.transportType)
+    setDayTransportRateId('')
+    setDayLegFrom(fill.legFrom)
+    setDayLegTo(fill.legTo)
+    setDayLength(fill.length)
+    setDayNoSightseeing(fill.noSightseeing)
+    setDayCruiseAssist(fill.cruiseAssist)
+    setBlockFill({ code: block.code, notes: fill.notes })
+  }
+
   // What this city has on file, per tier. Loaded only when a city is named:
   // the picker is an offer to be exact, not a requirement.
   useEffect(() => {
@@ -527,6 +562,7 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
   }
 
   const resetDayForm = () => {
+    setBlockFill(null)
     setDayTitle('')
     setDayDescription('')
     setDayMeals({ breakfast: '', lunch: '', dinner: '' })
@@ -738,16 +774,27 @@ function ItineraryEditor({ itinerary, onChange, attractionOptions, activityOptio
               ? `Day ${itinerary.length + 1}`
               : `Editing day ${itinerary[editingDayIndex]?.day}`}
           </span>
-          {editingDayIndex !== null && (
-            <button
-              type="button"
-              onClick={resetDayForm}
-              className="ml-auto text-xs text-gray-500 hover:text-gray-800 underline"
-            >
-              Cancel
-            </button>
-          )}
+          <div className="ml-auto flex items-center gap-3">
+            {blocks.length > 0 && (
+              <BlockPicker blocks={blocks} onPick={fillFromBlock} label="Fill from a block" title="Fill this day from one of your day blocks" />
+            )}
+            {editingDayIndex !== null && (
+              <button
+                type="button"
+                onClick={resetDayForm}
+                className="text-xs text-gray-500 hover:text-gray-800 underline"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
+        {blockFill && (
+          <div className="text-xs rounded-md border border-green-200 bg-green-50 text-green-900 px-3 py-2 space-y-0.5">
+            <p>Filled from day block {blockFill.code}. Check it, then {editingDayIndex === null ? 'add the day' : 'save the day'} below.</p>
+            {blockFill.notes.map(n => <p key={n} className="text-amber-900">{n}</p>)}
+          </div>
+        )}
 
         {/* Where the day is, and where the night is spent. Both used to be
             read out of the title: an unplaced day was priced as Cairo, and a

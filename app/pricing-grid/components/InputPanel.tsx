@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import BlockPicker from './BlockPicker'
+import BlockPicker from '@/components/day-blocks/BlockPicker'
 import type { GridBlock } from '@/lib/day-blocks/grid-apply'
 import { PACKAGE_TYPE_CONFIGS, type PackageType } from '@/lib/package-types'
 import { Plus, FileText, Upload, Loader2, Trash2, X, File, Image, FileSpreadsheet } from 'lucide-react'
