@@ -113,7 +113,7 @@ export async function createLandItineraryServices(
     // was — a day trip does not move the bed; only a transfer day does
     // (lib/itineraries/overnight-city.ts). It used to fall to the day's own
     // city: "Overnight in Alexandria" on a day trip from Cairo.
-    let overnightCity: string = dayData.overnight_city || (isTransferOnly ? null : lastNightAshore) || dayData.city || effectiveCity
+    let overnightCity: string = generatedOvernightCity(dayData, lastNightAshore) || dayData.city || effectiveCity
     if (isCruiseDay && !isLastDay) {
       overnightCity = `On board - ${dayData.city || effectiveCity}`
       lastNightAshore = null
@@ -492,16 +492,65 @@ export function tipOccasionsForGeneratedDay(
 /** The nights a generated itinerary sleeps in a hotel, and where — read with
  *  the same conditions the loop above uses to write the accommodation line. */
 export function hotelNightsForGeneratedDays(
-  days: ReadonlyArray<{ day_number?: number; city?: string | null; overnight_city?: string | null; is_cruise_day?: boolean; accommodation_type?: string | null; includes_hotel?: boolean }> | null | undefined,
+  days: ReadonlyArray<{ day_number?: number; city?: string | null; overnight_city?: string | null; is_cruise_day?: boolean; accommodation_type?: string | null; includes_hotel?: boolean; description?: string | null; activities?: readonly string[] | null }> | null | undefined,
   p: { durationDays: number; effectiveCity: string; includeAccommodationFinal: boolean }
 ): Array<{ day: number; city: string }> {
   if (!p.includeAccommodationFinal) return []
+  // A day trip's night is booked where the loop puts the bed.
+  let lastNightAshore: string | null = null
   return (days ?? []).flatMap(d => {
     const day = d.day_number || 1
     const onShip = d.is_cruise_day || d.accommodation_type === 'cruise'
-    if (day === p.durationDays || onShip || d.includes_hotel === false) return []
-    return [{ day, city: String(d.overnight_city || d.city || p.effectiveCity || '').trim() }]
+    // Only the AI's own overnight city is corrected here (a day trip that
+    // returns); a day without one is booked in its city, as before.
+    const night = (d.overnight_city ? generatedOvernightCity(d, lastNightAshore) : null) || d.city || p.effectiveCity
+    const isLastDay = day === p.durationDays
+    lastNightAshore = onShip && !isLastDay ? null : night
+    if (isLastDay || onShip || d.includes_hotel === false) return []
+    return [{ day, city: String(night || '').trim() }]
   })
+}
+
+const norm = (s: string | null | undefined) => String(s ?? '').trim().toLowerCase()
+
+/**
+ * Where a generated day's night is, before the day's own city is the
+ * fallback. The AI's overnight city wins, except on a plain day trip: the AI
+ * often echoes the day's city ("Alexandria") while the day itself says it
+ * returns to the night before's city ("Return to Cairo for overnight").
+ * The bed stays where it was (lib/itineraries/overnight-city.ts). With no
+ * overnight city from the AI, the night is the night before's, unless the
+ * day is a transfer.
+ */
+export function generatedOvernightCity(
+  dayData: {
+    city?: string | null
+    overnight_city?: string | null
+    is_transfer_only?: boolean
+    description?: string | null
+    activities?: readonly string[] | null
+  },
+  lastNightAshore: string | null
+): string | null {
+  const given = String(dayData.overnight_city ?? '').trim() || null
+  if (dayData.is_transfer_only) return given
+  if (!given) return lastNightAshore
+  if (
+    lastNightAshore &&
+    norm(given) === norm(dayData.city) &&
+    norm(given) !== norm(lastNightAshore) &&
+    returnsTo(dayData, lastNightAshore)
+  ) {
+    return lastNightAshore
+  }
+  return given
+}
+
+/** Whether the day's own words bring the traveller back to `city`. */
+function returnsTo(dayData: { description?: string | null; activities?: readonly string[] | null }, city: string): boolean {
+  const text = [dayData.description ?? '', ...(dayData.activities ?? [])].join(' \n ').toLowerCase()
+  const c = city.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`\\b(return|returning|returns|back|drive back|head back)\\b[^.\\n]{0,20}\\b${c}\\b`).test(text)
 }
 
 /** The days a generated itinerary needs a guide on — the loop's own condition. */
