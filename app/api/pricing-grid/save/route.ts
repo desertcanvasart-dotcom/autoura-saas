@@ -6,8 +6,9 @@
 // Pricing parity note: per-service costs are derived from the grid's
 // passport-aware `selectedItems` (rateEur / rateNonEur) exactly as in
 // travel-ops-pro — group slots charged once, per-person slots × pax, custom
-// amounts honoured. The tenant_id / client_id persistence model and the B2B
-// quote RPC are the sibling's own and are preserved unchanged.
+// amounts honoured. The tenant_id / client_id persistence model is the
+// sibling's own and is preserved unchanged. A B2B quote is not made here — the
+// grid asks /api/b2b/quote-from-itinerary for it after the save.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
@@ -353,49 +354,14 @@ export async function POST(request: NextRequest) {
     const daysCreated: number = savedRow?.days_inserted ?? dayPayload.length
     const servicesCreated: number = savedRow?.services_inserted ?? 0
 
-    // 4. B2B: Create quote if needed
+    // 4. B2B: the quote is made by /api/b2b/quote-from-itinerary, which the
+    // grid calls next with its multi-size rate sheet (b2b-rate-sheet.ts). This
+    // route used to make one too, so a save with a partner left two quotes.
     let quoteId: string | undefined
     let quoteNumber: string | undefined
     let redirectUrl: string | undefined
 
-    if (config.clientType === 'b2b' && config.partnerId) {
-      try {
-        const adminClient = createAdminClient()
-        // Generate quote number via RPC
-        const { data: quoteNum } = await adminClient.rpc('generate_b2b_quote_number')
-
-        const { data: quote, error: quoteError } = await supabase
-          .from('b2b_quotes')
-          .insert({
-            tenant_id,
-            itinerary_id: itineraryId,
-            partner_id: config.partnerId,
-            quote_number: quoteNum || `B2B-${Date.now()}`,
-            tier: config.tier,
-            currency: config.currency || 'EUR',
-            status: 'draft',
-            pricing_table: [{
-              pax,
-              cost_per_person: totals.costPerPerson,
-              selling_per_person: totals.sellingPricePerPerson,
-              total: totals.sellingPriceTotal,
-            }],
-            internal_notes: `Created via Pricing Grid`,
-          })
-          .select()
-          .single()
-
-        if (!quoteError && quote) {
-          quoteId = quote.id
-          redirectUrl = `/quotes/b2b/${quote.id}`
-        }
-      } catch (b2bError: any) {
-        console.error('B2B quote creation error:', b2bError.message)
-        // Non-fatal: itinerary was still saved
-      }
-    }
-
-    // 5. B2C: the commercial-offer wrapper, mirroring the B2B branch.
+    // 5. B2C: the commercial-offer wrapper.
     // The priced itinerary is the trip; the b2c_quotes row is the offer with
     // the sales lifecycle (quote number, sent/viewed, versioning) and the
     // anchor bookings convert from (one booking per quote, migration 256).

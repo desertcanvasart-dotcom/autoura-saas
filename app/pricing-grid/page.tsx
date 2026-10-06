@@ -5,7 +5,8 @@ import { todayLocal } from '@/lib/today'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { GridConfig, GridDay, AllRates, SlotValue, GridTotals } from './types'
 import { SLOT_DEFINITIONS } from './types'
-import { calculateGrandTotals, calculateDay, convertAmount } from './lib/calculator'
+import { calculateGrandTotals, calculateDay, convertAmount, buildTransportTierIndex } from './lib/calculator'
+import { gridSheetCosts } from './lib/b2b-rate-sheet'
 import { getCurrencySymbol } from '@/lib/currency'
 import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/throughout-guide'
 import { mapServicesToSlots } from './lib/slot-mapping'
@@ -697,6 +698,12 @@ function PricingGridContent() {
                 language: 'English',
                 // Stored via B1's columns, non-default only.
                 guide_mode: config.guideMode === 'throughout' ? 'throughout' : undefined,
+                // The partner price list: the grid's cost at each group size
+                // (b2b-rate-sheet.ts); the route applies the quote's margin.
+                rate_sheet_costs: gridSheetCosts(
+                  days, config, buildTransportTierIndex(rates?.route ?? []),
+                  { groupExtraEur: throughoutGuide.totalEur },
+                ),
               })
             })
             const quoteData = await quoteRes.json()
