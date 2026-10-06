@@ -76,3 +76,30 @@ describe('overnightLabel', () => {
     expect(overnightLabel(null, null)).toBe('')
   })
 })
+
+// ITN-S-2026-8987: the grid's hotel line names no supplier, so the page fell
+// back to the day's city alone — and "Overnight in Alexandria" hid that the
+// night's hotel was in Cairo. The grid's tag says which line is the night.
+describe('a Pricing Grid night line', () => {
+  it('names the hotel from the rate option, without its tier/board detail', () => {
+    expect(propertyFromService({
+      service_type: 'accommodation',
+      service_name: 'Marriott Mena House Cairo (standard | BB)',
+      description: '[pricing-grid:accommodation] Marriott Mena House Cairo (standard | BB)',
+    })).toEqual({ name: 'Marriott Mena House Cairo', kind: 'hotel' })
+  })
+  it('a grid cruise (saved as accommodation) is the ship', () => {
+    expect(propertyFromService({
+      service_type: 'accommodation',
+      service_name: 'Sonesta St. George (3N, Standard)',
+      description: '[pricing-grid:cruise] Sonesta St. George (3N, Standard)',
+    })).toEqual({ name: 'Sonesta St. George', kind: 'cruise' })
+  })
+  it('the grid’s single supplement is not the night', () => {
+    expect(propertyFromService({
+      service_type: 'accommodation',
+      service_name: 'Single Supplement',
+      description: '[pricing-grid:accommodation] Single Supplement',
+    })).toBeNull()
+  })
+})

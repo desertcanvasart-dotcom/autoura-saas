@@ -8,7 +8,9 @@
 //
 //   AI generator  → supplier_name = the property, "<hotel> (2 persons)",
 //                   "<ship> - Full Board (…)"
-//   pricing grid  → supplier_name = the property
+//   pricing grid  → no supplier_name; description "[pricing-grid:accommodation]"
+//                   or "[pricing-grid:cruise]", service_name = the rate option
+//                   ("<hotel> <city> (standard | BB)", "<ship> (3N, cabin)")
 //   engine line   → "Hotel - Steigenberger Nile Palace (Cairo)",
 //                   "Nile Cruise - Al Farida (3 nights)"
 //
@@ -26,14 +28,21 @@ export type ServiceLike = {
   service_type?: string | null
   service_name?: string | null
   supplier_name?: string | null
+  description?: string | null
 }
+
+/** The grid tags its lines "[pricing-grid:<slot>] …" — its night slots. */
+const GRID_NIGHT = /^\[pricing-grid:(accommodation|cruise)\]/
 
 const NOT_THE_NIGHT = /^(hotel supplement|cruise supplement|throughout guide|guide bed|guide cabin|single supplement|triple reduction)\b/i
 
 /** The property named by one service line, or null. */
 export function propertyFromService(s: ServiceLike): OvernightProperty | null {
   const type = String(s.service_type ?? '').toLowerCase()
-  const kind = type === 'accommodation' || type === 'hotel' ? 'hotel' : type === 'cruise' ? 'cruise' : null
+  const grid = String(s.description ?? '').match(GRID_NIGHT)
+  // The grid saves a cruise as service_type 'accommodation'; its tag says which.
+  const kind = grid ? (grid[1] === 'cruise' ? 'cruise' : 'hotel')
+    : type === 'accommodation' || type === 'hotel' ? 'hotel' : type === 'cruise' ? 'cruise' : null
   if (!kind) return null
 
   const name = String(s.service_name ?? '').trim()
@@ -41,6 +50,13 @@ export function propertyFromService(s: ServiceLike): OvernightProperty | null {
 
   const supplier = String(s.supplier_name ?? '').trim()
   if (supplier) return { name: supplier, kind }
+
+  // A grid line: the rate option's name, without its "(tier | board)" /
+  // "(3N, cabin)" detail.
+  if (grid) {
+    const option = name.replace(/\s*\([^()]*\)\s*$/, '').trim()
+    return option ? { name: option, kind } : null
+  }
 
   // "Hotel - <name> (Cairo)" / "Nile Cruise - <ship> (3 nights)"
   const engine = name.match(/^(?:Hotel|Nile Cruise|Cruise)\s+-\s+(.+?)\s*\([^()]*\)\s*$/i)

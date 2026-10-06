@@ -80,6 +80,8 @@ export async function createLandItineraryServices(
     }
   })
 
+  // The last night spent ashore, for a day the AI gave no overnight city.
+  let lastNightAshore: string | null = null
   for (const dayData of days || []) {
     const dayNumber = dayData.day_number || 1
     const dayDate = new Date(startDateObj)
@@ -106,10 +108,17 @@ export async function createLandItineraryServices(
     // Determine accommodation type for this day
     const dayAccommodationType = isCruiseDay ? (isLastDay ? 'none' : 'cruise') : (includesHotelForDay ? 'hotel' : 'none')
 
-    // Determine overnight display — show cruise name for cruise days
-    let overnightCity = dayData.overnight_city || dayData.city || effectiveCity
+    // Determine overnight display — show cruise name for cruise days.
+    // With no overnight city from the AI, the night is where the night before
+    // was — a day trip does not move the bed; only a transfer day does
+    // (lib/itineraries/overnight-city.ts). It used to fall to the day's own
+    // city: "Overnight in Alexandria" on a day trip from Cairo.
+    let overnightCity: string = dayData.overnight_city || (isTransferOnly ? null : lastNightAshore) || dayData.city || effectiveCity
     if (isCruiseDay && !isLastDay) {
       overnightCity = `On board - ${dayData.city || effectiveCity}`
+      lastNightAshore = null
+    } else {
+      lastNightAshore = overnightCity
     }
 
     // Create day record
