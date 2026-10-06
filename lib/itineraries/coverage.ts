@@ -130,3 +130,18 @@ export function tripCoverage(days: readonly CoverageDay[], assignments: readonly
     return { type, label: COVERAGE_LABELS[type], cells, missing: cells.filter(c => c.state === 'missing').map(c => c.day) }
   })
 }
+
+export interface DayResource {
+  type: CoverageType
+  label: string
+  state: Exclude<CellState, 'not_needed'>
+  names: string[]
+}
+
+/** One day's column of the grid, for its day card: who is assigned, what is missing. */
+export function dayResources(rows: readonly CoverageRow[], dayNumber: number): DayResource[] {
+  return rows.flatMap(r => {
+    const cell = r.cells.find(c => c.day === dayNumber)
+    return cell && cell.state !== 'not_needed' ? [{ type: r.type, label: r.label, state: cell.state, names: cell.names }] : []
+  })
+}
