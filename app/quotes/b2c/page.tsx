@@ -278,6 +278,17 @@ export default function B2CQuotesPage() {
         throw new Error('Failed to update quotes')
       }
 
+      // The database may change fewer than were picked (e.g. no permission):
+      // say so, rather than reloading as if every one was updated.
+      const result = await response.json().catch(() => ({}))
+      const changed = Number(result?.updated_count ?? 0)
+      const asked = selectedQuotes.size
+      if (changed < asked) {
+        showToast('error', `Only ${changed} of ${asked} quote(s) were updated`)
+      } else {
+        showToast('success', `${changed} quote(s) updated`)
+      }
+
       await fetchQuotes()
       setSelectedQuotes(new Set())
     } catch (err: any) {
@@ -310,6 +321,17 @@ export default function B2CQuotesPage() {
 
       if (!response.ok) {
         throw new Error('Failed to delete quotes')
+      }
+
+      // The database may change fewer than were picked (e.g. no permission):
+      // say so, rather than reloading as if every one was deleted.
+      const result = await response.json().catch(() => ({}))
+      const changed = Number(result?.deleted_count ?? 0)
+      const asked = selectedQuotes.size
+      if (changed < asked) {
+        showToast('error', `Only ${changed} of ${asked} quote(s) were deleted`)
+      } else {
+        showToast('success', `${changed} quote(s) deleted`)
       }
 
       await fetchQuotes()
