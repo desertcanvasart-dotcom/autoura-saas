@@ -108,11 +108,19 @@ export async function POST(request: NextRequest) {
     // itinerary.total_cost previously persisted 0 while the services held real
     // prices. total_cost stores the CLIENT/selling price (how the header,
     // invoice and PDF consume it).
-    const supplierTotal = (days || []).reduce((sum: number, day: any) => {
+    const slotsTotal = (days || []).reduce((sum: number, day: any) => {
       return sum + (day.slots || []).reduce((dsum: number, slot: any) => {
         return dsum + slotSupplierCost(slot, passport, pax, withGuide)
       }, 0)
     }, 0)
+    // The throughout guide's bed / meals / flight seats: the same rows the
+    // save writes below (one per extra on a day of this trip). Left out, a
+    // save without client totals stored the trip without his costs.
+    const dayNumbers = new Set((days || []).map((d: any) => d.dayNumber))
+    const throughoutTotal = throughoutExtras
+      .filter(e => dayNumbers.has(e.dayNumber))
+      .reduce((sum, e) => sum + (Number(e.amountEur) || 0), 0)
+    const supplierTotal = slotsTotal + throughoutTotal
     // `resolveMarginPercent`, not `|| 25`: 0 is an at-cost grid, and `0 || 25`
     // resold it at 25%.
     const marginPct = resolveMarginPercent({ explicit: config.marginPercent }).marginPercent

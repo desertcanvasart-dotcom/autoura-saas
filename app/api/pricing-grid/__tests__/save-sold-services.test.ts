@@ -248,3 +248,30 @@ describe('a typed accommodation amount: the price, the B2B sheet and the save ag
     })
   }
 })
+
+// The throughout guide's bed / meals / seats are written as rows; the total a
+// save computes when the grid sends none must count them too.
+describe('a save without client totals counts the throughout guide', () => {
+  async function saveWith(extras: unknown[]) {
+    for (const k of Object.keys(inserted)) delete inserted[k]
+    const { POST } = await import('@/app/api/pricing-grid/save/route')
+    await POST(new Request('http://x', {
+      method: 'POST',
+      body: JSON.stringify({ config: config(true), days: [day()], totals: {}, throughout_extras: extras }),
+    }) as never)
+  }
+  // day(): guide 40 + guide tip 10 + driver tip 5 + entrance 10 × 2 pax = 75.
+  it('his rows are written and the stored total includes them', async () => {
+    await saveWith([
+      { dayNumber: 1, kind: 'bed', label: 'Throughout Guide — bed (Mena House)', amountEur: 50 },
+      { dayNumber: 1, kind: 'meal', label: 'Throughout Guide — meal (Lunch)', amountEur: 12.5 },
+    ])
+    const guideRows = (inserted.itinerary_services ?? []).filter(s => String(s.description).startsWith('[pricing-grid:throughout_guide]'))
+    expect(guideRows.map(s => s.total_cost)).toEqual([50, 12.5])
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo((75 + 62.5) * 1.3, 2)
+  })
+  it('an extra for a day the trip does not have is neither written nor counted', async () => {
+    await saveWith([{ dayNumber: 9, kind: 'bed', label: 'x', amountEur: 50 }])
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(75 * 1.3, 2)
+  })
+})
