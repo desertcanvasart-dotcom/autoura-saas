@@ -9,7 +9,7 @@
 // categories are skipped because no active department handles them — and
 // picks who each department's tasks go to, before anything is written.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ClipboardList, Loader2, X } from 'lucide-react'
 import { todayLocal } from '@/lib/today'
@@ -55,7 +55,13 @@ const ACTION_STYLE: Record<TaskPreview['tasks'][number]['action'], string> = {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-export default function GenerateTasksButton({ itineraryId }: { itineraryId: string }) {
+export default function GenerateTasksButton({ itineraryId, openSignal = 0, hideTrigger = false }: {
+  itineraryId: string
+  /** Bump to open the dialog from elsewhere (the itinerary page's ⋯ menu). */
+  openSignal?: number
+  /** No button of its own: opened only by openSignal. */
+  hideTrigger?: boolean
+}) {
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
   const [preview, setPreview] = useState<TaskPreview | null>(null)
@@ -132,9 +138,15 @@ export default function GenerateTasksButton({ itineraryId }: { itineraryId: stri
     : []
   const hasWork = !!preview?.tasks.some(t => t.action !== 'unchanged')
 
+  useEffect(() => {
+    if (openSignal > 0) openDialog()
+    // Only a new signal opens it; openDialog is recreated each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal])
+
   return (
     <>
-      <button
+      {!hideTrigger && <button
         onClick={openDialog}
         disabled={busy}
         className="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
@@ -142,7 +154,7 @@ export default function GenerateTasksButton({ itineraryId }: { itineraryId: stri
       >
         {busy && !open ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardList className="w-4 h-4" />}
         Tasks
-      </button>
+      </button>}
 
       {open && preview && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

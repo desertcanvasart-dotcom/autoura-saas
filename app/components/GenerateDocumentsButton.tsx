@@ -7,6 +7,10 @@ import { FileText, ChevronDown, Loader2, Check, AlertCircle } from 'lucide-react
 interface GenerateDocumentsButtonProps {
   itineraryId: string
   itineraryCode: string
+  /** The button's words; "Documents" by default. */
+  label?: string
+  /** A plain outlined button, beside one main action. */
+  quiet?: boolean
 }
 
 const DOCUMENT_TYPES = [
@@ -18,7 +22,7 @@ const DOCUMENT_TYPES = [
   { value: 'cruise_voucher', label: 'Cruise Vouchers', icon: '🚢' },
 ]
 
-export default function GenerateDocumentsButton({ itineraryId, itineraryCode }: GenerateDocumentsButtonProps) {
+export default function GenerateDocumentsButton({ itineraryId, itineraryCode, label = 'Documents', quiet = false }: GenerateDocumentsButtonProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -103,7 +107,9 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode }: 
         className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
           generating
             ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-700'
+            : quiet
+              ? 'border border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
         }`}
       >
         {generating ? (
@@ -114,7 +120,7 @@ export default function GenerateDocumentsButton({ itineraryId, itineraryCode }: 
         ) : (
           <>
             <FileText size={16} />
-            <span>Documents</span>
+            <span>{label}</span>
             <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
           </>
         )}

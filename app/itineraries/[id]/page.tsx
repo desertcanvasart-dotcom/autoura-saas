@@ -6,7 +6,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake } from 'lucide-react'
+import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake, MoreHorizontal, BookOpen, AlertTriangle, Info, ClipboardList } from 'lucide-react'
 import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import { generateWhatsAppMessage, generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
@@ -27,6 +27,9 @@ import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } f
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
 import type { TripPnL } from '@/lib/trip-pnl'
+import { nextAction, tripAttention, tripSteps, type AttentionAction, type PrimaryKind } from '@/lib/itineraries/trip-stage'
+import HeaderMenu from '@/components/HeaderMenu'
+import { useConfirmDialog } from '@/components/ConfirmDialog'
 
 interface Itinerary {
   id: string
@@ -140,6 +143,13 @@ export default function ViewItineraryPage() {
   // each in the trip's currency) — the Profit & Loss report's own figures
   // (lib/trip-pnl.ts), so the two never disagree.
   const [actualPnl, setActualPnl] = useState<TripPnL | null>(null)
+  // The trip's booking, when there is one — for the header's link and stage.
+  const [booking, setBooking] = useState<{ id: string; booking_number: string } | null>(null)
+  // The ⋯ menu opens these dialogs; the components keep their own forms.
+  const [expenseSignal, setExpenseSignal] = useState(0)
+  const [tasksSignal, setTasksSignal] = useState(0)
+  const [closingOut, setClosingOut] = useState(false)
+  const { confirm: confirmDialog } = useConfirmDialog()
   const [sendingEmail, setSendingEmail] = useState(false)
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendSuccess, setSendSuccess] = useState<string | null>(null)
@@ -162,6 +172,20 @@ export default function ViewItineraryPage() {
       checkExistingInvoice()
     }
   }, [params.id])
+
+  useEffect(() => {
+    if (!params.id) return
+    let live = true
+    createClient()
+      .from('bookings')
+      .select('id, booking_number')
+      .eq('itinerary_id', String(params.id))
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => { if (live) setBooking(data ?? null) })
+    return () => { live = false }
+  }, [params.id, itinerary?.status])
 
   useEffect(() => {
     if (!params.id) return
@@ -722,177 +746,243 @@ export default function ViewItineraryPage() {
     )
   }
 
+  // Where the trip stands, what to do next, and what needs attention
+  // (lib/itineraries/trip-stage) — from what this page already loaded.
+  const facts = {
+    status: itinerary.status,
+    hasBooking: !!booking,
+    hasInvoice: !!existingInvoice,
+    invoiced: actualPnl && actualPnl.invoice_count > 0 ? actualPnl.total_revenue : null,
+    paid: actualPnl && actualPnl.invoice_count > 0 ? actualPnl.total_paid : null,
+    startDate: itinerary.start_date,
+    endDate: itinerary.end_date,
+    today: todayLocal(),
+  }
+  const steps = tripSteps(facts)
+  const primary = nextAction(facts)
+  const attention = tripAttention({
+    ...facts,
+    currency: itinerary.currency || 'EUR',
+    cruiseNotes: itinerary.cruise_sailing_notes ?? [],
+    staleNights: days.flatMap(day => {
+      const property = overnightProperty(day.services as never)
+      const status = day.services.find(sv => sv.property_rate_status)?.property_rate_status
+      return property && (status === 'not_on_file' || status === 'switched_off')
+        ? [{ day: day.day_number, property: property.name, switchedOff: status === 'switched_off' }]
+        : []
+    }),
+  })
+
+  const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  const closeOut = async () => {
+    const ok = await confirmDialog({
+      title: 'Close out this trip',
+      message: 'This marks the itinerary as completed. Expenses and payments can still be added afterwards.',
+      confirmText: 'Close out',
+      cancelText: 'Cancel',
+      variant: 'info',
+    })
+    if (!ok) return
+    setClosingOut(true)
+    try {
+      const res = await fetch(`/api/itineraries/${itinerary.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) throw new Error(data.error || 'Could not close out the trip')
+      setItinerary(prev => (prev ? { ...prev, status: 'completed' } : prev))
+      showToast('success', 'Trip closed out')
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not close out the trip')
+    } finally {
+      setClosingOut(false)
+    }
+  }
+
+  const runPrimary = (kind: PrimaryKind) => {
+    if (kind === 'send_quote') setShowSendModal(true)
+    else if (kind === 'create_invoice' || kind === 'record_payment') handleGenerateInvoice()
+    else if (kind === 'assign_resources') scrollTo('resource-assignment')
+    else if (kind === 'open_trip_log') scrollTo('trip-timeline')
+    else if (kind === 'close_out') closeOut()
+  }
+
+  const runAttention = (kind: AttentionAction, dayNumber?: number) => {
+    if (kind === 'go_to_day' && dayNumber != null) {
+      setExpandedDays(prev => new Set([...prev, dayNumber]))
+      setTimeout(() => scrollTo(`day-${dayNumber}`), 50)
+    } else if (kind === 'create_invoice' || kind === 'record_payment') handleGenerateInvoice()
+    else if (kind === 'close_out') closeOut()
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* HEADER */}
+      {/* HEADER — one main action, chosen by where the trip stands
+          (lib/itineraries/trip-stage); everything else in a few menus. */}
       <header className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Link 
+        <div className="container mx-auto px-4 py-3 space-y-2">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Link
                 href="/itineraries"
-                className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-md transition-colors shrink-0"
                 title="Back to list"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-600" />
               </Link>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">{itinerary.trip_name}</h1>
-                <p className="text-sm text-gray-500">
+              <div className="min-w-0">
+                <h1 className="text-xl font-semibold text-gray-900 truncate" title={itinerary.trip_name}>{itinerary.trip_name}</h1>
+                <p className="text-sm text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-mono text-primary-600">{itinerary.itinerary_code}</span>
-                  <span className="mx-2">•</span>
-                  {itinerary.client_name || 'No client'}
-                  {itinerary.tier && (
+                  <span>•</span>
+                  <span>{itinerary.client_name || 'No client'}</span>
+                  {itinerary.start_date && (
                     <>
-                      <span className="mx-2">•</span>
-                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                        itinerary.tier === 'luxury' ? 'bg-amber-100 text-amber-700' :
-                        itinerary.tier === 'deluxe' ? 'bg-purple-100 text-purple-700' :
-                        itinerary.tier === 'standard' ? 'bg-blue-100 text-blue-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {itinerary.tier.toUpperCase()}
+                      <span>•</span>
+                      <span>
+                        {new Date(itinerary.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {itinerary.end_date && ` – ${new Date(itinerary.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                       </span>
                     </>
+                  )}
+                  <span>•</span>
+                  <span>{itinerary.num_adults} {itinerary.num_adults === 1 ? 'adult' : 'adults'}{itinerary.num_children > 0 ? `, ${itinerary.num_children} ${itinerary.num_children === 1 ? 'child' : 'children'}` : ''}</span>
+                  {itinerary.tier && (
+                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                      itinerary.tier === 'luxury' ? 'bg-amber-100 text-amber-700' :
+                      itinerary.tier === 'deluxe' ? 'bg-purple-100 text-purple-700' :
+                      itinerary.tier === 'standard' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {itinerary.tier.toUpperCase()}
+                    </span>
+                  )}
+                  {/* Linked records are links, not actions. */}
+                  {booking && (
+                    <Link href={`/bookings/${booking.id}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
+                      <BookOpen className="w-3 h-3" /> {booking.booking_number}
+                    </Link>
+                  )}
+                  {existingInvoice && (
+                    <Link href={`/invoices/${existingInvoice.id}`} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50">
+                      <Receipt className="w-3 h-3" /> {existingInvoice.invoice_number}
+                    </Link>
                   )}
                 </p>
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex items-center gap-2 flex-wrap">
-              <ItineraryBookingAction
-                itineraryId={itinerary.id}
-                status={itinerary.status}
-                onStatusChange={status => setItinerary({ ...itinerary, status })}
+              <HeaderMenu
+                label="Send"
+                icon={<Send className="w-4 h-4" />}
+                items={[
+                  { label: 'Send quote', icon: <Send className="w-4 h-4" />, onSelect: () => setShowSendModal(true) },
+                  { label: sharing ? 'Sharing…' : shareUrl ? 'Copy share link' : 'Create share link', icon: <Share2 className="w-4 h-4" />, onSelect: handleShare, disabled: sharing, title: 'A client-facing link to this itinerary' },
+                  shareUrl ? { label: 'Revoke share link', danger: true, onSelect: handleRevokeShare } : null,
+                ]}
               />
-              <button
-                onClick={() => setShowSendModal(true)}
-                className="bg-primary-600 text-white px-3 py-1.5 rounded-md hover:bg-primary-700 transition-colors text-sm font-medium flex items-center gap-1.5"
-              >
-                <Send className="w-4 h-4" />
-                Send Quote
-              </button>
-              <button
-                onClick={handleGenerateInvoice}
-                disabled={generatingInvoice}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors ${
-                  existingInvoice 
-                    ? 'bg-green-600 text-white hover:bg-green-700' 
-                    : 'bg-amber-600 text-white hover:bg-amber-700'
-                } ${generatingInvoice ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title={existingInvoice ? `View ${existingInvoice.invoice_number}` : 'Generate Invoice'}
-              >
-                {generatingInvoice ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Creating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Receipt className="w-4 h-4" />
-                    {existingInvoice ? existingInvoice.invoice_number : 'Invoice'}
-                  </>
-                )}
-              </button>
-              <button
-                onClick={handleGenerateCommissions}
-                disabled={generatingCommissions}
-                className="px-3 py-1.5 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
-                title="Generate commission records from services"
-              >
-                {generatingCommissions ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Handshake className="w-4 h-4" />
-                    <span>Commissions</span>
-                  </>
-                )}
-              </button>
-              <GenerateTasksButton itineraryId={itinerary.id} />
-                   <GenerateDocumentsButton 
+              <HeaderMenu
+                label="Documents"
+                icon={<FileText className="w-4 h-4" />}
+                items={[
+                  {
+                    label: generatingPDF ? 'Generating PDF…' : 'Itinerary PDF',
+                    icon: <Download className="w-4 h-4" />,
+                    onSelect: handleDownloadPDF,
+                    disabled: generatingPDF || days.length === 0,
+                    title: days.length === 0 ? 'Add days to the itinerary first — an empty itinerary has nothing to print' : 'Preview and download the client itinerary PDF',
+                  },
+                  { label: 'Contract', icon: <FileText className="w-4 h-4" />, href: `/documents/contract/${itinerary.id}` },
+                  {
+                    label: existingInvoice ? `Invoice ${existingInvoice.invoice_number}` : generatingInvoice ? 'Creating invoice…' : 'Create invoice',
+                    icon: <Receipt className="w-4 h-4" />,
+                    onSelect: handleGenerateInvoice,
+                    disabled: generatingInvoice,
+                  },
+                ]}
+              />
+              <GenerateDocumentsButton itineraryId={itinerary.id} itineraryCode={itinerary.itinerary_code} label="Supplier docs" quiet />
+              <HeaderMenu
+                ariaLabel="More actions"
+                icon={<MoreHorizontal className="w-4 h-4" />}
+                items={[
+                  { label: 'Edit itinerary', icon: <Edit2 className="w-4 h-4" />, href: `/itineraries/${itinerary.id}/edit` },
+                  { label: 'Add expense', icon: <Receipt className="w-4 h-4" />, onSelect: () => setExpenseSignal(n => n + 1) },
+                  { label: 'Operations tasks', icon: <ClipboardList className="w-4 h-4" />, onSelect: () => setTasksSignal(n => n + 1), title: 'Create or sync the operations tasks for this itinerary' },
+                  { label: generatingCommissions ? 'Generating commissions…' : 'Generate commissions', icon: <Handshake className="w-4 h-4" />, onSelect: handleGenerateCommissions, disabled: generatingCommissions },
+                ]}
+              />
+              {/* The one thing to do next. */}
+              {primary?.kind === 'convert' ? (
+                <ItineraryBookingAction
                   itineraryId={itinerary.id}
-                   itineraryCode={itinerary.itinerary_code}
-                    />
-              <Link
-                href={`/documents/contract/${itinerary.id}`}
-                className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm font-medium flex items-center gap-1.5"
-              >
-                <FileText className="w-4 h-4" />
-                Contract
-              </Link>
-              <button
-                onClick={handleShare}
-                disabled={sharing}
-                className="px-3 py-1.5 bg-[#647C47] text-white rounded-md hover:bg-[#4f613a] text-sm font-medium flex items-center gap-1.5 disabled:opacity-50"
-                title="Create a client-facing link to this itinerary"
-              >
-                <Share2 className="w-4 h-4" />
-                {sharing ? 'Sharing…' : shareUrl ? 'Copy link' : 'Share link'}
-              </button>
-              {shareUrl && (
+                  status={itinerary.status}
+                  onStatusChange={status => setItinerary({ ...itinerary, status })}
+                />
+              ) : primary ? (
                 <button
-                  onClick={handleRevokeShare}
-                  className="px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 rounded-md"
-                  title="Kill the shared URL"
+                  type="button"
+                  onClick={() => runPrimary(primary.kind)}
+                  disabled={(primary.kind === 'create_invoice' && generatingInvoice) || closingOut}
+                  className="px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-semibold disabled:opacity-50"
                 >
-                  Revoke
+                  {primary.label}
                 </button>
-              )}
-              <button
-                onClick={handleDownloadPDF}
-                disabled={generatingPDF || days.length === 0}
-                title={days.length === 0 ? 'Add days to the itinerary first — an empty itinerary has nothing to print' : 'Preview and download the client itinerary PDF'}
-                className={`px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-1.5 ${
-                  generatingPDF || days.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
-              >
-                {generatingPDF ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    Itinerary PDF
-                  </>
-                )}
-              </button>
+              ) : null}
               <AddExpenseFromItinerary
                 itineraryId={itinerary.id}
                 itineraryCode={itinerary.itinerary_code}
                 clientName={itinerary.client_name}
                 onExpenseAdded={() => setExpenseRefreshTrigger(t => t + 1)}
+                openSignal={expenseSignal}
+                hideTrigger
               />
-              <Link 
-                href={`/itineraries/${itinerary.id}/edit`}
-                className="p-1.5 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
-                title="Edit"
-              >
-                <Edit2 className="w-4 h-4" />
-              </Link>
+              <GenerateTasksButton itineraryId={itinerary.id} openSignal={tasksSignal} hideTrigger />
             </div>
           </div>
+
+          {/* Where the trip stands. */}
+          {itinerary.status !== 'cancelled' && (
+            <ol className="flex flex-wrap items-center gap-x-1 gap-y-1 text-xs" aria-label="Trip stage">
+              {steps.map((st, i) => (
+                <li key={st.key} className="flex items-center gap-1">
+                  {i > 0 && <span className="text-gray-300 mx-0.5">→</span>}
+                  <span className={`px-2 py-0.5 rounded-full border ${
+                    st.current ? 'border-amber-300 bg-amber-50 text-amber-800 font-medium'
+                    : st.done ? 'border-green-200 bg-green-50 text-green-800'
+                    : 'border-gray-200 text-gray-400'
+                  }`}>
+                    {st.done ? '✓ ' : ''}{st.label}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+          {itinerary.status === 'cancelled' && <p className="text-xs font-medium text-red-700">Cancelled</p>}
         </div>
       </header>
 
-      {/* Cruise sailing-day note: the ship does not leave on the day this
-          itinerary boards it. The price stands; the booking may not — confirm
-          the date before sending (migration 382). */}
-      {itinerary.cruise_sailing_notes && itinerary.cruise_sailing_notes.length > 0 && (
+      {/* What needs attention — only when something does. */}
+      {attention.length > 0 && (
         <div className="container mx-auto px-4 pt-3">
-          <div className="bg-amber-50 border border-amber-200 p-3 rounded-md">
-            <p className="text-sm font-semibold text-amber-800 mb-1">⚠ Check the cruise date</p>
-            <ul className="text-xs text-amber-700 space-y-0.5">
-              {itinerary.cruise_sailing_notes.map((n, i) => (
-                <li key={i}>• {n}</li>
-              ))}
-            </ul>
+          <div className="bg-white border border-amber-200 rounded-md divide-y divide-amber-100">
+            {attention.map((a, i) => (
+              <div key={i} className={`flex items-start justify-between gap-3 px-3 py-2 text-sm ${a.severity === 'warning' ? 'text-amber-900' : 'text-gray-700'}`}>
+                <span className="flex items-start gap-2">
+                  {a.severity === 'warning' ? <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" /> : <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500" />}
+                  {a.message}
+                </span>
+                {a.action && (
+                  <button type="button" onClick={() => runAttention(a.action!.kind, a.action!.day)} className="shrink-0 text-xs font-medium underline hover:no-underline">
+                    {a.action.label}
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -1155,7 +1245,7 @@ export default function ViewItineraryPage() {
         </div>
 
         {/* Trip timeline — the execution layer's checkpoint log, office view */}
-        <TripTimeline itineraryId={itinerary.id} />
+        <div id="trip-timeline"><TripTimeline itineraryId={itinerary.id} /></div>
 
         {/* Traveller chat — office side of the share-page thread (mig 291) */}
         <TravellerChat itineraryId={itinerary.id} />
@@ -1172,7 +1262,7 @@ export default function ViewItineraryPage() {
         {/* DAYS LIST */}
         <div className="space-y-3">
           {days.map((day) => (
-            <div key={day.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div key={day.id} id={`day-${day.day_number}`} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden scroll-mt-40">
               <button onClick={() => toggleDay(day.day_number)} className="w-full px-4 py-3 bg-gray-50 flex items-center justify-between hover:bg-gray-100 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-primary-600 text-white rounded-md flex items-center justify-center font-semibold text-sm">{day.day_number}</div>
