@@ -8,7 +8,6 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake } from 'lucide-react'
 import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
-import ResourceSummaryCard from '@/app/components/ResourceSummaryCard'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import { generateWhatsAppMessage, generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
 import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
@@ -26,6 +25,8 @@ import GenerateTasksButton from '@/components/tasks/GenerateTasksButton'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
+import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
+import type { TripPnL } from '@/lib/trip-pnl'
 
 interface Itinerary {
   id: string
@@ -135,6 +136,10 @@ export default function ViewItineraryPage() {
   const [pdfPreviewBlob, setPdfPreviewBlob] = useState<Blob | null>(null)
   const [pdfShowBreakdown, setPdfShowBreakdown] = useState(true)
   const [expenseRefreshTrigger, setExpenseRefreshTrigger] = useState(0)
+  // The trip's real money so far (invoices, payments, expenses, commissions,
+  // each in the trip's currency) — the Profit & Loss report's own figures
+  // (lib/trip-pnl.ts), so the two never disagree.
+  const [actualPnl, setActualPnl] = useState<TripPnL | null>(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendSuccess, setSendSuccess] = useState<string | null>(null)
@@ -157,6 +162,17 @@ export default function ViewItineraryPage() {
       checkExistingInvoice()
     }
   }, [params.id])
+
+  useEffect(() => {
+    if (!params.id) return
+    let live = true
+    fetch(`/api/profit-loss?itineraryId=${params.id}`)
+      .then(r => r.json())
+      .then(json => { if (live && json?.success && Array.isArray(json.data)) setActualPnl((json.data[0] as TripPnL) ?? null) })
+      // Without it the page shows the quoted figures only, as before.
+      .catch(() => undefined)
+    return () => { live = false }
+  }, [params.id, expenseRefreshTrigger])
 
   const fetchItinerary = async () => {
     try {
@@ -1035,12 +1051,21 @@ export default function ViewItineraryPage() {
               }
             />
           </div>
-          {itinerary.notes && (
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <p className="text-xs text-gray-500 mb-1">Notes</p>
-              <p className="text-sm text-gray-700">{itinerary.notes}</p>
-            </div>
-          )}
+          {(() => {
+            // "Created via Pricing Grid | B2C | 2 pax" is the system's, not a note.
+            const { source, note } = splitSystemNote(itinerary.notes)
+            return (
+              <>
+                {note && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Notes</p>
+                    <p className="text-sm text-gray-700 whitespace-pre-line">{note}</p>
+                  </div>
+                )}
+                {source && <p className="mt-3 text-xs text-gray-400">Source: {source}</p>}
+              </>
+            )
+          })()}
         </div>
 
         {/* COST MODE TOGGLE */}
@@ -1071,7 +1096,7 @@ export default function ViewItineraryPage() {
         </div>
 
         {/* PROFIT & LOSS */}
-        {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={effectiveTotalCost} currency={itinerary.currency} marginPercent={marginPercent} days={days} />}
+        {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={effectiveTotalCost} currency={itinerary.currency} marginPercent={marginPercent} days={days} actual={actualPnl} />}
 
         {/* EXTRA EXPENSES */}
         <ItineraryExpenses
@@ -1086,6 +1111,24 @@ export default function ViewItineraryPage() {
             <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center"><span className="text-white text-lg">📱</span></div>
             <div><h3 className="text-sm font-semibold text-gray-900">WhatsApp Actions</h3><p className="text-xs text-gray-600">Send updates to {itinerary.client_name}</p></div>
           </div>
+          {/* Where the payment stands, before reminding or thanking anyone for it. */}
+          {actualPnl && (
+            <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              {actualPnl.invoice_count === 0 ? (
+                <span className="text-gray-600">No invoice yet</span>
+              ) : (
+                <>
+                  <span className="text-gray-600">Invoiced <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_revenue.toFixed(2)}</span></span>
+                  <span className="text-gray-600">Paid <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_paid.toFixed(2)}</span></span>
+                  {actualPnl.total_revenue - actualPnl.total_paid > 0.005 ? (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Balance due {itinerary.currency} {(actualPnl.total_revenue - actualPnl.total_paid).toFixed(2)}</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">Paid in full</span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           {!itinerary.client_phone && <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md"><p className="text-yellow-800 text-xs">⚠️ Client phone number required. Add it in edit mode.</p></div>}
           {itinerary.client_phone && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -1104,8 +1147,9 @@ export default function ViewItineraryPage() {
           )}
         </div>
 
-        {/* Resource Cards */}
-        <ResourceSummaryCard guideId={itinerary.assigned_guide_id} vehicleId={itinerary.assigned_vehicle_id} guideNotes={itinerary.guide_notes} vehicleNotes={itinerary.vehicle_notes} pickupLocation={itinerary.pickup_location} pickupTime={itinerary.pickup_time} onEdit={() => document.getElementById('resource-assignment')?.scrollIntoView({ behavior: 'smooth' })} />
+        {/* Resources: the assignments below are the one source. The summary
+            banner that sat here read an older single-guide field, so it could
+            say "guide needed" beside a confirmed guide. */}
         <div id="resource-assignment">
           <ResourceAssignmentV2 itineraryId={itinerary.id} startDate={itinerary.start_date} endDate={itinerary.end_date} numTravelers={itinerary.num_adults} clientName={itinerary.client_name} tripName={itinerary.trip_name} onUpdate={fetchItinerary} />
         </div>
@@ -1151,8 +1195,8 @@ export default function ViewItineraryPage() {
                             <div className="flex items-center gap-2 flex-1">
                               <span className="text-lg">{getServiceIcon(service.service_type)}</span>
                               <div>
-                                <p className="text-sm font-medium text-gray-900">{service.service_name}</p>
-                                <p className="text-xs text-gray-500 capitalize">{service.service_type.replace('_', ' ')}{service.quantity > 1 && ` • Qty: ${service.quantity}`}</p>
+                                <p className="text-sm font-medium text-gray-900">{serviceLabel(service.service_name)}</p>
+                                <p className="text-xs text-gray-500">{serviceTypeLabel(service.service_type)}{service.quantity > 1 && ` • Qty: ${service.quantity}`}</p>
                                 {service.notes && <p className="text-xs text-gray-600 mt-0.5">{service.notes}</p>}
                               </div>
                             </div>

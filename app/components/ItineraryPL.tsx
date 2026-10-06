@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getCurrencySymbol } from '@/lib/currency'
+import type { TripPnL } from '@/lib/trip-pnl'
 import { 
   TrendingUp, 
   DollarSign, 
@@ -31,6 +32,9 @@ interface ItineraryPLProps {
   currency: string
   marginPercent?: number
   days: DayWithServices[]
+  /** The trip's real money so far (GET /api/profit-loss, lib/trip-pnl):
+   *  invoiced, minus expenses and commissions, in the trip's currency. */
+  actual?: TripPnL | null
 }
 
 interface PLBreakdown {
@@ -59,7 +63,8 @@ export default function ItineraryPL({
   totalCost, 
   currency, 
   marginPercent = 25,
-  days 
+  days,
+  actual,
 }: ItineraryPLProps) {
   const [expanded, setExpanded] = useState(false)
   const [breakdown, setBreakdown] = useState<PLBreakdown[]>([])
@@ -159,7 +164,7 @@ export default function ItineraryPL({
           </div>
           <div className="text-left">
             <h3 className="text-sm font-semibold text-gray-900">Profit & Loss</h3>
-            <p className="text-xs text-gray-500">Cost breakdown and margins</p>
+            <p className="text-xs text-gray-500">Quoted from the services; actual from invoices and expenses</p>
           </div>
         </div>
 
@@ -174,7 +179,7 @@ export default function ItineraryPL({
               <p className="text-sm font-medium text-blue-600">{formatCurrency(totals.clientPrice)}</p>
             </div>
             <div className={`px-3 py-1.5 rounded-lg border ${getMarginBg(totals.marginPercent)}`}>
-              <p className="text-xs text-gray-500">Margin</p>
+              <p className="text-xs text-gray-500">Quoted margin</p>
               <p className={`text-sm font-bold ${getMarginColor(totals.marginPercent)}`}>
                 {formatCurrency(totals.margin)} ({totals.marginPercent.toFixed(1)}%)
               </p>
@@ -198,6 +203,34 @@ export default function ItineraryPL({
           <p className={`text-sm font-bold ${getMarginColor(totals.marginPercent)}`}>{totals.marginPercent.toFixed(1)}%</p>
         </div>
       </div>
+
+      {/* What the trip has actually made so far — the Profit & Loss report's
+          own figures. The quoted margin above is on the services' costs; a
+          supplier's confirmed cost is an expense here, never counted twice. */}
+      {actual && (
+        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/60 text-xs flex flex-wrap items-center gap-x-5 gap-y-1">
+          <span className="font-semibold text-gray-700">Actual so far</span>
+          {actual.invoice_count === 0 ? (
+            <span className="text-gray-600">
+              No invoice yet{actual.total_expenses > 0 ? ` · costs recorded ${formatCurrency(actual.total_expenses)}` : ''}. Actual profit shows once the trip is invoiced.
+            </span>
+          ) : (
+            <>
+              <span className="text-gray-600">Invoiced <span className="font-medium text-gray-900">{formatCurrency(actual.total_revenue)}</span></span>
+              <span className="text-gray-600">Expenses <span className="font-medium text-gray-900">{formatCurrency(actual.total_expenses)}</span></span>
+              {actual.net_commission !== 0 && (
+                <span className="text-gray-600">Commissions <span className="font-medium text-gray-900">{actual.net_commission > 0 ? '+' : ''}{formatCurrency(actual.net_commission)}</span></span>
+              )}
+              <span className={`font-semibold ${getMarginColor(actual.profit_margin)}`}>
+                Profit {formatCurrency(actual.gross_profit)} ({actual.profit_margin.toFixed(1)}% of revenue)
+              </span>
+            </>
+          )}
+          {!actual.complete && (
+            <span className="text-amber-700">Incomplete: {actual.holes.length} line(s) in another currency had no rate and are left out.</span>
+          )}
+        </div>
+      )}
 
       {expanded && (
         <div className="border-t border-gray-200">
