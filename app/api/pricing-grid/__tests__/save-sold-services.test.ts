@@ -190,3 +190,39 @@ describe('the grid saves each line by its rate’s basis', () => {
     expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(105 * 1.3, 2)
   })
 })
+
+// The single supplement is sold only to a party of one (single-supplement.ts).
+// The save used to write it for every party, × pax: a 2-pax trip stored a
+// supplement line the quote never charged.
+describe('the grid saves the single supplement only for a party of one', () => {
+  const hotelDay = (): GridDay => ({
+    id: 'd1', dayNumber: 1, title: 'Cairo', city: 'Cairo', description: '',
+    slots: [
+      { slotId: 'accommodation', selectedItems: [item('mena', 'Mena House', 100), item('mena_supp', 'Single Supplement', 60)] },
+    ],
+  } as unknown as GridDay)
+
+  async function saveAt(pax: number) {
+    for (const k of Object.keys(inserted)) delete inserted[k]
+    const { POST } = await import('@/app/api/pricing-grid/save/route')
+    await POST(new Request('http://x', {
+      method: 'POST',
+      body: JSON.stringify({ config: { ...config(true), pax }, days: [hotelDay()], totals: {} }),
+    }) as never)
+    return (inserted.itinerary_services ?? []).map(s => [s.service_name, s.quantity, s.total_cost])
+  }
+
+  it('2 pax: only the double rate is saved, and the total matches the calculator', async () => {
+    expect(await saveAt(2)).toEqual([['Mena House', 2, 200]])
+    const priced = calculateDay(hotelDay(), { ...config(true), pax: 2 })
+    expect(priced.dailyTotal).toBe(200)
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(200 * 1.3, 2)
+  })
+
+  it('1 pax: the supplement is saved and charged', async () => {
+    expect(await saveAt(1)).toEqual([['Mena House', 1, 100], ['Single Supplement', 1, 60]])
+    const priced = calculateDay(hotelDay(), { ...config(true), pax: 1 })
+    expect(priced.dailyTotal).toBe(160)
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(160 * 1.3, 2)
+  })
+})

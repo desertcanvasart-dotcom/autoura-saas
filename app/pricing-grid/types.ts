@@ -235,6 +235,10 @@ export interface RateOption {
    *  (airport / hotel services, activities). */
   pricing_basis?: PricingBasis
   unit_capacity?: number | null
+  /** Accommodation only: the single supplement, added as a second item when
+   *  the hotel is picked (single-supplement.ts). */
+  single_supp_eur?: number | null
+  single_supp_non_eur?: number | null
 }
 
 export interface AllRates {
