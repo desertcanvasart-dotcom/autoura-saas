@@ -7,7 +7,7 @@ import { GROUP_SLOTS, PP_SLOTS, DAY_TYPES, DAY_TYPE_LABELS, DEFAULT_DAY_TYPE, DA
 import { calculateDay, convertAmount } from '../lib/calculator'
 import SlotRow from './SlotRow'
 import CitySelect from '@/components/CitySelect'
-import BlockPicker from './BlockPicker'
+import BlockPicker from '@/components/day-blocks/BlockPicker'
 import type { GridBlock } from '@/lib/day-blocks/grid-apply'
 
 /** A day block on a day: laid on it, suggested for it, or none fitting. */
