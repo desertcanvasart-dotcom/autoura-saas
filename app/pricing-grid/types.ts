@@ -169,6 +169,9 @@ export interface SelectedItem {
   pricingBasis?: PricingBasis
   /** per_unit only: people per unit. */
   unitCapacity?: number | null
+  /** Tipping only: who the tip is for (tipping_rates.role_type — 'guide',
+   *  'driver' …). Switching the guide off drops the guide's tips by it. */
+  tipRole?: string | null
 }
 
 export interface SlotValue {
@@ -239,6 +242,8 @@ export interface RateOption {
    *  the hotel is picked (single-supplement.ts). */
   single_supp_eur?: number | null
   single_supp_non_eur?: number | null
+  /** Tipping only: who the tip is for (tipping_rates.role_type). */
+  tip_role?: string | null
 }
 
 export interface AllRates {

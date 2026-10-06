@@ -19,6 +19,7 @@ import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { resolveGridClient } from '@/lib/grid-client-link'
 import { findOpenGridQuote, quotePriceFields } from '@/lib/pricing/grid-quote-sync'
 import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
+import { fillTipRoles, type TipRoleReader } from '@/lib/pricing/tip-roles'
 import { BASIS_SLOTS, itemCost } from '@/app/pricing-grid/lib/item-basis'
 import { soldAccommodationItems } from '@/app/pricing-grid/lib/single-supplement'
 import type { Json, TablesInsert } from '@/types/database.types'
@@ -34,6 +35,8 @@ interface SavedGridItem {
   rateId: string; name?: string; rateEur?: number; rateNonEur?: number
   /** Per group / per person / per unit (item-basis.ts). */
   pricingBasis?: 'flat' | 'per_person' | 'per_unit'; unitCapacity?: number | null
+  /** Tipping: who the tip is for (guide-rule.ts). */
+  tipRole?: string | null
 }
 
 // Group slots are charged once for the whole group; per-person slots scale by pax.
@@ -101,6 +104,11 @@ export async function POST(request: NextRequest) {
     const startDate = config.startDate || new Date().toISOString().split('T')[0]
     const totalDays = days.length
     const endDate = new Date(new Date(startDate).getTime() + (totalDays - 1) * 86400000).toISOString().split('T')[0]
+
+    // A tip that reached the save without its role (a grid tab opened before
+    // tips carried one) gets it from its rate row, so switching the guide off
+    // still leaves the guide's tips out of both the price and the lines.
+    await fillTipRoles(supabase as unknown as TipRoleReader, days || [])
 
     // Server-authoritative pricing total. Sum the exact services we're about to
     // write (the source of truth) from the passport-aware selectedItems instead

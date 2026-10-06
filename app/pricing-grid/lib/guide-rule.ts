@@ -13,6 +13,21 @@
 
 interface RuleItem {
   rateId: string
+  /** tipping_rates.role_type, carried from the rate (types.ts SelectedItem). */
+  tipRole?: string | null
+}
+
+/**
+ * A tip for the guide. Decided by the tip's role (tipping_rates.role_type:
+ * 'guide' for the full-day, half-day and cruise guide tips). It used to look
+ * for "guide" in the item's id — but a tipping option's id is its row's UUID,
+ * so no real tip ever matched and switching the guide off still sold the
+ * guide's tips. The id check stays only for an item that carries no role.
+ */
+export function isGuideTip(item: RuleItem): boolean {
+  const role = String(item.tipRole ?? '').trim().toLowerCase()
+  if (role) return /(^|_)guide($|_)/.test(role)
+  return String(item.rateId).toLowerCase().includes('guide')
 }
 
 export function soldItems<T extends RuleItem>(
@@ -22,7 +37,7 @@ export function soldItems<T extends RuleItem>(
   const items = slot.selectedItems ?? []
   if (withGuide) return items
   if (slot.slotId === 'guide') return []
-  if (slot.slotId === 'tipping') return items.filter(item => !String(item.rateId).includes('guide'))
+  if (slot.slotId === 'tipping') return items.filter(item => !isGuideTip(item))
   return items
 }
 

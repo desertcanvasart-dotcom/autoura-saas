@@ -54,6 +54,7 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
           serviceType: opt.service_type,
           pricingClass: opt.pricing_class,
           ...(opt.pricing_basis ? { pricingBasis: opt.pricing_basis, unitCapacity: opt.unit_capacity ?? null } : {}),
+          ...(opt.tip_role ? { tipRole: opt.tip_role } : {}),
         }]
       })
     }

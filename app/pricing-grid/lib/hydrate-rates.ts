@@ -78,6 +78,8 @@ export function hydrateDayRates(
         if (opt.pricing_basis && !item.pricingBasis) {
           next = { ...next, pricingBasis: opt.pricing_basis, unitCapacity: opt.unit_capacity ?? null }
         }
+        // Whose tip it is, likewise the rate's (guide-rule.ts).
+        if (opt.tip_role && !item.tipRole) next = { ...next, tipRole: opt.tip_role }
         const repriced = !(mode === 'missing' && priced(item)) &&
           (opt.rateEur !== item.rateEur || opt.rateNonEur !== item.rateNonEur)
         if (repriced) next = { ...next, rateEur: opt.rateEur, rateNonEur: opt.rateNonEur }
