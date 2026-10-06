@@ -59,6 +59,9 @@ interface ResourceAssignmentV2Props {
   clientName?: string
   tripName?: string
   onUpdate?: () => void
+  /** The types this trip uses (lib/itineraries/coverage): only their tabs show
+   *  until "More types" is pressed. Empty or absent: every type, as before. */
+  types?: string[]
 }
 
 // City options for Egypt
@@ -236,11 +239,23 @@ export default function ResourceAssignmentV2({
   numTravelers,
   clientName,
   tripName,
-  onUpdate
+  onUpdate,
+  types
 }: ResourceAssignmentV2Props) {
   const dialog = useConfirmDialog()
   const { tenant } = useTenant()
   const [activeTab, setActiveTab] = useState('guide')
+  const [showAllTypes, setShowAllTypes] = useState(false)
+  const usedTypes = (types ?? []).filter(t => RESOURCE_TYPES.some(r => r.key === t))
+  const limited = usedTypes.length > 0 && !showAllTypes
+  const visibleTypes = limited ? RESOURCE_TYPES.filter(r => usedTypes.includes(r.key) || r.key === activeTab) : RESOURCE_TYPES
+  // Open on the trip's first used type once it is known, unless one was picked.
+  const [tabPicked, setTabPicked] = useState(false)
+  const usedKey = usedTypes.join(',')
+  useEffect(() => {
+    const used = usedKey ? usedKey.split(',') : []
+    if (!tabPicked && used.length > 0 && !used.includes(activeTab)) setActiveTab(used[0])
+  }, [usedKey, tabPicked, activeTab])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -748,7 +763,7 @@ export default function ResourceAssignmentV2({
       {/* Tabs */}
       <div className="border-b border-gray-200 overflow-x-auto">
         <div className="flex min-w-max">
-          {RESOURCE_TYPES.map((type) => {
+          {visibleTypes.map((type) => {
             const Icon = type.icon
             const count = getResourcesForType(type.key).length
             const hasConflict = getConflictsForType(type.key).length > 0
@@ -758,7 +773,7 @@ export default function ResourceAssignmentV2({
             return (
               <button
                 key={type.key}
-                onClick={() => setActiveTab(type.key)}
+                onClick={() => { setActiveTab(type.key); setTabPicked(true) }}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   isActive 
                     ? `${colorClass.text} border-current` 
@@ -780,6 +795,15 @@ export default function ResourceAssignmentV2({
               </button>
             )
           })}
+          {usedTypes.length > 0 && usedTypes.length < RESOURCE_TYPES.length && (
+            <button
+              type="button"
+              onClick={() => setShowAllTypes(v => !v)}
+              className="px-4 py-3 text-xs font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap"
+            >
+              {showAllTypes ? 'Fewer types' : 'More types'}
+            </button>
+          )}
         </div>
       </div>
 

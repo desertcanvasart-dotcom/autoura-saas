@@ -26,6 +26,8 @@ import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-p
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
+import { tripCoverage, type CoverageAssignment } from '@/lib/itineraries/coverage'
+import CoverageGrid from '@/components/itineraries/CoverageGrid'
 import type { TripPnL } from '@/lib/trip-pnl'
 import { defaultTab, nextAction, tripAttention, tripSteps, type AttentionAction, type PrimaryKind, type TabKey } from '@/lib/itineraries/trip-stage'
 import HeaderMenu from '@/components/HeaderMenu'
@@ -152,6 +154,9 @@ export default function ViewItineraryPage() {
   // each in the trip's currency) — the Profit & Loss report's own figures
   // (lib/trip-pnl.ts), so the two never disagree.
   const [actualPnl, setActualPnl] = useState<TripPnL | null>(null)
+  // The resource assignments, for the coverage grid and "needs attention".
+  const [assignments, setAssignments] = useState<CoverageAssignment[] | null>(null)
+  const [assignmentsVersion, setAssignmentsVersion] = useState(0)
   // The trip's booking, when there is one — for the header's link and stage.
   const [booking, setBooking] = useState<{ id: string; booking_number: string } | null>(null)
   // The ⋯ menu opens these dialogs; the components keep their own forms.
@@ -219,6 +224,17 @@ export default function ViewItineraryPage() {
       .catch(() => undefined)
     return () => { live = false }
   }, [params.id, expenseRefreshTrigger])
+
+  useEffect(() => {
+    let live = true
+    fetch(`/api/itinerary-resources?itinerary_id=${params.id}`)
+      .then(r => r.json())
+      .then(json => { if (live && json?.success && Array.isArray(json.data)) setAssignments(json.data) })
+      // Until they load (or if they can't), nothing is called missing: the
+      // grid and the attention rule wait for a real answer.
+      .catch(() => undefined)
+    return () => { live = false }
+  }, [params.id, assignmentsVersion])
 
   const fetchItinerary = async () => {
     try {
@@ -783,8 +799,10 @@ export default function ViewItineraryPage() {
   const steps = tripSteps(facts)
   const tab: TabKey = tabChoice ?? defaultTab(facts)
   const primary = nextAction(facts)
+  const coverage = assignments ? tripCoverage(days, assignments) : []
   const attention = tripAttention({
     ...facts,
+    missingResources: coverage.filter(r => r.missing.length > 0).map(r => ({ label: r.label, days: r.missing })),
     currency: itinerary.currency || 'EUR',
     cruiseNotes: itinerary.cruise_sailing_notes ?? [],
     staleNights: days.flatMap(day => {
@@ -838,7 +856,8 @@ export default function ViewItineraryPage() {
       selectTab('itinerary')
       setExpandedDays(prev => new Set([...prev, dayNumber]))
       setTimeout(() => scrollTo(`day-${dayNumber}`), 50)
-    } else if (kind === 'create_invoice' || kind === 'record_payment') handleGenerateInvoice()
+    } else if (kind === 'assign_resources') { selectTab('operations'); setTimeout(() => scrollTo('resource-assignment'), 50) }
+    else if (kind === 'create_invoice' || kind === 'record_payment') handleGenerateInvoice()
     else if (kind === 'close_out') closeOut()
   }
 
@@ -1330,8 +1349,13 @@ export default function ViewItineraryPage() {
         {/* Resources: the assignments below are the one source. The summary
             banner that sat here read an older single-guide field, so it could
             say "guide needed" beside a confirmed guide. */}
+        <CoverageGrid rows={coverage} days={days.map(d => ({ day: d.day_number, date: d.date, city: d.city }))} />
         <div id="resource-assignment">
-          <ResourceAssignmentV2 itineraryId={itinerary.id} startDate={itinerary.start_date} endDate={itinerary.end_date} numTravelers={itinerary.num_adults} clientName={itinerary.client_name} tripName={itinerary.trip_name} onUpdate={fetchItinerary} />
+          <ResourceAssignmentV2
+            itineraryId={itinerary.id} startDate={itinerary.start_date} endDate={itinerary.end_date} numTravelers={itinerary.num_adults} clientName={itinerary.client_name} tripName={itinerary.trip_name}
+            types={coverage.map(r => r.type)}
+            onUpdate={() => { setAssignmentsVersion(v => v + 1); fetchItinerary() }}
+          />
         </div>
 
         {/* Trip timeline — the execution layer's checkpoint log, office view */}
