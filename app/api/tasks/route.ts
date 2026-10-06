@@ -21,6 +21,8 @@ export async function GET(request: NextRequest) {
     const assignedTo = searchParams.get('assignedTo')
     const dueDate = searchParams.get('dueDate')
     const includeArchived = searchParams.get('includeArchived') === 'true'
+    // One itinerary's tasks (the itinerary page's Tasks card).
+    const itineraryId = searchParams.get('itineraryId')
 
     // Build query
     let query = supabase
@@ -47,6 +49,10 @@ export async function GET(request: NextRequest) {
 
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo)
+    }
+
+    if (itineraryId) {
+      query = query.eq('itinerary_id', itineraryId)
     }
 
     // Due date filters

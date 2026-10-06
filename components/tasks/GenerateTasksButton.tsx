@@ -55,8 +55,10 @@ const ACTION_STYLE: Record<TaskPreview['tasks'][number]['action'], string> = {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
-export default function GenerateTasksButton({ itineraryId, openSignal = 0, hideTrigger = false }: {
+export default function GenerateTasksButton({ itineraryId, openSignal = 0, hideTrigger = false, onSaved }: {
   itineraryId: string
+  /** After the tasks are created or synced (the itinerary page refreshes its list). */
+  onSaved?: () => void
   /** Bump to open the dialog from elsewhere (the itinerary page's ⋯ menu). */
   openSignal?: number
   /** No button of its own: opened only by openSignal. */
@@ -124,6 +126,7 @@ export default function GenerateTasksButton({ itineraryId, openSignal = 0, hideT
       }
       setOpen(false)
       showToast('success', result.message || 'Tasks updated')
+      onSaved?.()
     } catch (err) {
       console.error('Error generating tasks:', err)
       setError('Could not save the tasks')

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dayNeeds, tripCoverage, type CoverageDay } from '@/lib/itineraries/coverage'
+import { dayNeeds, dayResources, tripCoverage, type CoverageDay } from '@/lib/itineraries/coverage'
 import { tripAttention } from '@/lib/itineraries/trip-stage'
 
 const days: CoverageDay[] = [
@@ -64,5 +64,18 @@ describe('missing resources in "needs attention"', () => {
     expect(tripAttention({ ...base, today: '2026-08-01' })).toEqual([])
     expect(tripAttention({ ...base, status: 'sent', hasBooking: false, hasInvoice: false, invoiced: null, paid: null, today: '2026-10-01' })).toEqual([])
     expect(tripAttention({ ...base, status: 'completed', today: '2026-10-20' })).toEqual([])
+  })
+})
+
+describe('a day card’s resources', () => {
+  it('the day’s column: assigned with names, missing said, not-needed left out', () => {
+    const rows = tripCoverage(days, [
+      { resource_type: 'guide', resource_name: 'Amr', start_date: '2026-10-02', end_date: '2026-10-02', status: 'confirmed' },
+    ])
+    expect(dayResources(rows, 2)).toEqual([
+      { type: 'guide', label: 'Guide', state: 'assigned', names: ['Amr'] },
+      { type: 'vehicle', label: 'Vehicle', state: 'missing', names: [] },
+    ])
+    expect(dayResources(rows, 4)).toEqual([])
   })
 })

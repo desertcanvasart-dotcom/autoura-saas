@@ -21,12 +21,12 @@ import TripTimeline from '@/app/components/TripTimeline'
 import TravellerChat from '@/app/components/TravellerChat'
 import { showToast } from '@/app/contexts/ToastContext'
 import ItineraryBookingAction from '@/components/ItineraryBookingAction'
-import GenerateTasksButton from '@/components/tasks/GenerateTasksButton'
+import TripTasksCard from '@/components/itineraries/TripTasksCard'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
-import { tripCoverage, type CoverageAssignment } from '@/lib/itineraries/coverage'
+import { dayResources, tripCoverage, type CoverageAssignment, type DayResource } from '@/lib/itineraries/coverage'
 import CoverageGrid from '@/components/itineraries/CoverageGrid'
 import type { TripPnL } from '@/lib/trip-pnl'
 import { defaultTab, nextAction, tripAttention, tripSteps, type AttentionAction, type PrimaryKind, type TabKey } from '@/lib/itineraries/trip-stage'
@@ -984,7 +984,6 @@ export default function ViewItineraryPage() {
                 openSignal={expenseSignal}
                 hideTrigger
               />
-              <GenerateTasksButton itineraryId={itinerary.id} openSignal={tasksSignal} hideTrigger />
             </div>
           </div>
 
@@ -1213,10 +1212,11 @@ export default function ViewItineraryPage() {
                   </>
                 )
               })()}
-              <button type="button" onClick={() => setTasksSignal(n => n + 1)} className="mt-3 text-xs text-primary-600 hover:underline flex items-center gap-1">
-                <ClipboardList className="w-3.5 h-3.5" /> Operations tasks
-              </button>
             </div>
+
+            {/* The trip's operations tasks — the old header's Tasks button,
+                now with the tasks themselves. */}
+            <TripTasksCard itineraryId={itinerary.id} openSignal={tasksSignal} today={facts.today} />
           </aside>
 
           <div className="lg:order-1 min-w-0 space-y-4">
@@ -1271,6 +1271,7 @@ export default function ViewItineraryPage() {
                   <div className="text-left">
                     <h3 className="text-sm font-semibold text-gray-900">{day.title || `Day ${day.day_number}`}</h3>
                     <p className="text-xs text-gray-500">{new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{day.city && ` • ${day.city}`}</p>
+                    <ResourceChips items={dayResources(coverage, day.day_number)} />
                   </div>
                 </div>
                 {expandedDays.has(day.day_number) ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
@@ -1278,6 +1279,12 @@ export default function ViewItineraryPage() {
               {expandedDays.has(day.day_number) && (
                 <div className="p-4">
                   {day.description && <div className="mb-4"><p className="text-sm text-gray-700">{day.description}</p></div>}
+                  {dayResources(coverage, day.day_number).some(r => r.state === 'missing') && (
+                    <p className="mb-4 text-xs text-amber-800 bg-amber-50 border border-dashed border-amber-300 rounded px-2 py-1.5 flex items-center justify-between gap-2">
+                      <span>{dayResources(coverage, day.day_number).filter(r => r.state === 'missing').map(r => r.label).join(', ')} still to assign for this day.</span>
+                      <button type="button" onClick={() => runAttention('assign_resources')} className="shrink-0 font-medium underline hover:no-underline">Assign</button>
+                    </p>
+                  )}
                   {day.services && day.services.length > 0 ? (
                     <div>
                       <h4 className="text-sm font-semibold text-gray-900 mb-3">Services Included</h4>
@@ -1432,5 +1439,25 @@ export default function ViewItineraryPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/** A day's guide, vehicle, driver… as chips: who is assigned, or dashed amber when still needed. */
+function ResourceChips({ items }: { items: DayResource[] }) {
+  if (items.length === 0) return null
+  return (
+    <span className="mt-1 flex flex-wrap gap-1">
+      {items.map(r =>
+        r.state === 'assigned' ? (
+          <span key={r.type} className="inline-flex max-w-[14rem] items-center rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-[11px] text-green-800" title={`${r.label}: ${r.names.join(', ')}`}>
+            <span className="truncate">{r.label}: {r.names.join(', ')}</span>
+          </span>
+        ) : (
+          <span key={r.type} className="inline-flex items-center rounded border border-dashed border-amber-400 bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800" title={`No ${r.label.toLowerCase()} assigned for this day`}>
+            {r.label} needed
+          </span>
+        ),
+      )}
+    </span>
   )
 }
