@@ -12,6 +12,7 @@ import { buildGuideRateIndex, computeThroughoutGuideExtras } from './lib/through
 import { mapServicesToSlots } from './lib/slot-mapping'
 import { parsedDaysToGrid } from './lib/parsed-days'
 import { hydrateDayRates } from './lib/hydrate-rates'
+import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
 import GridHeader from './components/GridHeader'
 import ClientInfoBar from './components/ClientInfoBar'
 import InputPanel from './components/InputPanel'
@@ -115,6 +116,10 @@ function PricingGridContent() {
     loadFromStorage(STORAGE_KEY_DAYS, [])
   )
   const [rates, setRates] = useState<AllRates | null>(null)
+  // The agency's day blocks (Settings → Day blocks); empty until imported.
+  const [blocks, setBlocks] = useState<GridBlock[]>([])
+  // Per day: what the last block laid on it left for the operator to pick.
+  const [blockNotes, setBlockNotes] = useState<Record<string, { code: string; toPick: string[] }>>({})
   const [loading, setLoading] = useState(true)
   const [isParsing, setIsParsing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -410,6 +415,40 @@ function PricingGridContent() {
 
   // --- Day Management ---
   const addDay = () => setDays(prev => [...prev, createEmptyDay(prev.length + 1)])
+
+  // --- Day blocks ---
+  useEffect(() => {
+    let live = true
+    fetch('/api/day-blocks')
+      .then(res => res.json())
+      .then(json => {
+        if (live && json?.success) setBlocks((json.data.blocks as (GridBlock & { is_active: boolean })[]).filter(b => b.is_active))
+      })
+      // No library (or no table yet): the Grid simply offers no blocks.
+      .catch(() => {})
+    return () => { live = false }
+  }, [])
+
+  const blockSummary = (code: string, filled: string[], toPick: string[]) =>
+    `${code}: ${filled.length ? filled.join(', ') : 'nothing priced'}${toPick.length ? ` — ${toPick.length} to pick yourself` : ''}`
+
+  const addDayFromBlock = (block: GridBlock) => {
+    if (!rates) return
+    const fresh = createEmptyDay(days.length + 1)
+    const { day, filled, toPick } = applyBlockToGridDay(fresh, block, rates, config.pax)
+    setDays(prev => [...prev, { ...day, dayNumber: prev.length + 1, isExpanded: true }])
+    setBlockNotes(prev => ({ ...prev, [day.id]: { code: block.code, toPick } }))
+    showToast(toPick.length ? 'warning' : 'success', `Day ${days.length + 1} from ${blockSummary(block.code, filled, toPick)}`)
+  }
+
+  const applyBlockToDay = (dayId: string, block: GridBlock) => {
+    const target = days.find(d => d.id === dayId)
+    if (!rates || !target) return
+    const { day, filled, toPick } = applyBlockToGridDay(target, block, rates, config.pax)
+    setDays(prev => prev.map(d => (d.id === dayId ? day : d)))
+    setBlockNotes(prev => ({ ...prev, [dayId]: { code: block.code, toPick } }))
+    showToast(toPick.length ? 'warning' : 'success', `Day ${target.dayNumber} ← ${blockSummary(block.code, filled, toPick)}`)
+  }
 
   const removeDay = (dayId: string) => {
     setDays(prev => prev.filter(d => d.id !== dayId).map((d, i) => ({ ...d, dayNumber: i + 1 })))
@@ -813,6 +852,8 @@ function PricingGridContent() {
       <InputPanel
         onParseDays={handleParseDays}
         onAddDay={addDay}
+        blocks={rates ? blocks : []}
+        onAddDayFromBlock={addDayFromBlock}
         onLoadItinerary={handleLoadItinerary}
         packageType={config.packageType ?? 'full-package'}
         onPackageTypeChange={(p) => setConfig(prev => ({ ...prev, packageType: p }))}
@@ -928,6 +969,10 @@ function PricingGridContent() {
                 onUpdateDay={(partial) => updateDay(day.id, partial)}
                 onRemoveDay={() => removeDay(day.id)}
                 onApplyToAllDays={applySlotToAllDays}
+                blocks={rates ? blocks : []}
+                onApplyBlock={(block) => applyBlockToDay(day.id, block)}
+                blockNote={blockNotes[day.id]}
+                onDismissBlockNote={() => setBlockNotes(prev => { const next = { ...prev }; delete next[day.id]; return next })}
               />
             ))}
           </div>

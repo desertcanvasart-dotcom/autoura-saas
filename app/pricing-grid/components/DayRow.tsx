@@ -7,6 +7,8 @@ import { GROUP_SLOTS, PP_SLOTS, DAY_TYPES, DAY_TYPE_LABELS, DEFAULT_DAY_TYPE, DA
 import { calculateDay, convertAmount } from '../lib/calculator'
 import SlotRow from './SlotRow'
 import CitySelect from '@/components/CitySelect'
+import BlockPicker from './BlockPicker'
+import type { GridBlock } from '@/lib/day-blocks/grid-apply'
 
 interface DayRowProps {
   day: GridDay
@@ -19,12 +21,18 @@ interface DayRowProps {
   onRemoveDay: () => void
   /** Copy one service to every day of the trip (offered on Water). */
   onApplyToAllDays?: (slotId: string, value: SlotValue) => void
+  /** The agency's day blocks, to lay one onto this day. */
+  blocks?: GridBlock[]
+  onApplyBlock?: (block: GridBlock) => void
+  /** What the last block laid here left for the operator to pick. */
+  blockNote?: { code: string; toPick: string[] }
+  onDismissBlockNote?: () => void
 }
 
 /** Services offered "Apply to all days" — a daily item, not a one-off. */
 const APPLY_TO_ALL_SLOTS = new Set(['water'])
 
-export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays }: DayRowProps) {
+export default function DayRow({ day, allDays, config, rates, onToggleExpand, onUpdateSlot, onUpdateDay, onRemoveDay, onApplyToAllDays, blocks, onApplyBlock, blockNote, onDismissBlockNote }: DayRowProps) {
   const calc: DayCalc = calculateDay(day, config)
   const cv = (n: number) => convertAmount(n, config.exchangeRate)
   const sym = config.currency === 'EUR' ? '€' : config.currency === 'USD' ? '$' : config.currency === 'GBP' ? '£' : config.currency
@@ -338,6 +346,9 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
 
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0">
+          {blocks && onApplyBlock && (
+            <BlockPicker blocks={blocks} onPick={onApplyBlock} label="Use a block" title="Use a day block for this day" compact />
+          )}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemoveDay() }}
@@ -354,6 +365,18 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
           </div>
         </div>
       </div>
+
+      {/* What a day block could not price: the operator picks it. */}
+      {blockNote && blockNote.toPick.length > 0 && (
+        <div className="px-4 py-2 bg-amber-50 border-t border-amber-100 text-xs text-amber-900 flex items-start justify-between gap-2">
+          <span>
+            From block {blockNote.code} &mdash; no rate found, pick these yourself: {blockNote.toPick.join('; ')}.
+          </span>
+          {onDismissBlockNote && (
+            <button type="button" onClick={onDismissBlockNote} className="shrink-0 text-amber-800 hover:underline">Dismiss</button>
+          )}
+        </div>
+      )}
 
       {/* Expanded Grid */}
       {day.isExpanded && (
