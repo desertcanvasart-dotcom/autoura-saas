@@ -27,7 +27,7 @@ import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } f
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
 import type { TripPnL } from '@/lib/trip-pnl'
-import { nextAction, tripAttention, tripSteps, type AttentionAction, type PrimaryKind } from '@/lib/itineraries/trip-stage'
+import { defaultTab, nextAction, tripAttention, tripSteps, type AttentionAction, type PrimaryKind, type TabKey } from '@/lib/itineraries/trip-stage'
 import HeaderMenu from '@/components/HeaderMenu'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -99,6 +99,15 @@ interface ExistingInvoice {
   status: string
 }
 
+/** The page's four sections (step 3 of the itinerary page clean-up). */
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'itinerary', label: 'Itinerary' },
+  { key: 'operations', label: 'Operations' },
+  { key: 'finance', label: 'Finance' },
+  { key: 'messages', label: 'Messages' },
+]
+const isTab = (v: string | null): v is TabKey => TABS.some(t => t.key === v)
+
 export default function ViewItineraryPage() {
   const { tenant } = useTenant()
   const params = useParams()
@@ -149,6 +158,19 @@ export default function ViewItineraryPage() {
   const [expenseSignal, setExpenseSignal] = useState(0)
   const [tasksSignal, setTasksSignal] = useState(0)
   const [closingOut, setClosingOut] = useState(false)
+  // The section shown: the one asked for in the address (?tab=), else the
+  // one that fits where the trip is (lib/itineraries/trip-stage defaultTab).
+  const [tabChoice, setTabChoice] = useState<TabKey | null>(null)
+  useEffect(() => {
+    const asked = new URLSearchParams(window.location.search).get('tab')
+    if (isTab(asked)) setTabChoice(asked)
+  }, [])
+  const selectTab = (key: TabKey) => {
+    setTabChoice(key)
+    const url = new URL(window.location.href)
+    url.searchParams.set('tab', key)
+    window.history.replaceState(window.history.state, '', url.toString())
+  }
   const { confirm: confirmDialog } = useConfirmDialog()
   const [sendingEmail, setSendingEmail] = useState(false)
   const [showSendModal, setShowSendModal] = useState(false)
@@ -759,6 +781,7 @@ export default function ViewItineraryPage() {
     today: todayLocal(),
   }
   const steps = tripSteps(facts)
+  const tab: TabKey = tabChoice ?? defaultTab(facts)
   const primary = nextAction(facts)
   const attention = tripAttention({
     ...facts,
@@ -805,13 +828,14 @@ export default function ViewItineraryPage() {
   const runPrimary = (kind: PrimaryKind) => {
     if (kind === 'send_quote') setShowSendModal(true)
     else if (kind === 'create_invoice' || kind === 'record_payment') handleGenerateInvoice()
-    else if (kind === 'assign_resources') scrollTo('resource-assignment')
-    else if (kind === 'open_trip_log') scrollTo('trip-timeline')
+    else if (kind === 'assign_resources') { selectTab('operations'); setTimeout(() => scrollTo('resource-assignment'), 50) }
+    else if (kind === 'open_trip_log') { selectTab('operations'); setTimeout(() => scrollTo('trip-timeline'), 50) }
     else if (kind === 'close_out') closeOut()
   }
 
   const runAttention = (kind: AttentionAction, dayNumber?: number) => {
     if (kind === 'go_to_day' && dayNumber != null) {
+      selectTab('itinerary')
       setExpandedDays(prev => new Set([...prev, dayNumber]))
       setTimeout(() => scrollTo(`day-${dayNumber}`), 50)
     } else if (kind === 'create_invoice' || kind === 'record_payment') handleGenerateInvoice()
@@ -1082,177 +1106,136 @@ export default function ViewItineraryPage() {
         onToggleBreakdown={handleToggleBreakdown}
       />
 
-      <div className="container mx-auto px-4 py-4 space-y-4">
-        {/* INFO CARD */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
+      <div className="container mx-auto px-4 py-4">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-4">
+          {/* RIGHT PANEL — who, how much, whose. Above the tabs on a narrow screen. */}
+          <aside className="lg:order-2 space-y-3 mb-4 lg:mb-0 lg:sticky lg:top-44 lg:self-start">
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
               <p className="text-xs text-gray-500 mb-1">Client</p>
               <p className="text-sm font-semibold text-gray-900">{itinerary.client_name || 'No client'}</p>
               {itinerary.client_email && (
-                <p className="text-xs text-gray-600 truncate">{itinerary.client_email}</p>
+                <a href={`mailto:${itinerary.client_email}`} className="block text-xs text-primary-600 hover:underline truncate">{itinerary.client_email}</a>
               )}
+              {itinerary.client_phone && <p className="text-xs text-gray-600">{itinerary.client_phone}</p>}
               {itinerary.client_phone && (
-                <p className="text-xs text-gray-600">{itinerary.client_phone}</p>
+                <div className="mt-2 flex gap-2">
+                  <a
+                    href={`https://wa.me/${formatPhoneForWhatsApp(itinerary.client_phone)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2 py-1 text-xs font-medium rounded-md border border-green-300 text-green-700 hover:bg-green-50"
+                  >
+                    WhatsApp
+                  </a>
+                  <button type="button" onClick={() => selectTab('messages')} className="px-2 py-1 text-xs font-medium rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">
+                    Messages
+                  </button>
+                </div>
               )}
             </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Dates</p>
-              <p className="text-sm font-semibold text-gray-900">
-                {new Date(itinerary.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </p>
-              <p className="text-xs text-gray-600">
-                to {new Date(itinerary.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </p>
-              <p className="text-xs text-primary-600 font-medium mt-0.5">{itinerary.total_days} days</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Passengers</p>
-              <p className="text-sm font-semibold text-gray-900">
-                {itinerary.num_adults} {itinerary.num_adults === 1 ? 'adult' : 'adults'}
-              </p>
-              {itinerary.num_children > 0 && (
-                <p className="text-xs text-gray-600">{itinerary.num_children} {itinerary.num_children === 1 ? 'child' : 'children'}</p>
-              )}
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Total Cost</p>
-              <p className="text-xl font-bold text-gray-900">{itinerary.currency} {effectiveTotalCost.toFixed(2)}</p>
-              <div className="flex items-center gap-2 mt-1">
+
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-gray-500">Price</p>
                 <span className={`inline-block px-2 py-0.5 rounded border text-xs font-medium ${getStatusBadge(itinerary.status)}`}>
                   {itinerary.status.charAt(0).toUpperCase() + itinerary.status.slice(1)}
                 </span>
-                <ItineraryBookingAction itineraryId={itinerary.id} status={itinerary.status} variant="tag" />
-                {existingInvoice && (
-                  <Link href={`/invoices/${existingInvoice.id}`} className="inline-block px-2 py-0.5 rounded border text-xs font-medium bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100">
-                    {existingInvoice.invoice_number}
-                  </Link>
-                )}
               </div>
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-200 max-w-sm">
-            <AssigneeSelect
-              value={itinerary.assigned_to}
-              endpoint={`/api/itineraries/${itinerary.id}`}
-              method="PUT"
-              onSaved={(assigneeId) =>
-                setItinerary(prev => (prev ? { ...prev, assigned_to: assigneeId } : prev))
-              }
-            />
-          </div>
-          {(() => {
-            // "Created via Pricing Grid | B2C | 2 pax" is the system's, not a note.
-            const { source, note } = splitSystemNote(itinerary.notes)
-            return (
-              <>
-                {note && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <p className="text-xs text-gray-500 mb-1">Notes</p>
-                    <p className="text-sm text-gray-700 whitespace-pre-line">{note}</p>
-                  </div>
-                )}
-                {source && <p className="mt-3 text-xs text-gray-400">Source: {source}</p>}
-              </>
-            )
-          })()}
-        </div>
-
-        {/* COST MODE TOGGLE */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${costMode === 'auto' ? 'bg-blue-100' : 'bg-amber-100'}`}>
-                {costMode === 'auto' ? <Calculator className="w-5 h-5 text-blue-600" /> : <Settings className="w-5 h-5 text-amber-600" />}
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Cost Calculation: {costMode === 'auto' ? 'Automatic' : 'Manual'}</h3>
-                <p className="text-xs text-gray-600">{costMode === 'auto' ? 'Costs are calculated from the rates database' : 'Click on any cost to edit it manually'}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {costModeChanged && <span className="text-xs text-green-600 font-medium flex items-center gap-1"><Check className="w-3 h-3" />Saved</span>}
-              <button onClick={handleToggleCostMode} disabled={savingCostMode} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${costMode === 'manual' ? 'bg-amber-600' : 'bg-gray-300'} ${savingCostMode ? 'opacity-50' : ''}`}>
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${costMode === 'manual' ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-              <span className="text-xs font-medium text-gray-700">{costMode === 'manual' ? 'Manual' : 'Auto'}</span>
-            </div>
-          </div>
-          {costMode === 'manual' && (
-            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <p className="text-xs text-amber-800"><strong>Manual Mode:</strong> Click on any service cost below to edit it. Changes are saved immediately.</p>
-            </div>
-          )}
-        </div>
-
-        {/* PROFIT & LOSS */}
-        {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={effectiveTotalCost} currency={itinerary.currency} marginPercent={marginPercent} days={days} actual={actualPnl} />}
-
-        {/* EXTRA EXPENSES */}
-        <ItineraryExpenses
-          itineraryId={itinerary.id}
-          currency={itinerary.currency || 'EUR'}
-          refreshTrigger={expenseRefreshTrigger}
-        />
-
-        {/* WHATSAPP ACTIONS */}
-        <div className="bg-white rounded-lg border border-green-200 shadow-sm p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center"><span className="text-white text-lg">📱</span></div>
-            <div><h3 className="text-sm font-semibold text-gray-900">WhatsApp Actions</h3><p className="text-xs text-gray-600">Send updates to {itinerary.client_name}</p></div>
-          </div>
-          {/* Where the payment stands, before reminding or thanking anyone for it. */}
-          {actualPnl && (
-            <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              {actualPnl.invoice_count === 0 ? (
-                <span className="text-gray-600">No invoice yet</span>
-              ) : (
-                <>
-                  <span className="text-gray-600">Invoiced <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_revenue.toFixed(2)}</span></span>
-                  <span className="text-gray-600">Paid <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_paid.toFixed(2)}</span></span>
-                  {actualPnl.total_revenue - actualPnl.total_paid > 0.005 ? (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Balance due {itinerary.currency} {(actualPnl.total_revenue - actualPnl.total_paid).toFixed(2)}</span>
+              <p className="text-xl font-bold text-gray-900">{itinerary.currency} {effectiveTotalCost.toFixed(2)}</p>
+              <p className="text-xs text-gray-500">{itinerary.total_days} days · {itinerary.num_adults + (itinerary.num_children || 0)} travellers</p>
+              {actualPnl && (
+                <dl className="pt-2 mt-2 border-t border-gray-100 text-xs grid grid-cols-2 gap-y-1">
+                  {actualPnl.invoice_count === 0 ? (
+                    <><dt className="text-gray-500">Invoice</dt><dd className="text-right text-gray-700">none yet</dd></>
                   ) : (
-                    <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">Paid in full</span>
+                    <>
+                      <dt className="text-gray-500">Paid</dt>
+                      <dd className="text-right text-gray-900">{itinerary.currency} {actualPnl.total_paid.toFixed(2)}</dd>
+                      <dt className="text-gray-500">Balance due</dt>
+                      <dd className={`text-right font-medium ${actualPnl.total_revenue - actualPnl.total_paid > 0.005 ? 'text-amber-700' : 'text-green-700'}`}>
+                        {itinerary.currency} {Math.max(0, actualPnl.total_revenue - actualPnl.total_paid).toFixed(2)}
+                      </dd>
+                    </>
                   )}
-                </>
+                  <dt className="text-gray-500">Costs recorded</dt>
+                  <dd className="text-right text-gray-900">{itinerary.currency} {actualPnl.total_expenses.toFixed(2)}</dd>
+                  {actualPnl.invoice_count > 0 && (
+                    <>
+                      <dt className="text-gray-500">Profit so far</dt>
+                      <dd className="text-right font-medium text-gray-900">{itinerary.currency} {actualPnl.gross_profit.toFixed(2)}</dd>
+                    </>
+                  )}
+                </dl>
               )}
+              <button type="button" onClick={() => selectTab('finance')} className="text-xs text-primary-600 hover:underline">Open finance</button>
             </div>
-          )}
-          {!itinerary.client_phone && <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md"><p className="text-yellow-800 text-xs">⚠️ Client phone number required. Add it in edit mode.</p></div>}
-          {itinerary.client_phone && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {itinerary.status === 'draft' && <WhatsAppButton itineraryId={itinerary.id} type="status" status="confirmed" onSuccess={() => { setSendSuccess('Booking confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} className="bg-blue-600 hover:bg-blue-700" />}
-            {itinerary.status !== 'completed' && <WhatsAppButton itineraryId={itinerary.id} type="status" status="pending_payment" onSuccess={() => { setSendSuccess('Payment reminder sent! ✅'); setTimeout(() => setSendSuccess(null), 5000) }} className="bg-yellow-600 hover:bg-yellow-700" />}
-            <WhatsAppButton itineraryId={itinerary.id} type="status" status="paid" onSuccess={() => { setSendSuccess('Payment confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} className="bg-emerald-600 hover:bg-emerald-700" />
-          </div>
-          )}
-          {itinerary.client_phone && (
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              <div className="flex flex-wrap gap-2 text-xs">
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 text-green-700 rounded-full"><span>📱</span><span>{itinerary.client_phone}</span></div>
-                {itinerary.status === 'sent' && <div className="flex items-center gap-1.5 px-2 py-1 bg-primary-50 text-primary-700 rounded-full"><span>✅</span><span>Quote sent</span></div>}
-              </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+              <AssigneeSelect
+                value={itinerary.assigned_to}
+                endpoint={`/api/itineraries/${itinerary.id}`}
+                method="PUT"
+                onSaved={(assigneeId) =>
+                  setItinerary(prev => (prev ? { ...prev, assigned_to: assigneeId } : prev))
+                }
+              />
+              {(() => {
+                // "Created via Pricing Grid | B2C | 2 pax" is the system's, not a note.
+                const { source, note } = splitSystemNote(itinerary.notes)
+                return (
+                  <>
+                    {note && (
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <p className="text-xs text-gray-500 mb-1">Notes</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-line">{note}</p>
+                      </div>
+                    )}
+                    {source && <p className="mt-3 text-xs text-gray-400">Source: {source}</p>}
+                  </>
+                )
+              })()}
+              <button type="button" onClick={() => setTasksSignal(n => n + 1)} className="mt-3 text-xs text-primary-600 hover:underline flex items-center gap-1">
+                <ClipboardList className="w-3.5 h-3.5" /> Operations tasks
+              </button>
             </div>
-          )}
-        </div>
+          </aside>
 
-        {/* Resources: the assignments below are the one source. The summary
-            banner that sat here read an older single-guide field, so it could
-            say "guide needed" beside a confirmed guide. */}
-        <div id="resource-assignment">
-          <ResourceAssignmentV2 itineraryId={itinerary.id} startDate={itinerary.start_date} endDate={itinerary.end_date} numTravelers={itinerary.num_adults} clientName={itinerary.client_name} tripName={itinerary.trip_name} onUpdate={fetchItinerary} />
-        </div>
+          <div className="lg:order-1 min-w-0 space-y-4">
+            {/* TABS — the itinerary, running it, the money, the messages. */}
+            <nav className="flex gap-1 border-b border-gray-200 overflow-x-auto" aria-label="Itinerary sections">
+              {TABS.map(t => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => selectTab(t.key)}
+                  aria-current={tab === t.key ? 'page' : undefined}
+                  className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${
+                    tab === t.key ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500 hover:text-gray-800'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </nav>
 
-        {/* Trip timeline — the execution layer's checkpoint log, office view */}
-        <div id="trip-timeline"><TripTimeline itineraryId={itinerary.id} /></div>
-
-        {/* Traveller chat — office side of the share-page thread (mig 291) */}
-        <TravellerChat itineraryId={itinerary.id} />
-
+            {tab === 'itinerary' && (
+              <div className="space-y-4">
         {/* DAY CONTROLS */}
-        <div className="flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">Daily Itinerary</h2>
+        <div className="flex flex-wrap justify-between items-center gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Daily Itinerary</h2>
+            {/* How costs are kept: a setting, not a card. Manual lets a cost
+                below be typed over. */}
+            <p className="text-xs text-gray-500 flex items-center gap-1.5">
+              {costMode === 'auto' ? <Calculator className="w-3.5 h-3.5" /> : <Settings className="w-3.5 h-3.5 text-amber-600" />}
+              Costs: {costMode === 'auto' ? 'automatic, from your rates' : 'manual — click a cost below to change it'}
+              {' · '}
+              <button type="button" onClick={handleToggleCostMode} disabled={savingCostMode} className="text-primary-600 hover:underline disabled:opacity-50">
+                {costMode === 'auto' ? 'switch to manual' : 'switch to automatic'}
+              </button>
+              {costModeChanged && <span className="text-green-600 flex items-center gap-0.5"><Check className="w-3 h-3" />Saved</span>}
+            </p>
+          </div>
           <div className="flex gap-2">
             <button onClick={expandAll} className="px-3 py-1.5 text-xs bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors">Expand All</button>
             <button onClick={collapseAll} className="px-3 py-1.5 text-xs border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">Collapse All</button>
@@ -1339,6 +1322,90 @@ export default function ViewItineraryPage() {
         </div>
 
         {days.length === 0 && <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 text-center"><p className="text-sm text-gray-500">No days planned yet</p></div>}
+              </div>
+            )}
+
+            {tab === 'operations' && (
+              <div className="space-y-4">
+        {/* Resources: the assignments below are the one source. The summary
+            banner that sat here read an older single-guide field, so it could
+            say "guide needed" beside a confirmed guide. */}
+        <div id="resource-assignment">
+          <ResourceAssignmentV2 itineraryId={itinerary.id} startDate={itinerary.start_date} endDate={itinerary.end_date} numTravelers={itinerary.num_adults} clientName={itinerary.client_name} tripName={itinerary.trip_name} onUpdate={fetchItinerary} />
+        </div>
+
+        {/* Trip timeline — the execution layer's checkpoint log, office view */}
+        <div id="trip-timeline"><TripTimeline itineraryId={itinerary.id} /></div>
+
+              </div>
+            )}
+
+            {tab === 'finance' && (
+              <div className="space-y-4">
+        {/* PROFIT & LOSS */}
+        {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={effectiveTotalCost} currency={itinerary.currency} marginPercent={marginPercent} days={days} actual={actualPnl} />}
+
+        {/* EXTRA EXPENSES */}
+        <ItineraryExpenses
+          itineraryId={itinerary.id}
+          currency={itinerary.currency || 'EUR'}
+          refreshTrigger={expenseRefreshTrigger}
+        />
+
+              </div>
+            )}
+
+            {tab === 'messages' && (
+              <div className="space-y-4">
+        {/* WHATSAPP ACTIONS */}
+        <div className="bg-white rounded-lg border border-green-200 shadow-sm p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center"><span className="text-white text-lg">📱</span></div>
+            <div><h3 className="text-sm font-semibold text-gray-900">WhatsApp Actions</h3><p className="text-xs text-gray-600">Send updates to {itinerary.client_name}</p></div>
+          </div>
+          {/* Where the payment stands, before reminding or thanking anyone for it. */}
+          {actualPnl && (
+            <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              {actualPnl.invoice_count === 0 ? (
+                <span className="text-gray-600">No invoice yet</span>
+              ) : (
+                <>
+                  <span className="text-gray-600">Invoiced <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_revenue.toFixed(2)}</span></span>
+                  <span className="text-gray-600">Paid <span className="font-semibold text-gray-900">{itinerary.currency} {actualPnl.total_paid.toFixed(2)}</span></span>
+                  {actualPnl.total_revenue - actualPnl.total_paid > 0.005 ? (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Balance due {itinerary.currency} {(actualPnl.total_revenue - actualPnl.total_paid).toFixed(2)}</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 font-medium">Paid in full</span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          {!itinerary.client_phone && <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md"><p className="text-yellow-800 text-xs">⚠️ Client phone number required. Add it in edit mode.</p></div>}
+          {itinerary.client_phone && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            {itinerary.status === 'draft' && <WhatsAppButton itineraryId={itinerary.id} type="status" status="confirmed" onSuccess={() => { setSendSuccess('Booking confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} className="bg-blue-600 hover:bg-blue-700" />}
+            {itinerary.status !== 'completed' && <WhatsAppButton itineraryId={itinerary.id} type="status" status="pending_payment" onSuccess={() => { setSendSuccess('Payment reminder sent! ✅'); setTimeout(() => setSendSuccess(null), 5000) }} className="bg-yellow-600 hover:bg-yellow-700" />}
+            <WhatsAppButton itineraryId={itinerary.id} type="status" status="paid" onSuccess={() => { setSendSuccess('Payment confirmation sent! ✅'); setTimeout(() => setSendSuccess(null), 5000); fetchItinerary() }} className="bg-emerald-600 hover:bg-emerald-700" />
+          </div>
+          )}
+          {itinerary.client_phone && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <div className="flex flex-wrap gap-2 text-xs">
+                <div className="flex items-center gap-1.5 px-2 py-1 bg-green-50 text-green-700 rounded-full"><span>📱</span><span>{itinerary.client_phone}</span></div>
+                {itinerary.status === 'sent' && <div className="flex items-center gap-1.5 px-2 py-1 bg-primary-50 text-primary-700 rounded-full"><span>✅</span><span>Quote sent</span></div>}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Traveller chat — office side of the share-page thread (mig 291) */}
+        <TravellerChat itineraryId={itinerary.id} />
+
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
