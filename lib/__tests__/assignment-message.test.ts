@@ -55,7 +55,7 @@ describe('resolveAssigneeContact for someone typed in by hand', () => {
 
   it('finds the phone in the saved name when there is no directory row', async () => {
     expect(await resolveAssigneeContact(empty, { resource_type: 'driver', resource_id: 'x', resource_name: 'Sayed · 0100 111 2222 (outside)' }))
-      .toEqual({ name: 'Sayed', phone: '0100 111 2222' })
+      .toEqual({ name: 'Sayed', phone: '0100 111 2222', email: null })
   })
 
   it('still returns nothing for a venue', async () => {

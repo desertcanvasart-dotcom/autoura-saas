@@ -77,7 +77,7 @@ describe('resolveAssigneeContact — who gets the wa.me handoff', () => {
   it('resolves a driver from the directory, preferring whatsapp', async () => {
     const c = client({ team_members: { name: 'Mostafa Ali', phone: '+201', whatsapp: '+202' } })
     expect(await resolveAssigneeContact(c, { resource_type: 'driver', resource_id: 'tm-1' }))
-      .toEqual({ name: 'Mostafa Ali', phone: '+202' })
+      .toEqual({ name: 'Mostafa Ali', phone: '+202', email: null })
   })
 
   it('resolves a vehicle through its default driver, falling back to the legacy phone', async () => {
@@ -86,13 +86,13 @@ describe('resolveAssigneeContact — who gets the wa.me handoff', () => {
       team_members: { name: 'Real Driver', phone: '+209', whatsapp: null },
     })
     expect(await resolveAssigneeContact(linked, { resource_type: 'vehicle', resource_id: 'v-1' }))
-      .toEqual({ name: 'Real Driver', phone: '+209' })
+      .toEqual({ name: 'Real Driver', phone: '+209', email: null })
 
     const legacyOnly = client({
       vehicles: { default_driver_id: null, default_driver_name: 'Legacy', default_driver_phone: '+200' },
     })
     expect(await resolveAssigneeContact(legacyOnly, { resource_type: 'vehicle', resource_id: 'v-1' }))
-      .toEqual({ name: 'Legacy', phone: '+200' })
+      .toEqual({ name: 'Legacy', phone: '+200', email: null })
   })
 
   it('resolves guides from SUPPLIERS first — that is where /api/guides lives', async () => {
@@ -101,13 +101,21 @@ describe('resolveAssigneeContact — who gets the wa.me handoff', () => {
       guides: { name: 'Ahmed (legacy)', phone: '+203', whatsapp: null },
     })
     expect(await resolveAssigneeContact(c, { resource_type: 'guide', resource_id: 'g-1' }))
-      .toEqual({ name: 'Ahmed (supplier)', phone: '+205' })
+      .toEqual({ name: 'Ahmed (supplier)', phone: '+205', email: null })
   })
 
   it('falls back to the legacy guides table when no supplier row matches', async () => {
     const c = client({ guides: { name: 'Ahmed', phone: '+203', whatsapp: null } })
     expect(await resolveAssigneeContact(c, { resource_type: 'guide', resource_id: 'g-1' }))
-      .toEqual({ name: 'Ahmed', phone: '+203' })
+      .toEqual({ name: 'Ahmed', phone: '+203', email: null })
+  })
+
+  it('carries the email for the brief: the directory row, or a supplier guide’s contact email', async () => {
+    const driver = client({ team_members: { name: 'Mostafa Ali', phone: '+201', whatsapp: null, email: 'mostafa@example.com' } })
+    expect(await resolveAssigneeContact(driver, { resource_type: 'driver', resource_id: 'tm-1' }))
+      .toEqual({ name: 'Mostafa Ali', phone: '+201', email: 'mostafa@example.com' })
+    const guide = client({ suppliers: { name: 'Ahmed', phone: '+205', email: null, contact_email: 'ahmed@example.com' } })
+    expect((await resolveAssigneeContact(guide, { resource_type: 'guide', resource_id: 'g-1' }))?.email).toBe('ahmed@example.com')
   })
 
   it('venues and unknowns resolve to null — a hotel is not a link-holder', async () => {
