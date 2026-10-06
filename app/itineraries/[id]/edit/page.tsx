@@ -7,6 +7,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { todayLocal } from '@/lib/today'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import ServiceSupplierSelect from '@/components/itineraries/ServiceSupplierSelect'
+import { supplierCityForService } from '@/lib/suppliers/service-supplier-kinds'
 import { createClient } from '@/app/supabase'
 import {
   GripVertical,
@@ -120,14 +122,6 @@ interface ItineraryService {
   isDeleted?: boolean
 }
 
-interface Supplier {
-  id: string
-  name: string | null
-  type: string | null
-  city?: string | null
-  contact_phone?: string | null
-}
-
 // ============================================
 // CONSTANTS
 // ============================================
@@ -239,7 +233,6 @@ export default function ItineraryEditorPage() {
   const [attractionCityFilter, setAttractionCityFilter] = useState<string | null>(null)
 
   // Suppliers state
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [supplierSearch, setSupplierSearch] = useState('')
 
   // ============================================
@@ -249,7 +242,6 @@ export default function ItineraryEditorPage() {
   useEffect(() => {
     loadItinerary()
     loadAttractions()
-    loadSuppliers()
   }, [itineraryId])
 
   const loadItinerary = async () => {
@@ -402,48 +394,6 @@ export default function ItineraryEditorPage() {
     }
   }
 
-  const loadSuppliers = async () => {
-    try {
-
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('id, name, type, city, contact_phone')
-        .order('type')
-        .order('name')
-
-      if (error) {
-        console.error('Error loading suppliers:', error)
-        return
-      }
-
-
-      setSuppliers(data || [])
-    } catch (error) {
-      console.error('Error loading suppliers:', error)
-    }
-  }
-
-  // Helper to get relevant suppliers for a service type
-  const getSuppliersForServiceType = (serviceType: string | null) => {
-    const typeMapping: Record<string, string[]> = {
-      transportation: ['transport', 'driver', 'dmc', 'ground_handler'],
-      guide: ['guide', 'dmc', 'ground_handler'],
-      accommodation: ['hotel'],
-      entrance: ['activity_provider', 'attraction', 'dmc'],
-      activity: ['activity_provider', 'attraction', 'dmc'],
-      meal: ['restaurant', 'dmc', 'ground_handler'],
-      cruise: ['cruise', 'cruise_line'],
-      tips: ['dmc', 'ground_handler'],
-      supplies: ['dmc', 'ground_handler'],
-      service_fee: ['dmc', 'ground_handler', 'tour_operator']
-    }
-
-    const relevantTypes = (serviceType && typeMapping[serviceType]) || []
-    if (relevantTypes.length === 0) return suppliers
-
-    return suppliers.filter(s => s.type !== null && relevantTypes.includes(s.type))
-  }
-
   const checkExistingInvoice = async () => {
     try {
       const response = await fetch(`/api/invoices?itineraryId=${itineraryId}`)
@@ -568,7 +518,8 @@ export default function ItineraryEditorPage() {
       title: 'New Day',
       city: lastDay?.city || 'Cairo',
       description: '',
-      overnight_city: lastDay?.city || 'Cairo',
+      // A new day sleeps where the night before was (overnight-city.ts).
+      overnight_city: lastDay?.overnight_city || lastDay?.city || 'Cairo',
       attractions: [],
       services: { guide: true, lunch: true, dinner: false, hotel: true, water: true, tips: true }
     }
@@ -1211,7 +1162,10 @@ export default function ItineraryEditorPage() {
                       {CITIES.map(city => (
                         <button
                           key={city}
-                          onClick={() => updateDay(day.id, { city, overnight_city: city })}
+                          // Where the day is SPENT. It used to move the night too,
+                          // so a day trip to Alexandria from a Cairo hotel read
+                          // "Overnight in Alexandria" (lib/itineraries/overnight-city).
+                          onClick={() => updateDay(day.id, day.overnight_city ? { city } : { city, overnight_city: city })}
                           className={`px-3 py-2 rounded-md text-sm transition-all ${
                             day.city === city
                               ? 'bg-[#647C47] text-white'
@@ -1221,6 +1175,38 @@ export default function ItineraryEditorPage() {
                           {city}
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Where the night is spent — its own choice, not the day's city. */}
+                  <div className="mb-4">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+                      Overnight in
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {CITIES.map(city => (
+                        <button
+                          key={city}
+                          onClick={() => updateDay(day.id, { overnight_city: city })}
+                          className={`px-3 py-2 rounded-md text-sm transition-all ${
+                            day.overnight_city === city
+                              ? 'bg-[#647C47] text-white'
+                              : 'bg-white border border-gray-200 text-gray-600 hover:border-[#b8c9a8]'
+                          }`}
+                        >
+                          {city}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => updateDay(day.id, { overnight_city: null })}
+                        className={`px-3 py-2 rounded-md text-sm transition-all ${
+                          !day.overnight_city
+                            ? 'bg-[#647C47] text-white'
+                            : 'bg-white border border-gray-200 text-gray-600 hover:border-[#b8c9a8]'
+                        }`}
+                      >
+                        No overnight
+                      </button>
                     </div>
                   </div>
 
@@ -1415,38 +1401,14 @@ export default function ItineraryEditorPage() {
                                       <label className="text-xs font-medium text-gray-600 whitespace-nowrap">
                                         📦 Supplier:
                                       </label>
-                                      <select
-                                        value={service.supplier_id || ''}
-                                        onChange={(e) => {
-                                          const supplierId = e.target.value || null
-                                          const supplier = suppliers.find(s => s.id === supplierId)
-                                          updateService(service.id, { 
-                                            supplier_id: supplierId,
-                                            supplier_name: supplier?.name || null
-                                          })
-                                        }}
+                                      <ServiceSupplierSelect
+                                        serviceType={service.service_type}
+                                        city={supplierCityForService(service.service_type, day)}
+                                        supplierId={service.supplier_id}
+                                        supplierName={service.supplier_name}
+                                        onChange={next => updateService(service.id, next)}
                                         className="flex-1 px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-[#647C47] bg-white"
-                                      >
-                                        <option value="">-- No Supplier (Optional) --</option>
-                                        {getSuppliersForServiceType(service.service_type).length > 0 && (
-                                          <optgroup label={`Recommended for ${service.service_type}`}>
-                                            {getSuppliersForServiceType(service.service_type).map(s => (
-                                              <option key={s.id} value={s.id}>
-                                                {s.name} {s.city ? `(${s.city})` : ''} - {s.type}
-                                              </option>
-                                            ))}
-                                          </optgroup>
-                                        )}
-                                        {suppliers.filter(s => !getSuppliersForServiceType(service.service_type).find(r => r.id === s.id)).length > 0 && (
-                                          <optgroup label="All Other Suppliers">
-                                            {suppliers.filter(s => !getSuppliersForServiceType(service.service_type).find(r => r.id === s.id)).map(s => (
-                                              <option key={s.id} value={s.id}>
-                                                {s.name} {s.city ? `(${s.city})` : ''} - {s.type}
-                                              </option>
-                                            ))}
-                                          </optgroup>
-                                        )}
-                                      </select>
+                                      />
                                     </div>
 
                                     {/* Row 3: Qty, Rate, Total, Actions */}

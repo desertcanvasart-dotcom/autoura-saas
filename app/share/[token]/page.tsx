@@ -74,7 +74,7 @@ async function loadShare(token: string): Promise<{ itinerary: ClientItinerary; o
     // Only the resolved NAME is put on the day below.
     supabase
       .from('itinerary_services')
-      .select('itinerary_day_id, service_type, service_name, supplier_name')
+      .select('itinerary_day_id, service_type, service_name, supplier_name, description')
       .eq('itinerary_id', share.itinerary_id)
       .in('service_type', ['accommodation', 'hotel', 'cruise']),
     supabase

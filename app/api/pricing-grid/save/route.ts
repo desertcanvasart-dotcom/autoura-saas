@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { resolveMarginPercent } from '@/lib/pricing/resolve-margin'
 import { ratePin } from '@/lib/pricing/rate-pin'
 import { gridDayComponents } from '@/lib/pricing/grid-day-components'
+import { gridOvernightCities } from '@/lib/itineraries/grid-overnight'
 import { requireAuth, createAdminClient } from '@/lib/supabase-server'
 import { resolveGridClient } from '@/lib/grid-client-link'
 import { findOpenGridQuote, quotePriceFields } from '@/lib/pricing/grid-quote-sync'
@@ -238,6 +239,9 @@ export async function POST(request: NextRequest) {
     //    services while the save still answered success. Now any error rolls
     //    the whole write back and the previous days survive.
     const dayPayload: Array<Record<string, unknown>> = []
+    // Where each night is spent: the booked hotel's city, not the day's
+    // sightseeing city (lib/itineraries/overnight-city.ts).
+    const overnightByDay = await gridOvernightCities(supabase as unknown as Parameters<typeof gridOvernightCities>[0], days)
 
     for (const day of days) {
       const dayDate = new Date(new Date(startDate).getTime() + (day.dayNumber - 1) * 86400000)
@@ -318,7 +322,7 @@ export async function POST(request: NextRequest) {
         title: day.title || `Day ${day.dayNumber}`,
         description: day.description || '',
         city: day.city || '',
-        overnight_city: day.city || '',
+        overnight_city: overnightByDay.get(day.dayNumber) ?? null,
         // The day's type and its per-part overrides (NULL = the type's
         // default). The grid's reload and completeness gate read these back;
         // they were never stored, so every reload reset every day to "tour".
