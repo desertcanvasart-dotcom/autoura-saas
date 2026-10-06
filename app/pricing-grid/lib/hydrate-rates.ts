@@ -24,9 +24,13 @@
 //               takes it, so a saved quote's prices are never silently moved.
 // Water held as a hidden amount becomes a visible Water item: at the
 // company's water rate after a parse, at its own amount otherwise. An item
-// with no pricing basis takes its rate's (per group / person / unit).
+// with no pricing basis takes its rate's (per group / person / unit). A hotel
+// without its single supplement takes it back: the save writes the supplement
+// only for a party of one (single-supplement.ts), but the grid keeps it for
+// any party — the B2B sheet's tour leader and a later switch to 1 pax use it.
 
 import type { AllRates, GridDay, RateOption, SelectedItem, SlotValue } from '../types'
+import { supplementItem } from './single-supplement'
 
 export type HydrateMode = 'all' | 'missing'
 
@@ -82,6 +86,15 @@ export function hydrateDayRates(
         changed++
         return next
       })
+      if (out.slotId === 'accommodation' && items.length === 1) {
+        const hotel = byId.get(items[0].rateId)
+        const supp = hotel ? supplementItem(hotel) : null
+        if (supp) {
+          items.push(supp)
+          itemsChanged = true
+          changed++
+        }
+      }
       return itemsChanged ? { ...out, selectedItems: items } : out
     })
     dayChanged = slots.some((s, i) => s !== day.slots[i])

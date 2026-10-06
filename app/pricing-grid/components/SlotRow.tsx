@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { SlotDefinition, SlotValue, RateOption, SelectedItem, PassportType } from '../types'
+import { supplementItem } from '../lib/single-supplement'
 
 interface SlotRowProps {
   definition: SlotDefinition
@@ -76,13 +77,9 @@ export default function SlotRow({ definition, value, options, allOptions, passpo
       ...(opt.pricing_basis ? { pricingBasis: opt.pricing_basis, unitCapacity: opt.unit_capacity ?? null } : {}),
     }
     const items: SelectedItem[] = [item]
-    if (definition.slotId === 'accommodation' && (opt as any).single_supp_eur) {
-      items.push({
-        rateId: `${opt.id}_supp`,
-        name: 'Single Supplement',
-        rateEur: (opt as any).single_supp_eur || 0,
-        rateNonEur: (opt as any).single_supp_non_eur || 0,
-      })
+    if (definition.slotId === 'accommodation') {
+      const supp = supplementItem(opt)
+      if (supp) items.push(supp)
     }
     onChange({ ...value, selectedItems: items, customAmount: 0 })
   }

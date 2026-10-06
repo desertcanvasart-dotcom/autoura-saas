@@ -18,6 +18,7 @@ import { resolveGridClient } from '@/lib/grid-client-link'
 import { findOpenGridQuote, quotePriceFields } from '@/lib/pricing/grid-quote-sync'
 import { soldItems, customAmountSold } from '@/app/pricing-grid/lib/guide-rule'
 import { BASIS_SLOTS, itemCost } from '@/app/pricing-grid/lib/item-basis'
+import { soldAccommodationItems } from '@/app/pricing-grid/lib/single-supplement'
 import type { Json, TablesInsert } from '@/types/database.types'
 
 function generateItineraryCode(): string {
@@ -41,16 +42,23 @@ function itemRate(item: any, passport: string): number {
   return passport === 'eu' ? (Number(item.rateEur) || 0) : (Number(item.rateNonEur) || 0)
 }
 
+// The slot's items the quote actually charges: guide off drops the guide
+// (guide-rule.ts); the accommodation single supplement is sold only to a party
+// of one (single-supplement.ts). Both are the calculator's own rules.
+function slotSoldItems(slot: any, pax: number, withGuide: boolean): SavedGridItem[] {
+  const sold = soldItems<SavedGridItem>(slot, withGuide)
+  return slot.slotId === 'accommodation' ? soldAccommodationItems(sold, pax) : sold
+}
+
 // Supplier (cost) total for one slot under the given passport, before margin.
-// Only what is SOLD: with the guide switched off the guide slot (and guide
-// tips) are not — the calculator's own rule (guide-rule.ts).
+// Only what is SOLD (slotSoldItems).
 function slotSupplierCost(slot: any, passport: string, pax: number, withGuide: boolean): number {
   const isGroup = GRID_GROUP_SLOTS.includes(slot.slotId)
   if (slot.customAmount && slot.customAmount > 0 && customAmountSold(slot.slotId, withGuide)) {
     return isGroup ? slot.customAmount : slot.customAmount * pax
   }
   let line = 0
-  for (const item of soldItems<SavedGridItem>(slot, withGuide)) {
+  for (const item of slotSoldItems(slot, pax, withGuide)) {
     const rate = itemRate(item, passport)
     // Airport / hotel services and activities: by the item's own basis.
     if (BASIS_SLOTS.has(slot.slotId)) line += itemCost(slot.slotId, item, rate, pax).lineTotal
@@ -239,9 +247,10 @@ export async function POST(request: NextRequest) {
       //    charged once; per-person slots × pax — identical to calculator.ts.
       const services: any[] = []
       for (const slot of day.slots) {
-        // Only what the grid SOLD — guide off leaves the guide out here
-        // exactly as it does in the price (guide-rule.ts).
-        const sold = soldItems<SavedGridItem>(slot, withGuide)
+        // Only what the grid SOLD — guide off leaves the guide out, and a
+        // party of more than one the single supplement, exactly as the price
+        // does (slotSoldItems).
+        const sold = slotSoldItems(slot, pax, withGuide)
         const hasItems = sold.length > 0
         const hasCustom = slot.customAmount && slot.customAmount > 0 && customAmountSold(slot.slotId, withGuide)
         if (!hasItems && !hasCustom) continue

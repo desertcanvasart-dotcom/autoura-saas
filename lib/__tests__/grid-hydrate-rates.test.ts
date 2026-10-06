@@ -74,3 +74,30 @@ describe('hydrateDayRates', () => {
     expect(hydrateDayRates([d], rates, 'all').changed).toBe(0)
   })
 })
+
+// The save writes the single supplement only for a party of one, so a 2-pax
+// trip reloads its hotel alone. The grid keeps the supplement for any party
+// (the B2B sheet's tour leader; a later switch to 1 pax), so it comes back.
+describe('hydrateDayRates — the single supplement', () => {
+  const suppRates = {
+    accommodation: [{ id: 'mena', name: 'Mena House', rateEur: 100, rateNonEur: 110, single_supp_eur: 60, single_supp_non_eur: 65 }],
+  } as unknown as AllRates
+  const hotel = { rateId: 'mena', name: 'Mena House', rateEur: 100, rateNonEur: 110 }
+
+  it('a hotel reloaded without its supplement takes it back; 2 pax still pays only the double rate', () => {
+    const d = day(slot('accommodation', { selectedItems: [hotel] }))
+    const { days, changed } = hydrateDayRates([d], suppRates, 'missing')
+    expect(changed).toBe(1)
+    expect(find(days[0], 'accommodation').selectedItems).toEqual([
+      hotel,
+      { rateId: 'mena_supp', name: 'Single Supplement', rateEur: 60, rateNonEur: 65 },
+    ])
+    expect(calculateDay(days[0], config).perPersonTotal).toBe(100)
+    expect(calculateDay(days[0], { ...config, pax: 1 } as GridConfig).perPersonTotal).toBe(160)
+  })
+
+  it('a hotel that already has its supplement is left alone', () => {
+    const d = day(slot('accommodation', { selectedItems: [hotel, { rateId: 'x', name: 'Single Supplement', rateEur: 60, rateNonEur: 65 }] }))
+    expect(hydrateDayRates([d], suppRates, 'missing').changed).toBe(0)
+  })
+})

@@ -11,6 +11,7 @@ import { priceAcrossPax } from '@/lib/pricing/pax-range'
 import { soldItems, customAmountSold } from './guide-rule'
 import { BASIS_SLOTS, itemCost, itemBasis } from './item-basis'
 import { unitsFor } from '@/lib/pricing/pricing-basis'
+import { soldAccommodationItems } from './single-supplement'
 
 // --- Helpers ---
 
@@ -65,14 +66,11 @@ export function calculateDay(day: GridDay, config: GridConfig): DayCalc {
 
     } else if (PP_SLOT_IDS.has(slot.slotId)) {
       if (slot.slotId === 'accommodation') {
-        // Accommodation: pp_double_eur is already a per-person rate
-        // For single pax, add single supplement on top
+        // Accommodation: pp_double_eur is already a per-person rate; a party
+        // of one also pays the single supplement (single-supplement.ts).
         if (slot.selectedItems.length > 0) {
-          const ppDouble = getRate(slot.selectedItems[0], passport)
-          const singleSupp = pax === 1 && slot.selectedItems.length > 1
-            ? getRate(slot.selectedItems[1], passport)
-            : 0
-          perPersonTotal += ppDouble + (pax === 1 ? singleSupp : 0)
+          perPersonTotal += soldAccommodationItems(slot.selectedItems, pax)
+            .reduce((sum, item) => sum + getRate(item, passport), 0)
         }
       } else {
         perPersonTotal += cost
