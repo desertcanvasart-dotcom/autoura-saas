@@ -31,13 +31,19 @@ function usableNumber(value: unknown): number | null {
   return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : null
 }
 
-/** The multi-pax sheet rows that carry a usable {pax, total}. */
+/** The multi-pax sheet rows that carry a usable {pax, total}. Two shapes are
+ *  stored: a list of { pax, total } rows (older saves) and a table keyed by
+ *  group size, { "2": { pp, total } } (what the quote pages read). */
 function pricingRows(table: unknown): PricingRow[] {
-  if (!Array.isArray(table)) return []
+  const entries: Array<[unknown, unknown]> = Array.isArray(table)
+    ? table.map(row => [(row as Record<string, unknown> | null)?.pax, row])
+    : table && typeof table === 'object'
+      ? Object.entries(table as Record<string, unknown>)
+      : []
   const rows: PricingRow[] = []
-  for (const row of table) {
+  for (const [paxKey, row] of entries) {
     if (!row || typeof row !== 'object') continue
-    const pax = usableNumber((row as Record<string, unknown>).pax)
+    const pax = usableNumber(paxKey)
     const total = usableNumber((row as Record<string, unknown>).total)
     if (pax != null && total != null) rows.push({ pax: Math.floor(pax), total })
   }

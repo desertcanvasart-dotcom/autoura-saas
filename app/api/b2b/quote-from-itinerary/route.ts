@@ -6,6 +6,7 @@ import { getTieredActivityRate } from '@/lib/rates/activity-tiers'
 import { getCurrencySymbol } from '@/lib/currency'
 import { repriceItineraryServices } from '@/lib/b2b/quote-from-itinerary-pricing'
 import type { Json } from '@/types/database.types'
+import { cleanSheetCosts, keyedPricingTable } from '@/app/pricing-grid/lib/b2b-rate-sheet'
 
 // POST /api/b2b/quote-from-itinerary
 // Creates a B2B quote from an itinerary. Lines the pricing grid already
@@ -13,6 +14,10 @@ import type { Json } from '@/types/database.types'
 // lookups (pinned row first, then the tier lookup, which refuses to guess).
 // Any remaining hole REFUSES the quote (422) — never a quote priced at 0.
 // Rules: lib/b2b/quote-from-itinerary-pricing.ts.
+//
+// The Pricing Grid sends `rate_sheet_costs` — its cost at each group size
+// (app/pricing-grid/lib/b2b-rate-sheet.ts). The quote stores them, at its
+// margin, as the price list partners see; without them it lists its own size.
 
 function getSeason(date: Date): 'low' | 'high' | 'peak' {
   const month = date.getMonth() + 1
@@ -31,6 +36,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { itinerary_id, partner_id = null, margin_percent = 25, tour_leader_included = false, is_eur_passport = true, language = 'English', guide_mode = null, guide_grade = null } = body
     if (!itinerary_id) return NextResponse.json({ success: false, error: 'itinerary_id is required' }, { status: 400 })
+    const sheetCosts = body.rate_sheet_costs === undefined ? [] : cleanSheetCosts(body.rate_sheet_costs)
+    if (!sheetCosts) return NextResponse.json({ success: false, error: 'rate_sheet_costs must be whole group sizes with their costs' }, { status: 400 })
 
     // 1. Fetch itinerary
     const { data: itinerary, error: itinError } = await supabase
@@ -110,7 +117,9 @@ export async function POST(request: NextRequest) {
         tier,
         currency: itinerary.currency || 'EUR',
         status: 'draft',
-        pricing_table: [{ pax: numPax, cost_per_person: Math.round((totalCost / numPax) * 100) / 100, selling_per_person: pricePerPerson, total: sellingPrice }],
+        // Keyed by group size — the shape every quote page, email and PDF
+        // reads. A list here showed as one "0 pax" column with no price.
+        pricing_table: keyedPricingTable(sheetCosts, Number(effectiveMargin) || 0, { pax: numPax, sellingPrice, pricePerPerson }),
         // Summary pricing + trip facts (migration 270 columns). These used to
         // be computed above and then dropped from the insert, so converting
         // the quote to a booking found selling_price NULL and froze a zero.
