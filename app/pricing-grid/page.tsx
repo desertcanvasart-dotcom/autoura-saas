@@ -13,6 +13,9 @@ import { mapServicesToSlots } from './lib/slot-mapping'
 import { parsedDaysToGrid } from './lib/parsed-days'
 import { hydrateDayRates } from './lib/hydrate-rates'
 import { applyBlockToGridDay, type GridBlock } from '@/lib/day-blocks/grid-apply'
+import type { DayMatch } from '@/lib/day-blocks/match'
+import { preParseRawItinerary } from '@/lib/ai/parsing-utils'
+import type { BlockNote } from './components/DayRow'
 import GridHeader from './components/GridHeader'
 import ClientInfoBar from './components/ClientInfoBar'
 import InputPanel from './components/InputPanel'
@@ -119,7 +122,7 @@ function PricingGridContent() {
   // The agency's day blocks (Settings → Day blocks); empty until imported.
   const [blocks, setBlocks] = useState<GridBlock[]>([])
   // Per day: what the last block laid on it left for the operator to pick.
-  const [blockNotes, setBlockNotes] = useState<Record<string, { code: string; toPick: string[] }>>({})
+  const [blockNotes, setBlockNotes] = useState<Record<string, BlockNote>>({})
   const [loading, setLoading] = useState(true)
   const [isParsing, setIsParsing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -437,7 +440,7 @@ function PricingGridContent() {
     const fresh = createEmptyDay(days.length + 1)
     const { day, filled, toPick } = applyBlockToGridDay(fresh, block, rates, config.pax)
     setDays(prev => [...prev, { ...day, dayNumber: prev.length + 1, isExpanded: true }])
-    setBlockNotes(prev => ({ ...prev, [day.id]: { code: block.code, toPick } }))
+    setBlockNotes(prev => ({ ...prev, [day.id]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
     showToast(toPick.length ? 'warning' : 'success', `Day ${days.length + 1} from ${blockSummary(block.code, filled, toPick)}`)
   }
 
@@ -446,7 +449,7 @@ function PricingGridContent() {
     if (!rates || !target) return
     const { day, filled, toPick } = applyBlockToGridDay(target, block, rates, config.pax)
     setDays(prev => prev.map(d => (d.id === dayId ? day : d)))
-    setBlockNotes(prev => ({ ...prev, [dayId]: { code: block.code, toPick } }))
+    setBlockNotes(prev => ({ ...prev, [dayId]: { kind: 'applied', code: block.code, by: 'manual', toPick } }))
     showToast(toPick.length ? 'warning' : 'success', `Day ${target.dayNumber} ← ${blockSummary(block.code, filled, toPick)}`)
   }
 
@@ -532,9 +535,60 @@ function PricingGridContent() {
   // --- Clear All ---
   const handleClearAll = () => {
     setDays([])
+    setBlockNotes({})
     setConfig(DEFAULT_CONFIG)
     clearStorage()
     setSaveMessage(null)
+  }
+
+  // --- Day blocks for a parsed itinerary ---
+  const matchParsedDaysToBlocks = async (text: string, parsed: GridDay[], pax: number) => {
+    if (!rates) return
+    try {
+      // The day's own words, when the text is split into D1 / Day 1 parts.
+      const segments = preParseRawItinerary(text)
+      const rawFor = (n: number) => (segments.length > 1 ? segments.find(s => s.dayNumber === n)?.rawContent ?? null : null)
+      const res = await fetch('/api/day-blocks/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          days: parsed.map(d => ({ dayNumber: d.dayNumber, title: d.title, city: d.city, description: d.description, raw: rawFor(d.dayNumber) })),
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'matching failed')
+      const matches: DayMatch[] = json.data.matches
+      const byCode = new Map(blocks.map(b => [b.code, b]))
+      const byNumber = new Map(parsed.map(d => [d.dayNumber, d]))
+      const applied = new Map<string, GridDay>()
+      const notes: Record<string, BlockNote> = {}
+      for (const m of matches) {
+        const day = byNumber.get(m.dayNumber)
+        if (!day) continue
+        const block = m.code ? byCode.get(m.code) : undefined
+        if (block && m.confidence === 'high') {
+          const result = applyBlockToGridDay(day, block, rates, pax)
+          applied.set(day.id, result.day)
+          notes[day.id] = { kind: 'applied', code: block.code, by: m.by === 'shorthand' ? 'shorthand' : 'ai', toPick: result.toPick, reason: m.reason }
+        } else if (block) {
+          notes[day.id] = { kind: 'suggested', code: block.code, toPick: [], reason: m.reason }
+        } else {
+          notes[day.id] = { kind: 'unmatched', code: null, toPick: [], reason: m.reason }
+        }
+      }
+      // Only the days still there: the operator may have edited meanwhile.
+      setDays(prev => prev.map(d => applied.get(d.id) ?? d))
+      setBlockNotes(prev => ({ ...prev, ...notes }))
+      const count = (k: BlockNote['kind']) => Object.values(notes).filter(n => n.kind === k).length
+      const unmatched = count('unmatched'), suggested = count('suggested')
+      showToast(unmatched || suggested ? 'warning' : 'success',
+        `Day blocks: ${count('applied')} of ${parsed.length} day(s) built from your blocks` +
+        (suggested ? `, ${suggested} to confirm` : '') +
+        (unmatched ? `, ${unmatched} with no block (check the AI's reading)` : ''))
+    } catch (err) {
+      console.error('Matching days to blocks:', err)
+      showToast('info', "Couldn't match the days to your day blocks — the days show the AI's reading.")
+    }
   }
 
   // --- Parse Text via AI ---
@@ -545,6 +599,7 @@ function PricingGridContent() {
       // Clear old data immediately so the loading indicator shows
       // and the user knows a fresh parse is starting
       setDays([])
+      setBlockNotes({})
       setConfig(prev => ({ ...prev, itineraryId: null, itineraryCode: null }))
       const res = await fetch('/api/pricing-grid/parse', {
         method: 'POST',
@@ -556,7 +611,14 @@ function PricingGridContent() {
         const parsedDays: GridDay[] = parsedDaysToGrid(data.days, () => crypto.randomUUID())
         // The parser's prices are its own derivation (a seasonal hotel came in
         // at 0); the grid's rate list is the authority (hydrate-rates.ts).
-        setDays(rates ? hydrateDayRates(parsedDays, rates, 'all').days : parsedDays)
+        const hydrated = rates ? hydrateDayRates(parsedDays, rates, 'all').days : parsedDays
+        setDays(hydrated)
+        // Which of the agency's day blocks is each day? The blocks then supply
+        // the services (lib/day-blocks/match.ts); the AI's reading stays only
+        // where no block fits, and is flagged.
+        if (rates && blocks.length > 0) {
+          void matchParsedDaysToBlocks(text, hydrated, data.metadata?.pax ?? config.pax)
+        }
         // Show indicator if itinerary was AI-generated (not parsed from detailed text)
         if (data.generationMode === 'generated') {
           setSaveMessage('✨ AI-suggested itinerary based on inquiry — review and adjust as needed')

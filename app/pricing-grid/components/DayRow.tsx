@@ -10,6 +10,17 @@ import CitySelect from '@/components/CitySelect'
 import BlockPicker from './BlockPicker'
 import type { GridBlock } from '@/lib/day-blocks/grid-apply'
 
+/** A day block on a day: laid on it, suggested for it, or none fitting. */
+export interface BlockNote {
+  kind: 'applied' | 'suggested' | 'unmatched'
+  code: string | null
+  /** Who chose it: by hand, by the shorthand in the text, or by the AI. */
+  by?: 'manual' | 'shorthand' | 'ai'
+  /** What no rate answered: the operator picks it. */
+  toPick: string[]
+  reason?: string | null
+}
+
 interface DayRowProps {
   day: GridDay
   allDays: GridDay[]
@@ -24,8 +35,8 @@ interface DayRowProps {
   /** The agency's day blocks, to lay one onto this day. */
   blocks?: GridBlock[]
   onApplyBlock?: (block: GridBlock) => void
-  /** What the last block laid here left for the operator to pick. */
-  blockNote?: { code: string; toPick: string[] }
+  /** What a day block did (or would do) for this day. */
+  blockNote?: BlockNote
   onDismissBlockNote?: () => void
 }
 
@@ -366,17 +377,42 @@ export default function DayRow({ day, allDays, config, rates, onToggleExpand, on
         </div>
       </div>
 
-      {/* What a day block could not price: the operator picks it. */}
-      {blockNote && blockNote.toPick.length > 0 && (
-        <div className="px-4 py-2 bg-amber-50 border-t border-amber-100 text-xs text-amber-900 flex items-start justify-between gap-2">
-          <span>
-            From block {blockNote.code} &mdash; no rate found, pick these yourself: {blockNote.toPick.join('; ')}.
-          </span>
-          {onDismissBlockNote && (
-            <button type="button" onClick={onDismissBlockNote} className="shrink-0 text-amber-800 hover:underline">Dismiss</button>
-          )}
-        </div>
-      )}
+      {/* What a day block did here, or why none did. */}
+      {blockNote && (() => {
+        const suggested = blockNote.kind === 'suggested' && blockNote.code ? blocks?.find(b => b.code === blockNote.code) : undefined
+        const tone = blockNote.kind === 'applied' && blockNote.toPick.length === 0
+          ? 'bg-green-50 border-green-100 text-green-900'
+          : 'bg-amber-50 border-amber-100 text-amber-900'
+        const by = blockNote.by === 'shorthand' ? ' (your shorthand)' : blockNote.by === 'ai' ? ' (matched by AI)' : ''
+        return (
+          <div className={`px-4 py-2 border-t text-xs flex items-start justify-between gap-2 ${tone}`} onClick={(e) => e.stopPropagation()}>
+            <span>
+              {blockNote.kind === 'applied' && (
+                <>
+                  From day block {blockNote.code}{by}.
+                  {blockNote.toPick.length > 0 && <> No rate found &mdash; pick these yourself: {blockNote.toPick.join('; ')}.</>}
+                </>
+              )}
+              {blockNote.kind === 'suggested' && (
+                <>
+                  Looks like day block {blockNote.code}{blockNote.reason ? ` — ${blockNote.reason}` : ''}. Not applied: confirm it.
+                  {suggested && onApplyBlock && (
+                    <button type="button" onClick={() => onApplyBlock(suggested)} className="ml-2 font-medium underline">
+                      Use {suggested.code}
+                    </button>
+                  )}
+                </>
+              )}
+              {blockNote.kind === 'unmatched' && (
+                <>No day block fits this day{blockNote.reason ? ` (${blockNote.reason})` : ''}: its services are the AI&rsquo;s reading of your text &mdash; check them.</>
+              )}
+            </span>
+            {onDismissBlockNote && (
+              <button type="button" onClick={onDismissBlockNote} className="shrink-0 hover:underline">Dismiss</button>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Expanded Grid */}
       {day.isExpanded && (
