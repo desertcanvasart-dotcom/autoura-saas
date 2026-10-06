@@ -38,7 +38,8 @@ import {
   Receipt,
   Download,
   Eye,
-  Send
+  Send,
+  AlertTriangle
 } from 'lucide-react'
 import AddExpenseFromItinerary from '@/components/AddExpenseFromItinerary'
 import GenerateDocumentsButton from '@/app/components/GenerateDocumentsButton'
@@ -46,6 +47,8 @@ import { showToast } from '@/app/contexts/ToastContext'
 import { useRole } from '@/hooks/useRole'
 import ItineraryBookingAction from '@/components/ItineraryBookingAction'
 import { itineraryClientTotal } from '@/lib/itinerary-client-total'
+import { dayBookings, includesFromLines, type DayBooking } from '@/lib/itineraries/day-bookings'
+import { hotelRateIdOf, nightFromBooking, tripChecks, tripStays, type CheckDay } from '@/lib/itineraries/trip-checks'
 
 // ============================================
 // TYPES
@@ -118,6 +121,10 @@ interface ItineraryService {
   rate_non_eur: number | null
   total_cost: number | null
   notes: string | null
+  description?: string | null
+  rate_table?: string | null
+  rate_id?: string | null
+  service_code?: string | null
   isNew?: boolean
   isDeleted?: boolean
 }
@@ -219,6 +226,9 @@ export default function ItineraryEditorPage() {
   const [showServicesSection, setShowServicesSection] = useState(true)
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null)
   const [servicesChanged, setServicesChanged] = useState(false)
+  // service id → the city of the hotel row it was booked from (Rates), so a
+  // night follows its hotel (lib/itineraries/trip-checks).
+  const [lineCities, setLineCities] = useState<Map<string, string>>(new Map())
 
   // Status & Invoice State
   const [existingInvoice, setExistingInvoice] = useState<{id: string, invoice_number: string} | null>(null)
@@ -368,6 +378,7 @@ export default function ItineraryEditorPage() {
             return { ...service, day_number: day?.day_number || 1 }
           })
           setServices(servicesWithDayNumber)
+          await loadLineCities(servicesWithDayNumber)
         }
       }
 
@@ -376,6 +387,30 @@ export default function ItineraryEditorPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // The booked hotels' cities: a night is where its hotel is.
+  const loadLineCities = async (lines: ItineraryService[]) => {
+    const byLine = new Map<string, string>()
+    for (const line of lines) {
+      const rateId = hotelRateIdOf(line)
+      if (rateId) byLine.set(line.id, rateId)
+    }
+    const rateIds = [...new Set(byLine.values())]
+    if (rateIds.length === 0) return
+    const { data, error } = await supabase.from('accommodation_rates').select('id, city').in('id', rateIds)
+    if (error) {
+      // Without the cities the nights stay as saved; nothing is guessed.
+      console.error('Error loading hotel cities:', error.message)
+      return
+    }
+    const cityOf = new Map((data ?? []).filter(r => r.city).map(r => [r.id, String(r.city)]))
+    const cities = new Map<string, string>()
+    for (const [lineId, rateId] of byLine) {
+      const city = cityOf.get(rateId)
+      if (city) cities.set(lineId, city)
+    }
+    setLineCities(cities)
   }
 
   const loadAttractions = async () => {
@@ -536,6 +571,30 @@ export default function ItineraryEditorPage() {
   }
 
   // ============================================
+  // WHAT EACH DAY HAS BOOKED
+  // ============================================
+  // The day's service lines are the booking (the grid saves and reloads
+  // them). The card shows them, the day flags follow them, and a night with
+  // a booked hotel is where that hotel is.
+
+  const linesOf = (dayId: string) => services.filter(s => s.itinerary_day_id === dayId && !s.isDeleted)
+  const isPriced = services.some(s => !s.isDeleted)
+
+  /** The city the day's booked hotel puts its night in, when Rates says. */
+  const hotelNightCity = (day: ItineraryDay): string | null => {
+    const booked = nightFromBooking(linesOf(day.id), lineCities)
+    return booked?.kind === 'hotel' ? booked.city : null
+  }
+  /** Where the day's night is: its hotel's city, else the day's own choice. */
+  const nightOf = (day: ItineraryDay): string | null => hotelNightCity(day) ?? day.overnight_city
+
+  const openService = (serviceId: string) => {
+    setShowServicesSection(true)
+    setEditingServiceId(serviceId)
+    setTimeout(() => document.getElementById(`service-${serviceId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+  }
+
+  // ============================================
   // SERVICE MANAGEMENT
   // ============================================
 
@@ -650,17 +709,22 @@ export default function ItineraryEditorPage() {
 
       // 2. Update each day
       for (const day of days) {
+        // A priced itinerary's flags are read from its lines, so the share
+        // page and the tasks say what is booked; an unpriced one keeps the
+        // boxes as ticked.
+        const booked = isPriced ? includesFromLines(linesOf(day.id)) : null
         const dayData = {
           day_number: day.day_number,
           title: day.title,
           city: day.city,
           description: day.description,
-          overnight_city: day.overnight_city,
+          // The night follows its booked hotel (lib/itineraries/trip-checks).
+          overnight_city: nightOf(day),
           attractions: day.attractions || [],
-          guide_required: day.services?.guide ?? true,
-          lunch_included: day.services?.lunch ?? true,
-          dinner_included: day.services?.dinner ?? false,
-          hotel_included: day.services?.hotel ?? false
+          guide_required: booked ? booked.guide : day.services?.guide ?? true,
+          lunch_included: booked?.lunch ?? day.services?.lunch ?? true,
+          dinner_included: booked?.dinner ?? day.services?.dinner ?? false,
+          hotel_included: booked ? booked.hotel : day.services?.hotel ?? false
         }
 
         const isRealUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(day.id)
@@ -808,6 +872,18 @@ export default function ItineraryEditorPage() {
     day,
     services: services.filter(s => s.itinerary_day_id === day.id && !s.isDeleted)
   }))
+
+  const checkDays: CheckDay[] = days.map(d => ({
+    day_number: d.day_number,
+    city: d.city,
+    overnight_city: nightOf(d),
+    description: d.description,
+    lines: linesOf(d.id),
+  }))
+  const sellsHotels = !['tours-only', 'day-trips', 'cruise-package', 'shore-excursions'].includes(itinerary?.package_type ?? '')
+  const stays = tripStays(checkDays, lineCities)
+  const checks = tripChecks(checkDays, lineCities, { sellsHotels })
+  const checksOf = (dayNumber: number) => checks.filter(c => c.day_number === dayNumber)
 
   const totalServicesCost = services
     .filter(s => !s.isDeleted)
@@ -1102,6 +1178,41 @@ export default function ItineraryEditorPage() {
             <span className="text-xs text-gray-500">💡 Drag to reorder • Click Edit to expand</span>
           </div>
 
+          {/* Where each night is slept, from the booked hotels; and what
+              disagrees (lib/itineraries/trip-checks). */}
+          {stays.length > 0 && (
+            <div className="bg-white rounded-xl mb-3 shadow-sm border border-gray-200 p-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Stays</p>
+              <div className="flex flex-wrap gap-2">
+                {stays.map(st => (
+                  <span
+                    key={st.from}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm border ${
+                      st.unbooked && isPriced && sellsHotels ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-gray-50 border-gray-200 text-gray-700'
+                    }`}
+                  >
+                    <Moon size={13} />
+                    {st.from === st.to ? `Night ${st.from}` : `Nights ${st.from}–${st.to}`}
+                    {' · '}{st.city ?? 'somewhere'}
+                    {st.property ? ` · ${st.property}` : isPriced && sellsHotels ? ' · no hotel booked' : ''}
+                  </span>
+                ))}
+              </div>
+              {checks.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <p className="text-xs font-semibold text-amber-800 mb-1">Check before sending</p>
+                  <ul className="space-y-0.5">
+                    {checks.map(c => (
+                      <li key={`${c.day_number}-${c.kind}`} className="text-xs text-amber-800">
+                        Day {c.day_number}: {c.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Days List */}
           {days.map((day) => (
             <div
@@ -1135,7 +1246,10 @@ export default function ItineraryEditorPage() {
                       📍 {day.city}
                     </span>
                     {day.flight_from && <span className="flex items-center gap-1"><Plane size={12} /> from {day.flight_from}</span>}
-                    {day.overnight_city && <span className="flex items-center gap-1"><Moon size={12} /> {day.overnight_city}</span>}
+                    {nightOf(day) && <span className="flex items-center gap-1"><Moon size={12} /> {nightOf(day)}</span>}
+                    {checksOf(day.day_number).length > 0 && (
+                      <span className="flex items-center gap-1 text-amber-700"><AlertTriangle size={12} /> Check</span>
+                    )}
                   </div>
                 </div>
                 <button
@@ -1178,11 +1292,26 @@ export default function ItineraryEditorPage() {
                     </div>
                   </div>
 
-                  {/* Where the night is spent — its own choice, not the day's city. */}
+                  {/* Where the night is spent. With a hotel booked, the hotel says
+                      (lib/itineraries/trip-checks); otherwise it is the day's
+                      own choice, not the day's city. */}
                   <div className="mb-4">
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
                       Overnight in
                     </label>
+                    {hotelNightCity(day) ? (
+                      <div className="flex flex-wrap items-center gap-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm">
+                        <span className="px-3 py-1 rounded-md bg-[#647C47] text-white">{hotelNightCity(day)}</span>
+                        <span className="text-gray-600">
+                          Set by the hotel booked this night
+                          {nightFromBooking(linesOf(day.id), lineCities)?.property ? ` (${nightFromBooking(linesOf(day.id), lineCities)?.property})` : ''}.
+                          {day.overnight_city && day.overnight_city !== hotelNightCity(day) ? ` It was saved as ${day.overnight_city}; saving corrects it.` : ''}
+                        </span>
+                        <button onClick={calculatePricing} className="text-[#647C47] font-medium hover:underline">
+                          Change the hotel in the Grid
+                        </button>
+                      </div>
+                    ) : (
                     <div className="flex flex-wrap gap-2">
                       {CITIES.map(city => (
                         <button
@@ -1208,6 +1337,7 @@ export default function ItineraryEditorPage() {
                         No overnight
                       </button>
                     </div>
+                    )}
                   </div>
 
                   {/* Description */}
@@ -1256,33 +1386,78 @@ export default function ItineraryEditorPage() {
                     </div>
                   </div>
 
-                  {/* Services Grid */}
-                  <div className="grid grid-cols-6 gap-3 p-4 bg-gray-50 rounded-lg">
-                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={day.services.guide} onChange={(e) => updateDayService(day.id, 'guide', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
-                      <User size={14} /> Guide
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={day.services.lunch} onChange={(e) => updateDayService(day.id, 'lunch', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
-                      <Utensils size={14} /> Lunch
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={day.services.dinner} onChange={(e) => updateDayService(day.id, 'dinner', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
-                      <Wine size={14} /> Dinner
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                      <input type="checkbox" checked={day.services.hotel} onChange={(e) => updateDayService(day.id, 'hotel', e.target.checked)} className="w-4 h-4 accent-[#647C47]" disabled={day.day_number === days.length} />
-                      <Hotel size={14} /> Hotel
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-400 cursor-not-allowed">
-                      <input type="checkbox" checked disabled className="w-4 h-4" />
-                      <Droplets size={14} /> Water
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-400 cursor-not-allowed">
-                      <input type="checkbox" checked disabled className="w-4 h-4" />
-                      <Banknote size={14} /> Tips
-                    </label>
-                  </div>
+                  {/* What the day has booked: its service lines, not separate
+                      tick boxes (lib/itineraries/day-bookings). */}
+                  {isPriced ? (
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Booked this day</span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => { addNewService(day.id, day.day_number); setShowServicesSection(true) }}
+                            className="text-xs text-[#647C47] hover:text-[#4a5c35] font-medium flex items-center gap-1"
+                          >
+                            <Plus size={12} /> Add service
+                          </button>
+                          <button onClick={calculatePricing} className="text-xs text-[#647C47] hover:text-[#4a5c35] font-medium">
+                            Change in Grid
+                          </button>
+                        </div>
+                      </div>
+                      {dayBookings(linesOf(day.id)).length === 0 ? (
+                        <p className="text-sm text-gray-500">Nothing is booked on this day.</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {dayBookings(linesOf(day.id)).map((b: DayBooking) => (
+                            <button
+                              key={b.serviceId}
+                              onClick={() => openService(b.serviceId)}
+                              title="Edit this service"
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-gray-200 rounded-md text-sm text-gray-700 hover:border-[#b8c9a8]"
+                            >
+                              {b.kind === 'hotel' && <Hotel size={14} />}
+                              {b.kind === 'guide' && <User size={14} />}
+                              {(b.kind === 'lunch' || b.kind === 'meal') && <Utensils size={14} />}
+                              {b.kind === 'dinner' && <Wine size={14} />}
+                              {b.kind === 'water' && <Droplets size={14} />}
+                              {b.kind === 'tips' && <Banknote size={14} />}
+                              {b.kind === 'transport' && <Car size={14} />}
+                              {b.kind === 'entrance' && <Ticket size={14} />}
+                              {b.kind === 'flight' && <Plane size={14} />}
+                              <span className="max-w-[220px] truncate">{b.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {checksOf(day.day_number).map(c => (
+                        <p key={c.kind} className="mt-2 flex items-start gap-1.5 text-xs text-amber-800">
+                          <AlertTriangle size={13} className="mt-px shrink-0" /> {c.message}
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                          <input type="checkbox" checked={day.services.guide} onChange={(e) => updateDayService(day.id, 'guide', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
+                          <User size={14} /> Guide
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                          <input type="checkbox" checked={day.services.lunch} onChange={(e) => updateDayService(day.id, 'lunch', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
+                          <Utensils size={14} /> Lunch
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                          <input type="checkbox" checked={day.services.dinner} onChange={(e) => updateDayService(day.id, 'dinner', e.target.checked)} className="w-4 h-4 accent-[#647C47]" />
+                          <Wine size={14} /> Dinner
+                        </label>
+                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                          <input type="checkbox" checked={day.services.hotel} onChange={(e) => updateDayService(day.id, 'hotel', e.target.checked)} className="w-4 h-4 accent-[#647C47]" disabled={day.day_number === days.length} />
+                          <Hotel size={14} /> Hotel
+                        </label>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-500">Not priced yet. &ldquo;Price in Grid&rdquo; books the services for these choices.</p>
+                    </div>
+                  )}
 
                   {days.length > 1 && (
                     <div className="mt-4 pt-4 border-t border-gray-200">
@@ -1368,6 +1543,7 @@ export default function ItineraryEditorPage() {
                             {dayServices.map(service => (
                               <div
                                 key={service.id}
+                                id={`service-${service.id}`}
                                 className={`px-4 py-3 ${
                                   editingServiceId === service.id ? 'bg-amber-50' : 'hover:bg-gray-50'
                                 }`}
