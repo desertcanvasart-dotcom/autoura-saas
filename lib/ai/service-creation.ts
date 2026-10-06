@@ -1,3 +1,4 @@
+import { dayReturnsTo } from '@/lib/itineraries/overnight-city'
 import { priceByBasis } from '@/lib/pricing/pricing-basis'
 import type { StaffPricing } from '@/lib/ai/staff-rate-resolution'
 import { resolveEntranceRate } from '@/lib/pricing/entrance-rate'
@@ -539,18 +540,11 @@ export function generatedOvernightCity(
     lastNightAshore &&
     norm(given) === norm(dayData.city) &&
     norm(given) !== norm(lastNightAshore) &&
-    returnsTo(dayData, lastNightAshore)
+    dayReturnsTo([dayData.description, ...(dayData.activities ?? [])], lastNightAshore)
   ) {
     return lastNightAshore
   }
   return given
-}
-
-/** Whether the day's own words bring the traveller back to `city`. */
-function returnsTo(dayData: { description?: string | null; activities?: readonly string[] | null }, city: string): boolean {
-  const text = [dayData.description ?? '', ...(dayData.activities ?? [])].join(' \n ').toLowerCase()
-  const c = city.trim().toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return new RegExp(`\\b(return|returning|returns|back|drive back|head back)\\b[^.\\n]{0,20}\\b${c}\\b`).test(text)
 }
 
 /** The days a generated itinerary needs a guide on — the loop's own condition. */

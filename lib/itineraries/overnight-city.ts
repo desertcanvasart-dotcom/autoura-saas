@@ -69,3 +69,16 @@ export function resolveOvernightCities(days: readonly OvernightDay[]): (string |
   }
   return out
 }
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * Whether a day's own words bring the traveller back to `city` ("Return to
+ * Cairo for overnight", "Drive back to Cairo") — a day trip, not a move.
+ */
+export function dayReturnsTo(texts: ReadonlyArray<string | null | undefined>, city: string | null | undefined): boolean {
+  const c = String(city ?? '').trim().toLowerCase()
+  if (!c) return false
+  const text = texts.map(t => String(t ?? '')).join(' \n ').toLowerCase()
+  return new RegExp(`\\b(return|returning|returns|back)\\b[^.\\n]{0,20}\\b${escapeRe(c)}\\b`).test(text)
+}
