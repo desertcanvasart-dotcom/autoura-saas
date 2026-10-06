@@ -275,3 +275,19 @@ describe('a save without client totals counts the throughout guide', () => {
     expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(75 * 1.3, 2)
   })
 })
+
+// Real grid tips are tipping_rates rows: UUID ids, the role on the item.
+describe('guide off: the guide’s real tips are not saved', () => {
+  it('the guide’s tip (by its role) is left out; the driver’s is saved', async () => {
+    const d = {
+      id: 'd1', dayNumber: 1, title: 'Cairo', city: 'Cairo', description: '',
+      slots: [{ slotId: 'tipping', selectedItems: [
+        { ...item('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Tour guide - full day', 10), tipRole: 'guide' },
+        { ...item('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'Driver - full day', 5), tipRole: 'driver' },
+      ] }],
+    } as unknown as GridDay
+    await save(false, [d])
+    expect((inserted.itinerary_services ?? []).map(s => s.service_name)).toEqual(['Driver - full day'])
+    expect(Number(inserted.itineraries?.[0]?.total_cost)).toBeCloseTo(5 * 1.3, 2)
+  })
+})

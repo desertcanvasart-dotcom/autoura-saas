@@ -176,7 +176,11 @@ export async function GET(request: NextRequest) {
 
       tipping: (tippingRates || []).map((r: any) => ({
         id: r.id,
-        name: r.role || r.service_code || 'Tip',
+        // `r.role` is not a column: every tip without a service code was
+        // listed as just "Tip". The description says whose it is.
+        name: r.description || r.service_code || [r.role_type, r.context].filter(Boolean).join(' – ') || 'Tip',
+        // Whose tip — the guide's are dropped when the guide is off (guide-rule.ts).
+        tip_role: r.role_type ?? null,
         rateEur: toNum(r.rate_eur || r.amount_eur),
         rateNonEur: toNum(r.rate_eur || r.amount_eur),
         details: r.description,
