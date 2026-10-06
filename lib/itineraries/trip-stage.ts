@@ -117,7 +117,7 @@ export function defaultTab(f: Pick<TripFacts, 'startDate' | 'endDate' | 'today' 
 
 // ── What needs attention ───────────────────────────────────────────────────
 
-export type AttentionAction = 'create_invoice' | 'record_payment' | 'close_out' | 'go_to_day'
+export type AttentionAction = 'create_invoice' | 'record_payment' | 'close_out' | 'go_to_day' | 'assign_resources'
 
 export interface Attention {
   severity: 'warning' | 'info'
@@ -133,6 +133,8 @@ export interface AttentionInput extends TripFacts {
   cruiseNotes: string[]
   /** How many days before the start an unpaid balance becomes urgent. */
   paymentDueDays?: number
+  /** Resource types some day needs with nobody assigned (lib/itineraries/coverage). */
+  missingResources?: { label: string; days: number[] }[]
 }
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
@@ -169,6 +171,19 @@ export function tripAttention(i: AttentionInput): Attention[] {
         severity: 'warning',
         message: `The trip ${when} with ${i.currency} ${balance.toFixed(2)} still unpaid.`,
         action: { kind: 'record_payment', label: 'Record payment' },
+      })
+    }
+  }
+
+  // A guide or a vehicle still missing matters once the trip is booked and close.
+  if (!ended && untilStart != null && untilStart <= dueDays && (status === 'confirmed' || i.hasBooking)) {
+    for (const m of i.missingResources ?? []) {
+      if (m.days.length === 0) continue
+      const which = m.days.length === 1 ? `day ${m.days[0]}` : `days ${m.days.slice(0, -1).join(', ')} and ${m.days[m.days.length - 1]}`
+      out.push({
+        severity: 'warning',
+        message: `No ${m.label.toLowerCase()} assigned for ${which}.`,
+        action: { kind: 'assign_resources', label: 'Assign' },
       })
     }
   }
