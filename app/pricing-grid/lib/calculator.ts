@@ -67,8 +67,11 @@ export function calculateDay(day: GridDay, config: GridConfig): DayCalc {
     } else if (PP_SLOT_IDS.has(slot.slotId)) {
       if (slot.slotId === 'accommodation') {
         // Accommodation: pp_double_eur is already a per-person rate; a party
-        // of one also pays the single supplement (single-supplement.ts).
-        if (slot.selectedItems.length > 0) {
+        // of one also pays the single supplement (single-supplement.ts). A
+        // typed amount is per person and wins, as in every slot and the save.
+        if (slot.customAmount > 0) {
+          perPersonTotal += slot.customAmount
+        } else {
           perPersonTotal += soldAccommodationItems(slot.selectedItems, pax)
             .reduce((sum, item) => sum + getRate(item, passport), 0)
         }
@@ -244,15 +247,16 @@ function aggregateNonTransport(days: GridDay[], config: GridConfig) {
 
       } else if (PP_SLOT_IDS.has(slot.slotId)) {
         if (slot.slotId === 'accommodation') {
-          if (slot.selectedItems.length > 0) {
+          // A typed amount wins, as in calculateDay and the save.
+          if (slot.customAmount > 0) {
+            perPerson += slot.customAmount
+          } else if (slot.selectedItems.length > 0) {
             // First item = double-occupancy per-person rate; any further items
             // are single-supplement add-ons (see SlotRow's `${id}_supp`).
             perPerson += getRate(slot.selectedItems[0], passport)
             for (let k = 1; k < slot.selectedItems.length; k++) {
               singleSupplement += getRate(slot.selectedItems[k], passport)
             }
-          } else if (slot.customAmount > 0) {
-            perPerson += slot.customAmount
           }
         } else {
           perPerson += slotTotal(slot, passport)
