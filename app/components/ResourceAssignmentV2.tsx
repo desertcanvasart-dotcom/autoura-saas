@@ -5,12 +5,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { 
   Users, Truck, Hotel, UtensilsCrossed, Ship, Plane, UserCheck,
   Check, AlertCircle, Loader2, MapPin, Clock, Plus, Trash2, Calendar,
-  ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor, Link2, Car } from 'lucide-react'
+  ChevronDown, ChevronUp, X, MessageCircle, Send, Filter, Anchor, Link2, Car, Mail, MoreHorizontal } from 'lucide-react'
 import { showToast } from '@/app/contexts/ToastContext'
 import { formatPhoneForWhatsApp, generateWhatsAppLink } from '@/lib/communication-utils'
 import { buildAssignmentMessage } from '@/lib/notify/assignment-message'
 import { useTenant } from '@/app/contexts/TenantContext'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
+import HeaderMenu from '@/components/HeaderMenu'
 
 // Types
 interface Resource {
@@ -636,6 +637,45 @@ export default function ResourceAssignmentV2({
     }
   }
 
+  // The same brief by email, from the office's own mail app (mailto) — like
+  // the wa.me handoff, nothing is sent by our servers. With no address on
+  // file, the brief is copied so it can be pasted anywhere.
+  const handleEmailBrief = async (resource: AssignedResource) => {
+    setCopyingLink(resource.id)
+    try {
+      const res = await fetch(`/api/itinerary-resources/${resource.id}/staff-link`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok || !data.success || !data.url) throw new Error(data.error || 'Failed')
+      const text = buildAssignmentMessage({
+        name: (data.contact?.name as string | undefined) ?? resource.resource_name,
+        agency: tenant?.company_name,
+        tripName,
+        clientName,
+        startDate: resource.start_date,
+        endDate: resource.end_date,
+        travelers: numTravelers,
+        notes: resource.notes,
+        url: data.url,
+      })
+      const email = data.contact?.email as string | undefined
+      if (!email) {
+        try {
+          await navigator.clipboard.writeText(text)
+          showToast('error', 'No email on file for this person — the brief is copied instead')
+        } catch {
+          showToast('error', 'No email on file for this person')
+        }
+        return
+      }
+      const subject = `Assignment${tripName ? `: ${tripName}` : ''}`
+      window.location.href = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not prepare the brief')
+    } finally {
+      setCopyingLink(null)
+    }
+  }
+
   const handleSendWhatsApp = async (resource: AssignedResource) => {
     const typeConfig = RESOURCE_TYPES.find(t => t.key === resource.resource_type)
     if (!typeConfig?.canNotify) return
@@ -743,7 +783,7 @@ export default function ResourceAssignmentV2({
   const allAvailableForType = availableResources[activeTab] || []
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <div>
@@ -877,75 +917,59 @@ export default function ResourceAssignmentV2({
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Actions: one Send brief menu, the staff link, and Remove
+                        out of the way in ⋯ (the itinerary page redesign). */}
                     <div className="flex items-center gap-2">
-                      {/* WhatsApp Button */}
-                      {canNotify && (
-                        <button
-                          onClick={() => handleSendWhatsApp(resource)}
-                          disabled={isSending}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            wasSent 
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-[#25D366] text-white hover:bg-[#20BD5A]'
-                          } disabled:opacity-50`}
-                          title="Send WhatsApp notification"
-                        >
-                          {isSending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : wasSent ? (
-                            <Check className="w-4 h-4" />
-                          ) : (
-                            <MessageCircle className="w-4 h-4" />
-                          )}
-                          <span className="hidden sm:inline">
-                            {isSending ? 'Sending...' : wasSent ? 'Sent!' : 'Notify'}
-                          </span>
-                        </button>
-                      )}
+                      <HeaderMenu
+                        label={isSending ? 'Sending…' : wasSent ? 'Sent' : copyingLink === resource.id ? 'Preparing…' : 'Send brief'}
+                        icon={isSending || copyingLink === resource.id ? <Loader2 className="w-4 h-4 animate-spin" /> : wasSent ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                        items={[
+                          canNotify && {
+                            label: 'Notify on WhatsApp',
+                            icon: <MessageCircle className="w-4 h-4" />,
+                            onSelect: () => handleSendWhatsApp(resource),
+                            disabled: isSending,
+                            title: 'Send the assignment from the agency’s WhatsApp number',
+                          },
+                          {
+                            label: 'Send via my WhatsApp',
+                            icon: <MessageCircle className="w-4 h-4" />,
+                            onSelect: () => handleWhatsAppStaffLink(resource),
+                            disabled: copyingLink === resource.id,
+                            title: 'Open your own WhatsApp with the assignment and check-in link typed in — works for anyone, no Meta template needed',
+                          },
+                          {
+                            label: 'Send by email',
+                            icon: <Mail className="w-4 h-4" />,
+                            onSelect: () => handleEmailBrief(resource),
+                            disabled: copyingLink === resource.id,
+                            title: 'Open your email with the assignment and check-in link written in',
+                          },
+                        ]}
+                      />
 
                       {/* Staff tap-link: copies the no-login checkpoint URL */}
                       <button
                         onClick={() => handleCopyStaffLink(resource.id)}
                         disabled={copyingLink === resource.id}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                           linkCopied.has(resource.id)
                             ? 'bg-green-100 text-green-700'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         } disabled:opacity-50`}
                         title="Copy staff tap-link (no login needed)"
                       >
-                        {copyingLink === resource.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : linkCopied.has(resource.id) ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Link2 className="w-4 h-4" />
-                        )}
+                        {linkCopied.has(resource.id) ? <Check className="w-4 h-4" /> : <Link2 className="w-4 h-4" />}
                         <span className="hidden sm:inline">
                           {linkCopied.has(resource.id) ? 'Copied!' : 'Staff link'}
                         </span>
                       </button>
 
-                      {/* Same tap-link, handed over via the office's own WhatsApp */}
-                      <button
-                        onClick={() => handleWhatsAppStaffLink(resource)}
-                        disabled={copyingLink === resource.id}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-50 text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
-                        title="Open your own WhatsApp with the assignment and check-in link typed in — works for anyone, no Meta template needed"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        <span className="hidden sm:inline">Send via my WhatsApp</span>
-                      </button>
-
-                      {/* Remove Button */}
-                      <button
-                        onClick={() => handleRemoveResource(resource.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Remove"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <HeaderMenu
+                        icon={<MoreHorizontal className="w-4 h-4" />}
+                        ariaLabel="More actions"
+                        items={[{ label: 'Remove', icon: <Trash2 className="w-4 h-4" />, onSelect: () => handleRemoveResource(resource.id), danger: true }]}
+                      />
                     </div>
                   </div>
                 </div>
