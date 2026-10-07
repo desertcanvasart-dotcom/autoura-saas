@@ -20,6 +20,23 @@
 //
 // Pure: the engine, the day editor and the tests share it.
 
+import { resolveCityCoordinates } from '@/lib/constants/egypt-city-coordinates'
+
+/**
+ * Whether two cities are a day trip apart: both known, and more than ~40 km
+ * from each other (Cairo–Alexandria ~180 km). Giza from a Cairo hotel — or a
+ * Cairo day from a Giza one — is the same city for a vehicle; a city with no
+ * coordinates on file is never assumed to be far.
+ */
+export function citiesFarApart(a: string, b: string): boolean {
+  const p = resolveCityCoordinates(a), q = resolveCityCoordinates(b)
+  if (!p || !q || p === q) return false
+  const rad = Math.PI / 180
+  const h = Math.sin((q.lat - p.lat) * rad / 2) ** 2 +
+    Math.cos(p.lat * rad) * Math.cos(q.lat * rad) * Math.sin((q.lng - p.lng) * rad / 2) ** 2
+  return 2 * 6371 * Math.asin(Math.sqrt(h)) > 40
+}
+
 const clean = (v: unknown): string => String(v ?? '').trim().replace(/\s+/g, ' ').slice(0, 80)
 
 export interface DayTripDay {
@@ -54,5 +71,8 @@ export function dayTripFromItineraryDay(
   if (day.intercity === 'road' || day.intercity === 'flight') return null
   const night = String(day.overnight_city ?? '').trim()
   if (/^on board\b/i.test(night)) return null
-  return dayTripFrom({ city: day.city, day_trip_from: night, transport_type: day.transport_type })
+  const from = dayTripFrom({ city: day.city, day_trip_from: night, transport_type: day.transport_type })
+  // Read from where a night was saved, not said by the operator: only a city
+  // a drive away is a day trip (a Giza hotel on a Cairo day is not).
+  return from && citiesFarApart(from, String(day.city)) ? from : null
 }

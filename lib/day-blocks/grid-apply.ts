@@ -30,7 +30,7 @@
 import type { AllRates, GridDay, RateOption, SelectedItem, SlotValue, Intercity } from '@/app/pricing-grid/types'
 import { DAY_TYPE_DEFAULTS } from '@/app/pricing-grid/types'
 import { airportCodeForCity } from '@/lib/ai/staff-rate-resolution'
-import { resolveCityCoordinates } from '@/lib/constants/egypt-city-coordinates'
+import { citiesFarApart as farApart } from '@/lib/pricing/day-trip'
 import type { DayBlock } from './blocks'
 
 export interface GridBlock extends DayBlock {
@@ -95,17 +95,6 @@ function hotelCity(day: GridDay, rates: AllRates): string | null {
   const hotel = day.slots.find(s => s.slotId === 'accommodation')?.selectedItems[0]
   if (!hotel) return null
   return rates.accommodation.find(o => o.id === hotel.rateId)?.city ?? null
-}
-
-/** Cities a day trip lies between: both known, and more than an hour's
- *  drive or so apart (Cairo–Alexandria ~180 km; Cairo–Giza ~10 km is one). */
-function farApart(a: string, b: string): boolean {
-  const p = resolveCityCoordinates(a), q = resolveCityCoordinates(b)
-  if (!p || !q || p === q) return false
-  const rad = Math.PI / 180
-  const h = Math.sin((q.lat - p.lat) * rad / 2) ** 2 +
-    Math.cos(p.lat * rad) * Math.cos(q.lat * rad) * Math.sin((q.lng - p.lng) * rad / 2) ** 2
-  return 2 * 6371 * Math.asin(Math.sqrt(h)) > 40
 }
 
 const isFlight = (b: DayBlock) => /\b(flight|fly|flies|plane)\b/i.test(b.transport ?? '')
