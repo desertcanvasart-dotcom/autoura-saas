@@ -622,7 +622,29 @@ export default function ItineraryEditorPage() {
     setServices([...services, newService])
     setEditingServiceId(newService.id)
     setServicesChanged(true)
+    return newService.id
   }
+
+  // "Add service" on a day card of the itinerary page lands here with
+  // ?addService=<day id>: that day's new line, open for editing, in view.
+  // Once only — the parameter is dropped so a reload adds nothing.
+  const [addServiceHandled, setAddServiceHandled] = useState(false)
+  useEffect(() => {
+    if (loading || addServiceHandled) return
+    const url = new URL(window.location.href)
+    const dayId = url.searchParams.get('addService')
+    if (!dayId) return
+    setAddServiceHandled(true)
+    url.searchParams.delete('addService')
+    window.history.replaceState(null, '', url.toString())
+    const day = days.find(d => d.id === dayId)
+    if (!day) return
+    setShowServicesSection(true)
+    const id = addNewService(day.id, day.day_number)
+    setTimeout(() => document.getElementById(`service-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
+    // addNewService is recreated each render; loading and days decide when.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, days, addServiceHandled])
 
   const deleteService = (serviceId: string) => {
     const service = services.find(s => s.id === serviceId)

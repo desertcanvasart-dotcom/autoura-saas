@@ -745,6 +745,9 @@ export default function ViewItineraryPage() {
     return styles[status as keyof typeof styles] || styles.draft
   }
 
+  /** A day's services added up, for its subtotal. */
+  const dayTotal = (day: DayWithServices) => day.services.reduce((n, sv) => n + (Number(sv.total_cost) || 0), 0)
+
   const getServiceIcon = (type: string) => {
     const icons: Record<string, string> = {
       accommodation: '🏨',
@@ -1295,7 +1298,10 @@ export default function ViewItineraryPage() {
                     <ResourceChips items={dayResources(coverage, day.day_number)} />
                   </div>
                 </div>
-                {expandedDays.has(day.day_number) ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+                <div className="flex items-center gap-3 shrink-0">
+                  {day.services.length > 0 && <span className="text-xs text-gray-500 whitespace-nowrap">{itinerary.currency} {dayTotal(day).toFixed(2)}</span>}
+                  {expandedDays.has(day.day_number) ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+                </div>
               </button>
               {expandedDays.has(day.day_number) && (
                 <div className="p-4">
@@ -1306,59 +1312,83 @@ export default function ViewItineraryPage() {
                       <button type="button" onClick={() => runAttention('assign_resources')} className="shrink-0 font-medium underline hover:no-underline">Assign</button>
                     </p>
                   )}
+                  {/* The day's services as a table — Service · Type · Qty · Cost, with
+                      the day's subtotal. A night whose hotel or ship has left Rates
+                      says so on its own row. */}
                   {day.services && day.services.length > 0 ? (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-900 mb-3">Services Included</h4>
-                      <div className="space-y-2">
-                        {day.services.map((service) => (
-                          <div key={service.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors">
-                            <div className="flex items-center gap-2 flex-1">
-                              <span className="text-lg">{getServiceIcon(service.service_type)}</span>
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{serviceLabel(service.service_name)}</p>
-                                <p className="text-xs text-gray-500">{serviceTypeLabel(service.service_type)}{service.quantity > 1 && ` • Qty: ${service.quantity}`}</p>
-                                {service.notes && <p className="text-xs text-gray-600 mt-0.5">{service.notes}</p>}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              {costMode === 'manual' && editingServiceId === service.id ? (
-                                <div className="flex items-center gap-1">
-                                  <span className="text-sm text-gray-500">{itinerary.currency}</span>
-                                  <input type="number" value={editedCost} onChange={(e) => setEditedCost(e.target.value)} className="w-20 px-2 py-1 text-sm font-semibold text-right border border-primary-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleSaveServiceCost(service.id, day.id); if (e.key === 'Escape') handleCancelEditCost() }} />
-                                  <button onClick={() => handleSaveServiceCost(service.id, day.id)} disabled={savingServiceCost} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check className="w-4 h-4" /></button>
-                                  <button onClick={handleCancelEditCost} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="w-4 h-4" /></button>
-                                </div>
-                              ) : (
-                                <button onClick={() => handleStartEditCost(service)} disabled={costMode !== 'manual'} className={`text-sm font-semibold ${costMode === 'manual' ? 'text-amber-700 hover:text-amber-800 cursor-pointer underline decoration-dashed underline-offset-2' : 'text-gray-900 cursor-default'}`} title={costMode === 'manual' ? 'Click to edit' : 'Switch to Manual mode to edit'}>
-                                  {itinerary.currency} {service.total_cost.toFixed(2)}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-xs text-gray-500 border-b border-gray-200">
+                            <th className="text-left font-medium py-1.5 pr-2">Service</th>
+                            <th className="text-left font-medium py-1.5 px-2 hidden sm:table-cell">Type</th>
+                            <th className="text-right font-medium py-1.5 px-2">Qty</th>
+                            <th className="text-right font-medium py-1.5 pl-2">Cost</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {day.services.map((service) => {
+                            const rate = service.property_rate_status
+                            const stale = rate === 'not_on_file' || rate === 'switched_off'
+                            return (
+                              <tr key={service.id} className={stale ? 'bg-amber-50' : ''}>
+                                <td className="py-2 pr-2 align-top">
+                                  <div className="flex items-start gap-1.5">
+                                    <span className="text-base leading-5">{getServiceIcon(service.service_type)}</span>
+                                    <div className="min-w-0">
+                                      <p className="font-medium text-gray-900">{serviceLabel(service.service_name)}</p>
+                                      <p className="text-xs text-gray-500 sm:hidden">{serviceTypeLabel(service.service_type)}</p>
+                                      {service.notes && <p className="text-xs text-gray-600 mt-0.5">{service.notes}</p>}
+                                      {stale && (
+                                        <p className="mt-1 inline-block text-xs text-amber-800 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5" data-testid="overnight-stale">
+                                          ⚠ {rate === 'switched_off'
+                                            ? 'Switched off in your rates — this night can no longer be re-priced or booked from it. Switch it back on in Rates, or choose another.'
+                                            : 'No longer in your rates — it was removed after this itinerary was priced. Check the night before confirming it.'}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-2 px-2 align-top text-xs text-gray-600 hidden sm:table-cell">{serviceTypeLabel(service.service_type)}</td>
+                                <td className="py-2 px-2 align-top text-right text-gray-700">{service.quantity}</td>
+                                <td className="py-2 pl-2 align-top text-right whitespace-nowrap">
+                                  {costMode === 'manual' && editingServiceId === service.id ? (
+                                    <div className="flex items-center justify-end gap-1">
+                                      <input type="number" value={editedCost} onChange={(e) => setEditedCost(e.target.value)} className="w-20 px-2 py-1 text-sm font-semibold text-right border border-primary-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleSaveServiceCost(service.id, day.id); if (e.key === 'Escape') handleCancelEditCost() }} />
+                                      <button onClick={() => handleSaveServiceCost(service.id, day.id)} disabled={savingServiceCost} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check className="w-4 h-4" /></button>
+                                      <button onClick={handleCancelEditCost} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="w-4 h-4" /></button>
+                                    </div>
+                                  ) : (
+                                    <button onClick={() => handleStartEditCost(service)} disabled={costMode !== 'manual'} className={`font-semibold ${costMode === 'manual' ? 'text-amber-700 hover:text-amber-800 cursor-pointer underline decoration-dashed underline-offset-2' : 'text-gray-900 cursor-default'}`} title={costMode === 'manual' ? 'Click to edit' : 'Switch to Manual mode to edit'}>
+                                      {itinerary.currency} {service.total_cost.toFixed(2)}
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+
+                      </table>
+                      <div className="mt-1 pt-2 border-t border-gray-200 flex items-center justify-between gap-2 text-sm">
+                        <Link href={`/itineraries/${itinerary.id}/edit?addService=${day.id}`} className="text-xs text-primary-600 hover:underline">+ Add service</Link>
+                        <span className="text-gray-500 text-xs">Day total <span className="ml-1 text-sm font-semibold text-gray-900">{itinerary.currency} {dayTotal(day).toFixed(2)}</span></span>
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-6 text-gray-500"><p className="text-sm">No services added yet</p></div>
+                    <div className="text-center py-6 text-gray-500">
+                      <p className="text-sm">No services added yet</p>
+                      <Link href={`/itineraries/${itinerary.id}/edit?addService=${day.id}`} className="mt-1 inline-block text-xs text-primary-600 hover:underline">+ Add service</Link>
+                    </div>
                   )}
                   {/* The hotel or ship, not just the city: the property is on the
                       day's accommodation line (lib/itineraries/overnight-property). */}
                   {(() => {
                     const property = overnightProperty(day.services as never)
                     const stay = overnightLabel(property, day.overnight_city)
-                    // The night line that named it says whether it is still in Rates.
-                    const status = day.services.find(s => s.property_rate_status)?.property_rate_status
-                    const stale = property && (status === 'not_on_file' || status === 'switched_off')
                     return stay ? (
                       <div className="mt-3 pt-3 border-t border-gray-200">
                         <p className="text-xs text-gray-600">🌙 Overnight in <span className="font-medium">{stay}</span></p>
-                        {stale && (
-                          <p className="mt-1 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1" data-testid="overnight-stale">
-                            ⚠ {status === 'switched_off'
-                              ? `${property!.name} is switched off in your rates — this night can no longer be re-priced or booked from it. Switch it back on in Rates, or choose another.`
-                              : `${property!.name} is no longer in your rates — it was removed after this itinerary was priced. Check the night before confirming it.`}
-                          </p>
-                        )}
                       </div>
                     ) : null
                   })()}
