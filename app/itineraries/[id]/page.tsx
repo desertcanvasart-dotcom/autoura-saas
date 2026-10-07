@@ -3,7 +3,7 @@
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
-import { useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake, MoreHorizontal, BookOpen, AlertTriangle, Info, ClipboardList } from 'lucide-react'
@@ -22,6 +22,7 @@ import TravellerChat from '@/app/components/TravellerChat'
 import { showToast } from '@/app/contexts/ToastContext'
 import ItineraryBookingAction from '@/components/ItineraryBookingAction'
 import TripTasksCard from '@/components/itineraries/TripTasksCard'
+import InvoicesPayments from '@/components/itineraries/InvoicesPayments'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
@@ -163,6 +164,9 @@ export default function ViewItineraryPage() {
   // The ⋯ menu opens these dialogs; the components keep their own forms.
   const [expenseSignal, setExpenseSignal] = useState(0)
   const [tasksSignal, setTasksSignal] = useState(0)
+  // Opens Record payment in the Finance tab's invoices card.
+  const [paymentSignal, setPaymentSignal] = useState(0)
+  const clearPaymentSignal = useCallback(() => setPaymentSignal(0), [])
   const [closingOut, setClosingOut] = useState(false)
   // The section shown: the one asked for in the address (?tab=), else the
   // one that fits where the trip is (lib/itineraries/trip-stage defaultTab).
@@ -850,9 +854,17 @@ export default function ViewItineraryPage() {
     }
   }
 
+  // Record payment happens in the Finance tab's invoices card, on this page.
+  const recordPayment = () => {
+    selectTab('finance')
+    setPaymentSignal(n => n + 1)
+    setTimeout(() => scrollTo('invoices-payments'), 50)
+  }
+
   const runPrimary = (kind: PrimaryKind) => {
     if (kind === 'send_quote') setShowSendModal(true)
-    else if (kind === 'create_invoice' || kind === 'record_payment') handleGenerateInvoice()
+    else if (kind === 'record_payment') recordPayment()
+    else if (kind === 'create_invoice') handleGenerateInvoice()
     else if (kind === 'assign_resources') { selectTab('operations'); setTimeout(() => scrollTo('resource-assignment'), 50) }
     else if (kind === 'open_trip_log') { selectTab('operations'); setTimeout(() => scrollTo('trip-timeline'), 50) }
     else if (kind === 'close_out') closeOut()
@@ -865,7 +877,8 @@ export default function ViewItineraryPage() {
       setTimeout(() => scrollTo(`day-${dayNumber}`), 50)
     } else if (kind === 'open_finance') { selectTab('finance'); window.scrollTo({ top: 0, behavior: 'smooth' }) }
     else if (kind === 'assign_resources') { selectTab('operations'); setTimeout(() => scrollTo('resource-assignment'), 50) }
-    else if (kind === 'create_invoice' || kind === 'record_payment') handleGenerateInvoice()
+    else if (kind === 'record_payment') recordPayment()
+    else if (kind === 'create_invoice') handleGenerateInvoice()
     else if (kind === 'close_out') closeOut()
   }
 
@@ -1381,6 +1394,17 @@ export default function ViewItineraryPage() {
 
             {tab === 'finance' && (
               <div className="space-y-4">
+        {/* INVOICES & PAYMENTS — what was billed, what came in, and Record payment here. */}
+        <InvoicesPayments
+          itineraryId={itinerary.id}
+          today={facts.today}
+          onCreateInvoice={handleGenerateInvoice}
+          creatingInvoice={generatingInvoice}
+          openSignal={paymentSignal}
+          onOpened={clearPaymentSignal}
+          onChanged={() => { setExpenseRefreshTrigger(t => t + 1); checkExistingInvoice() }}
+        />
+
         {/* PROFIT & LOSS */}
         {days.length > 0 && <ItineraryPL itineraryId={itinerary.id} totalCost={effectiveTotalCost} currency={itinerary.currency} marginPercent={marginPercent} days={days} actual={actualPnl} />}
 
