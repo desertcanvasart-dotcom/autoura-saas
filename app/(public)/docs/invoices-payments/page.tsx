@@ -102,7 +102,7 @@ export default function InvoicesPaymentsPage() {
             <ul className="list-disc list-inside ml-6 mt-2 space-y-1 text-gray-600">
               <li>Amount</li>
               <li>Payment date</li>
-              <li>Payment method (Bank Transfer, Airwallex, Tab, Credit Card, Cash, PayPal, Stripe, Wise)</li>
+              <li>Payment method (Bank Transfer, Tab, Credit Card, Cash, PayPal, Stripe)</li>
               <li>Transaction reference (optional)</li>
               <li>Notes (optional)</li>
             </ul>
