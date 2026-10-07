@@ -220,6 +220,9 @@ const RESOURCE_TYPES = [
   }
 ]
 
+/** Booked for a moment, not a stretch: their end date follows their start. */
+const SINGLE_DAY_TYPES = new Set(['airport_staff', 'restaurant'])
+
 const COLOR_CLASSES: Record<string, { bg: string, border: string, text: string, light: string }> = {
   blue: { bg: 'bg-blue-600', border: 'border-blue-200', text: 'text-blue-600', light: 'bg-blue-50' },
   green: { bg: 'bg-green-600', border: 'border-green-200', text: 'text-green-600', light: 'bg-green-50' },
@@ -247,6 +250,9 @@ export default function ResourceAssignmentV2({
   const { tenant } = useTenant()
   const [activeTab, setActiveTab] = useState('guide')
   const [showAllTypes, setShowAllTypes] = useState(false)
+  // Changing an assignment's dates in place (PATCH /api/itinerary-resources).
+  const [editingDates, setEditingDates] = useState<{ id: string; start: string; end: string } | null>(null)
+  const [savingDates, setSavingDates] = useState(false)
   const usedTypes = (types ?? []).filter(t => RESOURCE_TYPES.some(r => r.key === t))
   const limited = usedTypes.length > 0 && !showAllTypes
   const visibleTypes = limited ? RESOURCE_TYPES.filter(r => usedTypes.includes(r.key) || r.key === activeTab) : RESOURCE_TYPES
@@ -542,6 +548,28 @@ export default function ResourceAssignmentV2({
     }
   }
 
+  const handleSaveDates = async () => {
+    if (!editingDates) return
+    setSavingDates(true)
+    try {
+      const res = await fetch(`/api/itinerary-resources?id=${editingDates.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start_date: editingDates.start, end_date: editingDates.end }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) throw new Error(data.error || 'Could not change the dates')
+      setEditingDates(null)
+      await fetchAssignedResources()
+      await fetchConflicts()
+      if (onUpdate) onUpdate()
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not change the dates')
+    } finally {
+      setSavingDates(false)
+    }
+  }
+
   const handleRemoveResource = async (resourceId: string) => {
     if (!(await dialog.confirm({ message: 'Remove this resource assignment?', variant: 'danger', confirmText: 'Delete' }))) return
 
@@ -740,7 +768,10 @@ export default function ResourceAssignmentV2({
     setAddFormData({
       resource_id: '',
       start_date: startDate,
-      end_date: endDate,
+      // An airport meeting or a restaurant meal is one day, not the trip:
+      // defaulting them to the whole trip put the arrival's airport staff on
+      // every day.
+      end_date: SINGLE_DAY_TYPES.has(activeTab) ? startDate : endDate,
       notes: '',
       quantity: 1
     })
@@ -903,14 +934,38 @@ export default function ResourceAssignmentV2({
                           {resource.status}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-gray-600">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {formatDate(resource.start_date)}
-                          {resource.end_date && resource.end_date !== resource.start_date && (
-                            <> - {formatDate(resource.end_date)}</>
-                          )}
-                        </span>
+                      <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-gray-600">
+                        {editingDates?.id === resource.id ? (
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5" />
+                            <input
+                              type="date" value={editingDates.start} min={startDate} max={endDate}
+                              onChange={e => {
+                                const start = e.target.value
+                                setEditingDates(d => d && ({ ...d, start, end: SINGLE_DAY_TYPES.has(resource.resource_type) || d.end < start ? start : d.end }))
+                              }}
+                              className="px-2 py-1 text-sm border border-gray-300 rounded" aria-label="Start date"
+                            />
+                            <span>–</span>
+                            <input
+                              type="date" value={editingDates.end} min={editingDates.start} max={endDate}
+                              onChange={e => setEditingDates(d => d && ({ ...d, end: e.target.value }))}
+                              className="px-2 py-1 text-sm border border-gray-300 rounded" aria-label="End date"
+                            />
+                            <button type="button" onClick={handleSaveDates} disabled={savingDates} className="px-2 py-1 text-xs font-medium bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
+                              {savingDates ? 'Saving…' : 'Save'}
+                            </button>
+                            <button type="button" onClick={() => setEditingDates(null)} className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {formatDate(resource.start_date)}
+                            {resource.end_date && resource.end_date !== resource.start_date && (
+                              <> - {formatDate(resource.end_date)}</>
+                            )}
+                          </span>
+                        )}
                         {resource.notes && (
                           <span className="text-gray-500 truncate max-w-xs">• {resource.notes}</span>
                         )}
@@ -968,7 +1023,10 @@ export default function ResourceAssignmentV2({
                       <HeaderMenu
                         icon={<MoreHorizontal className="w-4 h-4" />}
                         ariaLabel="More actions"
-                        items={[{ label: 'Remove', icon: <Trash2 className="w-4 h-4" />, onSelect: () => handleRemoveResource(resource.id), danger: true }]}
+                        items={[
+                          { label: 'Change dates', icon: <Calendar className="w-4 h-4" />, onSelect: () => setEditingDates({ id: resource.id, start: resource.start_date.slice(0, 10), end: (resource.end_date || resource.start_date).slice(0, 10) }) },
+                          { label: 'Remove', icon: <Trash2 className="w-4 h-4" />, onSelect: () => handleRemoveResource(resource.id), danger: true },
+                        ]}
                       />
                     </div>
                   </div>
@@ -1225,7 +1283,12 @@ export default function ResourceAssignmentV2({
                   <input
                     type="date"
                     value={addFormData.start_date}
-                    onChange={(e) => setAddFormData({ ...addFormData, start_date: e.target.value })}
+                    onChange={(e) => {
+                      const start = e.target.value
+                      // One-day roles move with their start; nothing ends before it starts.
+                      const end = SINGLE_DAY_TYPES.has(activeTab) || addFormData.end_date < start ? start : addFormData.end_date
+                      setAddFormData({ ...addFormData, start_date: start, end_date: end })
+                    }}
                     min={startDate}
                     max={endDate}
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent"

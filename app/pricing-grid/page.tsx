@@ -776,11 +776,15 @@ function PricingGridContent() {
       const data = await res.json()
 
       if (data.success) {
+        // An office address offered as the client's was dropped by the save.
+        const warned = Array.isArray(data.warnings) && data.warnings.length > 0
+        if (warned) for (const w of data.warnings as string[]) showToast('error', w)
         setConfig(prev => ({
           ...prev,
           itineraryId: data.itineraryId,
           itineraryCode: data.itineraryCode,
           clientId: data.clientId ?? prev.clientId,
+          ...(warned ? { clientEmail: '' } : {}),
         }))
         if (typeof data.sellingTotal === 'number') setSavedSellingTotal(data.sellingTotal)
 
