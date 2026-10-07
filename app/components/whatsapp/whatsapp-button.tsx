@@ -13,6 +13,9 @@ interface WhatsAppButtonProps {
   contractPdfUrl?: string
   onSuccess?: () => void
   className?: string
+  /** 'quiet': a small outlined button that sits in a row with others (the
+   *  itinerary page's Messages tab). Default: the solid green button. */
+  variant?: 'solid' | 'quiet'
 }
 
 export default function WhatsAppButton({
@@ -24,7 +27,8 @@ export default function WhatsAppButton({
   guideId,
   contractPdfUrl,
   onSuccess,
-  className = ''
+  className = '',
+  variant = 'solid'
 }: WhatsAppButtonProps) {
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -133,6 +137,25 @@ export default function WhatsAppButton({
     if (sent) return 'bg-green-600 hover:bg-green-700'
     if (error) return 'bg-red-600 hover:bg-red-700'
     return 'bg-[#25D366] hover:bg-[#20BD5A]'
+  }
+
+  if (variant === 'quiet') {
+    return (
+      <span className="inline-flex flex-col gap-1">
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={loading || sent}
+          className={`px-3 py-1.5 border rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+            sent ? 'border-green-300 bg-green-50 text-green-700' : error ? 'border-red-300 bg-white text-red-700' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+          } ${className}`}
+        >
+          {getIcon()}
+          {getButtonText()}
+        </button>
+        {error && <span className="text-xs text-red-600">{error}</span>}
+      </span>
+    )
   }
 
   return (

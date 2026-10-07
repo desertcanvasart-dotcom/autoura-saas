@@ -51,8 +51,10 @@ export async function GET(request: NextRequest) {
       query = query.eq('assigned_to', assignedTo)
     }
 
+    // Tasks point at what they are for through linked_type / linked_id
+    // (the generator writes 'itinerary'); there is no itinerary_id column.
     if (itineraryId) {
-      query = query.eq('itinerary_id', itineraryId)
+      query = query.eq('linked_type', 'itinerary').eq('linked_id', itineraryId)
     }
 
     // Due date filters
