@@ -62,6 +62,7 @@ import { sanitizeTransportLines, isIntercityType, type TransportLine } from '@/l
 import { cruiseSailings, packageForDuration, type Sailing } from '@/lib/pricing/cruise-package'
 import { guideLanguageKey, pickGuideRateRow, type GuideRateRow } from '@/lib/guides/guide-language'
 import { roadShapeAt, type RoadShape } from '@/lib/pricing/road-trips'
+import { dayTripFrom } from '@/lib/pricing/day-trip'
 import { selectVehicleFromPackage, type PackageVehicleRates } from '@/lib/pricing/package-vehicle'
 import { tipLinesForTour, tipTotals, type TippingRow, type DayOccasions, type TipLine } from '@/lib/pricing/tipping'
 import { chooseEntranceFee, ambiguousFeeMessage } from '@/lib/pricing/entrance-fee-match'
@@ -213,6 +214,11 @@ export interface ItineraryDay {
    *  whatever else happens to be in that city. Absent = the engine picks, as
    *  it always has. */
   property_by_tier?: Record<string, string>
+  /** A DAY TRIP (lib/pricing/day-trip): the city the party goes to and comes
+   *  back from the same day. `city` is then where it is STAYING — the hotel,
+   *  the road moves before and after — and the vehicle is the Intercity Day
+   *  Trip from `city` to here. Absent = an ordinary day. */
+  day_trip_to?: string
   /** A transfer to somewhere else in town that is NOT sightseeing: the sound &
    *  light show, the market in Luxor or Aswan, an evening out. A day tour is
    *  the sightseeing; this is the getting there and back (operator,
@@ -606,6 +612,10 @@ export function determineTransportNeeds(
   area: TransportArea
   useSpecialVehicle: boolean
   specialVehicleType?: VehicleType
+  /** The road the vehicle runs when it is not "yesterday's city → today's":
+   *  a day trip's stay → sightseeing city. */
+  originCity?: string
+  destinationCity?: string
 } {
   // Check for explicit overrides first
   if (day.transport?.service_type) {
@@ -641,6 +651,21 @@ export function determineTransportNeeds(
       duration: 'one_way',
       area: null,
       useSpecialVehicle: false
+    }
+  }
+
+  // A day trip (lib/pricing/day-trip): out from where the party stays to the
+  // sightseeing city and back the same day — the agency's "Intercity Day
+  // Trip", priced on that road. Whatever city the day before was in, the
+  // party is based here tonight, so it is not a road move.
+  if (day.day_trip_to) {
+    return {
+      serviceType: 'intercity_day_trip',
+      duration: 'full_day',
+      area: null,
+      useSpecialVehicle: false,
+      originCity: day.city,
+      destinationCity: day.day_trip_to,
     }
   }
 
@@ -888,6 +913,11 @@ export function parseItinerary(itineraryData: any, opts?: {
     // tour, not from anything it says, so they do not make it a stated day.
     const asksForNothing = attractions.length === 0 && !hasAttractions
 
+    // A day trip is filed under where the party STAYS; the sightseeing city
+    // rides beside it (lib/pricing/day-trip).
+    const tripFrom = dayTripFrom({ ...day, transport_type })
+    const dayCity = day.city || inferCityFromTitle(day.title || '')
+
     return {
       day: day.day || index + 1,
       title: day.title || `Day ${index + 1}`,
@@ -901,7 +931,8 @@ export function parseItinerary(itineraryData: any, opts?: {
       /** A day-tour day that names no attraction: the guide, the vehicle and
        *  the tips are asked for, but its entrance fees cannot be. */
       dayTourWithoutAttractions: isDayTour && !saysNoSightseeing && attractions.length === 0 && attraction_ids.length === 0,
-      city: day.city || inferCityFromTitle(day.title || ''),
+      city: tripFrom ?? dayCity,
+      ...(tripFrom ? { day_trip_to: String(day.city).trim() } : {}),
       // A sleeping-train night has no hotel bed — the ticket IS the bed
       // (B-item 2); the sleeper night joins the rooming list instead.
       // A day tour has no overnight, whatever the day says: three live
@@ -2610,8 +2641,9 @@ export async function previewDayTransport(
       if (requiresHere && day.city) {
         const needs = determineTransportNeeds(day, previousDay, nextDay, roadShape)
         const intercity = isIntercityType(String(needs.serviceType))
-        lookup(String(needs.serviceType), day.city, intercity ? { from: previousDay?.city ?? '', to: day.city } : undefined, [],
-          intercity ? `${String(needs.serviceType).replace(/_/g, ' ')} ${previousDay?.city ?? '?'} → ${day.city}` : String(needs.serviceType).replace(/_/g, ' '), true)
+        const from = needs.originCity ?? previousDay?.city, to = needs.destinationCity ?? day.city
+        lookup(String(needs.serviceType), to, intercity ? { from: from ?? '', to } : undefined, [],
+          intercity ? `${String(needs.serviceType).replace(/_/g, ' ')} ${from ?? '?'} → ${to}${needs.originCity ? ' and back' : ''}` : String(needs.serviceType).replace(/_/g, ' '), true)
       }
     }
     // The extras — the derived ones (dinner, local, the road legs of a ticket),
@@ -4516,8 +4548,9 @@ export async function calculateDayBasedPricing(
       duration: needs.duration,
       area: needs.area,
       vehicleType,
-      originCity: itinerary[info.day - 2]?.city, // Previous day city for intercity
-      destinationCity: info.city
+      // Previous day city for intercity; a day trip names its own road.
+      originCity: needs.originCity ?? itinerary[info.day - 2]?.city,
+      destinationCity: needs.destinationCity ?? info.city
     })
 
     if (match && match.source === 'db') {
@@ -4525,7 +4558,7 @@ export async function calculateDayBasedPricing(
         id: `day${info.day}-transport`,
         dayNumber: info.day,
         serviceType: 'transportation',
-        serviceName: match.rate.route_name || `${vehicleType} - ${info.city}`,
+        serviceName: match.rate.route_name || (needs.originCity ? `${vehicleType} - ${needs.originCity} → ${needs.destinationCity} and back` : `${vehicleType} - ${info.city}`),
         quantity: 1,
         quantityMode: 'fixed',
         unitCost: match.rate.base_rate_eur,
@@ -4546,7 +4579,7 @@ export async function calculateDayBasedPricing(
         vehicleType,
         lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
         message: isIntercity(String(needs.serviceType))
-          ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${itinerary[info.day - 2]?.city ?? '?'} → ${info.city}. Add that route, in that shape, in Rates → Transportation.`
+          ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}. Add that route, in that shape, in Rates → Transportation.`
           : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
       })
     }
@@ -4662,8 +4695,8 @@ export async function calculateDayBasedPricing(
         duration: needs.duration,
         area: needs.area,
         vehicleType,
-        originCity: itinerary[info.day - 2]?.city,
-        destinationCity: info.city
+        originCity: needs.originCity ?? itinerary[info.day - 2]?.city,
+        destinationCity: needs.destinationCity ?? info.city
       })
 
       if (match && match.source === 'db') {
@@ -4679,7 +4712,7 @@ export async function calculateDayBasedPricing(
           vehicleType,
           lookupAttempted: `${needs.serviceType}/${needs.duration} ${vehicleType} in ${info.city}`,
           message: isIntercity(String(needs.serviceType))
-            ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${itinerary[info.day - 2]?.city ?? '?'} → ${info.city}. Add that route, in that shape, in Rates → Transportation.`
+            ? `No ${String(needs.serviceType).replace(/_/g, ' ')} rate for ${vehicleType} ${needs.originCity ?? itinerary[info.day - 2]?.city ?? '?'} → ${needs.destinationCity ?? info.city}. Add that route, in that shape, in Rates → Transportation.`
             : `No exact transport rate for ${vehicleType} (${needs.serviceType}/${needs.duration}) in ${info.city}. Add it in Rates → Transportation.`,
         })
       }

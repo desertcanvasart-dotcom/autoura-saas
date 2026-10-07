@@ -38,6 +38,9 @@ export interface DayForm {
   /** '' = leave as it was. 'in_transit' = the day is spent in the air. */
   night: string
   cityTransfer: boolean
+  /** A day trip: where the party is staying, the sightseeing being in `city`
+   *  (lib/pricing/day-trip). '' = an ordinary day; undefined = as it was. */
+  dayTripFrom?: string
   /** '' = a day tour, as before. */
   length: string
   propertiesByTier: Record<string, string>
@@ -132,6 +135,14 @@ export function applyDayForm(existing: Day | null, form: DayForm, dayNumber: num
 
   if (form.cityTransfer) day.city_transfer = true
   else drop(day, 'city_transfer')
+
+  // A day trip (lib/pricing/day-trip). The editor shows it, so it owns it; a
+  // caller that does not pass it leaves the day's as it was.
+  if (form.dayTripFrom !== undefined) {
+    const tripFrom = form.dayTripFrom.trim().replace(/\s+/g, ' ').slice(0, 80)
+    if (tripFrom) day.day_trip_from = tripFrom
+    else drop(day, 'day_trip_from')
+  }
 
   // The operator's own transport list (sibling #454). Absent = automatic.
   if (Array.isArray(form.transportLines)) day.transport_lines = sanitizeTransportLines(form.transportLines) ?? []
