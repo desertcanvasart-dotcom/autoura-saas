@@ -22,6 +22,8 @@ interface Tenant {
    * See lib/pricing/resolve-margin.ts.
    */
   default_margin_percent: number | null
+  /** Warn on an itinerary below this margin, on cost (migration 399). NULL = not set. */
+  min_margin_percent?: number | null
   /**
    * The currency this agency bills in (migration 281 reconciled it with the
    * legacy `currency` column and pins the two together). Amounts belonging to

@@ -26,6 +26,7 @@ import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-p
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
+import { actualMargin, quotedMargin } from '@/lib/itineraries/margin'
 import { dayResources, tripCoverage, type CoverageAssignment, type DayResource } from '@/lib/itineraries/coverage'
 import CoverageGrid from '@/components/itineraries/CoverageGrid'
 import type { TripPnL } from '@/lib/trip-pnl'
@@ -803,6 +804,12 @@ export default function ViewItineraryPage() {
   const attention = tripAttention({
     ...facts,
     missingResources: coverage.filter(r => r.missing.length > 0).map(r => ({ label: r.label, days: r.missing })),
+    minMarginPercent: tenant?.min_margin_percent ?? null,
+    quotedMarginPercent: (() => {
+      const q = quotedMargin(days.flatMap(d => d.services as never[]), marginPercent)
+      return q.supplierCost > 0 ? q.percent : null
+    })(),
+    actualMargin: actualMargin(actualPnl),
     currency: itinerary.currency || 'EUR',
     cruiseNotes: itinerary.cruise_sailing_notes ?? [],
     staleNights: days.flatMap(day => {
@@ -856,7 +863,8 @@ export default function ViewItineraryPage() {
       selectTab('itinerary')
       setExpandedDays(prev => new Set([...prev, dayNumber]))
       setTimeout(() => scrollTo(`day-${dayNumber}`), 50)
-    } else if (kind === 'assign_resources') { selectTab('operations'); setTimeout(() => scrollTo('resource-assignment'), 50) }
+    } else if (kind === 'open_finance') { selectTab('finance'); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+    else if (kind === 'assign_resources') { selectTab('operations'); setTimeout(() => scrollTo('resource-assignment'), 50) }
     else if (kind === 'create_invoice' || kind === 'record_payment') handleGenerateInvoice()
     else if (kind === 'close_out') closeOut()
   }

@@ -117,7 +117,7 @@ export function defaultTab(f: Pick<TripFacts, 'startDate' | 'endDate' | 'today' 
 
 // ── What needs attention ───────────────────────────────────────────────────
 
-export type AttentionAction = 'create_invoice' | 'record_payment' | 'close_out' | 'go_to_day' | 'assign_resources'
+export type AttentionAction = 'create_invoice' | 'record_payment' | 'close_out' | 'go_to_day' | 'assign_resources' | 'open_finance'
 
 export interface Attention {
   severity: 'warning' | 'info'
@@ -135,7 +135,15 @@ export interface AttentionInput extends TripFacts {
   paymentDueDays?: number
   /** Resource types some day needs with nobody assigned (lib/itineraries/coverage). */
   missingResources?: { label: string; days: number[] }[]
+  /** The agency's minimum margin, a markup on cost (tenants.min_margin_percent); null = not set. */
+  minMarginPercent?: number | null
+  /** The quoted margin, on cost (lib/itineraries/margin quotedMargin); null = nothing priced. */
+  quotedMarginPercent?: number | null
+  /** Profit so far on the costs recorded (lib/itineraries/margin actualMargin). */
+  actualMargin?: { profit: number; percent: number | null } | null
 }
+
+const pct = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, '')}%`
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
 
@@ -186,6 +194,30 @@ export function tripAttention(i: AttentionInput): Attention[] {
         action: { kind: 'assign_resources', label: 'Assign' },
       })
     }
+  }
+
+  // Margin: a loss already booked is said whether or not a minimum is set;
+  // below the agency's minimum only once it has set one.
+  const min = i.minMarginPercent
+  const actual = i.actualMargin
+  if (actual && actual.profit < -0.005) {
+    out.push({
+      severity: 'warning',
+      message: `This trip is losing money so far: ${i.currency} ${actual.profit.toFixed(2)} after the costs recorded.`,
+      action: { kind: 'open_finance', label: 'Open finance' },
+    })
+  } else if (min != null && actual?.percent != null && actual.percent < min - 0.05) {
+    out.push({
+      severity: 'warning',
+      message: `Profit so far is ${pct(actual.percent)} on cost — below your ${pct(min)} minimum.`,
+      action: { kind: 'open_finance', label: 'Open finance' },
+    })
+  } else if (min != null && !actual && i.quotedMarginPercent != null && i.quotedMarginPercent < min - 0.05) {
+    out.push({
+      severity: 'warning',
+      message: `The quoted margin is ${pct(i.quotedMarginPercent)} on cost — below your ${pct(min)} minimum.`,
+      action: { kind: 'open_finance', label: 'Open finance' },
+    })
   }
 
   if (ended && status !== 'completed') {

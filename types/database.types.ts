@@ -9404,6 +9404,7 @@ export interface Database {
           tagline: string | null
           is_primary: boolean | null
           locale: string
+          min_margin_percent: number | null
           stripe_customer_id: string | null
           email_domain: string | null
           email_from_local: string
@@ -9440,6 +9441,7 @@ export interface Database {
           tagline?: string | null
           is_primary?: boolean | null
           locale?: string
+          min_margin_percent?: number | null
           stripe_customer_id?: string | null
           email_domain?: string | null
           email_from_local?: string
@@ -9476,6 +9478,7 @@ export interface Database {
           tagline?: string | null
           is_primary?: boolean | null
           locale?: string
+          min_margin_percent?: number | null
           stripe_customer_id?: string | null
           email_domain?: string | null
           email_from_local?: string
