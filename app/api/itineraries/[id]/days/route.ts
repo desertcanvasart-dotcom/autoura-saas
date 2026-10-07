@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAuthenticatedClient } from '@/lib/supabase-server'
-import { propertyFromService, propertyRateStatus, type PropertyRateStatus } from '@/lib/itineraries/overnight-property'
+import { propertyFromService, propertyRateStatus, type PropertyRateStatus, type RatePin } from '@/lib/itineraries/overnight-property'
 
 export async function GET(
   request: Request,
@@ -37,14 +37,14 @@ export async function GET(
     // A catalogue that failed to load says nothing about its properties: the
     // status is withheld for that kind, never reported as "not in your rates".
     const [{ data: hotelRows, error: hotelError }, { data: shipRows, error: shipError }] = await Promise.all([
-      supabase.from('accommodation_rates').select('property_name, is_active'),
-      supabase.from('nile_cruises').select('ship_name, is_active'),
+      supabase.from('accommodation_rates').select('id, property_name, city, is_active'),
+      supabase.from('nile_cruises').select('id, ship_name, is_active'),
     ])
     if (hotelError || shipError) console.warn('[days-api] rates catalogue partly unavailable; overnight status withheld', hotelError?.message ?? shipError?.message)
     const loadedFor = { hotel: !hotelError, cruise: !shipError }
     const catalog = {
-      hotels: (hotelRows ?? []).map(r => ({ name: r.property_name, active: r.is_active })),
-      ships: (shipRows ?? []).map(r => ({ name: r.ship_name, active: r.is_active })),
+      hotels: (hotelRows ?? []).map(r => ({ id: r.id, name: r.property_name, city: r.city, active: r.is_active })),
+      ships: (shipRows ?? []).map(r => ({ id: r.id, name: r.ship_name, active: r.is_active })),
     }
 
     // Fetch services for each day
@@ -67,7 +67,7 @@ export async function GET(
             ...service,
             property_rate_status: ((): PropertyRateStatus | null => {
               const property = propertyFromService(service as never)
-              return property && loadedFor[property.kind] ? propertyRateStatus(property, catalog) : null
+              return property && loadedFor[property.kind] ? propertyRateStatus(property, catalog, service as RatePin) : null
             })(),
           }))
         }

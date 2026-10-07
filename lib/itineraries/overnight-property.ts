@@ -100,13 +100,50 @@ export const propertyKey = (name: string | null | undefined): string =>
   String(name ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
 
 export interface RatesCatalog {
-  hotels: ReadonlyArray<{ name: unknown; active: unknown }>
-  ships: ReadonlyArray<{ name: unknown; active: unknown }>
+  /** id and city are optional: with them, a line pinned to its rate row is
+   *  judged by that row, and "<hotel> <city>" names still find the hotel. */
+  hotels: ReadonlyArray<{ name: unknown; active: unknown; id?: unknown; city?: unknown }>
+  ships: ReadonlyArray<{ name: unknown; active: unknown; id?: unknown; city?: unknown }>
 }
 
-export function propertyRateStatus(property: OvernightProperty, catalog: RatesCatalog): PropertyRateStatus {
-  const key = propertyKey(property.name)
-  const rows = (property.kind === 'cruise' ? catalog.ships : catalog.hotels).filter(r => propertyKey(String(r.name ?? '')) === key)
-  if (rows.length === 0) return 'not_on_file'
-  return rows.some(r => r.active !== false) ? 'on_file' : 'switched_off'
+/** The rate row a line was priced from (migration 353), when it says. */
+export interface RatePin {
+  rate_table?: string | null
+  rate_id?: string | null
+}
+
+/** Separators a line's name carries around the hotel — "Marriott Mena House
+ *  | Cairo", "Hotel - X, Luxor" — read as spaces, so only the words compare. */
+const looseKey = (name: string | null | undefined): string =>
+  propertyKey(String(name ?? '').replace(/[|,;/()\[\]–—-]+/g, ' '))
+
+/**
+ * Is the night's hotel or ship still in the rates?
+ *
+ *   1. A line pinned to its rate row (the Pricing Grid saves rate_table and
+ *      rate_id) is judged by THAT row: there and on, switched off, or gone.
+ *      Its name is never re-read — so a name that drifts from the rate's
+ *      ("Marriott Mena House | Cairo" for "Marriott Mena House") can no longer
+ *      read as "removed after this trip was priced".
+ *   2. Otherwise by name, loosely: case, spacing and separators aside, and
+ *      "<hotel> <city>" counts as <hotel> in that city.
+ */
+export function propertyRateStatus(property: OvernightProperty, catalog: RatesCatalog, pin?: RatePin | null): PropertyRateStatus {
+  const rows = property.kind === 'cruise' ? catalog.ships : catalog.hotels
+  const table = property.kind === 'cruise' ? 'nile_cruises' : 'accommodation_rates'
+  if (pin?.rate_id && pin.rate_table === table && rows.some(r => r.id !== undefined)) {
+    const row = rows.find(r => String(r.id) === pin.rate_id)
+    if (!row) return 'not_on_file'
+    return row.active !== false ? 'on_file' : 'switched_off'
+  }
+  const key = looseKey(property.name)
+  const matches = rows.filter(r => {
+    const name = looseKey(String(r.name ?? ''))
+    if (!name) return false
+    if (name === key) return true
+    const city = looseKey(String(r.city ?? ''))
+    return !!city && (key === `${name} ${city}` || key === `${city} ${name}`)
+  })
+  if (matches.length === 0) return 'not_on_file'
+  return matches.some(r => r.active !== false) ? 'on_file' : 'switched_off'
 }
