@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { SERVICE_TO_DOC_TYPE, docMappingFor } from '@/lib/documents/group-services'
 import fs from 'fs'
 import path from 'path'
 import { contractNumber, contractTravelers, contractDuration, contractDestinations } from '@/lib/contract-facts'
@@ -100,14 +101,14 @@ describe('Generate Documents handles every service type the grid saves', () => {
     const gridTypes = new Set([...fn.slice(0, fn.indexOf('return map')).matchAll(/:\s*'(\w+)'/g)].map(m => m[1]))
     expect(gridTypes.size).toBeGreaterThan(5)
 
-    const gen = read('app/api/itineraries/[id]/generate-documents/route.ts')
-    const table = gen.slice(gen.indexOf('const SERVICE_TO_DOC_TYPE'), gen.indexOf('// Map supplier types'))
-    for (const t of gridTypes) expect(table, `grid type '${t}' unmapped — skipped silently`).toMatch(new RegExp(`\\n\\s+${t}: \\{`))
+    // The table lives in lib/documents/group-services, which the route uses.
+    expect(read('app/api/itineraries/[id]/generate-documents/route.ts')).toContain('docMappingFor(')
+    for (const t of gridTypes) expect(Object.keys(SERVICE_TO_DOC_TYPE), `grid type '${t}' unmapped — skipped silently`).toContain(t)
   })
   it('entrance fees make a service order', () => {
-    expect(read('app/api/itineraries/[id]/generate-documents/route.ts')).toMatch(/entrance_fee: \{ docType: 'service_order', category: 'entrance' \}/)
+    expect(docMappingFor({ service_type: 'entrance_fee' })).toEqual({ docType: 'service_order', category: 'entrance' })
   })
   it('a grid cruise line gets a cruise voucher, not a hotel voucher', () => {
-    expect(read('app/api/itineraries/[id]/generate-documents/route.ts')).toContain("startsWith('[pricing-grid:cruise]')")
+    expect(docMappingFor({ service_type: 'accommodation', description: '[pricing-grid:cruise] MS Nile' })?.docType).toBe('cruise_voucher')
   })
 })
