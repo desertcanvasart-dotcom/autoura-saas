@@ -123,9 +123,9 @@ const PAYMENT_METHODS = [
   { value: 'credit_card', label: 'Credit Card' },
   { value: 'cash', label: 'Cash' },
   { value: 'paypal', label: 'PayPal' },
-  { value: 'wise', label: 'Wise' },
-  { value: 'airwallex', label: 'Airwallex' },
   { value: 'stripe', label: 'Stripe' },
+  { value: 'tab', label: 'Tab' },
+  { value: 'other', label: 'Other' },
 ]
 
 const REMINDER_TYPE_LABELS: Record<string, string> = {

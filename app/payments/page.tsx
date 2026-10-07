@@ -353,8 +353,6 @@ export default function PaymentsPage() {
           <option value="credit_card">Credit Card</option>
           <option value="cash">Cash</option>
           <option value="paypal">PayPal</option>
-          <option value="wise">Wise</option>
-          <option value="airwallex">Airwallex</option>
           <option value="stripe">Stripe</option>
           <option value="tab">Tab</option>
         </select>

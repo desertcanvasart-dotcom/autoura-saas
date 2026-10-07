@@ -121,7 +121,6 @@ const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'credit_card', label: 'Credit Card' },
-  { value: 'wise', label: 'Wise' },
   { value: 'paypal', label: 'PayPal' },
   { value: 'company_card', label: 'Company Card' }
 ]

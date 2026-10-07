@@ -33,10 +33,10 @@ interface Payment {
   transaction_reference: string | null
 }
 
-/** The methods invoice_payments accepts (its CHECK, migration 006). */
+/** The methods invoice_payments accepts (its CHECK, migration 400). */
 const METHOD_LABELS: Record<string, string> = {
   bank_transfer: 'Bank transfer', cash: 'Cash', credit_card: 'Credit card',
-  paypal: 'PayPal', stripe: 'Stripe', other: 'Other',
+  paypal: 'PayPal', stripe: 'Stripe', tab: 'Tab', other: 'Other',
 }
 
 const STATUS: Record<string, string> = {

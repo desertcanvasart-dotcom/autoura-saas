@@ -31,7 +31,7 @@ export default function ExpensesCommissionsPage() {
               <li><strong>Link to itinerary</strong> (optional &mdash; connects the expense to a specific trip for P&amp;L)</li>
               <li><strong>Receipt</strong> (upload or paste URL)</li>
               <li><strong>Status</strong> &mdash; Pending, Approved, Paid, Rejected</li>
-              <li><strong>Payment method</strong> &mdash; Cash, Bank Transfer, Credit Card, Wise, PayPal, Company Card</li>
+              <li><strong>Payment method</strong> &mdash; Cash, Bank Transfer, Credit Card, PayPal, Company Card</li>
             </ul>
           </li>
           <li>Click <strong>Save</strong></li>
