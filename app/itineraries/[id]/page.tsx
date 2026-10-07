@@ -28,11 +28,11 @@ import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-p
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
-import { actualMargin, quotedMargin } from '@/lib/itineraries/margin'
-import { COVERAGE_LABELS, dayResources, tripCoverage, type CoverageAssignment, type CoverageType, type DayResource } from '@/lib/itineraries/coverage'
+import { buildTripAttention } from '@/lib/itineraries/attention'
+import { COVERAGE_LABELS, dayResources, type CoverageAssignment, type CoverageType, type DayResource } from '@/lib/itineraries/coverage'
 import CoverageGrid from '@/components/itineraries/CoverageGrid'
 import type { TripPnL } from '@/lib/trip-pnl'
-import { defaultTab, nextAction, tripAttention, tripSteps, type AttentionAction, type PrimaryKind, type TabKey } from '@/lib/itineraries/trip-stage'
+import { defaultTab, nextAction, tripSteps, type AttentionAction, type PrimaryKind, type TabKey } from '@/lib/itineraries/trip-stage'
 import HeaderMenu from '@/components/HeaderMenu'
 import { useConfirmDialog } from '@/components/ConfirmDialog'
 
@@ -797,39 +797,20 @@ export default function ViewItineraryPage() {
 
   // Where the trip stands, what to do next, and what needs attention
   // (lib/itineraries/trip-stage) — from what this page already loaded.
-  const facts = {
-    status: itinerary.status,
+  const { facts, coverage, attention } = buildTripAttention({
+    itinerary,
+    today: todayLocal(),
     hasBooking: !!booking,
     hasInvoice: !!existingInvoice,
-    invoiced: actualPnl && actualPnl.invoice_count > 0 ? actualPnl.total_revenue : null,
-    paid: actualPnl && actualPnl.invoice_count > 0 ? actualPnl.total_paid : null,
-    startDate: itinerary.start_date,
-    endDate: itinerary.end_date,
-    today: todayLocal(),
-  }
+    pnl: actualPnl,
+    days,
+    assignments,
+    cruiseNotes: itinerary.cruise_sailing_notes ?? [],
+    minMarginPercent: tenant?.min_margin_percent ?? null,
+  })
   const steps = tripSteps(facts)
   const tab: TabKey = tabChoice ?? defaultTab(facts)
   const primary = nextAction(facts)
-  const coverage = assignments ? tripCoverage(days, assignments) : []
-  const attention = tripAttention({
-    ...facts,
-    missingResources: coverage.filter(r => r.missing.length > 0).map(r => ({ label: r.label, days: r.missing })),
-    minMarginPercent: tenant?.min_margin_percent ?? null,
-    quotedMarginPercent: (() => {
-      const q = quotedMargin(days.flatMap(d => d.services as never[]), marginPercent)
-      return q.supplierCost > 0 ? q.percent : null
-    })(),
-    actualMargin: actualMargin(actualPnl),
-    currency: itinerary.currency || 'EUR',
-    cruiseNotes: itinerary.cruise_sailing_notes ?? [],
-    staleNights: days.flatMap(day => {
-      const property = overnightProperty(day.services as never)
-      const status = day.services.find(sv => sv.property_rate_status)?.property_rate_status
-      return property && (status === 'not_on_file' || status === 'switched_off')
-        ? [{ day: day.day_number, property: property.name, switchedOff: status === 'switched_off' }]
-        : []
-    }),
-  })
 
   const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 

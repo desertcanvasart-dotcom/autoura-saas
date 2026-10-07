@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, FileText, Eye, Edit2, Trash2, CheckCircle2, AlertCircle, X } from 'lucide-react'
+import { Plus, FileText, Eye, Edit2, Trash2, CheckCircle2, AlertCircle, X, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
+import { todayLocal } from '@/lib/today'
 
 interface Itinerary {
   id: string
@@ -31,6 +33,10 @@ export default function ItinerariesPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  // What needs attention on each open trip — the same list the trip's own
+  // page shows (GET /api/itineraries/attention, lib/itineraries/attention).
+  const [attention, setAttention] = useState<Record<string, { count: number; warnings: number; items: string[] }>>({})
+  const [attentionOnly, setAttentionOnly] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
   const router = useRouter()
@@ -54,7 +60,7 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
 
   useEffect(() => {
     filterItineraries()
-  }, [itineraries, searchQuery, statusFilter])
+  }, [itineraries, searchQuery, statusFilter, attentionOnly, attention])
 
   const fetchItineraries = async () => {
     try {
@@ -62,6 +68,11 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
       const data = await response.json()
       if (data.success) {
         setItineraries(data.data)
+        // After the list, not before it: the counts must never hold the page up.
+        fetch(`/api/itineraries/attention?today=${todayLocal()}`)
+          .then(r => r.json())
+          .then(json => { if (json?.success && json.data) setAttention(json.data) })
+          .catch(() => undefined)
       }
     } catch (error) {
       console.error('Error fetching itineraries:', error)
@@ -72,6 +83,10 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
 
   const filterItineraries = () => {
     let filtered = itineraries
+
+    if (attentionOnly) {
+      filtered = filtered.filter(it => attention[it.id])
+    }
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(it => it.status === statusFilter)
@@ -303,8 +318,23 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
         />
       </div>
 
-      <div className="text-xs text-gray-500">
-        Showing <span className="font-semibold text-gray-700">{filteredItineraries.length}</span> of {itineraries.length} itineraries
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs text-gray-500">
+          Showing <span className="font-semibold text-gray-700">{filteredItineraries.length}</span> of {itineraries.length} itineraries
+        </div>
+        {Object.keys(attention).length > 0 && (
+          <button
+            type="button"
+            onClick={() => setAttentionOnly(v => !v)}
+            aria-pressed={attentionOnly}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+              attentionOnly ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            {Object.keys(attention).length} need attention
+          </button>
+        )}
       </div>
 
       {/* ⭐ COMPACT TABLE - Linear Style */}
@@ -331,6 +361,19 @@ const showToast = (type: 'success' | 'error' | 'info', message: string) => {
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono font-medium bg-primary-50 text-primary-700 border border-primary-200">
                       {itinerary.itinerary_code}
                     </span>
+                    {attention[itinerary.id] && (
+                      <Link
+                        href={`/itineraries/${itinerary.id}`}
+                        title={attention[itinerary.id].items.join('\n')}
+                        aria-label={`${attention[itinerary.id].count} need attention: ${attention[itinerary.id].items.join('; ')}`}
+                        className={`ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                          attention[itinerary.id].warnings > 0 ? 'bg-amber-100 text-amber-800' : 'bg-blue-50 text-blue-700'
+                        }`}
+                      >
+                        <AlertTriangle className="w-3 h-3" />
+                        {attention[itinerary.id].count}
+                      </Link>
+                    )}
                   </td>
                   <td className="px-3 py-3">
                     <div className="text-sm font-medium text-gray-900">{itinerary.client_name}</div>
