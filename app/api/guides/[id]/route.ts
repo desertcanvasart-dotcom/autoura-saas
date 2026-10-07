@@ -9,7 +9,7 @@
 // A guide is a SUPPLIER row (supplier_type='guide') — the same source the
 // list at /api/guides reads, and the id every guide picker stores. This
 // route used to read the legacy `guides` table, so a guide picked in the app
-// 404'd here (ResourceSummaryCard, the resources page's Delete).
+// 404'd here (the resources page's Delete).
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server'

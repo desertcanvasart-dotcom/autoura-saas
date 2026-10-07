@@ -3,9 +3,8 @@ import { requireAuth } from '@/lib/supabase-server'
 
 // GET /api/resources/vehicles/[id]
 // Single transport supplier, mapped to the same vehicle-resource shape the
-// list route returns. ResourceSummaryCard calls this to resolve an assigned
-// vehicle; before this route existed it fetched /api/vehicles/[id], which
-// has never been a route in this app.
+// list route returns. Its only in-app caller, ResourceSummaryCard, was
+// removed with the itinerary page redesign; the route stays for the API.
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
