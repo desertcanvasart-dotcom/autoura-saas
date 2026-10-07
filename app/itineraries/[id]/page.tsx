@@ -28,7 +28,7 @@ import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } f
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
 import { serviceLabel, serviceTypeLabel, splitSystemNote } from '@/lib/itineraries/display'
 import { actualMargin, quotedMargin } from '@/lib/itineraries/margin'
-import { dayResources, tripCoverage, type CoverageAssignment, type DayResource } from '@/lib/itineraries/coverage'
+import { COVERAGE_LABELS, dayResources, tripCoverage, type CoverageAssignment, type CoverageType, type DayResource } from '@/lib/itineraries/coverage'
 import CoverageGrid from '@/components/itineraries/CoverageGrid'
 import type { TripPnL } from '@/lib/trip-pnl'
 import { defaultTab, nextAction, tripAttention, tripSteps, type AttentionAction, type PrimaryKind, type TabKey } from '@/lib/itineraries/trip-stage'
@@ -1387,7 +1387,17 @@ export default function ViewItineraryPage() {
         </div>
 
         {/* Trip timeline — the execution layer's checkpoint log, office view */}
-        <div id="trip-timeline"><TripTimeline itineraryId={itinerary.id} /></div>
+        <div id="trip-timeline">
+          <TripTimeline
+            itineraryId={itinerary.id}
+            startDate={itinerary.start_date}
+            endDate={itinerary.end_date}
+            today={facts.today}
+            people={(assignments ?? [])
+              .filter(a => a.id && String(a.status ?? '').toLowerCase() !== 'cancelled')
+              .map(a => ({ id: a.id!, label: `${COVERAGE_LABELS[a.resource_type as CoverageType] ?? a.resource_type}: ${a.resource_name ?? ''}`.trim() }))}
+          />
+        </div>
 
               </div>
             )}
