@@ -389,10 +389,14 @@ Return valid JSON only (no markdown, no backticks):
 ## TRANSPORT RULES
 The transport catalog has different service_type values. A single day often needs MULTIPLE transport entries:
 - "airport_transfer" — one-way airport-to-hotel or hotel-to-airport transfer
-- "day_tour" — full-day sightseeing transport within a city
-- "intercity" — between cities by road (e.g., Cairo → Alexandria)
+- "day_tour" / "half_day" / "long_day_tour" — sightseeing transport within a city (eight, four, twelve hours)
+- "intercity_dropoff" — one way by road to another city, sleeping there (e.g., Cairo → Alexandria, night in Alexandria)
+- "intercity_day_trip" — by road to another city and BACK THE SAME DAY, sleeping where the day started (e.g., Cairo → Alexandria → Cairo)
+- "intercity_overnight" — by road to another city, a night there, and back the NEXT day (priced once, on the day out)
 
 **Airport transfer and day tour are ALWAYS separate entries, even in the same city on the same day.**
+
+**Where the party sleeps decides the road rate.** A day that sightsees in one city and sleeps in another (an "Alexandria day trip" from a Cairo hotel, "CAI/ALX/CAI") takes the intercity_day_trip from the hotel's city to the sightseeing city — never intercity_overnight, never intercity_dropoff, and not a day_tour inside the sightseeing city. Its hotel stays in the city where they sleep. If the catalog has no intercity_day_trip for that road, a day_tour from the hotel's city to that city; otherwise leave the route empty for the operator rather than take another kind of journey.
 
 Common patterns (select ALL that apply for each day):
 - Arrival day with sightseeing: airport_transfer (airport→hotel) + day_tour (sightseeing transport)
@@ -403,7 +407,8 @@ Common patterns (select ALL that apply for each day):
   * airport_transfer in origin city (hotel→airport)
   * airport_transfer in destination city (airport→hotel or airport→sites)
   * day_tour in destination city (if sightseeing)
-- Intercity by road: intercity transfer (replaces flight + airport transfers)
+- Intercity by road, sleeping in the new city: intercity_dropoff (replaces flight + airport transfers)
+- Day trip to another city and back to the same hotel: intercity_day_trip (hotel's city → sightseeing city)
 
 Pick vehicle size based on pax count (${pax} travelers): sedan(1-2), minivan(3-7), van(8-12), minibus(13-20), bus(21-45).
 Match the origin_city and destination_city of each transport entry to the day's actual route.
@@ -678,7 +683,7 @@ Per-person services (cost per traveler):
 A single day often needs MULTIPLE separate transport services. Always list each as a separate service item:
 - "airport_transfer" — one-way airport-to-hotel or hotel-to-airport transfer
 - "day_tour" — full-day sightseeing transport within a city
-- "intercity" — between cities by road
+- intercity by road — one way and sleeping there; a day trip there and back the same day; or there and back the next day
 
 **Airport transfer and day tour are ALWAYS separate entries, even in the same city on the same day.**
 
@@ -691,7 +696,8 @@ Common patterns (list ALL that apply):
   * "Transfer from hotel to Cairo Airport" (group)
   * "Airport transfer from Luxor Airport to hotel/sites" (group)
   * "Full-day sightseeing transport in Luxor" (group)
-- Intercity by road: "Intercity transfer from [City A] to [City B]" (group)
+- Intercity by road, sleeping in the new city: "Intercity drop-off from [City A] to [City B]" (group)
+- Day trip to another city, back to the same hotel the same day: "Intercity day trip from [Hotel city] to [City B] and back" (group) — the hotel stays in the hotel's city
 
 ## RULES
 - List every service/activity mentioned or implied for each day as a separate item

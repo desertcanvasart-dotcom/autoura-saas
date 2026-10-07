@@ -28,6 +28,8 @@
 // without its single supplement takes it back: the save writes the supplement
 // only for a party of one (single-supplement.ts), but the grid keeps it for
 // any party — the B2B sheet's tour leader and a later switch to 1 pax use it.
+// A transport item takes its rate's current name (the route, and the kind of
+// journey), never a name it was saved under.
 
 import type { AllRates, GridDay, RateOption, SelectedItem, SlotValue } from '../types'
 import { supplementItem } from './single-supplement'
@@ -80,6 +82,13 @@ export function hydrateDayRates(
         }
         // Whose tip it is, likewise the rate's (guide-rule.ts).
         if (opt.tip_role && !item.tipRole) next = { ...next, tipRole: opt.tip_role }
+        // A transport line reloads under the name it was saved with — which
+        // may be an old route name, or one without the kind of journey — and
+        // read as a route the agency does not have (operator, 2026-10-07).
+        // The rate it came from names it now; the price is not touched.
+        if (out.slotId === 'route' && opt.name && opt.name !== item.name) {
+          next = { ...next, name: opt.name }
+        }
         const repriced = !(mode === 'missing' && priced(item)) &&
           (opt.rateEur !== item.rateEur || opt.rateNonEur !== item.rateNonEur)
         if (repriced) next = { ...next, rateEur: opt.rateEur, rateNonEur: opt.rateNonEur }
