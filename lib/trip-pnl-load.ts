@@ -61,7 +61,7 @@ export async function loadTripPnls(
       scoped(
         supabase
           .from('expenses')
-          .select('itinerary_id, expense_number, amount, currency, category, status, expense_date, payment_date')
+          .select('itinerary_id, expense_number, amount, currency, category, status, expense_date, payment_date, booking_supplier_status_id')
       ),
       scoped(
         supabase
