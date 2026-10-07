@@ -124,6 +124,8 @@ const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
   { value: 'paypal', label: 'PayPal' },
   { value: 'stripe', label: 'Stripe' },
+  { value: 'tab', label: 'Tab' },
+  { value: 'other', label: 'Other' },
 ]
 
 const REMINDER_TYPE_LABELS: Record<string, string> = {
