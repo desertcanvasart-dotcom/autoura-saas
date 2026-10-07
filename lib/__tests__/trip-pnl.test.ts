@@ -586,3 +586,23 @@ describe('buildPnlSummary — one currency, or none', () => {
     expect(summary.untranslated_trips).toBe(0)
   })
 })
+
+describe('other expenses: the costs that are not a supplier\'s confirmed cost', () => {
+  it('a supplier\'s confirmed cost is left out; a tip, a forgotten entrance, are counted — converted like the rest', () => {
+    const pnl = compute({
+      invoices: [invoice()],
+      expenses: [
+        expense({ expense_number: 'EXP-1', amount: 900, booking_supplier_status_id: 'bss-hotel' }),
+        expense({ expense_number: 'EXP-2', amount: 40 }),
+        expense({ expense_number: 'EXP-3', amount: 2750, currency: 'EGP', expense_date: '2026-03-01' }),
+      ],
+    })
+    expect(pnl.total_expenses).toBe(990)
+    expect(pnl.other_expenses).toBe(90)
+  })
+
+  it('a rejected expense is not one', () => {
+    const pnl = compute({ expenses: [expense({ amount: 40, status: 'rejected' })] })
+    expect(pnl.other_expenses).toBe(0)
+  })
+})

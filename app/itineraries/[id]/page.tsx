@@ -24,6 +24,7 @@ import ItineraryBookingAction from '@/components/ItineraryBookingAction'
 import TripTasksCard from '@/components/itineraries/TripTasksCard'
 import InvoicesPayments from '@/components/itineraries/InvoicesPayments'
 import CancelTripDialog from '@/components/itineraries/CancelTripDialog'
+import TripCommissions from '@/components/itineraries/TripCommissions'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
@@ -402,6 +403,8 @@ export default function ViewItineraryPage() {
       if (result.success) {
         setCommissionResult(`✅ ${result.message}`)
         setTimeout(() => setCommissionResult(null), 5000)
+        // The Finance tab's list and the P&L read them: refresh both.
+        setExpenseRefreshTrigger(t => t + 1)
       } else {
         showToast('error', result.error || 'Failed to generate commissions')
       }
@@ -1508,6 +1511,15 @@ export default function ViewItineraryPage() {
           itineraryId={itinerary.id}
           currency={itinerary.currency || 'EUR'}
           refreshTrigger={expenseRefreshTrigger}
+        />
+
+        {/* COMMISSIONS — earned and owed, as the P&L counts them. */}
+        <TripCommissions
+          itineraryId={itinerary.id}
+          currency={itinerary.currency || 'EUR'}
+          refreshSignal={expenseRefreshTrigger}
+          onGenerate={handleGenerateCommissions}
+          generating={generatingCommissions}
         />
 
               </div>
