@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { X, Send, Loader2, Paperclip } from 'lucide-react'
+import { escapeHtml } from '@/lib/html-escape'
 
 interface Props {
   onClose: () => void
@@ -17,24 +18,43 @@ export default function ComposeEmailModal({ onClose, userId, onSent, defaultTo, 
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [notConnected, setNotConnected] = useState(false)
+  // One key per email, repeated on retry: the send route claims it before it
+  // calls Gmail, so a double click cannot send the same email twice.
+  const sendKey = useRef<string | null>(null)
 
   const handleSend = async () => {
-    if (!to || !body) { setError('Recipient and body are required'); return }
-    setSending(true); setError('')
+    if (!to || !subject.trim() || !body) { setError('Recipient, subject and message are required'); return }
+    setSending(true); setError(''); setNotConnected(false)
     try {
+      if (!sendKey.current) sendKey.current = crypto.randomUUID()
       const res = await fetch('/api/gmail/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, subject, body, user_id: userId }),
+        // The route reads `userId` (it was sent as user_id, so every send here
+        // failed with "Missing required fields"). The message goes as HTML with
+        // its line breaks kept, and as plain text for the record.
+        body: JSON.stringify({
+          userId,
+          to,
+          subject: subject.trim(),
+          body: escapeHtml(body).replace(/\n/g, '<br>'),
+          body_text: body,
+          request_key: sendKey.current,
+        }),
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) throw new Error(data.error || 'Send failed')
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 401 && /not connected/i.test(String(data.error))) { setNotConnected(true); return }
+      if (!res.ok || data.success === false) throw new Error(data.error || 'Send failed')
+      sendKey.current = null
       onSent?.()
       onClose()
     } catch (err: any) {
       setError(err.message)
     } finally { setSending(false) }
   }
+
+  const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -46,6 +66,12 @@ export default function ComposeEmailModal({ onClose, userId, onSent, defaultTo, 
 
         <div className="p-5 space-y-3">
           {error && <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</div>}
+          {notConnected && (
+            <div className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Your Gmail is not connected, so this can&apos;t be sent from here. <a href="/settings/email" className="font-medium underline">Connect it in Settings → Email</a>, or{' '}
+              <a href={mailto} className="font-medium underline">open it in your email app</a> with this message filled in.
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-medium text-gray-500 mb-1 block">To</label>
@@ -68,7 +94,7 @@ export default function ComposeEmailModal({ onClose, userId, onSent, defaultTo, 
           <button className="text-sm text-gray-400 flex items-center gap-1"><Paperclip className="w-4 h-4" /> Attach</button>
           <div className="flex gap-2">
             <button onClick={onClose} className="px-4 py-2 text-sm text-gray-500">Cancel</button>
-            <button onClick={handleSend} disabled={sending || !to || !body}
+            <button onClick={handleSend} disabled={sending || !to || !subject.trim() || !body}
               className="btn-primary px-5 py-2 text-sm rounded-lg flex items-center gap-2 disabled:opacity-50">
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Send
