@@ -3,6 +3,8 @@
 import { identityFromTenant, fetchLogoDataUrl } from '@/lib/company-identity'
 import { todayLocal } from '@/lib/today'
 import { useTenant } from '@/app/contexts/TenantContext'
+import { useAuth } from '@/app/contexts/AuthContext'
+import ComposeEmailModal from '@/components/unified/ComposeEmailModal'
 import { useCallback, useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -116,6 +118,8 @@ const isTab = (v: string | null): v is TabKey => TABS.some(t => t.key === v)
 
 export default function ViewItineraryPage() {
   const { tenant } = useTenant()
+  const { user } = useAuth()
+  const [showEmail, setShowEmail] = useState(false)
   const params = useParams()
   const router = useRouter()
   const supabase = createClient()
@@ -1074,6 +1078,16 @@ export default function ViewItineraryPage() {
         </div>
       </header>
 
+      {showEmail && user?.id && itinerary.client_email && (
+        <ComposeEmailModal
+          userId={user.id}
+          defaultTo={itinerary.client_email}
+          defaultSubject={`${itinerary.trip_name} (${itinerary.itinerary_code})`}
+          onClose={() => setShowEmail(false)}
+          onSent={() => showToast('success', `Email sent to ${itinerary.client_email}`)}
+        />
+      )}
+
       {showCancel && (
         <CancelTripDialog
           itineraryId={itinerary.id}
@@ -1217,16 +1231,22 @@ export default function ViewItineraryPage() {
                 <a href={`mailto:${itinerary.client_email}`} className="block text-xs text-primary-600 hover:underline truncate">{itinerary.client_email}</a>
               )}
               {itinerary.client_phone && <p className="text-xs text-gray-600">{itinerary.client_phone}</p>}
-              {itinerary.client_phone && (
-                <div className="mt-2 flex gap-2">
-                  <a
+              {(itinerary.client_phone || itinerary.client_email) && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {/* Sent from the connected Gmail, so it lands in the inbox and the client's history. */}
+                  {itinerary.client_email && user?.id && (
+                    <button type="button" onClick={() => setShowEmail(true)} className="px-2 py-1 text-xs font-medium rounded-md border border-blue-300 text-blue-700 hover:bg-blue-50">
+                      Email
+                    </button>
+                  )}
+                  {itinerary.client_phone && <a
                     href={`https://wa.me/${formatPhoneForWhatsApp(itinerary.client_phone)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-2 py-1 text-xs font-medium rounded-md border border-green-300 text-green-700 hover:bg-green-50"
                   >
                     WhatsApp
-                  </a>
+                  </a>}
                   <button type="button" onClick={() => selectTab('messages')} className="px-2 py-1 text-xs font-medium rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50">
                     Messages
                   </button>
