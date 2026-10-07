@@ -6,7 +6,7 @@ import { useTenant } from '@/app/contexts/TenantContext'
 import { useCallback, useEffect, useState, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake, MoreHorizontal, BookOpen, AlertTriangle, Info, ClipboardList } from 'lucide-react'
+import { Share2, ArrowLeft, FileText, Download, Send, Edit2, ChevronDown, ChevronUp, Receipt, Calculator, Settings, Check, X, Handshake, MoreHorizontal, BookOpen, AlertTriangle, Info, ClipboardList, Copy, XCircle, RotateCcw } from 'lucide-react'
 import ResourceAssignmentV2 from '@/app/components/ResourceAssignmentV2'
 import WhatsAppButton from '@/app/components/whatsapp/whatsapp-button'
 import { generateWhatsAppMessage, generateWhatsAppLink, formatPhoneForWhatsApp } from '@/lib/communication-utils'
@@ -23,6 +23,7 @@ import { showToast } from '@/app/contexts/ToastContext'
 import ItineraryBookingAction from '@/components/ItineraryBookingAction'
 import TripTasksCard from '@/components/itineraries/TripTasksCard'
 import InvoicesPayments from '@/components/itineraries/InvoicesPayments'
+import CancelTripDialog from '@/components/itineraries/CancelTripDialog'
 import { overnightProperty, overnightLabel } from '@/lib/itineraries/overnight-property'
 import { effectiveItineraryTotal, resolveItineraryMargin, type PricedService } from '@/lib/itinerary-client-total'
 import { normalizeItineraryForView, normalizeDaysForView } from '@/lib/itineraries/view-normalize'
@@ -166,6 +167,8 @@ export default function ViewItineraryPage() {
   const [tasksSignal, setTasksSignal] = useState(0)
   // Opens Record payment in the Finance tab's invoices card.
   const [paymentSignal, setPaymentSignal] = useState(0)
+  const [showCancel, setShowCancel] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
   const clearPaymentSignal = useCallback(() => setPaymentSignal(0), [])
   const [closingOut, setClosingOut] = useState(false)
   // The section shown: the one asked for in the address (?tab=), else the
@@ -857,6 +860,57 @@ export default function ViewItineraryPage() {
     }
   }
 
+  // A new draft of the same trip (lib/itineraries/duplicate: days and services
+  // come along; booking, payments, assignments and frozen rates do not).
+  const duplicateTrip = async () => {
+    const ok = await confirmDialog({
+      title: 'Duplicate this itinerary',
+      message: 'A new draft with the same days, services and prices. The booking, invoices, payments, assigned staff and tasks stay with this one.',
+      confirmText: 'Duplicate',
+      cancelText: 'Cancel',
+      variant: 'info',
+    })
+    if (!ok) return
+    setDuplicating(true)
+    try {
+      const res = await fetch(`/api/itineraries/${itinerary.id}/duplicate`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) throw new Error(data.error || 'Could not duplicate the itinerary')
+      showToast('success', `Copied as ${data.data.itinerary_code}`)
+      router.push(`/itineraries/${data.data.id}`)
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not duplicate the itinerary')
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
+  // A cancelled trip back in play: confirmed if it has a booking, else a draft.
+  const reopenTrip = async () => {
+    const status = booking ? 'confirmed' : 'draft'
+    const ok = await confirmDialog({
+      title: 'Reopen this trip',
+      message: `It goes back to ${status}.${booking ? ` Booking ${booking.booking_number} is not changed — reopen it from the booking if it was cancelled too.` : ''}`,
+      confirmText: 'Reopen',
+      cancelText: 'Cancel',
+      variant: 'info',
+    })
+    if (!ok) return
+    try {
+      const res = await fetch(`/api/itineraries/${itinerary.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) throw new Error(data.error || 'Could not reopen the trip')
+      setItinerary(prev => (prev ? { ...prev, status } : prev))
+      showToast('success', 'Trip reopened')
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Could not reopen the trip')
+    }
+  }
+
   // Record payment happens in the Finance tab's invoices card, on this page.
   const recordPayment = () => {
     selectTab('finance')
@@ -981,6 +1035,10 @@ export default function ViewItineraryPage() {
                   { label: 'Add expense', icon: <Receipt className="w-4 h-4" />, onSelect: () => setExpenseSignal(n => n + 1) },
                   { label: 'Operations tasks', icon: <ClipboardList className="w-4 h-4" />, onSelect: () => setTasksSignal(n => n + 1), title: 'Create or sync the operations tasks for this itinerary' },
                   { label: generatingCommissions ? 'Generating commissions…' : 'Generate commissions', icon: <Handshake className="w-4 h-4" />, onSelect: handleGenerateCommissions, disabled: generatingCommissions },
+                  { label: duplicating ? 'Duplicating…' : 'Duplicate', icon: <Copy className="w-4 h-4" />, onSelect: duplicateTrip, disabled: duplicating, title: 'A new draft with the same days and services' },
+                  itinerary.status === 'cancelled'
+                    ? { label: 'Reopen trip', icon: <RotateCcw className="w-4 h-4" />, onSelect: reopenTrip }
+                    : { label: 'Cancel trip', icon: <XCircle className="w-4 h-4" />, onSelect: () => setShowCancel(true), danger: true },
                 ]}
               />
               {/* The one thing to do next. */}
@@ -1031,6 +1089,22 @@ export default function ViewItineraryPage() {
           {itinerary.status === 'cancelled' && <p className="text-xs font-medium text-red-700">Cancelled</p>}
         </div>
       </header>
+
+      {showCancel && (
+        <CancelTripDialog
+          itineraryId={itinerary.id}
+          tripName={itinerary.trip_name}
+          booking={booking}
+          paid={actualPnl && actualPnl.invoice_count > 0 ? actualPnl.total_paid : null}
+          currency={itinerary.currency || 'EUR'}
+          onClose={() => setShowCancel(false)}
+          onCancelled={() => {
+            setShowCancel(false)
+            setItinerary(prev => (prev ? { ...prev, status: 'cancelled' } : prev))
+            showToast('success', 'Trip cancelled')
+          }}
+        />
+      )}
 
       {/* What needs attention — only when something does. */}
       {attention.length > 0 && (
