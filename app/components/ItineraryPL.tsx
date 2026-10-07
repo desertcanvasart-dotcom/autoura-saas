@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { quotedMargin } from '@/lib/itineraries/margin'
 import { getCurrencySymbol } from '@/lib/currency'
 import type { TripPnL } from '@/lib/trip-pnl'
 import { 
@@ -81,8 +82,6 @@ export default function ItineraryPL({
 
   const calculatePL = () => {
     const byType: Record<string, PLBreakdown> = {}
-    let totalSupplierCost = 0
-    let totalClientPrice = 0
 
     days.forEach(day => {
       (day.services || []).forEach(service => {
@@ -91,8 +90,6 @@ export default function ItineraryPL({
           ? Number(service.client_price) 
           : supplierCost * (1 + marginPercent / 100)
 
-        totalSupplierCost += supplierCost
-        totalClientPrice += clientPrice
 
         if (!byType[service.service_type]) {
           byType[service.service_type] = {
@@ -119,17 +116,15 @@ export default function ItineraryPL({
     })
 
     const sortedBreakdown = Object.values(byType).sort((a, b) => b.margin - a.margin)
-    const totalMargin = totalClientPrice - totalSupplierCost
-    const overallMarginPercent = totalSupplierCost > 0 
-      ? (totalMargin / totalSupplierCost) * 100 
-      : 0
+    // The same figure the page's minimum-margin warning reads.
+    const q = quotedMargin(days.flatMap(day => day.services || []), marginPercent)
 
     setBreakdown(sortedBreakdown)
     setTotals({
-      supplierCost: totalSupplierCost,
-      clientPrice: totalClientPrice,
-      margin: totalMargin,
-      marginPercent: overallMarginPercent
+      supplierCost: q.supplierCost,
+      clientPrice: q.clientPrice,
+      margin: q.margin,
+      marginPercent: q.percent
     })
   }
 

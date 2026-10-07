@@ -80,6 +80,9 @@ export default function TenantSettingsPage() {
   // "fall through to the platform constant". A number state would force 0 —
   // and 0 is a real house rate (an at-cost agency), not an absence.
   const [defaultMargin, setDefaultMargin] = useState('')
+  // The minimum margin (mig 399), same measure as the house margin. '' = none:
+  // no below-minimum warning on itineraries.
+  const [minMargin, setMinMargin] = useState('')
   // The org's deposit rule (mig 325): blank = the defaults (30% / 7 days).
   const [depositPercent, setDepositPercent] = useState('')
   const [depositDueDays, setDepositDueDays] = useState('')
@@ -111,6 +114,8 @@ export default function TenantSettingsPage() {
           ? ''
           : String(tenant.default_margin_percent)
       )
+      const mm = tenant.min_margin_percent
+      setMinMargin(mm === null || mm === undefined ? '' : String(mm))
       const t = tenant as { deposit_percent?: number | null; deposit_due_days?: number | null }
       setDepositPercent(t.deposit_percent === null || t.deposit_percent === undefined ? '' : String(t.deposit_percent))
       setDepositDueDays(t.deposit_due_days === null || t.deposit_due_days === undefined ? '' : String(t.deposit_due_days))
@@ -308,6 +313,21 @@ export default function TenantSettingsPage() {
         throw new Error('Nothing was saved — your account may not have permission to change the organization. Ask the owner, or sign out and in again.')
       }
 
+      // The minimum margin arrives with migration 399. Saved on its own, and
+      // only when it changed, so a database without the column still saves
+      // everything else — and says what it could not keep.
+      let minMarginMissing = false
+      const minValue = minMargin.trim() === '' ? null : Number(minMargin)
+      const storedMin = tenant.min_margin_percent ?? null
+      if (minValue !== (storedMin === null ? null : Number(storedMin))) {
+        const { error: minError } = await supabase
+          .from('tenants')
+          .update({ min_margin_percent: minValue })
+          .eq('id', tenant.id)
+        if (minError && isMissingColumnError(minError, ['min_margin_percent'])) minMarginMissing = true
+        else if (minError) throw minError
+      }
+
       // What we asked for vs what the database kept, field by field.
       const stored = saved[0] as Record<string, unknown>
       const notKept = letterheadMissing ? [] : Object.entries(letterhead)
@@ -317,6 +337,13 @@ export default function TenantSettingsPage() {
       // Refetch tenant data
       await refetchTenant()
 
+      if (minMarginMissing) {
+        setMessage({
+          type: 'error',
+          text: 'Saved — except the minimum margin: the database has not been updated for it yet. Run the database migration (npm run migrate), then save again.',
+        })
+        return
+      }
       if (letterheadMissing) {
         setMessage({
           type: 'error',
@@ -505,6 +532,27 @@ export default function TenantSettingsPage() {
               <p className="mt-1 text-[10px] text-gray-400">
                 Leave blank to use the platform default. A colleague who clears their own
                 margin falls back to this.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Minimum Margin %
+                <span className="ml-1.5 text-[10px] text-gray-400 font-normal">(Warn below this)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="200"
+                step="0.5"
+                value={minMargin}
+                onChange={(e) => setMinMargin(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#647C47] focus:border-[#647C47]"
+                placeholder="Not set — no warning"
+              />
+              <p className="mt-1 text-[10px] text-gray-400">
+                On cost, like the house margin. An itinerary whose quoted margin, or profit so far,
+                is below this shows it under Needs attention. A trip losing money is always shown.
               </p>
             </div>
 
